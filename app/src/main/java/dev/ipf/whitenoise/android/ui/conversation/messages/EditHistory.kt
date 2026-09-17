@@ -23,6 +23,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -47,18 +48,14 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
 
-private data class EditHistoryRow(
-    val versionNumber: Int,
-    val text: String,
-    val recordedAt: ULong,
-)
-
 /** The prototype's edit history: a full-screen dialog listing the newest revision first, the original last. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming")
 @Composable
 internal fun EditHistoryDialog(
-    original: String,
+    // The body before any edit, or null when MarmotKit owns the edits and the record already carries the
+    // edited text; there is then no original to show and the newest revision is the current body.
+    original: String?,
     originalTimestamp: ULong,
     editState: EditState,
     onDismissRequest: () -> Unit,
@@ -67,16 +64,14 @@ internal fun EditHistoryDialog(
     loadAuthoritativeHistory: (suspend () -> List<EditVersion>?)? = null,
 ) {
     var authoritative by remember(editState) { mutableStateOf<List<EditVersion>?>(null) }
-    LaunchedEffect(editState, loadAuthoritativeHistory) {
-        authoritative = loadAuthoritativeHistory?.invoke()
+    val load by rememberUpdatedState(loadAuthoritativeHistory)
+    LaunchedEffect(editState) {
+        authoritative = load?.invoke()
     }
     val versions = authoritative ?: editState.versions
     val rows =
-        remember(original, originalTimestamp, versions) {
-            versions
-                .mapIndexed { index, version ->
-                    EditHistoryRow(index + 1, version.text, version.recordedAt)
-                }.reversed() + EditHistoryRow(0, original, originalTimestamp)
+        remember(original, originalTimestamp, versions, editState.count) {
+            editHistoryRows(original, originalTimestamp, versions, editState.count)
         }
     Dialog(
         onDismissRequest = onDismissRequest,

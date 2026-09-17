@@ -55,15 +55,38 @@ class AvatarAssetsTest {
         )
     }
 
+    /** A visible asset the engine does not hold, or holds stale, is requested; a ready one is not. */
+    @Test
+    fun onlyUnreadyAssetsAskForAcquisition() {
+        assertFalse(asset(AvatarAvailabilityFfi.READY).wantsAcquisition())
+        assertTrue(asset(AvatarAvailabilityFfi.MISSING).wantsAcquisition())
+        assertTrue(asset(AvatarAvailabilityFfi.STALE).wantsAcquisition())
+        assertTrue(asset(AvatarAvailabilityFfi.INVALIDATED).wantsAcquisition())
+    }
+
+    /** An acquisition the engine already queued or is fetching is not requested again. */
+    @Test
+    fun inFlightAcquisitionIsNotRepeated() {
+        assertFalse(missing(AvatarAcquisitionStateFfi.QUEUED).wantsAcquisition())
+        assertFalse(missing(AvatarAcquisitionStateFfi.FETCHING).wantsAcquisition())
+        assertTrue(missing(AvatarAcquisitionStateFfi.RETRY_SCHEDULED).wantsAcquisition())
+    }
+
+    private fun missing(acquisition: AvatarAcquisitionStateFfi): AvatarAssetFfi {
+        val availability = AvatarAvailabilityFfi.MISSING
+        return asset(availability, acquisition = acquisition)
+    }
+
     private fun asset(
         availability: AvatarAvailabilityFfi,
         reference: String? = "ref-1",
         revision: ULong = 1uL,
+        acquisition: AvatarAcquisitionStateFfi = AvatarAcquisitionStateFfi.IDLE,
     ) = AvatarAssetFfi(
         target = "target-1",
         reference = reference,
         availability = availability,
-        acquisition = AvatarAcquisitionStateFfi.IDLE,
+        acquisition = acquisition,
         contentRevision = revision,
         byteCount = 1_024uL,
     )

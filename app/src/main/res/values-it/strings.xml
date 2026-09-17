@@ -1532,6 +1532,13 @@
     <string name="report_message_explanation_hint">Cosa dovrebbero sapere gli amministratori (facoltativo)</string>
     <string name="report_message_send">Invia segnalazione</string>
     <string name="report_message_sent">Segnalazione inviata agli amministratori del gruppo.</string>
+    <string name="report_message_queued">Segnalazione salvata. Verrà inviata quando questa chat tornerà online.</string>
+    <string name="message_reported">Segnalato</string>
+    <string name="message_reports_section">Segnalazioni</string>
+    <string name="report_reported_by">Segnalato da %1$s</string>
+    <string name="report_dismissed_label">Ignorata</string>
+    <string name="report_dismiss">Ignora segnalazione</string>
+    <string name="report_dismissed">Segnalazione ignorata.</string>
     <string name="report_message_not_allowed">Non puoi segnalare messaggi in questa chat.</string>
     <string name="report_message_failed">Impossibile inviare la segnalazione. Riprova.</string>
     <string name="report_reason_spam">Spam</string>

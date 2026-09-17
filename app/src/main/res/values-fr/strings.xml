@@ -1532,6 +1532,13 @@
     <string name="report_message_explanation_hint">Ce que les administrateurs devraient savoir (facultatif)</string>
     <string name="report_message_send">Envoyer le signalement</string>
     <string name="report_message_sent">Signalement envoyé aux administrateurs du groupe.</string>
+    <string name="report_message_queued">Signalement enregistré. Il sera envoyé dès que cette discussion sera de nouveau en ligne.</string>
+    <string name="message_reported">Signalé</string>
+    <string name="message_reports_section">Signalements</string>
+    <string name="report_reported_by">Signalé par %1$s</string>
+    <string name="report_dismissed_label">Rejeté</string>
+    <string name="report_dismiss">Rejeter le signalement</string>
+    <string name="report_dismissed">Signalement rejeté.</string>
     <string name="report_message_not_allowed">Vous ne pouvez pas signaler de messages dans cette discussion.</string>
     <string name="report_message_failed">Impossible d’envoyer le signalement. Réessayez.</string>
     <string name="report_reason_spam">Spam</string>

@@ -1532,6 +1532,13 @@
     <string name="report_message_explanation_hint">O que os administradores devem saber (opcional)</string>
     <string name="report_message_send">Enviar denúncia</string>
     <string name="report_message_sent">Denúncia enviada aos administradores do grupo.</string>
+    <string name="report_message_queued">Denúncia guardada. Será enviada quando esta conversa voltar a estar online.</string>
+    <string name="message_reported">Denunciado</string>
+    <string name="message_reports_section">Denúncias</string>
+    <string name="report_reported_by">Denunciado por %1$s</string>
+    <string name="report_dismissed_label">Dispensada</string>
+    <string name="report_dismiss">Dispensar denúncia</string>
+    <string name="report_dismissed">Denúncia dispensada.</string>
     <string name="report_message_not_allowed">Não pode denunciar mensagens nesta conversa.</string>
     <string name="report_message_failed">Não foi possível enviar a denúncia. Tente novamente.</string>
     <string name="report_reason_spam">Spam</string>

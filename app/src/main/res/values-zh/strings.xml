@@ -1508,6 +1508,13 @@
     <string name="report_message_explanation_hint">管理员需要了解的信息（可选）</string>
     <string name="report_message_send">发送举报</string>
     <string name="report_message_sent">举报已发送给群管理员。</string>
+    <string name="report_message_queued">举报已保存，将在此聊天恢复联网后发送。</string>
+    <string name="message_reported">已被举报</string>
+    <string name="message_reports_section">举报</string>
+    <string name="report_reported_by">由 %1$s 举报</string>
+    <string name="report_dismissed_label">已忽略</string>
+    <string name="report_dismiss">忽略举报</string>
+    <string name="report_dismissed">举报已忽略。</string>
     <string name="report_message_not_allowed">你无法在此聊天中举报消息。</string>
     <string name="report_message_failed">举报发送失败，请重试。</string>
     <string name="report_reason_spam">垃圾信息</string>

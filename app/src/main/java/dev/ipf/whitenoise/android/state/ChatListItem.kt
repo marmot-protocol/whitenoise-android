@@ -361,7 +361,7 @@ data class ChatListItem(
             // Before the generic plaintext arm: a kind-1210 last message would
             // otherwise leak its raw JSON content into the chat list.
             MessageProjector.isGroupSystemKind(preview.kind) ->
-                GroupSystemEvents.previewText(preview.plaintext, copy.groupSystem)
+                GroupSystemEvents.previewText(preview.plaintext, copy.groupSystem, preview.groupSystem)
             preview.plaintext.isNotBlank() -> preview.plaintext
             // The engine's typed attachment projection beats the app-side
             // fallback, which derives from tags and optimistic state.

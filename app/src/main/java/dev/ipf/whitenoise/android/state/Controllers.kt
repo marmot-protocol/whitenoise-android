@@ -26,7 +26,6 @@ import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.ChatPinStateFfi
-import dev.ipf.marmotkit.ContentReportFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.GroupDetailsFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
@@ -44,7 +43,6 @@ import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
-import dev.ipf.marmotkit.ReportReasonFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
@@ -55,7 +53,6 @@ import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.AuthoritativeEdit
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.ChatListMessageSearch
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
@@ -64,7 +61,6 @@ import dev.ipf.whitenoise.android.core.ConversationTranscriptTimelineReader
 import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import dev.ipf.whitenoise.android.core.EMPTY_MARKDOWN_DOCUMENT
 import dev.ipf.whitenoise.android.core.EditState
-import dev.ipf.whitenoise.android.core.EditVersion
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.IndexedAttachment
@@ -1131,7 +1127,11 @@ internal fun optimisticMessageIdForProjection(
             }
         if (pendingMediaCount > 1) return null
     }
+    // MarmotKit 0.10.1 commits a pending row for a send before the call returns its id, so two identical
+    // texts in flight can both be candidates. `optimisticMessages` is a snapshot map with no insertion
+    // order; pairing oldest-first by the monotonic timeline order keeps the match deterministic.
     return optimisticMessages
+        .sortedBy { it.timelineOrder }
         .firstOrNull { optimistic ->
             if (!isSendableOptimisticStatus(optimistic.status, allowDelayedProjection)) return@firstOrNull false
             if (optimistic.record.direction != projected.direction) return@firstOrNull false
@@ -6109,9 +6109,6 @@ internal fun conversationStartsLoading(
 
 internal fun isTerminalOpenFailure(throwable: Throwable): Boolean = throwable is ConversationInitialLoadException
 
-/** Edit revisions requested per history page; a message with more is paged by the view that needs it. */
-internal const val EDIT_HISTORY_PAGE_LIMIT: UInt = 50u
-
 /** Retry cadence while MarmotKit reports a documented not-ready state; well under the connectivity backoff. */
 internal const val NOT_READY_RETRY_DELAY_MS = 2_000L
 
@@ -6493,7 +6490,7 @@ class ConversationController(
         lastMutationError = null
     }
 
-    private fun recordMutationFailure(
+    internal fun recordMutationFailure(
         @StringRes title: Int,
         operationCode: String,
         throwable: Throwable,
@@ -10676,82 +10673,6 @@ class ConversationController(
     }
 
     /**
-     * Reports [messageIdHex] to this group's admins with [reason] and an optional explanation. MarmotKit
-     * publishes the report encrypted to the group, so the outcome says whether it was actually sent rather
-     * than only whether the call returned.
-     */
-    internal suspend fun reportMessage(
-        messageIdHex: String,
-        reason: ReportReasonFfi,
-        explanation: String,
-    ): ReportOutcome {
-        val account = conversationAccountRef ?: return ReportOutcome.NotAllowed
-        return runCatchingCancellable {
-            appState.marmotIo {
-                reportMessage(account, group.groupIdHex, messageIdHex, reason, boundedExplanation(explanation))
-            }
-        }.fold(
-            onSuccess = { ReportOutcome.Sent },
-            onFailure = { failure ->
-                recordMutationFailure(R.string.report_message_failed, "MESSAGE_REPORT", failure)
-                if (failure is MarmotKitException.MemberNotInGroup) ReportOutcome.NotAllowed else ReportOutcome.Failed
-            },
-        )
-    }
-
-    /** Reports open against [messageIdHex], newest first; empty when there are none or the read failed. */
-    internal suspend fun reportsFor(messageIdHex: String): List<ContentReportFfi> {
-        val account = conversationAccountRef ?: return emptyList()
-        return runCatchingCancellable {
-            appState.marmotIo {
-                contentReports(account, group.groupIdHex, messageIdHex, null, CONTENT_REPORT_PAGE_LIMIT)
-            }
-        }.getOrNull()?.reports?.newestFirst().orEmpty()
-    }
-
-    /**
-     * Dismisses [reportIds] with a shared explanation, which MarmotKit shares with the group's other
-     * admins. Only an admin may do this, and the engine enforces that too.
-     */
-    internal suspend fun dismissReports(
-        reportIds: List<String>,
-        explanation: String,
-    ): ReportOutcome {
-        val account = conversationAccountRef ?: return ReportOutcome.NotAllowed
-        if (reportIds.isEmpty()) return ReportOutcome.NotAllowed
-        return runCatchingCancellable {
-            appState.marmotIo {
-                dismissReports(account, group.groupIdHex, reportIds, boundedExplanation(explanation))
-            }
-        }.fold(
-            onSuccess = { ReportOutcome.Sent },
-            onFailure = { failure ->
-                recordMutationFailure(R.string.report_dismiss_failed, "REPORT_DISMISS", failure)
-                if (failure is MarmotKitException.NotGroupAdmin) ReportOutcome.NotAllowed else ReportOutcome.Failed
-            },
-        )
-    }
-
-    /**
-     * MarmotKit's complete accepted-edit history for one message, oldest first, or null when the engine
-     * could not answer. The history view then falls back to whatever edits the loaded window contains.
-     */
-    internal suspend fun authoritativeEditHistory(messageIdHex: String): List<EditVersion>? {
-        val account = conversationAccountRef ?: return null
-        return runCatchingCancellable {
-            appState.marmotIo {
-                messageEditHistory(account, group.groupIdHex, messageIdHex, null, null, EDIT_HISTORY_PAGE_LIMIT)
-            }
-        }.getOrNull()?.versions?.map { version ->
-            EditVersion(
-                messageIdHex = version.messageIdHex,
-                text = version.plaintext,
-                recordedAt = version.editedAt,
-            )
-        }
-    }
-
-    /**
      * Recenters the live window on a retained message; false when MDK no longer retains it or there is no
      * window. Runs under the same active-call guard as pagination so a concurrent teardown cannot close the
      * native handle while the jump is in flight.
@@ -12158,19 +12079,8 @@ class ConversationController(
                     isTimelineMessageVisible(message.record.messageIdHex, hiddenIds)
                 }
             }
-        val aggregated =
-            withAuthoritativeEdits(
-                aggregateEdits(visible.map { it.record }),
-                timelineRecords.values.mapNotNull { record ->
-                    record.edit?.let {
-                        AuthoritativeEdit(
-                            messageIdHex = record.messageIdHex,
-                            editCount = it.editCount.toInt(),
-                            effectiveText = record.plaintext,
-                        )
-                    }
-                },
-            )
+        val localEdits = aggregateEdits(visible.map { it.record })
+        val aggregated = withAuthoritativeEdits(localEdits, authoritativeEditsOf(timelineRecords.values))
         // Drop any optimistic edit the real kind-1009 has now caught up to:
         // once `aggregateEdits` reports the same latest text, the overlay is
         // redundant and would otherwise mask a later remote edit. Failed/Pending

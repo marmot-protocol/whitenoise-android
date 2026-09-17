@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.HorizontalAlignmentLine
 import androidx.compose.ui.layout.layout
@@ -47,6 +48,8 @@ internal fun RowScope.MessageSenderAvatarSlot(
     enabled: Boolean,
     alignToBubbleBottom: Boolean,
     onClick: () -> Unit,
+    // Decoded bytes MarmotKit stores for the sender (0.10.1); when present the URL is not fetched.
+    picture: ImageBitmap? = null,
 ) {
     val avatarAlignment =
         if (alignToBubbleBottom) {
@@ -71,7 +74,8 @@ internal fun RowScope.MessageSenderAvatarSlot(
                     title = title,
                     seed = seed,
                     size = 30.dp,
-                    pictureUrl = pictureUrl,
+                    pictureUrl = pictureUrl.takeIf { picture == null },
+                    picture = picture,
                 )
             }
         }

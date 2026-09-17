@@ -614,6 +614,13 @@
     <string name="report_message_explanation_hint">Anything the admins should know (optional)</string>
     <string name="report_message_send">Send report</string>
     <string name="report_message_sent">Report sent to the group\'s admins.</string>
+    <string name="report_message_queued">Report saved. It will be sent once this chat is back online.</string>
+    <string name="message_reported">Reported</string>
+    <string name="message_reports_section">Reports</string>
+    <string name="report_reported_by">Reported by %1$s</string>
+    <string name="report_dismissed_label">Dismissed</string>
+    <string name="report_dismiss">Dismiss report</string>
+    <string name="report_dismissed">Report dismissed.</string>
     <string name="report_message_not_allowed">You can\'t report messages in this chat.</string>
     <string name="report_message_failed">Couldn\'t send the report. Try again.</string>
     <string name="report_reason_spam">Spam</string>

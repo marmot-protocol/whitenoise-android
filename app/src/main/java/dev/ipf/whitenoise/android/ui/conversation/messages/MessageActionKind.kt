@@ -62,8 +62,16 @@ internal fun messageActionKinds(
         if (canSpeak) add(MessageActionKind.Speak)
         if (canSpeak && canSpeakCodeLiterally) add(MessageActionKind.SpeakCodeLiterally)
         if (canSelect) add(MessageActionKind.Select)
+        addAll(trailingMessageActionKinds(canInfo, canReport))
+    }
+
+/** The closing actions: Info, then Report, which sits beside delete because both hand the message to someone else. */
+private fun trailingMessageActionKinds(
+    canInfo: Boolean,
+    canReport: Boolean,
+): List<MessageActionKind> =
+    buildList {
         if (canInfo) add(MessageActionKind.Info)
-        // Reporting sits last, beside delete: both hand the message to someone else to act on.
         if (canReport) add(MessageActionKind.Report)
     }
 

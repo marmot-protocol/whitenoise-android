@@ -154,6 +154,12 @@ internal fun ConversationTopBar(
                                 size = if (compactHeight) 28.dp else 40.dp,
                                 fallbackPictureUrl = presentedAvatarAccount?.let(appState::avatarUrl),
                                 firstFrameAvatar = firstFrameAvatar,
+                                // The prepared header names the avatar MarmotKit stores for this
+                                // conversation; a frozen route presentation keeps the row's picture instead.
+                                durableAvatar =
+                                    controller.window.header
+                                        ?.avatarAsset
+                                        ?.takeUnless { freezeRoutePresentation },
                             )
                         }
                         Column(verticalArrangement = Arrangement.spacedBy(CONVERSATION_TITLE_LINE_SPACING_DP.dp)) {

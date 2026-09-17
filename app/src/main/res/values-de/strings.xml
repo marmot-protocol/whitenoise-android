@@ -1530,6 +1530,13 @@
     <string name="report_message_explanation_hint">Was die Admins wissen sollten (optional)</string>
     <string name="report_message_send">Meldung senden</string>
     <string name="report_message_sent">Meldung an die Admins der Gruppe gesendet.</string>
+    <string name="report_message_queued">Meldung gespeichert. Sie wird gesendet, sobald dieser Chat wieder online ist.</string>
+    <string name="message_reported">Gemeldet</string>
+    <string name="message_reports_section">Meldungen</string>
+    <string name="report_reported_by">Gemeldet von %1$s</string>
+    <string name="report_dismissed_label">Verworfen</string>
+    <string name="report_dismiss">Meldung verwerfen</string>
+    <string name="report_dismissed">Meldung verworfen.</string>
     <string name="report_message_not_allowed">In diesem Chat kannst du keine Nachrichten melden.</string>
     <string name="report_message_failed">Meldung konnte nicht gesendet werden. Versuche es erneut.</string>
     <string name="report_reason_spam">Spam</string>

@@ -8029,6 +8029,38 @@
           "CHL-015",
           "CON-015"
         ]
+      },
+      {
+        "surface": "ReportMessageSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+        "anchor": "fun ReportMessageSheet(",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "ReportReasonRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+        "anchor": "fun ReportReasonRow(",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "MessageReportsSection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "fun MessageReportsSection(",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "MessageReportRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "fun MessageReportRow(",
+        "test_ids": [
+          "MSG-016"
+        ]
       }
     ],
     "settings_controls": [
@@ -21305,6 +21337,198 @@
         "anchor": "R.string.donate_open_failed",
         "test_ids": [
           "SET-026"
+        ]
+      },
+      {
+        "surface": "string:report_reason_illegal",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ContentReports.kt",
+        "anchor": "R.string.report_reason_illegal",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_reason_impersonation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ContentReports.kt",
+        "anchor": "R.string.report_reason_impersonation",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_reason_malware",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ContentReports.kt",
+        "anchor": "R.string.report_reason_malware",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_reason_nudity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ContentReports.kt",
+        "anchor": "R.string.report_reason_nudity",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_reason_other",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ContentReports.kt",
+        "anchor": "R.string.report_reason_other",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_reason_profanity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ContentReports.kt",
+        "anchor": "R.string.report_reason_profanity",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_reason_spam",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ContentReports.kt",
+        "anchor": "R.string.report_reason_spam",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_dismiss_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.report_dismiss_failed",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_message_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.report_message_failed",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActionKind.kt",
+        "anchor": "R.string.report_message",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:message_reported",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.message_reported",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_dismiss_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.report_dismiss_failed",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_dismissed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.report_dismissed",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_message_not_allowed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.report_message_not_allowed",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_message_queued",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.report_message_queued",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_message_sent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.report_message_sent",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:message_reports_section",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_reports_section",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_dismiss",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.report_dismiss",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_dismissed_label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.report_dismissed_label",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_reported_by",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.report_reported_by",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_message_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+        "anchor": "R.string.report_message_detail",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_message_explanation_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+        "anchor": "R.string.report_message_explanation_hint",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_message_send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+        "anchor": "R.string.report_message_send",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_message_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+        "anchor": "R.string.report_message_title",
+        "test_ids": [
+          "MSG-016"
         ]
       }
     ],

@@ -1532,6 +1532,13 @@
     <string name="report_message_explanation_hint">Algo que los administradores deban saber (opcional)</string>
     <string name="report_message_send">Enviar denuncia</string>
     <string name="report_message_sent">Denuncia enviada a los administradores del grupo.</string>
+    <string name="report_message_queued">Denuncia guardada. Se enviará cuando este chat vuelva a estar en línea.</string>
+    <string name="message_reported">Denunciado</string>
+    <string name="message_reports_section">Denuncias</string>
+    <string name="report_reported_by">Denunciado por %1$s</string>
+    <string name="report_dismissed_label">Descartada</string>
+    <string name="report_dismiss">Descartar denuncia</string>
+    <string name="report_dismissed">Denuncia descartada.</string>
     <string name="report_message_not_allowed">No puedes denunciar mensajes en este chat.</string>
     <string name="report_message_failed">No se pudo enviar la denuncia. Inténtalo de nuevo.</string>
     <string name="report_reason_spam">Spam</string>

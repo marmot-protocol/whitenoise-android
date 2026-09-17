@@ -1584,6 +1584,13 @@
     <string name="report_message_explanation_hint">Что стоит знать администраторам (необязательно)</string>
     <string name="report_message_send">Отправить жалобу</string>
     <string name="report_message_sent">Жалоба отправлена администраторам группы.</string>
+    <string name="report_message_queued">Жалоба сохранена. Она будет отправлена, когда чат снова окажется в сети.</string>
+    <string name="message_reported">Есть жалобы</string>
+    <string name="message_reports_section">Жалобы</string>
+    <string name="report_reported_by">Пожаловался: %1$s</string>
+    <string name="report_dismissed_label">Отклонена</string>
+    <string name="report_dismiss">Отклонить жалобу</string>
+    <string name="report_dismissed">Жалоба отклонена.</string>
     <string name="report_message_not_allowed">В этом чате нельзя жаловаться на сообщения.</string>
     <string name="report_message_failed">Не удалось отправить жалобу. Попробуйте ещё раз.</string>
     <string name="report_reason_spam">Спам</string>

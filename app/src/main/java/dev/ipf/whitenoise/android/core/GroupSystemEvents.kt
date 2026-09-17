@@ -401,8 +401,11 @@ object GroupSystemEvents {
     fun previewText(
         plaintext: String,
         copy: GroupSystemCopy = GroupSystemCopy.Default,
+        // MarmotKit 0.10.1 projects the chat-list preview's system event with its provenance; when
+        // present it is preferred over parsing the row's plaintext, exactly as timeline rows do.
+        structured: GroupSystemEventFfi? = null,
     ): String {
-        val event = resolve(plaintext) ?: return copy.fallback
+        val event = resolveAuthenticatedStateProjection(plaintext, structured) ?: return copy.fallback
         return summary(event, actorName = null, subjectName = null, copy = copy)
     }
 

@@ -1,16 +1,27 @@
 package dev.ipf.whitenoise.android.state
 
 import androidx.compose.ui.graphics.ImageBitmap
+import dev.ipf.marmotkit.AvatarAcquisitionStateFfi
 import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.marmotkit.AvatarAvailabilityFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 
 /**
- * Largest avatar payload accepted from one batched read. MarmotKit validates and stores the bytes, and
- * returns them only when a complete entry fits this budget; anything larger stays deferred and the URL
- * path renders instead.
+ * Byte budget for one batched read, MarmotKit's documented maximum. The engine already validated and
+ * stored the bytes, and returns an entry only when it fits the budget; anything larger stays deferred
+ * and the URL path renders instead. White Noise on iOS reads with the same budget.
  */
-internal const val DURABLE_AVATAR_MAX_BYTES: ULong = 2_097_152uL
+internal const val DURABLE_AVATAR_MAX_BYTES: ULong = 16_777_216uL
+
+/**
+ * Whether MarmotKit should be asked to acquire this asset. `READY` needs nothing, and an acquisition the
+ * engine already queued or is fetching would only be repeated; everything else names a visible target the
+ * engine does not hold yet, or holds stale.
+ */
+internal fun AvatarAssetFfi.wantsAcquisition(): Boolean =
+    availability != AvatarAvailabilityFfi.READY &&
+        acquisition != AvatarAcquisitionStateFfi.QUEUED &&
+        acquisition != AvatarAcquisitionStateFfi.FETCHING
 
 /**
  * Whether this asset can be drawn right now. `STALE` still has usable bytes, so it renders while the
@@ -30,10 +41,14 @@ internal fun AvatarAssetFfi.cacheKey(): String? = reference?.let { "marmot-avata
  * Bytes MarmotKit already holds for [asset], decoded and cached, or null when it has none to give. Use it
  * ahead of the network path: the bytes are durable, so this works offline and needs no fetch.
  *
- * MarmotKit answers a batched read with an empty payload when the entry is missing or too large for the
- * budget, and marks it deferred; the caller then falls back to the avatar URL exactly as before.
+ * A visible asset the engine does not hold yet is also requested here, because MarmotKit acquires avatars
+ * only for targets a screen names; the acquired bytes arrive as a later projection with a new content
+ * revision, which re-keys the caller. MarmotKit answers a batched read with an empty payload when the
+ * entry is missing or too large for the budget, and marks it deferred; the caller then falls back to the
+ * avatar URL exactly as before.
  */
 internal suspend fun WhiteNoiseAppState.durableAvatar(asset: AvatarAssetFfi?): ImageBitmap? {
+    if (asset?.wantsAcquisition() == true) requestAvatars(listOf(asset.target))
     val renderable = asset?.takeIf { it.isRenderable() }
     val reference = renderable?.reference
     val key = renderable?.cacheKey()

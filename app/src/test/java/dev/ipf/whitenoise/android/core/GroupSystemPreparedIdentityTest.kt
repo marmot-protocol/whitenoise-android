@@ -72,6 +72,19 @@ class GroupSystemPreparedIdentityTest {
         assertNull(GroupSystemEvents.preferredName(null, null))
     }
 
+    /** The chat-list preview takes the engine's projected event over the row's plaintext. */
+    @Test
+    fun chatListPreviewPrefersTheProjectedEvent() {
+        val preview =
+            GroupSystemEvents.previewText(
+                plaintext = "{}",
+                structured = event(GroupSystemEventProvenanceFfi.AUTHENTICATED_GROUP_STATE),
+            )
+
+        assertTrue(preview, preview.isNotBlank())
+        assertFalse(preview, preview.contains("{"))
+    }
+
     private fun event(provenance: GroupSystemEventProvenanceFfi) =
         GroupSystemEventFfi(
             provenance = provenance,

@@ -3,20 +3,16 @@ package dev.ipf.whitenoise.android.ui.common
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.produceState
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.Dp
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AvatarAssetFfi
-import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
 import dev.ipf.whitenoise.android.state.ChatListAvatarSeed
 import dev.ipf.whitenoise.android.state.ChatListAvatarSource
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.cacheKey
-import dev.ipf.whitenoise.android.state.durableAvatar
 
 /** Resolves encrypted pixels only within the current owner, runtime, and authoritative image identity. */
 @Composable
@@ -93,20 +89,4 @@ internal fun GroupAvatar(
                 ?.takeIf { durableImage == null },
         picture = durableImage ?: seededUrlImage ?: encryptedImage,
     )
-}
-
-/**
- * The bytes MarmotKit already stores for [asset], decoded once and held in the shared avatar cache. The
- * read is keyed by reference and content revision, so a refreshed avatar reloads and an unchanged one
- * never does. Null while it loads, or when the engine has nothing to give.
- */
-@Composable
-private fun rememberDurableAvatar(
-    appState: WhiteNoiseAppState,
-    asset: AvatarAssetFfi?,
-): ImageBitmap? {
-    val key = asset?.cacheKey()
-    return produceState<ImageBitmap?>(initialValue = key?.let(AvatarImageLoader::cachedImage), key) {
-        value = key?.let { appState.durableAvatar(asset) }
-    }.value
 }
