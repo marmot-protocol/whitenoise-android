@@ -13,10 +13,13 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -31,13 +34,42 @@ class ComposerResizeHandleTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    /** An expanded composer draws the grip, so the draggable top border is discoverable. */
+    /**
+     * An expanded composer draws the grip, so the draggable top border is discoverable. Its 32 x 4dp
+     * size is asserted at mdpi, where one density-independent pixel is one pixel.
+     */
     @Test
     fun expandedComposerDrawsTheResizeHandle() {
         render(ComposerExpansionMode.Manual, draft = "Line one\nLine two\nLine three")
         composeRule.onNodeWithTag(COMPOSER_RESIZE_HANDLE_TAG).assertIsDisplayed()
         val handle = composeRule.onNodeWithTag(COMPOSER_RESIZE_HANDLE_TAG).fetchSemanticsNode().boundsInRoot
-        assertTrue("the grip must be wide enough to read as one", handle.width >= 24f)
+        assertEquals("the grip is 32dp wide", 32f, handle.width, 1f)
+        assertEquals("the grip is 4dp thick", 4f, handle.height, 1f)
+    }
+
+    /** The grip sits centred on the strip, where a reader looks for a resize affordance. */
+    @Test
+    fun theResizeHandleIsCentredOnTheStrip() {
+        render(ComposerExpansionMode.Manual, draft = "Line one\nLine two\nLine three")
+        val strip = composeRule.onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG).fetchSemanticsNode().boundsInRoot
+        val handle = composeRule.onNodeWithTag(COMPOSER_RESIZE_HANDLE_TAG).fetchSemanticsNode().boundsInRoot
+        assertEquals("the grip is centred", strip.center.x, handle.center.x, 1f)
+    }
+
+    /**
+     * Drawing the grip does not replace the resize action a screen reader uses: the pill keeps the
+     * custom action that toggles the composer's height without any drag.
+     */
+    @Test
+    fun theExpandedComposerKeepsItsAccessibleResizeAction() {
+        render(ComposerExpansionMode.Manual, draft = "Line one\nLine two\nLine three")
+        val actions =
+            composeRule
+                .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
+                .fetchSemanticsNode()
+                .config
+                .getOrNull(SemanticsActions.CustomActions)
+        assertTrue("the pill must keep an accessible resize action", !actions.isNullOrEmpty())
     }
 
     /**
