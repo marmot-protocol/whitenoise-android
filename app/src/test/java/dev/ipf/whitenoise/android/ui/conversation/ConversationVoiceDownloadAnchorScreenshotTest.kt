@@ -601,8 +601,19 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
      * An incoming message inserts at the reversed transcript's origin, so every
      * lazy index shifts by one while the reader's rows stay exactly where they
      * were. The stable identities and the measured pixel geometry are therefore
-     * the contract here rather than the raw index, and the one re-anchor that
-     * follows must land on the renumbered row at the unchanged offset.
+     * the contract here rather than the raw index, and they must hold on every
+     * frame emitted after the row lands, not only the last one: a transient jump
+     * that is corrected before the final frame would otherwise go unnoticed. The
+     * one re-anchor that follows must land on the renumbered row at the unchanged
+     * offset.
+     *
+     * What the reader sees is each keyed row at its pixel position, so that is
+     * what every frame is held to. The anchor's logical id is held only once the
+     * coordinator has re-anchored: the first frame after the insert is captured
+     * while the id list has already renumbered but the layout has not yet been
+     * remeasured, so mapping its stale index through the new list names the
+     * neighbouring message even though no row has moved. The row keys on that
+     * same frame are what prove nothing moved.
      */
     private fun assertIncomingLeavesTheReaderUntouched(
         expected: ConversationViewportEvidence,
@@ -610,24 +621,31 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
         evidence: RecordingConversationScrollEvidenceSink,
         checkpoint: Int,
     ) {
-        assertEquals("incoming changed account owner", expected.accountRef, actual.accountRef)
+        val frames = evidence.viewportsSince(checkpoint)
+        assertTrue("incoming emitted no viewport frames to inspect", frames.isNotEmpty())
+        frames.forEachIndexed { index, frame ->
+            val phase = "incoming frame $index"
+            val permittedOwner =
+                when (val mode = frame.mode) {
+                    expected.mode -> true
+                    is ConversationScrollMode.Restoring ->
+                        mode.anchorMessageId == expected.anchor.messageId &&
+                            mode.pixelOffset == expected.anchor.pixelOffset
+                    else -> false
+                }
+            assertTrue("$phase used an unexpected scroll owner: ${frame.mode}", permittedOwner)
+            assertReaderGeometryUnchanged(phase, expected, frame)
+            val reanchored = frame.anchor.listIndex == expected.anchor.listIndex + 1
+            if (reanchored) assertLogicalIdentityUnchanged(phase, expected, frame)
+        }
         assertEquals("incoming changed scroll owner", expected.mode, actual.mode)
-        assertEquals("incoming changed logical message", expected.anchor.messageId, actual.anchor.messageId)
-        assertEquals("incoming changed logical item", expected.anchor.itemId, actual.anchor.itemId)
-        assertEquals("incoming changed pixel offset", expected.anchor.pixelOffset, actual.anchor.pixelOffset)
+        assertReaderGeometryUnchanged("incoming settled frame", expected, actual)
+        assertLogicalIdentityUnchanged("incoming settled frame", expected, actual)
         assertEquals(
             "one inserted row must shift the reader's lazy index by exactly one",
             expected.anchor.listIndex + 1,
             actual.anchor.listIndex,
         )
-        assertEquals("incoming changed viewport start", expected.viewportStartOffsetPx, actual.viewportStartOffsetPx)
-        assertEquals("incoming changed viewport end", expected.viewportEndOffsetPx, actual.viewportEndOffsetPx)
-        assertEquals(
-            "incoming moved or resized the reader's rows",
-            expected.visibleItems.map { it.key to (it.offsetPx to it.sizePx) },
-            actual.visibleItems.map { it.key to (it.offsetPx to it.sizePx) },
-        )
-        assertTrue("incoming emitted no viewport frames to inspect", evidence.viewportsSince(checkpoint).isNotEmpty())
         // The reader keeps its pixel position, but the row inserted at the origin
         // renumbers it, so the coordinator still owes exactly one re-anchor to the
         // shifted index at the same offset.
@@ -642,6 +660,38 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
             ),
             evidence.writes,
         )
+    }
+
+    /**
+     * Compares everything the reader can see that must survive a row being inserted
+     * at the origin: the pixel offset, the viewport bounds and where each keyed row
+     * sits. The raw lazy index is deliberately not compared, because the insertion
+     * renumbers it; the logical ids are compared separately once re-anchored.
+     */
+    private fun assertReaderGeometryUnchanged(
+        phase: String,
+        expected: ConversationViewportEvidence,
+        frame: ConversationViewportEvidence,
+    ) {
+        assertEquals("$phase changed account owner", expected.accountRef, frame.accountRef)
+        assertEquals("$phase changed pixel offset", expected.anchor.pixelOffset, frame.anchor.pixelOffset)
+        assertEquals("$phase changed viewport start", expected.viewportStartOffsetPx, frame.viewportStartOffsetPx)
+        assertEquals("$phase changed viewport end", expected.viewportEndOffsetPx, frame.viewportEndOffsetPx)
+        assertEquals(
+            "$phase moved or resized the reader's rows",
+            expected.visibleItems.map { it.key to (it.offsetPx to it.sizePx) },
+            frame.visibleItems.map { it.key to (it.offsetPx to it.sizePx) },
+        )
+    }
+
+    /** Requires the anchor to name the same message and item it did before the insert. */
+    private fun assertLogicalIdentityUnchanged(
+        phase: String,
+        expected: ConversationViewportEvidence,
+        frame: ConversationViewportEvidence,
+    ) {
+        assertEquals("$phase changed logical message", expected.anchor.messageId, frame.anchor.messageId)
+        assertEquals("$phase changed logical item", expected.anchor.itemId, frame.anchor.itemId)
     }
 }
 
