@@ -26,6 +26,7 @@ import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.ChatPinStateFfi
+import dev.ipf.marmotkit.ContentReportFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.GroupDetailsFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
@@ -43,6 +44,7 @@ import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
+import dev.ipf.marmotkit.ReportReasonFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
@@ -10646,6 +10648,63 @@ class ConversationController(
             loadedPageCount += 1
         }
         return timelineRecords.containsKey(messageIdHex)
+    }
+
+    /**
+     * Reports [messageIdHex] to this group's admins with [reason] and an optional explanation. MarmotKit
+     * publishes the report encrypted to the group, so the outcome says whether it was actually sent rather
+     * than only whether the call returned.
+     */
+    internal suspend fun reportMessage(
+        messageIdHex: String,
+        reason: ReportReasonFfi,
+        explanation: String,
+    ): ReportOutcome {
+        val account = conversationAccountRef ?: return ReportOutcome.NotAllowed
+        return runCatchingCancellable {
+            appState.marmotIo {
+                reportMessage(account, group.groupIdHex, messageIdHex, reason, boundedExplanation(explanation))
+            }
+        }.fold(
+            onSuccess = { ReportOutcome.Sent },
+            onFailure = { failure ->
+                recordMutationFailure(R.string.report_message_failed, "MESSAGE_REPORT", failure)
+                if (failure is MarmotKitException.MemberNotInGroup) ReportOutcome.NotAllowed else ReportOutcome.Failed
+            },
+        )
+    }
+
+    /** Reports open against [messageIdHex], newest first; empty when there are none or the read failed. */
+    internal suspend fun reportsFor(messageIdHex: String): List<ContentReportFfi> {
+        val account = conversationAccountRef ?: return emptyList()
+        return runCatchingCancellable {
+            appState.marmotIo {
+                contentReports(account, group.groupIdHex, messageIdHex, null, CONTENT_REPORT_PAGE_LIMIT)
+            }
+        }.getOrNull()?.reports?.newestFirst().orEmpty()
+    }
+
+    /**
+     * Dismisses [reportIds] with a shared explanation, which MarmotKit shares with the group's other
+     * admins. Only an admin may do this, and the engine enforces that too.
+     */
+    internal suspend fun dismissReports(
+        reportIds: List<String>,
+        explanation: String,
+    ): ReportOutcome {
+        val account = conversationAccountRef ?: return ReportOutcome.NotAllowed
+        if (reportIds.isEmpty()) return ReportOutcome.NotAllowed
+        return runCatchingCancellable {
+            appState.marmotIo {
+                dismissReports(account, group.groupIdHex, reportIds, boundedExplanation(explanation))
+            }
+        }.fold(
+            onSuccess = { ReportOutcome.Sent },
+            onFailure = { failure ->
+                recordMutationFailure(R.string.report_dismiss_failed, "REPORT_DISMISS", failure)
+                if (failure is MarmotKitException.NotGroupAdmin) ReportOutcome.NotAllowed else ReportOutcome.Failed
+            },
+        )
     }
 
     /**

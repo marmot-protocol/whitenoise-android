@@ -103,8 +103,10 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.MessageDeleteCapability
 import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.state.ReportOutcome
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.canReportMessage
 import dev.ipf.whitenoise.android.state.mediaReferencesFor
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
@@ -455,6 +457,8 @@ internal fun MessageBubble(
     var selectionSeedVisibleOffset by remember(record.messageIdHex) { mutableStateOf<Int?>(null) }
     var longPressWindowY by remember { mutableStateOf<Float?>(null) }
     var actionMenuAnchorBounds by remember(record.messageIdHex) { mutableStateOf<IntRect?>(null) }
+    var reportSheetOpen by remember(record.messageIdHex) { mutableStateOf(false) }
+    var reportInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
     val rowCoordinates = remember(record.messageIdHex) { arrayOfNulls<LayoutCoordinates>(1) }
     val messageBoundsInWindow = remember(record.messageIdHex) { arrayOfNulls<IntRect>(1) }
     val focusedMessageLayer = if (isActionMenuOpen) rememberGraphicsLayer() else null
@@ -2331,6 +2335,7 @@ internal fun MessageBubble(
                     canShare = canShareMessage,
                     canSave = !deleted && mediaReferences.isNotEmpty() && !attachmentSaveInFlight,
                     canInfo = !deleted,
+                    canReport = canReportMessage(mine = mine, deleted = deleted),
                     quickReactionEmojis = quickReactionEmojis,
                     onDismissRequest = { onActionMenuOpenChange(false) },
                     onReact = { emoji ->
@@ -2381,6 +2386,10 @@ internal fun MessageBubble(
                         }
                     },
                     onInfo = ::openInfoSheet,
+                    onReport = {
+                        onActionMenuOpenChange(false)
+                        reportSheetOpen = true
+                    },
                     onDelete = ::requestDelete,
                     mine = mine,
                     selectedReactionEmojis = reactionTallies.filter { it.mine }.mapTo(mutableSetOf()) { it.emoji },
@@ -2778,6 +2787,30 @@ internal fun MessageBubble(
                         editState = editState,
                         onDismissRequest = { editHistoryOpen = false },
                         loadAuthoritativeHistory = { controller.authoritativeEditHistory(record.messageIdHex) },
+                    )
+                }
+                if (reportSheetOpen) {
+                    ReportMessageSheet(
+                        onDismissRequest = { reportSheetOpen = false },
+                        sending = reportInFlight,
+                        onSubmit = { reason, explanation ->
+                            reportInFlight = true
+                            appState.launchMutation {
+                                try {
+                                    val outcome = controller.reportMessage(record.messageIdHex, reason, explanation)
+                                    reportSheetOpen = false
+                                    when (outcome) {
+                                        ReportOutcome.Sent -> appState.present(R.string.report_message_sent)
+                                        ReportOutcome.NotAllowed ->
+                                            appState.present(R.string.report_message_not_allowed)
+                                        // The controller already presented the failure with its report.
+                                        ReportOutcome.Failed -> Unit
+                                    }
+                                } finally {
+                                    reportInFlight = false
+                                }
+                            }
+                        },
                     )
                 }
                 if (infoSheetOpen && !deleted) {
