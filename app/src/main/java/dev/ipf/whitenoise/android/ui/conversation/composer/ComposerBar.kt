@@ -288,6 +288,20 @@ internal class ComposerTextState(
     val valueState: MutableState<TextFieldValue> = mutableStateOf(initial)
     val preEditState: MutableState<TextFieldValue?> = mutableStateOf(null)
 
+    /**
+     * True from the moment an accepted send empties the field until the pill has applied that
+     * collapse, or until the next content edit. The pill reads it to collapse in the same frame the
+     * text leaves: a tween there would drag the newest bubble, glued to the composer, down with the
+     * shrinking pill. It is one-shot so a later dismiss or refocus of the empty field tweens again.
+     */
+    var collapsedBySend by mutableStateOf(false)
+        private set
+
+    /** Called by the pill once the send collapse has been applied, so later geometry tweens again. */
+    fun consumeSendCollapse() {
+        collapsedBySend = false
+    }
+
     /** Captures the exact content generation an asynchronous acceptance may clear. */
     fun acceptanceToken(): ComposerAcceptanceToken =
         ComposerAcceptanceToken(
@@ -298,7 +312,10 @@ internal class ComposerTextState(
 
     /** Applies field state while advancing acceptance ownership only for content edits. */
     fun updateValue(value: TextFieldValue) {
-        if (value.text != valueState.value.text) contentRevision += 1L
+        if (value.text != valueState.value.text) {
+            contentRevision += 1L
+            collapsedBySend = false
+        }
         valueState.value = value
     }
 
@@ -306,6 +323,7 @@ internal class ComposerTextState(
     fun clearAccepted(token: ComposerAcceptanceToken): Boolean {
         if (!token.isCurrentFor(this, valueState.value.text, contentRevision)) return false
         updateValue(TextFieldValue(""))
+        collapsedBySend = true
         return true
     }
 }
@@ -1475,6 +1493,8 @@ internal fun ComposerBar(
                         onMultilineControlsChanged = { composerUsesMultilineControls = it },
                         multilineControlsSuppressed = composerMultilineControlsSuppressed(automaticComposerCeiling),
                         dismissInProgress = composerDismissInProgress,
+                        collapsedBySend = textState.collapsedBySend,
+                        onSendCollapseApplied = textState::consumeSendCollapse,
                         modifier =
                             Modifier
                                 .fillMaxWidth()

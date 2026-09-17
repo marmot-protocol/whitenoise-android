@@ -2863,6 +2863,21 @@ internal fun ConversationScreen(
         initialTimelineAnchored = true
         navigationState.lastFollowedLatestId = anchoredTimeline.lastOrNull()?.id
     }
+    // Resolved in composition so the row-inserting frame already knows which
+    // row is entering; the follow effect below only runs after that frame.
+    val tailEntrance =
+        rememberConversationTailEntrance(
+            latestItemId = latestTimelineItemId,
+            lastFollowedLatestId = navigationState.lastFollowedLatestId,
+            // Only a single appended row can be shifted by its own height; a batch
+            // of arrivals lands without motion and the follow effect pins the tail.
+            previousIsNewestButOne =
+                navigationState.lastFollowedLatestId?.let { previous ->
+                    renderedTimeline.getOrNull(renderedTimeline.lastIndex - 1)?.id == previous
+                } == true,
+            followingTail = scrollCoordinator.isFollowingTail,
+            initialTimelineAnchored = initialTimelineAnchored,
+        )
     LaunchedEffect(controller, latestTimelineItemId, initialTimelineAnchored) {
         if (!initialTimelineAnchored || renderedTimeline.isEmpty()) return@LaunchedEffect
         val latestId = renderedTimeline.lastOrNull()?.id
@@ -3745,7 +3760,10 @@ internal fun ConversationScreen(
                                 ) { index, item ->
                                     val messageId = item.record.messageIdHex
                                     TimelineRow(
-                                        modifier = Modifier.timelineReadingExposure(timelineViewport),
+                                        modifier =
+                                            Modifier
+                                                .timelineReadingExposure(timelineViewport)
+                                                .conversationTailEntranceMotion(tailEntrance, item.id),
                                         item = item,
                                         // Newest-first rows: the chronologically
                                         // older neighbour is the next row emitted.
