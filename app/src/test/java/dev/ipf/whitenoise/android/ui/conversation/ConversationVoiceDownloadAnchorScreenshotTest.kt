@@ -598,10 +598,6 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
     }
 
     /**
-     * Requires every concurrent incoming frame to retain the same logical and
-     * pixel anchor while permitting only the production structural reanchor owner.
-     */
-    /**
      * An incoming message inserts at the reversed transcript's origin, so every
      * lazy index shifts by one while the reader's rows stay exactly where they
      * were. The stable identities and the measured pixel geometry are therefore
