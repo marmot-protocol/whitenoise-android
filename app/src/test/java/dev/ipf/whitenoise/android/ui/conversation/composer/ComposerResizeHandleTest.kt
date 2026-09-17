@@ -82,6 +82,16 @@ class ComposerResizeHandleTest {
         composeRule.onNodeWithTag(COMPOSER_RESIZE_HANDLE_TAG).assertDoesNotExist()
     }
 
+    /**
+     * A two-line draft already has a border worth dragging, so it draws the grip. The multiline controls
+     * do not appear until the third line, and tying the grip to them left this row unmarked.
+     */
+    @Test
+    fun twoLineComposerDrawsTheResizeHandle() {
+        render(ComposerExpansionMode.Automatic, draft = "Line one\nLine two")
+        composeRule.onNodeWithTag(COMPOSER_RESIZE_HANDLE_TAG).assertIsDisplayed()
+    }
+
     /** The drag target stays the full-width strip, not just the drawn grip. */
     @Test
     fun theDragTargetRemainsTheFullWidthStrip() {

@@ -56,6 +56,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -670,6 +671,9 @@ internal fun ComposerPill(
     // The crossover is decided by the width the draft is leaving, even when the height targets the
     // width it is arriving at: the destination's own count can be lower and would suppress the change.
     val compactLineCount = compactDraftMeasurement?.crossoverLineCount
+    // The pill is also used without a measurement width, where the editor's own layout is the only line
+    // count there is. The grip needs one number from whichever path is live.
+    var editorLineCount by remember { mutableIntStateOf(1) }
     // The prototype animates the measured text row independently of discrete full-screen resizing.
     // Read frames in measurement so the field and its selection owner are never replaced.
     //
@@ -709,6 +713,13 @@ internal fun ComposerPill(
                 } ?: multilineControls
         }
     val expandedLayout = visualMultilineControls || expansionMode != ComposerExpansionMode.Automatic
+
+    // The grip marks a border that can be dragged, and the drag target exists from the second line on.
+    // Tying it to the multiline controls hid it until the third line, leaving a resizable border unmarked
+    // for exactly the drafts a reader is most likely to want smaller. Only the one-line row, which has
+    // nothing to shrink, goes without.
+    val composerCanResize =
+        expansionMode != ComposerExpansionMode.Automatic || (compactLineCount ?: editorLineCount) > 1
     // Keep the editor instance and selection owner stable while empty reading
     // mode unfolds into the full-width editing row above the native controls.
     val editingLayout =
@@ -1024,6 +1035,7 @@ internal fun ComposerPill(
                             keyboardActions = KeyboardActions(onSend = { onImeSend() }),
                             maxLines = Int.MAX_VALUE,
                             onTextLayout = { layout ->
+                                editorLineCount = layout.lineCount
                                 if (compactLineCount == null) updateMultilineControls(layout.lineCount)
                                 val nextSnapshot =
                                     ComposerTextLayoutSnapshot(
@@ -1175,7 +1187,7 @@ internal fun ComposerPill(
             // border-only pointer owner leaves reading drags and selection to
             // BasicTextField; the full surface exposes the accessible action.
             ComposerResizeGestureStrip(
-                showHandle = expandedLayout,
+                showHandle = composerCanResize,
                 onExpansionToggle = onExpansionToggle,
                 onHeightDragStarted = { latestOnHeightDragStarted() },
                 onHeightDrag = { latestOnHeightDrag(it) },
