@@ -75,6 +75,7 @@ internal object ChatRowPortFixtures {
                         deleted = false,
                         attachmentKind = null,
                         attachmentCount = 0u,
+                        groupSystem = null,
                         deliveryState = delivery,
                     ),
             )

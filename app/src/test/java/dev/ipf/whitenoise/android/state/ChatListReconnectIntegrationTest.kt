@@ -569,6 +569,7 @@ private fun windowSnapshot(
 private fun presentedRow(row: ChatListRowFfi) =
     PresentedChatRowFfi(
         row = row,
+        avatarAsset = null,
         presentation =
             ConversationPresentationFfi(
                 title = PresentationTextFfi.Literal(row.title.ifBlank { "Chat" }),

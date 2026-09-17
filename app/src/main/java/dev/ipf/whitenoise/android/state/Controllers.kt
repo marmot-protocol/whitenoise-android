@@ -3918,6 +3918,7 @@ class ChatsController private constructor(
                 preview =
                     entry.preview.copy(
                         messageIdHex = confirmedMessageIdHex,
+                        groupSystem = null,
                         deliveryState = ChatListMessageDeliveryStateFfi.DELIVERED,
                     ),
                 confirmedMessageIdHex = confirmedMessageIdHex,
@@ -7840,6 +7841,7 @@ class ConversationController(
                             deleted = false,
                             attachmentKind = null,
                             attachmentCount = 0u,
+                            groupSystem = null,
                             deliveryState = ChatListMessageDeliveryStateFfi.PENDING,
                         ),
                     )
@@ -8907,6 +8909,7 @@ class ConversationController(
             deleted = false,
             attachmentKind = null,
             attachmentCount = 0u,
+            groupSystem = null,
             deliveryState = ChatListMessageDeliveryStateFfi.PENDING,
         )
 

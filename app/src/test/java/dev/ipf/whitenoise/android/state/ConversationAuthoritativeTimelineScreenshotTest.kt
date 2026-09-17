@@ -10,6 +10,7 @@ import androidx.compose.ui.test.performScrollTo
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.marmotkit.GroupSystemEventFfi
+import dev.ipf.marmotkit.GroupSystemEventProvenanceFfi
 import dev.ipf.whitenoise.android.ui.conversation.CONVERSATION_BOTTOM_BAR_TAG
 import dev.ipf.whitenoise.android.ui.conversation.CONVERSATION_TIMELINE_TAIL_GAP
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
@@ -174,6 +175,9 @@ class ConversationAuthoritativeTimelineScreenshotTest {
             sourceEpoch = SOURCE_EPOCH,
             groupSystem =
                 GroupSystemEventFfi(
+                    provenance = GroupSystemEventProvenanceFfi.AUTHENTICATED_GROUP_STATE,
+                    actorDisplayName = null,
+                    subjectDisplayName = null,
                     systemType = "member_added",
                     text = "member added",
                     actorAccountIdHex = ConversationTimelineTestIds.ACCOUNT_ID,

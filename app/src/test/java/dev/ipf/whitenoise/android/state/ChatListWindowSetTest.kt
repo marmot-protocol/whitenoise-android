@@ -213,6 +213,7 @@ private class FakeWindow(
 private fun presentedRow(groupIdHex: String) =
     PresentedChatRowFfi(
         row = chatRow(groupIdHex),
+        avatarAsset = null,
         presentation =
             ConversationPresentationFfi(
                 title = PresentationTextFfi.Literal(groupIdHex),

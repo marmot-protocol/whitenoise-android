@@ -170,6 +170,8 @@ internal fun swipeTestProjectedRecord(
         deleted = false,
         deletedByMessageIdHex = null,
         invalidationStatus = null,
+        hasReports = false,
+        edit = null,
         sourceEpoch = if (media) 1uL else null,
         retentionSeconds = null,
         retentionExpiresAt = null,

@@ -146,6 +146,7 @@ class MarkReadChatListReturnLifecycleTest {
                 deleted = false,
                 attachmentKind = null,
                 attachmentCount = 0u,
+                groupSystem = null,
                 deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
             ),
         unreadCount = unreadCount,

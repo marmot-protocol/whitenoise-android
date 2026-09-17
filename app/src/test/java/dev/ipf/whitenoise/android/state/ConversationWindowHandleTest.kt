@@ -309,6 +309,7 @@ private fun snapshot(
             lifecycle = GroupLifecycleStateFfi.STABLE,
             disbanding = false,
             unrecoverable = false,
+            avatarAsset = null,
             capabilities =
                 ConversationCapabilitiesFfi(
                     participation = ConversationParticipationFfi.ACTIVE,

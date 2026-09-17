@@ -4,6 +4,7 @@ import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.GroupSystemEventFfi
+import dev.ipf.marmotkit.GroupSystemEventProvenanceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
@@ -59,6 +60,9 @@ class ConversationTranscriptExportTest {
                     timelineAt = 1uL,
                     groupSystem =
                         GroupSystemEventFfi(
+                            provenance = GroupSystemEventProvenanceFfi.AUTHENTICATED_GROUP_STATE,
+                            actorDisplayName = null,
+                            subjectDisplayName = null,
                             systemType = "group_renamed",
                             text = "Group renamed",
                             actorAccountIdHex = "alice",
@@ -436,6 +440,8 @@ class ConversationTranscriptExportTest {
         media = emptyList(),
         agentTextStreamJson = null,
         groupSystem = groupSystem,
+        hasReports = false,
+        edit = null,
         reactions = reactions,
         deleted = false,
         deletedByMessageIdHex = null,
