@@ -43,7 +43,7 @@ class ConversationTailEntranceTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    /** Only a genuine append seen by a tail-following reader of an anchored transcript arms the entrance. */
+    /** Only a single append seen by a tail-following reader of an anchored transcript arms the entrance. */
     @Test
     fun onlyAnAppendSeenFromTheTailArms() {
         assertTrue(arms(latest = "m2", followed = "m1"))
@@ -53,8 +53,8 @@ class ConversationTailEntranceTest {
             arms(latest = "m2", followed = "m1", followingTail = false),
         )
         assertFalse(
-            "an older-page trim dropped the followed row",
-            arms(latest = "m2", followed = "m1", previousStillPresent = false),
+            "a batch of arrivals, or a trim that dropped the followed row, is not a single append",
+            arms(latest = "m3", followed = "m1", previousIsNewestButOne = false),
         )
         assertFalse("the first publication has nothing to enter from", arms(latest = "m1", followed = null))
         assertFalse(
@@ -156,7 +156,8 @@ class ConversationTailEntranceTest {
                 rememberConversationTailEntrance(
                     latestItemId = harness.latestId,
                     lastFollowedLatestId = harness.followedId,
-                    previousStillPresent = harness.followedId in harness.rows,
+                    // Rows are newest first here, so the followed row is adjacent at index 1.
+                    previousIsNewestButOne = harness.rows.getOrNull(1) == harness.followedId,
                     followingTail = true,
                     initialTimelineAnchored = true,
                     rowSpacingPx = 0f,
@@ -193,7 +194,7 @@ class ConversationTailEntranceTest {
                 rememberConversationTailEntrance(
                     latestItemId = rows.first(),
                     lastFollowedLatestId = rows.first(),
-                    previousStillPresent = true,
+                    previousIsNewestButOne = true,
                     followingTail = true,
                     initialTimelineAnchored = true,
                     rowSpacingPx = 0f,
@@ -222,14 +223,14 @@ class ConversationTailEntranceTest {
     private fun arms(
         latest: String?,
         followed: String?,
-        previousStillPresent: Boolean = true,
+        previousIsNewestButOne: Boolean = true,
         followingTail: Boolean = true,
         anchored: Boolean = true,
     ): Boolean =
         conversationTailEntranceArms(
             latestItemId = latest,
             lastFollowedLatestId = followed,
-            previousStillPresent = previousStillPresent,
+            previousIsNewestButOne = previousIsNewestButOne,
             followingTail = followingTail,
             initialTimelineAnchored = anchored,
         )

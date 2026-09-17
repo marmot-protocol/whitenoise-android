@@ -2869,9 +2869,11 @@ internal fun ConversationScreen(
         rememberConversationTailEntrance(
             latestItemId = latestTimelineItemId,
             lastFollowedLatestId = navigationState.lastFollowedLatestId,
-            previousStillPresent =
+            // Only a single appended row can be shifted by its own height; a batch
+            // of arrivals lands without motion and the follow effect pins the tail.
+            previousIsNewestButOne =
                 navigationState.lastFollowedLatestId?.let { previous ->
-                    renderedTimeline.any { it.id == previous }
+                    renderedTimeline.getOrNull(renderedTimeline.lastIndex - 1)?.id == previous
                 } == true,
             followingTail = scrollCoordinator.isFollowingTail,
             initialTimelineAnchored = initialTimelineAnchored,

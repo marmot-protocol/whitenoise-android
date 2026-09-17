@@ -75,14 +75,16 @@ internal class ConversationTailEntrance internal constructor(
 }
 
 /**
- * Whether a newest-row change is an entrance the reader should see move: a
- * genuine append (the row followed before is still present) seen by a reader
- * who is following the tail of an anchored transcript.
+ * Whether a newest-row change is an entrance the reader should see move: exactly
+ * one row appended after the row followed before, seen by a reader who is
+ * following the tail of an anchored transcript. A batch of arrivals is not
+ * armed, since the shift is measured from the newest row alone; an older-page
+ * trim that dropped the followed row is not an append at all.
  */
 internal fun conversationTailEntranceArms(
     latestItemId: String?,
     lastFollowedLatestId: String?,
-    previousStillPresent: Boolean,
+    previousIsNewestButOne: Boolean,
     followingTail: Boolean,
     initialTimelineAnchored: Boolean,
 ): Boolean =
@@ -91,7 +93,7 @@ internal fun conversationTailEntranceArms(
         latestItemId != null &&
         lastFollowedLatestId != null &&
         latestItemId != lastFollowedLatestId &&
-        previousStillPresent
+        previousIsNewestButOne
 
 /**
  * Tracks which row is entering. The composition that inserts the row already
@@ -102,7 +104,7 @@ internal fun conversationTailEntranceArms(
 internal fun rememberConversationTailEntrance(
     latestItemId: String?,
     lastFollowedLatestId: String?,
-    previousStillPresent: Boolean,
+    previousIsNewestButOne: Boolean,
     followingTail: Boolean,
     initialTimelineAnchored: Boolean,
     rowSpacingPx: Float = with(LocalDensity.current) { CONVERSATION_TIMELINE_ROW_SPACING.toPx() },
@@ -114,7 +116,7 @@ internal fun rememberConversationTailEntrance(
             conversationTailEntranceArms(
                 latestItemId = latestItemId,
                 lastFollowedLatestId = lastFollowedLatestId,
-                previousStillPresent = previousStillPresent,
+                previousIsNewestButOne = previousIsNewestButOne,
                 followingTail = followingTail,
                 initialTimelineAnchored = initialTimelineAnchored,
             )
