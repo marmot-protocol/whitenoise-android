@@ -1166,6 +1166,30 @@ class ConversationDictationControllerTest {
     }
 
     @Test
+    fun confirmedSilentRetryCompletionPreservesOriginalProviderFailure() {
+        val fixture = fixture(draft = TextFieldValue("Keep"))
+        fixture.platform.pendingCallerAudio = true
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onError(ConversationDictationFailure.PermissionDenied)
+        fixture.scheduler.runDelay(500L)
+
+        fixture.controller.paste()
+        val silentRetrySession = fixture.platform.session
+        silentRetrySession.callerAudioHasSpeech = false
+        fixture.platform.pendingCallerAudio = false
+        fixture.platform.listener.onResult(null)
+
+        assertEquals(1, silentRetrySession.acknowledgedCallerAudio)
+        assertEquals(
+            ConversationDictationFailure.ProviderAccessRejected,
+            (fixture.controller.state as ConversationDictationState.Failed).reason,
+        )
+        assertEquals(0, fixture.writes)
+        assertEquals("Keep", fixture.drafts.getValue(key()).text)
+        assertFalse(fixture.controller.ownsMicrophone)
+    }
+
+    @Test
     fun emptyDisconnectCompletionPreservesCauseWithoutSending() {
         val fixture = fixture(draft = TextFieldValue("Keep"))
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
