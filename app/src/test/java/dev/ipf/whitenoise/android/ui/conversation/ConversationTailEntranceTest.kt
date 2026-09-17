@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -7,15 +8,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
+import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -24,6 +28,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /**
  * Motion contract for a new newest row while the reader follows the tail: the
@@ -32,6 +37,7 @@ import org.robolectric.annotation.Config
  * Layout snaps; what the reader sees is the laid-out top plus the drawn shift.
  */
 @RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
 class ConversationTailEntranceTest {
     @get:Rule
@@ -106,13 +112,21 @@ class ConversationTailEntranceTest {
         assertEquals("the row above settles one slot up", startTop - rowHeightPx(), seenTop("m3"), 1f)
     }
 
-    /** Advances through the entrance and checks both rows rise monotonically, as one, through in-between positions. */
+    /**
+     * Advances through the entrance and checks both rows rise monotonically, as one, through
+     * in-between positions. The fifth frame, well inside the 180ms, is recorded as the baseline.
+     */
     private fun assertRowsEaseUpTogether(startTop: Float) {
         var lastAboveTop = seenTop("m3")
         var lastEnteringTop = seenTop("m4")
         var sawIntermediate = false
-        repeat(20) {
+        repeat(20) { frame ->
             composeRule.mainClock.advanceTimeByFrame()
+            if (frame == CAPTURED_FRAME) {
+                composeRule
+                    .onNodeWithTag(LIST_TAG)
+                    .captureRoboImage("src/test/snapshots/conversation_tail_entrance_mid_motion.png")
+            }
             val aboveTop = seenTop("m3")
             val enteringTop = seenTop("m4")
             assertTrue("the row above must only ever move up", aboveTop <= lastAboveTop + 0.5f)
@@ -158,8 +172,11 @@ class ConversationTailEntranceTest {
                             .conversationTailEntranceMotion(harness.entrance, id)
                             .fillMaxWidth()
                             .height(ROW_HEIGHT)
+                            .background(if (id == "m4") Color(0xFF2E7D32) else Color(0xFF37474F))
                             .testTag(id),
-                    )
+                    ) {
+                        Text(id, color = Color.White)
+                    }
                 }
             }
         }
@@ -228,6 +245,7 @@ class ConversationTailEntranceTest {
 
     private companion object {
         const val LIST_TAG = "tail-entrance-list"
+        const val CAPTURED_FRAME = 4
         val LIST_HEIGHT = 300.dp
         val ROW_HEIGHT = 72.dp
     }
