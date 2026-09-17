@@ -153,8 +153,8 @@ object MessageProjector {
     private const val KindAgentOperation = 1202uL
     private val KindGroupSystem = 1210uL
 
-    private const val EventRefTag = "e"
-    private const val QuoteRefTag = "q"
+    internal const val EventRefTag = "e"
+    internal const val QuoteRefTag = "q"
     private const val ImetaTag = "imeta"
     private const val PendingMediaTag = "_media_pending"
     private const val StreamTag = "stream"
