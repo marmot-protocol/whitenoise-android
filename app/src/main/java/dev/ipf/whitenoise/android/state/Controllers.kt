@@ -18,6 +18,7 @@ import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
@@ -2989,6 +2990,8 @@ class ChatsController private constructor(
     }
 
     private val chatRowsByGroup = LinkedHashMap<String, ChatListRowFfi>()
+    private var selectedAvatarAssetsByGroup: Map<String, AvatarAssetFfi> = emptyMap()
+
     private var selectedPresentationsByGroup = emptyMap<String, ConversationPresentationFfi>()
     internal val chatRows: Collection<ChatListRowFfi>
         get() = chatRowsByGroup.values
@@ -4096,6 +4099,7 @@ class ChatsController private constructor(
             chatListItemFromProjection(
                 row = row,
                 selectedPresentation = selectedPresentationsByGroup[chatRowKey(row.groupIdHex)],
+                selectedAvatarAsset = selectedAvatarAssetsByGroup[chatRowKey(row.groupIdHex)],
                 group = optimisticArchiveGroup(row.groupIdHex, groupRecordsById[row.groupIdHex]),
                 activeAccountIdHex = activeAccountIdHex,
                 members = memberCacheByGroup[row.groupIdHex],
@@ -4120,6 +4124,7 @@ class ChatsController private constructor(
         return chatListItemFromProjection(
             row = row,
             selectedPresentation = selectedPresentationsByGroup[chatRowKey(row.groupIdHex)],
+            selectedAvatarAsset = selectedAvatarAssetsByGroup[chatRowKey(row.groupIdHex)],
             group = optimisticArchiveGroup(row.groupIdHex, groupRecordsById[row.groupIdHex]),
             activeAccountIdHex = activeAccountIdHex,
             members = memberCacheByGroup[row.groupIdHex],
@@ -4334,6 +4339,13 @@ class ChatsController private constructor(
     private fun replacePresentedChatRows(rows: List<PresentedChatRowFfi>) {
         selectedPresentationsByGroup =
             rows.associate { presented -> chatRowKey(presented.row.groupIdHex) to presented.presentation }
+        // MarmotKit 0.10.1 stores avatars durably and names each row's asset here; the row prefers those
+        // bytes over fetching its URL, so a cached avatar survives being offline.
+        selectedAvatarAssetsByGroup =
+            rows
+                .mapNotNull { presented ->
+                    presented.avatarAsset?.let { chatRowKey(presented.row.groupIdHex) to it }
+                }.toMap()
         rows.forEach { requestChatRowProfiles(it.row) }
         replaceChatRows(rows.map(PresentedChatRowFfi::row))
     }

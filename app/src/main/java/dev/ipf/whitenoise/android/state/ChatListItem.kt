@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
@@ -42,6 +43,7 @@ private const val DIRECT_CHAT_MEMBER_COUNT = 2
 internal fun chatListItemFromProjection(
     row: ChatListRowFfi,
     selectedPresentation: ConversationPresentationFfi? = null,
+    selectedAvatarAsset: AvatarAssetFfi? = null,
     group: AppGroupRecordFfi? = null,
     activeAccountIdHex: String? = null,
     members: List<AppGroupMemberRecordFfi>? = null,
@@ -94,6 +96,7 @@ internal fun chatListItemFromProjection(
             !displayGroup.selfMembership.isNonMember() &&
                 (group?.let { it.pendingConfirmation != row.pendingConfirmation } ?: row.pendingConfirmation),
         selectedPresentation = selectedPresentation,
+        selectedAvatarAsset = selectedAvatarAsset,
         previewTokens = previewTokens,
         resolvedMediaPreviewFallback = resolvedMediaPreviewFallback,
         removed = removed,
@@ -123,6 +126,8 @@ data class ChatListItem(
     val inviteConfirmationUnresolved: Boolean = false,
     /** MDK-selected title/avatar/peer projection for this exact chat row. */
     val selectedPresentation: ConversationPresentationFfi? = null,
+    /** MarmotKit's durably stored avatar for this row (0.10.1); preferred over fetching its URL. */
+    val selectedAvatarAsset: AvatarAssetFfi? = null,
     /**
      * Bounded snapshot of decoded pixels that were already in a presentation
      * loader when this row was published. Holding the hit on the immutable row
