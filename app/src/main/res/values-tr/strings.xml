@@ -1546,7 +1546,7 @@
     <string name="report_reason_malware">Kötü amaçlı yazılım veya dolandırıcılık bağlantısı</string>
     <string name="report_reason_impersonation">Kimliğe bürünme</string>
     <string name="report_reason_other">Başka bir şey</string>
-    <string name="report_dismiss_failed">Bildirimler kapatılamadı. Yeniden deneyin.</string>
+    <string name="report_dismiss_failed">Bildirim kapatılamadı. Yeniden deneyin.</string>
     <string name="report_a_bug">Hata bildir</string>
     <string name="report_a_bug_subtitle">GitHub’ı açmadan önce nelerin paylaşıldığını inceleyin</string>
     <string name="about_and_licenses">Hakkında ve lisanslar</string>

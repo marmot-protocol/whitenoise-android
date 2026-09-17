@@ -1546,7 +1546,7 @@
     <string name="report_reason_malware">Schadsoftware oder Betrugslink</string>
     <string name="report_reason_impersonation">Identitätsmissbrauch</string>
     <string name="report_reason_other">Etwas anderes</string>
-    <string name="report_dismiss_failed">Meldungen konnten nicht verworfen werden. Versuche es erneut.</string>
+    <string name="report_dismiss_failed">Die Meldung konnte nicht verworfen werden. Versuche es erneut.</string>
     <string name="report_a_bug">Fehler melden</string>
     <string name="report_a_bug_subtitle">Vor dem Öffnen von GitHub prüfen, was geteilt wird</string>
     <string name="about_and_licenses">Über und Lizenzen</string>

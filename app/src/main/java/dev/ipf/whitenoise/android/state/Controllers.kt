@@ -3223,6 +3223,7 @@ class ChatsController private constructor(
             }
             while (coroutineContext.isActive && shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) {
                 var chatListSubscription: ChatListWindowSet? = null
+                lastFailureNotReady = false
                 var chatsSubscription: ChatsSubscriptionHandle? = null
                 var receivedLiveUpdate = false
                 val connectionAttempt =

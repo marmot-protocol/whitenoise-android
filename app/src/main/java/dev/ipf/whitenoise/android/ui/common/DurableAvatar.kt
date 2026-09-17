@@ -20,7 +20,7 @@ internal fun rememberDurableAvatar(
     appState: WhiteNoiseAppState,
     asset: AvatarAssetFfi?,
 ): ImageBitmap? {
-    val key = asset?.cacheKey()
+    val key = appState.activeAccountRef?.let { asset?.cacheKey(it) }
     // The availability rides in the key so a `MISSING` asset with the same reference still re-runs the
     // acquisition request once the engine reports it.
     return produceState<ImageBitmap?>(

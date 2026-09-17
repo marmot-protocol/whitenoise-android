@@ -105,7 +105,11 @@ private suspend fun WhiteNoiseAppState.readExistingDirectConversation(
         ExistingDirectRead.Failed(directLookupFailure(failure))
     }
 
-/** The presented row for a reusable DM the retained rows do not already hold. */
+/**
+ * The presented row for a reusable DM the retained rows do not already hold. MDK confirmed the group
+ * exists, so a row that cannot be read is unavailable rather than a miss: a miss would let the flow
+ * create a second DM for the same peer.
+ */
 private suspend fun ChatsController.reusableRow(
     account: String,
     existing: ExistingDirectConversationFfi?,
@@ -117,7 +121,7 @@ private suspend fun ChatsController.reusableRow(
     return runCatchingCancellable { appState.marmotIo { presentedChatListRow(account, reusable.groupIdHex) } }
         .getOrNull()
         ?.let(DirectLookup::Row)
-        ?: DirectLookup.None
+        ?: DirectLookup.Unavailable
 }
 
 /** Whether MDK's lookup completed (with or without a DM) or could not be trusted. */

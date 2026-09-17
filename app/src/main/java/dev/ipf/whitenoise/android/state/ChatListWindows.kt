@@ -175,12 +175,25 @@ internal class ChatListWindowSet private constructor(
                 val marker = releaseFailureMarker("CHAT_LIST_WINDOW_OPEN", refused)
                 Log.e("DMChats", "$marker fallback=presented_list")
                 val whole = linkedMapOf(ChatListViewFfi.CHATS to fallback(account))
-                return ChatListWindowSet(whole, initialReplacements(whole))
+                return openOrClose(whole) { ChatListWindowSet(whole, initialReplacements(whole)) }
             } catch (throwable: Throwable) {
                 handles.values.forEach { handle -> runCatching { handle.close() } }
                 throw throwable
             }
         }
+
+        /** Runs [build] and closes every handle in [handles] if it fails, so a half-open set cannot leak. */
+        @Suppress("TooGenericExceptionCaught") // Any failure must release the handles opened so far.
+        private inline fun openOrClose(
+            handles: OpenedWindows,
+            build: () -> ChatListWindowSet,
+        ): ChatListWindowSet =
+            try {
+                build()
+            } catch (failure: Throwable) {
+                handles.values.forEach { handle -> runCatching { handle.close() } }
+                throw failure
+            }
 
         private suspend fun initialReplacements(handles: OpenedWindows): InitialReplacements =
             handles.mapValues { (_, handle) ->

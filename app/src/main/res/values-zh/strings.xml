@@ -1524,7 +1524,7 @@
     <string name="report_reason_malware">恶意软件或诈骗链接</string>
     <string name="report_reason_impersonation">冒充他人</string>
     <string name="report_reason_other">其他</string>
-    <string name="report_dismiss_failed">无法忽略举报，请重试。</string>
+    <string name="report_dismiss_failed">无法忽略该举报，请重试。</string>
     <string name="report_a_bug">报告错误</string>
     <string name="report_a_bug_subtitle">打开 GitHub 前先查看会分享哪些内容</string>
     <string name="about_and_licenses">关于与许可证</string>

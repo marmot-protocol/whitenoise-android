@@ -1548,7 +1548,7 @@
     <string name="report_reason_malware">Logiciel malveillant ou lien frauduleux</string>
     <string name="report_reason_impersonation">Usurpation d’identité</string>
     <string name="report_reason_other">Autre chose</string>
-    <string name="report_dismiss_failed">Impossible de rejeter les signalements. Réessayez.</string>
+    <string name="report_dismiss_failed">Impossible de rejeter le signalement. Réessayez.</string>
     <string name="report_a_bug">Signaler un bug</string>
     <string name="report_a_bug_subtitle">Vérifiez ce qui est partagé avant d’ouvrir GitHub</string>
     <string name="about_and_licenses">À propos et licences</string>

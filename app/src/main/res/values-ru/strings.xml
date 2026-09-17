@@ -1600,7 +1600,7 @@
     <string name="report_reason_malware">Вредоносная программа или мошенническая ссылка</string>
     <string name="report_reason_impersonation">Выдача себя за другого</string>
     <string name="report_reason_other">Другое</string>
-    <string name="report_dismiss_failed">Не удалось отклонить жалобы. Попробуйте ещё раз.</string>
+    <string name="report_dismiss_failed">Не удалось отклонить жалобу. Попробуйте ещё раз.</string>
     <string name="report_a_bug">Сообщить об ошибке</string>
     <string name="report_a_bug_subtitle">Прежде чем открывать GitHub, просмотрите, что будет отправлено</string>
     <string name="about_and_licenses">О приложении и лицензиях</string>

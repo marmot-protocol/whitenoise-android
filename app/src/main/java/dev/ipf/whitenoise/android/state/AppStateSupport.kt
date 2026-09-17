@@ -55,7 +55,7 @@ internal fun releaseFailureMarker(
         }
     }
 
-private val HEX_IDENTIFIER = Regex("[0-9a-fA-F]{64}")
+private val HEX_IDENTIFIER = Regex("[0-9a-fA-F]{64,}")
 private val BECH32_IDENTIFIER = Regex("\\b(npub1|nsec1|nprofile1|note1|nevent1)[0-9a-z]+")
 private val URL_OR_PATH = Regex("https?://\\S+|/data/\\S*")
 private val FIELD_TOKENS = Regex("\\b(details?|group|message|filename|path|report|error|reason)=")

@@ -32,10 +32,14 @@ internal fun AvatarAssetFfi.isRenderable(): Boolean =
         (availability == AvatarAvailabilityFfi.READY || availability == AvatarAvailabilityFfi.STALE)
 
 /**
- * The cache key a durable avatar occupies in [AvatarImageLoader]. The content revision is part of it so a
- * refreshed avatar never renders from the previous bytes, and it can never collide with a URL key.
+ * The cache key a durable avatar occupies in [AvatarImageLoader]. The account and content revision are
+ * part of it, so another account's bytes and a refreshed avatar's previous bytes never render, and it can
+ * never collide with a URL key.
  */
-internal fun AvatarAssetFfi.cacheKey(): String? = reference?.let { "marmot-avatar:$it@$contentRevision" }
+internal fun AvatarAssetFfi.cacheKey(accountRef: String): String? {
+    val ref = reference ?: return null
+    return "marmot-avatar:$accountRef:$ref@$contentRevision"
+}
 
 /**
  * Bytes MarmotKit already holds for [asset], decoded and cached, or null when it has none to give. Use it
@@ -51,8 +55,8 @@ internal suspend fun WhiteNoiseAppState.durableAvatar(asset: AvatarAssetFfi?): I
     if (asset?.wantsAcquisition() == true) requestAvatars(listOf(asset.target))
     val renderable = asset?.takeIf { it.isRenderable() }
     val reference = renderable?.reference
-    val key = renderable?.cacheKey()
     val account = activeAccountRef
+    val key = account?.let { renderable?.cacheKey(it) }
     if (reference == null || key == null || account == null) return null
     return AvatarImageLoader.cachedImage(key) ?: readDurableAvatar(account, reference, key)
 }
@@ -63,12 +67,13 @@ private suspend fun WhiteNoiseAppState.readDurableAvatar(
     reference: String,
     key: String,
 ): ImageBitmap? {
+    val lifetime = AvatarImageLoader.currentCacheLifetime()
     val payload =
         runCatchingCancellable {
             marmotIo { readAvatarAssets(account, listOf(reference), DURABLE_AVATAR_MAX_BYTES) }
         }.getOrNull()?.firstOrNull()
     val bytes = payload?.takeUnless { it.deferred || it.bytes.isEmpty() }?.bytes ?: return null
-    return AvatarImageLoader.decodeAndCache(key, bytes)
+    return AvatarImageLoader.decodeAndCache(key, bytes, lifetime)
 }
 
 /**

@@ -33,25 +33,29 @@ class AvatarAssetsTest {
     /** The cache key follows the content revision, so a refreshed avatar cannot reuse the old bytes. */
     @Test
     fun cacheKeyChangesWithTheContentRevision() {
-        val first = asset(AvatarAvailabilityFfi.READY, revision = 1uL).cacheKey()
-        val second = asset(AvatarAvailabilityFfi.READY, revision = 2uL).cacheKey()
+        val first = asset(AvatarAvailabilityFfi.READY, revision = 1uL).cacheKey("acct")
+        val second = asset(AvatarAvailabilityFfi.READY, revision = 2uL).cacheKey("acct")
 
         assertNotEquals(first, second)
-        assertEquals("marmot-avatar:ref-1@1", first)
+        assertEquals("marmot-avatar:acct:ref-1@1", first)
     }
 
     /** An asset the engine holds nothing for occupies no cache key at all. */
     @Test
     fun anAssetWithoutAReferenceHasNoCacheKey() {
-        assertNull(asset(AvatarAvailabilityFfi.MISSING, reference = null).cacheKey())
+        assertNull(asset(AvatarAvailabilityFfi.MISSING, reference = null).cacheKey("acct"))
     }
 
     /** Two rows sharing one avatar reference share its cache entry rather than decoding twice. */
     @Test
     fun theSameReferenceAndRevisionShareOneKey() {
         assertEquals(
-            asset(AvatarAvailabilityFfi.READY).cacheKey(),
-            asset(AvatarAvailabilityFfi.STALE).cacheKey(),
+            asset(AvatarAvailabilityFfi.READY).cacheKey("acct"),
+            asset(AvatarAvailabilityFfi.STALE).cacheKey("acct"),
+        )
+        assertNotEquals(
+            asset(AvatarAvailabilityFfi.READY).cacheKey("acct"),
+            asset(AvatarAvailabilityFfi.READY).cacheKey("other"),
         )
     }
 

@@ -1548,7 +1548,7 @@
     <string name="report_reason_malware">Malware o link truffaldino</string>
     <string name="report_reason_impersonation">Furto d’identità</string>
     <string name="report_reason_other">Altro</string>
-    <string name="report_dismiss_failed">Impossibile ignorare le segnalazioni. Riprova.</string>
+    <string name="report_dismiss_failed">Impossibile ignorare la segnalazione. Riprova.</string>
     <string name="report_a_bug">Segnala un bug</string>
     <string name="report_a_bug_subtitle">Controlla cosa viene condiviso prima di aprire GitHub</string>
     <string name="about_and_licenses">Informazioni e licenze</string>

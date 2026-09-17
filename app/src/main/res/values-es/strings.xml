@@ -1548,7 +1548,7 @@
     <string name="report_reason_malware">Malware o enlace fraudulento</string>
     <string name="report_reason_impersonation">Suplantación de identidad</string>
     <string name="report_reason_other">Otra cosa</string>
-    <string name="report_dismiss_failed">No se pudieron descartar las denuncias. Inténtalo de nuevo.</string>
+    <string name="report_dismiss_failed">No se pudo descartar la denuncia. Inténtalo de nuevo.</string>
     <string name="report_a_bug">Informar de un error</string>
     <string name="report_a_bug_subtitle">Revisa lo que se comparte antes de abrir GitHub</string>
     <string name="about_and_licenses">Acerca de y licencias</string>

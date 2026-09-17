@@ -630,7 +630,7 @@
     <string name="report_reason_malware">Malware or a scam link</string>
     <string name="report_reason_impersonation">Impersonation</string>
     <string name="report_reason_other">Something else</string>
-    <string name="report_dismiss_failed">Couldn\'t dismiss the reports. Try again.</string>
+    <string name="report_dismiss_failed">Couldn\'t dismiss the report. Try again.</string>
     <string name="report_a_bug">Report a bug</string>
     <string name="report_a_bug_subtitle">Review what is shared before opening GitHub</string>
     <string name="about_and_licenses">About &amp; licenses</string>

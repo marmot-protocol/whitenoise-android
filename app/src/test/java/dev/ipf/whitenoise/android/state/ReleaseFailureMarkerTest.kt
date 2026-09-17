@@ -51,6 +51,7 @@ class ReleaseFailureMarkerTest {
         assertEquals("detail:x error:y", redactForReleaseLog("detail=x error=y"))
         assertEquals("cause: IOExc", redactForReleaseLog("Caused by: IOException"))
         assertEquals("<hex>", redactForReleaseLog("f".repeat(64)))
+        assertEquals("<hex>", redactForReleaseLog("f".repeat(65)))
         assertEquals("<bech32> and <url>", redactForReleaseLog("npub1abc and https://example.org/a?b=c"))
     }
 }
