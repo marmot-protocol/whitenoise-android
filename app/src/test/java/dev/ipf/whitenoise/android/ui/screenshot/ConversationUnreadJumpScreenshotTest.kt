@@ -35,6 +35,7 @@ import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollAnchor
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollCoordinator
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollMode
 import dev.ipf.whitenoise.android.ui.conversation.LazyListConversationScrollWriter
+import dev.ipf.whitenoise.android.ui.conversation.conversationTimelineListIndex
 import dev.ipf.whitenoise.android.ui.conversation.isConversationItemTopAligned
 import dev.ipf.whitenoise.android.ui.conversation.jumpToUnreadOrNewest
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationNearBottom
@@ -62,13 +63,20 @@ class ConversationUnreadJumpScreenshotTest {
         lateinit var coordinator: ConversationScrollCoordinator
         val messages = (1..10).map { "Message $it" }
         val unreadTimelineIndex = 4
-        val unreadListIndex = unreadTimelineIndex + 1
-        val tailListIndex = messages.size
+        // Reversed emission: [newest row][messages, newest first][older header].
+        val trailingRowCount = 1
+        val unreadListIndex =
+            conversationTimelineListIndex(
+                timelineIndex = unreadTimelineIndex,
+                timelineSize = messages.size,
+                trailingRowCount = trailingRowCount,
+            )
+        val tailListIndex = 0
 
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
                 Surface(modifier = Modifier.fillMaxWidth().height(420.dp).testTag(ROOT_TAG)) {
-                    val listState = rememberLazyListState(initialFirstVisibleItemIndex = 2)
+                    val listState = rememberLazyListState(initialFirstVisibleItemIndex = 8)
                     val scope = rememberCoroutineScope()
                     var pendingUnreadId: String? by remember { mutableStateOf(UNREAD_ID) }
                     coordinator =
@@ -82,7 +90,7 @@ class ConversationUnreadJumpScreenshotTest {
                         rememberConversationNearBottom(
                             listState = listState,
                             renderedTimelineSize = messages.size,
-                            hasOlderHeader = false,
+                            trailingRowCount = trailingRowCount,
                         )
 
                     Box(modifier = Modifier.fillMaxSize()) {
@@ -90,12 +98,17 @@ class ConversationUnreadJumpScreenshotTest {
                             state = listState,
                             modifier = Modifier.fillMaxSize().testTag(LIST_TAG),
                             contentPadding = PaddingValues(bottom = 12.dp),
+                            reverseLayout = true,
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            item(key = "older-loading") {
-                                Text("Earlier messages", modifier = Modifier.padding(12.dp))
+                            item(key = "bottom-spacer") {
+                                Text("Newest message", modifier = Modifier.padding(12.dp).testTag(TAIL_TAG))
                             }
-                            itemsIndexed(messages, key = { index, _ -> "message-$index" }) { index, label ->
+                            itemsIndexed(
+                                messages.asReversed(),
+                                key = { index, _ -> "message-${messages.size - 1 - index}" },
+                            ) { reversedIndex, label ->
+                                val index = messages.size - 1 - reversedIndex
                                 val isUnreadTarget = index == unreadTimelineIndex
                                 Column(
                                     modifier =
@@ -121,8 +134,8 @@ class ConversationUnreadJumpScreenshotTest {
                                     }
                                 }
                             }
-                            item(key = "bottom-spacer") {
-                                Text("Newest message", modifier = Modifier.padding(12.dp).testTag(TAIL_TAG))
+                            item(key = "older-loading") {
+                                Text("Earlier messages", modifier = Modifier.padding(12.dp))
                             }
                         }
 

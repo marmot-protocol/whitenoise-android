@@ -58,47 +58,52 @@ class ConversationGroupRecoveryRowIndexTest {
         )
     }
 
-    /** Shifts the resolved final message row by the recovery card's own row. */
+    /**
+     * Leaves the newest row at the reversed list's origin whatever sits above it.
+     *
+     * Structural rows are emitted above the timeline, so in the reversed list
+     * they occupy the high-index end and cannot shift the newest row.
+     */
     @Test
-    fun tailIndexAccountsForAVisibleRecoveryRow() {
-        val withoutRecovery =
-            conversationTimelineTailListIndex(
-                timelineSize = 4,
-                leadingStructuralRowCount =
-                    conversationTimelineLeadingStructuralRowCount(
-                        hasOlderHeader = false,
-                        hasInlineTopError = false,
-                        hasGroupRecovery = false,
-                    ),
-            )
-        val withRecovery =
-            conversationTimelineTailListIndex(
-                timelineSize = 4,
-                leadingStructuralRowCount =
-                    conversationTimelineLeadingStructuralRowCount(
-                        hasOlderHeader = false,
-                        hasInlineTopError = false,
-                        hasGroupRecovery = true,
-                    ),
-            )
-        assertEquals(4, withoutRecovery)
-        assertEquals(5, withRecovery)
+    fun tailRowIsUnaffectedByLeadingStructuralRows() {
+        assertEquals(
+            0,
+            conversationTimelineTailListIndex(timelineSize = 4, trailingRowCount = 0),
+        )
+        assertEquals(
+            1,
+            conversationTimelineTailListIndex(timelineSize = 4, trailingRowCount = 1),
+        )
     }
 
-    /** Leaves an empty timeline without a tail row whatever structural rows are shown. */
+    /** Leaves an empty timeline without a tail row. */
     @Test
-    fun emptyTimelineHasNoTailRowEvenWithARecoveryRow() {
-        assertEquals(
-            null,
-            conversationTimelineTailListIndex(
-                timelineSize = 0,
-                leadingStructuralRowCount =
-                    conversationTimelineLeadingStructuralRowCount(
-                        hasOlderHeader = true,
-                        hasInlineTopError = false,
-                        hasGroupRecovery = true,
-                    ),
-            ),
-        )
+    fun emptyTimelineHasNoTailRow() {
+        assertEquals(null, conversationTimelineTailListIndex(timelineSize = 0, trailingRowCount = 1))
+    }
+
+    /** Places the newest message at the origin and the oldest furthest from it. */
+    @Test
+    fun listIndexMappingInvertsChronologicalOrder() {
+        val size = 5
+        assertEquals(0, conversationTimelineListIndex(timelineIndex = 4, timelineSize = size, trailingRowCount = 0))
+        assertEquals(4, conversationTimelineListIndex(timelineIndex = 0, timelineSize = size, trailingRowCount = 0))
+        assertEquals(1, conversationTimelineListIndex(timelineIndex = 4, timelineSize = size, trailingRowCount = 1))
+    }
+
+    /** Round-trips every chronological position back through the reverse mapping. */
+    @Test
+    fun listIndexMappingRoundTrips() {
+        val size = 7
+        for (trailing in 0..1) {
+            for (timelineIndex in 0 until size) {
+                val listIndex =
+                    conversationTimelineListIndex(timelineIndex, size, trailing)
+                assertEquals(
+                    timelineIndex,
+                    conversationTimelineIndexForListIndex(listIndex, size, trailing),
+                )
+            }
+        }
     }
 }

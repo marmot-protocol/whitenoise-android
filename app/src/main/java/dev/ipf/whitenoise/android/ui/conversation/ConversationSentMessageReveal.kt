@@ -14,7 +14,7 @@ internal suspend fun ConversationScrollCoordinator.revealSentAtLiveTail(controll
         val renderedTimelineSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
         return conversationTimelineTailListIndex(
             timelineSize = renderedTimelineSize,
-            leadingStructuralRowCount = controller.conversationLeadingStructuralRowCount(renderedTimelineSize),
+            trailingRowCount = controller.conversationTrailingRowCount(renderedTimelineSize),
         ) ?: 0
     }
 

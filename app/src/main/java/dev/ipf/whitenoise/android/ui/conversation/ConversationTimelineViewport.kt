@@ -64,11 +64,15 @@ internal class ConversationTimelineViewport(
             (if (enabled) foregroundHeightPx.coerceAtMost(chromeHeightPx) else 0).toDp()
         }
 
-    /** Only overlap present in this native layout pass is removed, avoiding mixed-frame measurement projections. */
+    /**
+     * Only overlap present in this native layout pass is removed, avoiding
+     * mixed-frame measurement projections. The transcript is reversed, so the
+     * composer's clearance is the list's before-content padding.
+     */
     fun readingLayoutInfo(): LazyListLayoutInfo {
         val native = listState.layoutInfo
         val (base, overlap) = measuredPadding
-        val laidOutOverlap = (native.afterContentPadding - base).coerceIn(0, overlap)
+        val laidOutOverlap = (native.beforeContentPadding - base).coerceIn(0, overlap)
         return conversationReadingLayoutInfo(native, laidOutOverlap)
     }
 
@@ -106,6 +110,9 @@ internal class ConversationTimelineViewport(
 /**
  * Read-only occlusion projection for native geometry consumers. Item offsets retain their physical coordinates;
  * the native LazyListState and its scroll writers remain untouched. Partial rows remain visible and usable.
+ *
+ * The transcript is reversed, so the composer occludes the list's low-offset
+ * edge: the clear interval starts after the overlap rather than ending before it.
  */
 internal fun conversationReadingLayoutInfo(
     native: LazyListLayoutInfo,
@@ -113,14 +120,14 @@ internal fun conversationReadingLayoutInfo(
 ): LazyListLayoutInfo {
     val overlap = overlapPx.coerceIn(0, native.viewportSize.height)
     if (overlap == 0) return native
-    val clearEnd = native.viewportEndOffset - overlap
+    val clearStart = native.viewportStartOffset + overlap
     return object : LazyListLayoutInfo by native {
         override val viewportSize = IntSize(native.viewportSize.width, native.viewportSize.height - overlap)
-        override val viewportEndOffset = clearEnd
-        override val afterContentPadding = (native.afterContentPadding - overlap).coerceAtLeast(0)
+        override val viewportStartOffset = clearStart
+        override val beforeContentPadding = (native.beforeContentPadding - overlap).coerceAtLeast(0)
         override val visibleItemsInfo =
             native.visibleItemsInfo.filter {
-                it.offset < clearEnd && it.offset + it.size > native.viewportStartOffset
+                it.offset + it.size > clearStart && it.offset < native.viewportEndOffset
             }
     }
 }

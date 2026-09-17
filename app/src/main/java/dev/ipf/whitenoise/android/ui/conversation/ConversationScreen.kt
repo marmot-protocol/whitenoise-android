@@ -486,22 +486,25 @@ private fun rememberConversationReadAnchor(
     entrySessionIdentity: Any,
     renderedTimeline: List<TimelineMessage>,
     listState: LazyListState,
-    leadingStructuralRowCount: Int,
+    trailingRowCount: Int,
     initialTimelineAnchored: Boolean,
 ): MutableState<String?> {
     val readAnchor = remember(entrySessionIdentity) { mutableStateOf(controller.lastReadMessageId) }
     val renderedSize = renderedTimeline.size
     val currentHighestVisibleTimelineIndex by
-        remember(listState, renderedSize, leadingStructuralRowCount) {
+        remember(listState, renderedSize, trailingRowCount) {
             derivedStateOf {
                 val visible = listState.layoutInfo.visibleItemsInfo
-                if (visible.isEmpty()) return@derivedStateOf -1
-                // LazyColumn layout: [top spacer][maybe group recovery]
-                // [maybe top error][maybe older-loading][timeline items].
-                // Tail clearance is content padding, not a zero-sized list item.
-                val firstTimelineListIndex = 1 + leadingStructuralRowCount
-                (visible.last().index - firstTimelineListIndex)
-                    .coerceAtMost(renderedSize - 1)
+                if (visible.isEmpty() || renderedSize == 0) return@derivedStateOf -1
+                // Reversed layout, bottom to top: [maybe bottom error]
+                // [timeline items, newest first][maybe older-loading]
+                // [maybe top error][maybe group recovery][top spacer].
+                // The lowest visible index is therefore the newest row shown.
+                conversationTimelineIndexForListIndex(
+                    listIndex = visible.first().index,
+                    timelineSize = renderedSize,
+                    trailingRowCount = trailingRowCount,
+                ).coerceIn(0, renderedSize - 1)
             }
         }
     val currentHighestVisibleMessageId =
@@ -817,6 +820,14 @@ internal fun ConversationScreen(
         remember(controller.timeline) {
             controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
         }
+
+    // The transcript renders as a reversed lazy column so the newest message is
+    // the list's own layout origin. That keeps the bottom edge pinned while the
+    // keyboard resizes the viewport, with no compensating scroll writes. The
+    // chronological list stays authoritative everywhere else, so this is a view
+    // over it rather than a second copy.
+    val renderedTimelineNewestFirst =
+        remember(renderedTimeline) { renderedTimeline.asReversed() }
     val navigationState =
         rememberConversationNavigationState(
             controller = controller,
@@ -849,7 +860,7 @@ internal fun ConversationScreen(
                     anchorTailImmediately = firstFrameSeed.anchorTailImmediately,
                     seededTailAlignmentCommitted = seededTailAlignmentCommitted,
                     viewportMeasured = timelineViewport.readingLayoutInfo().viewportSize.height > 0,
-                    canScrollForward = listState.canScrollForward,
+                    canScrollTowardNewest = listState.canScrollBackward,
                 )
             }
         }
@@ -942,7 +953,11 @@ internal fun ConversationScreen(
             controller.errorEdge == ConversationLoadFailureEdge.TOP
     val inlineTopErrorCount = if (hasInlineTopError) 1 else 0
     val groupRecoveryCount = if (controller.conversationGroupRecoveryRowVisible()) 1 else 0
-    val leadingStructuralRowCount = controller.conversationLeadingStructuralRowCount(renderedTimeline.size)
+
+    // Rows the reversed list emits below the newest message. Every conversion
+    // between a chronological timeline position and a lazy-list row goes
+    // through this one count.
+    val trailingRowCount = controller.conversationTrailingRowCount(renderedTimeline.size)
     val conversationMedia =
         rememberSharedMediaTiles(
             controller = controller,
@@ -1090,18 +1105,12 @@ internal fun ConversationScreen(
     /** Captures the logical first visible message against the latest filtered timeline. */
     fun currentScrollAnchor(): ConversationScrollAnchor {
         val liveRenderedTimeline = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
-        val liveHasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
         return conversationScrollAnchor(
             listState = listState,
             timelineViewport = timelineViewport,
             renderedItemIds = liveRenderedTimeline.map { it.id },
             renderedMessageIds = liveRenderedTimeline.map { it.record.messageIdHex },
-            hasOlderHeader = liveHasOlderHeader,
-            hasInlineTopError =
-                liveRenderedTimeline.isNotEmpty() &&
-                    controller.error != null &&
-                    controller.errorEdge == ConversationLoadFailureEdge.TOP,
-            hasGroupRecovery = controller.conversationGroupRecoveryRowVisible(),
+            trailingRowCount = controller.conversationTrailingRowCount(liveRenderedTimeline.size),
         )
     }
 
@@ -1270,9 +1279,7 @@ internal fun ConversationScreen(
             listState = listState,
             timelineViewport = timelineViewport,
             renderedTimelineSize = renderedSize,
-            hasOlderHeader = hasOlderHeader,
-            hasInlineTopError = hasInlineTopError,
-            hasGroupRecovery = controller.conversationGroupRecoveryRowVisible(),
+            trailingRowCount = trailingRowCount,
         )
 
     /** Resolves a saved logical anchor after current header and error rows. */
@@ -1287,9 +1294,11 @@ internal fun ConversationScreen(
                     ?.let { itemId -> liveRenderedTimeline.indexOfFirst { it.id == itemId } }
                     ?.takeIf { it >= 0 }
                 ?: return null
-        return 1 +
-            controller.conversationLeadingStructuralRowCount(liveRenderedTimeline.size) +
-            timelineIndex
+        return conversationTimelineListIndex(
+            timelineIndex = timelineIndex,
+            timelineSize = liveRenderedTimeline.size,
+            trailingRowCount = controller.conversationTrailingRowCount(liveRenderedTimeline.size),
+        )
     }
 
     // Drag interactions are the authority for user intent. Programmatic list
@@ -1317,12 +1326,7 @@ internal fun ConversationScreen(
                         listState = listState,
                         timelineViewport = timelineViewport,
                         timelineSize = liveRenderedSize,
-                        hasOlderHeader = liveHasOlderHeader,
-                        hasInlineTopError =
-                            liveRenderedSize > 0 &&
-                                controller.error != null &&
-                                controller.errorEdge == ConversationLoadFailureEdge.TOP,
-                        hasGroupRecovery = controller.conversationGroupRecoveryRowVisible(),
+                        trailingRowCount = controller.conversationTrailingRowCount(liveRenderedSize),
                     ),
                 )
             },
@@ -1334,7 +1338,7 @@ internal fun ConversationScreen(
             entrySessionIdentity = entryUnreadSessionIdentity,
             renderedTimeline = renderedTimeline,
             listState = listState,
-            leadingStructuralRowCount = leadingStructuralRowCount,
+            trailingRowCount = trailingRowCount,
             initialTimelineAnchored = initialTimelineAnchored,
         )
     DisposableEffect(controller) {
@@ -1345,11 +1349,13 @@ internal fun ConversationScreen(
                 rendered.isNotEmpty() &&
                     controller.error != null &&
                     controller.errorEdge == ConversationLoadFailureEdge.TOP
-            val firstTimelineIndex =
-                listState.firstVisibleItemIndex -
-                    1 -
-                    controller.conversationLeadingStructuralRowCount(rendered.size)
-            val anchor = rendered.getOrNull(firstTimelineIndex)
+            val newestVisibleTimelineIndex =
+                conversationTimelineIndexForListIndex(
+                    listIndex = listState.firstVisibleItemIndex,
+                    timelineSize = rendered.size,
+                    trailingRowCount = controller.conversationTrailingRowCount(rendered.size),
+                )
+            val anchor = rendered.getOrNull(newestVisibleTimelineIndex)
             onSaveScrollSnapshot(
                 conversationScrollSnapshotOnLeave(
                     firstVisibleItemIndex = listState.firstVisibleItemIndex,
@@ -1862,11 +1868,12 @@ internal fun ConversationScreen(
                 .indexOfFirst { it.record.messageIdHex == messageId }
                 .takeIf { it >= 0 }
                 ?: return null
-        val leadingStructuralRowCount =
-            controller.conversationLeadingStructuralRowCount(
-                controller.timeline.count { !MessageProjector.isEdit(it.record) },
-            )
-        return 1 + leadingStructuralRowCount + timelineIndex
+        val liveSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
+        return conversationTimelineListIndex(
+            timelineIndex = timelineIndex,
+            timelineSize = liveSize,
+            trailingRowCount = controller.conversationTrailingRowCount(liveSize),
+        )
     }
 
     ConversationTtsFollowEffects(
@@ -1888,6 +1895,29 @@ internal fun ConversationScreen(
                 focusMessageRequestId
             },
     )
+
+    /**
+     * Heights of the message bubbles currently on screen, used to estimate the
+     * centering offset for a row that has not been measured yet.
+     */
+    fun visibleBubbleHeights(layoutInfo: LazyListLayoutInfo): List<Int> {
+        val rendered = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+        val trailingRows = controller.conversationTrailingRowCount(rendered.size)
+        val messageRows = trailingRows..(trailingRows + rendered.size - 1)
+        return layoutInfo.visibleItemsInfo
+            .filter { visibleItem ->
+                if (visibleItem.index !in messageRows) return@filter false
+                val row =
+                    rendered.getOrNull(
+                        conversationTimelineIndexForListIndex(
+                            listIndex = visibleItem.index,
+                            timelineSize = rendered.size,
+                            trailingRowCount = trailingRows,
+                        ),
+                    ) ?: return@filter false
+                timelineRowKind(row.record, appState.streamingDebugEnabled) == TimelineRowKind.Bubble
+            }.map { it.size }
+    }
 
     /**
      * Centers [targetMessageId] with surrounding context through the shared latest-wins owner.
@@ -1920,18 +1950,8 @@ internal fun ConversationScreen(
                 if (skipIfFullyVisible && layoutInfo.isItemFullyVisible(targetIndex)) {
                     return@programmaticJump
                 }
-                val renderedForHeightSample = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
-                val firstTimelineListIndex =
-                    1 + controller.conversationLeadingStructuralRowCount(renderedForHeightSample.size)
-                val lastTimelineListIndex = firstTimelineListIndex + renderedForHeightSample.size - 1
                 val visibleTargetHeight = layoutInfo.visibleItemsInfo.firstOrNull { it.index == targetIndex }?.size
-                val visibleTimelineHeights =
-                    layoutInfo.visibleItemsInfo
-                        .filter { visibleItem ->
-                            if (visibleItem.index !in firstTimelineListIndex..lastTimelineListIndex) return@filter false
-                            val row = renderedForHeightSample.getOrNull(visibleItem.index - firstTimelineListIndex) ?: return@filter false
-                            timelineRowKind(row.record, appState.streamingDebugEnabled) == TimelineRowKind.Bubble
-                        }.map { it.size }
+                val visibleTimelineHeights = visibleBubbleHeights(layoutInfo)
                 val itemHeight =
                     ReplyNavigation.itemHeightForScrollPx(
                         targetMessageId = targetMessageId,
@@ -2012,13 +2032,9 @@ internal fun ConversationScreen(
                         return@highlightWhile false
                     }
                     if (!navigationRequest.isCurrent()) return@highlightWhile false
-                    val leadingStructuralRowCount =
-                        controller.conversationLeadingStructuralRowCount(
-                            controller.timeline.count { !MessageProjector.isEdit(it.record) },
-                        )
                     centerTimelineItemAt(
                         targetMessageId,
-                        1 + leadingStructuralRowCount + timelineIndex,
+                        requireNotNull(currentTimelineListIndex(targetMessageId)),
                         ConversationScrollReason.Reply,
                         skipIfFullyVisible = true,
                     )
@@ -2050,14 +2066,10 @@ internal fun ConversationScreen(
                     return@launch
                 }
                 if (!navigationRequest.isCurrent()) return@launch
-                val leadingStructuralRowCount =
-                    controller.conversationLeadingStructuralRowCount(
-                        controller.timeline.count { !MessageProjector.isEdit(it.record) },
-                    )
                 val centered =
                     centerTimelineItemAt(
                         targetMessageId,
-                        1 + leadingStructuralRowCount + timelineIndex,
+                        requireNotNull(currentTimelineListIndex(targetMessageId)),
                         ConversationScrollReason.Mention,
                     )
                 if (!centered) return@launch
@@ -2084,7 +2096,7 @@ internal fun ConversationScreen(
     val tailTimelineIndex =
         conversationTimelineTailListIndex(
             timelineSize = renderedTimeline.size,
-            leadingStructuralRowCount = leadingStructuralRowCount,
+            trailingRowCount = trailingRowCount,
         ) ?: 0
     val currentTailIndex by rememberUpdatedState(newValue = tailTimelineIndex)
     val seededTailAlignmentReady =
@@ -2116,17 +2128,9 @@ internal fun ConversationScreen(
         },
         onTailAlignmentExhausted = { seededTailAlignmentRecoveryVisible = true },
     )
-    ConversationTailInsetReanchorEffect(
-        scrollCoordinator = scrollCoordinator,
-        bottomChromeHeightPx = measuredBottomChromeHeightPx,
-        snackbarContentInsetPx = with(density) { snackbarContentInset.value.roundToPx() },
-        bottomInputRevision = bottomInputRevision,
-        hasTimeline = renderedTimeline.isNotEmpty(),
-        initialTimelineAnchored = initialTimelineAnchored,
-        routePresentationFrozen = freezeRoutePresentation,
-        foregroundRestoreInProgress = scrollCoordinator.foregroundRestoreInProgress,
-        currentTailIndex = { currentTailIndex },
-    )
+    // The reversed transcript keeps its newest row against the composer through
+    // layout alone, so a growing keyboard, snackbar or composer no longer needs
+    // a compensating scroll write after the fact (#2621).
 
     // Edit events are derived state, so a raw subscription page can be non-empty
     // while offering no row for the initial anchor. Page backward before the
@@ -2188,11 +2192,20 @@ internal fun ConversationScreen(
     // frame. Mirrors the nearBottom / currentHighestVisibleTimelineIndex
     // derived-state pattern above (#375).
     val stickyDayLabelState =
-        remember(renderedTimeline, transcriptLocale, leadingStructuralRowCount) {
+        remember(renderedTimeline, transcriptLocale, trailingRowCount) {
             derivedStateOf {
+                // Reversed list: the oldest row on screen is the highest visible
+                // index, which is what the ribbon labels.
+                val oldestVisibleListIndex =
+                    listState.layoutInfo.visibleItemsInfo
+                        .lastOrNull()
+                        ?.index ?: return@derivedStateOf ""
                 val i =
-                    (listState.firstVisibleItemIndex - 1 - leadingStructuralRowCount)
-                        .coerceIn(0, (renderedTimeline.size - 1).coerceAtLeast(0))
+                    conversationTimelineIndexForListIndex(
+                        listIndex = oldestVisibleListIndex,
+                        timelineSize = renderedTimeline.size,
+                        trailingRowCount = trailingRowCount,
+                    ).coerceIn(0, (renderedTimeline.size - 1).coerceAtLeast(0))
                 renderedTimeline
                     .getOrNull(i)
                     ?.record
@@ -2293,11 +2306,14 @@ internal fun ConversationScreen(
             val visibleRows = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
             val timelineIndex = visibleRows.indexOfFirst { it.record.messageIdHex == messageIdHex }
             if (timelineIndex >= 0) {
-                val leadingRows = controller.conversationLeadingStructuralRowCount(visibleRows.size)
                 val centered =
                     centerTimelineItemAt(
                         messageIdHex,
-                        1 + leadingRows + timelineIndex,
+                        conversationTimelineListIndex(
+                            timelineIndex = timelineIndex,
+                            timelineSize = visibleRows.size,
+                            trailingRowCount = controller.conversationTrailingRowCount(visibleRows.size),
+                        ),
                         ConversationScrollReason.Search,
                     )
                 if (centered) showTransientMessageHighlight(messageIdHex)
@@ -2316,14 +2332,10 @@ internal fun ConversationScreen(
                 .filterNot { MessageProjector.isEdit(it.record) }
                 .indexOfFirst { it.record.messageIdHex == messageIdHex }
         if (timelineIndex >= 0 && navigationRequest.isCurrent()) {
-            val liveLeadingStructuralRowCount =
-                controller.conversationLeadingStructuralRowCount(
-                    controller.timeline.count { !MessageProjector.isEdit(it.record) },
-                )
             val centered =
                 centerTimelineItemAt(
                     messageIdHex,
-                    1 + liveLeadingStructuralRowCount + timelineIndex,
+                    requireNotNull(currentTimelineListIndex(messageIdHex)),
                     ConversationScrollReason.Search,
                 )
             if (centered && navigationRequest.isCurrent()) {
@@ -2472,21 +2484,32 @@ internal fun ConversationScreen(
         }
     }
 
-    // Extend history a few rows before the reader reaches the top, while a
-    // keyed message is still the anchor. Compose's keyed prepend then holds
-    // those messages at the same offset in the same measure pass — the new
-    // page lands above the fold and the reader scrolls up into it with no jump
-    // or blink (no post-hoc scroll, which is what caused the flip).
+    // Extend history a few rows before the reader reaches the top. The reversed
+    // list keeps history at its high-index end, so an older page appends there
+    // and never disturbs the anchored newest edge — the framework holds the
+    // visible rows in the same measure pass with no post-hoc scroll.
     LaunchedEffect(listState, controller) {
-        snapshotFlow { listState.firstVisibleItemIndex }
-            .collect { firstIndex ->
-                if (!initialTimelineAnchored || !controller.hasMoreBefore || controller.isLoadingOlder) {
-                    return@collect
-                }
-                if (firstIndex <= leadingStructuralRowCount + OLDER_PAGE_PREFETCH_ROWS) {
-                    controller.loadOlder()
-                }
+        snapshotFlow {
+            listState.layoutInfo.visibleItemsInfo
+                .lastOrNull()
+                ?.index ?: -1
+        }.collect { oldestVisibleIndex ->
+            if (!initialTimelineAnchored || !controller.hasMoreBefore || controller.isLoadingOlder) {
+                return@collect
             }
+            if (oldestVisibleIndex < 0) return@collect
+            val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
+            if (liveRenderedSize == 0) return@collect
+            val oldestMessageListIndex =
+                conversationTimelineListIndex(
+                    timelineIndex = 0,
+                    timelineSize = liveRenderedSize,
+                    trailingRowCount = controller.conversationTrailingRowCount(liveRenderedSize),
+                )
+            if (oldestVisibleIndex >= oldestMessageListIndex - OLDER_PAGE_PREFETCH_ROWS) {
+                controller.loadOlder()
+            }
+        }
     }
     // Loading the authoritative unread boundary can shift a capped subscription
     // window away from the newest edge. Page forward again as the reader reaches
@@ -2501,22 +2524,22 @@ internal fun ConversationScreen(
                 false
             } else {
                 val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
-                val liveLeadingStructuralRowCount =
-                    controller.conversationLeadingStructuralRowCount(liveRenderedSize)
+                val liveTrailingRowCount = controller.conversationTrailingRowCount(liveRenderedSize)
                 val liveNewestEdgeIndex =
-                    conversationTimelineTailListIndex(liveRenderedSize, liveLeadingStructuralRowCount)
+                    conversationTimelineTailListIndex(liveRenderedSize, liveTrailingRowCount)
                         // An edit-only page has no message-backed tail yet; retain
-                        // forward paging from its last structural header/spacer.
-                        ?: liveLeadingStructuralRowCount
-                val lastVisibleIndex =
+                        // forward paging from the rows below the newest edge.
+                        ?: liveTrailingRowCount
+                // Reversed list: the newest edge is the low-index end, so the
+                // lowest visible row is what approaches it.
+                val newestVisibleIndex =
                     timelineViewport
                         .readingLayoutInfo()
                         .visibleItemsInfo
-                        .lastOrNull()
-                        ?.index ?: -1
-                // The removed bottom sentinel sat one slot after the real tail.
+                        .firstOrNull()
+                        ?.index ?: Int.MAX_VALUE
                 // Keep the established inclusive N-row prefetch window.
-                lastVisibleIndex >= liveNewestEdgeIndex - NEWER_PAGE_PREFETCH_ROWS + 1
+                newestVisibleIndex <= liveNewestEdgeIndex + NEWER_PAGE_PREFETCH_ROWS - 1
             }
         }.distinctUntilChanged()
             .filter { it }
@@ -2632,29 +2655,18 @@ internal fun ConversationScreen(
                 if (rendered.isEmpty()) {
                     null
                 } else {
-                    val liveOlderHeaderCount =
-                        if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
-                    val liveInlineTopErrorCount =
-                        if (
-                            controller.error != null &&
-                            controller.errorEdge == ConversationLoadFailureEdge.TOP
-                        ) {
-                            1
-                        } else {
-                            0
-                        }
-                    val liveLeadingStructuralRowCount = liveOlderHeaderCount + liveInlineTopErrorCount
+                    val liveTrailingRowCount = controller.conversationTrailingRowCount(rendered.size)
                     val liveTailTimelineIndex =
-                        conversationTimelineTailListIndex(rendered.size, liveLeadingStructuralRowCount)
+                        conversationTimelineTailListIndex(rendered.size, liveTrailingRowCount)
                             ?: return@snapshotFlow null
+                    // Reversed rows: history sits above the tail, so a restored
+                    // anchor may never resolve below the newest row.
                     conversationScrollRestoreListIndex(
                         snapshot = restore,
                         renderedItemIds = rendered.map { it.id },
                         renderedMessageIds = rendered.map { it.record.messageIdHex },
-                        olderHeaderCount = liveOlderHeaderCount,
-                        inlineTopErrorCount = liveInlineTopErrorCount,
-                        groupRecoveryCount = if (controller.conversationGroupRecoveryRowVisible()) 1 else 0,
-                    ).coerceAtMost(liveTailTimelineIndex)
+                        trailingRowCount = liveTrailingRowCount,
+                    ).coerceAtLeast(liveTailTimelineIndex)
                 }
             }.filterNotNull()
                 .first()
@@ -2685,20 +2697,13 @@ internal fun ConversationScreen(
         }
         val restoredRendered =
             controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
-        val restoredOlderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
-        val restoredInlineTopErrorCount =
-            if (
-                restoredRendered.isNotEmpty() &&
-                controller.error != null &&
-                controller.errorEdge == ConversationLoadFailureEdge.TOP
-            ) {
-                1
-            } else {
-                0
-            }
         val restoredItem =
             restoredRendered.getOrNull(
-                targetIndex - 1 - controller.conversationLeadingStructuralRowCount(restoredRendered.size),
+                conversationTimelineIndexForListIndex(
+                    listIndex = targetIndex,
+                    timelineSize = restoredRendered.size,
+                    trailingRowCount = controller.conversationTrailingRowCount(restoredRendered.size),
+                ),
             )
         scrollCoordinator.settleReadingAt(
             ConversationScrollAnchor(
@@ -2712,8 +2717,17 @@ internal fun ConversationScreen(
             structure =
                 ConversationTimelineStructure(
                     rowKeys = restoredRendered.map { it.id to it.record.messageIdHex },
-                    olderHeaderCount = restoredOlderHeaderCount,
-                    inlineTopErrorCount = restoredInlineTopErrorCount,
+                    olderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0,
+                    inlineTopErrorCount =
+                        if (
+                            restoredRendered.isNotEmpty() &&
+                            controller.error != null &&
+                            controller.errorEdge == ConversationLoadFailureEdge.TOP
+                        ) {
+                            1
+                        } else {
+                            0
+                        },
                     groupRecoveryCount = if (controller.conversationGroupRecoveryRowVisible()) 1 else 0,
                 ),
             viewportHeight = timelineViewport.readingLayoutInfo().viewportSize.height,
@@ -2764,19 +2778,23 @@ internal fun ConversationScreen(
             } else {
                 0
             }
-        val anchoredLeadingStructuralRowCount = anchoredOlderHeaderCount + anchoredInlineTopErrorCount
+        val anchoredTrailingRowCount = controller.conversationTrailingRowCount(anchoredTimeline.size)
         val anchoredTailTimelineIndex =
             requireNotNull(
                 conversationTimelineTailListIndex(
                     anchoredTimeline.size,
-                    anchoredLeadingStructuralRowCount,
+                    anchoredTrailingRowCount,
                 ),
             )
         val renderedUnreadIndex =
             unreadId?.let { id -> anchoredTimeline.indexOfFirst { it.record.messageIdHex == id } } ?: -1
         val targetIndex =
             if (renderedUnreadIndex >= 0) {
-                1 + anchoredLeadingStructuralRowCount + renderedUnreadIndex
+                conversationTimelineListIndex(
+                    timelineIndex = renderedUnreadIndex,
+                    timelineSize = anchoredTimeline.size,
+                    trailingRowCount = anchoredTrailingRowCount,
+                )
             } else {
                 anchoredTailTimelineIndex
             }
@@ -2980,15 +2998,11 @@ internal fun ConversationScreen(
             appState.present(R.string.toast_original_message_unavailable)
             return@LaunchedEffect
         }
-        val leadingStructuralRowCount =
-            controller.conversationLeadingStructuralRowCount(
-                controller.timeline.count { !MessageProjector.isEdit(it.record) },
-            )
         // Center the match so prior + subsequent context is visible (#595).
         val centered =
             centerTimelineItemAt(
                 target,
-                1 + leadingStructuralRowCount + timelineIndex,
+                requireNotNull(currentTimelineListIndex(target)),
                 ConversationScrollReason.FocusMessage,
             )
         if (!centered) return@LaunchedEffect
@@ -3689,6 +3703,12 @@ internal fun ConversationScreen(
                                             PerformanceTestTags.CONVERSATION_TRANSCRIPT_VISIBLE,
                                             enabled = transcriptReadyToReveal && renderedTimeline.isNotEmpty(),
                                         ).onGloballyPositioned(timelineViewport::onPaintViewportMeasured),
+                                // Bottom-anchored like every established chat
+                                // client: the viewport shrinking under the keyboard
+                                // moves rows up as a layout consequence, so the
+                                // transcript tracks the IME instead of being
+                                // corrected after it settles (#2621).
+                                reverseLayout = true,
                                 verticalArrangement = CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT,
                                 // Content padding owns the final composer interval
                                 // and temporary notice clearance. Keeping spacing
@@ -3697,38 +3717,20 @@ internal fun ConversationScreen(
                                 contentPadding =
                                     conversationTimelineContentPadding(snackbarContentInset.value, overlayPadding),
                             ) {
-                                item(key = "top-spacer") { Spacer(Modifier.height(4.dp)) }
-                                if (controller.conversationGroupRecoveryRowVisible()) {
-                                    item(key = "group-recovery") {
-                                        ConversationGroupRecoveryCard(controller, appState)
-                                    }
-                                }
+                                // The list is reversed, so the first item emitted
+                                // is laid out against the composer. Emit the newest
+                                // edge first and walk back through history, which
+                                // puts the structural rows last.
                                 conversationLoadErrorItem(
-                                    key = "conversation-load-error-top",
+                                    key = "conversation-load-error-bottom",
                                     error = controller.error,
                                     placement = loadFailurePlacement,
                                     errorEdge = controller.errorEdge,
-                                    targetEdge = ConversationLoadFailureEdge.TOP,
+                                    targetEdge = ConversationLoadFailureEdge.BOTTOM,
                                     onRetry = { scope.launch { controller.retryLoadFailure() } },
                                 )
-                                if (controller.hasMoreBefore || controller.isLoadingOlder) {
-                                    item(key = "older-messages-loading") {
-                                        Box(
-                                            Modifier.fillMaxWidth().height(40.dp),
-                                            contentAlignment = Alignment.Center,
-                                        ) {
-                                            if (controller.isLoadingOlder) {
-                                                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                                            } else {
-                                                IconButton(onClick = { scope.launch { controller.loadOlder() } }) {
-                                                    Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
                                 itemsIndexed(
-                                    renderedTimeline,
+                                    renderedTimelineNewestFirst,
                                     key = { _, item -> item.id },
                                     // Pool layouts by category so Compose can reuse
                                     // structurally similar rows across scroll.
@@ -3744,8 +3746,10 @@ internal fun ConversationScreen(
                                     TimelineRow(
                                         modifier = Modifier.timelineReadingExposure(timelineViewport),
                                         item = item,
-                                        older = renderedTimeline.getOrNull(index - 1),
-                                        newer = renderedTimeline.getOrNull(index + 1),
+                                        // Newest-first rows: the chronologically
+                                        // older neighbour is the next row emitted.
+                                        older = renderedTimelineNewestFirst.getOrNull(index + 1),
+                                        newer = renderedTimelineNewestFirst.getOrNull(index - 1),
                                         transcriptLocale = transcriptLocale,
                                         entryUnreadCount = entryUnreadCount,
                                         entryUnreadDividerRetired = entryUnreadDividerRetired,
@@ -3841,14 +3845,36 @@ internal fun ConversationScreen(
                                         },
                                     )
                                 }
+                                if (controller.hasMoreBefore || controller.isLoadingOlder) {
+                                    item(key = "older-messages-loading") {
+                                        Box(
+                                            Modifier.fillMaxWidth().height(40.dp),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            if (controller.isLoadingOlder) {
+                                                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                                            } else {
+                                                IconButton(onClick = { scope.launch { controller.loadOlder() } }) {
+                                                    Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                                 conversationLoadErrorItem(
-                                    key = "conversation-load-error-bottom",
+                                    key = "conversation-load-error-top",
                                     error = controller.error,
                                     placement = loadFailurePlacement,
                                     errorEdge = controller.errorEdge,
-                                    targetEdge = ConversationLoadFailureEdge.BOTTOM,
+                                    targetEdge = ConversationLoadFailureEdge.TOP,
                                     onRetry = { scope.launch { controller.retryLoadFailure() } },
                                 )
+                                if (controller.conversationGroupRecoveryRowVisible()) {
+                                    item(key = "group-recovery") {
+                                        ConversationGroupRecoveryCard(controller, appState)
+                                    }
+                                }
+                                item(key = "top-spacer") { Spacer(Modifier.height(4.dp)) }
                             }
                             ConversationInitialLoadingOverlay(
                                 visible =

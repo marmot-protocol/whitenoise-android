@@ -132,9 +132,9 @@ class ConversationInitialPresentationTest {
     /** Maps a seeded timeline to its real final lazy row after the single top spacer. */
     @Test
     fun seededTailIndexTargetsTheRealFinalRow() {
-        assertEquals(0, seededConversationTailListIndex(0))
-        assertEquals(1, seededConversationTailListIndex(1))
-        assertEquals(4, seededConversationTailListIndex(4))
+        // The reversed transcript lays its newest row at the origin, so the
+        // seed no longer depends on how many messages the first frame carries.
+        assertEquals(0, SEEDED_CONVERSATION_TAIL_LIST_INDEX)
     }
 
     /** Keeps an oversized seeded row hidden from paint, TalkBack, and useful-frame telemetry until corrected. */
@@ -146,7 +146,7 @@ class ConversationInitialPresentationTest {
                 anchorTailImmediately = true,
                 seededTailAlignmentCommitted = false,
                 viewportMeasured = true,
-                canScrollForward = true,
+                canScrollTowardNewest = true,
             ),
         )
         assertFalse(
@@ -155,7 +155,7 @@ class ConversationInitialPresentationTest {
                 anchorTailImmediately = true,
                 seededTailAlignmentCommitted = false,
                 viewportMeasured = false,
-                canScrollForward = false,
+                canScrollTowardNewest = false,
             ),
         )
         assertTrue(
@@ -164,7 +164,7 @@ class ConversationInitialPresentationTest {
                 anchorTailImmediately = true,
                 seededTailAlignmentCommitted = false,
                 viewportMeasured = true,
-                canScrollForward = false,
+                canScrollTowardNewest = false,
             ),
         )
         assertTrue(
@@ -173,7 +173,7 @@ class ConversationInitialPresentationTest {
                 anchorTailImmediately = true,
                 seededTailAlignmentCommitted = true,
                 viewportMeasured = true,
-                canScrollForward = false,
+                canScrollTowardNewest = false,
             ),
         )
     }
@@ -233,14 +233,14 @@ class ConversationInitialPresentationTest {
                 seededTailAlignmentMayCommit(
                     positioned = positioned,
                     isFollowingTail = true,
-                    canScrollForward = true,
+                    canScrollTowardNewest = true,
                 ),
             )
             assertTrue(
                 seededTailAlignmentMayCommit(
                     positioned = positioned,
                     isFollowingTail = false,
-                    canScrollForward = true,
+                    canScrollTowardNewest = true,
                 ),
             )
         }
@@ -260,7 +260,7 @@ class ConversationInitialPresentationTest {
                         ownerReleased
                     },
                     isFollowingTail = { true },
-                    canScrollForward = { true },
+                    canScrollTowardNewest = { true },
                     awaitFrame = {
                         frames++
                         if (frames == SEEDED_TAIL_ANCHOR_MAX_ATTEMPTS) {
@@ -288,7 +288,7 @@ class ConversationInitialPresentationTest {
                         false
                     },
                     isFollowingTail = { true },
-                    canScrollForward = { true },
+                    canScrollTowardNewest = { true },
                     awaitFrame = { frames++ },
                 )
 
@@ -306,7 +306,7 @@ class ConversationInitialPresentationTest {
 
             awaitSeededTailAlignmentSafeFallback(
                 isFollowingTail = { followingTail },
-                canScrollForward = { true },
+                canScrollTowardNewest = { true },
                 awaitSafeState = { safeToReveal ->
                     safeStateWaits++
                     assertFalse(safeToReveal())

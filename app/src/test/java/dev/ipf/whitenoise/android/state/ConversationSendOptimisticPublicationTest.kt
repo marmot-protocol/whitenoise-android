@@ -134,9 +134,12 @@ class ConversationSendOptimisticPublicationTest {
                     "the durable callback must complete the Send-owned reveal",
                     withTimeout(5_000) { revealResult.await() },
                 )
+                // The transcript is reversed, so its origin always denotes the
+                // newest row. A reveal can no longer target a stale index that
+                // predates the row published after the previous composition.
                 assertEquals(
-                    "the reveal must include the row published after the previous composition",
-                    listOf(1),
+                    "the reveal must animate to the transcript's newest row",
+                    listOf(0),
                     writer.animatedIndexes,
                 )
                 send.await()

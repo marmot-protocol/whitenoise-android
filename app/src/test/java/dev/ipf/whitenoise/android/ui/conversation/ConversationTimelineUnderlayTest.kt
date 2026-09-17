@@ -279,17 +279,6 @@ class ConversationTimelineUnderlayTest {
                 LaunchedEffect(viewport) {
                     snapshotFlow { viewport.readingHeightPx() }.collect { observedReadingHeights += it }
                 }
-                ConversationTailInsetReanchorEffect(
-                    scrollCoordinator = coordinator,
-                    bottomChromeHeightPx = foreground + panel,
-                    snackbarContentInsetPx = notice,
-                    bottomInputRevision = 0,
-                    hasTimeline = true,
-                    initialTimelineAnchored = true,
-                    routePresentationFrozen = false,
-                    foregroundRestoreInProgress = false,
-                    currentTailIndex = { 19 },
-                )
                 Box(Modifier.size(320.dp, 480.dp).testTag("frame")) {
                     WhiteNoiseScaffold(
                         bottomBar = {
