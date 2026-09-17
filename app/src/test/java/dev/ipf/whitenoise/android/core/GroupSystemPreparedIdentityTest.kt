@@ -70,6 +70,8 @@ class GroupSystemPreparedIdentityTest {
         assertEquals("Alice", GroupSystemEvents.preferredName(null, "Alice"))
         assertEquals("Alice", GroupSystemEvents.preferredName("  ", "Alice"))
         assertNull(GroupSystemEvents.preferredName(null, null))
+        // A blank local name with no prepared label stays blank rather than becoming absent.
+        assertEquals("", GroupSystemEvents.preferredName("", null))
     }
 
     /** The chat-list preview takes the engine's projected event over the row's plaintext. */

@@ -182,7 +182,9 @@ object GroupSystemEvents {
     ): String? {
         val local = localName?.trim()?.takeIf { it.isNotEmpty() }
         if (local != null && !IdentityFormatter.isNostrIdentityFallback(local)) return local
-        return preparedName?.trim()?.takeIf { it.isNotEmpty() } ?: local
+        // With nothing better, the caller's own value comes back untouched, blank included: [summary]
+        // distinguishes a blank name from an absent one, and this helper must not change that outcome.
+        return preparedName?.trim()?.takeIf { it.isNotEmpty() } ?: localName
     }
 
     /**
