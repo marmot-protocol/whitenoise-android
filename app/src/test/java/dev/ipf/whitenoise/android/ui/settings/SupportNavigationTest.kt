@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -61,6 +62,12 @@ class SupportNavigationTest {
         val original = composeRule.onNodeWithText(support).fetchSemanticsNode().boundsInRoot
         composeRule.onNodeWithText(support).performClick()
         assertEquals(SettingsDetail.Support, current)
+        // The relays row is only emitted once the support relay state has left
+        // Loading, which resolves asynchronously after the screen opens. Wait for
+        // the row itself rather than racing that resolution.
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("support.relays").fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithTag("support.relays").performScrollTo().performClick()
         assertEquals(SettingsDetail.SupportRelays, current)
         val back = context.getString(R.string.back)
