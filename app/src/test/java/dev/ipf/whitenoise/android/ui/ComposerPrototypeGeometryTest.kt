@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -35,6 +36,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -95,10 +97,53 @@ class ComposerPrototypeGeometryTest {
             assertEquals(draft.text, sentText)
             assertEquals(draft, state.valueState.value)
             assertNotNull(accepted)
-            accepted?.invoke()
         }
+        composeRule.runOnIdle { accepted?.invoke() }
         composeRule.waitForIdle()
         composeRule.runOnIdle { assertEquals("", state.valueState.value.text) }
+    }
+
+    /** An accepted multi-line send takes its one-line geometry on the next frame, never a height in between. */
+    @Test
+    fun acceptedSendCollapsesThePillInTheFrameTheTextLeaves() {
+        val draft =
+            TextFieldValue("Ready to send a draft long enough to wrap onto a second line here", TextRange(10))
+        val state = ComposerTextState(draft)
+        render(state, dark = true)
+        val withDraft =
+            composeRule
+                .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
+                .fetchSemanticsNode()
+                .boundsInRoot.height
+
+        composeRule.onNodeWithContentDescription(app.getString(R.string.send)).performClick()
+        composeRule.runOnIdle { assertNotNull(accepted) }
+        // Hold the clock so the geometry is read a few frames after the clear,
+        // where a tween would still show most of the two-line height.
+        composeRule.mainClock.autoAdvance = false
+        composeRule.runOnUiThread {
+            accepted?.invoke()
+            Snapshot.sendApplyNotifications()
+        }
+        repeat(4) { composeRule.mainClock.advanceTimeByFrame() }
+        composeRule.runOnIdle { assertEquals("", state.valueState.value.text) }
+        val afterFourFrames =
+            composeRule
+                .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
+                .fetchSemanticsNode()
+                .boundsInRoot.height
+        capture("composer_prototype_accepted_send_collapsed_dark")
+
+        composeRule.mainClock.autoAdvance = true
+        composeRule.waitForIdle()
+        val settled =
+            composeRule
+                .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
+                .fetchSemanticsNode()
+                .boundsInRoot.height
+        assertTrue("the empty pill must be shorter than it was with the two-line draft", settled < withDraft - 1f)
+        assertEquals("the collapse lands in one step, with no in-between height", settled, afterFourFrames, 1f)
+        composeRule.runOnIdle { assertFalse("the one-shot collapse is released once applied", state.collapsedBySend) }
     }
 
     /** Full width two line draft does not reserve the multiline resize header. */

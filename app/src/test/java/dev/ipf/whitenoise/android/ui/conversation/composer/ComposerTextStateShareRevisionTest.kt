@@ -156,9 +156,9 @@ class ComposerTextStateShareRevisionTest {
         assertEquals("", state.valueState.value.text)
     }
 
-    /** The send-collapse flag lives exactly from the accepted clear until the next content edit. */
+    /** The send-collapse flag lives from the accepted clear until the pill applies it or the text changes. */
     @Test
-    fun acceptedClearMarksTheCollapseUntilTheNextContentEdit() {
+    fun acceptedClearMarksTheCollapseUntilItIsAppliedOrTheTextChanges() {
         val state = ComposerTextState(TextFieldValue("three lines of draft", TextRange(20)))
         val token = state.acceptanceToken()
         assertFalse(state.collapsedBySend)
@@ -168,6 +168,22 @@ class ComposerTextStateShareRevisionTest {
 
         state.updateValue(TextFieldValue("", TextRange(0)))
         assertTrue("a selection-only change keeps the collapse", state.collapsedBySend)
+
+        state.consumeSendCollapse()
+        assertFalse(
+            "once the pill has snapped, a dismiss or refocus of the empty field tweens again",
+            state.collapsedBySend,
+        )
+
+        state.updateValue(TextFieldValue("n", TextRange(1)))
+        assertFalse("typing never re-arms a consumed collapse", state.collapsedBySend)
+    }
+
+    /** Typing before the pill applies the collapse also releases it. */
+    @Test
+    fun typingBeforeTheCollapseIsAppliedReleasesIt() {
+        val state = ComposerTextState(TextFieldValue("draft", TextRange(5)))
+        assertTrue(state.clearAccepted(state.acceptanceToken()))
 
         state.updateValue(TextFieldValue("n", TextRange(1)))
         assertFalse("typing again restores the tweened geometry", state.collapsedBySend)

@@ -61,6 +61,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -428,6 +429,9 @@ internal fun ComposerPill(
     // geometry in the same frame, so the bubble it produced lands where it will
     // stay instead of riding the shrinking pill down.
     collapsedBySend: Boolean = false,
+    // Reports that the send collapse has taken its snap so the owner can let
+    // later geometry, a dismiss or a refocus of the empty field, tween again.
+    onSendCollapseApplied: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -763,6 +767,22 @@ internal fun ComposerPill(
                 ),
             label = "composer layout progress",
         )
+    // Release the one-shot send collapse once every piece of geometry has
+    // reached the target it snapped to, so a later dismiss or refocus of the
+    // empty field tweens again. Geometry the send left unchanged settles at once.
+    val latestOnSendCollapseApplied by rememberUpdatedState(onSendCollapseApplied)
+    val textHeightTarget by rememberUpdatedState(compactTextLayout?.size?.height ?: 0)
+    val editingTarget by rememberUpdatedState(if (editingLayout) 1f else 0f)
+    val expansionTarget by rememberUpdatedState(if (expandedLayout) 1f else 0f)
+    LaunchedEffect(collapsedBySend) {
+        if (!collapsedBySend) return@LaunchedEffect
+        snapshotFlow {
+            animatedTextHeight.value == textHeightTarget &&
+                editingProgress.value == editingTarget &&
+                expansionProgress.value == expansionTarget
+        }.first { settled -> settled }
+        latestOnSendCollapseApplied()
+    }
     val toggleDescription =
         stringResource(
             if (expansionMode != ComposerExpansionMode.Automatic) {

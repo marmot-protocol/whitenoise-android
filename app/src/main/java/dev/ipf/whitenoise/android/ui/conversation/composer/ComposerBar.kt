@@ -289,12 +289,18 @@ internal class ComposerTextState(
     val preEditState: MutableState<TextFieldValue?> = mutableStateOf(null)
 
     /**
-     * True from the moment an accepted send empties the field until the next content edit. The
-     * pill reads it to collapse in the same frame the text leaves: a tween there would drag the
-     * newest bubble, glued to the composer, down with the shrinking pill.
+     * True from the moment an accepted send empties the field until the pill has applied that
+     * collapse, or until the next content edit. The pill reads it to collapse in the same frame the
+     * text leaves: a tween there would drag the newest bubble, glued to the composer, down with the
+     * shrinking pill. It is one-shot so a later dismiss or refocus of the empty field tweens again.
      */
     var collapsedBySend by mutableStateOf(false)
         private set
+
+    /** Called by the pill once the send collapse has been applied, so later geometry tweens again. */
+    fun consumeSendCollapse() {
+        collapsedBySend = false
+    }
 
     /** Captures the exact content generation an asynchronous acceptance may clear. */
     fun acceptanceToken(): ComposerAcceptanceToken =
@@ -1488,6 +1494,7 @@ internal fun ComposerBar(
                         multilineControlsSuppressed = composerMultilineControlsSuppressed(automaticComposerCeiling),
                         dismissInProgress = composerDismissInProgress,
                         collapsedBySend = textState.collapsedBySend,
+                        onSendCollapseApplied = textState::consumeSendCollapse,
                         modifier =
                             Modifier
                                 .fillMaxWidth()
