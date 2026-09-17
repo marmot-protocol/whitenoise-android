@@ -13,7 +13,6 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.composerGeometrySpec
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerHeightAnimationDurationMillis
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerHeightPx
 import dev.ipf.whitenoise.android.ui.conversation.composer.dragComposerHeight
-import dev.ipf.whitenoise.android.ui.conversation.composer.settleComposerEndpoint
 import dev.ipf.whitenoise.android.ui.conversation.composer.settleComposerHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.toComposerExpansionState
 import dev.ipf.whitenoise.android.ui.conversation.composer.toRetainedPreference
@@ -23,16 +22,22 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ComposerExpansionTest {
-    /** Velocity chooses an endpoint; slow drags use the midpoint, never a new retained manual height. */
+    /** A release between the endpoints keeps its own height instead of snapping to one of them. */
     @Test
-    fun newGesturesSettleAtPrototypeEndpoints() {
+    fun newGesturesKeepTheHeightTheyWereReleasedAt() {
         val belowMiddle = ComposerExpansionState(ComposerExpansionMode.Manual, 399f)
         val aboveMiddle = ComposerExpansionState(ComposerExpansionMode.Manual, 401f)
-        assertEquals(ComposerExpansionMode.Automatic, settleComposerEndpoint(belowMiddle, 200f, 600f, 0f, 48f).mode)
-        assertEquals(ComposerExpansionMode.FullScreen, settleComposerEndpoint(aboveMiddle, 200f, 600f, 0f, 48f).mode)
-        assertEquals(ComposerExpansionMode.FullScreen, settleComposerEndpoint(belowMiddle, 200f, 600f, -48f, 48f).mode)
-        assertEquals(ComposerExpansionMode.Automatic, settleComposerEndpoint(aboveMiddle, 200f, 600f, 48f, 48f).mode)
-        assertEquals(ComposerExpansionMode.Automatic, settleComposerEndpoint(aboveMiddle, 600f, 600f, -96f, 48f).mode)
+        assertEquals(belowMiddle, settleComposerHeight(belowMiddle, 200f, 200f, 600f, 24f))
+        assertEquals(aboveMiddle, settleComposerHeight(aboveMiddle, 200f, 200f, 600f, 24f))
+    }
+
+    /** Each endpoint keeps a deadband, so landing on the automatic height or full screen stays easy. */
+    @Test
+    fun releasingNearAnEndpointStillLandsOnIt() {
+        val nearAutomatic = ComposerExpansionState(ComposerExpansionMode.Manual, 210f)
+        val nearMaximum = ComposerExpansionState(ComposerExpansionMode.Manual, 590f)
+        assertEquals(ComposerExpansionMode.Automatic, settleComposerHeight(nearAutomatic, 200f, 200f, 600f, 24f).mode)
+        assertEquals(ComposerExpansionMode.FullScreen, settleComposerHeight(nearMaximum, 200f, 200f, 600f, 24f).mode)
     }
 
     @Test

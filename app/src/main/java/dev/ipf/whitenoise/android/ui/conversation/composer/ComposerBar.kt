@@ -102,6 +102,9 @@ import kotlin.math.roundToInt
 
 private val ComposerManualMinimumHeight = 144.dp
 
+/** How close to an endpoint a release still counts as landing on it rather than resting free. */
+private val ComposerSettleDeadband = 24.dp
+
 /**
  * Whether the composer bottom cluster (reply preview, edit banner, mention
  * picker, input row, and inline emoji/attachment panes) should apply
@@ -1461,14 +1464,17 @@ internal fun ComposerBar(
                                     maximumHeightPx = maximumComposerHeightPx,
                                 )
                         },
-                        onHeightDragSettled = { velocityY ->
+                        onHeightDragSettled = {
+                            // A release keeps the height it was let go at. The endpoints keep a deadband
+                            // so the automatic height and full screen stay easy to land on deliberately,
+                            // but everything between them is the reader's own choice and is retained.
                             val settledExpansion =
-                                settleComposerEndpoint(
+                                settleComposerHeight(
                                     state = composerHeightDragState ?: currentComposerExpansion(),
                                     automaticHeightPx = resolvedAutomaticHeightPx,
+                                    minimumManualHeightPx = resolvedAutomaticHeightPx,
                                     maximumHeightPx = maximumComposerHeightPx,
-                                    projectedTravelPx = velocityY * 0.5f,
-                                    velocityThresholdPx = with(density) { 48.dp.toPx() },
+                                    deadbandPx = with(density) { ComposerSettleDeadband.toPx() },
                                 )
                             composerHeightDragActive = false
                             composerHeightDragState = null
