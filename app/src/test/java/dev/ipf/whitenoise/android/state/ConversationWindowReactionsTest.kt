@@ -73,6 +73,27 @@ class ConversationWindowReactionsTest {
         assertEquals(listOf(ReactionTally("👍", 1, mine = true)), merged.getValue("optimistic"))
     }
 
+    @Test
+    fun changesStayWithTheirTarget() {
+        val references = mapOf("first" to referencesFor(reactions), "second" to referencesFor(reactions))
+        val merged =
+            reactionTalliesForWindow(
+                emptyMap(),
+                references,
+                listOf(
+                    OptimisticReactionChange("first", "👍", add = true),
+                    OptimisticReactionChange("second", "❤️", add = false),
+                    OptimisticReactionChange("outside", "🔥", add = true),
+                ),
+                "me",
+            )
+        assertEquals(4, merged.getValue("first").first { it.emoji == "👍" }.count)
+        assertEquals(2, merged.getValue("first").first { it.emoji == "❤️" }.count)
+        assertEquals(3, merged.getValue("second").first { it.emoji == "👍" }.count)
+        assertEquals(1, merged.getValue("second").first { it.emoji == "❤️" }.count)
+        assertEquals(setOf("first", "second"), merged.keys)
+    }
+
     private fun referencesFor(reactions: ConversationReactionsFfi) =
         dev.ipf.marmotkit.ConversationMessageReferencesFfi(
             messageIdHex = "m",

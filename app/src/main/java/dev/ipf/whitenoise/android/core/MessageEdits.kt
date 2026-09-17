@@ -43,7 +43,9 @@ data class EditState(
  * recompute will pick them up once the target arrives.
  */
 fun aggregateEdits(records: List<AppMessageRecordFfi>): Map<String, EditState> {
-    if (records.isEmpty()) return emptyMap()
+    if (records.none(MessageProjector::isEdit)) {
+        return emptyMap()
+    }
     val byId = HashMap<String, AppMessageRecordFfi>(records.size)
     for (r in records) {
         if (r.messageIdHex.isNotBlank()) byId[r.messageIdHex] = r

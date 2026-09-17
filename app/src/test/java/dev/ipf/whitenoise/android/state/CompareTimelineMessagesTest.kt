@@ -6,6 +6,17 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class CompareTimelineMessagesTest {
+    @Test
+    fun authoritativePageKeepsOrder() {
+        val first = msg("first", 300uL, 0uL, authoritativeOrder = 0uL)
+        val second = msg("second", 100uL, 1uL, authoritativeOrder = 1uL)
+        assertEquals(
+            listOf("first", "second"),
+            orderTimelineMessagesForDisplay(listOf(second, first, second)).map { it.id },
+        )
+        assertEquals(emptyList<TimelineMessage>(), orderTimelineMessagesForDisplay(emptyList()))
+    }
+
     /** Builds the smallest display row needed to exercise ordering policy. */
     private fun msg(
         id: String,

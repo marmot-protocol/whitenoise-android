@@ -20,6 +20,22 @@ import java.time.Duration
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class ConversationAuthoritativeTimelineOrderingTest {
+    @Test
+    fun pageDoesNotRestartFinalStream() =
+        runBlocking {
+            val subscription = ScriptedConversationTimelineSubscription(timelinePage(appRecord(100uL)))
+            withController(subscription) { controller, _ ->
+                awaitConversationCondition { controller.timeline.size == 1 }
+                val streams =
+                    controller.applyTimelinePage(
+                        timelinePage(streamFinalRecord(103uL), streamStartRecord(102uL), appRecord(100uL)),
+                        replaceWindow = true,
+                        updatePagination = true,
+                    )
+                assertTrue(streams.isEmpty())
+            }
+        }
+
     /** A later wall-clock membership event retains MDK's position above its app row. */
     @Test
     fun snapshotKeepsMembershipBeforeTheMessageItAuthorizes() =

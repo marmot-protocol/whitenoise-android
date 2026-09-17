@@ -11059,6 +11059,8 @@ class ConversationController(
         val pageMessages = applied.messages
         if (replaceWindow) trimStateForWindowReplacement()
         authoritativeTimelineOrderByMessageId.clear()
+        val profileIds = linkedSetOf<String>()
+        val streamIds = mutableListOf<String>()
         pageMessages.forEachIndexed { index, record ->
             // Keep MDK's optimistic-head position for pending local projections.
             // Only terminally invalidated rows without accepted-history evidence
@@ -11073,9 +11075,10 @@ class ConversationController(
                     reconcileOptimistic = replaceWindow,
                     allowDelayedProjection = replaceWindow,
                 )
-            appState.requestProfile(record.sender)
-            record.replyPreview?.let { appState.requestProfile(it.sender) }
-            appState.requestProfiles(record.reactions.userReactions.map { it.sender })
+            profileIds.add(record.sender)
+            record.replyPreview?.let { profileIds.add(it.sender) }
+            record.reactions.userReactions.forEach { profileIds.add(it.sender) }
+            actionRecord.takeIf(MessageProjector::isStreamStart)?.let(MessageProjector::streamId)?.let(streamIds::add)
             if (record.deleted) {
                 deletedMessageIds = deletedMessageIds - record.messageIdHex
             }
@@ -11089,6 +11092,7 @@ class ConversationController(
                 }
             }
         }
+        appState.requestProfiles(profileIds)
         applyDurableStreamPositions(durableStreamDisplayPositions(timelineRecords.values.toList()))
         if (updatePagination) {
             hasMoreBefore = applied.hasMoreBefore
@@ -11118,10 +11122,7 @@ class ConversationController(
             records = pageMessages,
             markInitialPresentationReady = preparingInitialPresentation,
         )
-        return pageMessages
-            .map { TimelineProjector.toAppMessageRecord(it) }
-            .filter { MessageProjector.isStreamStart(it) }
-            .mapNotNull { MessageProjector.streamId(it) }
+        return streamIds
             // Don't relaunch a watcher for a stream whose final record was in
             // this same page — it was just marked removed. See #25.
             .filterNot { it in removedStreamIds }

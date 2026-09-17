@@ -363,11 +363,12 @@ internal fun reactionTalliesForWindow(
     viewerAccountIdHex: String?,
 ): Map<String, List<ReactionTally>> {
     val targets = sendersByTarget.keys + references?.keys.orEmpty()
+    val changesByTarget = optimisticChanges.groupBy { it.targetMessageId }
     return targets
         .associateWith { target ->
             val windowReferences = references?.get(target)
             if (windowReferences != null) {
-                val changes = optimisticChanges.filter { it.targetMessageId == target }
+                val changes = changesByTarget[target].orEmpty()
                 windowReactionTallies(windowReferences.reactions, changes)
             } else {
                 reactionTalliesForSenders(viewerAccountIdHex, sendersByTarget[target].orEmpty(), emptyList())
