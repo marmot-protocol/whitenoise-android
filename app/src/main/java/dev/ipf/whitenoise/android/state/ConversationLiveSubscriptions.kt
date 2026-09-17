@@ -121,11 +121,14 @@ internal fun WhiteNoiseAppState.conversationLiveSubscriptions(): ConversationLiv
     liveSubscriptionOverrides.conversation ?: ConversationLiveSubscriptions.bind(this)
 
 /**
- * Opens MarmotKit's conversation window, and when the engine refuses it (not ready after the upgrade,
- * timed out, or any other window error) falls back to the plain timeline subscription the app used before
- * 0.10.0. The screen then loses only the window-only extras (prepared title, capabilities, anchors) and
- * keeps its messages, instead of showing an error for every chat. The refusal is logged as a release-safe
- * marker so field reports name the engine error.
+ * Opens MarmotKit's conversation window, and when the engine refuses it falls back to the plain timeline
+ * subscription the app used before 0.10.0. The screen then loses only the window-only extras (prepared
+ * title, capabilities, anchors) and keeps its messages, instead of showing an error for every chat. The
+ * refusal is logged as a release-safe marker so field reports name the engine error.
+ *
+ * Opening keeps MDK's own deadline. MarmotKit 0.10.1 returns the stored conversation before live recovery
+ * (mdk#1873), so a healthy open no longer waits on hydration and a shorter app-side deadline would only
+ * abandon opens that are about to succeed.
  */
 internal suspend fun MarmotInterface.openTimelineWithFallback(
     account: String,
@@ -140,7 +143,7 @@ internal suspend fun MarmotInterface.openTimelineWithFallback(
                 mode = ConversationOpenModeFfi.AUTOMATIC,
                 messageIdHex = null,
                 initialRows = limit.coerceIn(1u, CONVERSATION_WINDOW_MAX_ROWS),
-                timeoutMs = CONVERSATION_WINDOW_OPEN_DEADLINE_MS,
+                timeoutMs = CONVERSATION_WINDOW_DEFAULT_DEADLINE,
             )
         FfiConversationWindowHandle(window, release = window::close)
     } catch (cancel: CancellationException) {
