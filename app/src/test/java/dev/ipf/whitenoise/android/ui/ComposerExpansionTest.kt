@@ -31,15 +31,6 @@ class ComposerExpansionTest {
         assertEquals(aboveMiddle, settleComposerHeight(aboveMiddle, 200f, 200f, 600f, 24f))
     }
 
-    /** Each endpoint keeps a deadband, so landing on the automatic height or full screen stays easy. */
-    @Test
-    fun releasingNearAnEndpointStillLandsOnIt() {
-        val nearAutomatic = ComposerExpansionState(ComposerExpansionMode.Manual, 210f)
-        val nearMaximum = ComposerExpansionState(ComposerExpansionMode.Manual, 590f)
-        assertEquals(ComposerExpansionMode.Automatic, settleComposerHeight(nearAutomatic, 200f, 200f, 600f, 24f).mode)
-        assertEquals(ComposerExpansionMode.FullScreen, settleComposerHeight(nearMaximum, 200f, 200f, 600f, 24f).mode)
-    }
-
     @Test
     fun onlyDiscreteHeightChangesAnimateOutsideThePill() {
         assertEquals(
@@ -136,6 +127,18 @@ class ComposerExpansionTest {
             ComposerExpansionMode.FullScreen,
             settleComposerHeight(middle.copy(manualHeightPx = 585f), 200f, 140f, 600f, 20f).mode,
         )
+
+        // Both boundaries, from both sides: the deadband is inclusive, and one pixel past it the
+        // release keeps its own height rather than being pulled onto the endpoint.
+        val settle = { height: Float ->
+            settleComposerHeight(middle.copy(manualHeightPx = height), 200f, 140f, 600f, 20f)
+        }
+        assertEquals(ComposerExpansionMode.Automatic, settle(220f).mode)
+        assertEquals(ComposerExpansionMode.Manual, settle(221f).mode)
+        assertEquals(221f, settle(221f).manualHeightPx)
+        assertEquals(ComposerExpansionMode.FullScreen, settle(580f).mode)
+        assertEquals(ComposerExpansionMode.Manual, settle(579f).mode)
+        assertEquals(579f, settle(579f).manualHeightPx)
     }
 
     /** The resize handle remains the only gesture that explicitly leaves full-screen mode. */
