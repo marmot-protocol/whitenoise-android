@@ -72,6 +72,41 @@ fun aggregateEdits(records: List<AppMessageRecordFfi>): Map<String, EditState> {
     return result
 }
 
+/**
+ * One message's accepted-edit state as MarmotKit resolved it (0.10.1). The engine owns edit acceptance and
+ * shares the effective text across timelines, replies and chat previews, so this holds regardless of how
+ * much of the conversation the app has loaded.
+ */
+data class AuthoritativeEdit(
+    val messageIdHex: String,
+    val editCount: Int,
+    val effectiveText: String,
+)
+
+/**
+ * Replaces the locally aggregated edit state with MarmotKit's wherever the engine reported one. The local
+ * aggregate only sees kind-1009 rows inside the loaded window, so an older edit used to leave a message
+ * with no "edited" marker and an undercounted badge. Retained local versions ride along for the history
+ * view until it loads the authoritative page.
+ */
+fun withAuthoritativeEdits(
+    aggregated: Map<String, EditState>,
+    authoritative: Collection<AuthoritativeEdit>,
+): Map<String, EditState> {
+    if (authoritative.isEmpty()) return aggregated
+    val merged = LinkedHashMap(aggregated)
+    for (edit in authoritative) {
+        if (edit.editCount <= 0) continue
+        merged[edit.messageIdHex] =
+            EditState(
+                latestText = edit.effectiveText,
+                count = edit.editCount,
+                versions = merged[edit.messageIdHex]?.versions.orEmpty(),
+            )
+    }
+    return merged
+}
+
 private fun sendersMatch(
     a: String,
     b: String,

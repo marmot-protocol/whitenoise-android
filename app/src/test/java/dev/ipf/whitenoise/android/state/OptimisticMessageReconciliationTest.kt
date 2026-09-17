@@ -114,6 +114,25 @@ class OptimisticMessageReconciliationTest {
         )
     }
 
+    /**
+     * MarmotKit 0.10.1 commits a pending row for a send before the call returns its id, so two identical
+     * texts in flight must pair oldest-first regardless of the optimistic map's iteration order.
+     */
+    @Test
+    fun identicalPendingSendsReconcileOldestFirst() {
+        val older = timelineMessage("older-temp", MessageStatus.Pending, plaintext = "same").copy(timelineOrder = 1uL)
+        val newer = timelineMessage("newer-temp", MessageStatus.Pending, plaintext = "same").copy(timelineOrder = 2uL)
+
+        assertEquals(
+            "older-temp",
+            optimisticMessageIdForProjection(listOf(newer, older), message("confirmed", plaintext = "same")),
+        )
+        assertEquals(
+            "older-temp",
+            optimisticMessageIdForProjection(listOf(older, newer), message("confirmed", plaintext = "same")),
+        )
+    }
+
     @Test
     fun delayedQueuedProjectionCanReconcileAfterWorkerWait() {
         val pending = timelineMessage("temp", MessageStatus.Pending)
@@ -599,6 +618,8 @@ class OptimisticMessageReconciliationTest {
             media = emptyList(),
             agentTextStreamJson = null,
             groupSystem = null,
+            hasReports = false,
+            edit = null,
             reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
             deleted = false,
             deletedByMessageIdHex = null,

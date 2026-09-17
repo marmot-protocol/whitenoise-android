@@ -6,6 +6,7 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.Dp
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
@@ -50,7 +51,11 @@ internal fun GroupAvatar(
     size: Dp,
     fallbackPictureUrl: String? = null,
     firstFrameAvatar: ChatListAvatarSeed? = null,
+    // MarmotKit 0.10.1 keeps avatars durably; its bytes are preferred over fetching the URL, so a row
+    // keeps its picture offline and costs no request. Null falls back to the URL path unchanged.
+    durableAvatar: AvatarAssetFfi? = null,
 ) {
+    val durableImage = rememberDurableAvatar(appState, durableAvatar)
     val legacyUrl = ProfileSanitizer.protocolImageUrl(group.avatarUrl)
     val encryptedCacheKey = encryptedGroupAvatarCacheKey(appState.activeAccountRef, group)
     val loadedEncryptedImage = rememberEncryptedGroupAvatar(appState, group)
@@ -79,7 +84,9 @@ internal fun GroupAvatar(
         title = title,
         seed = seed,
         size = size,
-        pictureUrl = legacyUrl ?: fallbackPictureUrl?.takeIf { encryptedImage == null },
-        picture = seededUrlImage ?: encryptedImage,
+        pictureUrl =
+            (legacyUrl ?: fallbackPictureUrl?.takeIf { encryptedImage == null })
+                ?.takeIf { durableImage == null },
+        picture = durableImage ?: seededUrlImage ?: encryptedImage,
     )
 }

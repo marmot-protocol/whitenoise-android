@@ -20,6 +20,7 @@ internal enum class MessageActionKind {
     Share,
     Save,
     Info,
+    Report,
 }
 
 internal const val MESSAGE_ACTION_MENU_TEST_TAG = "message-action-menu"
@@ -47,6 +48,7 @@ internal fun messageActionKinds(
     canShare: Boolean = false,
     canSave: Boolean,
     canInfo: Boolean = true,
+    canReport: Boolean = false,
 ): List<MessageActionKind> =
     buildList {
         if (canEdit) add(MessageActionKind.Edit)
@@ -60,7 +62,17 @@ internal fun messageActionKinds(
         if (canSpeak) add(MessageActionKind.Speak)
         if (canSpeak && canSpeakCodeLiterally) add(MessageActionKind.SpeakCodeLiterally)
         if (canSelect) add(MessageActionKind.Select)
+        addAll(trailingMessageActionKinds(canInfo, canReport))
+    }
+
+/** The closing actions: Info, then Report, which sits beside delete because both hand the message to someone else. */
+private fun trailingMessageActionKinds(
+    canInfo: Boolean,
+    canReport: Boolean,
+): List<MessageActionKind> =
+    buildList {
         if (canInfo) add(MessageActionKind.Info)
+        if (canReport) add(MessageActionKind.Report)
     }
 
 internal fun messageActionColumnCount(
@@ -104,6 +116,7 @@ internal fun messageActionLabel(kind: MessageActionKind): String =
         MessageActionKind.Share -> stringResource(R.string.shared_media_share)
         MessageActionKind.Save -> stringResource(R.string.save_attachments)
         MessageActionKind.Info -> stringResource(R.string.info)
+        MessageActionKind.Report -> stringResource(R.string.report_message)
     }
 
 /** The drawable the menu row leads with, mirroring the prototype's icon set. */
@@ -117,6 +130,7 @@ internal fun messageActionIconRes(kind: MessageActionKind): Int =
         MessageActionKind.CopyText -> R.drawable.ic_content_copy
         MessageActionKind.Speak, MessageActionKind.SpeakCodeLiterally -> R.drawable.ic_volume_up
         MessageActionKind.Forward -> R.drawable.ic_forward
+        MessageActionKind.Report -> R.drawable.ic_emoji_flags
         MessageActionKind.KeepOnScreen -> R.drawable.ic_floating_message
         MessageActionKind.Share -> R.drawable.ic_share
         MessageActionKind.Save -> R.drawable.ic_download

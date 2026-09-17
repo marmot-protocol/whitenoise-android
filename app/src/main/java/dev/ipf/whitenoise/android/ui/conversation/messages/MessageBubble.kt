@@ -31,6 +31,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -75,6 +76,7 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.ContentReportFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MediaAttachmentOutcomeFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -103,16 +105,23 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.MessageDeleteCapability
 import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.state.ReportOutcome
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.authoritativeEditHistory
+import dev.ipf.whitenoise.android.state.canReportMessage
+import dev.ipf.whitenoise.android.state.dismissReports
 import dev.ipf.whitenoise.android.state.mediaReferencesFor
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
+import dev.ipf.whitenoise.android.state.reportMessage
+import dev.ipf.whitenoise.android.state.reportsFor
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.ttsStartFailureMessage
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
 import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayout
 import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
 import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
+import dev.ipf.whitenoise.android.ui.common.rememberDurableAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.common.rememberedClockTime
 import dev.ipf.whitenoise.android.ui.common.rememberedMessageBubbleTime
@@ -455,6 +464,11 @@ internal fun MessageBubble(
     var selectionSeedVisibleOffset by remember(record.messageIdHex) { mutableStateOf<Int?>(null) }
     var longPressWindowY by remember { mutableStateOf<Float?>(null) }
     var actionMenuAnchorBounds by remember(record.messageIdHex) { mutableStateOf<IntRect?>(null) }
+    var reportSheetOpen by remember(record.messageIdHex) { mutableStateOf(false) }
+    var reportInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
+    val hasReports = item.projected?.hasReports == true
+    var messageReports by remember(record.messageIdHex) { mutableStateOf<List<ContentReportFfi>?>(null) }
+    var reportsRevision by remember(record.messageIdHex) { mutableIntStateOf(0) }
     val rowCoordinates = remember(record.messageIdHex) { arrayOfNulls<LayoutCoordinates>(1) }
     val messageBoundsInWindow = remember(record.messageIdHex) { arrayOfNulls<IntRect>(1) }
     val focusedMessageLayer = if (isActionMenuOpen) rememberGraphicsLayer() else null
@@ -1624,6 +1638,18 @@ internal fun MessageBubble(
                     title = appState.displayName(record.sender),
                     seed = record.sender,
                     pictureUrl = appState.avatarUrl(record.sender),
+                    picture =
+                        if (showSenderAvatar) {
+                            rememberDurableAvatar(
+                                appState,
+                                controller.window.frame
+                                    ?.identities
+                                    ?.get(record.sender)
+                                    ?.avatarAsset,
+                            )
+                        } else {
+                            null
+                        },
                     enabled = !textSelectionMode,
                     alignToBubbleBottom = reactionHostPresent,
                     onClick = { appState.presentProfile(appState.npub(record.sender)) },
@@ -1915,6 +1941,12 @@ internal fun MessageBubble(
                     } else {
                         null
                     }
+                // MarmotKit 0.10.1 flags a message any member reported; the footer says so beside the
+                // edited marker, and Message Details lists the reports.
+                val reportedLabel =
+                    stringResource(R.string.message_reported).takeIf { hasReports && !deleted }
+                val footerLabel =
+                    listOfNotNull(editedLabel, reportedLabel).takeIf { it.isNotEmpty() }?.joinToString(" · ")
                 // A long body collapses to MESSAGE_COLLAPSE_LINE_LIMIT lines
                 // with Read More in the bottom footer row opening the full-screen view;
                 // tombstones, edit/info copy, and groups with the local collapse
@@ -2129,7 +2161,7 @@ internal fun MessageBubble(
                                     statusContainerColor = colorFromArgb(bubblePresentation.backgroundArgb),
                                     showStatus = showOutgoingStatus && !fileFooterInCard,
                                     retentionOwnedByFileCard = fileFooterInCard,
-                                    editedLabel = editedLabel,
+                                    editedLabel = footerLabel,
                                     onEditedClick = onEditedClick,
                                     footerOnVisualMedia = footerOnVisualMedia,
                                     footerOnPendingVisual = footerOnPendingVisual,
@@ -2214,7 +2246,7 @@ internal fun MessageBubble(
                                     statusContainerColor = colorFromArgb(bubblePresentation.backgroundArgb),
                                     showStatus = showOutgoingStatus && !fileFooterInCard,
                                     retentionOwnedByFileCard = fileFooterInCard,
-                                    editedLabel = editedLabel,
+                                    editedLabel = footerLabel,
                                     onEditedClick = onEditedClick,
                                     footerOnVisualMedia = footerOnVisualMedia,
                                     footerOnPendingVisual = footerOnPendingVisual,
@@ -2284,7 +2316,7 @@ internal fun MessageBubble(
                             statusContainerColor = bubbleBackgroundColor,
                             showStatus = shouldShowMessageStatus(mine, deleted, invalidationPresentation),
                             retentionOwnedByFileCard = false,
-                            editedLabel = editedLabel,
+                            editedLabel = footerLabel,
                             onEditedClick = onEditedClick,
                             footerOnVisualMedia = footerOnVisualMedia,
                             footerOnPendingVisual = footerOnPendingVisual,
@@ -2331,6 +2363,12 @@ internal fun MessageBubble(
                     canShare = canShareMessage,
                     canSave = !deleted && mediaReferences.isNotEmpty() && !attachmentSaveInFlight,
                     canInfo = !deleted,
+                    canReport =
+                        canReportMessage(
+                            mine = mine,
+                            deleted = deleted,
+                            directConversation = controller.isDirectConversation,
+                        ),
                     quickReactionEmojis = quickReactionEmojis,
                     onDismissRequest = { onActionMenuOpenChange(false) },
                     onReact = { emoji ->
@@ -2381,6 +2419,10 @@ internal fun MessageBubble(
                         }
                     },
                     onInfo = ::openInfoSheet,
+                    onReport = {
+                        onActionMenuOpenChange(false)
+                        reportSheetOpen = true
+                    },
                     onDelete = ::requestDelete,
                     mine = mine,
                     selectedReactionEmojis = reactionTallies.filter { it.mine }.mapTo(mutableSetOf()) { it.emoji },
@@ -2448,7 +2490,7 @@ internal fun MessageBubble(
                                 color = timestampColor,
                                 showStatus = showOutgoingStatus && !fileFooterInCard,
                                 status = item.status,
-                                editedLabel = editedLabel,
+                                editedLabel = footerLabel,
                                 onEditedClick = null,
                                 retention = previewRetention,
                                 reserveRetentionSpace = previewReserveRetention,
@@ -2528,7 +2570,7 @@ internal fun MessageBubble(
                                 media = mediaPreview,
                                 footerContent = previewFooter,
                                 warning = outerInvalidationWarning,
-                                editedLabel = editedLabel,
+                                editedLabel = footerLabel,
                                 retention =
                                     record.retentionIndicatorInput(
                                         controllerKey = controller,
@@ -2773,15 +2815,61 @@ internal fun MessageBubble(
                 }
                 if (editHistoryOpen && !deleted && editState != null) {
                     EditHistoryDialog(
-                        original = record.plaintext,
+                        // With an engine edit summary the record's plaintext is already the edited body.
+                        original = record.plaintext.takeIf { item.projected?.edit == null },
                         originalTimestamp = record.recordedAt,
                         editState = editState,
                         onDismissRequest = { editHistoryOpen = false },
+                        loadAuthoritativeHistory = { controller.authoritativeEditHistory(record.messageIdHex) },
+                    )
+                }
+                if (reportSheetOpen) {
+                    ReportMessageSheet(
+                        onDismissRequest = { reportSheetOpen = false },
+                        sending = reportInFlight,
+                        onSubmit = { reason, explanation ->
+                            reportInFlight = true
+                            appState.launchMutation {
+                                try {
+                                    val outcome = controller.reportMessage(record.messageIdHex, reason, explanation)
+                                    reportSheetOpen = false
+                                    when (outcome) {
+                                        ReportOutcome.Sent -> appState.present(R.string.report_message_sent)
+                                        ReportOutcome.Queued -> appState.present(R.string.report_message_queued)
+                                        ReportOutcome.NotAllowed ->
+                                            appState.present(R.string.report_message_not_allowed)
+                                        // The controller already presented the failure with its report.
+                                        ReportOutcome.Failed -> Unit
+                                    }
+                                } finally {
+                                    reportInFlight = false
+                                }
+                            }
+                        },
                     )
                 }
                 if (infoSheetOpen && !deleted) {
+                    LaunchedEffect(hasReports, reportsRevision) {
+                        messageReports = if (hasReports) controller.reportsFor(record.messageIdHex) else null
+                    }
                     MessageDetailsScreen(
                         record = record,
+                        reports = messageReports?.takeIf { hasReports },
+                        reporterName = appState::displayName,
+                        canDismissReports = controller.isSelfAdmin && !controller.isDirectConversation,
+                        onDismissReport = { report ->
+                            appState.launchMutation {
+                                when (controller.dismissReports(listOf(report.reportIdHex), "")) {
+                                    ReportOutcome.Sent, ReportOutcome.Queued -> {
+                                        appState.present(R.string.report_dismissed)
+                                        reportsRevision += 1
+                                    }
+                                    ReportOutcome.NotAllowed -> appState.present(R.string.report_dismiss_failed)
+                                    // The controller already presented the failure with its report.
+                                    ReportOutcome.Failed -> Unit
+                                }
+                            }
+                        },
                         status = item.status,
                         mine = mine,
                         senderDisplayName = appState.displayName(record.sender),

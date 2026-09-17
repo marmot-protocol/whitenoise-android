@@ -158,6 +158,8 @@ class ConversationRetentionPolicyTransitionTest {
             media = emptyList(),
             agentTextStreamJson = null,
             groupSystem = null,
+            hasReports = false,
+            edit = null,
             reactions = reactions,
             deleted = false,
             deletedByMessageIdHex = null,

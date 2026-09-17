@@ -529,6 +529,8 @@ class TimelineProjectorTest {
         media = emptyList(),
         agentTextStreamJson = null,
         groupSystem = null,
+        hasReports = false,
+        edit = null,
         reactions = reactions,
         deleted = deleted,
         deletedByMessageIdHex = deletedByMessageIdHex,

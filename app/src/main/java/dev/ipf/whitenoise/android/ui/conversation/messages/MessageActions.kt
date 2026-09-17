@@ -98,6 +98,7 @@ internal fun MessageActionMenu(
     canShare: Boolean = false,
     canSave: Boolean,
     canInfo: Boolean = true,
+    canReport: Boolean = false,
     quickReactionEmojis: List<String>,
     onDismissRequest: () -> Unit,
     onReact: (String) -> Unit,
@@ -114,6 +115,7 @@ internal fun MessageActionMenu(
     onShare: () -> Unit = {},
     onSave: () -> Unit,
     onInfo: () -> Unit,
+    onReport: () -> Unit = {},
     onDelete: () -> Unit,
     mine: Boolean = false,
     selectedReactionEmojis: Set<String> = emptySet(),
@@ -139,6 +141,7 @@ internal fun MessageActionMenu(
             canShare,
             canSave,
             canInfo,
+            canReport,
         ) {
             messageActionKinds(
                 canReply = canReply,
@@ -153,6 +156,7 @@ internal fun MessageActionMenu(
                 canShare = canShare,
                 canSave = canSave,
                 canInfo = canInfo,
+                canReport = canReport,
             )
         }
     val labeledActions: List<Pair<MessageActionKind?, String>> =
@@ -187,6 +191,7 @@ internal fun MessageActionMenu(
                         MessageActionKind.Share -> onShare()
                         MessageActionKind.Save -> onSave()
                         MessageActionKind.Info -> onInfo()
+                        MessageActionKind.Report -> onReport()
                         null -> onDelete()
                     }
                 },

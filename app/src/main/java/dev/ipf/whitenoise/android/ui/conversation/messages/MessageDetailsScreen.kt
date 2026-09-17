@@ -23,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -43,6 +44,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.os.ConfigurationCompat
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.ContentReportFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ReactionTally
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -50,6 +52,7 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.MessageStatusLabels
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.labelFor
+import dev.ipf.whitenoise.android.state.reportReasonLabel
 import dev.ipf.whitenoise.android.state.shouldShowOriginalTimestamp
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.common.Avatar
@@ -107,6 +110,12 @@ internal fun MessageDetailsScreen(
     attachmentLabels: List<String>,
     onDismissRequest: () -> Unit,
     onCopy: (String) -> Unit,
+    // MarmotKit 0.10.1 content reports against this message; null hides the section, an empty list shows
+    // it still loading. Dismissal is offered only to admins, which the engine enforces as well.
+    reports: List<ContentReportFfi>? = null,
+    reporterName: (String) -> String = { it },
+    canDismissReports: Boolean = false,
+    onDismissReport: (ContentReportFfi) -> Unit = {},
 ) {
     Dialog(
         onDismissRequest = onDismissRequest,
@@ -145,6 +154,9 @@ internal fun MessageDetailsScreen(
                     MessageDetailsContentCard(record.plaintext, attachmentLabels)
                     MessageFactsSection(record, status, mine, senderNpub, onCopy)
                     if (reactions.isNotEmpty()) MessageReactionsSection(reactions)
+                    if (reports != null) {
+                        MessageReportsSection(reports, reporterName, canDismissReports, onDismissReport)
+                    }
                     MessageDeliverySection(mine, status, senderDisplayName, record.sender, senderAvatarUrl, recipients)
                 }
             }
@@ -333,6 +345,88 @@ private fun MessageReactionsSection(reactions: List<ReactionTally>) {
             }
         }
     }
+}
+
+/**
+ * Reports members filed against this message, newest first with dismissed ones last. Each names its reason,
+ * the reporter and the time; an admin can dismiss an open one, which MarmotKit shares with the other admins.
+ */
+@Composable
+private fun MessageReportsSection(
+    reports: List<ContentReportFfi>,
+    reporterName: (String) -> String,
+    canDismiss: Boolean,
+    onDismiss: (ContentReportFfi) -> Unit,
+) {
+    val locale = ConfigurationCompat.getLocales(LocalConfiguration.current)[0] ?: Locale.ROOT
+    val zone = ZoneId.systemDefault()
+    Surface(
+        modifier = Modifier.fillMaxWidth().testTag("message.details.reports"),
+        border = amoledOutlineBorder(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        Column {
+            Text(
+                text = stringResource(R.string.message_reports_section),
+                modifier =
+                    Modifier.padding(
+                        start = WhiteNoiseSpacing.CompactScreenMargin,
+                        top = WhiteNoiseSpacing.CompactScreenMargin,
+                        end = WhiteNoiseSpacing.CompactScreenMargin,
+                        bottom = WhiteNoiseSpacing.Related,
+                    ),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            reports.forEachIndexed { index, report ->
+                if (index > 0) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                    )
+                }
+                MessageReportRow(report, index, reporterName(report.reporter), locale, zone, canDismiss, onDismiss)
+            }
+        }
+    }
+}
+
+/** One report: its reason, the reporter's explanation and name, when it was filed, and its dismissal state. */
+@Suppress("LongParameterList")
+@Composable
+private fun MessageReportRow(
+    report: ContentReportFfi,
+    index: Int,
+    reporter: String,
+    locale: Locale,
+    zone: ZoneId,
+    canDismiss: Boolean,
+    onDismiss: (ContentReportFfi) -> Unit,
+) {
+    val filedAt = remember(report.reportedAt, locale, zone) { editHistoryRevisionTime(report.reportedAt, locale, zone) }
+    ListItem(
+        modifier = Modifier.testTag("message.details.report.$index"),
+        headlineContent = { Text(stringResource(reportReasonLabel(report.reason))) },
+        supportingContent = {
+            Column {
+                if (report.explanation.isNotBlank()) Text(report.explanation)
+                Text(stringResource(R.string.report_reported_by, reporter))
+                Text(filedAt, style = MaterialTheme.typography.labelSmall)
+            }
+        },
+        trailingContent = {
+            when {
+                report.dismissed -> Text(stringResource(R.string.report_dismissed_label))
+                canDismiss -> {
+                    TextButton(onClick = { onDismiss(report) }) {
+                        Text(stringResource(R.string.report_dismiss))
+                    }
+                }
+            }
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+    )
 }
 
 /** Incoming: who sent it. Outgoing: every other member with the message's delivery state. */

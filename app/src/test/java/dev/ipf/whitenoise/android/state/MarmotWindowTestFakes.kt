@@ -92,6 +92,7 @@ internal object MarmotWindowTestFakes {
                     lifecycle = GroupLifecycleStateFfi.STABLE,
                     disbanding = false,
                     unrecoverable = false,
+                    avatarAsset = null,
                     capabilities =
                         ConversationCapabilitiesFfi(
                             participation = ConversationParticipationFfi.ACTIVE,
@@ -131,6 +132,7 @@ internal object MarmotWindowTestFakes {
     private fun presentedRow(row: ChatListRowFfi) =
         PresentedChatRowFfi(
             row = row,
+            avatarAsset = null,
             presentation =
                 ConversationPresentationFfi(
                     title = PresentationTextFfi.Literal(row.title.ifBlank { "Chat" }),

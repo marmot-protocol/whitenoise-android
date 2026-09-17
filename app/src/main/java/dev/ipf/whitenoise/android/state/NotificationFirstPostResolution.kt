@@ -228,7 +228,11 @@ internal class NotificationGroupSystemTextResolver(
                 GroupSystemEvents.resolve(record)?.let { event ->
                     val diff = GroupSystemEvents.renameDiffNames(event)
                     val actorHex = GroupSystemEvents.actorHex(event, record.sender)
-                    val actorName = actorName(update, actorHex, senderName, localOnly)
+                    val actorName =
+                        GroupSystemEvents.preferredName(
+                            actorName(update, actorHex, senderName, localOnly),
+                            event.actorDisplayName,
+                        ) ?: context.getString(R.string.group_system_someone)
                     val subjectHex = event.subject
                     val subjectName = subjectName(update, subjectHex, localOnly)
                     NotificationSystemText(
@@ -245,7 +249,8 @@ internal class NotificationGroupSystemTextResolver(
                                 GroupSystemEvents.summary(
                                     event = event,
                                     actorName = actorName,
-                                    subjectName = subjectName,
+                                    subjectName =
+                                        GroupSystemEvents.preferredName(subjectName, event.subjectDisplayName),
                                     actorIsSelf = GroupSystemEvents.isSelf(update.accountIdHex, actorHex),
                                     subjectIsSelf = GroupSystemEvents.isSelf(update.accountIdHex, subjectHex),
                                     copy = notificationGroupSystemCopy(context),
@@ -255,19 +260,22 @@ internal class NotificationGroupSystemTextResolver(
                 }
             }
 
-    /** Resolves a system-event actor without letting a profile failure discard the event. */
+    /**
+     * Resolves a system-event actor without letting a profile failure discard the event. Null when no local
+     * name exists, so the caller can prefer MarmotKit's prepared name before falling back to "someone".
+     */
     private suspend fun actorName(
         update: NotificationUpdateFfi,
         actorHex: String?,
         senderName: String?,
         localOnly: Boolean,
-    ): String =
+    ): String? =
         when {
             GroupSystemEvents.isSelf(update.accountIdHex, actorHex) -> context.getString(R.string.you)
             !senderName.isNullOrBlank() -> senderName
             !actorHex.isNullOrBlank() -> bestEffortName(update.accountRef, actorHex, localOnly)
             else -> null
-        } ?: context.getString(R.string.group_system_someone)
+        }
 
     /** Resolves an optional system-event subject under the same local-only policy. */
     private suspend fun subjectName(

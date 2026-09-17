@@ -1,11 +1,14 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.ChatListAnchorOutcomeFfi
 import dev.ipf.marmotkit.ChatListPageDirectionFfi
 import dev.ipf.marmotkit.ChatListViewFfi
 import dev.ipf.marmotkit.ChatListWindowSnapshotFfi
 import dev.ipf.marmotkit.ChatListWindowSubscription
 import dev.ipf.marmotkit.ChatsSubscription
+import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.PresentedChatListUpdateFfi
 
 /** Rows requested when a chat-list window opens; MDK defaults to the same value and caps requests at 100. */
 internal const val CHAT_LIST_WINDOW_INITIAL_ROWS: UInt = 50u
@@ -83,6 +86,58 @@ private class FfiChatListWindowHandle(
     override fun close() = subscription.close()
 }
 
+/**
+ * MarmotKit's pre-0.10.0 presented chat list wearing the window seam. Every replacement is exposed as one
+ * complete `CHATS` view that already contains archived rows, never has more to page, and ignores anchor
+ * and return-to-top commands. It exists so a chat list still renders and stays live when the bounded
+ * windows cannot open on an account, which happened on real accounts right after the 0.10.0 upgrade.
+ */
+internal class PresentedChatListWindowHandle(
+    private val snapshotOnce: () -> PresentedChatListUpdateFfi?,
+    private val nextUpdate: suspend () -> PresentedChatListUpdateFfi?,
+    private val release: () -> Unit,
+) : ChatListWindowHandle {
+    private var latest: ChatListWindowSnapshotFfi? = null
+
+    /** The initial presented frame as a whole-list `CHATS` window. */
+    override fun snapshot(): ChatListWindowSnapshotFfi? = snapshotOnce()?.let(::asWindow)
+
+    /** The next presented frame as a whole-list replacement. */
+    override suspend fun next(): ChatListWindowSnapshotFfi? = nextUpdate()?.let(::asWindow)
+
+    /** Nothing more is ever retained beyond the complete list, so paging returns the installed frame. */
+    override suspend fun page(
+        sequence: ULong,
+        direction: ChatListPageDirectionFfi,
+        count: UInt,
+    ): ChatListWindowSnapshotFfi = installedFrame()
+
+    /** The complete list needs no anchor; the installed frame is returned unchanged. */
+    override suspend fun setVisibleAnchor(
+        sequence: ULong,
+        groupIdHex: String,
+    ): ChatListWindowSnapshotFfi = installedFrame()
+
+    /** The complete list is already at its top. */
+    override suspend fun returnToTop(sequence: ULong): ChatListWindowSnapshotFfi = installedFrame()
+
+    /** Releases the presented-list subscription. */
+    override fun close() = release()
+
+    private fun installedFrame(): ChatListWindowSnapshotFfi = latest ?: throw MarmotKitException.ChatWindowClosed()
+
+    private fun asWindow(update: PresentedChatListUpdateFfi): ChatListWindowSnapshotFfi =
+        ChatListWindowSnapshotFfi(
+            subscriptionGeneration = update.subscriptionGeneration,
+            sequence = update.sequence,
+            view = ChatListViewFfi.CHATS,
+            rows = update.snapshot.rows,
+            hasMoreBefore = false,
+            hasMoreAfter = false,
+            anchor = ChatListAnchorOutcomeFfi.Top,
+        ).also { latest = it }
+}
+
 /** Production adapter around MarmotKit's group subscription. */
 private class FfiChatsSubscriptionHandle(
     private val subscription: ChatsSubscription,
@@ -101,6 +156,8 @@ private class FfiChatsSubscriptionHandle(
 internal class ChatListLiveSubscriptions(
     val openChatListWindow: suspend (account: String, view: ChatListViewFfi) -> ChatListWindowHandle,
     val openChats: suspend (account: String, includeArchived: Boolean) -> ChatsSubscriptionHandle,
+    /** Whole-list fallback used only when the bounded windows fail to open; null disables the fallback. */
+    val openPresentedChatList: (suspend (account: String) -> ChatListWindowHandle)? = null,
 ) {
     companion object {
         /** Binds the seam to the production MarmotKit runtime. */
@@ -114,6 +171,16 @@ internal class ChatListLiveSubscriptions(
                 openChats = { account, includeArchived ->
                     appState.marmotIo {
                         FfiChatsSubscriptionHandle(subscribeChats(account, includeArchived))
+                    }
+                },
+                openPresentedChatList = { account ->
+                    appState.marmotIo {
+                        val subscription = openPresentedChatList(account, true)
+                        PresentedChatListWindowHandle(
+                            snapshotOnce = subscription::snapshot,
+                            nextUpdate = subscription::next,
+                            release = subscription::close,
+                        )
                     }
                 },
             )

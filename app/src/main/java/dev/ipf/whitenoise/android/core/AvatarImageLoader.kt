@@ -317,6 +317,32 @@ object AvatarImageLoader {
             AvatarByteFetchResult.Unavailable -> AvatarImageFetchResult.Unavailable
         }
 
+    /** The image already held for [key], whether it came from a URL fetch or MarmotKit's durable store. */
+    internal fun cachedImage(key: String): ImageBitmap? = cached(key.trim())
+
+    /** The cache lifetime a durable read must capture before it suspends; [clear] makes it stale. */
+    internal fun currentCacheLifetime(): Long = cacheLifetime.capture()
+
+    /**
+     * Decodes avatar bytes MarmotKit already validated and stored, caching them under [key] unless the
+     * cache was cleared after [lifetime] was captured, so a read that outlives a sign-out cannot repopulate
+     * the next account's cache. It reuses the same sampling and dimension budget as a fetched avatar, so a
+     * durable avatar costs the cache no more than the URL it replaces. Null when the bytes do not decode or
+     * the publication is stale.
+     */
+    internal fun decodeAndCache(
+        key: String,
+        bytes: ByteArray,
+        lifetime: Long,
+    ): ImageBitmap? {
+        val image = decode(bytes)?.asImageBitmap() ?: return null
+        val published =
+            synchronized(lock) {
+                cacheLifetime.isCurrent(lifetime).also { current -> if (current) putCached(key, image) }
+            }
+        return image.takeIf { published }
+    }
+
     private fun decode(bytes: ByteArray): android.graphics.Bitmap? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)

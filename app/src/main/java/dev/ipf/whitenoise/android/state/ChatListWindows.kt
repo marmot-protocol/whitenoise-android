@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import android.util.Log
 import dev.ipf.marmotkit.ChatListPageDirectionFfi
 import dev.ipf.marmotkit.ChatListViewFfi
 import dev.ipf.marmotkit.ChatListWindowSnapshotFfi
@@ -16,6 +17,12 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicReference
+
+/** The window handle opened for each rendered view. */
+private typealias OpenedWindows = Map<ChatListViewFfi, ChatListWindowHandle>
+
+/** Each view's first complete replacement, consumed once when the set opens. */
+private typealias InitialReplacements = Map<ChatListViewFfi, ChatListWindowSnapshotFfi>
 
 /** The MDK chat-list views whose rows the app renders: active chats, archived chats and departed groups. */
 internal val CHAT_LIST_WINDOW_VIEWS = listOf(ChatListViewFfi.CHATS, ChatListViewFfi.ARCHIVED, ChatListViewFfi.LEFT)
@@ -146,25 +153,52 @@ internal class ChatListWindowSet private constructor(
     }
 
     companion object {
-        /** Opens every rendered view and consumes each initial replacement; closes all handles if any open fails. */
+        /**
+         * Opens every rendered view and consumes each initial replacement; closes all handles if any open
+         * fails. When MarmotKit refuses the windows and [openFallback] is given, the set is built from that
+         * single whole-list handle instead, so the account still gets a live chat list. The refusal is
+         * logged as a release-safe marker because it is exactly the evidence a field report needs.
+         */
         @Suppress("TooGenericExceptionCaught") // Any failure while opening must release the handles opened so far.
         suspend fun open(
             account: String,
+            openFallback: (suspend (account: String) -> ChatListWindowHandle)? = null,
             openWindow: suspend (account: String, view: ChatListViewFfi) -> ChatListWindowHandle,
         ): ChatListWindowSet {
             val handles = LinkedHashMap<ChatListViewFfi, ChatListWindowHandle>()
             try {
                 for (view in CHAT_LIST_WINDOW_VIEWS) handles[view] = openWindow(account, view)
-                val initial =
-                    handles.mapValues { (_, handle) ->
-                        withContext(Dispatchers.IO) { handle.snapshot() }.requireChatListWindowSnapshot()
-                    }
-                return ChatListWindowSet(handles, initial)
+                return ChatListWindowSet(handles, initialReplacements(handles))
+            } catch (refused: MarmotKitException) {
+                handles.values.forEach { handle -> runCatching { handle.close() } }
+                val fallback = openFallback ?: throw refused
+                val marker = releaseFailureMarker("CHAT_LIST_WINDOW_OPEN", refused)
+                Log.e("DMChats", "$marker fallback=presented_list")
+                val whole = linkedMapOf(ChatListViewFfi.CHATS to fallback(account))
+                return openOrClose(whole) { ChatListWindowSet(whole, initialReplacements(whole)) }
             } catch (throwable: Throwable) {
                 handles.values.forEach { handle -> runCatching { handle.close() } }
                 throw throwable
             }
         }
+
+        /** Runs [build] and closes every handle in [handles] if it fails, so a half-open set cannot leak. */
+        @Suppress("TooGenericExceptionCaught") // Any failure must release the handles opened so far.
+        private inline fun openOrClose(
+            handles: OpenedWindows,
+            build: () -> ChatListWindowSet,
+        ): ChatListWindowSet =
+            try {
+                build()
+            } catch (failure: Throwable) {
+                handles.values.forEach { handle -> runCatching { handle.close() } }
+                throw failure
+            }
+
+        private suspend fun initialReplacements(handles: OpenedWindows): InitialReplacements =
+            handles.mapValues { (_, handle) ->
+                withContext(Dispatchers.IO) { handle.snapshot() }.requireChatListWindowSnapshot()
+            }
     }
 }
 

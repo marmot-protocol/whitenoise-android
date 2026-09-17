@@ -865,6 +865,7 @@ private fun presentedChatListSnapshot(rows: List<ChatListRowFfi>) =
             rows.map { row ->
                 PresentedChatRowFfi(
                     row = row,
+                    avatarAsset = null,
                     presentation =
                         ConversationPresentationFfi(
                             title = PresentationTextFfi.Literal(row.title.ifBlank { "Chat" }),
