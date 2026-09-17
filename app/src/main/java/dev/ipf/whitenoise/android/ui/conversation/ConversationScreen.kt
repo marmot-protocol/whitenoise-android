@@ -1128,6 +1128,7 @@ internal fun ConversationScreen(
                 viewportEndOffsetPx = layoutInfo.viewportEndOffset,
                 viewportHeightPx = layoutInfo.viewportSize.height,
                 canScrollForward = listState.canScrollForward,
+                canScrollBackward = listState.canScrollBackward,
                 visibleItems =
                     layoutInfo.visibleItemsInfo.map { visible ->
                         ConversationVisibleItemEvidence(

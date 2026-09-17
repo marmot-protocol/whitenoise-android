@@ -203,7 +203,7 @@ class ConversationVoiceDownloadProductionAndroidTest {
 
             evidence.assertViewportStayedFixed(composeRule, afterIncoming, completionCheckpoint)
             assertTrue(evidence.latestViewport().mode is ConversationScrollMode.FollowingTail)
-            assertFalse(evidence.latestViewport().canScrollForward)
+            assertFalse(evidence.latestViewport().canScrollBackward)
             assertEquals(emptyList<ConversationScrollWriteEvidence>(), evidence.writes)
         } finally {
             closeInstrumentedFixture(fixture, runtime)
@@ -1063,7 +1063,13 @@ private class InstrumentedConversationEvidence : ConversationScrollEvidenceSink 
             it.anchor.messageId == messageId
         }
 
-    /** Waits until production tail ownership and physical-end geometry agree. */
+    /**
+     * Waits until production tail ownership and physical-end geometry agree.
+     *
+     * The transcript is a reversed list, so its newest message sits at index zero and the tail is the
+     * end the list can no longer travel *backward* from. Forward travel stays available for as long as
+     * there is older history, which is almost always.
+     */
     fun awaitFollowingTailAt(
         composeRule: androidx.compose.ui.test.junit4.AndroidComposeTestRule<*, *>,
         messageId: String,
@@ -1071,7 +1077,7 @@ private class InstrumentedConversationEvidence : ConversationScrollEvidenceSink 
         awaitViewport(composeRule, "tail never settled with message $messageId visible") { viewport ->
             viewport.visibleItems.any { it.key == "msg:$messageId" } &&
                 viewport.mode is ConversationScrollMode.FollowingTail &&
-                !viewport.canScrollForward
+                !viewport.canScrollBackward
         }
 
     /** Waits for a post-write anchor and durable ReadingHistory ownership. */
@@ -1112,6 +1118,7 @@ private class InstrumentedConversationEvidence : ConversationScrollEvidenceSink 
             assertEquals(expected.viewportEndOffsetPx, actual.viewportEndOffsetPx)
             assertEquals(expected.viewportHeightPx, actual.viewportHeightPx)
             assertEquals(expected.canScrollForward, actual.canScrollForward)
+            assertEquals(expected.canScrollBackward, actual.canScrollBackward)
             assertEquals(expected.visibleItems, actual.visibleItems)
         }
     }
