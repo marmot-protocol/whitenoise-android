@@ -1539,7 +1539,7 @@
     <string name="report_dismissed">Meldung verworfen.</string>
     <string name="report_message_not_allowed">In diesem Chat kannst du keine Nachrichten melden.</string>
     <string name="report_message_failed">Meldung konnte nicht gesendet werden. Versuche es erneut.</string>
-    <string name="report_reason_spam">Spam</string>
+    <string name="report_reason_spam">Spam oder Werbung</string>
     <string name="report_reason_nudity">Nacktheit oder sexuelle Inhalte</string>
     <string name="report_reason_profanity">Beleidigende Sprache</string>
     <string name="report_reason_illegal">Illegale Inhalte</string>

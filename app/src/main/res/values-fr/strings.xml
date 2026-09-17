@@ -1541,7 +1541,7 @@
     <string name="report_dismissed">Signalement rejeté.</string>
     <string name="report_message_not_allowed">Vous ne pouvez pas signaler de messages dans cette discussion.</string>
     <string name="report_message_failed">Impossible d’envoyer le signalement. Réessayez.</string>
-    <string name="report_reason_spam">Spam</string>
+    <string name="report_reason_spam">Spam ou publicité</string>
     <string name="report_reason_nudity">Nudité ou contenu sexuel</string>
     <string name="report_reason_profanity">Propos injurieux</string>
     <string name="report_reason_illegal">Contenu illégal</string>

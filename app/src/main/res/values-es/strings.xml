@@ -1541,7 +1541,7 @@
     <string name="report_dismissed">Denuncia descartada.</string>
     <string name="report_message_not_allowed">No puedes denunciar mensajes en este chat.</string>
     <string name="report_message_failed">No se pudo enviar la denuncia. Inténtalo de nuevo.</string>
-    <string name="report_reason_spam">Spam</string>
+    <string name="report_reason_spam">Spam o publicidad</string>
     <string name="report_reason_nudity">Desnudez o contenido sexual</string>
     <string name="report_reason_profanity">Lenguaje abusivo</string>
     <string name="report_reason_illegal">Contenido ilegal</string>

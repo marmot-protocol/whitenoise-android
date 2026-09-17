@@ -1541,7 +1541,7 @@
     <string name="report_dismissed">Denúncia dispensada.</string>
     <string name="report_message_not_allowed">Não pode denunciar mensagens nesta conversa.</string>
     <string name="report_message_failed">Não foi possível enviar a denúncia. Tente novamente.</string>
-    <string name="report_reason_spam">Spam</string>
+    <string name="report_reason_spam">Spam ou publicidade</string>
     <string name="report_reason_nudity">Nudez ou conteúdo sexual</string>
     <string name="report_reason_profanity">Linguagem abusiva</string>
     <string name="report_reason_illegal">Conteúdo ilegal</string>

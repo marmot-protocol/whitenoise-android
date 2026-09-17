@@ -1539,7 +1539,7 @@
     <string name="report_dismissed">Bildirim kapatıldı.</string>
     <string name="report_message_not_allowed">Bu sohbette mesaj bildiremezsiniz.</string>
     <string name="report_message_failed">Bildirim gönderilemedi. Yeniden deneyin.</string>
-    <string name="report_reason_spam">Spam</string>
+    <string name="report_reason_spam">Spam veya reklam</string>
     <string name="report_reason_nudity">Çıplaklık veya cinsel içerik</string>
     <string name="report_reason_profanity">Saldırgan dil</string>
     <string name="report_reason_illegal">Yasa dışı içerik</string>

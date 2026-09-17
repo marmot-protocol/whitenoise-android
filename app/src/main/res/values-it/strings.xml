@@ -1541,7 +1541,7 @@
     <string name="report_dismissed">Segnalazione ignorata.</string>
     <string name="report_message_not_allowed">Non puoi segnalare messaggi in questa chat.</string>
     <string name="report_message_failed">Impossibile inviare la segnalazione. Riprova.</string>
-    <string name="report_reason_spam">Spam</string>
+    <string name="report_reason_spam">Spam o pubblicità</string>
     <string name="report_reason_nudity">Nudità o contenuti sessuali</string>
     <string name="report_reason_profanity">Linguaggio offensivo</string>
     <string name="report_reason_illegal">Contenuti illegali</string>
