@@ -16,8 +16,10 @@ internal val CONVERSATION_TIMELINE_TAIL_GAP = 8.dp
  * spacing. This matches the arrangement a reversed lazy column defaults to, so
  * a short transcript still rests against the composer.
  */
+internal val CONVERSATION_TIMELINE_ROW_SPACING = 2.dp
+
 internal val CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT =
-    Arrangement.spacedBy(2.dp, Alignment.Bottom)
+    Arrangement.spacedBy(CONVERSATION_TIMELINE_ROW_SPACING, Alignment.Bottom)
 
 /**
  * Applies the resting tail gap and any temporary snackbar clearance at the

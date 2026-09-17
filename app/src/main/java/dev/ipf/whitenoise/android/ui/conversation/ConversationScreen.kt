@@ -2863,6 +2863,19 @@ internal fun ConversationScreen(
         initialTimelineAnchored = true
         navigationState.lastFollowedLatestId = anchoredTimeline.lastOrNull()?.id
     }
+    // Resolved in composition so the row-inserting frame already knows which
+    // row is entering; the follow effect below only runs after that frame.
+    val tailEntrance =
+        rememberConversationTailEntrance(
+            latestItemId = latestTimelineItemId,
+            lastFollowedLatestId = navigationState.lastFollowedLatestId,
+            previousStillPresent =
+                navigationState.lastFollowedLatestId?.let { previous ->
+                    renderedTimeline.any { it.id == previous }
+                } == true,
+            followingTail = scrollCoordinator.isFollowingTail,
+            initialTimelineAnchored = initialTimelineAnchored,
+        )
     LaunchedEffect(controller, latestTimelineItemId, initialTimelineAnchored) {
         if (!initialTimelineAnchored || renderedTimeline.isEmpty()) return@LaunchedEffect
         val latestId = renderedTimeline.lastOrNull()?.id
@@ -3745,7 +3758,10 @@ internal fun ConversationScreen(
                                 ) { index, item ->
                                     val messageId = item.record.messageIdHex
                                     TimelineRow(
-                                        modifier = Modifier.timelineReadingExposure(timelineViewport),
+                                        modifier =
+                                            Modifier
+                                                .timelineReadingExposure(timelineViewport)
+                                                .conversationTailEntranceMotion(tailEntrance, item.id),
                                         item = item,
                                         // Newest-first rows: the chronologically
                                         // older neighbour is the next row emitted.
