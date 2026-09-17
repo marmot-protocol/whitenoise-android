@@ -52,6 +52,7 @@ import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AuthoritativeEdit
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.ChatListMessageSearch
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
@@ -59,6 +60,7 @@ import dev.ipf.whitenoise.android.core.ConversationTranscriptExport
 import dev.ipf.whitenoise.android.core.ConversationTranscriptTimelineReader
 import dev.ipf.whitenoise.android.core.EMPTY_MARKDOWN_DOCUMENT
 import dev.ipf.whitenoise.android.core.EditState
+import dev.ipf.whitenoise.android.core.EditVersion
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.IndexedAttachment
@@ -80,6 +82,7 @@ import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
 import dev.ipf.whitenoise.android.core.replyBodyWithTypedMediaFallback
 import dev.ipf.whitenoise.android.core.replyMediaKindFromMime
 import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
+import dev.ipf.whitenoise.android.core.withAuthoritativeEdits
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
 import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
@@ -6081,6 +6084,9 @@ internal fun conversationStartsLoading(
 
 internal fun isTerminalOpenFailure(throwable: Throwable): Boolean = throwable is ConversationInitialLoadException
 
+/** Edit revisions requested per history page; a message with more is paged by the view that needs it. */
+internal const val EDIT_HISTORY_PAGE_LIMIT: UInt = 50u
+
 internal fun shouldOfferConversationLoadRetry(throwable: Throwable): Boolean = !isTerminalOpenFailure(throwable)
 
 internal typealias MediaUploader =
@@ -10631,6 +10637,25 @@ class ConversationController(
     }
 
     /**
+     * MarmotKit's complete accepted-edit history for one message, oldest first, or null when the engine
+     * could not answer. The history view then falls back to whatever edits the loaded window contains.
+     */
+    internal suspend fun authoritativeEditHistory(messageIdHex: String): List<EditVersion>? {
+        val account = conversationAccountRef ?: return null
+        return runCatchingCancellable {
+            appState.marmotIo {
+                messageEditHistory(account, group.groupIdHex, messageIdHex, null, null, EDIT_HISTORY_PAGE_LIMIT)
+            }
+        }.getOrNull()?.versions?.map { version ->
+            EditVersion(
+                messageIdHex = version.messageIdHex,
+                text = version.plaintext,
+                recordedAt = version.editedAt,
+            )
+        }
+    }
+
+    /**
      * Recenters the live window on a retained message; false when MDK no longer retains it or there is no
      * window. Runs under the same active-call guard as pagination so a concurrent teardown cannot close the
      * native handle while the jump is in flight.
@@ -12037,7 +12062,19 @@ class ConversationController(
                     isTimelineMessageVisible(message.record.messageIdHex, hiddenIds)
                 }
             }
-        val aggregated = aggregateEdits(visible.map { it.record })
+        val aggregated =
+            withAuthoritativeEdits(
+                aggregateEdits(visible.map { it.record }),
+                timelineRecords.values.mapNotNull { record ->
+                    record.edit?.let {
+                        AuthoritativeEdit(
+                            messageIdHex = record.messageIdHex,
+                            editCount = it.editCount.toInt(),
+                            effectiveText = record.plaintext,
+                        )
+                    }
+                },
+            )
         // Drop any optimistic edit the real kind-1009 has now caught up to:
         // once `aggregateEdits` reports the same latest text, the overlay is
         // redundant and would otherwise mask a later remote edit. Failed/Pending

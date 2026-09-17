@@ -19,7 +19,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
@@ -32,6 +36,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.core.os.ConfigurationCompat
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.EditState
+import dev.ipf.whitenoise.android.core.EditVersion
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -57,10 +62,18 @@ internal fun EditHistoryDialog(
     originalTimestamp: ULong,
     editState: EditState,
     onDismissRequest: () -> Unit,
+    // MarmotKit 0.10.1 owns accepted edits, so its history is complete where the loaded window's is not.
+    // Null means the engine could not answer and the window's own edits stand in.
+    loadAuthoritativeHistory: (suspend () -> List<EditVersion>?)? = null,
 ) {
+    var authoritative by remember(editState) { mutableStateOf<List<EditVersion>?>(null) }
+    LaunchedEffect(editState, loadAuthoritativeHistory) {
+        authoritative = loadAuthoritativeHistory?.invoke()
+    }
+    val versions = authoritative ?: editState.versions
     val rows =
-        remember(original, originalTimestamp, editState) {
-            editState.versions
+        remember(original, originalTimestamp, versions) {
+            versions
                 .mapIndexed { index, version ->
                     EditHistoryRow(index + 1, version.text, version.recordedAt)
                 }.reversed() + EditHistoryRow(0, original, originalTimestamp)

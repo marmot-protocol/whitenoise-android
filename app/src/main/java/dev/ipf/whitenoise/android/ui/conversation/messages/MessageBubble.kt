@@ -2777,6 +2777,7 @@ internal fun MessageBubble(
                         originalTimestamp = record.recordedAt,
                         editState = editState,
                         onDismissRequest = { editHistoryOpen = false },
+                        loadAuthoritativeHistory = { controller.authoritativeEditHistory(record.messageIdHex) },
                     )
                 }
                 if (infoSheetOpen && !deleted) {
