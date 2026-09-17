@@ -536,7 +536,9 @@ class ComposerBarScreenshotTest {
      */
     @Test
     fun composerBulkPasteMidTransitionFrame() {
-        renderBulkPasteComposer()
+        // Empty and unfocused, so the composer is genuinely compact: the text arriving is what requests
+        // the editing row, and the width animates alongside the height instead of having settled already.
+        renderBulkPasteComposer(initialDraft = "")
         val field = composeRule.onNode(hasSetTextAction())
         val root = composeRule.onNodeWithTag(BULK_PASTE_TAG)
         // Short enough that the row is still growing toward its target here. The long draft used by the
@@ -544,7 +546,6 @@ class ComposerBarScreenshotTest {
         // alike, so it could not tell the two apart.
         val replacement = (1..3).joinToString("\n") { line -> "Bulk paste line $line." }
 
-        field.performClick()
         composeRule.mainClock.autoAdvance = false
         try {
             field.performTextReplacement(replacement)
@@ -556,8 +557,8 @@ class ComposerBarScreenshotTest {
         }
     }
 
-    /** Renders a short focused composer at the bottom of a fixed phone viewport. */
-    private fun renderBulkPasteComposer() {
+    /** Renders a composer at the bottom of a fixed phone viewport, holding [initialDraft]. */
+    private fun renderBulkPasteComposer(initialDraft: String = "Short") {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
                 Surface(Modifier.width(360.dp).height(720.dp).testTag(BULK_PASTE_TAG)) {
@@ -567,7 +568,7 @@ class ComposerBarScreenshotTest {
                             messageTextCopy = MessageTextCopy.Default,
                             onCancelReply = {},
                             onSend = { _, _ -> },
-                            initialDraft = TextFieldValue("Short"),
+                            initialDraft = TextFieldValue(initialDraft),
                         )
                     }
                 }
