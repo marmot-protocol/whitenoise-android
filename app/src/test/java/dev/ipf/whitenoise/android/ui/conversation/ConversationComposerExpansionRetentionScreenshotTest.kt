@@ -133,6 +133,49 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         composeRule.onNodeWithText("Short draft").assertExists()
     }
 
+    /**
+     * A drag released between the endpoints keeps the height it was let go at.
+     *
+     * Every release used to settle at the draft's natural height or full screen, so a reader could drag
+     * the border anywhere but could not leave it there. The capture is the settled composer, which is
+     * the only thing a screenshot can show about a gesture that has already ended.
+     */
+    @Test
+    fun releasedDragKeepsItsOwnHeightOnTheProductionRoute() {
+        val draftStore = DraftStore(InMemoryDraftPersistence())
+        val appState = appState(draftStore)
+        draftStore.set(ACCOUNT_A, GROUP_A, TextFieldValue(longDraft("free resize")))
+        val fixture = productionConversation(appState, ACCOUNT_A, GROUP_A)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ConversationScreen(
+                    appState = appState,
+                    chat = fixture.chat,
+                    controller = fixture.controller,
+                    onBack = {},
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        val automaticHeight = productionComposerPillContentHeight()
+        composeRule.onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG, useUnmergedTree = true).performTouchInput {
+            down(center)
+            moveBy(Offset(0f, -160f), delayMillis = 200)
+            up()
+        }
+        composeRule.waitForIdle()
+
+        val settled = productionComposerPillContentHeight()
+        assertTrue(
+            "a release between the endpoints must keep its own height, not fall back to $automaticHeight",
+            settled > automaticHeight + 1f,
+        )
+        composeRule.onRoot().captureRoboImage(
+            "src/test/snapshots/conversation_composer_free_released_height_light.png",
+        )
+    }
+
     /** Releases all production fixture owners after the test, including failed assertion paths. */
     @After
     fun releaseControllers() {
