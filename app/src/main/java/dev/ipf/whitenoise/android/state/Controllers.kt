@@ -1153,18 +1153,25 @@ internal fun optimisticMessageIdForProjection(
             val optimisticIsMediaPending = optimistic.record.tags.any { it.values.firstOrNull() == "_media_pending" }
             if (optimisticIsMediaPending && projectedIsMedia) return@firstOrNull true
 
-            // Standard match for text sends: plaintext equal, and tags equal
-            // ignoring engine-derived `p` (mention) tags. The optimistic record is
-            // built from the typed text before the engine adds NIP-27 `p` tags for
-            // `@npub1…` mentions, so requiring full tag equality leaves the
-            // optimistic and projected copies unmatched — a transient double bubble
-            // until the confirmed id lands. Reply tags (e/q) still must match.
+            // Standard match for text sends: plaintext equal and the same reply
+            // identity. The optimistic record is built from the typed text and
+            // carries only its reply tags; everything else on the projected copy
+            // is engine-derived on publish (NIP-27 `p` mentions, expiry, provenance
+            // and whatever a later engine adds). Requiring those to agree left the
+            // two copies unmatched whenever the echo landed before the send call
+            // returned, a double bubble until the confirmed id arrived.
             optimistic.record.plaintext == projected.plaintext &&
-                optimistic.record.tags.filterNot { it.values.firstOrNull() == "p" } ==
-                projected.tags.filterNot { it.values.firstOrNull() == "p" }
+                replyIdentityTags(optimistic.record.tags) == replyIdentityTags(projected.tags)
         }?.record
         ?.messageIdHex
 }
+
+/** The tags that name what a text message replies to; the only tags the optimistic copy carries. */
+private fun replyIdentityTags(tags: List<MessageTagFfi>): List<MessageTagFfi> =
+    tags.filter { tag ->
+        val name = tag.values.firstOrNull()
+        name == MessageProjector.EventRefTag || name == MessageProjector.QuoteRefTag
+    }
 
 /**
  * MDK assigns an app-event id before reporting [SendAcceptDispositionFfi.ACCEPTED_PENDING].

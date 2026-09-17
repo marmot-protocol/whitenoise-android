@@ -21905,6 +21905,15 @@
     ],
     "source_coverage": [
       {
+        "surface": "A relay echo that lands before the send call returns replaces the pending bubble instead of joining it",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "fun optimisticMessageIdForProjection(",
+        "test_ids": [
+          "CON-004",
+          "CON-005"
+        ]
+      },
+      {
         "surface": "First-use event-card client initialization stays off the conversation UI thread",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCardResolver.kt",
         "anchor": "internal fun defaultNostrEventQuery(",
