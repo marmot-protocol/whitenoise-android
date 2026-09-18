@@ -1,14 +1,102 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/coder/websocket"
 	"github.com/nbd-wtf/go-nostr"
+	"github.com/nbd-wtf/go-nostr/nip46"
 )
+
+func TestReconnectRetainsOriginalInvitation(t *testing.T) {
+	key, clientKey := nostr.GeneratePrivateKey(), nostr.GeneratePrivateKey()
+	pub, _ := nostr.GetPublicKey(key)
+	clientPub, _ := nostr.GetPublicKey(clientKey)
+	signer := nip46.NewStaticKeySigner(key)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	seen := make(chan string, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := websocket.Accept(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.CloseNow()
+		sub := ""
+		send := func(values ...any) { data, _ := json.Marshal(values); _ = conn.Write(ctx, websocket.MessageText, data) }
+		for {
+			_, raw, err := conn.Read(ctx)
+			if err != nil {
+				return
+			}
+			var parts []json.RawMessage
+			if json.Unmarshal(raw, &parts) != nil || len(parts) < 2 {
+				return
+			}
+			var kind string
+			_ = json.Unmarshal(parts[0], &kind)
+			if kind == "REQ" {
+				_ = json.Unmarshal(parts[1], &sub)
+				send("EOSE", sub)
+			}
+			if kind != "EVENT" {
+				continue
+			}
+			var event nostr.Event
+			if json.Unmarshal(parts[1], &event) != nil || event.Kind != 24133 || event.PubKey != clientPub {
+				return
+			}
+			req, _, response, err := signer.HandleRequest(ctx, &event)
+			if err != nil {
+				return
+			}
+			if req.Method == "connect" {
+				seen <- req.Params[1]
+				if req.Params[1] != "original-invitation" {
+					return
+				}
+			}
+			send("OK", event.ID, true, "")
+			send("EVENT", sub, response)
+		}
+	}))
+	defer server.Close()
+	dir := t.TempDir()
+	stub := "#!/bin/sh\n[ \"$1\" = publish ] && [ \"$2\" = --offline ] || exit 99\ncat <<'PAYLOAD'\n"
+	for _, kind := range []int{3063, 30063, 32267} {
+		event := nostr.Event{Kind: kind, CreatedAt: nostr.Now(), Tags: nostr.Tags{}, Content: "fixture"}
+		if err := event.Sign(key); err != nil {
+			t.Fatal(err)
+		}
+		payload, _ := json.Marshal(event)
+		stub += string(payload) + "\n"
+	}
+	stub += "PAYLOAD\n"
+	binary := filepath.Join(dir, "zsp")
+	if err := os.WriteFile(binary, []byte(stub), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("SIGN_WITH", "bunker://"+pub+"?relay="+strings.Replace(server.URL, "http://", "ws://", 1)+"&secret=original-invitation")
+	t.Setenv("BUNKER_CLIENT_KEY", clientKey)
+	t.Setenv("EXPECTED_PUBLISHER", pub)
+	before := os.Args
+	os.Args = []string{"test", binary, filepath.Join(dir, "fixture.apk")}
+	t.Cleanup(func() { os.Args = before })
+	if err := testSigner(); err != nil {
+		t.Fatal(err)
+	}
+	if <-seen != "original-invitation" {
+		t.Fatal("reconnect discarded invitation")
+	}
+}
 
 func TestSignedEventRejectsTampering(t *testing.T) {
 	key := nostr.GeneratePrivateKey()

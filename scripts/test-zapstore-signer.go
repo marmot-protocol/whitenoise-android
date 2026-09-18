@@ -104,12 +104,9 @@ func testSigner() error {
 		return fmt.Errorf("persistent client identity changed")
 	}
 	fmt.Println("Verified offline signatures for kinds 3063, 30063, 32267")
-	// Reconnect with the SAME client, without reusing the invitation secret.
-	// This checks durable pairing as well as permission for upload auth.
-	query := u.Query()
-	query.Del("secret")
-	u.RawQuery = query.Encode()
-	bunker, err := nip46.ConnectBunker(ctx, clientKey, u.String(), nil, func(string) {})
+	// Reconnect exactly as the publisher does: same client key and bunker URI.
+	// Keycast accepts the consumed invitation for its original active client.
+	bunker, err := nip46.ConnectBunker(ctx, clientKey, connection, nil, func(string) {})
 	if err != nil {
 		return fmt.Errorf("paired-client reconnect failed (remote details withheld)")
 	}
@@ -125,7 +122,7 @@ func testSigner() error {
 	if err := bunker.SignEvent(ctx, &auth); err != nil || !validSignedEvent(auth, publisher) {
 		return fmt.Errorf("kind 24242 signing failed (remote details withheld)")
 	}
-	fmt.Println("Verified kind 24242 signature and reconnect without invitation secret")
+	fmt.Println("Verified kind 24242 signature and reconnect with persistent client and URI")
 	fmt.Println("Signer:", publisher)
 	fmt.Println("PASS: no files uploaded; no release events published")
 	return nil
