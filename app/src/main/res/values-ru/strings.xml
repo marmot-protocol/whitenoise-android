@@ -1879,6 +1879,7 @@
     <string name="choose_files">Выбрать из Файлов</string>
     <string name="group_emoji_create">Создать из эмодзи</string>
     <string name="profile_suggest_name">Предложить имя</string>
+    <string name="profile_restore_saved_name">Восстановить сохранённое имя</string>
     <string name="profile_lightning_address">Lightning-адрес</string>
     <string name="profile_image_failed">Не удалось загрузить это изображение. Выберите другое изображение или повторите попытку.</string>
     <string name="profile_publish_failed">Ваш профиль не удалось сохранить. Проверьте свои данные и повторите попытку.</string>

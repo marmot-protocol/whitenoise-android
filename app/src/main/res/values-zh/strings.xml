@@ -1803,6 +1803,7 @@
     <string name="choose_files">从文件中选择</string>
     <string name="group_emoji_create">用表情符号创建</string>
     <string name="profile_suggest_name">建议名称</string>
+    <string name="profile_restore_saved_name">恢复已保存的名称</string>
     <string name="profile_lightning_address">Lightning 地址</string>
     <string name="profile_image_failed">无法加载此图片。请选择其他图片或重试。</string>
     <string name="profile_publish_failed">您的配置文件无法保存 。 检查你的细节再试一次</string>

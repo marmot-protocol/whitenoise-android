@@ -810,6 +810,8 @@ internal fun ProfileEditScreen(
         onSuggestName = {
             fields.name.setTextAndPlaceCursorAtEnd(appState.randomProfilePseudonym(excluding = displayName))
         },
+        onRestoreName = { fields.name.setTextAndPlaceCursorAtEnd(baselineDraft.displayName) },
+        nameDiffersFromSaved = displayName != baselineDraft.displayName,
         onOpenPicture = { if (avatarImageAvailable) fullPictureOpen = true },
         onEditPicture = { showPictureSheet = true },
         onEditBanner = { showBannerSheet = true },

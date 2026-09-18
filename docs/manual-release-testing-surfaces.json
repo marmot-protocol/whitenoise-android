@@ -14102,6 +14102,15 @@
         ]
       },
       {
+        "surface": "string:profile_restore_saved_name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditContent.kt",
+        "anchor": "R.string.profile_restore_saved_name",
+        "test_ids": [
+          "PRO-001",
+          "PRO-002"
+        ]
+      },
+      {
         "surface": "string:profile_suggest_name",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditContent.kt",
         "anchor": "R.string.profile_suggest_name",
@@ -21985,25 +21994,34 @@
         "surface": "Authoritative-only timeline ordering preserves native chronology",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/TimelineDisplayOrdering.kt",
         "anchor": "fun orderTimelineMessagesForDisplay(",
-        "test_ids": ["CON-002"]
+        "test_ids": [
+          "CON-002"
+        ]
       },
       {
         "surface": "Conversation replacements deduplicate profile requests and retain completed stream state",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "suspend fun applyTimelinePage(",
-        "test_ids": ["CON-002", "CON-004"]
+        "test_ids": [
+          "CON-002",
+          "CON-004"
+        ]
       },
       {
         "surface": "Optimistic reaction changes remain scoped to each retained message",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationWindow.kt",
         "anchor": "fun reactionTalliesForWindow(",
-        "test_ids": ["MSG-005"]
+        "test_ids": [
+          "MSG-005"
+        ]
       },
       {
         "surface": "Pages without edit events skip aggregation without changing edit presentation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/core/MessageEdits.kt",
         "anchor": "fun aggregateEdits(",
-        "test_ids": ["MSG-007"]
+        "test_ids": [
+          "MSG-007"
+        ]
       },
       {
         "surface": "First-use event-card client initialization stays off the conversation UI thread",

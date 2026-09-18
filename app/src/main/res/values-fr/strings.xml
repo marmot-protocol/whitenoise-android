@@ -1827,6 +1827,7 @@
     <string name="choose_files">Choisir dans Fichiers</string>
     <string name="group_emoji_create">Créer à partir d’un emoji</string>
     <string name="profile_suggest_name">Suggérer un nom</string>
+    <string name="profile_restore_saved_name">Restaurer le nom enregistré</string>
     <string name="profile_lightning_address">Adresse Lightning</string>
     <string name="profile_image_failed">Impossible de charger cette image. Choisissez une autre image ou réessayez.</string>
     <string name="profile_publish_failed">Impossible d’enregistrer le profil. Réessayez.</string>
