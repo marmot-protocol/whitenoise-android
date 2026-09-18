@@ -890,6 +890,8 @@ class LocalNotificationPresenter(
         senderAvatarBitmap: Bitmap?,
         enrichedSender: Person,
     ) {
+        // The enriched rewrite is a second platform write for the same card; it takes a slot like the first.
+        postPacer.awaitSlot()
         ConversationCardPostSynchronizer.withLock(
             content.notificationTag,
             content.notificationId,
