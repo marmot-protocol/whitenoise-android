@@ -1642,16 +1642,15 @@ internal class ConversationDictationController internal constructor(
                         val retainedCallerAudio = retainSpeechBearingCallerAudioForRetry()
                         clearRecognitionGeneration(cancel = false)
                         when {
-                            finishRequested && retainedCallerAudio ->
+                            finishRequested && callerAudioContainsSpeech == false ->
+                                continueOrFinalizeCallerAudioDrain(sessionId, target)
+                            finishRequested &&
+                                (retainedCallerAudio || platform.callerAudioHasPending()) ->
                                 retryRetainedCallerAudioOrFail(
                                     sessionId,
                                     target,
                                     unresolvedRecognitionFailure ?: ConversationDictationFailure.NoSpeech,
                                 )
-                            finishRequested && platform.callerAudioHasPending() ->
-                                continueOrFinalizeCallerAudioDrain(sessionId, target)
-                            finishRequested && callerAudioContainsSpeech == false ->
-                                finalizeAccumulatedTranscript(sessionId, target)
                             finishRequested ->
                                 failOrRetainTranscript(
                                     sessionId,

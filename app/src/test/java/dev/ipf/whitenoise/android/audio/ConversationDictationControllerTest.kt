@@ -1785,25 +1785,34 @@ class ConversationDictationControllerTest {
         }
     }
 
-    /** A pipe stall that pre-requeues the chunk still consumes the same bounded completion budget. */
+    /** A pipe stall that pre-requeues the chunk still consumes one budget for either provider callback. */
     @Test
-    fun stopBoundsAlternatingNoSpeechAndPreRequeuedDisconnects() {
-        val fixture = fixture(draft = TextFieldValue(""))
-        fixture.platform.pendingCallerAudio = true
-        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
-        fixture.platform.listener.onResult("first")
-        fixture.scheduler.runDelay(250L)
-        fixture.controller.paste()
+    fun stopBoundsAlternatingFailuresAfterCallerAudioWasPreRequeued() {
+        listOf<ConversationDictationFailure?>(
+            null,
+            ConversationDictationFailure.ProviderDisconnected,
+        ).forEach { stalledProviderCallback ->
+            val fixture = fixture(draft = TextFieldValue(""))
+            fixture.platform.pendingCallerAudio = true
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.platform.listener.onResult("first")
+            fixture.scheduler.runDelay(250L)
+            fixture.controller.paste()
 
-        fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
-        fixture.platform.session.callerAudioRetryAvailable = false
-        fixture.platform.listener.onError(ConversationDictationFailure.ProviderDisconnected)
-        fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+            fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+            fixture.platform.session.callerAudioRetryAvailable = false
+            if (stalledProviderCallback == null) {
+                fixture.platform.listener.onResult(null)
+            } else {
+                fixture.platform.listener.onError(stalledProviderCallback)
+            }
+            fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
 
-        assertEquals("first", fixture.drafts.getValue(key()).text)
-        assertEquals(4, fixture.platform.sessions.size)
-        assertFalse(fixture.controller.hasDurableSession)
-        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+            assertEquals("first", fixture.drafts.getValue(key()).text)
+            assertEquals(4, fixture.platform.sessions.size)
+            assertFalse(fixture.controller.hasDurableSession)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        }
     }
 
     /** Retry exhaustion keeps an explicit Send instead of diverting the transcript to the pen. */
