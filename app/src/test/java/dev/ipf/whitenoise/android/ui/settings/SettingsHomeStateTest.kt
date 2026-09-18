@@ -7,15 +7,16 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SettingsHomeStateTest {
-    /** A self-updating build with an account shows every section in display order, with three labelled groups. */
+    /** An update worth installing leads the screen, above the labelled groups. */
     @Test
-    fun selfUpdatingBuildIncludesEverySettingsSectionInDisplayOrder() {
-        val state = settingsHomeState(hasActiveAccount = true, selfUpdateEnabled = true)
+    fun anAvailableUpdateLeadsTheSettingsSections() {
+        val state =
+            settingsHomeState(hasActiveAccount = true, selfUpdateEnabled = true, updateAvailable = true)
         assertTrue(state.showProfileHeader)
         assertEquals(
             listOf(
                 SettingsHomeSection.Profile,
-                SettingsHomeSection.AppUpdates,
+                SettingsHomeSection.AppUpdateAvailable,
                 SettingsHomeSection.Account,
                 SettingsHomeSection.AppPreferences,
                 SettingsHomeSection.Support,
@@ -23,6 +24,58 @@ class SettingsHomeStateTest {
                 SettingsHomeSection.Version,
             ),
             state.sections,
+        )
+    }
+
+    /** With nothing to install the check keeps its place beside the version rather than leading. */
+    @Test
+    fun withNoUpdateTheCheckSitsAboveTheVersion() {
+        val state =
+            settingsHomeState(hasActiveAccount = true, selfUpdateEnabled = true, updateAvailable = false)
+        assertEquals(
+            listOf(
+                SettingsHomeSection.Profile,
+                SettingsHomeSection.Account,
+                SettingsHomeSection.AppPreferences,
+                SettingsHomeSection.Support,
+                SettingsHomeSection.SignOut,
+                SettingsHomeSection.AppUpdateControls,
+                SettingsHomeSection.Version,
+            ),
+            state.sections,
+        )
+    }
+
+    /** A store-managed build owns its own updates, so neither placement appears at all. */
+    @Test
+    fun aStoreManagedBuildShowsNeitherUpdateSection() {
+        for (available in listOf(false, true)) {
+            val state =
+                settingsHomeState(
+                    hasActiveAccount = true,
+                    selfUpdateEnabled = false,
+                    updateAvailable = available,
+                )
+            assertFalse(
+                "a store build must not offer its own update path (available=$available)",
+                state.sections.any {
+                    it == SettingsHomeSection.AppUpdateAvailable || it == SettingsHomeSection.AppUpdateControls
+                },
+            )
+        }
+    }
+
+    /** Without an account the update placement is unchanged: it does not depend on who is signed in. */
+    @Test
+    fun theUpdatePlacementDoesNotDependOnAnAccount() {
+        val signedOut =
+            settingsHomeState(hasActiveAccount = false, selfUpdateEnabled = true, updateAvailable = true)
+        assertEquals(SettingsHomeSection.AppUpdateAvailable, signedOut.sections.first())
+        val current =
+            settingsHomeState(hasActiveAccount = false, selfUpdateEnabled = true, updateAvailable = false)
+        assertEquals(
+            listOf(SettingsHomeSection.AppUpdateControls, SettingsHomeSection.Version),
+            current.sections.takeLast(2),
         )
     }
 

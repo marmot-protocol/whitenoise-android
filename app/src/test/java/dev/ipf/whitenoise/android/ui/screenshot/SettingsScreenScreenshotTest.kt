@@ -169,7 +169,12 @@ class SettingsScreenScreenshotTest {
         latestVersion: String? = null,
     ) {
         SettingsHomeContent(
-            state = settingsHomeState(hasActiveAccount = true, selfUpdateEnabled = true),
+            state =
+                settingsHomeState(
+                    hasActiveAccount = true,
+                    selfUpdateEnabled = true,
+                    updateAvailable = latestVersion != null,
+                ),
             account =
                 SettingsHomeAccount(
                     title = "Alice",
