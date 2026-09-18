@@ -75,7 +75,7 @@ internal suspend fun ConversationController.loadOlderPageInternal(anchorId: Stri
         // materialized window backwards by `count` and returns the new
         // authoritative window — already deduped, sorted, head-anchored,
         // and cap-trimmed. We render it by extending the current window.
-        val outcome = pageOlderIfActive(subscription, anchorId, trace, startedMs)
+        val outcome = pageOlderIfActive(subscription, anchorId, trace)
         when (outcome) {
             null -> ConversationPageLoad.INACTIVE
             is TimelinePageOutcome.Unchanged -> unchangedPageLoad(outcome, ConversationSearchPageDirection.OLDER)
@@ -210,17 +210,21 @@ private suspend fun ConversationController.pageOlderIfActive(
     handle: PagingHandle,
     anchorId: String?,
     trace: PerformanceTrace? = null,
-    startedMs: Long = 0L,
 ): TimelinePageOutcome? =
     timelineSubscriptionActiveCallMutex.withLock {
         if (!retainsSubscription(handle)) return@withLock null
         if (anchorId != null && retainsTimelineRecord(anchorId)) {
+            val anchorStartedMs = SystemClock.elapsedRealtime()
             val anchored = withContext(Dispatchers.IO) { handle.setVisibleAnchor(anchorId) }
+            trace.recordPhase(PerformancePhase.PAGE_ANCHOR, anchorStartedMs, PerformanceLayer.FFI)
+            // Re-check before folding anything in, not after. Reconnect reassigns the subscription
+            // under liveSubscriptionLock rather than this mutex, so the IO hop above can return a
+            // window belonging to a handle this controller has already replaced; applying it first
+            // would put a stale window on screen until the new subscription's snapshot lands.
+            if (!retainsSubscription(handle)) return@withLock null
             if (anchored != null) {
                 applyTimelinePage(anchored, replaceWindow = false, updatePagination = true)
             }
-            trace.recordPhase(PerformancePhase.PAGE_ANCHOR, startedMs, PerformanceLayer.FFI)
-            if (!retainsSubscription(handle)) return@withLock null
         }
         // Time the window command from here, not from the caller's start: page_window is documented
         // as the engine answering, and anchoring is already its own phase.

@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
+import dev.ipf.whitenoise.android.core.TimelineProjector
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -34,7 +35,7 @@ class ConversationTimelineExtendApplyTest {
     @Test
     fun extendKeepsUnchangedRecordsByIdentity() =
         runBlocking {
-            withController(seed = listOf(row(SECOND), row(THIRD))) { controller ->
+            withController(seed = listOf(row(SECOND), row(THIRD))) { controller, _ ->
                 val before = controller.timelineRecords.toMap()
 
                 controller.applyTimelinePage(
@@ -56,7 +57,7 @@ class ConversationTimelineExtendApplyTest {
     @Test
     fun extendRestampsKeptRowsSoTheSlidWindowKeepsItsOrder() =
         runBlocking {
-            withController(seed = listOf(row(SECOND), row(THIRD))) { controller ->
+            withController(seed = listOf(row(SECOND), row(THIRD))) { controller, _ ->
                 controller.applyTimelinePage(
                     page(listOf(row(FIRST), row(SECOND), row(THIRD))),
                     replaceWindow = false,
@@ -71,7 +72,7 @@ class ConversationTimelineExtendApplyTest {
     @Test
     fun extendRemovesRowsTheWindowNoLongerHolds() =
         runBlocking {
-            withController(seed = listOf(row(SECOND), row(THIRD))) { controller ->
+            withController(seed = listOf(row(SECOND), row(THIRD))) { controller, _ ->
                 controller.applyTimelinePage(
                     page(listOf(row(FIRST), row(SECOND))),
                     replaceWindow = false,
@@ -87,7 +88,7 @@ class ConversationTimelineExtendApplyTest {
     @Test
     fun extendCarriesMarkdownTokensForUnchangedText() =
         runBlocking {
-            withController(seed = listOf(hydratedRow(SECOND))) { controller ->
+            withController(seed = listOf(hydratedRow(SECOND))) { controller, _ ->
                 val parsedBefore = controller.timelineRecords.getValue(SECOND).contentTokens
                 assertTrue(parsedBefore.blocks.isNotEmpty())
 
@@ -105,7 +106,7 @@ class ConversationTimelineExtendApplyTest {
     @Test
     fun extendRehydratesWhenTextChanged() =
         runBlocking {
-            withController(seed = listOf(hydratedRow(SECOND))) { controller ->
+            withController(seed = listOf(hydratedRow(SECOND))) { controller, _ ->
                 controller.applyTimelinePage(
                     page(listOf(row(SECOND, plaintext = "edited"))),
                     replaceWindow = false,
@@ -125,7 +126,7 @@ class ConversationTimelineExtendApplyTest {
     @Test
     fun replaceStillRebuildsTheWholeWindow() =
         runBlocking {
-            withController(seed = listOf(row(SECOND), row(THIRD))) { controller ->
+            withController(seed = listOf(row(SECOND), row(THIRD))) { controller, _ ->
                 val before = controller.timeline.first { it.record.messageIdHex == SECOND }
 
                 controller.applyTimelinePage(
@@ -142,27 +143,44 @@ class ConversationTimelineExtendApplyTest {
 
     /**
      * A newer page can install the authoritative row for a send whose optimistic bubble is still
-     * pending, before the live update arrives. Rows it newly adds must still reconcile, or the
-     * reader sees the same message twice.
+     * pending, before the live update arrives. The row it newly adds must consume that bubble, or
+     * the reader sees the same message twice.
      */
     @Test
-    fun extendReconcilesRowsANewerPageNewlyAdds() =
+    fun extendReconcilesAPendingSendANewerPageConfirms() =
         runBlocking {
-            withController(seed = listOf(row(SECOND))) { controller ->
+            withController(seed = listOf(row(SECOND))) { controller, appState ->
+                val optimistic = appState.optimisticMessages(controller.boundAccountRef, GROUP_ID)
+                optimistic["msg:$TEMP_ID"] = pendingSend()
+                assertEquals(1, optimistic.size)
+
+                // The authoritative row for that same send: the reader's own message, same text.
+                val confirmed = row(THIRD).copy(direction = "sent")
+
                 controller.applyTimelinePage(
-                    page(listOf(row(SECOND), row(THIRD))),
+                    page(listOf(row(SECOND), confirmed)),
                     replaceWindow = false,
                     updatePagination = true,
                     reconcileNewExtendedRecords = true,
                 )
 
+                assertTrue("the confirmed send's optimistic bubble must be consumed", optimistic.isEmpty())
                 assertEquals(listOf(SECOND, THIRD), timelineMessageIds(controller))
-                assertEquals(
-                    timelineMessageIds(controller).distinct(),
-                    timelineMessageIds(controller),
-                )
             }
         }
+
+    /** An optimistic send still awaiting confirmation, as the send path leaves one. */
+    private fun pendingSend(): TimelineMessage {
+        val record =
+            timelineRecord(messageId = TEMP_ID, timelineAt = SENT_AT, plaintext = "body")
+                .copy(direction = "sent")
+        return TimelineMessage(
+            id = "msg:$TEMP_ID",
+            record = TimelineProjector.toAppMessageRecord(record),
+            status = MessageStatus.Pending,
+            timelineOrder = 300uL,
+        )
+    }
 
     /** A page ordered oldest-first keeps that order after an extend. */
     private fun page(messages: List<TimelineMessageRecordFfi>): TimelinePageFfi {
@@ -199,7 +217,7 @@ class ConversationTimelineExtendApplyTest {
     /** Owns a controller seeded with [seed] as its opening window. */
     private suspend fun withController(
         seed: List<TimelineMessageRecordFfi>,
-        block: suspend (ConversationController) -> Unit,
+        block: suspend (ConversationController, WhiteNoiseAppState) -> Unit,
     ) {
         val subscription = ScriptedConversationTimelineSubscription(snapshotPage = page(seed))
         val scripted =
@@ -207,9 +225,10 @@ class ConversationTimelineExtendApplyTest {
                 timelineScripts = listOf(subscription),
                 group = conversationTimelineTestGroup(),
             )
+        val appState = conversationTimelineTestAppState(scripted.subscriptions)
         val controller =
             ConversationController(
-                appState = conversationTimelineTestAppState(scripted.subscriptions),
+                appState = appState,
                 initialGroup = conversationTimelineTestGroup(),
                 initialMemberSnapshot = conversationTimelineMemberSnapshot(),
                 groupRosterReader = { _, _ -> conversationTimelineGroupRoster() },
@@ -221,7 +240,7 @@ class ConversationTimelineExtendApplyTest {
             settle()
             controller.applyTimelinePage(page(seed), replaceWindow = true, updatePagination = true)
             check(timelineMessageIds(controller).isNotEmpty()) { "the seeded window must be applied" }
-            block(controller)
+            block(controller, appState)
             settle()
         } finally {
             controller.onCleared()
@@ -233,6 +252,9 @@ class ConversationTimelineExtendApplyTest {
         val FIRST = "11".repeat(32)
         val SECOND = "22".repeat(32)
         val THIRD = "33".repeat(32)
+        const val TEMP_ID = "0d2b6c1e-4f6a-4b1e-9c1d-3a7f0b2e5c88"
+        const val SENT_AT = 300uL // matches THIRD's rank, so the projection lands on the same instant
+        val GROUP_ID = ConversationTimelineTestIds.GROUP_ID
         val RANK = mapOf(FIRST to 100uL, SECOND to 200uL, THIRD to 300uL)
     }
 }

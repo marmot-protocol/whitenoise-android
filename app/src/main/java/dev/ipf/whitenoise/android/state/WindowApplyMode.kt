@@ -40,14 +40,32 @@ internal class WindowApplyPlan(
     private val heldBefore: Map<String, TimelineMessageRecordFfi>,
     /** Rows whose tally must be recomputed: everything added, altered or dropped by this window. */
     val touchedIds: MutableSet<String>,
+    private val reconcilesNewRows: Boolean,
 ) {
     /** Whether the whole window is being rebuilt rather than extended. */
     val replaces: Boolean get() = mode == WindowApplyMode.REPLACE
 
     /**
+     * Whether this row may claim a pending optimistic send.
+     *
+     * A newer page can install the authoritative row for a send whose optimistic bubble is still
+     * waiting, before the live NEW_MESSAGE update arrives, so rows the page newly adds still
+     * reconcile. Rows it merely retained do not, or the delayed same-text matcher could consume an
+     * unrelated optimistic message from further up the window.
+     */
+    fun reconciles(messageIdHex: String): Boolean = replaces || (reconcilesNewRows && messageIdHex !in entryRows)
+
+    /**
      * The record as it should be projected, with Markdown carried over when its text is unchanged,
      * recording whether it differs from what the timeline already held.
      */
+    private var entryRows: Set<String> = emptySet()
+
+    /** Records which rows the timeline held on entry, before this window removed any. */
+    fun rememberEntryRows(ids: Set<String>) {
+        entryRows = ids
+    }
+
     fun carry(
         record: TimelineMessageRecordFfi,
         current: TimelineMessageRecordFfi?,
@@ -67,12 +85,21 @@ internal class WindowApplyPlan(
 internal fun ConversationController.planWindowApply(
     page: TimelinePageFfi,
     replaceWindow: Boolean,
+    reconcileNewExtendedRecords: Boolean = false,
 ): WindowApplyPlan {
     val mode = if (replaceWindow) WindowApplyMode.REPLACE else WindowApplyMode.EXTEND
     val carriedTokens = timelineRecords.markdownTokensFor(page.messages.map { it.messageIdHex })
-    val heldBefore = if (mode == WindowApplyMode.EXTEND) timelineRecords.toMap() else emptyMap()
+    // Snapshot what the timeline holds before any removal, so both the Markdown carry and the
+    // newly-added test below see the window as it was on entry.
+    val heldBefore = timelineRecords.toMap()
     val departed = if (mode == WindowApplyMode.EXTEND) removeRowsAbsentFromPage(page) else emptySet()
-    return WindowApplyPlan(mode, carriedTokens, heldBefore, departed.toMutableSet())
+    return WindowApplyPlan(
+        mode = mode,
+        carriedTokens = carriedTokens,
+        heldBefore = if (mode == WindowApplyMode.EXTEND) heldBefore else emptyMap(),
+        touchedIds = departed.toMutableSet(),
+        reconcilesNewRows = reconcileNewExtendedRecords,
+    ).also { it.rememberEntryRows(heldBefore.keys) }
 }
 
 /**
@@ -104,8 +131,11 @@ internal fun ConversationController.removeRowsAbsentFromPage(page: TimelinePageF
 internal fun ConversationController.refreshAuthoritativeOrder(page: TimelinePageFfi) {
     page.messages.forEach { record ->
         val id = record.messageIdHex
+        // Ordinary rows are keyed by message id, so look that up directly; only a durable stream
+        // row, keyed by its stream id, needs the scan.
         val itemId =
-            timelineItemsById.keys.firstOrNull { it == "msg:$id" || timelineItemHoldsMessage(it, id) }
+            "msg:$id".takeIf(timelineItemsById::containsKey)
+                ?: timelineItemsById.keys.firstOrNull { timelineItemHoldsMessage(it, id) }
                 ?: return@forEach
         val item = timelineItemsById[itemId] ?: return@forEach
         val ordinal =

@@ -10832,6 +10832,8 @@ class ConversationController(
     suspend fun retryLoadFailure() {
         if (subscriptionError?.retryable == false) return
         when (failedPageDirection?.takeIf { pageError != null }) {
+            // Retrying deliberately pages from the revision MDK still holds rather than re-reporting
+            // an anchor: the reader has not scrolled since the attempt they are retrying.
             ConversationSearchPageDirection.OLDER -> loadOlderPage()
             ConversationSearchPageDirection.NEWER -> loadNewerPage()
             null ->
@@ -10992,7 +10994,7 @@ class ConversationController(
         val pageMessages = applied.messages
         // Settle the Markdown this timeline already parsed, and the rows the window dropped, before
         // anything clears the indexes they are read from.
-        val plan = planWindowApply(applied, replaceWindow)
+        val plan = planWindowApply(applied, replaceWindow, reconcileNewExtendedRecords)
         if (replaceWindow) trimStateForWindowReplacement()
         authoritativeTimelineOrderByMessageId.clear()
         val profileIds = linkedSetOf<String>()
@@ -11006,12 +11008,7 @@ class ConversationController(
             if (record.usesAuthoritativePageOrder()) {
                 authoritativeTimelineOrderByMessageId[record.messageIdHex] = index.toULong()
             }
-            // A newer page can install the authoritative row for a send whose optimistic bubble is
-            // still pending, before the live NEW_MESSAGE update arrives. Rows this page newly adds
-            // therefore still reconcile; retained rows do not, so the delayed same-text matcher
-            // cannot consume an unrelated optimistic message from further up the window.
-            val newlyAdded = record.messageIdHex !in timelineRecords
-            val reconciles = plan.replaces || (reconcileNewExtendedRecords && newlyAdded)
+            val reconciles = plan.reconciles(record.messageIdHex)
             val carried = plan.carry(record, timelineRecords[record.messageIdHex])
             appliedRecords.add(carried)
             val actionRecord =
