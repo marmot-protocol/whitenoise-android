@@ -7,6 +7,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -95,6 +96,61 @@ class MessageDraftRepositoryTest {
 
             assertEquals(MessageDraftConditionalDeleteResult.Superseded, result)
             assertEquals("next draft", gateway.current?.content)
+        }
+
+    /**
+     * A keystroke save still queued when its send completes must not write.
+     *
+     * The writer debounces, so the save wakes after successful-send cleanup has advanced the
+     * generation and deleted the draft. Writing anyway re-created that row, and because the
+     * hydration block guarding it lives only in memory, a later process restart read the sent
+     * text straight back into the composer.
+     */
+    @Test
+    fun debouncedWriteDoesNotResurrectTheDraftAfterSuccessfulSendCleanup() =
+        runTest {
+            val gateway = FakeDraftGateway(null)
+            val writer = debouncingWriter(gateway)
+
+            writer.submit(ACCOUNT, GROUP, "hello")
+            val sentGeneration = writer.generation(ACCOUNT, GROUP)
+            runCurrent()
+            assertEquals("the save must still be queued behind the debounce", 0, gateway.saveCalls)
+
+            val cleanupGeneration =
+                writer.beginSuccessfulSendCleanup(
+                    accountRef = ACCOUNT,
+                    groupIdHex = GROUP,
+                    sentGeneration = sentGeneration,
+                )
+            assertNotNull("cleanup must claim the send's generation", cleanupGeneration)
+            writer.deleteIfCurrent(ACCOUNT, GROUP, requireNotNull(cleanupGeneration))
+
+            advanceTimeBy(DEBOUNCE_MILLIS + 1)
+            runCurrent()
+            writer.flush()
+
+            assertEquals("the superseded save must not reach storage", 0, gateway.saveCalls)
+            assertNull("the debounced save must not re-create the sent draft", gateway.current)
+        }
+
+    /** A queued save whose generation is still authoritative still writes once the debounce elapses. */
+    @Test
+    fun debouncedWriteStillPersistsWhenItsGenerationIsCurrent() =
+        runTest {
+            val gateway = FakeDraftGateway(null)
+            val writer = debouncingWriter(gateway)
+
+            writer.submit(ACCOUNT, GROUP, "hello")
+            runCurrent()
+            assertEquals(0, gateway.saveCalls)
+
+            advanceTimeBy(DEBOUNCE_MILLIS + 1)
+            runCurrent()
+            writer.flush()
+
+            assertEquals(1, gateway.saveCalls)
+            assertEquals("hello", gateway.current?.content)
         }
 
     @Test
@@ -799,6 +855,23 @@ class MessageDraftRepositoryTest {
 
     private fun CoroutineScope.writer(gateway: FakeDraftGateway) = writer(repository(gateway))
 
+    /**
+     * A writer that actually debounces, so a save can still be queued when a send completes.
+     * The shared [writer] helper coalesces with a zero interval and closes that window before
+     * the test can use it.
+     */
+    private fun TestScope.debouncingWriter(gateway: FakeDraftGateway) =
+        CoalescingMessageDraftWriter(
+            scope = this,
+            drafts =
+                MessageDraftRepository(
+                    gateway = gateway,
+                    editorSessions = EditorSessionStore(RepositorySessionStrings()),
+                    ioDispatcher = StandardTestDispatcher(testScheduler),
+                ),
+            debounceMillis = DEBOUNCE_MILLIS,
+        )
+
     private fun CoroutineScope.writer(drafts: MessageDraftRepository) =
         CoalescingMessageDraftWriter(
             scope = this,
@@ -849,6 +922,9 @@ class MessageDraftRepositoryTest {
     companion object {
         private const val ACCOUNT = "account"
         private const val GROUP = "group"
+
+        /** Matches the production composer debounce, so the queued-save window is the real one. */
+        private const val DEBOUNCE_MILLIS = 250L
     }
 }
 

@@ -160,6 +160,15 @@ internal sealed interface MessageDraftConditionalDeleteResult {
     data object Superseded : MessageDraftConditionalDeleteResult
 }
 
+/** Outcome of a draft save that only writes while its generation is still authoritative. */
+internal sealed interface MessageDraftConditionalSaveResult {
+    data class Applied(
+        val result: MessageDraftMutationResult,
+    ) : MessageDraftConditionalSaveResult
+
+    data object Superseded : MessageDraftConditionalSaveResult
+}
+
 internal data class MessageDraftGeneration(
     val value: Long,
 )
@@ -469,14 +478,30 @@ internal class MessageDraftCoordinatedOperations(
         generation: MessageDraftGeneration,
     ): Boolean = mutationGenerations.isCurrent(DraftKey(accountRef, groupIdHex), generation)
 
-    suspend fun saveAcceptedText(
+    /**
+     * Writes [content] only while [generation] is still authoritative for this account and
+     * group, making the same currency check [deleteIf] and [draftIf] already make.
+     *
+     * The coalescing writer debounces keystrokes, so a queued save can wake after the send
+     * carrying its text has durably completed. Successful-send cleanup advances the
+     * generation before deleting MDK's draft, so an unguarded write at that point re-creates
+     * the row cleanup just removed and the sent text returns to the composer on the next
+     * hydration. Reporting the supersession lets the writer retire that queue entry instead.
+     */
+    suspend fun saveAcceptedTextIfCurrent(
         accountRef: String,
         groupIdHex: String,
         content: String,
-    ): MessageDraftMutationResult =
+        generation: MessageDraftGeneration,
+    ): MessageDraftConditionalSaveResult =
         withContext(ioDispatcher) {
             draftLocks.withLock(DraftKey(accountRef, groupIdHex)) {
-                runDraftMutation { saveDraftText(gateway, accountRef, groupIdHex, content) }
+                if (!mutationGenerations.isCurrent(DraftKey(accountRef, groupIdHex), generation)) {
+                    return@withLock MessageDraftConditionalSaveResult.Superseded
+                }
+                MessageDraftConditionalSaveResult.Applied(
+                    runDraftMutation { saveDraftText(gateway, accountRef, groupIdHex, content) },
+                )
             }
         }
 
