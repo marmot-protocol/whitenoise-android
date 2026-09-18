@@ -336,8 +336,9 @@ Keep the signer available and allow `get_public_key` plus `sign_event` for kinds
 
 The test signs a disposable `invalid.example.zspfixture` APK listing through the
 pinned ZSP binary with `--offline`. It verifies event IDs, Schnorr signatures and
-the pinned publisher, then reconnects with the same CI client without the
-invitation secret and signs an already-expired fixture upload authorization.
+the pinned publisher, then reconnects with the same CI client and original bunker URI, as publication
+does, and signs an already-expired fixture upload authorization. Keycast permits
+the consumed invitation for its original active client; retain the URI secret.
 No Blossom upload or public release publication is invoked. Raw signed events,
 connection URLs and remote errors are withheld; the log contains only public
 client/publisher keys and test results. This proves signer access and permissions,
