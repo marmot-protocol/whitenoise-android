@@ -9,36 +9,30 @@ import dev.ipf.marmotkit.SelectedMessageDraftFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 
 /**
- * Sends the composer's message through MDK's revision-safe draft when the selected draft describes
- * exactly what is being sent, so MDK clears only that revision on durable acceptance and later typing
- * survives. Anything the draft does not describe — a draft with staged media behind a text-only send,
- * media whose descriptors do not match the uploaded references, or a revision that changed underneath
- * the send — falls back to the direct send the app used before 0.10.0.
+ * Publishes the composer's text with one engine call, the way the app sent before 0.10.0.
+ *
+ * Routing text through MDK's revision-safe draft cost three further calls — reading the selected
+ * draft, re-reading it for attachments, and writing the revision — all inside the conversation's
+ * commit lock and all ahead of the publish. The write also raced the composer's own debounced
+ * draft writer, so the common "type, then send" case reached `MessageDraftRevisionConflict` and
+ * fell back to this same direct send after paying for the round trip.
+ *
+ * Nothing is lost by skipping it: text typed after Send survives because the keystroke advances
+ * the draft generation, which makes `beginSuccessfulSendCleanup` decline to delete the draft the
+ * send did not carry. Media still submits its revision — see [sendComposerMedia] — because the
+ * attachment descriptors have to match what MDK holds.
  */
 internal suspend fun MarmotInterface.sendComposerText(
     accountRef: String,
     groupIdHex: String,
     replyTargetMessageIdHex: String?,
     text: String,
-): SendSummaryFfi {
-    val selected = selectedDraftOrNull(accountRef, groupIdHex)
-    if (selected != null &&
-        selected.draft
-            ?.mediaAttachments
-            .orEmpty()
-            .isEmpty()
-    ) {
-        val submitted =
-            saveDraftForSend(accountRef, selected, text, replyTargetMessageIdHex)
-                ?.let { revision -> sendDraftOrNull(accountRef, revision, emptyList()) }
-        if (submitted != null) return submitted
-    }
-    return if (replyTargetMessageIdHex != null) {
+): SendSummaryFfi =
+    if (replyTargetMessageIdHex != null) {
         replyToMessage(accountRef, groupIdHex, replyTargetMessageIdHex, text)
     } else {
         sendText(accountRef, groupIdHex, text)
     }
-}
 
 /** Media variant of [sendComposerText]: the draft must describe every uploaded reference in order. */
 internal suspend fun MarmotInterface.sendComposerMedia(

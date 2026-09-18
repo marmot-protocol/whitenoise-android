@@ -22,42 +22,42 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DraftSendTest {
-    /** A text send with a plain draft flushes the text into the revision and submits that revision. */
+    /** A text send publishes with one engine call and reads no draft on the way. */
     @Test
-    fun textSendSubmitsTheSelectedDraftRevision() =
+    fun textSendPublishesWithASingleEngineCall() =
         runBlocking {
             val engine = ScriptedEngine(draft = content("typed so fa", attachments = emptyList()))
             val summary = engine.marmot.sendComposerText("acct", "group", null, "typed so far")
-            assertEquals(listOf("saveMessageDraftIfRevision", "sendMessageDraft"), engine.calls)
-            assertEquals("typed so far", engine.savedContent)
-            assertEquals("draft", summary.messageIds.single())
+            assertEquals(listOf("sendText"), engine.calls)
+            assertEquals("sendText", summary.messageIds.single())
         }
 
-    /** An unchanged draft is submitted as is, without an extra save. */
+    /** A reply send takes the same single-call path through the reply entry point. */
     @Test
-    fun unchangedDraftIsSubmittedDirectly() =
+    fun replySendPublishesWithASingleEngineCall() =
         runBlocking {
             val engine = ScriptedEngine(draft = content("hello", attachments = emptyList(), replyTo = "parent"))
             engine.marmot.sendComposerText("acct", "group", "parent", "hello")
-            assertEquals(listOf("sendMessageDraft"), engine.calls)
+            assertEquals(listOf("replyToMessage"), engine.calls)
         }
 
-    /** A draft holding staged media is not what a text-only send describes, so the direct send is used. */
+    /** A staged-media draft does not divert a text send into the revision route. */
     @Test
-    fun textSendFallsBackWhenTheDraftHoldsMedia() =
+    fun textSendIgnoresAStagedMediaDraft() =
         runBlocking {
             val engine = ScriptedEngine(draft = content("caption", attachments = listOf(jpeg("a.jpg"))))
             engine.marmot.sendComposerText("acct", "group", null, "caption")
             assertEquals(listOf("sendText"), engine.calls)
         }
 
-    /** A revision that changed underneath the send falls back to the direct reply send. */
+    /** A text send never writes the draft, so a revision conflict cannot arise on this path. */
     @Test
-    fun conflictFallsBackToDirectSend() =
+    fun textSendNeverWritesTheDraft() =
         runBlocking {
             val engine = ScriptedEngine(draft = content("x", attachments = emptyList()), conflictOnSave = true)
             engine.marmot.sendComposerText("acct", "group", "parent", "y")
-            assertEquals(listOf("saveMessageDraftIfRevision", "replyToMessage"), engine.calls)
+            assertEquals(listOf("replyToMessage"), engine.calls)
+            assertEquals(null, engine.savedContent)
         }
 
     /** Media sends submit the revision only when every uploaded reference matches a descriptor in order. */
@@ -66,11 +66,11 @@ class DraftSendTest {
         runBlocking {
             val matching = ScriptedEngine(draft = content("cap", attachments = listOf(jpeg("a.jpg"))))
             matching.marmot.sendComposerMedia("acct", "group", listOf(reference("a.jpg", "image/jpeg")), "cap")
-            assertEquals(listOf("sendMessageDraft"), matching.calls)
+            assertEquals(listOf("selectedMessageDraft", "sendMessageDraft"), matching.calls)
 
             val mismatched = ScriptedEngine(draft = content("cap", attachments = listOf(jpeg("a.jpg"))))
             mismatched.marmot.sendComposerMedia("acct", "group", listOf(reference("b.pdf", "application/pdf")), "cap")
-            assertEquals(listOf("sendMediaAttachments"), mismatched.calls)
+            assertEquals(listOf("selectedMessageDraft", "sendMediaAttachments"), mismatched.calls)
         }
 
     /** The descriptor match is positional and covers name and media type. */
@@ -96,16 +96,22 @@ private class ScriptedEngine private constructor() : Marmot(NoPointer) {
 
     val marmot: MarmotInterface get() = this
 
+    /** Records the read so a send's full engine-call sequence, not just its writes, is assertable. */
     override fun selectedMessageDraft(
         accountRef: String,
         groupIdHex: String,
-    ): SelectedMessageDraftFfi = SelectedMessageDraftFfi(revision, draft)
+    ): SelectedMessageDraftFfi {
+        calls += "selectedMessageDraft"
+        return SelectedMessageDraftFfi(revision, draft)
+    }
 
+    /** Records the attachment re-read the revision save needs. */
     override fun messageDraft(
         accountRef: String,
         groupIdHex: String,
-    ): MessageDraftFfi? =
-        draft?.let {
+    ): MessageDraftFfi? {
+        calls += "messageDraft"
+        return draft?.let {
             MessageDraftFfi(
                 it.groupIdHex,
                 it.content,
@@ -115,6 +121,7 @@ private class ScriptedEngine private constructor() : Marmot(NoPointer) {
                 1L,
             )
         }
+    }
 
     override fun saveMessageDraftIfRevision(
         accountRef: String,
