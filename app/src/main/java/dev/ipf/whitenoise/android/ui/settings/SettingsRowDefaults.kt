@@ -4,12 +4,14 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.theme.ConnectedRowShape
 import dev.ipf.whitenoise.android.ui.theme.amoledRowSeamColor
@@ -21,6 +23,9 @@ internal object SettingsRowDefaults {
 
     /** The existing settings rows size their busy indicator like the switch it replaces. */
     val BusyIndicatorSize = 24.dp
+
+    /** One leading slot for every row type, matching the trailing control and the Material icon box. */
+    val LeadingIconSize = 24.dp
 
     /** AMOLED has no tonal surfaces, so a selected choice uses a faint content-colour wash instead. */
     const val AmoledSelectionAlpha = 0.16f
@@ -62,6 +67,26 @@ internal fun SettingsRowTrailing(
     } else {
         control()
     }
+}
+
+/**
+ * The decorative glyph in a row's leading slot, at one size and the row's own disabled treatment.
+ *
+ * The title already names the action, so the icon carries no content description and adds nothing for
+ * a screen reader to repeat. Direction-dependent glyphs keep whatever mirroring their [icon] declares.
+ */
+@Suppress("FunctionNaming")
+@Composable
+internal fun SettingsLeadingIcon(
+    icon: ImageVector,
+    editable: Boolean = true,
+) {
+    Icon(
+        imageVector = icon,
+        contentDescription = null,
+        modifier = Modifier.size(SettingsRowDefaults.LeadingIconSize),
+        tint = MaterialTheme.colorScheme.onSurfaceVariant.dimmedUnless(editable),
+    )
 }
 
 /** Blocked rows scale the token's own alpha by the disabled alpha, enabled rows keep the token untouched. */

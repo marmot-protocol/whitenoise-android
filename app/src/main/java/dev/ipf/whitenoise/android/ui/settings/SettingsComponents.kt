@@ -91,7 +91,8 @@ internal fun SettingsGroup(
  * One native toggle action covers the entire row; the child switch is decorative.
  *
  * Both [enabled] and [busy] gate edits while the caller retains the authoritative [checked] value.
- * Busy rows replace the decorative switch with the existing Material progress indicator.
+ * Busy rows replace the decorative switch with the existing Material progress indicator. [leading]
+ * is the same optional slot the link and action rows expose, so a group can carry one icon column.
  */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
@@ -104,6 +105,7 @@ internal fun SettingsSwitch(
     subtitle: String? = null,
     enabled: Boolean = true,
     busy: Boolean = false,
+    leading: (@Composable () -> Unit)? = null,
 ) {
     val editable = enabled && !busy
     ListItem(
@@ -116,6 +118,7 @@ internal fun SettingsSwitch(
                 .settingsRowBorder(context, editable)
                 .semantics { role = Role.Switch },
         enabled = editable,
+        leadingContent = leading,
         supportingContent = subtitle?.let { { SettingsRowSupportingText(it, editable) } },
         trailingContent = {
             SettingsRowTrailing(busy) {
