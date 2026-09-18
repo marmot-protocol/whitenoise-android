@@ -4,10 +4,6 @@ import android.Manifest
 import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
-import dev.ipf.marmotkit.NotificationTrafficClassFfi
-import dev.ipf.marmotkit.NotificationTriggerFfi
-import dev.ipf.marmotkit.NotificationUpdateFfi
-import dev.ipf.marmotkit.NotificationUserFfi
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -71,7 +67,11 @@ class LocalNotificationPresenterAlertBudgetTest {
                 now += 20_000
                 assertTrue(
                     presenter.show(
-                        update(messageIdHex = "old-$index", timestampMs = now - 600_000, isMention = index == 2),
+                        alertBudgetUpdate(
+                            messageIdHex = "old-$index",
+                            timestampMs = now - 600_000,
+                            isMention = index == 2,
+                        ),
                         shortNpub = { it },
                     ),
                 )
@@ -79,7 +79,9 @@ class LocalNotificationPresenterAlertBudgetTest {
             catchUpWindow.close()
             elapsed += NOTIFICATION_CATCH_UP_TAIL_MS + 1
             now += 20_000
-            assertTrue(presenter.show(update(messageIdHex = "live", timestampMs = now), shortNpub = { it }))
+            assertTrue(
+                presenter.show(alertBudgetUpdate(messageIdHex = "live", timestampMs = now), shortNpub = { it }),
+            )
 
             assertEquals(4, posted.size)
             assertEquals(
@@ -93,13 +95,21 @@ class LocalNotificationPresenterAlertBudgetTest {
     @Test
     fun liveBurstRingsOnce() =
         runBlocking {
-            assertTrue(presenter.show(update(messageIdHex = "first", timestampMs = now), shortNpub = { it }))
+            assertTrue(
+                presenter.show(alertBudgetUpdate(messageIdHex = "first", timestampMs = now), shortNpub = { it }),
+            )
             now += 1_000
-            assertTrue(presenter.show(update(messageIdHex = "second", timestampMs = now), shortNpub = { it }))
+            assertTrue(
+                presenter.show(alertBudgetUpdate(messageIdHex = "second", timestampMs = now), shortNpub = { it }),
+            )
             now += 1_000
-            assertTrue(presenter.show(update(messageIdHex = "third", timestampMs = now), shortNpub = { it }))
+            assertTrue(
+                presenter.show(alertBudgetUpdate(messageIdHex = "third", timestampMs = now), shortNpub = { it }),
+            )
             now += NOTIFICATION_ALERT_BURST_WINDOW_MS
-            assertTrue(presenter.show(update(messageIdHex = "later", timestampMs = now), shortNpub = { it }))
+            assertTrue(
+                presenter.show(alertBudgetUpdate(messageIdHex = "later", timestampMs = now), shortNpub = { it }),
+            )
 
             assertEquals(listOf(false, true, true, false), posted.map { it.isOnlyAlertOnce() })
         }
@@ -108,11 +118,13 @@ class LocalNotificationPresenterAlertBudgetTest {
     @Test
     fun freshMentionRingsInsideABurst() =
         runBlocking {
-            assertTrue(presenter.show(update(messageIdHex = "first", timestampMs = now), shortNpub = { it }))
+            assertTrue(
+                presenter.show(alertBudgetUpdate(messageIdHex = "first", timestampMs = now), shortNpub = { it }),
+            )
             now += 1_000
             assertTrue(
                 presenter.show(
-                    update(messageIdHex = "mention", timestampMs = now, isMention = true),
+                    alertBudgetUpdate(messageIdHex = "mention", timestampMs = now, isMention = true),
                     shortNpub = { it },
                 ),
             )
@@ -124,38 +136,13 @@ class LocalNotificationPresenterAlertBudgetTest {
     fun aRejectedWriteHandsTheRingBack() =
         runBlocking {
             rejectNextWrite = true
-            assertFalse(presenter.show(update(messageIdHex = "lost", timestampMs = now), shortNpub = { it }))
+            assertFalse(presenter.show(alertBudgetUpdate(messageIdHex = "lost", timestampMs = now), shortNpub = { it }))
             now += 1_000
-            assertTrue(presenter.show(update(messageIdHex = "next", timestampMs = now), shortNpub = { it }))
+            assertTrue(
+                presenter.show(alertBudgetUpdate(messageIdHex = "next", timestampMs = now), shortNpub = { it }),
+            )
 
             assertEquals(1, posted.size)
             assertFalse(posted.single().isOnlyAlertOnce())
         }
-
-    private fun Notification.isOnlyAlertOnce(): Boolean = flags and Notification.FLAG_ONLY_ALERT_ONCE != 0
-
-    private fun update(
-        messageIdHex: String,
-        timestampMs: Long,
-        isMention: Boolean = false,
-    ) = NotificationUpdateFfi(
-        notificationKey = "key-$messageIdHex",
-        conversationKey = "conversation",
-        trigger = NotificationTriggerFfi.NEW_MESSAGE,
-        trafficClass = NotificationTrafficClassFfi.STANDARD,
-        accountRef = "account-a",
-        accountIdHex = "account-a",
-        groupIdHex = "group-a",
-        groupName = "General",
-        isDm = false,
-        isMention = isMention,
-        messageIdHex = messageIdHex,
-        sender = NotificationUserFfi(accountIdHex = "01".repeat(32), displayName = "Alice", pictureUrl = null),
-        receiver = NotificationUserFfi(accountIdHex = "self", displayName = "Me", pictureUrl = null),
-        previewText = "hi $messageIdHex",
-        reactionEmoji = null,
-        reactedToPreview = null,
-        timestampMs = timestampMs,
-        isFromSelf = false,
-    )
 }

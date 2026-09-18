@@ -373,7 +373,11 @@ class LocalNotificationPresenter(
         // silent, and handed back below if this card is never written. Enrichment rewrites arrive with
         // silentUpdate already set and never touch the budget.
         val alertReservation =
-            if (silentUpdate) null else alertBudget.reserve(nowMs = nowMillis(), isMention = update.isMention)
+            if (silentUpdate) {
+                null
+            } else {
+                alertBudget.reserve(nowMs = nowMillis(), isMention = update.isMention, accountRef = update.accountRef)
+            }
         val heldAlert = alertReservation?.takeIf { it.decision == NotificationAlertDecision.Alert }
         val silentPost = silentUpdate || alertReservation?.decision?.silent == true
         if (alertReservation != null && alertReservation.decision.silent) {

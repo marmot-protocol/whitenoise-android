@@ -3,7 +3,7 @@ package dev.ipf.whitenoise.android.notifications
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** One ring per catch-up cohort or burst: the rest of the cohort and close followers are shown, not rung. */
+/** One ring per account per catch-up cohort, one per live burst: the rest are shown, not rung. */
 class NotificationAlertBudgetTest {
     /** Inside a cohort the first post rings and every later post of that cohort stays silent, mentions included. */
     @Test
@@ -45,6 +45,42 @@ class NotificationAlertBudgetTest {
                 msSinceLastAlert = 30_000L,
                 isMention = false,
             ),
+        )
+    }
+
+    /** The first post of an account in a cohort rings even if a live alert rang a moment ago. */
+    @Test
+    fun aCohortsFirstPostRingsThroughABurst() {
+        assertEquals(
+            NotificationAlertDecision.Alert,
+            notificationAlertDecision(
+                catchUpGeneration = 3L,
+                alertedCatchUpGeneration = null,
+                msSinceLastAlert = 1_000L,
+                isMention = false,
+            ),
+        )
+    }
+
+    /** Inside one cohort every signed-in account rings once; the accounts do not share the charge. */
+    @Test
+    fun eachAccountRingsOnceInACohort() {
+        val window = NotificationCatchUpWindow(clock = { 0L })
+        val budget = NotificationAlertBudget(catchUpWindow = window)
+        val now = 1_000_000_000_000L
+
+        window.open()
+        budget.reserve(nowMs = now, isMention = false, accountRef = "a").commit()
+        assertEquals(
+            NotificationAlertDecision.SilentCatchUp,
+            budget.reserve(nowMs = now + 1_000L, isMention = false, accountRef = "a").decision,
+        )
+        val other = budget.reserve(nowMs = now + 2_000L, isMention = false, accountRef = "b")
+        assertEquals("the other account has not rung for this cohort", NotificationAlertDecision.Alert, other.decision)
+        other.commit()
+        assertEquals(
+            NotificationAlertDecision.SilentCatchUp,
+            budget.reserve(nowMs = now + 3_000L, isMention = false, accountRef = "b").decision,
         )
     }
 
@@ -103,27 +139,27 @@ class NotificationAlertBudgetTest {
         val now = 1_000_000_000_000L
 
         window.open()
-        val first = budget.reserve(nowMs = now, isMention = false)
+        val first = budget.reserve(nowMs = now, isMention = false, accountRef = "a")
         assertEquals(NotificationAlertDecision.Alert, first.decision)
         assertEquals(
             "a concurrent post sees the held ring",
             NotificationAlertDecision.SilentCatchUp,
-            budget.reserve(nowMs = now, isMention = false).decision,
+            budget.reserve(nowMs = now, isMention = false, accountRef = "a").decision,
         )
         first.release()
-        val second = budget.reserve(nowMs = now + 1_000L, isMention = false)
+        val second = budget.reserve(nowMs = now + 1_000L, isMention = false, accountRef = "a")
         assertEquals("the released ring is free again", NotificationAlertDecision.Alert, second.decision)
         second.commit()
         assertEquals(
             NotificationAlertDecision.SilentCatchUp,
-            budget.reserve(nowMs = now + 30_000L, isMention = false).decision,
+            budget.reserve(nowMs = now + 30_000L, isMention = false, accountRef = "a").decision,
         )
         window.close()
         elapsed += NOTIFICATION_CATCH_UP_TAIL_MS + 1L
         assertEquals(
             "the cohort is over, the burst window too",
             NotificationAlertDecision.Alert,
-            budget.reserve(nowMs = now + 30_000L, isMention = false).decision,
+            budget.reserve(nowMs = now + 30_000L, isMention = false, accountRef = "a").decision,
         )
     }
 
@@ -133,13 +169,13 @@ class NotificationAlertBudgetTest {
         val budget = NotificationAlertBudget(catchUpWindow = NotificationCatchUpWindow(clock = { 0L }))
         val now = 1_000_000_000_000L
 
-        val first = budget.reserve(nowMs = now, isMention = false)
-        val later = budget.reserve(nowMs = now + 20_000L, isMention = false)
+        val first = budget.reserve(nowMs = now, isMention = false, accountRef = "a")
+        val later = budget.reserve(nowMs = now + 20_000L, isMention = false, accountRef = "a")
         assertEquals(NotificationAlertDecision.Alert, later.decision)
         first.release()
         assertEquals(
             NotificationAlertDecision.SilentBurst,
-            budget.reserve(nowMs = now + 21_000L, isMention = false).decision,
+            budget.reserve(nowMs = now + 21_000L, isMention = false, accountRef = "a").decision,
         )
     }
 
@@ -151,12 +187,12 @@ class NotificationAlertBudgetTest {
         val budget = NotificationAlertBudget(catchUpWindow = window)
         val now = 1_000_000_000_000L
 
-        budget.reserve(nowMs = now, isMention = false).commit()
+        budget.reserve(nowMs = now, isMention = false, accountRef = "a").commit()
         elapsed += 60_000L
         window.open()
         assertEquals(
             NotificationAlertDecision.Alert,
-            budget.reserve(nowMs = now + 60_000L, isMention = false).decision,
+            budget.reserve(nowMs = now + 60_000L, isMention = false, accountRef = "a").decision,
         )
     }
 }

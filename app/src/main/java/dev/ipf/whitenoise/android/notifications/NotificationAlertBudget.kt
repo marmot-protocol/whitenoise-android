@@ -18,11 +18,11 @@ enum class NotificationAlertDecision(
 }
 
 /**
- * Decides whether one first post rings. A post inside a catch-up cohort (see [NotificationCatchUpWindow])
- * rings only if that cohort has not rung yet, so a reconnect backlog produces at most one attention
- * event however many cards it writes. Outside a cohort, a message rings unless another alert rang
- * within the burst window, so a flood of live arrivals rings once; a mention of the reader breaks the
- * burst rule, never the cohort rule.
+ * Decides whether one first post rings. Inside a catch-up cohort (see [NotificationCatchUpWindow]) the
+ * post rings if its account has not rung for that cohort yet, whatever rang moments before, so a reconnect
+ * backlog produces one attention event per signed-in account however many cards it writes. Outside a
+ * cohort, a message rings unless another alert rang within the burst window, so a flood of live arrivals
+ * rings once; a mention of the reader breaks the burst rule, never the cohort rule.
  */
 internal fun notificationAlertDecision(
     catchUpGeneration: Long?,
@@ -34,6 +34,7 @@ internal fun notificationAlertDecision(
     when {
         catchUpGeneration != null && catchUpGeneration == alertedCatchUpGeneration ->
             NotificationAlertDecision.SilentCatchUp
+        catchUpGeneration != null -> NotificationAlertDecision.Alert
         !isMention && msSinceLastAlert != null && msSinceLastAlert < burstWindowMs ->
             NotificationAlertDecision.SilentBurst
         else -> NotificationAlertDecision.Alert
@@ -46,6 +47,7 @@ internal fun notificationAlertDecision(
  */
 class NotificationAlertReservation internal constructor(
     val decision: NotificationAlertDecision,
+    internal val accountRef: String,
     private val budget: NotificationAlertBudget,
 ) {
     /** The alerting card was written: the ring is spent. */
@@ -56,9 +58,9 @@ class NotificationAlertReservation internal constructor(
 }
 
 /**
- * Process-wide memory of the last audible alert and of the catch-up cohort it rang for. [reserve] takes
- * the ring at decision time, so two first posts racing through the presenter cannot both ring; a claim
- * whose card is never written is released and leaves the next arrival free to ring.
+ * Process-wide memory of the last audible alert and, per local account, of the catch-up cohort it rang
+ * for. [reserve] takes the ring at decision time, so two first posts racing through the presenter cannot
+ * both ring; a claim whose card is never written is released and leaves the next arrival free to ring.
  */
 class NotificationAlertBudget(
     /** The cohort boundary this budget charges; the catch-up coordinator opens and closes it. */
@@ -67,15 +69,16 @@ class NotificationAlertBudget(
 ) {
     private val lock = Any()
     private var lastAlertAtMs: Long? = null
-    private var alertedCatchUpGeneration: Long? = null
+    private val alertedCatchUpGenerations = mutableMapOf<String, Long>()
     private var pendingAlert: NotificationAlertReservation? = null
     private var lastAlertBeforePendingMs: Long? = null
     private var alertedGenerationBeforePending: Long? = null
 
-    /** Decides for a first post being written at [nowMs] and, when it may ring, holds the ring for it. */
+    /** Decides for [accountRef]'s first post being written at [nowMs] and, when it may ring, holds the ring. */
     fun reserve(
         nowMs: Long,
         isMention: Boolean,
+        accountRef: String,
     ): NotificationAlertReservation =
         synchronized(lock) {
             // Read once: the window has its own lock, and a cohort opening between two reads would let
@@ -84,17 +87,17 @@ class NotificationAlertBudget(
             val decision =
                 notificationAlertDecision(
                     catchUpGeneration = generation,
-                    alertedCatchUpGeneration = alertedCatchUpGeneration,
+                    alertedCatchUpGeneration = alertedCatchUpGenerations[accountRef],
                     msSinceLastAlert = lastAlertAtMs?.let { nowMs - it },
                     isMention = isMention,
                     burstWindowMs = burstWindowMs,
                 )
-            val reservation = NotificationAlertReservation(decision, this)
+            val reservation = NotificationAlertReservation(decision, accountRef, this)
             if (decision == NotificationAlertDecision.Alert) {
                 lastAlertBeforePendingMs = lastAlertAtMs
-                alertedGenerationBeforePending = alertedCatchUpGeneration
+                alertedGenerationBeforePending = alertedCatchUpGenerations[accountRef]
                 lastAlertAtMs = nowMs
-                generation?.let { alertedCatchUpGeneration = it }
+                generation?.let { alertedCatchUpGenerations[accountRef] = it }
                 pendingAlert = reservation
             }
             reservation
@@ -112,7 +115,12 @@ class NotificationAlertBudget(
             if (pendingAlert !== reservation) return
             pendingAlert = null
             lastAlertAtMs = lastAlertBeforePendingMs
-            alertedCatchUpGeneration = alertedGenerationBeforePending
+            val previous = alertedGenerationBeforePending
+            if (previous == null) {
+                alertedCatchUpGenerations.remove(reservation.accountRef)
+            } else {
+                alertedCatchUpGenerations[reservation.accountRef] = previous
+            }
         }
     }
 }
