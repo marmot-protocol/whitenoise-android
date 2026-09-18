@@ -1862,8 +1862,7 @@
     <string name="chat_rows_no_archived_title">沒有已封存的聊天</string>
     <string name="chat_rows_no_archived_detail">已封存的聊天會顯示在這裡。</string>
     <string name="quick_account_switching">快速切換帳戶</string>
-    <string name="quick_account_switching_detail">在頭像旁顯示按鈕，輕觸一下即可切換帳戶。</string>
-    <string name="quick_account_switch_to">切換至 %1$s</string>
+    <string name="quick_account_switching_detail">在頭像旁顯示你的其他帳戶，輕觸其中一個即可切換。</string>
     <string name="quick_account_switched">已切換至 %1$s</string>
     <string name="add_profile">新增個人資料</string>
     <string name="switch_profile">切換個人資料</string>

@@ -329,18 +329,9 @@
         ]
       },
       {
-        "surface": "QuickProfileCycleButton",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/QuickProfileCycleButton.kt",
-        "anchor": "fun QuickProfileCycleButton(",
-        "test_ids": [
-          "NAV-005",
-          "NAV-006"
-        ]
-      },
-      {
-        "surface": "rememberQuickProfileCycleNotice",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/QuickProfileCycleButton.kt",
-        "anchor": "fun rememberQuickProfileCycleNotice(",
+        "surface": "rememberQuickAccountSwitchNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/QuickAccountSwitchNotice.kt",
+        "anchor": "fun rememberQuickAccountSwitchNotice(",
         "test_ids": [
           "NAV-005"
         ]
@@ -16175,17 +16166,8 @@
         ]
       },
       {
-        "surface": "R.string.quick_account_switch_to",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/QuickProfileCycleButton.kt",
-        "anchor": "R.string.quick_account_switch_to",
-        "test_ids": [
-          "NAV-005",
-          "NAV-006"
-        ]
-      },
-      {
         "surface": "R.string.quick_account_switched",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/QuickProfileCycleButton.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/QuickAccountSwitchNotice.kt",
         "anchor": "R.string.quick_account_switched",
         "test_ids": [
           "NAV-005",

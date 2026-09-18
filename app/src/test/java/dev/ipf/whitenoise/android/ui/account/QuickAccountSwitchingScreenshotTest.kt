@@ -18,7 +18,7 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.updateQuickProfileCycling
+import dev.ipf.whitenoise.android.state.updateQuickAccountSwitching
 import dev.ipf.whitenoise.android.ui.chats.ChatListTopBar
 import dev.ipf.whitenoise.android.ui.settings.AppearanceScreen
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -30,40 +30,46 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** Native cycle target, retained stack/update emblem and Appearance toggle using local test identities. */
+/** The other-account avatars, the retained update emblem and the Appearance toggle, on local test identities. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
-class QuickProfileCycleScreenshotTest {
+class QuickAccountSwitchingScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
 
     /** Screenshot: light theme. */
-    @Test fun light() = capture("profile_cycle_light")
+    @Test fun light() = capture("quick_account_switching_light")
 
     /** Screenshot: dark theme. */
-    @Test fun dark() = capture("profile_cycle_dark", dark = true)
+    @Test fun dark() = capture("quick_account_switching_dark", dark = true)
 
     /** Screenshot: AMOLED. */
-    @Test fun amoled() = capture("profile_cycle_amoled", dark = true, amoled = true)
+    @Test fun amoled() = capture("quick_account_switching_amoled", dark = true, amoled = true)
 
     /** Density fixture for a high-density render. */
     @Test
     @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-xxhdpi")
-    fun highDensity() = capture("profile_cycle_amoled_xxhdpi", dark = true, amoled = true)
+    fun highDensity() = capture("quick_account_switching_amoled_xxhdpi", dark = true, amoled = true)
 
-    /** Large rtl. */
-    @Test fun largeRtl() = capture("profile_cycle_rtl_200", dark = true, rtl = true)
+    /** Right-to-left at double type: the stack mirrors and stays clear of the actions. */
+    @Test fun largeRtl() = capture("quick_account_switching_rtl_200", dark = true, rtl = true)
 
-    /** Off. */
-    @Test fun off() = capture("profile_cycle_off", enabled = false)
+    /** Off: the active avatar stands alone with no other accounts beside it. */
+    @Test fun off() = capture("quick_account_switching_off", enabled = false)
 
-    /** Appearance. */
-    @Test fun appearance() = capture("profile_cycle_appearance_light", settings = true, enabled = false)
+    /** The Appearance opt-in row that reveals the other accounts. */
+    @Test fun appearance() = capture("quick_account_switching_appearance_light", settings = true, enabled = false)
 
-    /** Appearance amoled rtl. */
+    /** The Appearance opt-in in AMOLED right-to-left. */
     @Test
     fun appearanceAmoledRtl() {
-        capture("profile_cycle_appearance_amoled_rtl", dark = true, amoled = true, rtl = true, settings = true)
+        capture(
+            "quick_account_switching_appearance_amoled_rtl",
+            dark = true,
+            amoled = true,
+            rtl = true,
+            settings = true,
+        )
     }
 
     /** Renders the fixture and records its screenshot baseline. */
@@ -90,7 +96,7 @@ class QuickProfileCycleScreenshotTest {
                 profileReader = { null },
                 profileRefreshRequest = {},
             )
-        app.updateQuickProfileCycling(enabled)
+        app.updateQuickAccountSwitching(enabled)
         app.updateAccountUnreadCount("b", 3uL)
         composeRule.setContent {
             CompositionLocalProvider(
@@ -113,7 +119,7 @@ class QuickProfileCycleScreenshotTest {
                                     {},
                                     {},
                                     {},
-                                    onCycleAccount = {},
+                                    onSwitchToAccount = {},
                                     updateInfo = updateTestInfo(),
                                     selfUpdateEnabled = true,
                                 )

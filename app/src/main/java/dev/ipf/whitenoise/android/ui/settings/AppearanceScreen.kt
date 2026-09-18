@@ -16,8 +16,8 @@ import dev.ipf.whitenoise.android.state.AppFontScale
 import dev.ipf.whitenoise.android.state.AppThemeMode
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.quickProfileCycling
-import dev.ipf.whitenoise.android.state.updateQuickProfileCycling
+import dev.ipf.whitenoise.android.state.quickAccountSwitching
+import dev.ipf.whitenoise.android.state.updateQuickAccountSwitching
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
 
 internal val AppThemeMode.labelRes: Int
@@ -127,9 +127,9 @@ internal fun AppearanceScreen(
                         SettingsSwitch(
                             context = context,
                             title = stringResource(R.string.quick_account_switching),
-                            checked = appState.quickProfileCycling,
+                            checked = appState.quickAccountSwitching,
                             subtitle = stringResource(R.string.quick_account_switching_detail),
-                            onCheckedChange = appState::updateQuickProfileCycling,
+                            onCheckedChange = appState::updateQuickAccountSwitching,
                         )
                     }
                 }

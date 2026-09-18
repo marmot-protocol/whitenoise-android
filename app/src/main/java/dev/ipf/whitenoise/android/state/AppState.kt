@@ -1868,7 +1868,7 @@ class WhiteNoiseAppState private constructor(
         private set
 
     /** App-wide preference owner, retained across account changes and reset by erased app preferences. */
-    internal val quickProfileCyclePreference = QuickProfileCyclePreference(preferences)
+    internal val quickAccountSwitchingPreference = QuickAccountSwitchingPreference(preferences)
 
     var languageTag by mutableStateOf(preferences.getString(APP_LANGUAGE_TAG_KEY, null).orEmpty())
         private set

@@ -1862,8 +1862,7 @@
     <string name="chat_rows_no_archived_title">没有已归档的聊天</string>
     <string name="chat_rows_no_archived_detail">已归档的聊天会显示在这里。</string>
     <string name="quick_account_switching">快速切换账户</string>
-    <string name="quick_account_switching_detail">在头像旁显示按钮，轻点一下即可切换账户。</string>
-    <string name="quick_account_switch_to">切换到 %1$s</string>
+    <string name="quick_account_switching_detail">在头像旁显示你的其他账户，轻点其中一个即可切换。</string>
     <string name="quick_account_switched">已切换到 %1$s</string>
     <string name="add_profile">添加个人资料</string>
     <string name="switch_profile">切换个人资料</string>

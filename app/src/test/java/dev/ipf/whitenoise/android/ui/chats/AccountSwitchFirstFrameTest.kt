@@ -6,12 +6,13 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupMemberIdsFfi
@@ -37,8 +38,8 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.emptyGroupRecord
-import dev.ipf.whitenoise.android.state.quickProfileCycleTarget
-import dev.ipf.whitenoise.android.state.updateQuickProfileCycling
+import dev.ipf.whitenoise.android.state.updateQuickAccountSwitching
+import dev.ipf.whitenoise.android.ui.account.otherAccountAvatarTag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -327,13 +328,15 @@ class AccountSwitchFirstFrameTest {
                             controller = controller,
                             onOpenSettings = {},
                             onOpenGroup = { _, _, _, _ -> },
-                            onQuickCycleAccount = { requestedAccount = appState.quickProfileCycleTarget()?.label },
+                            onQuickSwitchToAccount = { requestedAccount = it },
                         )
                     }
                 }
             }
 
-            composeRule.onNodeWithContentDescription(ACCOUNT_A_NAME, substring = true).performClick()
+            composeRule
+                .onNodeWithTag(otherAccountAvatarTag(ACCOUNT_A), useUnmergedTree = true)
+                .performTouchInput { click() }
             composeRule.runOnIdle {
                 assertEquals(ACCOUNT_A, requestedAccount)
                 assertEquals(TARGET_ACCOUNT, appState.activeAccountRef)
@@ -421,7 +424,7 @@ class AccountSwitchFirstFrameTest {
                 ),
             activeAccountRef = TARGET_ACCOUNT,
             profileRefreshRequest = {},
-        ).also { it.updateQuickProfileCycling(true) }
+        ).also { it.updateQuickAccountSwitching(true) }
 
     private fun activeAccount() =
         AccountSummaryFfi(

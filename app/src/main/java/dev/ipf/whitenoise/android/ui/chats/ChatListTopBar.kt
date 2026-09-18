@@ -47,12 +47,12 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AccountSwitchPreloadPolicy
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.chatsAvatarOpensSelector
-import dev.ipf.whitenoise.android.state.quickProfileCycleTarget
-import dev.ipf.whitenoise.android.state.requestQuickProfileCycle
+import dev.ipf.whitenoise.android.state.quickSwitchAvatarAccounts
+import dev.ipf.whitenoise.android.state.requestQuickAccountSwitchTo
 import dev.ipf.whitenoise.android.ui.account.AccountAvatarButton
 import dev.ipf.whitenoise.android.ui.account.AccountSelectorSheet
-import dev.ipf.whitenoise.android.ui.account.QuickProfileCycleButton
-import dev.ipf.whitenoise.android.ui.account.rememberQuickProfileCycleNotice
+import dev.ipf.whitenoise.android.ui.account.OtherAccountAvatarsRow
+import dev.ipf.whitenoise.android.ui.account.rememberQuickAccountSwitchNotice
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.profile.AddIdentitySheet
@@ -63,10 +63,13 @@ import dev.ipf.whitenoise.android.updates.AppUpdateInfo
 internal const val CHAT_LIST_FILTER_CHIP_ALL_TAG = "chats.scope.chats"
 internal const val CHAT_LIST_OTHER_ACCOUNT_AVATARS_TAG = "chat-list-other-account-avatars"
 
+/** Separates the active avatar from the stacked other accounts without breaking the avatar cluster. */
+private val CHAT_LIST_ACCOUNT_AVATAR_GAP = 8.dp
+
 /** Stable test tag for a folder pill. */
 internal fun chatListFilterChipTag(folderId: String): String = "chats.folder.$folderId"
 
-/** Chat list header: account avatar and quick switch, or the search field with its filter action. */
+/** Chat list header: the account avatars and quick switch, or the search field with its filter action. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("LongMethod", "LongParameterList", "CyclomaticComplexMethod", "UnusedParameter", "FunctionNaming")
 @Composable
@@ -82,7 +85,7 @@ internal fun ChatListTopBar(
     onOpenSettings: () -> Unit,
     onSwitchAccount: (String) -> Unit,
     connectivityState: ConnectivityBannerState = ConnectivityBannerState.Hidden,
-    onCycleAccount: (() -> Unit)? = null,
+    onSwitchToAccount: ((String) -> Unit)? = null,
     updateInfo: AppUpdateInfo = appState.appUpdateInfo,
     selfUpdateEnabled: Boolean = BuildConfig.SELF_UPDATE_ENABLED,
     searchFilterState: GlobalSearchState = GlobalSearchState(),
@@ -91,7 +94,7 @@ internal fun ChatListTopBar(
 ) {
     var showSelector by remember(appState.runtimeGeneration) { mutableStateOf(false) }
     var showAddIdentity by remember(appState.runtimeGeneration) { mutableStateOf(false) }
-    val cycleNotice = rememberQuickProfileCycleNotice()
+    val switchNotice = rememberQuickAccountSwitchNotice()
     LaunchedEffect(appState.signOutInProgress, appState.wipeInProgress) {
         if (appState.signOutInProgress || appState.wipeInProgress) {
             showSelector = false
@@ -104,13 +107,13 @@ internal fun ChatListTopBar(
         if (!appState.signOutInProgress && !appState.wipeInProgress) showSelector = true
     }
 
-    /** Switches to the next quick-cycle account through the caller's handler or the app state. */
-    fun cycle() {
-        if (appState.quickProfileCycleTarget() == null) return
-        if (onCycleAccount != null) {
-            onCycleAccount()
+    /** Switches to the tapped account through the caller's handler or the app state. */
+    fun switchTo(targetLabel: String) {
+        if (onSwitchToAccount != null) {
+            onSwitchToAccount(targetLabel)
         } else {
-            appState.requestQuickProfileCycle(
+            appState.requestQuickAccountSwitchTo(
+                targetLabel = targetLabel,
                 requestSwitch = { target, activated ->
                     appState.launchMutation {
                         appState.setActiveAccount(
@@ -120,7 +123,7 @@ internal fun ChatListTopBar(
                         )
                     }
                 },
-                onSwitched = cycleNotice::show,
+                onSwitched = switchNotice::show,
             )
         }
     }
@@ -205,11 +208,21 @@ internal fun ChatListTopBar(
                             showUnreadDot = appState.accountShowsUnreadDot(active?.label),
                             unreadDotColor = accountActionColors(appState, active?.label).container,
                         )
-                        appState.quickProfileCycleTarget()?.let { next ->
-                            QuickProfileCycleButton(
-                                nextTitle = appState.accountDisplayNameCached(next.accountIdHex),
-                                onClick = ::cycle,
-                            )
+                        // Quick account switching shows the other signed-in accounts themselves: tap one to
+                        // land on it, long-press for the full selector. Off, the active avatar stands alone.
+                        if (appState.quickSwitchAvatarAccounts().isNotEmpty()) {
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .padding(start = CHAT_LIST_ACCOUNT_AVATAR_GAP)
+                                        .testTag(CHAT_LIST_OTHER_ACCOUNT_AVATARS_TAG),
+                            ) {
+                                OtherAccountAvatarsRow(
+                                    appState = appState,
+                                    onSwitchAccount = ::switchTo,
+                                    onOpenSwitcher = ::openSelector,
+                                )
+                            }
                         }
                     }
                 }

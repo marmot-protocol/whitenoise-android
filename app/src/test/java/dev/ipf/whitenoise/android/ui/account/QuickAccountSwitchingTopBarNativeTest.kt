@@ -4,14 +4,15 @@ import android.app.Application
 import android.os.Looper
 import androidx.compose.runtime.remember
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.NotificationBootstrapTestFixture
-import dev.ipf.whitenoise.android.state.updateQuickProfileCycling
+import dev.ipf.whitenoise.android.state.updateQuickAccountSwitching
 import dev.ipf.whitenoise.android.ui.chats.ChatListTopBar
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
@@ -30,7 +31,7 @@ import java.util.concurrent.atomic.AtomicInteger
 /** Actual cycle-button wiring reaches native activation, including a repeated tap while its local read is held. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
-class QuickProfileCycleTopBarNativeTest {
+class QuickAccountSwitchingTopBarNativeTest {
     @get:Rule val composeRule = createComposeRule()
 
     /** Native generation fencing prevents repeated pending taps from producing duplicate or premature success. */
@@ -61,15 +62,15 @@ class QuickProfileCycleTopBarNativeTest {
         try {
             runBlocking { fixture.bootstrap() }
             val app = fixture.appState
-            // Start with a distinct hydrated name. Activation clears cross-account
-            // presentation state before its local-ready callback; the name returns later.
+            // Start with a distinct hydrated name. Activation clears cross-account presentation state
+            // before its local-ready callback, so the notice must carry the name captured at the tap.
             runBlocking {
                 fixture.runWithMainLooperPumping {
                     app.warmProfilePresentationsBlocking(listOf("aa".repeat(32), "bb".repeat(32)))
                 }
             }
             assertEquals("Bea", app.accountDisplayNameCached("bb".repeat(32)))
-            app.updateQuickProfileCycling(true)
+            app.updateQuickAccountSwitching(true)
             ShadowToast.reset()
             composeRule.setContent {
                 WhiteNoiseTheme {
@@ -88,12 +89,12 @@ class QuickProfileCycleTopBarNativeTest {
                     )
                 }
             }
-            composeRule.onNodeWithTag("chats.quickSwitch").performClick()
+            composeRule.onNodeWithTag(otherAccountAvatarTag("b"), useUnmergedTree = true).performTouchInput { click() }
             composeRule.waitUntil(5_000) {
                 shadowOf(Looper.getMainLooper()).idle()
                 reads.get() == 1
             }
-            composeRule.onNodeWithTag("chats.quickSwitch").performClick()
+            composeRule.onNodeWithTag(otherAccountAvatarTag("b"), useUnmergedTree = true).performTouchInput { click() }
             composeRule.waitUntil(5_000) {
                 shadowOf(Looper.getMainLooper()).idle()
                 reads.get() >= 2
@@ -106,18 +107,17 @@ class QuickProfileCycleTopBarNativeTest {
                 app.activeAccountRef == "b" && ShadowToast.shownToastCount() == 1
             }
             assertEquals(
-                context.getString(R.string.quick_account_switched, "b"),
+                context.getString(R.string.quick_account_switched, "Bea"),
                 ShadowToast.getTextOfLatestToast(),
             )
             composeRule.waitUntil(5_000) {
                 shadowOf(Looper.getMainLooper()).idle()
                 app.accountDisplayNameCached("bb".repeat(32)) == "Bea"
             }
-            // Known presentation limitation: this callback currently uses the account-ref fallback.
-            // This checks current timing and one-notice behavior, not a requirement to discard names;
-            // a future name-preserving activation should update these expectations together.
+            // The name survives the activation window rather than degrading to the account ref, and the
+            // returning presentation neither emits a second notice nor rewrites the first one.
             assertEquals(1, ShadowToast.shownToastCount())
-            assertEquals(context.getString(R.string.quick_account_switched, "b"), ShadowToast.getTextOfLatestToast())
+            assertEquals(context.getString(R.string.quick_account_switched, "Bea"), ShadowToast.getTextOfLatestToast())
         } finally {
             release.countDown()
             fixture.close()

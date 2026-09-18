@@ -20,7 +20,7 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.updateQuickProfileCycling
+import dev.ipf.whitenoise.android.state.updateQuickAccountSwitching
 import dev.ipf.whitenoise.android.ui.chats.ChatListTopBar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -95,7 +95,7 @@ class ProfileSwitcherScreenshotTest {
                 profileReader = { null },
                 profileRefreshRequest = {},
             )
-        app.updateQuickProfileCycling(cycle)
+        app.updateQuickAccountSwitching(cycle)
         composeRule.setContent {
             CompositionLocalProvider(
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
@@ -115,7 +115,7 @@ class ProfileSwitcherScreenshotTest {
                                     {},
                                     {},
                                     {},
-                                    onCycleAccount = {},
+                                    onSwitchToAccount = {},
                                     updateInfo = updateTestInfo(),
                                     selfUpdateEnabled = true,
                                 )
