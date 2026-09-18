@@ -56,7 +56,6 @@ import dev.ipf.whitenoise.android.core.MessageBodyMatch
 import dev.ipf.whitenoise.android.core.SnippetHighlight
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
-import dev.ipf.whitenoise.android.state.OutgoingMessageIndicator
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
@@ -454,7 +453,7 @@ private fun ChatRowTitleStatus(
     )
 }
 
-/** Two-line production preview with native typed attachment decoration; status lives in the trailing badge. */
+/** One-line production preview with native typed attachment decoration; status lives in the trailing badge. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun ChatRowPreviewLine(
@@ -495,7 +494,7 @@ internal fun ChatRowPreviewLine(
     Text(
         text = text,
         inlineContent = inlineContent,
-        maxLines = 2,
+        maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         fontStyle = fontStyle,
         modifier = modifier.fillMaxWidth(),

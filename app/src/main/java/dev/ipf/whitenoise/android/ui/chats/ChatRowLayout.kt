@@ -48,6 +48,9 @@ internal const val CHAT_ROW_SELECTION_INDICATOR_TAG = "chat-row-selection-indica
 
 private val ChatRowContentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
 
+/** The prototype list row. One preview line, so no second minimum is needed for a taller preview. */
+private val ChatRowMinimumHeight = 72.dp
+
 /** Native prototype list item with the production selection and metadata visibility contract. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList")
@@ -130,8 +133,8 @@ internal fun ChatRowLayout(
 /**
  * Adapted from pinned prototype ChatListRow.kt. One content slot avoids Material's inherited supporting
  * baseline query during lazy reuse. Only the direct title/time Text baselines are read. Production's
- * preview can include a delivery Row; its measured height, rather than that container's inherited
- * baseline, selects the 72/88 dp minimum and leaves large fonts free to grow.
+ * preview can include a delivery Row; the row keeps one minimum height and lets a large font or a
+ * two-line search snippet grow past it on its measured height rather than an inherited baseline.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming", "LongMethod")
@@ -183,7 +186,7 @@ private fun ChatRowTextLayout(
                     maxOf(name.width + iconGap + icons.width + timeSpace, message.width + badgeSpace),
                 )
             }
-        val minimumHeight = if (message.height > name.height) 88.dp else 72.dp
+        val minimumHeight = ChatRowMinimumHeight
         val contentMinimum =
             (minimumHeight - padding.calculateTopPadding() - padding.calculateBottomPadding()).roundToPx()
         val height = constraints.constrainHeight(maxOf(textHeight, contentMinimum))
