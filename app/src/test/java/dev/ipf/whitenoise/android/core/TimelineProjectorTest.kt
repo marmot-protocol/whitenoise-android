@@ -119,6 +119,20 @@ class TimelineProjectorTest {
         )
         val plain = TimelineProjector.toAppMessageRecord(timelineRecord())
         assertTrue(plain.tags.isEmpty())
+
+        val blankTarget = TimelineProjector.toAppMessageRecord(timelineRecord(replyToMessageIdHex = " "))
+        assertTrue("a blank target is no reply", blankTarget.tags.isEmpty())
+
+        val halfTagged =
+            TimelineProjector.toAppMessageRecord(
+                timelineRecord(replyToMessageIdHex = "parent", tags = listOf(MessageProjector.eventTag("parent"))),
+            )
+        assertEquals(
+            "only the missing half is restored",
+            listOf(MessageProjector.eventTag("parent"), MessageProjector.quoteTag("parent")),
+            halfTagged.tags,
+        )
+        assertEquals("parent", MessageProjector.replyTargetMessageId(halfTagged))
     }
 
     @Test

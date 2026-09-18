@@ -171,18 +171,21 @@ object TimelineProjector {
                     }
                 }
             }
-        val replyTarget = record.replyToMessageIdHex
+        val replyTarget = record.replyToMessageIdHex?.takeIf { it.isNotBlank() }
         val replyTags =
-            if (
-                replyTarget == null ||
-                tags.any { tag ->
-                    val name = tag.values.firstOrNull()
-                    name == MessageProjector.EventRefTag || name == MessageProjector.QuoteRefTag
-                }
-            ) {
+            if (replyTarget == null) {
                 emptyList()
             } else {
-                listOf(MessageProjector.eventTag(replyTarget), MessageProjector.quoteTag(replyTarget))
+                // Each half of the reply identity is restored on its own, so a record
+                // that kept one of the two tags still ends up navigable and pairable.
+                buildList {
+                    if (tags.none { it.values.firstOrNull() == MessageProjector.EventRefTag }) {
+                        add(MessageProjector.eventTag(replyTarget))
+                    }
+                    if (tags.none { it.values.firstOrNull() == MessageProjector.QuoteRefTag }) {
+                        add(MessageProjector.quoteTag(replyTarget))
+                    }
+                }
             }
         return if (mediaMarkers.isEmpty() && replyTags.isEmpty()) tags else tags + replyTags + mediaMarkers
     }
