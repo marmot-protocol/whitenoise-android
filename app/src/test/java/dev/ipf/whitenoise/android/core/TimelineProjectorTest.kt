@@ -1,7 +1,10 @@
 package dev.ipf.whitenoise.android.core
 
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MediaAttachmentOutcomeFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.marmotkit.MediaAttachmentRejectionFfi
+import dev.ipf.marmotkit.MediaAttachmentRejectionKindFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
@@ -56,6 +59,66 @@ class TimelineProjectorTest {
         assertEquals("Quarterly report", MessageProjector.mediaCaption(captioned))
         assertEquals("", intentionallyBlank.plaintext)
         assertNull(MessageProjector.mediaCaption(intentionallyBlank))
+    }
+
+    /** MarmotKit 0.10 hands over parsed attachments without the event's imeta tags; the caption must survive. */
+    @Test
+    fun projectedMediaWithoutImetaTagsStillReadsAsMediaAndKeepsItsCaption() {
+        val record =
+            TimelineProjector.toAppMessageRecord(
+                timelineRecord(
+                    plaintext = "Look at this",
+                    media =
+                        MessageAttachments.acceptedOutcomes(
+                            listOf(mediaAttachment(fileName = "photo.jpg", mediaType = "image/jpeg")),
+                        ) +
+                            MediaAttachmentOutcomeFfi.Rejected(
+                                attachmentIndex = 1u,
+                                rejection =
+                                    MediaAttachmentRejectionFfi(
+                                        kind = MediaAttachmentRejectionKindFfi.INVALID_STRUCTURE,
+                                        detail = "not an imeta tag",
+                                    ),
+                            ),
+                ),
+            )
+
+        assertEquals("Look at this", MessageProjector.mediaCaption(record))
+        val markers = record.tags.filter { it.values.firstOrNull() == MessageProjector.ImetaTag }
+        assertEquals("one marker per attachment slot, rejected ones included", 2, markers.size)
+        assertEquals(listOf("imeta", "m image/jpeg", "filename photo.jpg"), markers[0].values)
+        assertEquals(listOf("imeta"), markers[1].values)
+    }
+
+    /** A record that still carries its own imeta tags is projected exactly as it came. */
+    @Test
+    fun projectedMediaThatCarriesItsOwnTagsIsLeftAlone() {
+        val ownTag = MessageTagFfi(listOf("imeta", "m application/pdf", "filename report.pdf", "x abc"))
+        val record =
+            TimelineProjector.toAppMessageRecord(
+                timelineRecord(
+                    plaintext = "Report",
+                    tags = listOf(ownTag),
+                    media =
+                        MessageAttachments.acceptedOutcomes(
+                            listOf(mediaAttachment(fileName = "report.pdf", mediaType = "application/pdf")),
+                        ),
+                ),
+            )
+        assertEquals(listOf(ownTag), record.tags)
+    }
+
+    /** A typed reply target is restored as the e/q tags the app pairs and navigates by. */
+    @Test
+    fun projectedReplyWithoutTagsRestoresItsReplyIdentity() {
+        val record = TimelineProjector.toAppMessageRecord(timelineRecord(replyToMessageIdHex = "parent"))
+        assertEquals("parent", MessageProjector.replyTargetMessageId(record))
+        assertEquals(
+            listOf(MessageProjector.eventTag("parent"), MessageProjector.quoteTag("parent")),
+            record.tags,
+        )
+        val plain = TimelineProjector.toAppMessageRecord(timelineRecord())
+        assertTrue(plain.tags.isEmpty())
     }
 
     @Test
@@ -511,6 +574,7 @@ class TimelineProjectorTest {
         mediaJson: String? = null,
         tags: List<MessageTagFfi> = emptyList(),
         replyToMessageIdHex: String? = replyPreview?.messageIdHex,
+        media: List<MediaAttachmentOutcomeFfi> = emptyList(),
     ) = TimelineMessageRecordFfi(
         messageIdHex = id,
         sourceMessageIdHex = null,
@@ -526,7 +590,7 @@ class TimelineProjectorTest {
         replyToMessageIdHex = replyToMessageIdHex,
         replyPreview = replyPreview,
         mediaJson = mediaJson,
-        media = emptyList(),
+        media = media,
         agentTextStreamJson = null,
         groupSystem = null,
         hasReports = false,

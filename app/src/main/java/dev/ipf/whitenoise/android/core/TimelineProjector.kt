@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.core
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MediaAttachmentOutcomeFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReplyPreviewFfi
 import dev.ipf.whitenoise.android.core.MessageAttachments
@@ -133,13 +134,58 @@ object TimelineProjector {
             plaintext = record.plaintext,
             contentTokens = record.contentTokens,
             kind = record.kind,
-            tags = record.tags,
+            tags = tagsWithProjectedStructure(record),
             sourceEpoch = record.sourceEpoch,
             retentionSeconds = record.retentionSeconds,
             retentionExpiresAt = record.retentionExpiresAt,
             recordedAt = record.timelineAt,
             receivedAt = record.receivedAt,
         )
+
+    /**
+     * MarmotKit 0.10 reports a message's attachments as parsed [TimelineMessageRecordFfi.media]
+     * outcomes and its reply target as [TimelineMessageRecordFfi.replyToMessageIdHex], and no longer
+     * echoes the event's `imeta`, `e` and `q` tags. The app still classifies a message from those tags,
+     * so a captioned photo read as plain text with a stray caption and its caption was dropped, and an
+     * echo could not be paired with the reply it confirmed. Give such a record one `imeta` marker per
+     * attachment slot, carrying the type and name the attachment views already take from the outcomes,
+     * and its reply tags back. A record that carries the tags itself is left exactly as it came.
+     */
+    internal fun tagsWithProjectedStructure(record: TimelineMessageRecordFfi): List<MessageTagFfi> {
+        val tags = record.tags
+        val mediaMarkers =
+            if (record.media.isEmpty() || tags.any { it.values.firstOrNull() == MessageProjector.ImetaTag }) {
+                emptyList()
+            } else {
+                record.media.map { outcome ->
+                    when (outcome) {
+                        is MediaAttachmentOutcomeFfi.Accepted ->
+                            MessageTagFfi(
+                                listOf(
+                                    MessageProjector.ImetaTag,
+                                    "m ${outcome.reference.mediaType}",
+                                    "filename ${outcome.reference.fileName}",
+                                ),
+                            )
+                        is MediaAttachmentOutcomeFfi.Rejected -> MessageTagFfi(listOf(MessageProjector.ImetaTag))
+                    }
+                }
+            }
+        val replyTarget = record.replyToMessageIdHex
+        val replyTags =
+            if (
+                replyTarget == null ||
+                tags.any { tag ->
+                    val name = tag.values.firstOrNull()
+                    name == MessageProjector.EventRefTag || name == MessageProjector.QuoteRefTag
+                }
+            ) {
+                emptyList()
+            } else {
+                listOf(MessageProjector.eventTag(replyTarget), MessageProjector.quoteTag(replyTarget))
+            }
+        return if (mediaMarkers.isEmpty() && replyTags.isEmpty()) tags else tags + replyTags + mediaMarkers
+    }
 
     fun invalidationWarning(
         record: TimelineMessageRecordFfi,
