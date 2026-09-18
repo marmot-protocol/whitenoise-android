@@ -13,6 +13,7 @@
     <string name="error_try_again">Something went wrong. Try again; if it keeps happening, copy the error report.</string>
     <string name="error_restart_app_before_retry">The conversation is still loading locally. Restart White Noise before trying again.</string>
     <string name="error_not_ready">White Noise is still finishing an update for this account. This usually takes under a minute, and it retries on its own.</string>
+    <string name="chat_list_startup_slow">Still finishing your update. Your chats will appear in a moment; please keep White Noise open.</string>
     <string name="error_window_timed_out">This chat is taking longer than usual to open. It keeps retrying; your messages are safe.</string>
     <string name="error_loaded_content_may_be_out_of_date">Your loaded content is still available, but it may be out of date. Retrying…</string>
     <string name="error_loaded_content_kept">Couldn\'t load more. Your messages are still available; retry when you\'re ready.</string>

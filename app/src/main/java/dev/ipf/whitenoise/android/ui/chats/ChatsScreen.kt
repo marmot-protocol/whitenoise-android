@@ -1604,7 +1604,10 @@ internal fun ChatsScreen(
                             },
                             thumbnail = { item -> libraryThumbnail(appState, controller.boundAccountRef, item) },
                         )
-                    controller.isLoading && sourceList.isEmpty() -> LoadingScreen()
+                    controller.isLoading && sourceList.isEmpty() -> {
+                        val slowCopy = stringResource(R.string.chat_list_startup_slow)
+                        LoadingScreen(message = slowCopy.takeIf { controller.startupTakingLonger })
+                    }
                     loadFailurePlacement == LoadFailurePlacement.FullScreen ->
                         ErrorContent(
                             stringResource(R.string.couldnt_load_chats),

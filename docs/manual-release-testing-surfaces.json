@@ -21539,6 +21539,14 @@
         "test_ids": [
           "MSG-016"
         ]
+      },
+      {
+        "surface": "string:chat_list_startup_slow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.chat_list_startup_slow",
+        "test_ids": [
+          "CHL-015"
+        ]
       }
     ],
     "manifest_permissions": [
@@ -25061,6 +25069,22 @@
         "anchor": "internal fun settleComposerHeight(",
         "test_ids": [
           "CON-017"
+        ]
+      },
+      {
+        "surface": "Notification writes are paced under the platform rate limit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationPostPacer.kt",
+        "anchor": "suspend fun awaitSlot(",
+        "test_ids": [
+          "NTF-007"
+        ]
+      },
+      {
+        "surface": "Slow first chat-list window switches the spinner copy and logs a marker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatListStartup.kt",
+        "anchor": "suspend fun ChatsController.watchSlowChatListStartup(",
+        "test_ids": [
+          "CHL-015"
         ]
       }
     ],

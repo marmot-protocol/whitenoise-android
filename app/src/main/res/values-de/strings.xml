@@ -7,6 +7,7 @@
     <string name="error_try_again">Etwas ist schiefgelaufen. Versuche es erneut. Wenn das Problem weiterhin besteht, kopiere den Fehlerbericht.</string>
     <string name="error_restart_app_before_retry">Die Unterhaltung wird lokal noch geladen. Starte White Noise neu, bevor du es erneut versuchst.</string>
     <string name="error_not_ready">White Noise schließt für dieses Konto noch ein Update ab. Das dauert meist unter einer Minute und wird automatisch wiederholt.</string>
+    <string name="chat_list_startup_slow">Das Update wird noch abgeschlossen. Deine Chats erscheinen gleich; bitte lass White Noise geöffnet.</string>
     <string name="error_window_timed_out">Dieser Chat braucht ungewöhnlich lange zum Öffnen. Es wird weiter versucht; deine Nachrichten sind sicher.</string>
     <string name="error_loaded_content_may_be_out_of_date">Ihre geladenen Inhalte sind weiterhin verfügbar, könnten aber veraltet sein. Wird erneut versucht…</string>
     <string name="error_loaded_content_kept">Weitere Inhalte konnten nicht geladen werden. Deine Nachrichten sind weiterhin verfügbar; versuche es erneut, wenn du bereit bist.</string>

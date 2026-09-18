@@ -14,6 +14,7 @@ import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
@@ -217,6 +218,23 @@ class ChatsControllerDmMemberHydrationTest {
         }
         assertTrue(attempts >= 2)
         assertEquals(PEER, controller.items.single().otherMemberAccount)
+    }
+
+    /** A group MarmotKit no longer knows is a permanent answer: one read, no retry chain, no backoff churn. */
+    @Test
+    fun unknownGroupMemberFetchIsNotRetried() {
+        var attempts = 0
+        val controller =
+            bindDmController(retryDelayMillis = { 1L }) { _, groupIdHex ->
+                attempts += 1
+                throw MarmotKitException.UnknownGroup(groupIdHex)
+            }
+
+        awaitCondition { attempts >= 1 }
+        drainMainLooperFor(300)
+
+        assertEquals(1, attempts)
+        assertNull(controller.items.single().otherMemberAccount)
     }
 
     @Test
