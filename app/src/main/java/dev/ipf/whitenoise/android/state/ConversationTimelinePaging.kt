@@ -76,7 +76,6 @@ internal suspend fun ConversationController.loadOlderPageInternal(anchorId: Stri
         // authoritative window — already deduped, sorted, head-anchored,
         // and cap-trimmed. We render it by extending the current window.
         val outcome = pageOlderIfActive(subscription, anchorId, trace, startedMs)
-        trace.recordPhase(PerformancePhase.PAGE_WINDOW, startedMs, PerformanceLayer.FFI)
         when (outcome) {
             null -> ConversationPageLoad.INACTIVE
             is TimelinePageOutcome.Unchanged -> unchangedPageLoad(outcome, ConversationSearchPageDirection.OLDER)
@@ -120,7 +119,12 @@ internal suspend fun ConversationController.loadNewerPageInternal(): Conversatio
             null -> ConversationPageLoad.INACTIVE
             is TimelinePageOutcome.Unchanged -> unchangedPageLoad(outcome, ConversationSearchPageDirection.NEWER)
             is TimelinePageOutcome.Advanced -> {
-                applyTimelinePage(outcome.page, replaceWindow = false, updatePagination = true)
+                applyTimelinePage(
+                    outcome.page,
+                    replaceWindow = false,
+                    updatePagination = true,
+                    reconcileNewExtendedRecords = true,
+                )
                 failedPageDirection = null
                 protectedTimelineMessageIds.clear()
                 if (hasLoadedOlderPages) {
@@ -218,7 +222,11 @@ private suspend fun ConversationController.pageOlderIfActive(
             trace.recordPhase(PerformancePhase.PAGE_ANCHOR, startedMs, PerformanceLayer.FFI)
             if (!retainsSubscription(handle)) return@withLock null
         }
+        // Time the window command from here, not from the caller's start: page_window is documented
+        // as the engine answering, and anchoring is already its own phase.
+        val windowStartedMs = SystemClock.elapsedRealtime()
         pageWithNotReadyBudget(handle) { it.paginateBackwards(ConversationTimelinePageLimit) }
+            .also { trace.recordPhase(PerformancePhase.PAGE_WINDOW, windowStartedMs, PerformanceLayer.FFI) }
     }
 
 /** Pages newer under the same active-call guard. */

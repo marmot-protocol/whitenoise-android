@@ -2491,7 +2491,11 @@ internal fun ConversationScreen(
     // visible rows in the same measure pass with no post-hoc scroll.
     LaunchedEffect(listState, controller) {
         snapshotFlow {
-            listState.layoutInfo.visibleItemsInfo.lastOrNull()
+            // The reversed list emits the older-loading row, the top error row and the top spacer
+            // after the messages, so they hold the highest indexes — exactly the oldest end, and
+            // exactly what is on screen when a page is due. Taking the last visible item would pick
+            // one of those, resolve no anchor, and page unanchored: the bug this is meant to fix.
+            listState.layoutInfo.visibleItemsInfo.lastOrNull { conversationAnchorMessageId(it.key) != null }
         }.collect { oldestVisible ->
             val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
             if (liveRenderedSize == 0) return@collect

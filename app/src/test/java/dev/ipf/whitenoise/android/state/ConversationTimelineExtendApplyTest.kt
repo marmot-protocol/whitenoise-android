@@ -140,6 +140,30 @@ class ConversationTimelineExtendApplyTest {
             }
         }
 
+    /**
+     * A newer page can install the authoritative row for a send whose optimistic bubble is still
+     * pending, before the live update arrives. Rows it newly adds must still reconcile, or the
+     * reader sees the same message twice.
+     */
+    @Test
+    fun extendReconcilesRowsANewerPageNewlyAdds() =
+        runBlocking {
+            withController(seed = listOf(row(SECOND))) { controller ->
+                controller.applyTimelinePage(
+                    page(listOf(row(SECOND), row(THIRD))),
+                    replaceWindow = false,
+                    updatePagination = true,
+                    reconcileNewExtendedRecords = true,
+                )
+
+                assertEquals(listOf(SECOND, THIRD), timelineMessageIds(controller))
+                assertEquals(
+                    timelineMessageIds(controller).distinct(),
+                    timelineMessageIds(controller),
+                )
+            }
+        }
+
     /** A page ordered oldest-first keeps that order after an extend. */
     private fun page(messages: List<TimelineMessageRecordFfi>): TimelinePageFfi {
         val older = true

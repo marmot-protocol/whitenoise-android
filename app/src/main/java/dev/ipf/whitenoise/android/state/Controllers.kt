@@ -10984,6 +10984,7 @@ class ConversationController(
         page: TimelinePageFfi,
         replaceWindow: Boolean,
         updatePagination: Boolean,
+        reconcileNewExtendedRecords: Boolean = false,
     ): List<String> {
         timelineWindowGeneration.advance()
         val installed = timelineSubscription?.latestInstalledWindow()
@@ -11005,13 +11006,19 @@ class ConversationController(
             if (record.usesAuthoritativePageOrder()) {
                 authoritativeTimelineOrderByMessageId[record.messageIdHex] = index.toULong()
             }
+            // A newer page can install the authoritative row for a send whose optimistic bubble is
+            // still pending, before the live NEW_MESSAGE update arrives. Rows this page newly adds
+            // therefore still reconcile; retained rows do not, so the delayed same-text matcher
+            // cannot consume an unrelated optimistic message from further up the window.
+            val newlyAdded = record.messageIdHex !in timelineRecords
+            val reconciles = plan.replaces || (reconcileNewExtendedRecords && newlyAdded)
             val carried = plan.carry(record, timelineRecords[record.messageIdHex])
             appliedRecords.add(carried)
             val actionRecord =
                 upsertProjectedRecord(
                     carried,
-                    reconcileOptimistic = plan.replaces,
-                    allowDelayedProjection = plan.replaces,
+                    reconcileOptimistic = reconciles,
+                    allowDelayedProjection = reconciles,
                 )
             profileIds.add(record.sender)
             record.replyPreview?.let { profileIds.add(it.sender) }

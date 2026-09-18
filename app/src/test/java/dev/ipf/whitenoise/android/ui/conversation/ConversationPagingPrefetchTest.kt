@@ -62,6 +62,28 @@ class ConversationPagingPrefetchTest {
         assertNull(conversationAnchorMessageId(7))
     }
 
+    /**
+     * The reversed list emits the older-loading row, the top error row and the top spacer after the
+     * messages, so they hold the highest indexes and sit at the oldest end — precisely what is on
+     * screen when a page is due. Only a real message row may be chosen as the anchor, so the
+     * selection must skip past them rather than take the last visible item.
+     */
+    @Test
+    fun structuralRowsAtTheOldestEndNeverBecomeTheAnchor() {
+        val visible =
+            listOf(
+                "msg:$MESSAGE_ID",
+                "stream:reply",
+                "older-messages-loading",
+                "conversation-load-error-top",
+            )
+
+        val chosen = visible.lastOrNull { conversationAnchorMessageId(it) != null }
+
+        assertEquals("msg:$MESSAGE_ID", chosen)
+        assertEquals(MESSAGE_ID, conversationAnchorMessageId(chosen))
+    }
+
     /** Evaluates the predicate with one field varied from a prefetch-ready baseline. */
     private fun prefetch(
         anchored: Boolean = true,
