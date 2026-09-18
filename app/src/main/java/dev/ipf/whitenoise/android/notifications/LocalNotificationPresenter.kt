@@ -98,10 +98,16 @@ class LocalNotificationPresenter(
         manager.cancel(tag, id)
     },
     private val postPacer: NotificationPostPacer = NotificationPostPacer.shared,
+    private val alertBudget: NotificationAlertBudget = NotificationAlertBudget(),
+    // Kept last so callers may still pass it as a trailing lambda.
     private val activeNotificationsProvider: (NotificationManager) -> Array<StatusBarNotification> = { manager ->
         manager.activeNotifications
     },
 ) {
+    /** The catch-up cohort boundary first posts are judged against; the catch-up coordinator drives it. */
+    internal val catchUpWindow: NotificationCatchUpWindow
+        get() = alertBudget.catchUpWindow
+
     private val shortcutSnapshots = ConcurrentHashMap<String, ConversationShortcutSnapshot>()
     private val shortcutLastUsed = ConcurrentHashMap<String, Long>()
     private val shortcutAccessClock = AtomicLong()
@@ -362,6 +368,23 @@ class LocalNotificationPresenter(
                 return false
             }
         val rawNotificationContent = formattedContent ?: return false
+        // A first post rings only if its catch-up cohort has not rung yet and no alert rang moments ago
+        // (#1579). Enrichment rewrites arrive with silentUpdate already set and never touch the budget.
+        val alertDecision =
+            if (silentUpdate) null else alertBudget.decide(nowMs = nowMillis(), isMention = update.isMention)
+        val silentPost = silentUpdate || alertDecision?.silent == true
+        if (alertDecision != null && alertDecision.silent) {
+            notificationDebug { "silent first post key=${update.notificationKey.take(16)} reason=$alertDecision" }
+        }
+        val writeObserver: (() -> Unit)? =
+            if (alertDecision == NotificationAlertDecision.Alert) {
+                {
+                    alertBudget.markAlerted(nowMillis())
+                    onNotificationWritten?.invoke()
+                }
+            } else {
+                onNotificationWritten
+            }
         val notificationContent =
             if (redactContent) {
                 LocalNotificationFormatter.redactedContent(
@@ -428,12 +451,12 @@ class LocalNotificationPresenter(
                     .setPriority(decision.importance.toCompatPriority())
                     .setShowWhen(true)
                     .setAutoCancel(true)
-                    .setOnlyAlertOnce(silentUpdate)
+                    .setOnlyAlertOnce(silentPost)
                     .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
                     // Matching corrections keep their original grouping. setSilent(true)
                     // moves an ungrouped card into the platform's silent group and can
                     // remove its heads-up banner; onlyAlertOnce suppresses repeat alerts.
-                    .setSilent(silentUpdate && !replaceCurrentMessage)
+                    .setSilent(silentPost && !replaceCurrentMessage)
             // Name the recipient identity in the header when multi-account (#836).
             if (!redactContent && !recipientAccountSubtext.isNullOrBlank()) builder.setSubText(recipientAccountSubtext)
             if (
@@ -646,7 +669,7 @@ class LocalNotificationPresenter(
                                     notificationContent.notificationTag,
                                     notificationContent.notificationId,
                                     notification,
-                                    onNotificationWritten,
+                                    writeObserver,
                                 )
                             if (firstPostSucceeded) {
                                 ConversationCardPostSynchronizer.awaitTestBarrier(
@@ -681,7 +704,7 @@ class LocalNotificationPresenter(
                                             notificationContent.notificationTag,
                                             notificationContent.notificationId,
                                             cleanNotification,
-                                            onNotificationWritten,
+                                            writeObserver,
                                         )
                                     if (retrySucceeded) {
                                         ConversationCardPostSynchronizer.awaitTestBarrier(
@@ -731,7 +754,7 @@ class LocalNotificationPresenter(
                                     notificationContent.notificationTag,
                                     notificationContent.notificationId,
                                     notification,
-                                    onNotificationWritten,
+                                    writeObserver,
                                 )
                             if (succeeded) {
                                 ConversationCardPostSynchronizer.awaitTestBarrier(

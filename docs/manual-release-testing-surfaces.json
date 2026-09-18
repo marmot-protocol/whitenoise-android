@@ -21956,6 +21956,14 @@
         ]
       },
       {
+        "surface": "A reconnect catch-up cohort rings at most once and a live burst rings once",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationAlertBudget.kt",
+        "anchor": "internal fun notificationAlertDecision(",
+        "test_ids": [
+          "NTF-006"
+        ]
+      },
+      {
         "surface": "A relay echo that lands before the send call returns replaces the pending bubble instead of joining it",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "fun optimisticMessageIdForProjection(",
