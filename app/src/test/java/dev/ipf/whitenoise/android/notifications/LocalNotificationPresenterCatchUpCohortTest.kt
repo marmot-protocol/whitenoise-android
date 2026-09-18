@@ -135,29 +135,45 @@ class LocalNotificationPresenterCatchUpCohortTest {
             assertFalse("the released ring goes to the next card", posted.single().third.isOnlyAlertOnce())
         }
 
-    /** A ring taken by another account while this post waited makes this card silent and frees its account. */
+    /** Another account ringing for the cohort while this post waited leaves this account's first card ringing. */
     @Test
-    fun aClaimSupersededWhileWaitingPostsSilently() =
+    fun anotherAccountsCohortRingDoesNotSilenceAWaitingFirstCard() =
         runBlocking {
-            ConversationCardPostSynchronizer.testHook =
-                object : ConversationCardTestHook {
-                    override fun onBarrier(
-                        op: ConversationCardOp,
-                        barrier: ConversationCardBarrier,
-                        notificationTag: String,
-                        notificationId: Int,
-                    ) {
-                        if (op == ConversationCardOp.SHOW_NOTIFY && barrier == ConversationCardBarrier.AFTER_REGISTER) {
-                            ConversationCardPostSynchronizer.testHook = null
-                            budget.reserve(nowMs = now + 20_000, isMention = false, accountRef = "account-b").commit()
-                        }
-                    }
-                }
+            ringForAccountBWhileTheNextPostWaits()
+            assertTrue(presenter.show(alertBudgetUpdate("waited", now), shortNpub = { it }))
+            assertFalse("each account rings once for the cohort", posted.single().third.isOnlyAlertOnce())
+        }
+
+    /** Outside a cohort, a live ring taken by another account while this post waited makes this card silent. */
+    @Test
+    fun aLiveClaimSupersededWhileWaitingPostsSilently() =
+        runBlocking {
+            catchUpWindow.close()
+            elapsed += NOTIFICATION_CATCH_UP_TAIL_MS + 1
+            ringForAccountBWhileTheNextPostWaits()
             assertTrue(presenter.show(alertBudgetUpdate("waited", now), shortNpub = { it }))
             assertTrue("the overtaken card must not ring twice in a row", posted.single().third.isOnlyAlertOnce())
 
-            now += 1_000
-            assertTrue(presenter.show(alertBudgetUpdate("next", now), shortNpub = { it }))
-            assertFalse("the account never rang for this cohort, so it may now", posted.last().third.isOnlyAlertOnce())
+            now += NOTIFICATION_ALERT_BURST_WINDOW_MS + 20_000
+            assertTrue(presenter.show(alertBudgetUpdate("later", now), shortNpub = { it }))
+            assertFalse("a later live card rings again", posted.last().third.isOnlyAlertOnce())
         }
+
+    /** Arms a one-shot hook that lets account B reserve and commit a ring during the next post's registration. */
+    private fun ringForAccountBWhileTheNextPostWaits() {
+        ConversationCardPostSynchronizer.testHook =
+            object : ConversationCardTestHook {
+                override fun onBarrier(
+                    op: ConversationCardOp,
+                    barrier: ConversationCardBarrier,
+                    notificationTag: String,
+                    notificationId: Int,
+                ) {
+                    if (op == ConversationCardOp.SHOW_NOTIFY && barrier == ConversationCardBarrier.AFTER_REGISTER) {
+                        ConversationCardPostSynchronizer.testHook = null
+                        budget.reserve(nowMs = now + 20_000, isMention = false, accountRef = "account-b").commit()
+                    }
+                }
+            }
+    }
 }

@@ -49,7 +49,6 @@ class NotificationAlertReservation internal constructor(
     val decision: NotificationAlertDecision,
     internal val accountRef: String,
     internal val reservedAtMs: Long,
-    internal val alertSequence: Long,
     private val budget: NotificationAlertBudget,
 ) {
     /** The alerting card was written: the ring is spent. */
@@ -59,8 +58,9 @@ class NotificationAlertReservation internal constructor(
     fun release() = budget.release(this)
 
     /**
-     * False once a later alert took the ring while this post was still waiting to write, or once the
-     * claim was settled: the card must then be written silently, and [release] hands the charge back.
+     * False once the claim was settled, or, for a live claim, once a later live alert rang while this post
+     * was still waiting to write: the card is then written silently and [release] hands the charge back.
+     * A cohort claim answers only for its own account, so two accounts' backlog cards can both ring.
      */
     fun stillHoldsTheRing(): Boolean = budget.holdsTheRing(this)
 }
@@ -87,7 +87,6 @@ class NotificationAlertBudget(
 
     /** When the last live alert rang. Cohort rings never set it, so post-catch-up live traffic rings normally. */
     private var lastAlertAtMs: Long? = null
-    private var latestAlertSequence = 0L
     private val alertedCatchUpGenerations = mutableMapOf<String, Long>()
     private val pendingClaims = mutableMapOf<String, PendingClaim>()
 
@@ -109,10 +108,8 @@ class NotificationAlertBudget(
                     isMention = isMention,
                     burstWindowMs = burstWindowMs,
                 )
-            val alerts = decision == NotificationAlertDecision.Alert
-            if (alerts) latestAlertSequence += 1L
-            val reservation = NotificationAlertReservation(decision, accountRef, nowMs, latestAlertSequence, this)
-            if (alerts) {
+            val reservation = NotificationAlertReservation(decision, accountRef, nowMs, this)
+            if (decision == NotificationAlertDecision.Alert) {
                 pendingClaims[accountRef] =
                     PendingClaim(
                         reservation,
@@ -154,7 +151,7 @@ class NotificationAlertBudget(
 
     internal fun holdsTheRing(reservation: NotificationAlertReservation): Boolean =
         synchronized(lock) {
-            pendingClaims[reservation.accountRef]?.reservation === reservation &&
-                latestAlertSequence == reservation.alertSequence
+            val claim = pendingClaims[reservation.accountRef]?.takeIf { it.reservation === reservation }
+            claim != null && (!claim.startedBurst || lastAlertAtMs == reservation.reservedAtMs)
         }
 }

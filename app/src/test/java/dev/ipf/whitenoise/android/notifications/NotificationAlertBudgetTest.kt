@@ -248,6 +248,24 @@ class NotificationAlertBudgetTest {
         )
     }
 
+    /** Two accounts' first cohort cards reserved back to back both keep their ring. */
+    @Test
+    fun interleavedCohortClaimsOfTwoAccountsBothKeepTheRing() {
+        val window = NotificationCatchUpWindow(clock = { 0L })
+        val budget = NotificationAlertBudget(catchUpWindow = window)
+        val now = 1_000_000_000_000L
+
+        window.open()
+        val first = budget.reserve(nowMs = now, isMention = false, accountRef = "a")
+        val second = budget.reserve(nowMs = now + 500L, isMention = false, accountRef = "b")
+        assertEquals(NotificationAlertDecision.Alert, first.decision)
+        assertEquals(NotificationAlertDecision.Alert, second.decision)
+        assertEquals("the other account's cohort ring does not supersede this one", true, first.stillHoldsTheRing())
+        assertEquals(true, second.stillHoldsTheRing())
+        first.commit()
+        second.commit()
+    }
+
     /** An alert written between cohorts does not charge the next cohort. */
     @Test
     fun liveAlertsDoNotChargeTheNextCohort() {
