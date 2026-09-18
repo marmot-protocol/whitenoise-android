@@ -177,7 +177,11 @@ internal suspend fun stageMessageShareStreams(
                         AttachmentPlaintextCache.protectPublicationFile(file)
                         protectedFiles += file
                         file.outputStream().use { it.write(bytes) }
-                        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                        // The cache file keeps its collision-safe generated name; the
+                        // receiving app is told the attachment's own sanitized name, so
+                        // `story.pdf` arrives as `story.pdf` rather than `message_…_story.pdf`.
+                        val authority = "${context.packageName}.fileprovider"
+                        val uri = FileProvider.getUriForFile(context, authority, file, safeName)
                         OutboundShareStream(uri, source.mediaType)
                     } catch (failure: Throwable) {
                         if (file !in protectedFiles) runCatching { file.delete() }

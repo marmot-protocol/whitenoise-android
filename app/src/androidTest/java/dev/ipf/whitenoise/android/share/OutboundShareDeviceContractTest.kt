@@ -1,12 +1,21 @@
 package dev.ipf.whitenoise.android.share
 
 import android.content.Intent
+import android.provider.OpenableColumns
 import android.view.KeyEvent
 import androidx.core.content.FileProvider
 import androidx.core.content.IntentCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.ipf.marmotkit.EncryptedMediaVersionFfi
+import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
+import dev.ipf.whitenoise.android.state.PendingAttachment
+import dev.ipf.whitenoise.android.ui.conversation.media.StagedMessageShareStreams
+import dev.ipf.whitenoise.android.ui.conversation.media.messageShareAttachmentSources
+import dev.ipf.whitenoise.android.ui.conversation.media.stageMessageShareStreams
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -16,6 +25,85 @@ import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class OutboundShareDeviceContractTest {
+    /** A receiving app reads each staged attachment by its own sanitized name, never by the cache file's. */
+    @Test
+    fun stagedStreamsExposeTheAttachmentsOwnDisplayNames() =
+        runBlocking {
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            val directory = File(context.cacheDir, MediaCacheDirs.SHARED).apply { mkdirs() }
+            val neighbor = File(directory, "neighbor-secret.txt").apply { writeBytes("not shared".encodeToByteArray()) }
+            val confirmed =
+                messageShareAttachmentSources(
+                    references =
+                        listOf(
+                            reference("story.pdf", "application/pdf"),
+                            reference("../story.pdf", "application/pdf"),
+                        ),
+                    retained = emptyList(),
+                )
+            val retained =
+                messageShareAttachmentSources(
+                    references = emptyList(),
+                    retained = listOf(PendingAttachment("voice".encodeToByteArray(), "audio/mp4", "voice note.m4a")),
+                )
+            val staged = mutableListOf<StagedMessageShareStreams>()
+            try {
+                staged +=
+                    stageMessageShareStreams(context, confirmed) { source ->
+                        "sent ${source.attachmentIndex}".encodeToByteArray()
+                    }
+                staged += stageMessageShareStreams(context, retained) { "voice".encodeToByteArray() }
+                val streams = staged.flatMap { it.streams }
+
+                assertEquals(
+                    listOf("story.pdf", "story.pdf", "voice note.m4a"),
+                    streams.map { displayName(context, it.uri) },
+                )
+                assertEquals(listOf("application/pdf", "application/pdf", "audio/mp4"), streams.map { it.mediaType })
+                assertEquals(3, streams.map { it.uri }.distinct().size)
+                assertEquals(
+                    listOf("sent 0", "sent 1", "voice"),
+                    streams.map { stream ->
+                        context.contentResolver.openInputStream(stream.uri)!!.use { it.readBytes().decodeToString() }
+                    },
+                )
+                streams.forEach { stream ->
+                    assertFalse(displayName(context, stream.uri).startsWith("message_"))
+                    assertFalse(stream.uri.toString().contains("neighbor"))
+                }
+            } finally {
+                staged.forEach { it.deletePlaintext() }
+                neighbor.delete()
+            }
+        }
+
+    private fun displayName(
+        context: android.content.Context,
+        uri: android.net.Uri,
+    ): String =
+        context.contentResolver
+            .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)!!
+            .use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                cursor.getString(cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
+            }
+
+    private fun reference(
+        fileName: String,
+        mediaType: String,
+    ) = MediaAttachmentReferenceFfi(
+        locators = listOf(MediaLocatorFfi(kind = "blossom-v1", value = "https://cdn.example.test/blob")),
+        ciphertextSha256 = "a".repeat(64),
+        plaintextSha256 = "b".repeat(64),
+        nonceHex = "c".repeat(48),
+        fileName = fileName,
+        mediaType = mediaType,
+        version = EncryptedMediaVersionFfi.V1,
+        sourceEpoch = 1uL,
+        dim = null,
+        thumbhash = null,
+    )
+
     @Test
     fun realChooserCarriesSentAndReceivedStreamsThenCancelsWithoutStateMutation() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
