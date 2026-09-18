@@ -78,9 +78,12 @@ class NotificationAlertBudget(
         isMention: Boolean,
     ): NotificationAlertReservation =
         synchronized(lock) {
+            // Read once: the window has its own lock, and a cohort opening between two reads would let
+            // a live post charge the cohort it never belonged to.
+            val generation = catchUpWindow.currentGeneration()
             val decision =
                 notificationAlertDecision(
-                    catchUpGeneration = catchUpWindow.currentGeneration(),
+                    catchUpGeneration = generation,
                     alertedCatchUpGeneration = alertedCatchUpGeneration,
                     msSinceLastAlert = lastAlertAtMs?.let { nowMs - it },
                     isMention = isMention,
@@ -91,7 +94,7 @@ class NotificationAlertBudget(
                 lastAlertBeforePendingMs = lastAlertAtMs
                 alertedGenerationBeforePending = alertedCatchUpGeneration
                 lastAlertAtMs = nowMs
-                catchUpWindow.currentGeneration()?.let { alertedCatchUpGeneration = it }
+                generation?.let { alertedCatchUpGeneration = it }
                 pendingAlert = reservation
             }
             reservation
