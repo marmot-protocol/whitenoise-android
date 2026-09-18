@@ -6554,9 +6554,9 @@ class ConversationController(
     /** Whether [messageIdHex] is an authoritative row of the current window rather than a local optimistic id. */
     internal fun retainsTimelineRecord(messageIdHex: String): Boolean = timelineRecords.containsKey(messageIdHex)
 
-    private val timelineItemsById = linkedMapOf<String, TimelineMessage>()
+    internal val timelineItemsById = linkedMapOf<String, TimelineMessage>()
     private val timelineOrder = mutableListOf<String>()
-    private val authoritativeTimelineOrderByMessageId = linkedMapOf<String, ULong>()
+    internal val authoritativeTimelineOrderByMessageId = linkedMapOf<String, ULong>()
     private val durableStreamDisplayParentByMessageId = mutableMapOf<String, String>()
     private val optimisticMessages = appState.optimisticMessages(conversationAccountRef, initialGroup.groupIdHex)
     private val durableAcceptanceCallbacks =
@@ -6615,8 +6615,9 @@ class ConversationController(
     var groupRecoveryMutationInFlight by mutableStateOf(false)
         private set
     private val projectedMessageIds = appState.projectedMessageIds(conversationAccountRef, initialGroup.groupIdHex)
-    private val localTimelineOrderOverrides = appState.timelineOrderOverrides(conversationAccountRef, initialGroup.groupIdHex)
-    private val localTimelineTimestampOverrides =
+    internal val localTimelineOrderOverrides =
+        appState.timelineOrderOverrides(conversationAccountRef, initialGroup.groupIdHex)
+    internal val localTimelineTimestampOverrides =
         appState.timelineTimestampOverrides(conversationAccountRef, initialGroup.groupIdHex)
 
     // Subset of the preserves above that came from an optimistic *send* handoff
@@ -6643,7 +6644,7 @@ class ConversationController(
     // and bridge insert, the OLD controller's `performMediaUpload` still
     // sees the stash that the NEW controller's subscription contributed
     // to (or vice-versa).
-    private val pendingProjectionsAwaitingBridge =
+    internal val pendingProjectionsAwaitingBridge =
         appState.pendingProjectionsAwaitingBridge(conversationAccountRef, initialGroup.groupIdHex)
     private val optimisticReactionChanges = linkedMapOf<String, OptimisticReactionChange>()
 
@@ -10935,6 +10936,21 @@ class ConversationController(
         )
     }
 
+    /**
+     * Retires a stream whose final record arrived in this window.
+     *
+     * Marking it removed stops a late `AgentStreamUpdateFfi.Finished` event recreating the
+     * optimistic preview as a duplicate. See #25.
+     */
+    private fun retireFinishedStream(actionRecord: AppMessageRecordFfi) {
+        if (!MessageProjector.isStreamFinal(actionRecord)) return
+        MessageProjector.streamId(actionRecord)?.let { streamId ->
+            activeStreamIds.remove(streamId)
+            removedStreamIds.add(streamId)
+            optimisticMessages.remove("stream:$streamId")
+        }
+    }
+
     /** Drops indexes owned by the previous authoritative bounded window. */
     private fun trimStateForWindowReplacement() {
         timelineRecords.clear()
@@ -10973,10 +10989,14 @@ class ConversationController(
         val installed = timelineSubscription?.latestInstalledWindow()
         val applied = installed?.page ?: page
         val pageMessages = applied.messages
+        // Settle the Markdown this timeline already parsed, and the rows the window dropped, before
+        // anything clears the indexes they are read from.
+        val plan = planWindowApply(applied, replaceWindow)
         if (replaceWindow) trimStateForWindowReplacement()
         authoritativeTimelineOrderByMessageId.clear()
         val profileIds = linkedSetOf<String>()
         val streamIds = mutableListOf<String>()
+        val appliedRecords = ArrayList<TimelineMessageRecordFfi>(pageMessages.size)
         pageMessages.forEachIndexed { index, record ->
             // Keep MDK's optimistic-head position for pending local projections.
             // Only terminally invalidated rows without accepted-history evidence
@@ -10985,11 +11005,13 @@ class ConversationController(
             if (record.usesAuthoritativePageOrder()) {
                 authoritativeTimelineOrderByMessageId[record.messageIdHex] = index.toULong()
             }
+            val carried = plan.carry(record, timelineRecords[record.messageIdHex])
+            appliedRecords.add(carried)
             val actionRecord =
                 upsertProjectedRecord(
-                    record,
-                    reconcileOptimistic = replaceWindow,
-                    allowDelayedProjection = replaceWindow,
+                    carried,
+                    reconcileOptimistic = plan.replaces,
+                    allowDelayedProjection = plan.replaces,
                 )
             profileIds.add(record.sender)
             record.replyPreview?.let { profileIds.add(it.sender) }
@@ -10998,15 +11020,7 @@ class ConversationController(
             if (record.deleted) {
                 deletedMessageIds = deletedMessageIds - record.messageIdHex
             }
-            if (MessageProjector.isStreamFinal(actionRecord)) {
-                MessageProjector.streamId(actionRecord)?.let { streamId ->
-                    activeStreamIds.remove(streamId)
-                    // Mark removed so a late AgentStreamUpdateFfi.Finished event
-                    // can't recreate the optimistic preview as a duplicate. See #25.
-                    removedStreamIds.add(streamId)
-                    optimisticMessages.remove("stream:$streamId")
-                }
-            }
+            retireFinishedStream(actionRecord)
         }
         appState.requestProfiles(profileIds)
         applyDurableStreamPositions(durableStreamDisplayPositions(timelineRecords.values.toList()))
@@ -11014,13 +11028,19 @@ class ConversationController(
             hasMoreBefore = applied.hasMoreBefore
             hasMoreAfter = applied.hasMoreAfter
         }
+        // Rows this page kept skip re-projection, so their projected items still carry the ordinal
+        // from where the window used to sit. Display sorts on that ordinal, so re-stamp it before
+        // publishing or a slid window would reorder history the reader is looking at.
+        if (!plan.replaces) refreshAuthoritativeOrder(applied)
         pruneReadAnchorsToWindow()
         pruneConfirmedOptimisticMessages()
         pruneRetentionAtSendToWindow()
         pruneConfirmedOptimisticReactions()
         pruneMessageOverlaysToWindow()
         installWindowFrame(installed?.frame)
-        recomputeReactions()
+        // A replacement rebuilt every row, so every tally is stale. An extended window only changed
+        // the rows it added, altered or dropped.
+        if (plan.replaces) recomputeReactions() else recomputeReactions(plan.touchedIds)
         // A non-replaceWindow page (older-history load once hasLoadedOlderPages
         // is set) skips the replaceWindow trim above, so prune messageById to the
         // current window + optimistic records here too (#373).
@@ -11033,9 +11053,9 @@ class ConversationController(
         val preparingInitialPresentation = !hasPreparedInitialPresentation
         hasPublishedAuthoritativeTimeline = true
         initialTimelineSeedActive = false
-        publishTimelinePageBeforeMarkdownHydration(pageMessages)
+        publishTimelinePageBeforeMarkdownHydration(appliedRecords)
         scheduleProfilePresentationWarm(
-            records = pageMessages,
+            records = appliedRecords,
             markInitialPresentationReady = preparingInitialPresentation,
         )
         return streamIds
@@ -11736,7 +11756,7 @@ class ConversationController(
     }
 
     /** Removes one projection and every controller-owned index keyed to it. */
-    private fun removeProjectedRecord(messageIdHex: String) {
+    internal fun removeProjectedRecord(messageIdHex: String) {
         val itemId = timelineRecords[messageIdHex]?.let(::projectedItemId) ?: "msg:$messageIdHex"
         timelineRecords.remove(messageIdHex)
         authoritativeTimelineOrderByMessageId.remove(messageIdHex)

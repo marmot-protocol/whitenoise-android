@@ -392,19 +392,21 @@ class AppStateSendLockCoverageTest {
 
     @Test
     fun loadOlderPageRoutesPaginateThroughActiveSubscriptionGuard() {
-        val loadOlder = controllerFunctionBody("loadOlderPage")
-        val guard = controllerFunctionBody("paginateOlderIfSubscriptionActive")
-        val controllersSource = controllersSource().readText()
+        val pagingSource = pagingSource().readText()
+        val loadOlder = functionBodyIn(pagingSource, "loadOlderPageInternal")
+        val guard = functionBodyIn(pagingSource, "pageOlderIfActive")
+        val retains = functionBodyIn(pagingSource, "retainsSubscription")
 
         assertTrue(
-            "loadOlderPage must not call paginateBackwards directly on a captured subscription",
-            "paginateOlderIfSubscriptionActive(subscription)" in loadOlder && "subscription.paginateBackwards" !in loadOlder,
+            "loadOlderPageInternal must not call paginateBackwards directly on a captured subscription",
+            "pageOlderIfActive(subscription" in loadOlder && "subscription.paginateBackwards" !in loadOlder,
         )
         assertTrue(
             "paginate guard must serialize paginate against close and re-check the active timeline subscription identity",
-            "timelineSubscriptionActiveCallMutex.withLock" in controllersSource &&
-                "timelineSubscription === subscription" in guard &&
-                "subscription.paginateBackwards(ConversationTimelinePageLimit)" in guard,
+            "timelineSubscriptionActiveCallMutex.withLock" in pagingSource &&
+                "retainsSubscription(handle)" in guard &&
+                "paginateBackwards(ConversationTimelinePageLimit)" in guard &&
+                "timelineSubscription === handle" in retains,
         )
     }
 
@@ -520,6 +522,31 @@ class AppStateSendLockCoverageTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
         ).firstOrNull { it.exists() }
             ?: error("Missing AppState.kt source file")
+
+    /** The conversation paging extensions, which own the active-call guard around window pages. */
+    private fun pagingSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/state/ConversationTimelinePaging.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/ConversationTimelinePaging.kt"),
+        ).firstOrNull { it.exists() }
+            ?: error("Missing ConversationTimelinePaging.kt source file")
+
+    /** The body of [functionName] within an already-read source file. */
+    private fun functionBodyIn(
+        source: String,
+        functionName: String,
+    ): String {
+        val start =
+            // Extensions declare a receiver between `fun` and the name.
+            Regex("""\bfun\s+(?:\w+\.)?${Regex.escape(functionName)}\s*\(""")
+                .find(source)
+                ?.range
+                ?.first
+                ?: error("Missing function $functionName")
+        val braceStart = source.indexOf('{', start)
+        require(braceStart >= 0) { "Missing body for $functionName" }
+        return source.kotlinBlockFrom(braceStart, "function $functionName")
+    }
 
     internal fun controllerFunctionBody(functionName: String): String {
         val source = controllersSource().readText()

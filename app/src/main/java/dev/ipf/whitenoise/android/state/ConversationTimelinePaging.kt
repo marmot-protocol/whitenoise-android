@@ -74,7 +74,7 @@ internal suspend fun ConversationController.loadOlderPageInternal(anchorId: Stri
             is TimelinePageOutcome.Advanced -> {
                 hasLoadedOlderPages = true
                 failedPageDirection = null
-                applyTimelinePage(outcome.page, replaceWindow = true, updatePagination = true)
+                applyTimelinePage(outcome.page, replaceWindow = false, updatePagination = true)
                 protectedTimelineMessageIds.clear()
                 protectedTimelineMessageIds.addAll(timelineRecords.keys)
                 progressPageLoad(priorMessageIds)
@@ -105,7 +105,7 @@ internal suspend fun ConversationController.loadNewerPageInternal(): Conversatio
             null -> ConversationPageLoad.INACTIVE
             is TimelinePageOutcome.Unchanged -> unchangedPageLoad(outcome, ConversationSearchPageDirection.NEWER)
             is TimelinePageOutcome.Advanced -> {
-                applyTimelinePage(outcome.page, replaceWindow = true, updatePagination = true)
+                applyTimelinePage(outcome.page, replaceWindow = false, updatePagination = true)
                 failedPageDirection = null
                 protectedTimelineMessageIds.clear()
                 if (hasLoadedOlderPages) {
@@ -196,7 +196,7 @@ private suspend fun ConversationController.pageOlderIfActive(
         if (anchorId != null && retainsTimelineRecord(anchorId)) {
             val anchored = withContext(Dispatchers.IO) { handle.setVisibleAnchor(anchorId) }
             if (anchored != null) {
-                applyTimelinePage(anchored, replaceWindow = true, updatePagination = true)
+                applyTimelinePage(anchored, replaceWindow = false, updatePagination = true)
             }
             if (!retainsSubscription(handle)) return@withLock null
         }
