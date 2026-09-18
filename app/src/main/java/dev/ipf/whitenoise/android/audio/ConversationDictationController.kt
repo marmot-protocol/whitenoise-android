@@ -1752,15 +1752,22 @@ internal class ConversationDictationController internal constructor(
         }
     }
 
-    /** Keeps ordinary manual silence alive while bounding broken rapid empty generations. */
+    /** Keeps manual dictation alive through silence while bounding broken automatic sessions. */
     private fun restartAfterNoSpeech(
         sessionId: Long,
         target: ConversationDictationTarget,
         readyAtElapsedMillis: Long?,
     ) {
         val readyDurationMillis = readyAtElapsedMillis?.let { elapsedRealtime() - it }
+        val manualNoSpeech =
+            target.finishAfterSilenceMillis == null &&
+                unresolvedRecognitionFailure == ConversationDictationFailure.NoSpeech
         val ordinarySilence = readyDurationMillis != null && readyDurationMillis >= ORDINARY_SILENCE_MILLIS
-        if (ordinarySilence) {
+        if (manualNoSpeech || ordinarySilence) {
+            // "Finish manually" is an explicit session-lifetime choice. Some
+            // caller-audio providers return rapid ERROR_NO_MATCH callbacks for
+            // a speech-bearing chunk after a pause; those callbacks may restart
+            // the provider generation, but must not end the logical session.
             consecutiveNoSpeechRestarts = 0
         } else {
             consecutiveNoSpeechRestarts += 1

@@ -2567,10 +2567,14 @@ class ConversationDictationControllerTest {
         )
     }
 
-    /** Verifies three rapid empty generations terminate while ordinary silence stays recoverable. */
+    /** Verifies a configured automatic session still bounds a broken rapid empty-generation loop. */
     @Test
     fun repeatedNoSpeechCallbacksStopAfterABoundedNumberOfRestarts() {
-        val fixture = fixture(draft = TextFieldValue(""))
+        val fixture =
+            fixture(
+                draft = TextFieldValue(""),
+                finishAfterSilenceMillis = { 3_000L },
+            )
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
 
         repeat(2) {
@@ -2586,6 +2590,32 @@ class ConversationDictationControllerTest {
         )
         assertEquals(3, fixture.platform.sessions.size)
         assertFalse(fixture.controller.hasDurableSession)
+    }
+
+    /** Rapid provider NoSpeech callbacks cannot override the user's manual-finish preference. */
+    @Test
+    fun manualFinishSurvivesRapidNoSpeechUntilDone() {
+        val fixture = fixture(draft = TextFieldValue(""))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        repeat(5) {
+            fixture.platform.listener.onReady()
+            fixture.scheduler.advanceBy(1_000L)
+            fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+            assertTrue(fixture.controller.state is ConversationDictationState.Starting)
+            fixture.scheduler.advanceBy(250L)
+        }
+
+        assertTrue(fixture.controller.hasDurableSession)
+        assertEquals(6, fixture.platform.sessions.size)
+
+        fixture.controller.stop()
+        assertTrue(fixture.platform.session.stopped)
+        fixture.platform.listener.onResult("final words")
+
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        assertFalse(fixture.controller.hasDurableSession)
+        assertEquals("final words", fixture.drafts.getValue(key()).text)
     }
 
     @Test
