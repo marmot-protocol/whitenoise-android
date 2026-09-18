@@ -155,7 +155,7 @@ object MessageProjector {
 
     internal const val EventRefTag = "e"
     internal const val QuoteRefTag = "q"
-    private const val ImetaTag = "imeta"
+    internal const val ImetaTag = "imeta"
     private const val PendingMediaTag = "_media_pending"
     private const val StreamTag = "stream"
     private const val StreamStartTag = "stream-start"

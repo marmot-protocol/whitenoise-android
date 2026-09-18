@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import android.provider.OpenableColumns
 import androidx.core.content.FileProvider
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
@@ -99,6 +100,46 @@ class MessageOutboundShareTest {
                 assertFalse(stream.uri.toString().contains(".."))
                 assertFalse(stream.uri.toString().contains("%0A", ignoreCase = true))
                 assertFalse(stream.uri.toString().contains("%E2%80%AE", ignoreCase = true))
+            }
+            // The receiving app sees the sanitized original name, never the
+            // collision-safe cache name or anything the sanitizer removed.
+            assertEquals(listOf("release.pdf", "notesprivate.txt"), streams.map { displayName(it.uri) })
+        }
+
+    /** Recipients read each attachment's own name while the cache files behind equal names stay distinct. */
+    @Test
+    fun recipientsSeeTheAttachmentsOwnNamesForConfirmedRetainedAndDuplicateFiles() =
+        runTest {
+            clearSharedFiles()
+            val confirmed =
+                messageShareAttachmentSources(
+                    references =
+                        listOf(
+                            reference("story.pdf", "application/pdf"),
+                            reference("story.pdf", "application/pdf"),
+                        ),
+                    retained = emptyList(),
+                )
+            val retained =
+                messageShareAttachmentSources(
+                    references = emptyList(),
+                    retained = listOf(pending("voice note.m4a", "audio/mp4")),
+                )
+
+            val confirmedStreams =
+                stageMessageShareStreams(context, confirmed) { source ->
+                    "bytes ${source.attachmentIndex}".encodeToByteArray()
+                }.streams
+            val retainedStreams = stageMessageShareStreams(context, retained) { "voice".encodeToByteArray() }.streams
+
+            assertEquals(listOf("story.pdf", "story.pdf"), confirmedStreams.map { displayName(it.uri) })
+            assertEquals(listOf("voice note.m4a"), retainedStreams.map { displayName(it.uri) })
+            assertEquals(2, confirmedStreams.map { it.uri }.distinct().size)
+            val cacheNames = sharedFiles().map(File::getName)
+            assertEquals(3, cacheNames.distinct().size)
+            assertTrue(cacheNames.all { it.startsWith("message_") })
+            (confirmedStreams + retainedStreams).forEach { stream ->
+                assertFalse(displayName(stream.uri).startsWith("message_"))
             }
         }
 
@@ -221,6 +262,15 @@ class MessageOutboundShareTest {
         fileName: String,
         mediaType: String,
     ) = PendingAttachment("pending".encodeToByteArray(), mediaType, fileName)
+
+    /** What a receiving app is told the shared file is called. */
+    private fun displayName(uri: android.net.Uri): String =
+        context.contentResolver
+            .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)!!
+            .use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                cursor.getString(cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
+            }
 
     private fun clearSharedFiles() {
         sharedFiles().forEach(File::delete)

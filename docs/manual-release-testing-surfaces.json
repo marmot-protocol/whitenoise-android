@@ -21905,12 +21905,31 @@
     ],
     "source_coverage": [
       {
+        "surface": "A projected media or reply record without engine tags still reads as media or reply",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/TimelineProjector.kt",
+        "anchor": "internal fun tagsWithProjectedStructure(",
+        "test_ids": [
+          "MED-003",
+          "MED-009",
+          "MED-016",
+          "CON-005"
+        ]
+      },
+      {
         "surface": "A relay echo that lands before the send call returns replaces the pending bubble instead of joining it",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "fun optimisticMessageIdForProjection(",
         "test_ids": [
           "CON-004",
           "CON-005"
+        ]
+      },
+      {
+        "surface": "A shared attachment reaches the receiving app under its own sanitized filename",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MessageOutboundShare.kt",
+        "anchor": "internal suspend fun stageMessageShareStreams(",
+        "test_ids": [
+          "MED-016"
         ]
       },
       {

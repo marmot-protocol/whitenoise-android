@@ -831,7 +831,9 @@ internal abstract class ConversationVoiceDownloadAnchorTestBase {
                 timelineRecord(
                     messageId = messageId,
                     timelineAt = (idOffset + index + 1).toULong(),
-                    plaintext = if (index in voiceIndices) "incoming voice note $index" else "message-$index",
+                    // A voice note is sent without a caption, so its record carries no body; a stand-in
+                    // body would now render as a caption under the waveform.
+                    plaintext = if (index in voiceIndices) "" else "message-$index",
                 ).let { record ->
                     references[messageId]?.let { reference ->
                         val media = MessageAttachments.acceptedOutcomes(listOf(reference))

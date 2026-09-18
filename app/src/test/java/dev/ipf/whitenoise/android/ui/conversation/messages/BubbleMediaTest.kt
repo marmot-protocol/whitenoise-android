@@ -195,9 +195,9 @@ class BubbleMediaTest {
         assertEquals(1, listOf(visualOwnsFooter, fileOwnsFooter).count { it })
     }
 
-    /** Captions and invalidation warnings must not create a second owner beside the final file card. */
+    /** A caption is the message's last line: it carries the footer, so neither tile nor card may. */
     @Test
-    fun invalidatedCaptionedFileGroupStillHasExactlyOneFileFooterOwner() {
+    fun invalidatedCaptionedFileGroupLeavesTheFooterToItsCaption() {
         val visualOwnsFooter =
             visualMediaOwnsFooter(
                 deleted = false,
@@ -211,11 +211,18 @@ class BubbleMediaTest {
                 deleted = false,
                 fileCount = 2,
                 visualOwnsFooter = visualOwnsFooter,
+                hasCaption = true,
             )
 
         assertFalse(visualOwnsFooter)
-        assertTrue(fileOwnsFooter)
-        assertEquals(1, listOf(visualOwnsFooter, fileOwnsFooter).count { it })
+        assertFalse(fileOwnsFooter)
+    }
+
+    /** Without a caption the last file card keeps the footer; with one, the caption takes it. */
+    @Test
+    fun captionedFileHandsTheFooterToItsCaption() {
+        assertTrue(fileCardOwnsFooter(deleted = false, fileCount = 1, visualOwnsFooter = false, hasCaption = false))
+        assertFalse(fileCardOwnsFooter(deleted = false, fileCount = 1, visualOwnsFooter = false, hasCaption = true))
     }
 
     /** A retained generic file with no confirmed media selects the pending file renderer. */

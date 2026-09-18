@@ -63,6 +63,7 @@ import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineReplyPreviewFfi
 import dev.ipf.whitenoise.android.core.MessageAttachments
+import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
@@ -343,16 +344,13 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
         val captionedCardTag = fileAttachmentCardTestTag(fixtures.captionedUnconfirmed.record.messageIdHex, 0)
         val mixedCardTag = fileAttachmentCardTestTag(fixtures.mixedDelivered.record.messageIdHex, 1)
         val failedCardTag = fileAttachmentCardTestTag(fixtures.confirmedFailed.record.messageIdHex, 0)
-        assertAccessibleFileCardText(
-            cardTag = captionedCardTag,
-            CAPTIONED_UNCONFIRMED_FILE,
-            DELIVERY_NOT_CONFIRMED,
-            CAPTIONED_UNCONFIRMED_TIME,
-        )
-        assertAccessibleFileCardDescriptions(captionedCardTag, "Disappearing message")
-        assertNodeInsideCard(captionedCardTag, text = DELIVERY_NOT_CONFIRMED)
-        assertNodeInsideCard(captionedCardTag, text = CAPTIONED_UNCONFIRMED_TIME)
-        assertDescriptionInsideCard(captionedCardTag, description = "Disappearing message")
+        // The caption is the message's last line, so it carries the warning, the time and the
+        // retention glyph; the card itself names only the file.
+        assertAccessibleFileCardText(cardTag = captionedCardTag, CAPTIONED_UNCONFIRMED_FILE)
+        assertNodeBelowCard(captionedCardTag, text = CAPTIONED_UNCONFIRMED_TEXT)
+        assertNodeBelowCard(captionedCardTag, text = DELIVERY_NOT_CONFIRMED)
+        assertNodeBelowCard(captionedCardTag, text = CAPTIONED_UNCONFIRMED_TIME)
+        assertDescriptionBelowCard(captionedCardTag, description = "Disappearing message")
         assertAccessibleFileCardText(mixedCardTag, MIXED_FILE, MIXED_DELIVERED_TIME)
         assertAccessibleFileCardDescriptions(mixedCardTag, "Sent")
         assertNodeInsideCard(mixedCardTag, text = MIXED_DELIVERED_TIME)
@@ -362,11 +360,12 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
         assertNodeInsideCard(failedCardTag, text = CONFIRMED_FAILED_TIME)
         assertDescriptionInsideCard(failedCardTag, description = "Send failed")
 
+        // Below the card, the caption's warning and time keep separate rows, as a text bubble's do.
         val warningBounds =
             composeRule.onNodeWithText(DELIVERY_NOT_CONFIRMED, useUnmergedTree = true).getUnclippedBoundsInRoot()
         val timestampBounds =
             composeRule.onNodeWithText(CAPTIONED_UNCONFIRMED_TIME, useUnmergedTree = true).getUnclippedBoundsInRoot()
-        assertTrue(warningBounds.bottom <= timestampBounds.top)
+        assertTrue(warningBounds.bottom <= timestampBounds.top || timestampBounds.bottom <= warningBounds.top)
     }
 
     private data class FooterMatrixFixtures(
@@ -673,6 +672,29 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
         assertBoundsInside(cardBounds, nodeBounds)
     }
 
+    /** Verifies a caption-owned footer element sits under the file card rather than inside it. */
+    private fun assertNodeBelowCard(
+        cardTag: String,
+        text: String,
+    ) {
+        val cardBounds =
+            composeRule.onNodeWithTag(cardTag, useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val nodeBounds = composeRule.onNodeWithText(text, useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertTrue("'$text' must sit below the file card", nodeBounds.top >= cardBounds.bottom)
+    }
+
+    /** Verifies a caption-owned glyph sits under the file card rather than inside it. */
+    private fun assertDescriptionBelowCard(
+        cardTag: String,
+        description: String,
+    ) {
+        val cardBounds =
+            composeRule.onNodeWithTag(cardTag, useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val nodeBounds =
+            composeRule.onNodeWithContentDescription(description, useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertTrue("'$description' must sit below the file card", nodeBounds.top >= cardBounds.bottom)
+    }
+
     /** Verifies an icon announcement is spatially contained by the owning file card. */
     private fun assertDescriptionInsideCard(
         cardTag: String,
@@ -779,6 +801,9 @@ open class MessageBubbleFileAttachmentFixtures {
         status: MessageStatus = if (mine) MessageStatus.Sent else MessageStatus.Received,
         retentionSeconds: ULong? = null,
         retentionExpiresAt: ULong? = null,
+        // MarmotKit 0.10 projects attachments as outcomes and echoes no imeta tags; false builds that shape
+        // and derives the app record the way the controller does, through TimelineProjector.
+        engineEchoesTags: Boolean = true,
     ): TimelineMessage {
         val messageId = index.toString(16).padStart(2, '0') + "00".repeat(31)
         val (sender, direction) = if (mine) ACCOUNT_ID to "sent" else SENDER_ID to "received"
@@ -812,7 +837,7 @@ open class MessageBubbleFileAttachmentFixtures {
                 plaintext = caption,
                 contentTokens = markdown(caption),
                 kind = 9uL,
-                tags = mediaTags,
+                tags = if (engineEchoesTags) mediaTags else emptyList(),
                 timelineAt = (ONE_AM_UTC_EPOCH_SECONDS + index).toULong(),
                 receivedAt = (ONE_AM_UTC_EPOCH_SECONDS + index).toULong(),
                 replyToMessageIdHex = PARENT_MESSAGE_ID.takeIf { hasReply },
@@ -836,7 +861,7 @@ open class MessageBubbleFileAttachmentFixtures {
             )
         return TimelineMessage(
             id = "msg:$messageId",
-            record = record,
+            record = if (engineEchoesTags) record else TimelineProjector.toAppMessageRecord(projected),
             status = status,
             projected = projected,
         )
