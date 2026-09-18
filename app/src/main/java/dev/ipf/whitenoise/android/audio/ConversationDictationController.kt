@@ -527,6 +527,7 @@ internal class ConversationDictationController internal constructor(
     private var requestedDeliveryMode: ConversationDictationDeliveryMode? = null
     private var generationHasSpeech = false
     private var consecutiveNoSpeechRestarts = 0
+    private var retainedCallerAudioRetries = 0
     private var generationReadyAtElapsedMillis: Long? = null
     private var restartTimeoutHandle: ConversationDictationTimeoutHandle? = null
     private var restartId = 0L
@@ -1641,11 +1642,15 @@ internal class ConversationDictationController internal constructor(
                         val retainedCallerAudio = retainSpeechBearingCallerAudioForRetry()
                         clearRecognitionGeneration(cancel = false)
                         when {
+                            finishRequested && callerAudioContainsSpeech == false ->
+                                continueOrFinalizeCallerAudioDrain(sessionId, target)
                             finishRequested &&
                                 (retainedCallerAudio || platform.callerAudioHasPending()) ->
-                                continueOrFinalizeCallerAudioDrain(sessionId, target)
-                            finishRequested && callerAudioContainsSpeech == false ->
-                                finalizeAccumulatedTranscript(sessionId, target)
+                                retryRetainedCallerAudioOrFail(
+                                    sessionId,
+                                    target,
+                                    unresolvedRecognitionFailure ?: ConversationDictationFailure.NoSpeech,
+                                )
                             finishRequested ->
                                 failOrRetainTranscript(
                                     sessionId,
@@ -1696,7 +1701,7 @@ internal class ConversationDictationController internal constructor(
                         finishRequested &&
                             callerAudioPending &&
                             failure.canRetryRetainedCallerAudio ->
-                            startRecognition(sessionId, target)
+                            retryRetainedCallerAudioOrFail(sessionId, target, failure)
                         finishRequested -> failOrRetainTranscript(sessionId, target, failure)
                         error == ConversationDictationFailure.NoSpeech ->
                             restartAfterNoSpeech(sessionId, target, readyAt)
@@ -1740,11 +1745,36 @@ internal class ConversationDictationController internal constructor(
         }
     }
 
+    /** Bounds exact-chunk recovery, then completes safe accumulated text through the chosen action. */
+    private fun retryRetainedCallerAudioOrFail(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+        failure: ConversationDictationFailure,
+    ) {
+        retainedCallerAudioRetries += 1
+        if (retainedCallerAudioRetries > MAX_RETAINED_CALLER_AUDIO_RETRIES) {
+            conversationDictationDiagnostic(
+                "event=caller_audio_retry_exhausted failure=${failure.name} " +
+                    "attempts=$retainedCallerAudioRetries action=finalize",
+            )
+            finalizeAccumulatedTranscript(sessionId, target)
+        } else {
+            conversationDictationDiagnostic(
+                "event=caller_audio_retry_scheduled failure=${failure.name} " +
+                    "retry=$retainedCallerAudioRetries",
+            )
+            startRecognition(sessionId, target)
+        }
+    }
+
     /** Keeps the logical session fenced while every captured chunk is recognized exactly once. */
     private fun continueOrFinalizeCallerAudioDrain(
         sessionId: Long,
         target: ConversationDictationTarget,
     ) {
+        // Reaching this helper means the previous chunk was resolved or there was no owned chunk.
+        // Keep the recovery budget local to the next pending chunk instead of leaking it across the drain.
+        retainedCallerAudioRetries = 0
         if (runCatching(platform::callerAudioHasPending).getOrDefault(false)) {
             startRecognition(sessionId, target)
         } else {
@@ -1993,6 +2023,7 @@ internal class ConversationDictationController internal constructor(
         if (normalized.isBlank()) return
         accumulatedTranscript = appendConversationDictationSegment(accumulatedTranscript, normalized)
         consecutiveNoSpeechRestarts = 0
+        retainedCallerAudioRetries = 0
         silenceDeadlineElapsedMillis = null
     }
 
@@ -2474,6 +2505,7 @@ internal class ConversationDictationController internal constructor(
         requestedDeliveryMode = null
         generationHasSpeech = false
         consecutiveNoSpeechRestarts = 0
+        retainedCallerAudioRetries = 0
         generationReadyAtElapsedMillis = null
         providerDisconnectRetries = 0
         permissionRetryUsed = false
@@ -2506,6 +2538,7 @@ internal class ConversationDictationController internal constructor(
         const val PROCESSING_TIMEOUT_MILLIS = 20_000L
         const val ORDINARY_SILENCE_MILLIS = 2_000L
         const val MAX_CONSECUTIVE_RAPID_EMPTY_GENERATIONS = 3
+        const val MAX_RETAINED_CALLER_AUDIO_RETRIES = 2
         const val GENERATION_RESTART_DELAY_MILLIS = 250L
         const val SUCCESS_RESULT_RESTART_DELAY_MILLIS = 250L
         const val PERMISSION_RETRY_DELAY_MILLIS = 500L

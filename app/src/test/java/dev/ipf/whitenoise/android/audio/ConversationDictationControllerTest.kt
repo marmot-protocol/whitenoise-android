@@ -1744,6 +1744,134 @@ class ConversationDictationControllerTest {
         assertTrue(fixture.controller.state is ConversationDictationState.Idle)
     }
 
+    /** Repeated blank/error finals stop the Paste spinner through the originally selected action. */
+    @Test
+    fun stopBoundsRetainedCallerAudioRetriesAndCompletesRequestedPaste() {
+        listOf(
+            null,
+            ConversationDictationFailure.NoSpeech,
+            ConversationDictationFailure.ProviderDisconnected,
+        ).forEach { failureCallback ->
+            val fixture = fixture(draft = TextFieldValue(""))
+            fixture.platform.pendingCallerAudio = true
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.platform.listener.onResult("first")
+            fixture.scheduler.runDelay(250L)
+            fixture.controller.paste()
+
+            repeat(2) {
+                if (failureCallback != null) {
+                    fixture.platform.listener.onError(failureCallback)
+                } else {
+                    fixture.platform.listener.onResult(null)
+                }
+                assertTrue(fixture.controller.state is ConversationDictationState.Starting)
+            }
+            if (failureCallback != null) {
+                fixture.platform.listener.onError(failureCallback)
+            } else {
+                fixture.platform.listener.onResult(null)
+            }
+
+            assertEquals("first", fixture.drafts.getValue(key()).text)
+            assertEquals(
+                3,
+                fixture.platform.sessions
+                    .drop(1)
+                    .sumOf { it.retriedCallerAudio },
+            )
+            assertFalse(fixture.controller.hasDurableSession)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        }
+    }
+
+    /** A pipe stall that pre-requeues the chunk still consumes one budget for either provider callback. */
+    @Test
+    fun stopBoundsAlternatingFailuresAfterCallerAudioWasPreRequeued() {
+        listOf<ConversationDictationFailure?>(
+            null,
+            ConversationDictationFailure.ProviderDisconnected,
+        ).forEach { stalledProviderCallback ->
+            val fixture = fixture(draft = TextFieldValue(""))
+            fixture.platform.pendingCallerAudio = true
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.platform.listener.onResult("first")
+            fixture.scheduler.runDelay(250L)
+            fixture.controller.paste()
+
+            fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+            fixture.platform.session.callerAudioRetryAvailable = false
+            if (stalledProviderCallback == null) {
+                fixture.platform.listener.onResult(null)
+            } else {
+                fixture.platform.listener.onError(stalledProviderCallback)
+            }
+            fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+
+            assertEquals("first", fixture.drafts.getValue(key()).text)
+            assertEquals(4, fixture.platform.sessions.size)
+            assertFalse(fixture.controller.hasDurableSession)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        }
+    }
+
+    /** Retry exhaustion keeps an explicit Send instead of diverting the transcript to the pen. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun stopBoundsRetainedCallerAudioRetriesAndCompletesRequestedSend() =
+        runTest {
+            val sent = mutableListOf<String>()
+            val fixture =
+                fixture(
+                    draft = TextFieldValue(""),
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        sent += request.payload
+                        true
+                    },
+                )
+            fixture.platform.pendingCallerAudio = true
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.platform.listener.onResult("first")
+            fixture.scheduler.runDelay(250L)
+            fixture.controller.send()
+
+            repeat(3) {
+                fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+            }
+            advanceUntilIdle()
+
+            assertEquals(listOf("first"), sent)
+            assertEquals("", fixture.drafts.getValue(key()).text)
+            assertFalse(fixture.controller.hasDurableSession)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        }
+
+    /** A resolved chunk cannot consume the retry budget of the next caller-audio chunk. */
+    @Test
+    fun stopResetsRetainedCallerAudioRetryBudgetForTheNextChunk() {
+        val fixture = fixture(draft = TextFieldValue(""))
+        fixture.platform.pendingCallerAudio = true
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onResult("first")
+        fixture.scheduler.runDelay(250L)
+        fixture.controller.paste()
+
+        fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+        fixture.platform.session.callerAudioHasSpeech = false
+        fixture.platform.listener.onResult(null)
+
+        repeat(2) {
+            fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+            assertTrue(fixture.controller.state is ConversationDictationState.Starting)
+        }
+        fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+
+        assertEquals("first", fixture.drafts.getValue(key()).text)
+        assertFalse(fixture.controller.hasDurableSession)
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+    }
+
     /** Confirmed silence-only tail audio is consumed once instead of retrying until the drain timeout. */
     @Test
     fun stopAcknowledgesBlankSilenceOnlyTailAndFinalizesAccumulatedSpeech() {
@@ -3776,6 +3904,7 @@ class ConversationDictationControllerTest {
         var acknowledgedCallerAudio = 0
         var retriedCallerAudio = 0
         var callerAudioHasSpeech = true
+        var callerAudioRetryAvailable = callerAudioOwned
         private val captureFinished = mutableListOf<() -> Unit>()
         private var captureClosed = false
         private var deferredProviderError: ConversationDictationFailure? = null
@@ -3860,7 +3989,7 @@ class ConversationDictationControllerTest {
 
         /** Tracks exact-chunk retry so blank and failed finals cannot consume retained PCM. */
         override fun retryCallerAudio(): Boolean {
-            if (!callerAudioOwned) return false
+            if (!callerAudioOwned || !callerAudioRetryAvailable) return false
             retriedCallerAudio += 1
             return true
         }
