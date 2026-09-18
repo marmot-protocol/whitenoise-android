@@ -4,10 +4,12 @@ import android.content.Context
 import androidx.compose.runtime.remember
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.test.assertContentDescriptionContains
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
@@ -15,7 +17,6 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.quickAccountSwitching
 import dev.ipf.whitenoise.android.state.updateQuickAccountSwitching
-import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_OTHER_ACCOUNT_AVATARS_TAG
 import dev.ipf.whitenoise.android.ui.chats.ChatListTopBar
 import dev.ipf.whitenoise.android.ui.settings.AppearanceScreen
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -89,7 +90,11 @@ class QuickAccountSwitchingUiTest {
         composeRule.onNodeWithTag(otherAccountAvatarTag(B.label), useUnmergedTree = true).assertExists()
         composeRule.onNodeWithTag(otherAccountUnreadDotTag(B.label), useUnmergedTree = true).assertExists()
 
-        composeRule.onNodeWithTag(CHAT_LIST_OTHER_ACCOUNT_AVATARS_TAG).performClick()
+        // The row owns one tap handler across the whole stack, so name the avatar rather than relying on a
+        // single other account making the container's centre the right slice.
+        composeRule
+            .onNodeWithTag(otherAccountAvatarTag(B.label), useUnmergedTree = true)
+            .performTouchInput { click() }
 
         assertEquals(listOf(B.label), switches)
     }
