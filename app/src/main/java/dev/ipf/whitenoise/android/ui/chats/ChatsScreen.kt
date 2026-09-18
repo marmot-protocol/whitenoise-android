@@ -161,7 +161,7 @@ internal fun ChatsScreen(
     // MainShell supplies the request-owned presentation handoff for the
     // home-screen quick toggle. Isolated screens keep the legacy direct path.
     onQuickSwitchAccount: ((String) -> Unit)? = null,
-    onQuickCycleAccount: (() -> Unit)? = null,
+    onQuickSwitchToAccount: ((String) -> Unit)? = null,
     // Head row id captured when the shell opened a conversation from this list.
     // Compared once on re-entry so a background reorder while away can snap to
     // item 0 without yanking an active on-list reader (issue #1313).
@@ -1390,7 +1390,7 @@ internal fun ChatsScreen(
                             onGlobalSearchStateChange(GlobalSearchTransitions::closeSearch)
                         },
                         onSwitchAccount = switchAccount,
-                        onCycleAccount = onQuickCycleAccount,
+                        onSwitchToAccount = onQuickSwitchToAccount,
                         onMic = {
                             val intent =
                                 android.content

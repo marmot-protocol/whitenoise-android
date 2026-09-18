@@ -15,14 +15,14 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/** Cycles reach the production setActiveAccount/local-row/preload owner through the existing native fixture. */
+/** Avatar taps reach the production setActiveAccount/local-row/preload owner through the native fixture. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
-class QuickProfileCycleNativeTest {
+class QuickAccountSwitchingNativeTest {
     private val context: Application = RuntimeEnvironment.getApplication()
 
-    /** A cycle publishes the target's native local snapshot before its one destination confirmation. */
-    @Test fun cycleUsesNativeActivationAndConfirmsOnlyTheActualAccount() =
+    /** A tap publishes the target's native local snapshot before its one destination confirmation. */
+    @Test fun switchUsesNativeActivationAndConfirmsOnlyTheActualAccount() =
         runBlocking {
             val fixture =
                 NotificationBootstrapTestFixture(
@@ -33,12 +33,13 @@ class QuickProfileCycleNativeTest {
             try {
                 fixture.bootstrap()
                 val app = fixture.appState
-                app.updateQuickProfileCycling(true)
+                app.updateQuickAccountSwitching(true)
                 val nativeReads = fixture.directChatListCalls.get()
                 val notices = mutableListOf<String>()
                 var activation: Deferred<Boolean>? = null
                 var accountAtNotice: String? = null
-                app.requestQuickProfileCycle(
+                app.requestQuickAccountSwitchTo(
+                    targetLabel = B.label,
                     requestSwitch = { target, activated ->
                         activation =
                             async {
@@ -76,10 +77,11 @@ class QuickProfileCycleNativeTest {
             try {
                 fixture.bootstrap()
                 val app = fixture.appState
-                app.updateQuickProfileCycling(true)
+                app.updateQuickAccountSwitching(true)
                 var activation: Deferred<Boolean>? = null
                 val notices = mutableListOf<String>()
-                app.requestQuickProfileCycle(
+                app.requestQuickAccountSwitchTo(
+                    targetLabel = B.label,
                     requestSwitch = { target, activated ->
                         activation =
                             async {
@@ -96,8 +98,8 @@ class QuickProfileCycleNativeTest {
             }
         }
 
-    /** Destination selection happens at the tap, so a removed cached candidate never reaches native activation. */
-    @Test fun removedTargetIsRecomputedBeforeNativeRequest() =
+    /** The target is re-resolved at the tap, so an account removed since the last frame starts no activation. */
+    @Test fun removedTargetIsRejectedBeforeNativeRequest() =
         runBlocking {
             val fixture =
                 NotificationBootstrapTestFixture(
@@ -108,14 +110,18 @@ class QuickProfileCycleNativeTest {
             try {
                 fixture.bootstrap()
                 val app = fixture.appState
-                app.updateQuickProfileCycling(true)
-                assertEquals(B.label, app.quickProfileCycleTarget()?.label)
+                app.updateQuickAccountSwitching(true)
+                assertEquals(listOf(B.label, C.label), app.quickSwitchAvatarAccounts().map { it.label })
                 WhiteNoiseAppState::class.java
                     .getDeclaredMethod("setAccounts", List::class.java)
                     .apply { isAccessible = true }
                     .invoke(app, listOf(A, C))
+
+                app.requestQuickAccountSwitchTo(B.label, { _, _ -> error("Removed target must reject") }, {})
+
                 var activation: Deferred<Boolean>? = null
-                app.requestQuickProfileCycle(
+                app.requestQuickAccountSwitchTo(
+                    targetLabel = C.label,
                     requestSwitch = { target, activated ->
                         assertEquals(C.label, target)
                         activation = async { app.setActiveAccount(target, onActivated = activated) }

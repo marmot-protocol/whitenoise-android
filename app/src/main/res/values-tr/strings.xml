@@ -1883,8 +1883,7 @@
     <string name="chat_rows_no_archived_title">Arşivlenmiş sohbet yok</string>
     <string name="chat_rows_no_archived_detail">Arşivlediğiniz sohbetler burada görünür.</string>
     <string name="quick_account_switching">Hızlı hesap değiştirme</string>
-    <string name="quick_account_switching_detail">Hesapları tek dokunuşla değiştirmek için avatarınızın yanında bir düğme gösterin.</string>
-    <string name="quick_account_switch_to">%1$s hesabına geç</string>
+    <string name="quick_account_switching_detail">Diğer hesaplarınızı avatarınızın yanında gösterin ve geçmek için birine dokunun.</string>
     <string name="quick_account_switched">%1$s hesabına geçildi</string>
     <string name="add_profile">Profil Ekle</string>
     <string name="switch_profile">Profili Değiştir</string>

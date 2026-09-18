@@ -75,11 +75,11 @@ import dev.ipf.whitenoise.android.state.newAttachmentOpenNavigationGeneration
 import dev.ipf.whitenoise.android.state.nextNavAccountRef
 import dev.ipf.whitenoise.android.state.observeTtsConversationDestination
 import dev.ipf.whitenoise.android.state.reconcileProvisionalOpenChat
-import dev.ipf.whitenoise.android.state.requestQuickProfileCycle
+import dev.ipf.whitenoise.android.state.requestQuickAccountSwitchTo
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.shouldResetNavOnAccountChange
 import dev.ipf.whitenoise.android.state.transcriptPresentationNeedsRetry
-import dev.ipf.whitenoise.android.ui.account.rememberQuickProfileCycleNotice
+import dev.ipf.whitenoise.android.ui.account.rememberQuickAccountSwitchNotice
 import dev.ipf.whitenoise.android.ui.chats.ChatsScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupFlow
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
@@ -645,7 +645,7 @@ internal fun MainShell(
         mutableStateOf<NotificationMessagePreload<ChatListItem>?>(null)
     }
     val context = LocalContext.current
-    val cycleNotice = rememberQuickProfileCycleNotice()
+    val switchNotice = rememberQuickAccountSwitchNotice()
     val currentInboundNotificationTarget by rememberUpdatedState(inboundNotificationTarget)
     val currentInboundNotificationRequestId by rememberUpdatedState(inboundNotificationRequestId)
     val currentRuntimeGeneration by rememberUpdatedState(appState.runtimeGeneration)
@@ -2343,12 +2343,13 @@ internal fun MainShell(
                                     onSelectFolder = { selectedChatListFolderId = it },
                                     onTtsTransportBodyClick = requestTtsDestinationOpen,
                                     onQuickSwitchAccount = { requestQuickAccountSwitch(it) },
-                                    onQuickCycleAccount = {
-                                        appState.requestQuickProfileCycle(
+                                    onQuickSwitchToAccount = { targetLabel ->
+                                        appState.requestQuickAccountSwitchTo(
+                                            targetLabel = targetLabel,
                                             requestSwitch = { target, activated ->
                                                 requestQuickAccountSwitch(target, activated)
                                             },
-                                            onSwitched = cycleNotice::show,
+                                            onSwitched = switchNotice::show,
                                         )
                                     },
                                     onGroupCreateSubmitted = onGroupCreateSubmitted,

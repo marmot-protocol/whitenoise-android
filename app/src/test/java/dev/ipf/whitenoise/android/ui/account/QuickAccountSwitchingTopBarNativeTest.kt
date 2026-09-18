@@ -11,7 +11,8 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.NotificationBootstrapTestFixture
-import dev.ipf.whitenoise.android.state.updateQuickProfileCycling
+import dev.ipf.whitenoise.android.state.updateQuickAccountSwitching
+import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_OTHER_ACCOUNT_AVATARS_TAG
 import dev.ipf.whitenoise.android.ui.chats.ChatListTopBar
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
@@ -30,7 +31,7 @@ import java.util.concurrent.atomic.AtomicInteger
 /** Actual cycle-button wiring reaches native activation, including a repeated tap while its local read is held. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
-class QuickProfileCycleTopBarNativeTest {
+class QuickAccountSwitchingTopBarNativeTest {
     @get:Rule val composeRule = createComposeRule()
 
     /** Native generation fencing prevents repeated pending taps from producing duplicate or premature success. */
@@ -69,7 +70,7 @@ class QuickProfileCycleTopBarNativeTest {
                 }
             }
             assertEquals("Bea", app.accountDisplayNameCached("bb".repeat(32)))
-            app.updateQuickProfileCycling(true)
+            app.updateQuickAccountSwitching(true)
             ShadowToast.reset()
             composeRule.setContent {
                 WhiteNoiseTheme {
@@ -88,12 +89,12 @@ class QuickProfileCycleTopBarNativeTest {
                     )
                 }
             }
-            composeRule.onNodeWithTag("chats.quickSwitch").performClick()
+            composeRule.onNodeWithTag(CHAT_LIST_OTHER_ACCOUNT_AVATARS_TAG).performClick()
             composeRule.waitUntil(5_000) {
                 shadowOf(Looper.getMainLooper()).idle()
                 reads.get() == 1
             }
-            composeRule.onNodeWithTag("chats.quickSwitch").performClick()
+            composeRule.onNodeWithTag(CHAT_LIST_OTHER_ACCOUNT_AVATARS_TAG).performClick()
             composeRule.waitUntil(5_000) {
                 shadowOf(Looper.getMainLooper()).idle()
                 reads.get() >= 2

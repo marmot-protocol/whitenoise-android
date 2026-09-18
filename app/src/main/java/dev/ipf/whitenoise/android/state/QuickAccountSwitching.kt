@@ -2,27 +2,40 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AccountSummaryFfi
 
-internal const val QUICK_PROFILE_CYCLE_KEY = "quick_profile_cycle"
+/**
+ * The stored key still reads `quick_profile_cycle`: the opt-in it records is the same one, so renaming it
+ * would silently reset the choice for everyone who already made it.
+ */
+internal const val QUICK_ACCOUNT_SWITCHING_KEY = "quick_profile_cycle"
 
-/** Stable native account order, independent of active-first selector presentation and signer liveness. */
-internal fun nextQuickProfileCycleAccount(
+/** Signed-in, fully set-up accounts other than the active one, in stable native order. */
+internal fun quickSwitchAccounts(
     accounts: List<AccountSummaryFfi>,
     activeAccountRef: String?,
     enabled: Boolean,
     eligible: (AccountSummaryFfi) -> Boolean = { true },
-): AccountSummaryFfi? {
+): List<AccountSummaryFfi> {
+    if (!enabled || activeAccountRef == null) return emptyList()
     val signedIn = accounts.filter { it.isSignedInSigningAccount() && eligible(it) }
-    val index = signedIn.indexOfFirst { it.label == activeAccountRef }
-    return if (!enabled || signedIn.size < 2 || index < 0) null else signedIn[(index + 1) % signedIn.size]
+    return if (signedIn.none { it.label == activeAccountRef }) {
+        emptyList()
+    } else {
+        signedIn.filterNot { it.label == activeAccountRef }
+    }
 }
 
-/** The app-wide opt-in never admits retained sign-out, incomplete setup or destructive-operation targets. */
-internal fun WhiteNoiseAppState.quickProfileCycleTarget(): AccountSummaryFfi? =
-    nextQuickProfileCycleAccount(
+/**
+ * Whether the chat list shows the other accounts beside the active avatar.
+ *
+ * The app-wide opt-in never admits retained sign-out, incomplete setup or destructive-operation targets, so
+ * a wipe or sign-out that transiently clears the active account hides the row rather than flashing a stale one.
+ */
+internal fun WhiteNoiseAppState.quickSwitchAvatarAccounts(): List<AccountSummaryFfi> =
+    quickSwitchAccounts(
         accounts = accounts,
         activeAccountRef = activeAccountRef,
         enabled =
-            quickProfileCycling &&
+            quickAccountSwitching &&
                 !signOutInProgress &&
                 !wipeInProgress &&
                 retainedAccountReactivationRef == null,
@@ -36,14 +49,16 @@ internal fun WhiteNoiseAppState.chatsAvatarOpensSelector(): Boolean {
 }
 
 /**
- * Recompute at the tap, then let the existing quick-switch/native activation owner decide whether to commit.
- * Completion copy is emitted only by the native local-ready callback and must still identify that account/runtime.
+ * Re-resolve the tapped account, then let the existing quick-switch/native activation owner decide whether to
+ * commit. Completion copy is emitted only by the native local-ready callback and must still identify that
+ * account and runtime, so a target removed between the tap and the callback confirms nothing.
  */
-internal fun WhiteNoiseAppState.requestQuickProfileCycle(
+internal fun WhiteNoiseAppState.requestQuickAccountSwitchTo(
+    targetLabel: String,
     requestSwitch: (String, () -> Unit) -> Unit,
     onSwitched: (String) -> Unit,
 ) {
-    val target = quickProfileCycleTarget() ?: return
+    val target = quickSwitchAvatarAccounts().firstOrNull { it.label == targetLabel } ?: return
     val runtime = runtimeGeneration
     requestSwitch(target.label) {
         val actual = activeAccount

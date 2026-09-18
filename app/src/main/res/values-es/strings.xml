@@ -1885,8 +1885,7 @@
     <string name="chat_rows_no_archived_title">No hay chats archivados</string>
     <string name="chat_rows_no_archived_detail">Los chats que archives aparecerán aquí.</string>
     <string name="quick_account_switching">Cambio rápido de cuenta</string>
-    <string name="quick_account_switching_detail">Muestra un botón junto a tu avatar para cambiar de cuenta con un toque.</string>
-    <string name="quick_account_switch_to">Cambiar a %1$s</string>
+    <string name="quick_account_switching_detail">Muestra tus otras cuentas junto a tu avatar y toca una para cambiar.</string>
     <string name="quick_account_switched">Se ha cambiado a %1$s</string>
     <string name="add_profile">Añadir perfil</string>
     <string name="switch_profile">Cambiar de perfil</string>
