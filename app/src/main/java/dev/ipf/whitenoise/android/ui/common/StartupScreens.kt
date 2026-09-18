@@ -3,6 +3,7 @@
 package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.WindowInsets
@@ -11,10 +12,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -24,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -36,14 +40,34 @@ import dev.ipf.whitenoise.android.state.ErrorPresentation
 /** Literal prototype loading chrome; indeterminate feedback never estimates native bootstrap progress. */
 @Composable
 internal fun StartupProgressContent() {
-    StartupStatusPage(Modifier.testTag(STARTUP_LOADING_TEST_TAG)) {
-        CircularProgressIndicator()
-        Text(
-            stringResource(R.string.startup_loading_message),
-            Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-        )
+    // The mark, the indicator and the caption sit together in the middle of the screen, as the app has
+    // always started; the scrollable status column is for recovery copy that may not fit.
+    Box(
+        Modifier.fillMaxSize().padding(24.dp).testTag(STARTUP_LOADING_TEST_TAG),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(24.dp),
+        ) {
+            Icon(
+                painterResource(R.drawable.ic_white_noise_mark),
+                contentDescription = null,
+                modifier = Modifier.size(STARTUP_MARK_SIZE).testTag(STARTUP_MARK_TEST_TAG),
+            )
+            CircularProgressIndicator(modifier = Modifier.size(32.dp), strokeWidth = 3.dp)
+            Text(
+                stringResource(R.string.startup_loading_message),
+                Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
     }
 }
+
+private val STARTUP_MARK_SIZE = 96.dp
+internal const val STARTUP_MARK_TEST_TAG = "startup-mark"
 
 /**
  * Startup-only recovery preserves the native retry grant and safe report while adopting prototype chrome.

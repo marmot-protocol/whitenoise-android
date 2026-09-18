@@ -2538,6 +2538,8 @@ class ChatsController private constructor(
 
     var isLoading by mutableStateOf(initialLocalSnapshot == null)
         private set
+    internal var slowStartupEpoch by mutableStateOf(-1L)
+    val startupTakingLonger: Boolean get() = isLoading && slowStartupEpoch == bindEpoch
 
     /**
      * True once the bound account's local projection has returned, including
@@ -3061,6 +3063,7 @@ class ChatsController private constructor(
     private val memberFetchRetryBackoffTierByGroup = mutableMapOf<String, Int>()
     private val memberFetchRetryJobsByGroup = mutableMapOf<String, Job>()
     private val failedMemberFetches = mutableSetOf<String>()
+    private val terminalMemberFetches = mutableSetOf<String>()
 
     // A self-only direct roster gets one dedicated confirmation read before it
     // becomes authoritative. Keep this separate from the general backoff tier:
@@ -3190,6 +3193,7 @@ class ChatsController private constructor(
             resetBackingState()
         }
         bindLifetime.advance()
+        if (isLoading) recomputeScope.launch { watchSlowChatListStartup(bindEpoch) }
         connectionOwner.reset(accountRef, bindEpoch)
         recompute(scheduleBackgroundEnrichment = seededLocalSnapshot == null)
         error = null
@@ -3468,7 +3472,7 @@ class ChatsController private constructor(
         account: String,
         epoch: Long,
     ) {
-        val groupIds = chatRows.map { it.groupIdHex }
+        val groupIds = chatRows.map { it.groupIdHex }.filterNot { it in terminalMemberFetches }
         if (groupIds.isEmpty()) return
         val expectedCacheEpoch = memberCacheEpoch
         val projections = loadInitialMemberIdProjections(account, groupIds)
@@ -3506,6 +3510,7 @@ class ChatsController private constructor(
                 .filter { memberSnapshotNeedsFetch(it) }
                 .filterNot { it in inFlightMemberFetches }
                 .filterNot { memberFetchRetryJobsByGroup[it]?.isActive == true }
+                .filterNot { it in terminalMemberFetches }
                 .toList()
         if (pending.isEmpty()) return
         inFlightMemberFetches.addAll(pending)
@@ -3672,8 +3677,11 @@ class ChatsController private constructor(
                         "initial member fallback failed group=${groupIdHex.take(8)}: " +
                             (throwable.message ?: throwable.javaClass.simpleName)
                     }
-                    markMemberSnapshotFetchFailed(groupIdHex)
-                    scheduleMemberSnapshotRetry(groupIdHex, epoch)
+                    // A terminal failure marks the group for this bind only, like the ordinary fetch path.
+                    if (isActiveBindEpoch(epoch)) {
+                        markMemberSnapshotFetchFailed(groupIdHex, throwable)
+                        scheduleMemberSnapshotRetry(groupIdHex, epoch)
+                    }
                 },
             )
         }
@@ -5368,6 +5376,7 @@ class ChatsController private constructor(
         memberFetchRetryJobsByGroup.clear()
         memberFetchRetryBackoffTierByGroup.clear()
         failedMemberFetches.clear()
+        terminalMemberFetches.clear()
         selfOnlyDirectGraceRetryGroups.clear()
         previewTokensByText = emptyMap()
         inFlightPreviewParses.clear()
@@ -5494,6 +5503,7 @@ class ChatsController private constructor(
                 .filter { memberSnapshotNeedsFetch(it) }
                 .filterNot { it in inFlightMemberFetches }
                 .filterNot { memberFetchRetryJobsByGroup[it]?.isActive == true }
+                .filterNot { it in terminalMemberFetches }
                 .toList()
         if (pending.isEmpty()) return
         if (failedMemberFetches.removeAll(pending.toSet())) memberSnapshotsRevision += 1L
@@ -5519,7 +5529,7 @@ class ChatsController private constructor(
                             (throwable.message ?: throwable.javaClass.simpleName)
                     }
                     if (isActiveBindEpoch(epoch)) {
-                        markMemberSnapshotFetchFailed(groupIdHex)
+                        markMemberSnapshotFetchFailed(groupIdHex, throwable)
                         scheduleMemberSnapshotRetry(groupIdHex, epoch)
                     }
                 } finally {
@@ -5605,7 +5615,11 @@ class ChatsController private constructor(
         scheduleRecomputeIfRequested(scheduleRecomputeAfterPublish)
     }
 
-    private fun markMemberSnapshotFetchFailed(groupIdHex: String) {
+    private fun markMemberSnapshotFetchFailed(
+        groupIdHex: String,
+        throwable: Throwable? = null,
+    ) {
+        if (throwable != null && isTerminalMemberFetchFailure(throwable)) terminalMemberFetches += groupIdHex
         if (failedMemberFetches.add(groupIdHex)) memberSnapshotsRevision += 1L
     }
 
@@ -5620,6 +5634,7 @@ class ChatsController private constructor(
         val backoffTier = memberFetchRetryBackoffTierByGroup.getOrDefault(groupIdHex, 0)
         val shouldRetry =
             isActiveBindEpoch(epoch) &&
+                groupIdHex !in terminalMemberFetches &&
                 memberSnapshotNeedsFetch(groupIdHex) &&
                 chatRowsByGroup.containsKey(chatRowKey(groupIdHex))
         if (!shouldRetry) return
@@ -5848,22 +5863,6 @@ private fun TimelineUpdateTriggerFfi.recomputesReactions(): Boolean =
         TimelineUpdateTriggerFfi.CUSTOM_EVENT,
         -> false
     }
-
-private inline fun chatsDebug(message: () -> String) {
-    // Debug-only so operational INFO logs don't ship in release logcat. See #39.
-    if (BuildConfig.DEBUG) Log.i("DMChats", message())
-}
-
-private inline fun chatsDebug(
-    error: Throwable,
-    message: () -> String,
-) {
-    if (BuildConfig.DEBUG) {
-        Log.e("DMChats", message(), error)
-    } else {
-        Log.e("DMChats", releaseFailureMarker("CHATS", error, message()))
-    }
-}
 
 private val ConversationTimelinePageLimit = 50u
 

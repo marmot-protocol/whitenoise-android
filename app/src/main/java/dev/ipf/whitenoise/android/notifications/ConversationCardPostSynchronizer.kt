@@ -59,6 +59,7 @@ internal interface ConversationCardTestHook {
 // Striped locks avoid unbounded per-conversation state.
 internal object ConversationCardPostSynchronizer {
     private const val STRIPE_COUNT = 64
+    private const val POSTED_CARD_CAPACITY = 256
     private val stripes = Array(STRIPE_COUNT) { Any() }
 
     // This registry contains only currently preparing posts and their bounded
@@ -66,6 +67,13 @@ internal object ConversationCardPostSynchronizer {
     // so dismissal ordering adds no durable cache.
     private val inFlightShowsLock = Any()
     private val inFlightShows = mutableMapOf<ConversationCardKey, InFlightShowState>()
+
+    // Cards this process has written and not yet cancelled. The platform lists a
+    // card only after its own handler has run, so a dismissal that follows a
+    // write closely cannot rely on that snapshot. Bounded: an evicted key falls
+    // back to the platform snapshot, which is the pre-existing behaviour.
+    private val postedCardsLock = Any()
+    private val postedCards = LinkedHashSet<ConversationCardKey>()
 
     @VisibleForTesting
     @Volatile
@@ -150,6 +158,28 @@ internal object ConversationCardPostSynchronizer {
                 ?.dismissals
                 ?.advance()
         }
+    }
+
+    /** Records an app-side write of this card so a dismissal cancels it before the platform lists it. */
+    fun markPosted(
+        notificationTag: String,
+        notificationId: Int,
+    ) {
+        val key = ConversationCardKey(notificationTag, notificationId)
+        synchronized(postedCardsLock) {
+            postedCards.remove(key)
+            postedCards += key
+            while (postedCards.size > POSTED_CARD_CAPACITY) postedCards.remove(postedCards.first())
+        }
+    }
+
+    /** Forgets the app-side write of this card and reports whether one was on record. */
+    fun clearPosted(
+        notificationTag: String,
+        notificationId: Int,
+    ): Boolean {
+        val key = ConversationCardKey(notificationTag, notificationId)
+        return synchronized(postedCardsLock) { postedCards.remove(key) }
     }
 
     /** Serializes one conversation-card mutation on its deterministic key stripe. */

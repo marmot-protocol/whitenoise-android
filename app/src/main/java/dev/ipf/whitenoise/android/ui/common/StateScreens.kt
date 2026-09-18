@@ -38,12 +38,17 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.TransientNotice
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 internal enum class LoadFailurePlacement {
     None,
@@ -62,14 +67,37 @@ internal fun loadFailurePlacement(
         else -> LoadFailurePlacement.FullScreen
     }
 
-/** Fills an established destination with neutral progress feedback. */
+/**
+ * Fills an established destination with neutral progress feedback. A [message] appears under the
+ * indicator once the caller knows the wait is longer than usual, so a long spinner reads as intentional
+ * rather than as a hang.
+ */
 @Composable
-fun LoadingScreen() {
+fun LoadingScreen(message: String? = null) {
     Box(
         Modifier.fillMaxSize().testTag(FULL_SCREEN_LOADING_TEST_TAG),
         contentAlignment = Alignment.Center,
     ) {
-        CircularProgressIndicator()
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
+            modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+        ) {
+            CircularProgressIndicator()
+            if (message != null) {
+                Text(
+                    message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    // The copy arrives after the indicator has been on screen a while, so announce it.
+                    modifier =
+                        Modifier
+                            .testTag(FULL_SCREEN_LOADING_MESSAGE_TEST_TAG)
+                            .semantics { liveRegion = LiveRegionMode.Polite },
+                )
+            }
+        }
     }
 }
 
@@ -80,6 +108,7 @@ fun StartupLoadingScreen() {
 }
 
 internal const val FULL_SCREEN_LOADING_TEST_TAG = "full-screen-loading"
+internal const val FULL_SCREEN_LOADING_MESSAGE_TEST_TAG = "full-screen-loading-message"
 internal const val STARTUP_LOADING_TEST_TAG = "startup-loading"
 internal const val WARM_RESUME_USEFUL_SURFACE_TEST_TAG = "warm-resume-useful-surface"
 
