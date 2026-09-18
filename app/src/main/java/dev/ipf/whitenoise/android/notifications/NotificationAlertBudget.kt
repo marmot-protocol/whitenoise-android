@@ -40,9 +40,25 @@ internal fun notificationAlertDecision(
     }
 
 /**
- * Process-wide memory of the last audible alert and of the catch-up cohort it rang for. [decide] never
- * consumes the budget; the presenter calls [markAlerted] once the alerting card has actually been
- * written, so a post that the eligibility gates reject leaves the next arrival free to ring.
+ * One first post's claim on the budget. An [NotificationAlertDecision.Alert] claim already holds the ring,
+ * so a concurrent first post for another conversation sees it and stays silent; the presenter settles the
+ * claim with [commit] once the card is written or [release] when it is not, which hands the ring back.
+ */
+class NotificationAlertReservation internal constructor(
+    val decision: NotificationAlertDecision,
+    private val budget: NotificationAlertBudget,
+) {
+    /** The alerting card was written: the ring is spent. */
+    fun commit() = budget.commit(this)
+
+    /** The card was not written: the ring goes back so the next arrival may take it. */
+    fun release() = budget.release(this)
+}
+
+/**
+ * Process-wide memory of the last audible alert and of the catch-up cohort it rang for. [reserve] takes
+ * the ring at decision time, so two first posts racing through the presenter cannot both ring; a claim
+ * whose card is never written is released and leaves the next arrival free to ring.
  */
 class NotificationAlertBudget(
     /** The cohort boundary this budget charges; the catch-up coordinator opens and closes it. */
@@ -52,27 +68,48 @@ class NotificationAlertBudget(
     private val lock = Any()
     private var lastAlertAtMs: Long? = null
     private var alertedCatchUpGeneration: Long? = null
+    private var pendingAlert: NotificationAlertReservation? = null
+    private var lastAlertBeforePendingMs: Long? = null
+    private var alertedGenerationBeforePending: Long? = null
 
-    /** The decision for a first post being written at [nowMs]. */
-    fun decide(
+    /** Decides for a first post being written at [nowMs] and, when it may ring, holds the ring for it. */
+    fun reserve(
         nowMs: Long,
         isMention: Boolean,
-    ): NotificationAlertDecision =
+    ): NotificationAlertReservation =
         synchronized(lock) {
-            notificationAlertDecision(
-                catchUpGeneration = catchUpWindow.currentGeneration(),
-                alertedCatchUpGeneration = alertedCatchUpGeneration,
-                msSinceLastAlert = lastAlertAtMs?.let { nowMs - it },
-                isMention = isMention,
-                burstWindowMs = burstWindowMs,
-            )
+            val decision =
+                notificationAlertDecision(
+                    catchUpGeneration = catchUpWindow.currentGeneration(),
+                    alertedCatchUpGeneration = alertedCatchUpGeneration,
+                    msSinceLastAlert = lastAlertAtMs?.let { nowMs - it },
+                    isMention = isMention,
+                    burstWindowMs = burstWindowMs,
+                )
+            val reservation = NotificationAlertReservation(decision, this)
+            if (decision == NotificationAlertDecision.Alert) {
+                lastAlertBeforePendingMs = lastAlertAtMs
+                alertedGenerationBeforePending = alertedCatchUpGeneration
+                lastAlertAtMs = nowMs
+                catchUpWindow.currentGeneration()?.let { alertedCatchUpGeneration = it }
+                pendingAlert = reservation
+            }
+            reservation
         }
 
-    /** Records that an alerting card was written at [nowMs], charging the current cohort if there is one. */
-    fun markAlerted(nowMs: Long) {
+    internal fun commit(reservation: NotificationAlertReservation) {
         synchronized(lock) {
-            lastAlertAtMs = nowMs
-            catchUpWindow.currentGeneration()?.let { alertedCatchUpGeneration = it }
+            if (pendingAlert === reservation) pendingAlert = null
+        }
+    }
+
+    /** Restores the state before the claim, unless a later alert has been reserved since, which then stands. */
+    internal fun release(reservation: NotificationAlertReservation) {
+        synchronized(lock) {
+            if (pendingAlert !== reservation) return
+            pendingAlert = null
+            lastAlertAtMs = lastAlertBeforePendingMs
+            alertedCatchUpGeneration = alertedGenerationBeforePending
         }
     }
 }

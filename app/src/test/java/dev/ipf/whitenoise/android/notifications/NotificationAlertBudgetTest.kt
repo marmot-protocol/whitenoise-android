@@ -94,34 +94,52 @@ class NotificationAlertBudgetTest {
         )
     }
 
-    /** The budget only remembers alerts the presenter reports as written, and charges them to the open cohort. */
+    /** Reserving holds the ring at once so a racing post stays silent; release hands it back, commit spends it. */
     @Test
-    fun budgetConsumesOnlyWrittenAlerts() {
+    fun aReservationHoldsTheRingUntilItIsSettled() {
         var elapsed = 0L
         val window = NotificationCatchUpWindow(clock = { elapsed })
         val budget = NotificationAlertBudget(catchUpWindow = window)
         val now = 1_000_000_000_000L
 
         window.open()
-        assertEquals(NotificationAlertDecision.Alert, budget.decide(nowMs = now, isMention = false))
-        // Deciding did not consume anything: a second decision at the same moment still rings.
-        assertEquals(NotificationAlertDecision.Alert, budget.decide(nowMs = now, isMention = false))
-        budget.markAlerted(now)
+        val first = budget.reserve(nowMs = now, isMention = false)
+        assertEquals(NotificationAlertDecision.Alert, first.decision)
+        assertEquals(
+            "a concurrent post sees the held ring",
+            NotificationAlertDecision.SilentCatchUp,
+            budget.reserve(nowMs = now, isMention = false).decision,
+        )
+        first.release()
+        val second = budget.reserve(nowMs = now + 1_000L, isMention = false)
+        assertEquals("the released ring is free again", NotificationAlertDecision.Alert, second.decision)
+        second.commit()
         assertEquals(
             NotificationAlertDecision.SilentCatchUp,
-            budget.decide(nowMs = now + 30_000L, isMention = false),
+            budget.reserve(nowMs = now + 30_000L, isMention = false).decision,
         )
         window.close()
         elapsed += NOTIFICATION_CATCH_UP_TAIL_MS + 1L
         assertEquals(
             "the cohort is over, the burst window too",
             NotificationAlertDecision.Alert,
-            budget.decide(nowMs = now + 30_000L, isMention = false),
+            budget.reserve(nowMs = now + 30_000L, isMention = false).decision,
         )
-        budget.markAlerted(now + 30_000L)
+    }
+
+    /** Releasing a stale claim after a later alert was reserved leaves the later claim standing. */
+    @Test
+    fun releasingAStaleClaimKeepsTheLaterAlert() {
+        val budget = NotificationAlertBudget(catchUpWindow = NotificationCatchUpWindow(clock = { 0L }))
+        val now = 1_000_000_000_000L
+
+        val first = budget.reserve(nowMs = now, isMention = false)
+        val later = budget.reserve(nowMs = now + 20_000L, isMention = false)
+        assertEquals(NotificationAlertDecision.Alert, later.decision)
+        first.release()
         assertEquals(
             NotificationAlertDecision.SilentBurst,
-            budget.decide(nowMs = now + 32_000L, isMention = false),
+            budget.reserve(nowMs = now + 21_000L, isMention = false).decision,
         )
     }
 
@@ -133,9 +151,12 @@ class NotificationAlertBudgetTest {
         val budget = NotificationAlertBudget(catchUpWindow = window)
         val now = 1_000_000_000_000L
 
-        budget.markAlerted(now)
+        budget.reserve(nowMs = now, isMention = false).commit()
         elapsed += 60_000L
         window.open()
-        assertEquals(NotificationAlertDecision.Alert, budget.decide(nowMs = now + 60_000L, isMention = false))
+        assertEquals(
+            NotificationAlertDecision.Alert,
+            budget.reserve(nowMs = now + 60_000L, isMention = false).decision,
+        )
     }
 }

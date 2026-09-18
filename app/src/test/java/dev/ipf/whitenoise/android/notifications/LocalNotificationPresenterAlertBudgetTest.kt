@@ -22,7 +22,8 @@ import org.robolectric.annotation.Config
 
 /**
  * The presenter's first posts through a real alert budget: a catch-up backlog rings once for the whole
- * cohort, a live burst rings once, and every card still reaches the notification manager.
+ * cohort, a live burst rings once, a rejected write hands its ring back, and every written card reaches
+ * the notification manager.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -32,6 +33,7 @@ class LocalNotificationPresenterAlertBudgetTest {
     private val manager: NotificationManager
         get() = context.getSystemService(NotificationManager::class.java)
     private val posted = mutableListOf<Notification>()
+    private var rejectNextWrite = false
     private var now = 1_700_000_000_000L
     private var elapsed = 0L
     private val catchUpWindow = NotificationCatchUpWindow(clock = { elapsed })
@@ -48,6 +50,10 @@ class LocalNotificationPresenterAlertBudgetTest {
                 nowMillis = { now },
                 alertBudget = NotificationAlertBudget(catchUpWindow),
                 notificationPoster = { notificationManager, tag, id, notification ->
+                    if (rejectNextWrite) {
+                        rejectNextWrite = false
+                        throw IllegalStateException("shade rejected the write")
+                    }
                     posted += notification
                     notificationManager.notify(tag, id, notification)
                 },
@@ -111,6 +117,19 @@ class LocalNotificationPresenterAlertBudgetTest {
                 ),
             )
             assertFalse(posted.last().isOnlyAlertOnce())
+        }
+
+    /** A card the shade rejects hands its ring back, so the next card rings instead of joining a phantom burst. */
+    @Test
+    fun aRejectedWriteHandsTheRingBack() =
+        runBlocking {
+            rejectNextWrite = true
+            assertFalse(presenter.show(update(messageIdHex = "lost", timestampMs = now), shortNpub = { it }))
+            now += 1_000
+            assertTrue(presenter.show(update(messageIdHex = "next", timestampMs = now), shortNpub = { it }))
+
+            assertEquals(1, posted.size)
+            assertFalse(posted.single().isOnlyAlertOnce())
         }
 
     private fun Notification.isOnlyAlertOnce(): Boolean = flags and Notification.FLAG_ONLY_ALERT_ONCE != 0
