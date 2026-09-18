@@ -30,6 +30,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.WrapText
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -37,6 +38,8 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -128,6 +131,7 @@ import dev.ipf.whitenoise.android.ui.settings.IdentifierCopyCapsule
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroupScope
+import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsPanel
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
@@ -1377,6 +1381,7 @@ internal fun GroupDetailsScreen(
                             appState.updateCollapseLongMessagesInGroup(controller.group.groupIdHex, it)
                         },
                         subtitle = stringResource(R.string.collapse_long_messages_subtitle),
+                        leading = { SettingsLeadingIcon(Icons.AutoMirrored.Filled.WrapText) },
                     )
                 }
                 if (appState.ttsHasUsableEngine) {
@@ -1396,6 +1401,7 @@ internal fun GroupDetailsScreen(
                         onClick = { showNotificationSettings = true },
                         modifier = Modifier.performanceTestTag(PerformanceTestTags.GROUP_NOTIFICATION_SETTINGS),
                         value = notificationModeLabel(conversationNotifyMode),
+                        leading = { SettingsLeadingIcon(Icons.Filled.Notifications) },
                     )
                 }
                 row("bubble_colors") { rowContext ->
@@ -1403,6 +1409,7 @@ internal fun GroupDetailsScreen(
                         context = rowContext,
                         title = stringResource(R.string.chat_bubble_colors),
                         onClick = { showBubbleColors = true },
+                        leading = { SettingsLeadingIcon(Icons.Filled.Palette) },
                     )
                 }
             }

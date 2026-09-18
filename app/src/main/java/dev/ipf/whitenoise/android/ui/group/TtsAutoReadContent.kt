@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.ui.group
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -11,6 +13,7 @@ import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.TtsAutoReadOverride
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogChoiceRow
+import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsRowContext
 
@@ -19,7 +22,8 @@ internal const val TTS_AUTO_READ_GROUP_ROW_TAG = "tts_auto_read_group_row"
 
 /**
  * The per-chat Read Aloud row inside a chat's actions group: the title with the resolved provenance as its value,
- * announced together, opening the override picker.
+ * announced together, opening the override picker. The row carries its own speech glyph, so every caller
+ * gets the icon that belongs to it rather than restating it.
  */
 @Suppress("FunctionNaming")
 @Composable
@@ -39,6 +43,7 @@ internal fun TtsAutoReadGroupActionRow(
                 .testTag(TTS_AUTO_READ_GROUP_ROW_TAG)
                 .semantics(mergeDescendants = true) { contentDescription = "$title. $provenanceLabel" },
         value = provenanceLabel,
+        leading = { SettingsLeadingIcon(Icons.AutoMirrored.Filled.VolumeUp) },
     )
 }
 
