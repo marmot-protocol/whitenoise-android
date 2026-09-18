@@ -1,6 +1,12 @@
 package dev.ipf.whitenoise.android.state
 
+import android.os.SystemClock
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
+import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
+import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
+import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
+import dev.ipf.whitenoise.android.diagnostics.PerformanceTrace
 import dev.ipf.whitenoise.android.state.ConversationWindowUnchangedReason.NOT_READY
 import dev.ipf.whitenoise.android.state.ConversationWindowUnchangedReason.TIMED_OUT
 import kotlinx.coroutines.CancellationException
@@ -62,24 +68,33 @@ internal suspend fun ConversationController.loadOlderPageInternal(anchorId: Stri
     // from "we forgot to clear it".
     pageError = null
     isLoadingOlder = true
+    val trace = PerformanceDiagnostics.begin(PerformanceOperation.CHAT_HISTORY_PAGE)
+    val startedMs = SystemClock.elapsedRealtime()
     return try {
         // The subscription's paginate_backwards extends the runtime's
         // materialized window backwards by `count` and returns the new
         // authoritative window — already deduped, sorted, head-anchored,
-        // and cap-trimmed. We render it directly via replaceWindow=true.
-        val outcome = pageOlderIfActive(subscription, anchorId)
+        // and cap-trimmed. We render it by extending the current window.
+        val outcome = pageOlderIfActive(subscription, anchorId, trace, startedMs)
+        trace.recordPhase(PerformancePhase.PAGE_WINDOW, startedMs, PerformanceLayer.FFI)
         when (outcome) {
             null -> ConversationPageLoad.INACTIVE
             is TimelinePageOutcome.Unchanged -> unchangedPageLoad(outcome, ConversationSearchPageDirection.OLDER)
             is TimelinePageOutcome.Advanced -> {
                 hasLoadedOlderPages = true
                 failedPageDirection = null
+                val appliedAtMs = SystemClock.elapsedRealtime()
                 applyTimelinePage(outcome.page, replaceWindow = false, updatePagination = true)
                 protectedTimelineMessageIds.clear()
                 protectedTimelineMessageIds.addAll(timelineRecords.keys)
+                trace.recordPhase(
+                    phase = PerformancePhase.PAGE_APPLY,
+                    startedMs = appliedAtMs,
+                    count = outcome.page.messages.size,
+                )
                 progressPageLoad(priorMessageIds)
             }
-        }
+        }.also { trace.recordCompletion(it, startedMs) }
     } catch (cancel: CancellationException) {
         throw cancel
     } catch (throwable: Throwable) {
@@ -190,6 +205,8 @@ private fun pageOperation(direction: ConversationSearchPageDirection): String =
 private suspend fun ConversationController.pageOlderIfActive(
     handle: PagingHandle,
     anchorId: String?,
+    trace: PerformanceTrace? = null,
+    startedMs: Long = 0L,
 ): TimelinePageOutcome? =
     timelineSubscriptionActiveCallMutex.withLock {
         if (!retainsSubscription(handle)) return@withLock null
@@ -198,6 +215,7 @@ private suspend fun ConversationController.pageOlderIfActive(
             if (anchored != null) {
                 applyTimelinePage(anchored, replaceWindow = false, updatePagination = true)
             }
+            trace.recordPhase(PerformancePhase.PAGE_ANCHOR, startedMs, PerformanceLayer.FFI)
             if (!retainsSubscription(handle)) return@withLock null
         }
         pageWithNotReadyBudget(handle) { it.paginateBackwards(ConversationTimelinePageLimit) }

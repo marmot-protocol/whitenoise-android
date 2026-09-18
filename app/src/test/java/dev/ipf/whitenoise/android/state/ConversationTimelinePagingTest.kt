@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.state
 import android.os.Looper
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
+import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
+import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -144,6 +146,28 @@ class ConversationTimelinePagingTest {
                 assertEquals(1, subscription.backwardsCallCount)
             }
         }
+
+    /**
+     * Every phase a history page can emit is part of the closed WNPerf vocabulary, so a diagnostics
+     * session on a tester's device cannot be asked to log a name the schema does not define.
+     */
+    @Test
+    fun historyPagePhasesAreInTheClosedVocabulary() {
+        val phases =
+            listOf(
+                PerformancePhase.PAGE_ANCHOR,
+                PerformancePhase.PAGE_WINDOW,
+                PerformancePhase.PAGE_APPLY,
+                PerformancePhase.PAGE_COMPLETE,
+            )
+
+        assertTrue(phases.all { it in PerformancePhase.entries })
+        assertEquals(
+            listOf("page_anchor", "page_window", "page_apply", "page_complete"),
+            phases.map { it.wireName },
+        )
+        assertEquals("chat_history_page", PerformanceOperation.CHAT_HISTORY_PAGE.wireName)
+    }
 
     /** Builds a subscription seeded with one row that still has older history behind it. */
     private fun subscriptionWith(vararg outcomes: TimelinePageOutcome) =

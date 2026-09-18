@@ -33,6 +33,21 @@ never persisted, so a process restart also disables ordinary device collection.
 The benchmark-selector build is the one exception: choosing that purpose-built
 local variant is the runner's explicit opt-in before its cold-start measurement.
 
+### Conversation history pages
+
+`op=chat_history_page` covers one page of older history, the operation behind a
+report that scrolling up is slow. Its phases are, in order:
+
+| Phase | Layer | What it measures |
+| --- | --- | --- |
+| `page_anchor` | `ffi` | Reporting the reader's oldest visible row as the window anchor. Absent when the row is not one MDK retains. |
+| `page_window` | `ffi` | The window command itself, including any wait for a not-ready window. |
+| `page_apply` | `android` | Folding the returned window into the timeline; `count` is the rows it carried. |
+| `page_complete` | `android` | The whole page. `result=failure` means the engine did not answer — a deadline or an exhausted not-ready budget — and the reader was left a retry row. |
+
+A `page_window` far larger than `page_apply` is the engine taking time to reach
+the request, not the app taking time to render it.
+
 To validate a slow journey on a staging device, enable the switch, reproduce one
 operation, then open **App info → View logs** and filter for `WNPerf`. Confirm the
 lines identify `op`, `phase`, `layer`, bounded timings/counts, and a closed

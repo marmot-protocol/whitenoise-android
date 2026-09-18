@@ -104,6 +104,7 @@ class PerformanceDiagnosticSchemaTest {
                 "media_send",
                 "attachment_fetch",
                 "sync_catch_up",
+                "chat_history_page",
             ),
             PerformanceOperation.entries.mapTo(mutableSetOf()) { it.wireName },
         )
