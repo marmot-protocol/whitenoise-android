@@ -10910,7 +10910,7 @@ class ConversationController(
                 }
             if (!stillActive) return@withLock null
             withContext(Dispatchers.IO) {
-                subscription.paginateBackwards(ConversationTimelinePageLimit)
+                subscription.paginateBackwards(ConversationTimelinePageLimit).pageOrCurrent()
             }
         }
 
@@ -10922,7 +10922,7 @@ class ConversationController(
                 }
             if (!stillActive) return@withLock null
             withContext(Dispatchers.IO) {
-                subscription.paginateForwards(ConversationTimelinePageLimit)
+                subscription.paginateForwards(ConversationTimelinePageLimit).pageOrCurrent()
             }
         }
 

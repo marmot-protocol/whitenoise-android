@@ -22,6 +22,7 @@ import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
+import dev.ipf.whitenoise.android.state.TimelinePageOutcome.Advanced
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import org.junit.Assert.assertEquals
@@ -75,10 +76,10 @@ internal class ScriptedConversationTimelineSubscription(
     }
 
     /** Returns the configured backward-pagination window. */
-    override suspend fun paginateBackwards(count: UInt): TimelinePageFfi = backwardsPage
+    override suspend fun paginateBackwards(count: UInt): TimelinePageOutcome = Advanced(backwardsPage)
 
     /** Returns the configured forward-pagination window. */
-    override suspend fun paginateForwards(count: UInt): TimelinePageFfi = forwardsPage
+    override suspend fun paginateForwards(count: UInt): TimelinePageOutcome = Advanced(forwardsPage)
 
     /** Records closure and unblocks any pending live-window read. */
     override fun close() {
