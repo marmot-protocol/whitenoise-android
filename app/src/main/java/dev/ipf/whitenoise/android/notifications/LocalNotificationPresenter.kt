@@ -986,6 +986,7 @@ class LocalNotificationPresenter(
     ): Boolean =
         try {
             notificationPoster(manager, tag, id, notification)
+            ConversationCardPostSynchronizer.markPosted(tag, id)
             runCatching { onNotificationWritten?.invoke() }
             true
         } catch (exception: RuntimeException) {
@@ -997,8 +998,9 @@ class LocalNotificationPresenter(
 
     /**
      * Cancels one card under its lock. With [onlyIfLive] the platform cancel is skipped for a card that is
-     * not on screen, checked inside the lock so a post that lands first is still removed; the dismissal
-     * generation advances either way so an in-flight post for the key cannot resurrect it afterwards.
+     * neither on screen nor written by this process since its last cancel, both checked inside the lock so a
+     * post that lands first is still removed even before the platform lists it; the dismissal generation
+     * advances either way so an in-flight post for the key cannot resurrect it afterwards.
      */
     private fun cancelSynchronized(
         manager: NotificationManagerCompat,
@@ -1008,7 +1010,8 @@ class LocalNotificationPresenter(
     ) {
         ConversationCardPostSynchronizer.withLock(tag, id, ConversationCardOp.DISMISS_CANCEL) {
             ConversationCardPostSynchronizer.markDismissed(tag, id)
-            if (!onlyIfLive || cardIsLive(tag, id)) notificationCanceller(manager, tag, id)
+            val writtenByApp = ConversationCardPostSynchronizer.clearPosted(tag, id)
+            if (!onlyIfLive || writtenByApp || cardIsLive(tag, id)) notificationCanceller(manager, tag, id)
         }
     }
 
@@ -1036,7 +1039,10 @@ class LocalNotificationPresenter(
     ) {
         ConversationCardPostSynchronizer.withLock(tag, id, ConversationCardOp.DISMISS_CANCEL) {
             val live = activeNotification(manager, tag, id) ?: return@withLock
-            if (live.postTime <= sinceMs) compat.cancel(tag, id)
+            if (live.postTime <= sinceMs) {
+                ConversationCardPostSynchronizer.clearPosted(tag, id)
+                compat.cancel(tag, id)
+            }
         }
     }
 
@@ -1173,6 +1179,7 @@ class LocalNotificationPresenter(
                 notificationId,
             )
             if (shouldCancelRepliedConversationCard(actedMessageIdHex, liveCardMessageIdHex)) {
+                ConversationCardPostSynchronizer.clearPosted(notificationTag, notificationId)
                 NotificationManagerCompat.from(context).cancel(notificationTag, notificationId)
                 notificationDebug { "cancelled tag=${notificationTag.take(16)} id=$notificationId" }
             }

@@ -4,6 +4,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -34,7 +38,7 @@ class LoadingScreenScreenshotTest {
     @Test
     fun brandedStartupDark() = capture("loading_screen_dark.png", darkTheme = true)
 
-    /** The chat list's slow-start state: the neutral indicator with the still-finishing copy under it. */
+    /** The chat list's slow-start state: the indicator with the still-finishing copy under it, announced politely. */
     @Test
     fun slowStartLoadingLight() {
         composeRule.setContent {
@@ -44,7 +48,10 @@ class LoadingScreenScreenshotTest {
                 }
             }
         }
-        composeRule.onNodeWithTag(FULL_SCREEN_LOADING_MESSAGE_TEST_TAG).assertIsDisplayed()
+        composeRule
+            .onNodeWithTag(FULL_SCREEN_LOADING_MESSAGE_TEST_TAG)
+            .assertIsDisplayed()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
         composeRule.onRoot().captureRoboImage("src/test/snapshots/loading_screen_slow_start_light.png")
     }
 

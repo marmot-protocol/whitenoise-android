@@ -3677,8 +3677,11 @@ class ChatsController private constructor(
                         "initial member fallback failed group=${groupIdHex.take(8)}: " +
                             (throwable.message ?: throwable.javaClass.simpleName)
                     }
-                    markMemberSnapshotFetchFailed(groupIdHex, throwable)
-                    scheduleMemberSnapshotRetry(groupIdHex, epoch)
+                    // A terminal failure marks the group for this bind only, like the ordinary fetch path.
+                    if (isActiveBindEpoch(epoch)) {
+                        markMemberSnapshotFetchFailed(groupIdHex, throwable)
+                        scheduleMemberSnapshotRetry(groupIdHex, epoch)
+                    }
                 },
             )
         }

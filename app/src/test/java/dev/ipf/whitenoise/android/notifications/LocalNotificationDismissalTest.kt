@@ -461,6 +461,29 @@ class LocalNotificationDismissalTest {
         assertEquals(listOf(messageKey.tag to messageKey.id), cancelled)
     }
 
+    /** A card this process wrote moments ago is cancelled even while the platform snapshot does not list it yet. */
+    @Test
+    fun dismissCancelsCardTheAppJustWroteBeforeThePlatformListsIt() {
+        val account = "account-just-written"
+        val group = "group-just-written"
+        val messageKey = LocalNotificationFormatter.conversationDismissalKey(account, group)
+        val cancelled = mutableListOf<Pair<String, Int>>()
+        val presenter =
+            LocalNotificationPresenter(
+                context,
+                notificationCanceller = { _, tag, id -> cancelled += tag to id },
+                activeNotificationsProvider = { emptyArray() },
+            )
+        ConversationCardPostSynchronizer.markPosted(messageKey.tag, messageKey.id)
+
+        assertTrue(presenter.dismissConversationMessagesImmediately(account, group))
+        assertEquals(listOf(messageKey.tag to messageKey.id), cancelled)
+
+        // The write record is consumed by that cancel, so a repeat dismissal with nothing on screen is free.
+        assertTrue(presenter.dismissConversationMessagesImmediately(account, group))
+        assertEquals(1, cancelled.size)
+    }
+
     private fun notification(extras: Bundle? = null) =
         NotificationCompat
             .Builder(context, TEST_CHANNEL)

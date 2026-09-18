@@ -38,7 +38,10 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -87,7 +90,11 @@ fun LoadingScreen(message: String? = null) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.testTag(FULL_SCREEN_LOADING_MESSAGE_TEST_TAG),
+                    // The copy arrives after the indicator has been on screen a while, so announce it.
+                    modifier =
+                        Modifier
+                            .testTag(FULL_SCREEN_LOADING_MESSAGE_TEST_TAG)
+                            .semantics { liveRegion = LiveRegionMode.Polite },
                 )
             }
         }
