@@ -72,11 +72,16 @@ internal enum class SettingsHomeSection(
     @param:StringRes val groupTitleRes: Int? = null,
 ) {
     Profile,
-    AppUpdates,
+
+    /** A newer version is waiting, so the offer sits where a reader lands. */
+    AppUpdateAvailable,
     Account(R.string.account),
     AppPreferences(R.string.app_preferences),
     Support(R.string.support),
     SignOut,
+
+    /** Nothing to install: the check stays reachable, quietly, beside the version it reports on. */
+    AppUpdateControls,
     Version,
 }
 
@@ -285,15 +290,23 @@ private val settingsHomeGroupSections: List<SettingsHomeSection>
 internal fun settingsHomeState(
     hasActiveAccount: Boolean,
     selfUpdateEnabled: Boolean,
+    updateAvailable: Boolean = false,
 ): SettingsHomeState =
     SettingsHomeState(
         sections =
             buildList {
                 if (hasActiveAccount) add(SettingsHomeSection.Profile)
                 // Store-managed builds own updates; off-store redirects violate policy.
-                if (selfUpdateEnabled) add(SettingsHomeSection.AppUpdates)
+                //
+                // An update worth installing is the only thing here a reader has to act on, so it leads.
+                // With nothing to install the same row would be a standing callout for news that never
+                // changes, so it drops to the foot of the screen beside the version it reports on. A
+                // dismissed-but-available update still counts as available: dismissal belongs to the
+                // banner, and Settings should keep offering what the banner stopped interrupting with.
+                if (selfUpdateEnabled && updateAvailable) add(SettingsHomeSection.AppUpdateAvailable)
                 addAll(settingsHomeGroupSections)
                 if (hasActiveAccount) add(SettingsHomeSection.SignOut)
+                if (selfUpdateEnabled && !updateAvailable) add(SettingsHomeSection.AppUpdateControls)
                 add(SettingsHomeSection.Version)
             },
         groups =
@@ -511,6 +524,7 @@ private fun SettingsHomeScreen(
             settingsHomeState(
                 hasActiveAccount = activeAccount != null,
                 selfUpdateEnabled = BuildConfig.SELF_UPDATE_ENABLED,
+                updateAvailable = appState.appUpdateInfo.isUpdateAvailable,
             ),
         account =
             activeAccount?.let { account ->
@@ -641,7 +655,10 @@ internal fun SettingsHomeContent(
                                     onSwitchProfile = onSwitchProfile,
                                 )
                             }
-                        SettingsHomeSection.AppUpdates -> AppUpdateGroup(appUpdateInfo, onAppUpdateAction)
+                        SettingsHomeSection.AppUpdateAvailable ->
+                            AppUpdateGroup(appUpdateInfo, onAppUpdateAction, prominent = true)
+                        SettingsHomeSection.AppUpdateControls ->
+                            AppUpdateGroup(appUpdateInfo, onAppUpdateAction, prominent = false)
                         SettingsHomeSection.Account,
                         SettingsHomeSection.AppPreferences,
                         SettingsHomeSection.Support,
@@ -856,6 +873,7 @@ private fun SettingsHubIcon(
 private fun AppUpdateGroup(
     info: AppUpdateInfo,
     onClick: () -> Unit,
+    prominent: Boolean,
 ) {
     SettingsGroup(modifier = Modifier.padding(top = WhiteNoiseSpacing.FormField).testTag("settings.app_updates")) {
         row("app_updates") { context ->
@@ -864,7 +882,9 @@ private fun AppUpdateGroup(
                 title = stringResource(R.string.app_updates),
                 subtitle = appUpdateSubtitle(info),
                 onClick = onClick,
-                leading = { AppUpdateEmblem() },
+                // The emblem announces something to do. Without an update it would be announcing
+                // that there is nothing to announce.
+                leading = if (prominent) ({ AppUpdateEmblem() }) else null,
             )
         }
     }
