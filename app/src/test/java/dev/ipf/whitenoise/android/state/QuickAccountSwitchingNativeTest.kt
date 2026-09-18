@@ -35,6 +35,7 @@ class QuickAccountSwitchingNativeTest {
                 val app = fixture.appState
                 app.updateQuickAccountSwitching(true)
                 val nativeReads = fixture.directChatListCalls.get()
+                val titleAtTap = app.accountDisplayNameCached(B.accountIdHex)
                 val notices = mutableListOf<String>()
                 var activation: Deferred<Boolean>? = null
                 var accountAtNotice: String? = null
@@ -58,7 +59,7 @@ class QuickAccountSwitchingNativeTest {
                 assertTrue(withTimeout(5_000) { checkNotNull(activation).await() })
                 assertEquals(B.label, app.activeAccountRef)
                 assertEquals(B.label, accountAtNotice)
-                assertEquals(listOf(app.accountDisplayNameCached(B.accountIdHex)), notices)
+                assertEquals(listOf(titleAtTap), notices)
                 assertEquals(nativeReads + 1, fixture.directChatListCalls.get())
             } finally {
                 fixture.close()

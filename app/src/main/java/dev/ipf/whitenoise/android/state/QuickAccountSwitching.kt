@@ -59,6 +59,11 @@ internal fun WhiteNoiseAppState.requestQuickAccountSwitchTo(
     onSwitched: (String) -> Unit,
 ) {
     val target = quickSwitchAvatarAccounts().firstOrNull { it.label == targetLabel } ?: return
+    // Name the account while its presentation is still warm, which is exactly what the avatar the user
+    // tapped was showing. Activation clears cross-account presentation before the local-ready callback,
+    // so resolving the title inside that callback degrades to the account ref and, once the label is an
+    // identity fallback with no cached npub, all the way to the unknown placeholder.
+    val targetTitle = accountDisplayNameCached(target.accountIdHex)
     val runtime = runtimeGeneration
     requestSwitch(target.label) {
         val actual = activeAccount
@@ -69,7 +74,7 @@ internal fun WhiteNoiseAppState.requestQuickAccountSwitchTo(
                 actual.accountIdHex.equals(target.accountIdHex, ignoreCase = true)
         if (runtimeAvailable && sameAccount && actual != null) {
             if (actual.isSignedInSigningAccount() && accountSetup.eligible(actual)) {
-                onSwitched(accountDisplayNameCached(actual.accountIdHex))
+                onSwitched(targetTitle)
             }
         }
     }

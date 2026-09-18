@@ -4,15 +4,15 @@ import android.app.Application
 import android.os.Looper
 import androidx.compose.runtime.remember
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.NotificationBootstrapTestFixture
 import dev.ipf.whitenoise.android.state.updateQuickAccountSwitching
-import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_OTHER_ACCOUNT_AVATARS_TAG
 import dev.ipf.whitenoise.android.ui.chats.ChatListTopBar
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
@@ -62,8 +62,8 @@ class QuickAccountSwitchingTopBarNativeTest {
         try {
             runBlocking { fixture.bootstrap() }
             val app = fixture.appState
-            // Start with a distinct hydrated name. Activation clears cross-account
-            // presentation state before its local-ready callback; the name returns later.
+            // Start with a distinct hydrated name. Activation clears cross-account presentation state
+            // before its local-ready callback, so the notice must carry the name captured at the tap.
             runBlocking {
                 fixture.runWithMainLooperPumping {
                     app.warmProfilePresentationsBlocking(listOf("aa".repeat(32), "bb".repeat(32)))
@@ -89,12 +89,12 @@ class QuickAccountSwitchingTopBarNativeTest {
                     )
                 }
             }
-            composeRule.onNodeWithTag(CHAT_LIST_OTHER_ACCOUNT_AVATARS_TAG).performClick()
+            composeRule.onNodeWithTag(otherAccountAvatarTag("b"), useUnmergedTree = true).performTouchInput { click() }
             composeRule.waitUntil(5_000) {
                 shadowOf(Looper.getMainLooper()).idle()
                 reads.get() == 1
             }
-            composeRule.onNodeWithTag(CHAT_LIST_OTHER_ACCOUNT_AVATARS_TAG).performClick()
+            composeRule.onNodeWithTag(otherAccountAvatarTag("b"), useUnmergedTree = true).performTouchInput { click() }
             composeRule.waitUntil(5_000) {
                 shadowOf(Looper.getMainLooper()).idle()
                 reads.get() >= 2
@@ -107,18 +107,17 @@ class QuickAccountSwitchingTopBarNativeTest {
                 app.activeAccountRef == "b" && ShadowToast.shownToastCount() == 1
             }
             assertEquals(
-                context.getString(R.string.quick_account_switched, "b"),
+                context.getString(R.string.quick_account_switched, "Bea"),
                 ShadowToast.getTextOfLatestToast(),
             )
             composeRule.waitUntil(5_000) {
                 shadowOf(Looper.getMainLooper()).idle()
                 app.accountDisplayNameCached("bb".repeat(32)) == "Bea"
             }
-            // Known presentation limitation: this callback currently uses the account-ref fallback.
-            // This checks current timing and one-notice behavior, not a requirement to discard names;
-            // a future name-preserving activation should update these expectations together.
+            // The name survives the activation window rather than degrading to the account ref, and the
+            // returning presentation neither emits a second notice nor rewrites the first one.
             assertEquals(1, ShadowToast.shownToastCount())
-            assertEquals(context.getString(R.string.quick_account_switched, "b"), ShadowToast.getTextOfLatestToast())
+            assertEquals(context.getString(R.string.quick_account_switched, "Bea"), ShadowToast.getTextOfLatestToast())
         } finally {
             release.countDown()
             fixture.close()
