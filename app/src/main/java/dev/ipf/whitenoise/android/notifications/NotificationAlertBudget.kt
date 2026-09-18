@@ -48,6 +48,7 @@ internal fun notificationAlertDecision(
 class NotificationAlertReservation internal constructor(
     val decision: NotificationAlertDecision,
     internal val accountRef: String,
+    internal val reservedAtMs: Long,
     private val budget: NotificationAlertBudget,
 ) {
     /** The alerting card was written: the ring is spent. */
@@ -55,6 +56,12 @@ class NotificationAlertReservation internal constructor(
 
     /** The card was not written: the ring goes back so the next arrival may take it. */
     fun release() = budget.release(this)
+
+    /**
+     * False once a later alert took the ring while this post was still waiting to write, or once the
+     * claim was settled: the card must then be written silently, and [release] hands the charge back.
+     */
+    fun stillHoldsTheRing(): Boolean = budget.holdsTheRing(this)
 }
 
 /**
@@ -67,12 +74,17 @@ class NotificationAlertBudget(
     val catchUpWindow: NotificationCatchUpWindow = NotificationCatchUpWindow(),
     private val burstWindowMs: Long = NOTIFICATION_ALERT_BURST_WINDOW_MS,
 ) {
+    /** An unsettled alert claim and the state it displaced, so releasing it can put that state back. */
+    private class PendingClaim(
+        val reservation: NotificationAlertReservation,
+        val lastAlertBeforeMs: Long?,
+        val cohortGenerationBefore: Long?,
+    )
+
     private val lock = Any()
     private var lastAlertAtMs: Long? = null
     private val alertedCatchUpGenerations = mutableMapOf<String, Long>()
-    private var pendingAlert: NotificationAlertReservation? = null
-    private var lastAlertBeforePendingMs: Long? = null
-    private var alertedGenerationBeforePending: Long? = null
+    private val pendingClaims = mutableMapOf<String, PendingClaim>()
 
     /** Decides for [accountRef]'s first post being written at [nowMs] and, when it may ring, holds the ring. */
     fun reserve(
@@ -92,30 +104,35 @@ class NotificationAlertBudget(
                     isMention = isMention,
                     burstWindowMs = burstWindowMs,
                 )
-            val reservation = NotificationAlertReservation(decision, accountRef, this)
+            val reservation = NotificationAlertReservation(decision, accountRef, nowMs, this)
             if (decision == NotificationAlertDecision.Alert) {
-                lastAlertBeforePendingMs = lastAlertAtMs
-                alertedGenerationBeforePending = alertedCatchUpGenerations[accountRef]
+                pendingClaims[accountRef] =
+                    PendingClaim(reservation, lastAlertAtMs, alertedCatchUpGenerations[accountRef])
                 lastAlertAtMs = nowMs
                 generation?.let { alertedCatchUpGenerations[accountRef] = it }
-                pendingAlert = reservation
             }
             reservation
         }
 
     internal fun commit(reservation: NotificationAlertReservation) {
         synchronized(lock) {
-            if (pendingAlert === reservation) pendingAlert = null
+            if (pendingClaims[reservation.accountRef]?.reservation === reservation) {
+                pendingClaims.remove(reservation.accountRef)
+            }
         }
     }
 
-    /** Restores the state before the claim, unless a later alert has been reserved since, which then stands. */
+    /**
+     * Puts back what the claim displaced: its account's cohort charge, and the last-alert time unless a
+     * later alert has moved it since. A claim a newer reservation for the same account already replaced
+     * is left alone, and other accounts' claims are never touched.
+     */
     internal fun release(reservation: NotificationAlertReservation) {
         synchronized(lock) {
-            if (pendingAlert !== reservation) return
-            pendingAlert = null
-            lastAlertAtMs = lastAlertBeforePendingMs
-            val previous = alertedGenerationBeforePending
+            val claim = pendingClaims[reservation.accountRef]?.takeIf { it.reservation === reservation } ?: return
+            pendingClaims.remove(reservation.accountRef)
+            if (lastAlertAtMs == reservation.reservedAtMs) lastAlertAtMs = claim.lastAlertBeforeMs
+            val previous = claim.cohortGenerationBefore
             if (previous == null) {
                 alertedCatchUpGenerations.remove(reservation.accountRef)
             } else {
@@ -123,4 +140,10 @@ class NotificationAlertBudget(
             }
         }
     }
+
+    internal fun holdsTheRing(reservation: NotificationAlertReservation): Boolean =
+        synchronized(lock) {
+            pendingClaims[reservation.accountRef]?.reservation === reservation &&
+                lastAlertAtMs == reservation.reservedAtMs
+        }
 }

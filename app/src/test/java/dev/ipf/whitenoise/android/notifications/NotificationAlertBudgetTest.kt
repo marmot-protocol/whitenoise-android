@@ -179,6 +179,49 @@ class NotificationAlertBudgetTest {
         )
     }
 
+    /** Releasing one account's unsettled claim does not disturb another account's later claim. */
+    @Test
+    fun releasingOneAccountsClaimLeavesAnotherAccountsAlertStanding() {
+        val window = NotificationCatchUpWindow(clock = { 0L })
+        val budget = NotificationAlertBudget(catchUpWindow = window)
+        val now = 1_000_000_000_000L
+
+        window.open()
+        val first = budget.reserve(nowMs = now, isMention = false, accountRef = "a")
+        val second = budget.reserve(nowMs = now + 1_000L, isMention = false, accountRef = "b")
+        assertEquals(NotificationAlertDecision.Alert, first.decision)
+        assertEquals(NotificationAlertDecision.Alert, second.decision)
+        first.release()
+        assertEquals(
+            "the released account may ring again for this cohort",
+            NotificationAlertDecision.Alert,
+            budget.reserve(nowMs = now + 2_000L, isMention = false, accountRef = "a").decision,
+        )
+        assertEquals(
+            "the other account's claim still stands",
+            NotificationAlertDecision.SilentCatchUp,
+            budget.reserve(nowMs = now + 3_000L, isMention = false, accountRef = "b").decision,
+        )
+    }
+
+    /** A claim that a later alert overtook no longer holds the ring, and releasing it keeps the later alert. */
+    @Test
+    fun aLaterAlertSupersedesAnUnsettledClaim() {
+        val budget = NotificationAlertBudget(catchUpWindow = NotificationCatchUpWindow(clock = { 0L }))
+        val now = 1_000_000_000_000L
+
+        val stale = budget.reserve(nowMs = now, isMention = false, accountRef = "a")
+        assertEquals(true, stale.stillHoldsTheRing())
+        budget.reserve(nowMs = now + 20_000L, isMention = false, accountRef = "b").commit()
+        assertEquals(false, stale.stillHoldsTheRing())
+        stale.release()
+        assertEquals(
+            "the later alert still opens a burst window",
+            NotificationAlertDecision.SilentBurst,
+            budget.reserve(nowMs = now + 21_000L, isMention = false, accountRef = "a").decision,
+        )
+    }
+
     /** An alert written between cohorts does not charge the next cohort. */
     @Test
     fun liveAlertsDoNotChargeTheNextCohort() {

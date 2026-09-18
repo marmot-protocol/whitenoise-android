@@ -676,7 +676,8 @@ class LocalNotificationPresenter(
                                             ),
                                         )
                                     }
-                                    val notification = builder.build()
+                                    val notification =
+                                        builder.silencedIfSuperseded(heldAlert, replaceCurrentMessage).build()
                                     ConversationCardPostSynchronizer.awaitTestBarrier(
                                         ConversationCardOp.SHOW_NOTIFY,
                                         ConversationCardBarrier.BEFORE_WRITE,
@@ -723,7 +724,8 @@ class LocalNotificationPresenter(
                                                     newMessageTimestampMs = presentationTimestampMs,
                                                 ),
                                             )
-                                            val cleanNotification = builder.build()
+                                            val cleanNotification =
+                                                builder.silencedIfSuperseded(heldAlert, replaceCurrentMessage).build()
                                             val retrySucceeded =
                                                 postNotificationSafely(
                                                     notificationManager,
@@ -761,7 +763,8 @@ class LocalNotificationPresenter(
                                     }
                                     val presentationTimestampMs = nowMillis()
                                     stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
-                                    val notification = builder.build()
+                                    val notification =
+                                        builder.silencedIfSuperseded(heldAlert, replaceCurrentMessage).build()
                                     ConversationCardPostSynchronizer.awaitTestBarrier(
                                         ConversationCardOp.SHOW_NOTIFY,
                                         ConversationCardBarrier.BEFORE_WRITE,
@@ -1027,6 +1030,20 @@ class LocalNotificationPresenter(
         }
         existing.historicMessages.forEach { message -> enriched.addHistoricMessage(message) }
         return enriched
+    }
+
+    /**
+     * Applies the silent flags at write time when a later alert took the ring while this post was still
+     * waiting for its pacer slot or card lock, and hands the claim back so the account may ring later.
+     */
+    private fun NotificationCompat.Builder.silencedIfSuperseded(
+        heldAlert: NotificationAlertReservation?,
+        replaceCurrentMessage: Boolean,
+    ): NotificationCompat.Builder {
+        if (heldAlert == null || heldAlert.stillHoldsTheRing()) return this
+        notificationDebug { "silent first post reason=Superseded" }
+        heldAlert.release()
+        return setOnlyAlertOnce(true).setSilent(!replaceCurrentMessage)
     }
 
     /** Writes one card and reports success without allowing observer failures to alter delivery. */

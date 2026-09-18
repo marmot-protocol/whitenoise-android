@@ -35,6 +35,7 @@ class LocalNotificationPresenterCatchUpCohortTest {
     private var now = 1_700_000_000_000L
     private var elapsed = 0L
     private val catchUpWindow = NotificationCatchUpWindow(clock = { elapsed })
+    private val budget = NotificationAlertBudget(catchUpWindow)
     private lateinit var presenter: LocalNotificationPresenter
 
     /** Grants the permission, pins the clocks, records every write and opens one catch-up cohort. */
@@ -46,7 +47,7 @@ class LocalNotificationPresenterCatchUpCohortTest {
             LocalNotificationPresenter(
                 context = context,
                 nowMillis = { now },
-                alertBudget = NotificationAlertBudget(catchUpWindow),
+                alertBudget = budget,
                 notificationPoster = { notificationManager, tag, id, notification ->
                     posted += Triple(tag, id, notification)
                     notificationManager.notify(tag, id, notification)
@@ -132,5 +133,31 @@ class LocalNotificationPresenterCatchUpCohortTest {
             now += 1_000
             assertTrue(presenter.show(alertBudgetUpdate("next", now), shortNpub = { it }))
             assertFalse("the released ring goes to the next card", posted.single().third.isOnlyAlertOnce())
+        }
+
+    /** A ring taken by another account while this post waited makes this card silent and frees its account. */
+    @Test
+    fun aClaimSupersededWhileWaitingPostsSilently() =
+        runBlocking {
+            ConversationCardPostSynchronizer.testHook =
+                object : ConversationCardTestHook {
+                    override fun onBarrier(
+                        op: ConversationCardOp,
+                        barrier: ConversationCardBarrier,
+                        notificationTag: String,
+                        notificationId: Int,
+                    ) {
+                        if (op == ConversationCardOp.SHOW_NOTIFY && barrier == ConversationCardBarrier.AFTER_REGISTER) {
+                            ConversationCardPostSynchronizer.testHook = null
+                            budget.reserve(nowMs = now + 20_000, isMention = false, accountRef = "account-b").commit()
+                        }
+                    }
+                }
+            assertTrue(presenter.show(alertBudgetUpdate("waited", now), shortNpub = { it }))
+            assertTrue("the overtaken card must not ring twice in a row", posted.single().third.isOnlyAlertOnce())
+
+            now += 1_000
+            assertTrue(presenter.show(alertBudgetUpdate("next", now), shortNpub = { it }))
+            assertFalse("the account never rang for this cohort, so it may now", posted.last().third.isOnlyAlertOnce())
         }
 }
