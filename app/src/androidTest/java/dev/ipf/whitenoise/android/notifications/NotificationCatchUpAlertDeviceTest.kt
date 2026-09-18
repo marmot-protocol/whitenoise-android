@@ -31,7 +31,7 @@ import org.junit.runner.RunWith
 /**
  * Device evidence for #1579: as seen by a NotificationListenerService, a catch-up cohort gets one
  * sound and vibration opportunity, later cards of the cohort arrive with the alert-once flag, and a
- * live message after catch-up settles alerts normally again.
+ * live message right after catch-up settles alerts normally again, well inside the live-burst window.
  */
 @PullRequestDeviceSmoke
 @RunWith(AndroidJUnit4::class)
@@ -94,8 +94,7 @@ class NotificationCatchUpAlertDeviceTest {
             LocalNotificationPresenter(
                 context = context,
                 shortcutPublisher = { },
-                // A short burst window keeps the live card outside the burst that the cohort's ring opened.
-                alertBudget = NotificationAlertBudget(catchUpWindow, burstWindowMs = BURST_WINDOW_MS),
+                alertBudget = NotificationAlertBudget(catchUpWindow),
             )
         presenter.ensureChannels()
         NotificationTimingDeviceEvents.arm(context.packageName, target.tag, target.id)
@@ -179,7 +178,6 @@ class NotificationCatchUpAlertDeviceTest {
         const val ACCOUNT_REF = "catch-up-account"
         const val GROUP_ID_HEX = "catch-up-group"
         const val CATCH_UP_TAIL_MS = 300L
-        const val BURST_WINDOW_MS = 200L
         const val TAIL_SETTLE_MS = 100L
         const val LISTENER_CONNECT_TIMEOUT_MS = 15_000L
         const val LISTENER_POST_TIMEOUT_MS = 5_000L

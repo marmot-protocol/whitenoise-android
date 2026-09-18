@@ -58,7 +58,7 @@ class LocalNotificationPresenterAlertBudgetTest {
         presenter.ensureChannels()
     }
 
-    /** Coming back online writes every backlog card and rings for the first one only, mention or not. */
+    /** Coming back online writes every backlog card, rings once, and a live card soon after rings again. */
     @Test
     fun reconnectBacklogRingsOnce() =
         runBlocking {
@@ -78,7 +78,8 @@ class LocalNotificationPresenterAlertBudgetTest {
             }
             catchUpWindow.close()
             elapsed += NOTIFICATION_CATCH_UP_TAIL_MS + 1
-            now += 20_000
+            // Inside what would be the burst window of the cohort's ring: it must still ring.
+            now += 6_000
             assertTrue(
                 presenter.show(alertBudgetUpdate(messageIdHex = "live", timestampMs = now), shortNpub = { it }),
             )

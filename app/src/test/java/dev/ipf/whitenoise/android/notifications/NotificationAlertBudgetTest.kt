@@ -222,6 +222,32 @@ class NotificationAlertBudgetTest {
         )
     }
 
+    /** A cohort's ring never opens a live burst window: a live message 5 to 10 s later still rings. */
+    @Test
+    fun aLiveMessageRightAfterCatchUpRingsInsideTheOldBurstWindow() {
+        var elapsed = 0L
+        val window = NotificationCatchUpWindow(clock = { elapsed })
+        val budget = NotificationAlertBudget(catchUpWindow = window)
+        val now = 1_000_000_000_000L
+
+        window.open()
+        budget.reserve(nowMs = now, isMention = false, accountRef = "a").commit()
+        window.close()
+        elapsed += NOTIFICATION_CATCH_UP_TAIL_MS + 1L
+        val live = budget.reserve(nowMs = now + 6_000L, isMention = false, accountRef = "a")
+        assertEquals(
+            "the cohort is over and its ring did not start a burst",
+            NotificationAlertDecision.Alert,
+            live.decision,
+        )
+        live.commit()
+        assertEquals(
+            "the live ring does start one",
+            NotificationAlertDecision.SilentBurst,
+            budget.reserve(nowMs = now + 7_000L, isMention = false, accountRef = "a").decision,
+        )
+    }
+
     /** An alert written between cohorts does not charge the next cohort. */
     @Test
     fun liveAlertsDoNotChargeTheNextCohort() {
