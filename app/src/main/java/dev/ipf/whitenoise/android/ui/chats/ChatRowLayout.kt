@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
@@ -34,19 +35,29 @@ import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.offset
+import dev.ipf.whitenoise.android.state.OutgoingMessageIndicator
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.common.FailedDeliveryBadge
 import dev.ipf.whitenoise.android.ui.common.InvitationBadge
 import dev.ipf.whitenoise.android.ui.common.ManualUnreadDot
 import dev.ipf.whitenoise.android.ui.common.UnreadCountBadge
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
+import dev.ipf.whitenoise.android.ui.common.chatRowBadgeDiameter
 import dev.ipf.whitenoise.android.ui.common.rememberedRelativeTime
 import dev.ipf.whitenoise.android.ui.common.selectionRowIcon
+import dev.ipf.whitenoise.android.ui.conversation.messages.OutgoingIndicatorIcon
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 
 internal const val CHAT_ROW_SELECTION_INDICATOR_TAG = "chat-row-selection-indicator"
 
 private val ChatRowContentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+
+/**
+ * The text column's floor. The row's own height comes from its [ListItem], whose minimum is larger than
+ * this; the prototype's 68-72 dp row would mean taking the row off ListItem, as the pre-port list did
+ * with a plain Row and `heightIn(min = 72.dp)`.
+ */
+private val ChatRowMinimumHeight = 72.dp
 
 /** Native prototype list item with the production selection and metadata visibility contract. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -130,8 +141,8 @@ internal fun ChatRowLayout(
 /**
  * Adapted from pinned prototype ChatListRow.kt. One content slot avoids Material's inherited supporting
  * baseline query during lazy reuse. Only the direct title/time Text baselines are read. Production's
- * preview can include a delivery Row; its measured height, rather than that container's inherited
- * baseline, selects the 72/88 dp minimum and leaves large fonts free to grow.
+ * preview can include a delivery Row; the row keeps one minimum height and lets a large font or a
+ * two-line search snippet grow past it on its measured height rather than an inherited baseline.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming", "LongMethod")
@@ -183,7 +194,7 @@ private fun ChatRowTextLayout(
                     maxOf(name.width + iconGap + icons.width + timeSpace, message.width + badgeSpace),
                 )
             }
-        val minimumHeight = if (message.height > name.height) 88.dp else 72.dp
+        val minimumHeight = ChatRowMinimumHeight
         val contentMinimum =
             (minimumHeight - padding.calculateTopPadding() - padding.calculateBottomPadding()).roundToPx()
         val height = constraints.constrainHeight(maxOf(textHeight, contentMinimum))
@@ -209,7 +220,7 @@ internal fun ChatRowSupportingMetadata(
     actionColors: AccountActionColors?,
     pinned: Boolean,
     evicted: Boolean = false,
-    deliveryFailed: Boolean = false,
+    deliveryIndicator: OutgoingMessageIndicator? = null,
 ) {
     if (pendingConfirmation) {
         InvitationBadge(actionColors = actionColors)
@@ -220,7 +231,11 @@ internal fun ChatRowSupportingMetadata(
         ) {
             if (pinned) PinnedBadge()
             if (evicted) EvictedLabel()
-            if (deliveryFailed) FailedDeliveryBadge()
+            when (deliveryIndicator) {
+                null -> Unit
+                OutgoingMessageIndicator.Failed -> FailedDeliveryBadge()
+                else -> ChatRowDeliveryGlyph(deliveryIndicator)
+            }
             if (rowHasUnread) {
                 if (unreadMention) MentionBadge()
                 if (rowUnreadCount > 0uL) {
@@ -230,6 +245,19 @@ internal fun ChatRowSupportingMetadata(
                 }
             }
         }
+    }
+}
+
+/**
+ * The bubble's own delivery glyph at row-metadata weight: the pending clock while sending, the filled
+ * check disc once sent. Reused rather than redrawn so a row and its conversation never disagree about
+ * what a message's state looks like.
+ */
+@Suppress("FunctionNaming")
+@Composable
+private fun ChatRowDeliveryGlyph(indicator: OutgoingMessageIndicator) {
+    Box(Modifier.size(chatRowBadgeDiameter()), contentAlignment = Alignment.Center) {
+        OutgoingIndicatorIcon(indicator, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
