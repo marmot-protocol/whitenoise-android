@@ -71,6 +71,22 @@ class ChatRowDeliveryIndicatorTest {
         composeRule.onNodeWithContentDescription(context.getString(R.string.sending)).assertDoesNotExist()
     }
 
+    /**
+     * A deleted last message has no delivery worth reporting: the row must not keep showing a tick for
+     * something that is no longer there.
+     */
+    @Test
+    fun aDeletedLastMessageShowsNoDeliveryGlyph() {
+        render(
+            ChatRowPortFixtures.item(
+                delivery = ChatListMessageDeliveryStateFfi.DELIVERED,
+                deletedLastMessage = true,
+            ),
+        )
+        composeRule.onNodeWithContentDescription(context.getString(R.string.sent)).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.sending)).assertDoesNotExist()
+    }
+
     private fun render(item: ChatListItem) = renderState { item }
 
     private fun renderState(item: () -> ChatListItem) {

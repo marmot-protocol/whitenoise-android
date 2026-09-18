@@ -52,7 +52,11 @@ internal const val CHAT_ROW_SELECTION_INDICATOR_TAG = "chat-row-selection-indica
 
 private val ChatRowContentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
 
-/** The prototype list row. One preview line, so no second minimum is needed for a taller preview. */
+/**
+ * The text column's floor. The row's own height comes from its [ListItem], whose minimum is larger than
+ * this; the prototype's 68-72 dp row would mean taking the row off ListItem, as the pre-port list did
+ * with a plain Row and `heightIn(min = 72.dp)`.
+ */
 private val ChatRowMinimumHeight = 72.dp
 
 /** Native prototype list item with the production selection and metadata visibility contract. */

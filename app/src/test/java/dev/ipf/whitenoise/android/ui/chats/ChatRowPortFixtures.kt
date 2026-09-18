@@ -41,6 +41,7 @@ internal object ChatRowPortFixtures {
         retentionSeconds: ULong = 0uL,
         delivery: ChatListMessageDeliveryStateFfi = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
         pending: Boolean = false,
+        deletedLastMessage: Boolean = false,
     ): ChatListItem {
         val group =
             groupRecord(membership).copy(
@@ -72,7 +73,7 @@ internal object ChatRowPortFixtures {
                             ),
                         kind = 9uL,
                         timelineAt = (System.currentTimeMillis() / 1000).toULong(),
-                        deleted = false,
+                        deleted = deletedLastMessage,
                         attachmentKind = null,
                         attachmentCount = 0u,
                         groupSystem = null,
