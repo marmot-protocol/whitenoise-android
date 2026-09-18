@@ -60,6 +60,12 @@ class MessageEditsTest {
     }
 
     @Test
+    fun ordinaryPageHasNoEdits() {
+        val records = List(200) { chat("message-$it", "alice", "body", it.toULong()) }
+        assertTrue(aggregateEdits(records).isEmpty())
+    }
+
+    @Test
     fun singleEditPicksUpLatestText() {
         val records =
             listOf(

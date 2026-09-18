@@ -36,6 +36,9 @@ internal fun orderTimelineMessagesForDisplay(messages: List<TimelineMessage>): L
             .sortedWith(compareBy<TimelineMessage> { it.authoritativeOrder }.thenBy { it.id })
             .toMutableList()
     val overlays = distinct.filter { it.authoritativeOrder == null }
+    if (overlays.isEmpty()) {
+        return authoritative
+    }
     val messageIds = distinct.mapTo(mutableSetOf()) { it.displayMessageIdHex() }
     val anchoredOverlays =
         overlays.filter { overlay ->
