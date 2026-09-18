@@ -94,6 +94,10 @@ class LocalNotificationPresenter(
         notificationEnrichmentScope.launch { block() }
     },
     private val quickReactionChoices: () -> List<String> = { notificationQuickReactionChoices(context) },
+    private val notificationCanceller: (NotificationManagerCompat, String, Int) -> Unit = { manager, tag, id ->
+        manager.cancel(tag, id)
+    },
+    private val postPacer: NotificationPostPacer = NotificationPostPacer.shared,
     private val activeNotificationsProvider: (NotificationManager) -> Array<StatusBarNotification> = { manager ->
         manager.activeNotifications
     },
@@ -162,8 +166,11 @@ class LocalNotificationPresenter(
         val mention = LocalNotificationFormatter.mentionDismissalKey(accountRef, groupIdHex)
         val agentActivity = LocalNotificationFormatter.agentActivityDismissalKey(accountRef, groupIdHex)
         val groupMembership = LocalNotificationFormatter.groupMembershipDismissalKey(accountRef, groupIdHex)
+        // Android rate-limits cancels of cards that are not on screen exactly like posts, and a visible
+        // conversation dismisses on every update, so only keys with a live card reach the platform. The
+        // dismissal generation still advances for every key so an in-flight post cannot resurrect one.
         listOf(message, reaction, mention, agentActivity, groupMembership).forEach { key ->
-            cancelSynchronized(manager, key.tag, key.id)
+            cancelSynchronized(manager, key.tag, key.id, onlyIfLive = true)
         }
         dismissInvitesForGroup(accountRef, groupIdHex)
         notificationDebug { "dismissed group=${groupIdHex.take(8)}" }
@@ -547,6 +554,9 @@ class LocalNotificationPresenter(
                 }
             }
 
+            // Reserve a write slot before the serialized write so a burst of updates for one busy
+            // conversation never exceeds the platform's per-app notification rate limit.
+            postPacer.awaitSlot()
             val notificationManager = NotificationManagerCompat.from(context)
             val posted =
                 withContext(Dispatchers.Default) {
@@ -983,14 +993,35 @@ class LocalNotificationPresenter(
             false
         }
 
+    /**
+     * Cancels one card under its lock. With [onlyIfLive] the platform cancel is skipped for a card that is
+     * not on screen, checked inside the lock so a post that lands first is still removed; the dismissal
+     * generation advances either way so an in-flight post for the key cannot resurrect it afterwards.
+     */
     private fun cancelSynchronized(
         manager: NotificationManagerCompat,
         tag: String,
         id: Int,
+        onlyIfLive: Boolean = false,
     ) {
         ConversationCardPostSynchronizer.withLock(tag, id, ConversationCardOp.DISMISS_CANCEL) {
             ConversationCardPostSynchronizer.markDismissed(tag, id)
-            manager.cancel(tag, id)
+            if (!onlyIfLive || cardIsLive(tag, id)) notificationCanceller(manager, tag, id)
+        }
+    }
+
+    /** Whether the platform currently shows this card; a failed read counts as live so the cancel still goes out. */
+    private fun cardIsLive(
+        tag: String,
+        id: Int,
+    ): Boolean {
+        val manager = context.getSystemService(NotificationManager::class.java) ?: return true
+        return try {
+            activeNotificationsProvider(manager).any { it.tag == tag && it.id == id }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Throwable) {
+            true
         }
     }
 

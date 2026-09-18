@@ -442,6 +442,25 @@ class LocalNotificationDismissalTest {
             }.build()
     }
 
+    /** Only cards on screen reach the platform's cancel; absent siblings would count against the rate limit. */
+    @Test
+    fun dismissOnlyCancelsCardsThatAreOnScreen() {
+        val account = "account-live"
+        val group = "group-live"
+        val messageKey = LocalNotificationFormatter.conversationDismissalKey(account, group)
+        manager.notify(messageKey.tag, messageKey.id, notification())
+        val cancelled = mutableListOf<Pair<String, Int>>()
+        val presenter =
+            LocalNotificationPresenter(
+                context,
+                notificationCanceller = { _, tag, id -> cancelled += tag to id },
+            )
+
+        assertTrue(presenter.dismissConversationMessagesImmediately(account, group))
+
+        assertEquals(listOf(messageKey.tag to messageKey.id), cancelled)
+    }
+
     private fun notification(extras: Bundle? = null) =
         NotificationCompat
             .Builder(context, TEST_CHANNEL)
