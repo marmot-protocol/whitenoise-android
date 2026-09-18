@@ -1750,7 +1750,7 @@ internal class ConversationDictationController internal constructor(
         }
     }
 
-    /** Bounds exact-chunk recovery after completion so Paste/Send cannot spin until the drain watchdog. */
+    /** Bounds exact-chunk recovery, then completes safe accumulated text through the chosen action. */
     private fun retryRetainedCallerAudioOrFail(
         sessionId: Long,
         target: ConversationDictationTarget,
@@ -1760,9 +1760,9 @@ internal class ConversationDictationController internal constructor(
         if (retainedCallerAudioRetries > MAX_RETAINED_CALLER_AUDIO_RETRIES) {
             conversationDictationDiagnostic(
                 "event=caller_audio_retry_exhausted failure=${failure.name} " +
-                    "attempts=$retainedCallerAudioRetries",
+                    "attempts=$retainedCallerAudioRetries action=finalize",
             )
-            failOrRetainTranscript(sessionId, target, failure)
+            finalizeAccumulatedTranscript(sessionId, target)
         } else {
             conversationDictationDiagnostic(
                 "event=caller_audio_retry_scheduled failure=${failure.name} " +
