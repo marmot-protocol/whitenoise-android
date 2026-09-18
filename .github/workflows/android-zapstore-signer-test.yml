@@ -1,0 +1,37 @@
+name: Android Zapstore - Signer Test (NO publication)
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: android-zapstore-publication
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  signer-test:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: zapstore-production
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.24.11'
+          cache: false
+      - name: Install fixture APK tooling
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
+      - name: Test remote signing without uploads or publication
+        env:
+          SIGN_WITH: ${{ secrets.ZAPSTORE_SIGN_WITH }}
+          BUNKER_CLIENT_KEY: ${{ secrets.ZAPSTORE_BUNKER_CLIENT_KEY }}
+        run: bash scripts/test-zapstore-signer.sh

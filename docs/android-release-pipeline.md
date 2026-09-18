@@ -325,6 +325,30 @@ CI artifacts expire after 30 days; retain approved release evidence separately.
 
 ## Public Zapstore publication
 
+### Test the real signer without publishing
+
+Dispatch **Android Zapstore - Signer Test (NO publication)**
+(`android-zapstore-signer-test.yml`) on `master`, then approve the existing
+`zapstore-production` environment. It uses `ZAPSTORE_SIGN_WITH` and the existing
+`ZAPSTORE_BUNKER_CLIENT_KEY`; the first connection can consume the bunker invitation.
+Keep the signer available and allow `get_public_key` plus `sign_event` for kinds
+3063, 30063, 32267 and 24242.
+
+The test signs a disposable `invalid.example.zspfixture` APK listing through the
+pinned ZSP binary with `--offline`. It verifies event IDs, Schnorr signatures and
+the pinned publisher, then reconnects with the same CI client without the
+invitation secret and signs an already-expired fixture upload authorization.
+No Blossom upload or public release publication is invoked. Raw signed events,
+connection URLs and remote errors are withheld; the log contains only public
+client/publisher keys and test results. This proves signer access and permissions,
+not candidate qualification, certificate linking, upload success or updater behavior.
+
+```bash
+gh workflow run android-zapstore-signer-test.yml --ref master
+```
+
+### Publish the reviewed candidate
+
 This step makes the release public. Do not use it for a build rehearsal.
 
 1. Complete candidate qualification and the preliminary release decision.

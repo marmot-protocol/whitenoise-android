@@ -1,19 +1,17 @@
 #!/usr/bin/env bash
-# Real publisher contract test using a synthetic APK and loopback-only signer.
+# Contact the real bunker, but sign only an invalid.example APK fixture offline.
+# Never print connection URLs, client secrets, or signed event payloads.
 set -euo pipefail
 repo_dir="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=scripts/release-properties.sh
 source "$repo_dir/scripts/release-properties.sh"
-[[ "$(release_property ZSP_VERSION)" == 0.4.17 ]] || {
-  echo 'Update the rehearsal source pin with the ZSP binary pin' >&2; exit 1;
-}
+[[ "${SIGN_WITH:-}" == bunker://* ]] || { echo 'Missing bunker connection'; exit 1; }
+[[ "${BUNKER_CLIENT_KEY:-}" =~ ^[0-9a-fA-F]{64}$ ]] || { echo 'Invalid client key'; exit 1; }
+[[ "$(release_property ZSP_VERSION)" == 0.4.17 ]] || { echo 'Update signer test source pin'; exit 1; }
+umask 077
 temporary_dir="$(mktemp -d)"
 trap 'rm -rf "$temporary_dir"' EXIT
-receipt="${1:-$repo_dir/build/reports/zsp-offline.json}"
-mkdir -p "$(dirname "$receipt")"
-receipt="$(cd "$(dirname "$receipt")" && pwd)/$(basename "$receipt")"
 bash "$repo_dir/scripts/install-zsp.sh" "$temporary_dir/zsp"
-# Fetch the exact commit behind ZSP v0.4.17 for its checksummed Go dependencies.
 git -C "$temporary_dir" init -q source
 git -C "$temporary_dir/source" fetch -q --depth 1 https://github.com/zapstore/zsp.git c50c1ccbf32d7fa6ae00f74990ce2c83f3bac6a1
 git -C "$temporary_dir/source" checkout -q --detach FETCH_HEAD
@@ -31,18 +29,15 @@ keytool -genkeypair -alias fixture -keystore "$temporary_dir/fixture.jks" \
   -keyalg RSA -validity 1 >/dev/null 2>&1
 "$sdk_dir/build-tools/36.0.0/apksigner" sign --ks "$temporary_dir/fixture.jks" \
   --ks-pass pass:disposable-fixture --out "$temporary_dir/fixture.apk" "$temporary_dir/unsigned.apk"
-fixture_fingerprint="$(keytool -exportcert -alias fixture -keystore "$temporary_dir/fixture.jks" \
-  -storepass disposable-fixture | python3 -c 'import hashlib, sys; print(hashlib.sha256(sys.stdin.buffer.read()).hexdigest())')"
-# Match production verification: prefer PATH, otherwise the newest installed
-# build-tools path. Using only 36.0.0 here missed newer scheme-prefixed labels.
-apksigner_bin="$(command -v apksigner || find "$sdk_dir/build-tools" -mindepth 2 -maxdepth 2 \
-  -type f -name apksigner | sort | tail -1)"
-printf 'Verifying fixture with %s\n' "$apksigner_bin"
-python3 "$repo_dir/scripts/verify_apk_signature.py" "$apksigner_bin" \
-  "$temporary_dir/fixture.apk" "$fixture_fingerprint" >/dev/null
+# Compile before opening the connection so the invitation is consumed only by
+# the runtime using the persistent CI client key.
 (
   cd "$temporary_dir/source"
-  GOWORK=off go test "$repo_dir/scripts/test-zapstore-signer.go" "$repo_dir/scripts/test-zapstore-signer_test.go" >&2
-  GOWORK=off go run "$repo_dir/scripts/rehearse-zsp.go" "$temporary_dir/zsp" "$temporary_dir/fixture.apk"
-) > "$receipt"
-cat "$receipt"
+  GOWORK=off go build -o "$temporary_dir/test-signer" "$repo_dir/scripts/test-zapstore-signer.go"
+)
+export EXPECTED_PUBLISHER
+EXPECTED_PUBLISHER="$(release_property ZAPSTORE_PUBLISHER_PUBKEY)"
+"$temporary_dir/test-signer" "$temporary_dir/zsp" "$temporary_dir/fixture.apk"
+if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+  printf 'Verified pinned ZSP offline signatures for kinds 3063, 30063, 32267; verified a separate expired kind 24242 upload-auth signature. Persistent CI client reused. No files uploaded and no release events published.\n' >> "$GITHUB_STEP_SUMMARY"
+fi
