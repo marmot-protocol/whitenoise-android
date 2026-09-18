@@ -1785,6 +1785,27 @@ class ConversationDictationControllerTest {
         }
     }
 
+    /** A pipe stall that pre-requeues the chunk still consumes the same bounded completion budget. */
+    @Test
+    fun stopBoundsAlternatingNoSpeechAndPreRequeuedDisconnects() {
+        val fixture = fixture(draft = TextFieldValue(""))
+        fixture.platform.pendingCallerAudio = true
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onResult("first")
+        fixture.scheduler.runDelay(250L)
+        fixture.controller.paste()
+
+        fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+        fixture.platform.session.callerAudioRetryAvailable = false
+        fixture.platform.listener.onError(ConversationDictationFailure.ProviderDisconnected)
+        fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+
+        assertEquals("first", fixture.drafts.getValue(key()).text)
+        assertEquals(4, fixture.platform.sessions.size)
+        assertFalse(fixture.controller.hasDurableSession)
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+    }
+
     /** Retry exhaustion keeps an explicit Send instead of diverting the transcript to the pen. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
@@ -3874,6 +3895,7 @@ class ConversationDictationControllerTest {
         var acknowledgedCallerAudio = 0
         var retriedCallerAudio = 0
         var callerAudioHasSpeech = true
+        var callerAudioRetryAvailable = callerAudioOwned
         private val captureFinished = mutableListOf<() -> Unit>()
         private var captureClosed = false
         private var deferredProviderError: ConversationDictationFailure? = null
@@ -3958,7 +3980,7 @@ class ConversationDictationControllerTest {
 
         /** Tracks exact-chunk retry so blank and failed finals cannot consume retained PCM. */
         override fun retryCallerAudio(): Boolean {
-            if (!callerAudioOwned) return false
+            if (!callerAudioOwned || !callerAudioRetryAvailable) return false
             retriedCallerAudio += 1
             return true
         }

@@ -1700,13 +1700,9 @@ internal class ConversationDictationController internal constructor(
                         retainedCallerAudio || runCatching(platform::callerAudioHasPending).getOrDefault(false)
                     when {
                         finishRequested &&
-                            retainedCallerAudio &&
-                            failure.canRetryRetainedCallerAudio ->
-                            retryRetainedCallerAudioOrFail(sessionId, target, failure)
-                        finishRequested &&
                             callerAudioPending &&
                             failure.canRetryRetainedCallerAudio ->
-                            continueOrFinalizeCallerAudioDrain(sessionId, target)
+                            retryRetainedCallerAudioOrFail(sessionId, target, failure)
                         finishRequested -> failOrRetainTranscript(sessionId, target, failure)
                         error == ConversationDictationFailure.NoSpeech ->
                             restartAfterNoSpeech(sessionId, target, readyAt)
