@@ -142,7 +142,7 @@ internal class ConversationDictationCallerAudio internal constructor(
         }
         conversationDictationDiagnostic(
             "event=caller_audio_started sample_rate=$CALLER_AUDIO_SAMPLE_RATE_HZ " +
-                "channels=$CALLER_AUDIO_CHANNEL_COUNT encoding=pcm16 chunk_seconds=10-30 buffer_seconds=90",
+                "channels=$CALLER_AUDIO_CHANNEL_COUNT encoding=pcm16 chunk_seconds=2-30 buffer_seconds=90",
         )
         thread(name = "dictation-caller-audio-capture", isDaemon = true, block = ::capture)
         return true
@@ -355,7 +355,7 @@ internal class ConversationDictationCallerAudio internal constructor(
     }
 }
 
-private const val MIN_SENTENCE_CHUNK_SECONDS = 10
+private const val MIN_SENTENCE_CHUNK_SECONDS = 2
 private const val MIN_SENTENCE_CHUNK_BYTES =
     CALLER_AUDIO_SAMPLE_RATE_HZ * BYTES_PER_FRAME * MIN_SENTENCE_CHUNK_SECONDS
 private const val SENTENCE_BOUNDARY_SILENCE_MILLIS = 500L

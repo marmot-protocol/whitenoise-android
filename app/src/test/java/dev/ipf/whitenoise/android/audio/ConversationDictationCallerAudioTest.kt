@@ -148,6 +148,45 @@ class ConversationDictationCallerAudioTest {
         }
     }
 
+    /** A short utterance is sealed at its quiet boundary instead of accumulating a long silent tail. */
+    @Test
+    fun shortUtteranceSealsAfterQuietGapWithoutTenSecondTail() {
+        val clock = FakeElapsedRealtime()
+        val device = ShortUtteranceGapCaptureDevice(clock)
+        val writes = CopyOnWriteArrayList<Int>()
+        val buffer =
+            ConversationDictationAudioChunkBuffer(
+                sessionId = 6L,
+                chunkBytes = 960_000,
+                maxBufferedBytes = 2_880_000,
+            )
+        val capture =
+            callerAudio(
+                device = device,
+                buffer = buffer,
+                writer =
+                    ConversationDictationAudioPipeWriter { _, _, _, length ->
+                        writes += length
+                        length
+                    },
+                elapsedRealtime = clock::now,
+            )
+        val stream = checkNotNull(capture.openProviderStream())
+        try {
+            assertTrue(stream.start())
+            assertTrue(device.waitingForEnd.await(2, TimeUnit.SECONDS))
+            await { writes.isNotEmpty() }
+
+            assertEquals(listOf(80_000), writes)
+            assertEquals(true, stream.containsSpeech())
+        } finally {
+            device.allowEnd.countDown()
+            stream.cancel()
+            stream.closeProviderEnd()
+            capture.discard {}
+        }
+    }
+
     /** Continuous speech stays in one chunk until 500 ms of actual quiet, with every read in progress. */
     @Test
     fun continuousSpeechSealsOnlyAfterQuietGapAndReportsEveryRead() {
@@ -315,6 +354,48 @@ class ConversationDictationCallerAudioTest {
 
         override fun release() {
             allowQuiet.countDown()
+            allowEnd.countDown()
+        }
+    }
+
+    /** Produces two seconds of speech and an exact 500 ms quiet boundary, then holds capture open. */
+    private class ShortUtteranceGapCaptureDevice(
+        private val clock: FakeElapsedRealtime,
+    ) : ConversationDictationAudioCaptureDevice {
+        val waitingForEnd = CountDownLatch(1)
+        val allowEnd = CountDownLatch(1)
+        private var speechReads = 0
+        private var quietReads = 0
+
+        override val initialized: Boolean = true
+
+        override val recording: Boolean = true
+
+        override fun start() = Unit
+
+        override fun read(target: ShortArray): Int {
+            when {
+                speechReads < 20 -> {
+                    target.fill(1_000)
+                    speechReads += 1
+                }
+                quietReads < 5 -> {
+                    target.fill(0)
+                    quietReads += 1
+                }
+                else -> {
+                    waitingForEnd.countDown()
+                    check(allowEnd.await(2, TimeUnit.SECONDS))
+                    return 0
+                }
+            }
+            clock.advance(100L)
+            return target.size
+        }
+
+        override fun stop() = Unit
+
+        override fun release() {
             allowEnd.countDown()
         }
     }
