@@ -117,7 +117,11 @@ internal class ConversationLiveSubscriptions(
         fun bind(appState: WhiteNoiseAppState): ConversationLiveSubscriptions =
             ConversationLiveSubscriptions(
                 openTimeline = { account, groupIdHex, limit ->
-                    appState.marmotIo { openTimelineWithFallback(account, groupIdHex, limit) }
+                    // Traced on its own: this open is the largest measured segment of a notification
+                    // tap, and the route trace alone cannot separate it from the first page (#586).
+                    appState.marmotIo(MarmotTraceSection.CONVERSATION_WINDOW_OPEN) {
+                        openTimelineWithFallback(account, groupIdHex, limit)
+                    }
                 },
                 openGroupState = { account, groupIdHex ->
                     appState.marmotIo {
