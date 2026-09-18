@@ -25,6 +25,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -35,6 +37,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
+import kotlinx.coroutines.launch
 
 /** Shows the actual collection scope wherever a user can grant the expanded MDK receipt. */
 @Composable
@@ -108,26 +111,46 @@ internal fun UsageDiagnosticsPrompt(
 ) {
     val state = appState.diagnostics
     var loggingBusy by remember { mutableStateOf(false) }
+    var closing by remember { mutableStateOf(false) }
+    var dismissalRefused by remember { mutableStateOf(false) }
     val settled = !state.busy && !state.failed && state.snapshot != null && !loggingBusy
+    // `rememberModalBottomSheetState` keys its saved state on `confirmValueChange`, so a lambda that
+    // captures `settled` gets a new identity the moment a choice starts writing — and the sheet state
+    // is rebuilt underneath it, which the reader sees as the sheet closing and reopening on every tap.
+    // The lambda is remembered once and reads the current value through a snapshot instead.
+    val settledNow by rememberUpdatedState(settled)
+    val confirmValueChange = remember { { value: SheetValue -> value != SheetValue.Hidden || settledNow } }
+    val sheetState =
+        rememberModalBottomSheetState(
+            skipPartiallyExpanded = true,
+            confirmValueChange = confirmValueChange,
+        )
+    val scope = rememberCoroutineScope()
+    // The sheet closes on the gesture and records the declined choices afterwards. Waiting for one or
+    // two native writes first made a slow write read as "the X did nothing", and invited a second tap
+    // that re-entered the whole thing; `closing` makes the second tap a no-op instead.
+    //
+    // Declining is safe to lose: both writes turn things off and are idempotent, and nothing has
+    // recorded consent, so the policy simply asks again next launch.
     val finish = {
-        appState.launchMutation {
-            if (!state.busy && !state.failed && state.snapshot != null) {
-                // Closing without enabling uploads records the declined audit choice, as Done did.
+        if (settled && !closing) {
+            closing = true
+            scope.launch {
+                sheetState.hide()
+                onDone()
+            }
+            appState.launchMutation {
                 val auditSettled =
                     !appState.auditUploadConsentRequired || appState.setAuditLogsEnabled(false)
-                if (auditSettled && (!state.requiresChoice || appState.setTelemetryEnabled(false))) onDone()
+                if (auditSettled && state.requiresChoice) appState.setTelemetryEnabled(false)
             }
         }
         Unit
     }
     ModalBottomSheet(
-        onDismissRequest = { if (settled) finish() },
+        onDismissRequest = { if (settled) finish() else dismissalRefused = true },
         containerColor = amoledSheetContainerColor(),
-        sheetState =
-            rememberModalBottomSheetState(
-                skipPartiallyExpanded = true,
-                confirmValueChange = { it != SheetValue.Hidden || settled },
-            ),
+        sheetState = sheetState,
     ) {
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Section)) {
             WhiteNoiseSheetHeader(
@@ -135,6 +158,13 @@ internal fun UsageDiagnosticsPrompt(
                 onClose = finish,
                 closeEnabled = settled,
             )
+            // A refused swipe used to spring back with no explanation. The sheet already knows why it
+            // is not ready; it says so where the gesture happened rather than leaving it a mystery.
+            if (dismissalRefused && !settled) {
+                Column(Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)) {
+                    UsageDiagnosticsFeedback(appState)
+                }
+            }
             UsageDiagnosticsPromptBody(appState, loggingBusy) { loggingBusy = it }
         }
     }
