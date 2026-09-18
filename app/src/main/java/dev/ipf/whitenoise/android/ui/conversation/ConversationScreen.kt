@@ -2498,6 +2498,10 @@ internal fun ConversationScreen(
             if (!initialTimelineAnchored || !controller.hasMoreBefore || controller.isLoadingOlder) {
                 return@collect
             }
+            // A page that timed out or stayed not-ready leaves the reader a retry row. Without this
+            // the effect would re-issue it on every scroll frame, which is the silent stall this
+            // screen used to show. The retry, or any live replacement, clears the block.
+            if (controller.olderPageBlocked) return@collect
             if (oldestVisibleIndex < 0) return@collect
             val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
             if (liveRenderedSize == 0) return@collect
