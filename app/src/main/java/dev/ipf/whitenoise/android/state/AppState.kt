@@ -2311,7 +2311,8 @@ class WhiteNoiseAppState private constructor(
         )
     }
     private val notificationEnrichmentGate = Semaphore(NOTIFICATION_ENRICHMENT_FANOUT)
-    private val accountCatchUpCoordinator = AccountCatchUpCoordinator(notificationScope)
+    private val accountCatchUpCoordinator =
+        AccountCatchUpCoordinator(notificationScope, localNotificationPresenter.catchUpWindow)
     private var pendingAccountSwitchTrace: PendingAccountSwitchTrace? = null
     private val accountSwitchHandoff = AccountSwitchLocalSnapshotHandoff()
 
@@ -2327,7 +2328,6 @@ class WhiteNoiseAppState private constructor(
 
     @Volatile
     private var networkNotificationRecoverySuppressed = false
-
     private val notificationReceiverActive = MutableStateFlow(false)
     private val notificationReceiverRetryWake = MutableStateFlow(0L)
 

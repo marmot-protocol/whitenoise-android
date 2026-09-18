@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.notifications.NotificationCatchUpWindow
 import dev.ipf.whitenoise.android.ui.chats.relaysConnectedOnNetworkChange
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -123,9 +124,13 @@ internal suspend fun runCatchUpAfterTrigger(
     return result
 }
 
-/** Serializes process-wide native catch-up while coalescing queued successors. */
+/**
+ * Serializes process-wide native catch-up while coalescing queued successors. Each executed request
+ * opens [catchUpWindow] for its duration, so first posts can tell a draining backlog from live traffic.
+ */
 internal class AccountCatchUpCoordinator(
     private val scope: CoroutineScope,
+    private val catchUpWindow: NotificationCatchUpWindow? = null,
 ) {
     private data class Request(
         val key: AccountCatchUpKey,
@@ -200,6 +205,7 @@ internal class AccountCatchUpCoordinator(
                 newestStartSequence += 1L
                 newestStartSequence.also { request.startSequence = it }
             }
+        catchUpWindow?.open()
         val job =
             scope.launch {
                 runCatchingCancellable { request.block() }
@@ -220,6 +226,7 @@ internal class AccountCatchUpCoordinator(
         request: Request,
         cause: Throwable?,
     ) {
+        catchUpWindow?.close()
         if (cause != null && !request.result.isCompleted) {
             request.result.completeExceptionally(cause)
         }

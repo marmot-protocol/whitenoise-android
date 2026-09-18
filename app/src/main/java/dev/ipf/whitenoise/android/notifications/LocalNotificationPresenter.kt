@@ -98,10 +98,16 @@ class LocalNotificationPresenter(
         manager.cancel(tag, id)
     },
     private val postPacer: NotificationPostPacer = NotificationPostPacer.shared,
+    private val alertBudget: NotificationAlertBudget = NotificationAlertBudget(),
+    // Kept last so callers may still pass it as a trailing lambda.
     private val activeNotificationsProvider: (NotificationManager) -> Array<StatusBarNotification> = { manager ->
         manager.activeNotifications
     },
 ) {
+    /** The catch-up cohort boundary first posts are judged against; the catch-up coordinator drives it. */
+    internal val catchUpWindow: NotificationCatchUpWindow
+        get() = alertBudget.catchUpWindow
+
     private val shortcutSnapshots = ConcurrentHashMap<String, ConversationShortcutSnapshot>()
     private val shortcutLastUsed = ConcurrentHashMap<String, Long>()
     private val shortcutAccessClock = AtomicLong()
@@ -362,6 +368,32 @@ class LocalNotificationPresenter(
                 return false
             }
         val rawNotificationContent = formattedContent ?: return false
+        // A first post rings only if its catch-up cohort has not rung yet and no alert rang moments ago
+        // (#1579). The ring is held from here, so a concurrent first post for another conversation stays
+        // silent, and handed back below if this card is never written. Enrichment rewrites arrive with
+        // silentUpdate already set and never touch the budget.
+        val alertReservation =
+            if (silentUpdate) {
+                null
+            } else {
+                alertBudget.reserve(nowMs = nowMillis(), isMention = update.isMention, accountRef = update.accountRef)
+            }
+        val heldAlert = alertReservation?.takeIf { it.decision == NotificationAlertDecision.Alert }
+        val silentPost = silentUpdate || alertReservation?.decision?.silent == true
+        if (alertReservation != null && alertReservation.decision.silent) {
+            notificationDebug {
+                "silent first post key=${update.notificationKey.take(16)} reason=${alertReservation.decision}"
+            }
+        }
+        val writeObserver: (() -> Unit)? =
+            if (heldAlert != null) {
+                {
+                    heldAlert.commit()
+                    onNotificationWritten?.invoke()
+                }
+            } else {
+                onNotificationWritten
+            }
         val notificationContent =
             if (redactContent) {
                 LocalNotificationFormatter.redactedContent(
@@ -372,318 +404,388 @@ class LocalNotificationPresenter(
             } else {
                 rawNotificationContent
             }
-        return ConversationCardPostSynchronizer.withRegisteredShow(
-            notificationContent.notificationTag,
-            notificationContent.notificationId,
-        ) { showToken ->
-            val showGenerationAllowsPost = {
-                if (replaceCurrentMessage) {
-                    ConversationCardPostSynchronizer.isShowCurrent(showToken)
-                } else {
-                    ConversationCardPostSynchronizer.isShowNotDismissed(showToken)
-                }
-            }
-            ConversationCardPostSynchronizer.awaitTestBarrier(
-                ConversationCardOp.SHOW_NOTIFY,
-                ConversationCardBarrier.AFTER_REGISTER,
-                notificationContent.notificationTag,
-                notificationContent.notificationId,
-            )
-            if (!isPostStillAllowed() || !showGenerationAllowsPost()) return@withRegisteredShow false
-            // Ordinary messages keep their required People/conversation child.
-            // Other event types inherit the stable global channel until this
-            // chat has an explicit or legacy custom override.
-            val channelShortcutId =
-                if (!redactContent) {
-                    conversationShortcutId(update.accountRef, update.groupIdHex)
-                } else {
-                    null
-                }
-            val messagingShortcutId = channelShortcutId.takeIf { decision.style == NotificationStyleChoice.Messaging }
-            val vibrationPattern =
-                if (
-                    decision.channelId == NotificationChannelSpec.DIRECT_MESSAGES.id ||
-                    decision.channelId == NotificationChannelSpec.GROUP_MESSAGES.id
-                ) {
-                    conversationVibrationPreferences.pattern(update.accountRef, update.groupIdHex)
-                } else {
-                    ConversationVibrationPattern.SYSTEM_DEFAULT
-                }
-            val channelId =
-                withContext(Dispatchers.Default) {
-                    conversationNotificationRouting
-                        .resolveForPost(
-                            channel = NotificationChannelSpec.forUpdate(update),
-                            conversationShortcutId = channelShortcutId,
-                            conversationTitle = conversationTitleOverride,
-                            primaryVibrationPattern = vibrationPattern,
-                        ).channelId
-                }
-            val builder =
-                NotificationCompat
-                    .Builder(context, channelId)
-                    .setSmallIcon(R.drawable.ic_stat_whitenoise)
-                    .setContentIntent(conversationPendingIntent(update, notificationContent.notificationTag))
-                    .setCategory(decision.category)
-                    .setPriority(decision.importance.toCompatPriority())
-                    .setShowWhen(true)
-                    .setAutoCancel(true)
-                    .setOnlyAlertOnce(silentUpdate)
-                    .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
-                    // Matching corrections keep their original grouping. setSilent(true)
-                    // moves an ungrouped card into the platform's silent group and can
-                    // remove its heads-up banner; onlyAlertOnce suppresses repeat alerts.
-                    .setSilent(silentUpdate && !replaceCurrentMessage)
-            // Name the recipient identity in the header when multi-account (#836).
-            if (!redactContent && !recipientAccountSubtext.isNullOrBlank()) builder.setSubText(recipientAccountSubtext)
-            if (
-                decision.style == NotificationStyleChoice.Plain ||
-                decision.style == NotificationStyleChoice.Messaging
-            ) {
-                stampConversationCardMessageId(builder, update.messageIdHex)
-            }
-
-            var messagingPost: MessagingPostContext? = null
-            when (val style = decision.style) {
-                // Reactions get their own self-contained card (own tag/id on the
-                // reactions channel, see LocalNotificationFormatter) so they're muted
-                // independently of messages. They aren't repliable, so no
-                // MessagingStyle / reply / mark-read — just a plain expandable card.
-                NotificationStyleChoice.Plain -> {
-                    builder.setContentTitle(notificationContent.title)
-                    if (notificationContent.body.isNotBlank()) {
-                        builder
-                            .setContentText(notificationContent.body)
-                            .setStyle(NotificationCompat.BigTextStyle().bigText(notificationContent.body))
-                    } else {
-                        // Expand the same sentence for long group names without repeating its title.
-                        builder.setStyle(
-                            NotificationCompat.BigTextStyle().setBigContentTitle("").bigText(notificationContent.title),
-                        )
-                    }
-                }
-
-                // Messages stack into one per-conversation card; invites are
-                // one-off events, so keep them as a plain expandable notification.
-                NotificationStyleChoice.Messaging -> {
-                    val (resolvedConversationAvatarBitmap, resolvedSenderAvatarBitmap) =
-                        if (redactContent) {
-                            null to null
+        var written = false
+        try {
+            written =
+                ConversationCardPostSynchronizer.withRegisteredShow(
+                    notificationContent.notificationTag,
+                    notificationContent.notificationId,
+                ) { showToken ->
+                    val showGenerationAllowsPost = {
+                        if (replaceCurrentMessage) {
+                            ConversationCardPostSynchronizer.isShowCurrent(showToken)
                         } else {
-                            (conversationAvatarBitmap ?: cachedAvatarBitmap(conversationAvatarUrl)) to
-                                (senderAvatarBitmap ?: cachedAvatarBitmap(senderAvatarUrl))
+                            ConversationCardPostSynchronizer.isShowNotDismissed(showToken)
                         }
-                    val sender =
-                        notificationSenderPerson(
-                            notificationContent,
-                            resolvedSenderAvatarBitmap
-                                ?: if (redactContent) {
-                                    null
-                                } else {
-                                    notificationMonogramBitmap(
-                                        notificationContent.senderName,
-                                        notificationContent.senderKey,
-                                    )
-                                },
-                        )
-                    // Supply the group fallback icon in the first payload; shortcut publication
-                    // stays off the initial-post path and must not be needed to complete its image.
-                    if (notificationContent.isGroupConversation && !redactContent) {
-                        builder.setLargeIcon(resolvedConversationAvatarBitmap)
                     }
-                    if (!redactContent && messagingShortcutId != null) {
-                        val locusId = LocusIdCompat(messagingShortcutId)
-                        builder
-                            .setShortcutId(messagingShortcutId)
-                            .setLocusId(locusId)
-                            .addPerson(sender)
-                    }
-                    if (redactContent) {
-                        builder.addExtras(Bundle().apply { putBoolean(EXTRA_CONTENT_REDACTED, true) })
-                    }
-                    if (!redactContent) {
-                        val quickReactions =
-                            if (decision.actions.contains(NotificationActionKind.REPLY)) {
-                                withContext(Dispatchers.Default) {
-                                    notificationQuickReactionChoices(quickReactionChoices())
-                                }
-                            } else {
-                                emptyList()
-                            }
-                        NotificationActions
-                            .targetFromUpdate(update, notificationContent.notificationTag, notificationContent.notificationId)
-                            ?.let { actionTarget ->
-                                decision.actions.forEach { action ->
-                                    when (action) {
-                                        NotificationActionKind.REPLY ->
-                                            builder.addAction(replyNotificationAction(actionTarget, quickReactions))
-                                        // Reaction choices ride on Reply's RemoteInput so SystemUI
-                                        // can render them inline.
-                                        NotificationActionKind.REACT -> Unit
-                                        NotificationActionKind.MARK_READ -> builder.addAction(markReadNotificationAction(actionTarget))
-                                    }
-                                }
-                            }
-                    }
-                    messagingPost =
-                        MessagingPostContext(
-                            sender = sender,
-                            conversationTitleOverride = if (redactContent) null else conversationTitleOverride,
-                            shortcutId = messagingShortcutId,
-                            conversationAvatarUrl = conversationAvatarUrl,
-                            conversationAvatarBitmap = resolvedConversationAvatarBitmap,
-                            senderAvatarUrl = senderAvatarUrl,
-                            senderAvatarBitmap = resolvedSenderAvatarBitmap,
-                        )
-                }
-
-                is NotificationStyleChoice.InviteWithExtras -> {
-                    builder
-                        .setContentTitle(notificationContent.title)
-                        .setContentText(notificationContent.body)
-                        .setStyle(NotificationCompat.BigTextStyle().bigText(notificationContent.body))
-                    // Stamp the invited-to account + group so accepting/declining or
-                    // opening that conversation can find and dismiss this card (its
-                    // tag is the opaque key).
-                    builder.addExtras(
-                        Bundle().apply {
-                            putString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF, style.accountRef)
-                            putString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID, style.groupIdHex)
-                        },
+                    ConversationCardPostSynchronizer.awaitTestBarrier(
+                        ConversationCardOp.SHOW_NOTIFY,
+                        ConversationCardBarrier.AFTER_REGISTER,
+                        notificationContent.notificationTag,
+                        notificationContent.notificationId,
                     )
-                }
-            }
-
-            // Reserve a write slot before the serialized write so a burst of updates for one busy
-            // conversation never exceeds the platform's per-app notification rate limit.
-            postPacer.awaitSlot()
-            val notificationManager = NotificationManagerCompat.from(context)
-            val posted =
-                withContext(Dispatchers.Default) {
-                    val messaging = messagingPost
-                    if (messaging != null) {
-                        ConversationCardPostSynchronizer.withLock(
-                            notificationContent.notificationTag,
-                            notificationContent.notificationId,
-                            ConversationCardOp.SHOW_NOTIFY,
+                    if (!isPostStillAllowed() || !showGenerationAllowsPost()) return@withRegisteredShow false
+                    // Ordinary messages keep their required People/conversation child.
+                    // Other event types inherit the stable global channel until this
+                    // chat has an explicit or legacy custom override.
+                    val channelShortcutId =
+                        if (!redactContent) {
+                            conversationShortcutId(update.accountRef, update.groupIdHex)
+                        } else {
+                            null
+                        }
+                    val messagingShortcutId =
+                        channelShortcutId.takeIf { decision.style == NotificationStyleChoice.Messaging }
+                    val vibrationPattern =
+                        if (
+                            decision.channelId == NotificationChannelSpec.DIRECT_MESSAGES.id ||
+                            decision.channelId == NotificationChannelSpec.GROUP_MESSAGES.id
                         ) {
-                            if (
-                                !isPostStillAllowed() ||
-                                !showGenerationAllowsPost()
-                            ) {
-                                return@withLock false
-                            }
-                            val carried =
-                                if (redactContent) {
-                                    null
-                                } else {
-                                    existingConversationMessages(
-                                        notificationContent.notificationTag,
-                                        notificationContent.notificationId,
-                                        replacingMessageIdHex =
-                                            update.messageIdHex
-                                                ?.takeIf(String::isNotBlank)
-                                                ?.takeIf { replaceCurrentMessage },
-                                    )
-                                }
-                            ConversationCardPostSynchronizer.awaitTestBarrier(
-                                ConversationCardOp.SHOW_NOTIFY,
-                                ConversationCardBarrier.AFTER_READ,
-                                notificationContent.notificationTag,
-                                notificationContent.notificationId,
-                            )
-                            val presentationTimestampMs = nowMillis()
-                            stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
-                            if (
-                                shouldUseExpandedSingleMessageStyle(
-                                    body = notificationContent.body,
-                                    carriedMessageCount = carried.orEmpty().size,
-                                    redactContent = redactContent,
-                                )
-                            ) {
+                            conversationVibrationPreferences.pattern(update.accountRef, update.groupIdHex)
+                        } else {
+                            ConversationVibrationPattern.SYSTEM_DEFAULT
+                        }
+                    val channelId =
+                        withContext(Dispatchers.Default) {
+                            conversationNotificationRouting
+                                .resolveForPost(
+                                    channel = NotificationChannelSpec.forUpdate(update),
+                                    conversationShortcutId = channelShortcutId,
+                                    conversationTitle = conversationTitleOverride,
+                                    primaryVibrationPattern = vibrationPattern,
+                                ).channelId
+                        }
+                    val builder =
+                        NotificationCompat
+                            .Builder(context, channelId)
+                            .setSmallIcon(R.drawable.ic_stat_whitenoise)
+                            .setContentIntent(conversationPendingIntent(update, notificationContent.notificationTag))
+                            .setCategory(decision.category)
+                            .setPriority(decision.importance.toCompatPriority())
+                            .setShowWhen(true)
+                            .setAutoCancel(true)
+                            .setOnlyAlertOnce(silentPost)
+                            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+                            // Matching corrections keep their original grouping. setSilent(true)
+                            // moves an ungrouped card into the platform's silent group and can
+                            // remove its heads-up banner; onlyAlertOnce suppresses repeat alerts.
+                            .setSilent(silentPost && !replaceCurrentMessage)
+                    // Name the recipient identity in the header when multi-account (#836).
+                    if (!redactContent && !recipientAccountSubtext.isNullOrBlank()) {
+                        builder.setSubText(recipientAccountSubtext)
+                    }
+                    if (
+                        decision.style == NotificationStyleChoice.Plain ||
+                        decision.style == NotificationStyleChoice.Messaging
+                    ) {
+                        stampConversationCardMessageId(builder, update.messageIdHex)
+                    }
+
+                    var messagingPost: MessagingPostContext? = null
+                    when (val style = decision.style) {
+                        // Reactions get their own self-contained card (own tag/id on the
+                        // reactions channel, see LocalNotificationFormatter) so they're muted
+                        // independently of messages. They aren't repliable, so no
+                        // MessagingStyle / reply / mark-read — just a plain expandable card.
+                        NotificationStyleChoice.Plain -> {
+                            builder.setContentTitle(notificationContent.title)
+                            if (notificationContent.body.isNotBlank()) {
                                 builder
-                                    .setContentTitle(notificationContent.title)
                                     .setContentText(notificationContent.body)
                                     .setStyle(NotificationCompat.BigTextStyle().bigText(notificationContent.body))
-                                    .addExtras(
-                                        Bundle().apply {
-                                            putCharSequence(
-                                                EXTRA_EXPANDED_SINGLE_MESSAGE_BODY,
-                                                notificationContent.body,
-                                            )
-                                            putLong(EXTRA_EXPANDED_SINGLE_MESSAGE_TIMESTAMP, presentationTimestampMs)
-                                            putBundle(EXTRA_EXPANDED_SINGLE_MESSAGE_SENDER, messaging.sender.toBundle())
-                                        },
-                                    )
                             } else {
+                                // Expand the same sentence for long group names without repeating its title.
                                 builder.setStyle(
-                                    messagingStyle(
-                                        notificationContent,
-                                        messaging.conversationTitleOverride,
-                                        decision.historyCap,
-                                        carried,
-                                        messaging.sender,
-                                        presentationTimestampMs,
-                                    ),
+                                    NotificationCompat
+                                        .BigTextStyle()
+                                        .setBigContentTitle("")
+                                        .bigText(notificationContent.title),
                                 )
                             }
-                            val notification = builder.build()
-                            ConversationCardPostSynchronizer.awaitTestBarrier(
-                                ConversationCardOp.SHOW_NOTIFY,
-                                ConversationCardBarrier.BEFORE_WRITE,
-                                notificationContent.notificationTag,
-                                notificationContent.notificationId,
-                            )
-                            if (
-                                !isPostStillAllowed() ||
-                                !showGenerationAllowsPost()
-                            ) {
-                                return@withLock false
-                            }
-                            val firstPostSucceeded =
-                                postNotificationSafely(
-                                    notificationManager,
-                                    notificationContent.notificationTag,
-                                    notificationContent.notificationId,
-                                    notification,
-                                    onNotificationWritten,
-                                )
-                            if (firstPostSucceeded) {
-                                ConversationCardPostSynchronizer.awaitTestBarrier(
-                                    ConversationCardOp.SHOW_NOTIFY,
-                                    ConversationCardBarrier.AFTER_WRITE,
-                                    notificationContent.notificationTag,
-                                    notificationContent.notificationId,
-                                )
-                                true
-                            } else {
-                                notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
-                                if (carried.isNullOrEmpty()) {
-                                    false
+                        }
+
+                        // Messages stack into one per-conversation card; invites are
+                        // one-off events, so keep them as a plain expandable notification.
+                        NotificationStyleChoice.Messaging -> {
+                            val (resolvedConversationAvatarBitmap, resolvedSenderAvatarBitmap) =
+                                if (redactContent) {
+                                    null to null
                                 } else {
-                                    if (!isPostStillAllowed() || !showGenerationAllowsPost()) {
+                                    (conversationAvatarBitmap ?: cachedAvatarBitmap(conversationAvatarUrl)) to
+                                        (senderAvatarBitmap ?: cachedAvatarBitmap(senderAvatarUrl))
+                                }
+                            val sender =
+                                notificationSenderPerson(
+                                    notificationContent,
+                                    resolvedSenderAvatarBitmap
+                                        ?: if (redactContent) {
+                                            null
+                                        } else {
+                                            notificationMonogramBitmap(
+                                                notificationContent.senderName,
+                                                notificationContent.senderKey,
+                                            )
+                                        },
+                                )
+                            // Supply the group fallback icon in the first payload; shortcut publication
+                            // stays off the initial-post path and must not be needed to complete its image.
+                            if (notificationContent.isGroupConversation && !redactContent) {
+                                builder.setLargeIcon(resolvedConversationAvatarBitmap)
+                            }
+                            if (!redactContent && messagingShortcutId != null) {
+                                val locusId = LocusIdCompat(messagingShortcutId)
+                                builder
+                                    .setShortcutId(messagingShortcutId)
+                                    .setLocusId(locusId)
+                                    .addPerson(sender)
+                            }
+                            if (redactContent) {
+                                builder.addExtras(Bundle().apply { putBoolean(EXTRA_CONTENT_REDACTED, true) })
+                            }
+                            if (!redactContent) {
+                                val quickReactions =
+                                    if (decision.actions.contains(NotificationActionKind.REPLY)) {
+                                        withContext(Dispatchers.Default) {
+                                            notificationQuickReactionChoices(quickReactionChoices())
+                                        }
+                                    } else {
+                                        emptyList()
+                                    }
+                                NotificationActions
+                                    .targetFromUpdate(update, notificationContent.notificationTag, notificationContent.notificationId)
+                                    ?.let { actionTarget ->
+                                        decision.actions.forEach { action ->
+                                            when (action) {
+                                                NotificationActionKind.REPLY ->
+                                                    builder.addAction(
+                                                        replyNotificationAction(actionTarget, quickReactions),
+                                                    )
+                                                // Reaction choices ride on Reply's RemoteInput so SystemUI
+                                                // can render them inline.
+                                                NotificationActionKind.REACT -> Unit
+                                                NotificationActionKind.MARK_READ -> builder.addAction(markReadNotificationAction(actionTarget))
+                                            }
+                                        }
+                                    }
+                            }
+                            messagingPost =
+                                MessagingPostContext(
+                                    sender = sender,
+                                    conversationTitleOverride = if (redactContent) null else conversationTitleOverride,
+                                    shortcutId = messagingShortcutId,
+                                    conversationAvatarUrl = conversationAvatarUrl,
+                                    conversationAvatarBitmap = resolvedConversationAvatarBitmap,
+                                    senderAvatarUrl = senderAvatarUrl,
+                                    senderAvatarBitmap = resolvedSenderAvatarBitmap,
+                                )
+                        }
+
+                        is NotificationStyleChoice.InviteWithExtras -> {
+                            builder
+                                .setContentTitle(notificationContent.title)
+                                .setContentText(notificationContent.body)
+                                .setStyle(NotificationCompat.BigTextStyle().bigText(notificationContent.body))
+                            // Stamp the invited-to account + group so accepting/declining or
+                            // opening that conversation can find and dismiss this card (its
+                            // tag is the opaque key).
+                            builder.addExtras(
+                                Bundle().apply {
+                                    putString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF, style.accountRef)
+                                    putString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID, style.groupIdHex)
+                                },
+                            )
+                        }
+                    }
+
+                    // Reserve a write slot before the serialized write so a burst of updates for one busy
+                    // conversation never exceeds the platform's per-app notification rate limit.
+                    postPacer.awaitSlot()
+                    val notificationManager = NotificationManagerCompat.from(context)
+                    val posted =
+                        withContext(Dispatchers.Default) {
+                            val messaging = messagingPost
+                            if (messaging != null) {
+                                ConversationCardPostSynchronizer.withLock(
+                                    notificationContent.notificationTag,
+                                    notificationContent.notificationId,
+                                    ConversationCardOp.SHOW_NOTIFY,
+                                ) {
+                                    if (
+                                        !isPostStillAllowed() ||
+                                        !showGenerationAllowsPost()
+                                    ) {
                                         return@withLock false
                                     }
-                                    builder.setStyle(
-                                        messagingStyle(
-                                            notificationContent,
-                                            messaging.conversationTitleOverride,
-                                            decision.historyCap,
-                                            carriedHistory = null,
-                                            sender = messaging.sender,
-                                            newMessageTimestampMs = presentationTimestampMs,
-                                        ),
+                                    val carried =
+                                        if (redactContent) {
+                                            null
+                                        } else {
+                                            existingConversationMessages(
+                                                notificationContent.notificationTag,
+                                                notificationContent.notificationId,
+                                                replacingMessageIdHex =
+                                                    update.messageIdHex
+                                                        ?.takeIf(String::isNotBlank)
+                                                        ?.takeIf { replaceCurrentMessage },
+                                            )
+                                        }
+                                    ConversationCardPostSynchronizer.awaitTestBarrier(
+                                        ConversationCardOp.SHOW_NOTIFY,
+                                        ConversationCardBarrier.AFTER_READ,
+                                        notificationContent.notificationTag,
+                                        notificationContent.notificationId,
                                     )
-                                    val cleanNotification = builder.build()
-                                    val retrySucceeded =
+                                    val presentationTimestampMs = nowMillis()
+                                    stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
+                                    if (
+                                        shouldUseExpandedSingleMessageStyle(
+                                            body = notificationContent.body,
+                                            carriedMessageCount = carried.orEmpty().size,
+                                            redactContent = redactContent,
+                                        )
+                                    ) {
+                                        builder
+                                            .setContentTitle(notificationContent.title)
+                                            .setContentText(notificationContent.body)
+                                            .setStyle(NotificationCompat.BigTextStyle().bigText(notificationContent.body))
+                                            .addExtras(
+                                                Bundle().apply {
+                                                    putCharSequence(
+                                                        EXTRA_EXPANDED_SINGLE_MESSAGE_BODY,
+                                                        notificationContent.body,
+                                                    )
+                                                    putLong(
+                                                        EXTRA_EXPANDED_SINGLE_MESSAGE_TIMESTAMP,
+                                                        presentationTimestampMs,
+                                                    )
+                                                    putBundle(
+                                                        EXTRA_EXPANDED_SINGLE_MESSAGE_SENDER,
+                                                        messaging.sender.toBundle(),
+                                                    )
+                                                },
+                                            )
+                                    } else {
+                                        builder.setStyle(
+                                            messagingStyle(
+                                                notificationContent,
+                                                messaging.conversationTitleOverride,
+                                                decision.historyCap,
+                                                carried,
+                                                messaging.sender,
+                                                presentationTimestampMs,
+                                            ),
+                                        )
+                                    }
+                                    val notification =
+                                        builder.silencedIfSuperseded(heldAlert, replaceCurrentMessage).build()
+                                    ConversationCardPostSynchronizer.awaitTestBarrier(
+                                        ConversationCardOp.SHOW_NOTIFY,
+                                        ConversationCardBarrier.BEFORE_WRITE,
+                                        notificationContent.notificationTag,
+                                        notificationContent.notificationId,
+                                    )
+                                    if (
+                                        !isPostStillAllowed() ||
+                                        !showGenerationAllowsPost()
+                                    ) {
+                                        return@withLock false
+                                    }
+                                    val firstPostSucceeded =
                                         postNotificationSafely(
                                             notificationManager,
                                             notificationContent.notificationTag,
                                             notificationContent.notificationId,
-                                            cleanNotification,
-                                            onNotificationWritten,
+                                            notification,
+                                            writeObserver,
                                         )
-                                    if (retrySucceeded) {
+                                    if (firstPostSucceeded) {
+                                        ConversationCardPostSynchronizer.awaitTestBarrier(
+                                            ConversationCardOp.SHOW_NOTIFY,
+                                            ConversationCardBarrier.AFTER_WRITE,
+                                            notificationContent.notificationTag,
+                                            notificationContent.notificationId,
+                                        )
+                                        true
+                                    } else {
+                                        notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
+                                        if (carried.isNullOrEmpty()) {
+                                            false
+                                        } else {
+                                            if (!isPostStillAllowed() || !showGenerationAllowsPost()) {
+                                                return@withLock false
+                                            }
+                                            builder.setStyle(
+                                                messagingStyle(
+                                                    notificationContent,
+                                                    messaging.conversationTitleOverride,
+                                                    decision.historyCap,
+                                                    carriedHistory = null,
+                                                    sender = messaging.sender,
+                                                    newMessageTimestampMs = presentationTimestampMs,
+                                                ),
+                                            )
+                                            val cleanNotification =
+                                                builder.silencedIfSuperseded(heldAlert, replaceCurrentMessage).build()
+                                            val retrySucceeded =
+                                                postNotificationSafely(
+                                                    notificationManager,
+                                                    notificationContent.notificationTag,
+                                                    notificationContent.notificationId,
+                                                    cleanNotification,
+                                                    writeObserver,
+                                                )
+                                            if (retrySucceeded) {
+                                                ConversationCardPostSynchronizer.awaitTestBarrier(
+                                                    ConversationCardOp.SHOW_NOTIFY,
+                                                    ConversationCardBarrier.AFTER_WRITE,
+                                                    notificationContent.notificationTag,
+                                                    notificationContent.notificationId,
+                                                )
+                                            }
+                                            if (!retrySucceeded) {
+                                                notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
+                                            }
+                                            retrySucceeded
+                                        }
+                                    }
+                                }
+                            } else {
+                                ConversationCardPostSynchronizer.withLock(
+                                    notificationContent.notificationTag,
+                                    notificationContent.notificationId,
+                                    ConversationCardOp.SHOW_NOTIFY,
+                                ) {
+                                    if (
+                                        !isPostStillAllowed() ||
+                                        !showGenerationAllowsPost()
+                                    ) {
+                                        return@withLock false
+                                    }
+                                    val presentationTimestampMs = nowMillis()
+                                    stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
+                                    val notification =
+                                        builder.silencedIfSuperseded(heldAlert, replaceCurrentMessage).build()
+                                    ConversationCardPostSynchronizer.awaitTestBarrier(
+                                        ConversationCardOp.SHOW_NOTIFY,
+                                        ConversationCardBarrier.BEFORE_WRITE,
+                                        notificationContent.notificationTag,
+                                        notificationContent.notificationId,
+                                    )
+                                    if (
+                                        !isPostStillAllowed() ||
+                                        !showGenerationAllowsPost()
+                                    ) {
+                                        return@withLock false
+                                    }
+                                    val succeeded =
+                                        postNotificationSafely(
+                                            notificationManager,
+                                            notificationContent.notificationTag,
+                                            notificationContent.notificationId,
+                                            notification,
+                                            writeObserver,
+                                        )
+                                    if (succeeded) {
                                         ConversationCardPostSynchronizer.awaitTestBarrier(
                                             ConversationCardOp.SHOW_NOTIFY,
                                             ConversationCardBarrier.AFTER_WRITE,
@@ -691,80 +793,34 @@ class LocalNotificationPresenter(
                                             notificationContent.notificationId,
                                         )
                                     }
-                                    if (!retrySucceeded) {
+                                    if (!succeeded) {
                                         notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
                                     }
-                                    retrySucceeded
+                                    succeeded
                                 }
                             }
                         }
-                    } else {
-                        ConversationCardPostSynchronizer.withLock(
-                            notificationContent.notificationTag,
-                            notificationContent.notificationId,
-                            ConversationCardOp.SHOW_NOTIFY,
-                        ) {
-                            if (
-                                !isPostStillAllowed() ||
-                                !showGenerationAllowsPost()
-                            ) {
-                                return@withLock false
-                            }
-                            val presentationTimestampMs = nowMillis()
-                            stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
-                            val notification = builder.build()
-                            ConversationCardPostSynchronizer.awaitTestBarrier(
-                                ConversationCardOp.SHOW_NOTIFY,
-                                ConversationCardBarrier.BEFORE_WRITE,
-                                notificationContent.notificationTag,
-                                notificationContent.notificationId,
-                            )
-                            if (
-                                !isPostStillAllowed() ||
-                                !showGenerationAllowsPost()
-                            ) {
-                                return@withLock false
-                            }
-                            val succeeded =
-                                postNotificationSafely(
-                                    notificationManager,
-                                    notificationContent.notificationTag,
-                                    notificationContent.notificationId,
-                                    notification,
-                                    onNotificationWritten,
-                                )
-                            if (succeeded) {
-                                ConversationCardPostSynchronizer.awaitTestBarrier(
-                                    ConversationCardOp.SHOW_NOTIFY,
-                                    ConversationCardBarrier.AFTER_WRITE,
-                                    notificationContent.notificationTag,
-                                    notificationContent.notificationId,
-                                )
-                            }
-                            if (!succeeded) {
-                                notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
-                            }
-                            succeeded
-                        }
+                    if (!posted) return@withRegisteredShow false
+                    messagingPost?.takeUnless { redactContent }?.let { messaging ->
+                        dispatchMessagingEnrichment(
+                            update = update,
+                            content = notificationContent,
+                            messaging = messaging,
+                            showToken = showToken,
+                            directShareEligible = directShareEligible,
+                            isPostStillAllowed = isPostStillAllowed,
+                        )
                     }
+                    notificationDebug {
+                        // Never log the title/body — they carry sender / group names (PII).
+                        "posted tag=${notificationContent.notificationTag.take(16)} trigger=${update.trigger} group=${update.groupIdHex.take(8)}"
+                    }
+                    true
                 }
-            if (!posted) return@withRegisteredShow false
-            messagingPost?.takeUnless { redactContent }?.let { messaging ->
-                dispatchMessagingEnrichment(
-                    update = update,
-                    content = notificationContent,
-                    messaging = messaging,
-                    showToken = showToken,
-                    directShareEligible = directShareEligible,
-                    isPostStillAllowed = isPostStillAllowed,
-                )
-            }
-            notificationDebug {
-                // Never log the title/body — they carry sender / group names (PII).
-                "posted tag=${notificationContent.notificationTag.take(16)} trigger=${update.trigger} group=${update.groupIdHex.take(8)}"
-            }
-            true
+        } finally {
+            if (!written) heldAlert?.release()
         }
+        return written
     }
 
     private suspend fun dispatchMessagingEnrichment(
@@ -974,6 +1030,20 @@ class LocalNotificationPresenter(
         }
         existing.historicMessages.forEach { message -> enriched.addHistoricMessage(message) }
         return enriched
+    }
+
+    /**
+     * Applies the silent flags at write time when a later alert took the ring while this post was still
+     * waiting for its pacer slot or card lock, and hands the claim back so the account may ring later.
+     */
+    private fun NotificationCompat.Builder.silencedIfSuperseded(
+        heldAlert: NotificationAlertReservation?,
+        replaceCurrentMessage: Boolean,
+    ): NotificationCompat.Builder {
+        if (heldAlert == null || heldAlert.stillHoldsTheRing()) return this
+        notificationDebug { "silent first post reason=Superseded" }
+        heldAlert.release()
+        return setOnlyAlertOnce(true).setSilent(!replaceCurrentMessage)
     }
 
     /** Writes one card and reports success without allowing observer failures to alter delivery. */
