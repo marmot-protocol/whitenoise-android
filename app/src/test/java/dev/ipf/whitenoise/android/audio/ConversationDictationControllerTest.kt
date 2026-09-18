@@ -1744,6 +1744,70 @@ class ConversationDictationControllerTest {
         assertTrue(fixture.controller.state is ConversationDictationState.Idle)
     }
 
+    /** Repeated blank/error finals stop the Paste spinner and preserve useful text for review. */
+    @Test
+    fun stopBoundsRetainedCallerAudioRetriesInsteadOfSpinningUntilDrainTimeout() {
+        listOf(false, true).forEach { errorCallback ->
+            val fixture = fixture(draft = TextFieldValue(""))
+            fixture.platform.pendingCallerAudio = true
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.platform.listener.onResult("first")
+            fixture.scheduler.runDelay(250L)
+            fixture.controller.paste()
+
+            repeat(2) {
+                if (errorCallback) {
+                    fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+                } else {
+                    fixture.platform.listener.onResult(null)
+                }
+                assertTrue(fixture.controller.state is ConversationDictationState.Starting)
+            }
+            if (errorCallback) {
+                fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+            } else {
+                fixture.platform.listener.onResult(null)
+            }
+
+            val review = fixture.controller.state as ConversationDictationState.ReviewRequired
+            assertEquals("first", review.transcript)
+            assertEquals("", fixture.drafts.getValue(key()).text)
+            assertEquals(
+                3,
+                fixture.platform.sessions
+                    .drop(1)
+                    .sumOf { it.retriedCallerAudio },
+            )
+            assertFalse(fixture.controller.hasDurableSession)
+        }
+    }
+
+    /** A resolved chunk cannot consume the retry budget of the next caller-audio chunk. */
+    @Test
+    fun stopResetsRetainedCallerAudioRetryBudgetForTheNextChunk() {
+        val fixture = fixture(draft = TextFieldValue(""))
+        fixture.platform.pendingCallerAudio = true
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onResult("first")
+        fixture.scheduler.runDelay(250L)
+        fixture.controller.paste()
+
+        fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+        fixture.platform.session.callerAudioHasSpeech = false
+        fixture.platform.listener.onResult(null)
+
+        repeat(2) {
+            fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+            assertTrue(fixture.controller.state is ConversationDictationState.Starting)
+        }
+        fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+
+        val review = fixture.controller.state as ConversationDictationState.ReviewRequired
+        assertEquals("first", review.transcript)
+        assertEquals("", fixture.drafts.getValue(key()).text)
+        assertFalse(fixture.controller.hasDurableSession)
+    }
+
     /** Confirmed silence-only tail audio is consumed once instead of retrying until the drain timeout. */
     @Test
     fun stopAcknowledgesBlankSilenceOnlyTailAndFinalizesAccumulatedSpeech() {
