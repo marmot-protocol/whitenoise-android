@@ -71,18 +71,27 @@ class ChatRowDeliveryIndicatorTest {
         composeRule.onNodeWithContentDescription(context.getString(R.string.sending)).assertDoesNotExist()
     }
 
+    /** A failed send is the one state that predates this row's other glyphs, so it is pinned too. */
+    @Test
+    fun failedOutgoingMessageShowsTheFailureBadge() {
+        render(ChatRowPortFixtures.item(delivery = ChatListMessageDeliveryStateFfi.FAILED))
+        composeRule.onNodeWithContentDescription(context.getString(R.string.send_failed)).assertIsDisplayed()
+    }
+
     /**
-     * A deleted last message has no delivery worth reporting: the row must not keep showing a tick for
-     * something that is no longer there.
+     * A deleted last message has no delivery worth reporting: the row must not keep showing a tick, a
+     * clock or a failure for something that is no longer there. Deletion is asserted against the failure
+     * state because that is the loudest of the three and the one that already shipped.
      */
     @Test
     fun aDeletedLastMessageShowsNoDeliveryGlyph() {
         render(
             ChatRowPortFixtures.item(
-                delivery = ChatListMessageDeliveryStateFfi.DELIVERED,
+                delivery = ChatListMessageDeliveryStateFfi.FAILED,
                 deletedLastMessage = true,
             ),
         )
+        composeRule.onNodeWithContentDescription(context.getString(R.string.send_failed)).assertDoesNotExist()
         composeRule.onNodeWithContentDescription(context.getString(R.string.sent)).assertDoesNotExist()
         composeRule.onNodeWithContentDescription(context.getString(R.string.sending)).assertDoesNotExist()
     }
