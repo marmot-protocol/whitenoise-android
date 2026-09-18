@@ -11,6 +11,7 @@ internal data class ConversationDictationAudioChunk(
     val chunkId: Long,
     val firstSample: Long,
     val lastSampleExclusive: Long,
+    val hasSpeech: Boolean,
     val pcm: ByteArray,
 )
 
@@ -30,6 +31,7 @@ internal class ConversationDictationAudioChunkBuffer(
     private val inFlight = mutableMapOf<Long, ConversationDictationAudioChunk>()
     private var current = ByteArray(chunkBytes)
     private var currentSize = 0
+    private var currentHasSpeech = false
     private var nextChunkId = 0L
     private var nextSample = 0L
     private var finished = false
@@ -50,6 +52,7 @@ internal class ConversationDictationAudioChunkBuffer(
     fun append(
         source: ByteArray,
         length: Int,
+        hasSpeech: Boolean,
     ): Boolean {
         require(length in 0..source.size)
         require(length % 2 == 0)
@@ -60,6 +63,7 @@ internal class ConversationDictationAudioChunkBuffer(
             source.copyInto(current, currentSize, sourceOffset, sourceOffset + copied)
             currentSize += copied
             sourceOffset += copied
+            currentHasSpeech = currentHasSpeech || hasSpeech
             if (currentSize == current.size) sealCurrent()
         }
         bufferedBytes += length
@@ -114,6 +118,7 @@ internal class ConversationDictationAudioChunkBuffer(
         queued.clear()
         inFlight.clear()
         currentSize = 0
+        currentHasSpeech = false
         bufferedBytes = 0
         finished = true
     }
@@ -130,11 +135,13 @@ internal class ConversationDictationAudioChunkBuffer(
                 chunkId = ++nextChunkId,
                 firstSample = firstSample,
                 lastSampleExclusive = firstSample + sampleCount,
+                hasSpeech = currentHasSpeech,
                 pcm = pcm,
             ),
         )
         nextSample += sampleCount
         current = ByteArray(chunkBytes)
         currentSize = 0
+        currentHasSpeech = false
     }
 }

@@ -2316,6 +2316,14 @@
         ]
       },
       {
+        "surface": "ConversationDictationListeningIndicator",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "fun ConversationDictationListeningIndicator(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
         "surface": "ConversationDictationPersistentControl",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
         "anchor": "fun ConversationDictationPersistentControl(",
@@ -8168,6 +8176,22 @@
         "anchor": "R.string.dictation_discard_transcript",
         "test_ids": [
           "DIC-001",
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:dictation_listening",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.dictation_listening",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:dictation_processing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.dictation_processing",
+        "test_ids": [
           "DIC-002"
         ]
       },

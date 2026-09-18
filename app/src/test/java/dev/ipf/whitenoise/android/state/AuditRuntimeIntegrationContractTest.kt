@@ -12,7 +12,10 @@ class AuditRuntimeIntegrationContractTest {
             source
                 .substringAfter("private suspend fun startMarmotWithNotificationListener")
                 .substringBefore("private suspend fun resumeCompletedBootstrap")
-        val started = startBody.indexOf("runtimeStartResult.await().getOrThrow()")
+        val started =
+            startBody.indexOf(
+                "runtimeStartResult.await().getOrThrowAtStartupStage(BootstrapStage.RUNTIME_START)",
+            )
         val marker = startBody.indexOf("runtime.marmot.emitAuditRuntimeReadinessAfterStart()")
 
         assertTrue(started >= 0)

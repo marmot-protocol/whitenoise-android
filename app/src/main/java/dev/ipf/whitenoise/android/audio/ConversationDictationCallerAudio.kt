@@ -30,6 +30,7 @@ private const val BYTES_PER_FRAME = 2
 private const val PROGRESS_INTERVAL_MILLIS = 1_000L
 private const val SPEECH_PEAK = 0.02f
 private const val SHORT_FULL_SCALE = 32_768f
+private const val MIN_SPEECH_EVIDENCE_PEAK = 1f / SHORT_FULL_SCALE
 private const val BUFFER_READS = 4
 private const val BYTE_MASK = 0xFF
 private const val HIGH_BYTE_SHIFT = 8
@@ -109,8 +110,9 @@ internal class ConversationDictationCallerAudio internal constructor(
         ConversationDictationAudioPipeWriter { descriptor, source, offset, length ->
             Os.write(descriptor, source, offset, length)
         },
+    private val elapsedRealtime: () -> Long = SystemClock::elapsedRealtime,
 ) {
-    private val lastSpeechAt = AtomicLong(SystemClock.elapsedRealtime())
+    private val lastSpeechAt = AtomicLong(elapsedRealtime())
     private val recording = AtomicBoolean(false)
     private val finishing = AtomicBoolean(false)
     private val captureClosed = AtomicBoolean(false)
@@ -140,7 +142,7 @@ internal class ConversationDictationCallerAudio internal constructor(
         }
         conversationDictationDiagnostic(
             "event=caller_audio_started sample_rate=$CALLER_AUDIO_SAMPLE_RATE_HZ " +
-                "channels=$CALLER_AUDIO_CHANNEL_COUNT encoding=pcm16 chunk_seconds=10-30 buffer_seconds=90",
+                "channels=$CALLER_AUDIO_CHANNEL_COUNT encoding=pcm16 chunk_seconds=2-30 buffer_seconds=90",
         )
         thread(name = "dictation-caller-audio-capture", isDaemon = true, block = ::capture)
         return true
@@ -192,7 +194,7 @@ internal class ConversationDictationCallerAudio internal constructor(
     fun hasPending(): Boolean = buffer.hasPending
 
     /** Measures quiet capture time independently of delayed provider speech callbacks. */
-    fun silenceMillis(): Long = (SystemClock.elapsedRealtime() - lastSpeechAt.get()).coerceAtLeast(0L)
+    fun silenceMillis(): Long = (elapsedRealtime() - lastSpeechAt.get()).coerceAtLeast(0L)
 
     /** Releases the generation lease without clearing a capture failure waiting for its successor. */
     @Synchronized
@@ -216,7 +218,7 @@ internal class ConversationDictationCallerAudio internal constructor(
     private fun capture() {
         val samples = ShortArray(FRAMES_PER_READ)
         val encoded = ByteArray(FRAMES_PER_READ * BYTES_PER_FRAME)
-        val progress = CallerAudioProgress()
+        val progress = CallerAudioProgress(elapsedRealtime)
         var currentChunkHasSpeech = false
         try {
             while (recording.get() && progress.stopReason == null) {
@@ -247,7 +249,10 @@ internal class ConversationDictationCallerAudio internal constructor(
     ): Boolean {
         conversationDictationEncodePcm16(samples, read, encoded)
         val bytes = read * BYTES_PER_FRAME
-        if (!buffer.append(encoded, bytes)) {
+        val peak = conversationDictationPeak(samples, read)
+        val readHasSpeech = peak >= SPEECH_PEAK
+        val readHasSpeechEvidence = peak >= MIN_SPEECH_EVIDENCE_PEAK
+        if (!buffer.append(encoded, bytes, hasSpeech = readHasSpeechEvidence)) {
             progress.stopReason = "buffer_full"
             conversationDictationDiagnostic(
                 "event=caller_audio_backpressure bytes=${buffer.bufferedBytes} action=stop_capture",
@@ -256,8 +261,10 @@ internal class ConversationDictationCallerAudio internal constructor(
             return currentChunkHasSpeech
         }
 
-        val chunkHasSpeech = currentChunkHasSpeech || recordCaptureActivity(samples, read, progress)
-        val quietMillis = SystemClock.elapsedRealtime() - lastSpeechAt.get()
+        if (readHasSpeech) lastSpeechAt.set(elapsedRealtime())
+        progress.record(read, peak, buffer.bufferedBytes)
+        val chunkHasSpeech = currentChunkHasSpeech || readHasSpeech
+        val quietMillis = elapsedRealtime() - lastSpeechAt.get()
         val sealed =
             chunkHasSpeech &&
                 quietMillis >= SENTENCE_BOUNDARY_SILENCE_MILLIS &&
@@ -266,19 +273,6 @@ internal class ConversationDictationCallerAudio internal constructor(
             conversationDictationDiagnostic("event=caller_audio_chunk_sealed reason=silence")
         }
         return chunkHasSpeech && !sealed
-    }
-
-    /** Tracks capture-side speech before a provider receives the next sealed chunk. */
-    private fun recordCaptureActivity(
-        samples: ShortArray,
-        read: Int,
-        progress: CallerAudioProgress,
-    ): Boolean {
-        val peak = conversationDictationPeak(samples, read)
-        val speech = peak >= SPEECH_PEAK
-        if (speech) lastSpeechAt.set(SystemClock.elapsedRealtime())
-        progress.record(read, peak, buffer.bufferedBytes)
-        return speech
     }
 
     /** Runs a closure observer once, including registration racing with recorder release. */
@@ -361,7 +355,7 @@ internal class ConversationDictationCallerAudio internal constructor(
     }
 }
 
-private const val MIN_SENTENCE_CHUNK_SECONDS = 10
+private const val MIN_SENTENCE_CHUNK_SECONDS = 2
 private const val MIN_SENTENCE_CHUNK_BYTES =
     CALLER_AUDIO_SAMPLE_RATE_HZ * BYTES_PER_FRAME * MIN_SENTENCE_CHUNK_SECONDS
 private const val SENTENCE_BOUNDARY_SILENCE_MILLIS = 500L
@@ -406,6 +400,9 @@ internal class ConversationDictationCallerAudioStream(
 
     /** Releases this generation’s chunk after a final transcript makes its audio expendable. */
     fun acknowledge(): Boolean = settle(requeue = false)
+
+    /** Returns capture-side speech evidence for this generation's exact chunk, when claimed. */
+    fun containsSpeech(): Boolean? = chunk.get()?.hasSpeech
 
     /** Returns this generation’s chunk to the front of the queue without duplicating its byte accounting. */
     fun retry(): Boolean = settle(requeue = true)
@@ -515,8 +512,10 @@ internal class ConversationDictationCallerAudioStream(
 }
 
 /** Privacy-safe running totals for one logical capture. */
-private class CallerAudioProgress {
-    private val startedAt = SystemClock.elapsedRealtime()
+private class CallerAudioProgress(
+    private val elapsedRealtime: () -> Long,
+) {
+    private val startedAt = elapsedRealtime()
     private var lastReport = startedAt
     private var totalBytes = 0L
     private var intervalPeak = 0f
@@ -538,7 +537,7 @@ private class CallerAudioProgress {
                     "peak=${format(intervalPeak)}",
             )
         }
-        val now = SystemClock.elapsedRealtime()
+        val now = elapsedRealtime()
         if (now - lastReport >= PROGRESS_INTERVAL_MILLIS) {
             lastReport = now
             conversationDictationDiagnostic(
@@ -558,7 +557,7 @@ private class CallerAudioProgress {
     }
 
     /** Uses the monotonic clock to measure capture duration independently of wall-clock changes. */
-    private fun elapsed(): Long = SystemClock.elapsedRealtime() - startedAt
+    private fun elapsed(): Long = elapsedRealtime() - startedAt
 
     /** Formats diagnostic peak levels with a stable decimal separator across device locales. */
     private fun format(peak: Float): String = String.format(Locale.US, "%.3f", peak)

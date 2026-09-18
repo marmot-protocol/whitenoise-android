@@ -276,7 +276,7 @@ class ComposerBarScreenshotTest {
             .captureRoboImage("src/test/snapshots/composer_dictation_listening_compact_large_font.png")
     }
 
-    /** Captures processing controls in the compact large-font RTL composer. */
+    /** Captures explicit Paste processing in the compact large-font RTL composer. */
     @Test
     fun composerDictationProcessingCompactLargeFontRtl() {
         render(
@@ -613,7 +613,7 @@ class ComposerBarScreenshotTest {
             DictationPreview.Processing -> {
                 controller.requestStart(ACCOUNT, GROUP, draft)
                 platform.listener.onReady()
-                platform.listener.onEndOfSpeech()
+                controller.paste()
             }
             DictationPreview.ElsewhereListening -> {
                 controller.requestStart(OTHER_ACCOUNT, OTHER_GROUP, draft)

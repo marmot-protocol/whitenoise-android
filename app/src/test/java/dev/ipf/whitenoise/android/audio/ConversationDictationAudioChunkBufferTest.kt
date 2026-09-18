@@ -23,7 +23,7 @@ class ConversationDictationAudioChunkBufferTest {
 
         repeat(3_600) { second ->
             val pcm = ByteArray(bytesPerSecond) { (second and 0xff).toByte() }
-            assertTrue(buffer.append(pcm, pcm.size))
+            assertTrue(buffer.append(pcm, pcm.size, hasSpeech = true))
             buffer.poll()?.let { chunk ->
                 assertEquals(7L, chunk.sessionId)
                 assertEquals(chunks.toLong() + 1L, chunk.chunkId)
@@ -49,7 +49,7 @@ class ConversationDictationAudioChunkBufferTest {
     @Test
     fun retryRequeuesTheSameChunkWithoutDuplicatingItsAccounting() {
         val buffer = ConversationDictationAudioChunkBuffer(sessionId = 11L, chunkBytes = 4, maxBufferedBytes = 8)
-        assertTrue(buffer.append(byteArrayOf(1, 2, 3, 4), 4))
+        assertTrue(buffer.append(byteArrayOf(1, 2, 3, 4), 4, hasSpeech = true))
         val first = checkNotNull(buffer.poll())
 
         assertTrue(buffer.retry(first.chunkId))
@@ -63,13 +63,27 @@ class ConversationDictationAudioChunkBufferTest {
         assertFalse(buffer.acknowledge(retried.chunkId))
     }
 
+    /** Speech evidence follows the exact sealed chunk across silent and voiced appends. */
+    @Test
+    fun sealedChunksPreserveCaptureSideSpeechEvidence() {
+        val buffer = ConversationDictationAudioChunkBuffer(sessionId = 12L, chunkBytes = 4, maxBufferedBytes = 8)
+        assertTrue(buffer.append(byteArrayOf(0, 0, 0, 0), 4, hasSpeech = false))
+        assertTrue(buffer.append(byteArrayOf(1, 0, 2, 0), 4, hasSpeech = true))
+
+        val silence = checkNotNull(buffer.poll())
+        assertFalse(silence.hasSpeech)
+        assertTrue(buffer.acknowledge(silence.chunkId))
+        val speech = checkNotNull(buffer.poll())
+        assertTrue(speech.hasSpeech)
+    }
+
     /** A rejected read must leave earlier queued and partial PCM intact for recovery. */
     @Test
     fun overflowRejectsTheWholeWriteWithoutSilentlyChangingBufferedAudio() {
         val buffer = ConversationDictationAudioChunkBuffer(sessionId = 1L, chunkBytes = 4, maxBufferedBytes = 8)
-        assertTrue(buffer.append(byteArrayOf(1, 2, 3, 4, 5, 6), 6))
+        assertTrue(buffer.append(byteArrayOf(1, 2, 3, 4, 5, 6), 6, hasSpeech = true))
 
-        assertFalse(buffer.append(byteArrayOf(7, 8, 9, 10), 4))
+        assertFalse(buffer.append(byteArrayOf(7, 8, 9, 10), 4, hasSpeech = true))
         buffer.finish()
 
         val first = checkNotNull(buffer.poll())
@@ -86,7 +100,7 @@ class ConversationDictationAudioChunkBufferTest {
     @Test
     fun finishSealsOnePartialChunkAndIsIdempotent() {
         val buffer = ConversationDictationAudioChunkBuffer(sessionId = 3L, chunkBytes = 8, maxBufferedBytes = 16)
-        assertTrue(buffer.append(byteArrayOf(9, 8), 2))
+        assertTrue(buffer.append(byteArrayOf(9, 8), 2, hasSpeech = true))
 
         buffer.finish()
         buffer.finish()
@@ -96,14 +110,14 @@ class ConversationDictationAudioChunkBufferTest {
         assertEquals(0L, chunk.firstSample)
         assertEquals(1L, chunk.lastSampleExclusive)
         assertNull(buffer.poll())
-        assertFalse(buffer.append(byteArrayOf(7, 6), 2))
+        assertFalse(buffer.append(byteArrayOf(7, 6), 2, hasSpeech = true))
     }
 
     /** A speech-boundary seal shortens provider latency without gaps or overlapping sample ranges. */
     @Test
     fun sentenceBoundarySealsEligiblePartialChunkAndPreservesFollowingTail() {
         val buffer = ConversationDictationAudioChunkBuffer(sessionId = 8L, chunkBytes = 12, maxBufferedBytes = 24)
-        assertTrue(buffer.append(byteArrayOf(1, 2, 3, 4, 5, 6), 6))
+        assertTrue(buffer.append(byteArrayOf(1, 2, 3, 4, 5, 6), 6, hasSpeech = true))
         assertFalse(buffer.sealCurrentIfAtLeast(8))
         assertTrue(buffer.sealCurrentIfAtLeast(6))
 
@@ -113,7 +127,7 @@ class ConversationDictationAudioChunkBufferTest {
         assertEquals(3L, sentence.lastSampleExclusive)
         assertTrue(buffer.acknowledge(sentence.chunkId))
 
-        assertTrue(buffer.append(byteArrayOf(7, 8, 9, 10), 4))
+        assertTrue(buffer.append(byteArrayOf(7, 8, 9, 10), 4, hasSpeech = true))
         buffer.finish()
         val tail = checkNotNull(buffer.poll())
         assertArrayEquals(byteArrayOf(7, 8, 9, 10), tail.pcm)
@@ -129,14 +143,14 @@ class ConversationDictationAudioChunkBufferTest {
         }
         val buffer = ConversationDictationAudioChunkBuffer(sessionId = 1L, chunkBytes = 4, maxBufferedBytes = 8)
 
-        assertFails<IllegalArgumentException> { buffer.append(byteArrayOf(1), 1) }
+        assertFails<IllegalArgumentException> { buffer.append(byteArrayOf(1), 1, hasSpeech = true) }
     }
 
     /** Prevents parallel provider requests from claiming different chunks out of sequence. */
     @Test
     fun onlyOneChunkCanBeInFlightAtATime() {
         val buffer = ConversationDictationAudioChunkBuffer(sessionId = 5L, chunkBytes = 4, maxBufferedBytes = 8)
-        assertTrue(buffer.append(byteArrayOf(1, 2, 3, 4, 5, 6, 7, 8), 8))
+        assertTrue(buffer.append(byteArrayOf(1, 2, 3, 4, 5, 6, 7, 8), 8, hasSpeech = true))
 
         val first = checkNotNull(buffer.poll())
         assertNull(buffer.poll())
@@ -148,7 +162,7 @@ class ConversationDictationAudioChunkBufferTest {
     @Test
     fun discardClearsCurrentQueuedAndInFlightAudio() {
         val buffer = ConversationDictationAudioChunkBuffer(sessionId = 9L, chunkBytes = 4, maxBufferedBytes = 12)
-        assertTrue(buffer.append(byteArrayOf(1, 2, 3, 4, 5, 6), 6))
+        assertTrue(buffer.append(byteArrayOf(1, 2, 3, 4, 5, 6), 6, hasSpeech = true))
         checkNotNull(buffer.poll())
 
         buffer.discard()
@@ -156,7 +170,7 @@ class ConversationDictationAudioChunkBufferTest {
         assertEquals(0, buffer.bufferedBytes)
         assertFalse(buffer.hasPending)
         assertNull(buffer.poll())
-        assertFalse(buffer.append(byteArrayOf(7, 8), 2))
+        assertFalse(buffer.append(byteArrayOf(7, 8), 2, hasSpeech = true))
     }
 
     /** Checks the failure type and propagates unexpected exceptions instead of hiding test defects. */

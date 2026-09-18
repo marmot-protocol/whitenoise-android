@@ -51,12 +51,13 @@ class ConversationDictationPersistentControlTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    /** Verifies listening and processing keep the three explicit session outcomes visible and accessible. */
+    /** Provider segment processing stays visibly in dictation until a completion action is requested. */
     @Test
     fun listeningAndProcessingExposeCancelPasteAndSendActions() {
         val fixture = fixture(TextFieldValue("Draft", TextRange(5)))
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
         render(fixture)
+        composeRule.onNodeWithTag(DICTATION_LISTENING_INDICATOR_TAG).assertIsDisplayed()
         composeRule.onNodeWithTag(DICTATION_PROGRESS_TAG).assertDoesNotExist()
         fixture.platform.listener.onReady()
 
@@ -74,16 +75,23 @@ class ConversationDictationPersistentControlTest {
         }
         composeRule.onNodeWithContentDescription("Record voice message").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("Pause").assertDoesNotExist()
+        composeRule.onNodeWithTag(DICTATION_LISTENING_INDICATOR_TAG).assertIsDisplayed()
         composeRule.onNodeWithTag(DICTATION_PROGRESS_TAG).assertDoesNotExist()
 
         fixture.platform.listener.onEndOfSpeech()
 
         composeRule
             .onNodeWithTag(APP_DICTATION_CONTROL_TAG)
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Transcribing…"))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Dictating…"))
         listOf("Cancel", "Paste", "Send").forEach { label ->
             composeRule.onNodeWithContentDescription(label).assertIsDisplayed()
         }
+        composeRule.onNodeWithTag(DICTATION_LISTENING_INDICATOR_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(DICTATION_PROGRESS_TAG).assertDoesNotExist()
+
+        composeRule.onNodeWithContentDescription("Send").performClick()
+
+        composeRule.onNodeWithTag(DICTATION_LISTENING_INDICATOR_TAG).assertDoesNotExist()
         composeRule
             .onNodeWithTag(DICTATION_PROGRESS_TAG)
             .assertIsDisplayed()
@@ -105,6 +113,7 @@ class ConversationDictationPersistentControlTest {
         composeRule.onNodeWithContentDescription("Send").performClick()
 
         assertTrue(fixture.controller.state is ConversationDictationState.Processing)
+        composeRule.onNodeWithTag(DICTATION_LISTENING_INDICATOR_TAG).assertDoesNotExist()
         val send = composeRule.onNodeWithContentDescription("Send").getUnclippedBoundsInRoot()
         val progress = composeRule.onNodeWithTag(DICTATION_PROGRESS_TAG).assertIsDisplayed().getUnclippedBoundsInRoot()
         assertTrue(progress.left >= send.left && progress.right <= send.right)
