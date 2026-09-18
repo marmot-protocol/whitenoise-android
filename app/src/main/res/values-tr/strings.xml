@@ -1825,6 +1825,7 @@
     <string name="choose_files">Dosyalardan seç</string>
     <string name="group_emoji_create">Emojiden oluştur</string>
     <string name="profile_suggest_name">İsim öner</string>
+    <string name="profile_restore_saved_name">Kayıtlı adı geri yükle</string>
     <string name="profile_lightning_address">Lightning adresi</string>
     <string name="profile_image_failed">Bu resim yüklenemedi. Başka bir resim seçin veya tekrar deneyin.</string>
     <string name="profile_publish_failed">Profiliniz kaydedilemedi. Bilgilerinizi kontrol edip tekrar deneyin.</string>
