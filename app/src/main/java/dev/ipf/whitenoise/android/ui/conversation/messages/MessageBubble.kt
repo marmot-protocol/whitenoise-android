@@ -1770,11 +1770,15 @@ internal fun MessageBubble(
                 // image/video; a file card or caption owns the footer instead.
                 // The prototype keeps time and status below the media, inside the bubble, never overlaid on it.
                 val footerOnVisualMedia = false
+                // A caption is the message's last line, so it carries the time and
+                // delivery state the way a text bubble does; the file card keeps the
+                // footer only when there is no caption to carry it.
                 val confirmedFileFooterInCard =
                     fileCardOwnsFooter(
                         deleted = deleted,
                         fileCount = fileAttachments.size,
                         visualOwnsFooter = footerOnVisualMedia,
+                        hasCaption = mediaCaption != null,
                     )
                 // Share-message recognition (app-side rich rendering). A contact
                 // ships as a text/vcard attachment with a name/phone caption, so
@@ -1824,6 +1828,7 @@ internal fun MessageBubble(
                         deleted = deleted,
                         fileCount = pendingAttachmentsForRecord.size,
                         visualOwnsFooter = footerOnPendingVisual,
+                        hasCaption = mediaCaption != null,
                     ) &&
                         showPendingPlaceholder
                 val fileFooterInCard = confirmedFileFooterInCard || pendingFileFooterInCard
@@ -2124,6 +2129,7 @@ internal fun MessageBubble(
                                                 fileFooterWarning = fileFooterWarning,
                                                 onMediaLongPress = onMediaLongPress,
                                                 focusedPreview = isActionMenuOpen,
+                                                hasCaption = mediaCaption != null,
                                             )
                                         }
                                     }
@@ -2206,6 +2212,7 @@ internal fun MessageBubble(
                                                 fileFooterWarning = fileFooterWarning,
                                                 onMediaLongPress = onMediaLongPress,
                                                 focusedPreview = isActionMenuOpen,
+                                                hasCaption = mediaCaption != null,
                                             )
                                         }
                                     }

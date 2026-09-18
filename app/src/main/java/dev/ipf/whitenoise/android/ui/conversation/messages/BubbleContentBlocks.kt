@@ -92,14 +92,16 @@ internal fun ttsBodyIsCollapsed(
 ): Boolean = collapseEnabled && (measuredBodyHeightPx == null || measuredBodyHeightPx > maxBodyHeightPx)
 
 /**
- * Selects the final file card as the message footer owner when no visual tile already owns it.
+ * Selects the final file card as the message footer owner when no visual tile already owns it and
+ * the message has no caption; a caption is the message's last line and carries the footer itself.
  * Confirmed and optimistic file renderers apply the returned ownership only to their last card.
  */
 internal fun fileCardOwnsFooter(
     deleted: Boolean,
     fileCount: Int,
     visualOwnsFooter: Boolean,
-): Boolean = !deleted && fileCount > 0 && !visualOwnsFooter
+    hasCaption: Boolean = false,
+): Boolean = !deleted && fileCount > 0 && !visualOwnsFooter && !hasCaption
 
 /**
  * Selects an uncaptioned visual-only group for overlay metadata.
@@ -167,6 +169,8 @@ internal fun ColumnScope.BubbleMediaBlocks(
     fileFooterWarning: String?,
     onMediaLongPress: () -> Unit,
     focusedPreview: Boolean = false,
+    // A caption carries the footer, so no file card may draw the time, state or retention glyph.
+    hasCaption: Boolean = false,
 ) {
     val retentionInput =
         record.retentionIndicatorInput(
@@ -296,6 +300,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 deleted = deleted,
                 fileCount = bubbleMedia.files.size,
                 visualOwnsFooter = footerOnVisualMedia,
+                hasCaption = hasCaption,
             )
         val fileTimestamp = if (fileOwnsFooter) rememberedMessageBubbleTime(record.recordedAt) else null
         bubbleMedia.files.forEachIndexed { filePosition, entry ->
@@ -429,6 +434,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 deleted = deleted,
                 fileCount = controller.pendingAttachmentsList(record.messageIdHex).size,
                 visualOwnsFooter = footerOnPendingVisual,
+                hasCaption = hasCaption,
             )
         MediaPendingPlaceholder(
             pendingAttachments = controller.pendingAttachmentsList(record.messageIdHex),
