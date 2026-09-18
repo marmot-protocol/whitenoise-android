@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasTestTag
@@ -11,11 +12,14 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.After
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -42,9 +46,19 @@ class SettingsUpdatePlacementTest {
         updatePreferences().edit().clear().commit()
     }
 
+    /**
+     * These preferences outlive the test class, so a stored release would hand a later test a false
+     * available-update state depending on the order the runner picked.
+     */
+    @After
+    fun clearStoredUpdateStateAgain() {
+        updatePreferences().edit().clear().commit()
+    }
+
     /** With a newer release recorded, the row leads: it sits above the account group. */
     @Test
     fun anAvailableUpdateLeadsTheRealSettingsScreen() {
+        assumeTrue("a store-managed build shows no update section at all", BuildConfig.SELF_UPDATE_ENABLED)
         storeLatestVersion("2999.1.1")
         mountSettings()
         val update = composeRule.onNodeWithTag("settings.app_updates").fetchSemanticsNode().boundsInRoot
@@ -62,6 +76,7 @@ class SettingsUpdatePlacementTest {
      */
     @Test
     fun withNothingNewerTheRowLeavesTheFirstScreenful() {
+        assumeTrue("a store-managed build shows no update section at all", BuildConfig.SELF_UPDATE_ENABLED)
         mountSettings()
         composeRule.onNodeWithTag("settings.section.Account").assertExists()
         composeRule.onNodeWithTag("settings.app_updates").assertDoesNotExist()
@@ -70,6 +85,15 @@ class SettingsUpdatePlacementTest {
             .onNode(hasScrollToNodeAction())
             .performScrollToNode(hasTestTag("settings.app_updates"))
         composeRule.onNodeWithTag("settings.app_updates").assertExists()
+    }
+
+    /** A store-managed build owns its own updates, so neither placement is drawn at all. */
+    @Test
+    fun aStoreManagedBuildDrawsNoUpdateSection() {
+        assumeTrue("this case is about builds that do not self-update", !BuildConfig.SELF_UPDATE_ENABLED)
+        storeLatestVersion("2999.1.1")
+        mountSettings()
+        composeRule.onNodeWithTag("settings.app_updates").assertDoesNotExist()
     }
 
     private fun storeLatestVersion(version: String) {
@@ -81,8 +105,8 @@ class SettingsUpdatePlacementTest {
     private fun mountSettings() {
         composeRule.setContent {
             WhiteNoiseTheme {
-                var detail by mutableStateOf<SettingsDetail?>(null)
-                var homeViewport by mutableStateOf(SettingsHomeViewport.Top)
+                var detail by remember { mutableStateOf<SettingsDetail?>(null) }
+                var homeViewport by remember { mutableStateOf(SettingsHomeViewport.Top) }
                 SettingsScreen(
                     appState = appState(),
                     onBackToChats = {},
