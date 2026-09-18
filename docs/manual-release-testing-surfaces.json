@@ -663,6 +663,14 @@
         ]
       },
       {
+        "surface": "ChatRowDeliveryGlyph",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowLayout.kt",
+        "anchor": "fun ChatRowDeliveryGlyph(",
+        "test_ids": [
+          "CHL-002"
+        ]
+      },
+      {
         "surface": "ChatsNewMessageFab",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsNewMessageFab.kt",
         "anchor": "fun ChatsNewMessageFab(",

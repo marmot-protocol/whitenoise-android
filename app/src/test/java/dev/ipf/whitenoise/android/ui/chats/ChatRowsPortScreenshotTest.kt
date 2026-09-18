@@ -81,6 +81,8 @@ class ChatRowsPortScreenshotTest {
                 ChatRowPortFixtures.item(pinned = true, retentionSeconds = 86_400uL),
                 ChatRowPortFixtures.item(membership = SelfMembershipFfi.REMOVED, unread = true),
                 ChatRowPortFixtures.item(delivery = ChatListMessageDeliveryStateFfi.FAILED),
+                ChatRowPortFixtures.item(delivery = ChatListMessageDeliveryStateFfi.PENDING),
+                ChatRowPortFixtures.item(delivery = ChatListMessageDeliveryStateFfi.DELIVERED),
                 ChatRowPortFixtures.item(preview = "Selected chat"),
             )
         composeRule.setContent {
@@ -107,8 +109,8 @@ class ChatRowsPortScreenshotTest {
                                             onClick = {},
                                             onOpenProfile = {},
                                             isMuted = index == 1,
-                                            selectionMode = index == 4,
-                                            selected = index == 4,
+                                            selectionMode = index == rows.lastIndex,
+                                            selected = index == rows.lastIndex,
                                         )
                                     }
                                 }

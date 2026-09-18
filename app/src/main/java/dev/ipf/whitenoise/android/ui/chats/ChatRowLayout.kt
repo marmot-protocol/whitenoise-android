@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
@@ -34,14 +35,17 @@ import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.offset
+import dev.ipf.whitenoise.android.state.OutgoingMessageIndicator
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.common.FailedDeliveryBadge
 import dev.ipf.whitenoise.android.ui.common.InvitationBadge
 import dev.ipf.whitenoise.android.ui.common.ManualUnreadDot
 import dev.ipf.whitenoise.android.ui.common.UnreadCountBadge
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
+import dev.ipf.whitenoise.android.ui.common.chatRowBadgeDiameter
 import dev.ipf.whitenoise.android.ui.common.rememberedRelativeTime
 import dev.ipf.whitenoise.android.ui.common.selectionRowIcon
+import dev.ipf.whitenoise.android.ui.conversation.messages.OutgoingIndicatorIcon
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 
 internal const val CHAT_ROW_SELECTION_INDICATOR_TAG = "chat-row-selection-indicator"
@@ -212,7 +216,7 @@ internal fun ChatRowSupportingMetadata(
     actionColors: AccountActionColors?,
     pinned: Boolean,
     evicted: Boolean = false,
-    deliveryFailed: Boolean = false,
+    deliveryIndicator: OutgoingMessageIndicator? = null,
 ) {
     if (pendingConfirmation) {
         InvitationBadge(actionColors = actionColors)
@@ -223,7 +227,11 @@ internal fun ChatRowSupportingMetadata(
         ) {
             if (pinned) PinnedBadge()
             if (evicted) EvictedLabel()
-            if (deliveryFailed) FailedDeliveryBadge()
+            when (deliveryIndicator) {
+                null -> Unit
+                OutgoingMessageIndicator.Failed -> FailedDeliveryBadge()
+                else -> ChatRowDeliveryGlyph(deliveryIndicator)
+            }
             if (rowHasUnread) {
                 if (unreadMention) MentionBadge()
                 if (rowUnreadCount > 0uL) {
@@ -233,6 +241,19 @@ internal fun ChatRowSupportingMetadata(
                 }
             }
         }
+    }
+}
+
+/**
+ * The bubble's own delivery glyph at row-metadata weight: the pending clock while sending, the filled
+ * check disc once sent. Reused rather than redrawn so a row and its conversation never disagree about
+ * what a message's state looks like.
+ */
+@Suppress("FunctionNaming")
+@Composable
+private fun ChatRowDeliveryGlyph(indicator: OutgoingMessageIndicator) {
+    Box(Modifier.size(chatRowBadgeDiameter()), contentAlignment = Alignment.Center) {
+        OutgoingIndicatorIcon(indicator, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

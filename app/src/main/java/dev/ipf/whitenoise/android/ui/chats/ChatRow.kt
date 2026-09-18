@@ -267,8 +267,8 @@ internal fun ChatRow(
             else -> Modifier
         }
     val pinned = item.pinned()
-    val deliveryFailed = item.projectedDeliveryIndicator() == OutgoingMessageIndicator.Failed
-    val hasSupportingMetadata = item.group.pendingConfirmation || rowHasUnread || deliveryFailed
+    val deliveryIndicator = item.projectedDeliveryIndicator()
+    val hasSupportingMetadata = item.group.pendingConfirmation || rowHasUnread || deliveryIndicator != null
     val actionColors = accountActionColors(appState)
     ChatRowLayout(
         modifier = rowModifier.fillMaxWidth().padding(horizontal = 8.dp).testTag("chat.row.${item.id}"),
@@ -429,7 +429,7 @@ internal fun ChatRow(
                         actionColors = actionColors,
                         pinned = false,
                         evicted = false,
-                        deliveryFailed = deliveryFailed,
+                        deliveryIndicator = deliveryIndicator,
                     )
                 }
             } else {
