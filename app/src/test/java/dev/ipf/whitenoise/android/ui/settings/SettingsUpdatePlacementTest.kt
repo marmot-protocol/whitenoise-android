@@ -96,6 +96,41 @@ class SettingsUpdatePlacementTest {
         composeRule.onNodeWithTag("settings.app_updates").assertDoesNotExist()
     }
 
+    /**
+     * A dismissed update still leads. Dismissal belongs to the banner — it decides whether to interrupt
+     * — and Settings is the place a reader goes to find what the banner stopped mentioning.
+     */
+    @Test
+    fun aDismissedUpdateStillLeadsTheScreen() {
+        assumeTrue("a store-managed build shows no update section at all", BuildConfig.SELF_UPDATE_ENABLED)
+        storeLatestVersion("2999.1.1")
+        updatePreferences().edit().putString("dismissed_version", "2999.1.1").commit()
+        mountSettings()
+        val update = composeRule.onNodeWithTag("settings.app_updates").fetchSemanticsNode().boundsInRoot
+        val account = composeRule.onNodeWithTag("settings.section.Account").fetchSemanticsNode().boundsInRoot
+        assertTrue("a dismissed update must still be offered here: $update vs $account", update.top < account.top)
+    }
+
+    /**
+     * A failed check is not an update. It keeps the lower placement and stays tappable there, rather
+     * than promoting an error into the space reserved for something a reader can install.
+     */
+    @Test
+    fun aFailedCheckDoesNotPromoteTheRow() {
+        assumeTrue("a store-managed build shows no update section at all", BuildConfig.SELF_UPDATE_ENABLED)
+        updatePreferences()
+            .edit()
+            .putLong("last_attempt_ms", 1L)
+            .putString("last_attempt_error_report", "network unreachable")
+            .commit()
+        mountSettings()
+        composeRule.onNodeWithTag("settings.app_updates").assertDoesNotExist()
+        composeRule
+            .onNode(hasScrollToNodeAction())
+            .performScrollToNode(hasTestTag("settings.app_updates"))
+        composeRule.onNodeWithTag("settings.app_updates").assertExists()
+    }
+
     private fun storeLatestVersion(version: String) {
         updatePreferences().edit().putString("latest_version", version).commit()
     }
