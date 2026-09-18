@@ -168,12 +168,23 @@ class SettingsScreenScreenshotTest {
         profileCount: Int = 1,
         latestVersion: String? = null,
     ) {
+        // The same predicate production uses, rather than "a latest version was supplied": a latest
+        // version equal to the installed one is not an update, and deriving it any other way would let
+        // the fixture draw the prominent placement above an "Up to date" subtitle.
+        val appUpdateInfo =
+            AppUpdateInfo(
+                installedVersion = "2026.9.15",
+                latestVersion = latestVersion,
+                checkedAtMillis = null,
+                dismissedVersion = null,
+                releasesBehind = null,
+            )
         SettingsHomeContent(
             state =
                 settingsHomeState(
                     hasActiveAccount = true,
                     selfUpdateEnabled = true,
-                    updateAvailable = latestVersion != null,
+                    updateAvailable = appUpdateInfo.isUpdateAvailable,
                 ),
             account =
                 SettingsHomeAccount(
@@ -183,14 +194,7 @@ class SettingsScreenScreenshotTest {
                     pictureUrl = null,
                 ),
             profileCount = profileCount,
-            appUpdateInfo =
-                AppUpdateInfo(
-                    installedVersion = "2026.9.15",
-                    latestVersion = latestVersion,
-                    checkedAtMillis = null,
-                    dismissedVersion = null,
-                    releasesBehind = null,
-                ),
+            appUpdateInfo = appUpdateInfo,
             versionName = "2026.9.15",
             onBack = {},
             onOpenShareConnect = {},

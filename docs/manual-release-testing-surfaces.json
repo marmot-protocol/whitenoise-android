@@ -25162,7 +25162,7 @@
         ]
       },
       {
-        "surface": "The update row leads the settings home only while a newer version is available, and otherwise sits beside the version footer",
+        "surface": "In a self-managed build the update row leads the settings home only while a newer version is available and otherwise sits beside the version footer; a store-managed build shows neither",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
         "anchor": "internal fun settingsHomeState(",
         "test_ids": [
