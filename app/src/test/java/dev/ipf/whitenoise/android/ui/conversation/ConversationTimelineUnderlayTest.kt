@@ -128,16 +128,57 @@ class ConversationTimelineUnderlayTest {
             // The anchor reads the first entry of whichever layout it is given; reversed emission
             // makes that the newest row.
             val rawCandidate = list.layoutInfo.visibleItemsInfo.first()
-            val readingCandidate = viewport.readingLayoutInfo().visibleItemsInfo.first()
+            val readingCandidate = checkNotNull(viewport.readingLayoutInfo().newestReadRow())
             assertEquals(COVERED_ROW_VALUE, rawCandidate.key)
-            assertEquals(COVERED_ROW_VALUE - 1, readingCandidate.key)
+            // This slide buries the newest row whole and still leaves the one behind it clipped by
+            // the composer, so the watermark has to fall back a further row to find one read.
+            assertEquals(COVERED_ROW_VALUE - 2, readingCandidate.key)
             assertEquals(
                 TIMELINE_SIZE - 1,
                 conversationTimelineIndexForListIndex(rawCandidate.index, TIMELINE_SIZE, trailingRowCount = 0),
             )
             assertEquals(
-                TIMELINE_SIZE - 2,
+                TIMELINE_SIZE - 3,
                 conversationTimelineIndexForListIndex(readingCandidate.index, TIMELINE_SIZE, trailingRowCount = 0),
+            )
+        }
+    }
+
+    /**
+     * On open the transcript rests with the next message showing a sliver above the composer. That
+     * sliver is a real touch and TalkBack target, but it is not something anyone has read, so it
+     * must not become the read watermark and must not be deducted from the unread badge.
+     */
+    @Test
+    fun aRowLeftShowingASliverIsNotTreatedAsRead() {
+        foreground = 120
+        render()
+        rule.waitForIdle()
+        rule.runOnIdle { scope.launch { list.scrollToItem(0, SLIVER_OVERLAP_PX) } }
+        rule.waitForIdle()
+        rule.runOnIdle {
+            val reading = viewport.readingLayoutInfo()
+            // The sliver keeps the row usable, which is what the shared projection is for.
+            assertEquals(COVERED_ROW_VALUE, reading.visibleItemsInfo.first().key)
+            // The watermark asks a stricter question and must refuse it.
+            assertEquals(COVERED_ROW_VALUE - 1, reading.newestReadRow()?.key)
+        }
+    }
+
+    /** A row taller than the clear viewport is the only thing the reader can be looking at, so it counts. */
+    @Test
+    fun aRowTallerThanTheViewportStillCountsAsRead() {
+        foreground = 120
+        render(oversizedLastRow = true)
+        rule.waitForIdle()
+        rule.runOnIdle { scope.launch { list.scrollToItem(0, SLIVER_OVERLAP_PX) } }
+        rule.waitForIdle()
+        rule.runOnIdle {
+            val reading = viewport.readingLayoutInfo()
+            val newest = reading.newestReadRow()
+            assertTrue(
+                "an oversized row must not leave the watermark with nothing to advance to",
+                newest != null,
             )
         }
     }
@@ -422,6 +463,9 @@ private const val TIMELINE_SIZE = 20
  * plus the resting gap beneath it.
  */
 private const val COVERED_ROW_OVERLAP_PX = 100
+
+/** Slides the newest 80px row most of the way under, leaving only a sliver in the clear band. */
+private const val SLIVER_OVERLAP_PX = 72
 
 /** A row sitting well inside the clear band once the origin is slid under the composer. */
 private const val CLEAR_ROW_VALUE = 17

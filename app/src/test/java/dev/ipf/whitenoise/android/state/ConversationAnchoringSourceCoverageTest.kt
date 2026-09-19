@@ -92,7 +92,7 @@ class ConversationAnchoringSourceCoverageTest {
 
         assertTrue(
             "the read watermark must ignore rows the composer covers rather than the raw layout",
-            helper.containsAll("timelineViewport.readingLayoutInfo().visibleItemsInfo") &&
+            helper.containsAll("timelineViewport.readingLayoutInfo().newestReadRow()") &&
                 "listState.layoutInfo" !in helper,
         )
     }

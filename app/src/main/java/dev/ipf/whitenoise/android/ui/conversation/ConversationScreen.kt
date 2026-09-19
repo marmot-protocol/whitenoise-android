@@ -480,6 +480,10 @@ private fun rememberConversationBatchSelectionUiState(
  * in the same list slot still advances the anchor to the confirmed message.
  * A missing durable watermark rebases only at the fully loaded tail; while a
  * newer page exists it may be off-window and must remain monotonic.
+ *
+ * A row only counts once it clears the composer outright. The transcript rests with the next
+ * message showing a sliver above the composer, and taking that sliver as read deducted a message
+ * from the unread badge that nobody had seen.
  */
 @Composable
 private fun rememberConversationReadAnchor(
@@ -495,17 +499,17 @@ private fun rememberConversationReadAnchor(
     val currentHighestVisibleTimelineIndex by
         remember(timelineViewport, renderedSize, trailingRowCount) {
             derivedStateOf {
-                // The reading viewport rather than the raw layout: rows the composer covers are
-                // painted but cannot be read, so counting them would clear an unread badge for
-                // messages that never reached the reader's eyes.
-                val visible = timelineViewport.readingLayoutInfo().visibleItemsInfo
-                if (visible.isEmpty() || renderedSize == 0) return@derivedStateOf -1
+                // The reading viewport rather than the raw layout, and within it only a row that
+                // clears the composer outright. Counting a row the composer covers, or one left
+                // showing a sliver above it, clears an unread badge for a message nobody has read.
+                val newest = timelineViewport.readingLayoutInfo().newestReadRow()
+                if (newest == null || renderedSize == 0) return@derivedStateOf -1
                 // Reversed layout, bottom to top: [maybe bottom error]
                 // [timeline items, newest first][maybe older-loading]
                 // [maybe top error][maybe group recovery][top spacer].
-                // The lowest still-clear index is therefore the newest row actually shown.
+                // The lowest fully clear index is therefore the newest row actually read.
                 conversationTimelineIndexForListIndex(
-                    listIndex = visible.first().index,
+                    listIndex = newest.index,
                     timelineSize = renderedSize,
                     trailingRowCount = trailingRowCount,
                 ).coerceIn(0, renderedSize - 1)

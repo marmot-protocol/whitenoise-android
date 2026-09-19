@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.LazyListItemInfo
 import androidx.compose.foundation.lazy.LazyListLayoutInfo
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
@@ -131,6 +132,19 @@ internal fun conversationReadingLayoutInfo(
             }
     }
 }
+
+/**
+ * The newest row the reader has actually had in front of them, or null when none has.
+ *
+ * [conversationReadingLayoutInfo] keeps a row that merely pokes past the chrome, which is right for
+ * touch and for TalkBack, where a sliver is still a real target. It is wrong for the read watermark:
+ * a few pixels above the composer is not a message anyone has read, and on open the transcript rests
+ * with exactly that much of the next message showing. A row therefore has to clear the chrome
+ * outright, unless it is taller than the clear viewport, in which case it is the only thing the
+ * reader can be looking at.
+ */
+internal fun LazyListLayoutInfo.newestReadRow(): LazyListItemInfo? =
+    visibleItemsInfo.firstOrNull { it.offset >= viewportStartOffset || it.size >= viewportSize.height }
 
 /** Records the exact padding passed through this native list measure, including unchanged-total transitions. */
 internal fun Modifier.measureConversationTimelinePadding(
