@@ -22095,14 +22095,6 @@
         ]
       },
       {
-        "surface": "Dictation retained caller-audio completion retry bound",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
-        "anchor": "private fun retryRetainedCallerAudioOrFail(",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
         "surface": "Dictation automatic completion observes captured speech and drains the tail",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
         "anchor": "private fun finishAfterCallerAudioSilence(",
@@ -25169,11 +25161,36 @@
         ]
       },
       {
-        "surface": "In a self-managed build the update row leads the settings home only while a newer version is available and otherwise sits beside the version footer; a store-managed build shows neither",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
-        "anchor": "internal fun settingsHomeState(",
+        "surface": "A history page the engine never answers leaves the reader a retry affordance instead of a silent stall",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationTimelinePaging.kt",
+        "anchor": "fun ConversationController.loadOlderPageInternal(",
         "test_ids": [
-          "SET-001"
+          "CON-003"
+        ]
+      },
+      {
+        "surface": "An upward page reports the reader's oldest visible row as the window anchor before paging",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationTimelinePaging.kt",
+        "anchor": "fun ConversationController.pageOlderIfActive(",
+        "test_ids": [
+          "CON-003"
+        ]
+      },
+      {
+        "surface": "An extended window keeps the rows it still holds rather than rebuilding and re-parsing them",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/WindowApplyMode.kt",
+        "anchor": "fun ConversationController.planWindowApply(",
+        "test_ids": [
+          "CON-002",
+          "CON-003"
+        ]
+      },
+      {
+        "surface": "string:error_loaded_content_kept",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationTimelinePaging.kt",
+        "anchor": "R.string.error_loaded_content_kept",
+        "test_ids": [
+          "CON-003"
         ]
       }
     ],

@@ -2491,14 +2491,12 @@ internal fun ConversationScreen(
     // visible rows in the same measure pass with no post-hoc scroll.
     LaunchedEffect(listState, controller) {
         snapshotFlow {
-            listState.layoutInfo.visibleItemsInfo
-                .lastOrNull()
-                ?.index ?: -1
-        }.collect { oldestVisibleIndex ->
-            if (!initialTimelineAnchored || !controller.hasMoreBefore || controller.isLoadingOlder) {
-                return@collect
-            }
-            if (oldestVisibleIndex < 0) return@collect
+            // The reversed list emits the older-loading row, the top error row and the top spacer
+            // after the messages, so they hold the highest indexes — exactly the oldest end, and
+            // exactly what is on screen when a page is due. Taking the last visible item would pick
+            // one of those, resolve no anchor, and page unanchored: the bug this is meant to fix.
+            listState.layoutInfo.visibleItemsInfo.lastOrNull { conversationAnchorMessageId(it.key) != null }
+        }.collect { oldestVisible ->
             val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
             if (liveRenderedSize == 0) return@collect
             val oldestMessageListIndex =
@@ -2507,9 +2505,24 @@ internal fun ConversationScreen(
                     timelineSize = liveRenderedSize,
                     trailingRowCount = controller.conversationTrailingRowCount(liveRenderedSize),
                 )
-            if (oldestVisibleIndex >= oldestMessageListIndex - OLDER_PAGE_PREFETCH_ROWS) {
-                controller.loadOlder()
-            }
+            val prefetch =
+                shouldPrefetchOlder(
+                    anchored = initialTimelineAnchored,
+                    hasMoreBefore = controller.hasMoreBefore,
+                    isLoadingOlder = controller.isLoadingOlder,
+                    // A page the engine never answered leaves the reader a retry row; without this
+                    // the effect would re-issue it on every scroll frame, which is the silent stall
+                    // this screen used to show. The retry, or a live replacement, clears the block.
+                    olderPageBlocked = controller.olderPageBlocked,
+                    oldestVisibleIndex = oldestVisible?.index ?: -1,
+                    oldestMessageListIndex = oldestMessageListIndex,
+                )
+            if (!prefetch) return@collect
+            // MDK places a replacement relative to the window's anchor, so tell it which row the
+            // reader is actually on before paging. Without this an upward page is placed against
+            // whatever the read pointer last reported, which only ever moves towards newer
+            // messages — the reason scrolling up could move the reading position.
+            controller.loadOlder(conversationAnchorMessageId(oldestVisible?.key))
         }
     }
     // Loading the authoritative unread boundary can shift a capped subscription

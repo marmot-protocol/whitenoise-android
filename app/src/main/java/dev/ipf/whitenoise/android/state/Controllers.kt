@@ -5864,7 +5864,8 @@ private fun TimelineUpdateTriggerFfi.recomputesReactions(): Boolean =
         -> false
     }
 
-private val ConversationTimelinePageLimit = 50u
+@Suppress("MayBeConstant")
+internal val ConversationTimelinePageLimit = 50u
 
 internal fun compareConversationTimelinePosition(
     firstAt: ULong,
@@ -6453,10 +6454,10 @@ class ConversationController(
         )
         private set
     var isLoadingOlder by mutableStateOf(false)
-        private set
+        internal set
     var hasMoreBefore by mutableStateOf(false)
         private set
-    private var hasMoreAfter by mutableStateOf(false)
+    internal var hasMoreAfter by mutableStateOf(false)
 
     // Single guard for archive/leave/member-management mutations so the UI can
     // disable buttons while one is in flight and prevent double-submits.
@@ -6465,7 +6466,7 @@ class ConversationController(
     var lastMutationError by mutableStateOf<ErrorPresentation?>(null)
         private set
     private var subscriptionError by mutableStateOf<ErrorPresentation?>(null)
-    private var pageError by mutableStateOf<ErrorPresentation?>(null)
+    internal var pageError by mutableStateOf<ErrorPresentation?>(null)
     val error: ErrorPresentation?
         get() = pageError ?: subscriptionError
     internal val errorEdge: ConversationLoadFailureEdge
@@ -6476,7 +6477,7 @@ class ConversationController(
     var retryGeneration by mutableLongStateOf(0L)
         private set
     private var terminalLoadFailure = false
-    private var failedPageDirection: ConversationSearchPageDirection? = null
+    internal var failedPageDirection: ConversationSearchPageDirection? = null
 
     // Drops re-entrant calls so a rapid double-tap can't enqueue duplicate
     // FFI work even before Compose re-evaluates `enabled = !mutationInFlight`.
@@ -6548,14 +6549,14 @@ class ConversationController(
 
     private val mediaUploadSessionEpoch = appState.mediaUploadSessionEpoch()
     private val messageById = linkedMapOf<String, AppMessageRecordFfi>()
-    private val timelineRecords = linkedMapOf<String, TimelineMessageRecordFfi>()
+    internal val timelineRecords = linkedMapOf<String, TimelineMessageRecordFfi>()
 
     /** Whether [messageIdHex] is an authoritative row of the current window rather than a local optimistic id. */
     internal fun retainsTimelineRecord(messageIdHex: String): Boolean = timelineRecords.containsKey(messageIdHex)
 
-    private val timelineItemsById = linkedMapOf<String, TimelineMessage>()
+    internal val timelineItemsById = linkedMapOf<String, TimelineMessage>()
     private val timelineOrder = mutableListOf<String>()
-    private val authoritativeTimelineOrderByMessageId = linkedMapOf<String, ULong>()
+    internal val authoritativeTimelineOrderByMessageId = linkedMapOf<String, ULong>()
     private val durableStreamDisplayParentByMessageId = mutableMapOf<String, String>()
     private val optimisticMessages = appState.optimisticMessages(conversationAccountRef, initialGroup.groupIdHex)
     private val durableAcceptanceCallbacks =
@@ -6614,8 +6615,9 @@ class ConversationController(
     var groupRecoveryMutationInFlight by mutableStateOf(false)
         private set
     private val projectedMessageIds = appState.projectedMessageIds(conversationAccountRef, initialGroup.groupIdHex)
-    private val localTimelineOrderOverrides = appState.timelineOrderOverrides(conversationAccountRef, initialGroup.groupIdHex)
-    private val localTimelineTimestampOverrides =
+    internal val localTimelineOrderOverrides =
+        appState.timelineOrderOverrides(conversationAccountRef, initialGroup.groupIdHex)
+    internal val localTimelineTimestampOverrides =
         appState.timelineTimestampOverrides(conversationAccountRef, initialGroup.groupIdHex)
 
     // Subset of the preserves above that came from an optimistic *send* handoff
@@ -6642,7 +6644,7 @@ class ConversationController(
     // and bridge insert, the OLD controller's `performMediaUpload` still
     // sees the stash that the NEW controller's subscription contributed
     // to (or vice-versa).
-    private val pendingProjectionsAwaitingBridge =
+    internal val pendingProjectionsAwaitingBridge =
         appState.pendingProjectionsAwaitingBridge(conversationAccountRef, initialGroup.groupIdHex)
     private val optimisticReactionChanges = linkedMapOf<String, OptimisticReactionChange>()
 
@@ -6685,15 +6687,15 @@ class ConversationController(
 
     /** Newest installed conversation-window sidecar: header, capabilities, draft and reaction references. */
     internal val window = ConversationWindowState()
-    private val liveSubscriptionLock = Any()
-    private val timelineSubscriptionActiveCallMutex = Mutex()
+    internal val liveSubscriptionLock = Any()
+    internal val timelineSubscriptionActiveCallMutex = Mutex()
     private var groupStateSubscription: ConversationGroupStateSubscriptionHandle? = null
     private var startJob: Job? = null
 
     // staleness-exempt: captured subscription-start token, not a counter owner.
     private var lastStartedGeneration: Long? = null
     private var conversationScope: CoroutineScope? = null
-    private var accountTeardownRequested = false
+    internal var accountTeardownRequested = false
     private var controllerCleared = false
     private val activeStreamIds = mutableSetOf<String>()
     private val foregroundSweepScheduleSignals = Channel<Unit>(Channel.CONFLATED)
@@ -6714,12 +6716,12 @@ class ConversationController(
     // kept open for a long time can't grow memory or per-batch filter cost
     // without bound. See #200.
     private val removedStreamIds = BoundedStreamTombstones()
-    private var hasLoadedOlderPages = false
+    internal var hasLoadedOlderPages = false
 
     // Snapshot of message ids in the deliberately-loaded history window after the
     // last successful loadOlderPage(). Live Upserts after that are capped separately
     // so indexes and messageById cannot grow without bound (#1163).
-    private val protectedTimelineMessageIds = mutableSetOf<String>()
+    internal val protectedTimelineMessageIds = mutableSetOf<String>()
 
     // Last message id we successfully marked as read on the Rust side.
     // Dedupes scroll-driven [markReadUpTo] calls so settling on the same row
@@ -10645,8 +10647,8 @@ class ConversationController(
         }.getOrNull()
     }
 
-    suspend fun loadOlder() {
-        loadOlderPage()
+    suspend fun loadOlder(anchorMessageIdHex: String? = null) {
+        loadOlderPage(anchorMessageIdHex)
     }
 
     /** True when the canonical timeline holds more history after the loaded window. */
@@ -10809,87 +10811,29 @@ class ConversationController(
             ?.firstOrNull { it.messageIdHex.equals(messageIdHex, ignoreCase = true) }
     }
 
-    private suspend fun loadOlderPage(): Boolean {
-        if (!hasMoreBefore || isLoadingOlder) return false
-        val subscription = timelineSubscription ?: return false
-        val priorMessageIds = timelineRecords.keys.toSet()
-        // A previous loadOlderPage failure leaves `error` set; clear it now
-        // that we're actually retrying, otherwise the stale banner sits over
-        // a successful retry and a developer can't distinguish "still broken"
-        // from "we forgot to clear it".
-        pageError = null
-        isLoadingOlder = true
-        return try {
-            // The subscription's paginate_backwards extends the runtime's
-            // materialized window backwards by `count` and returns the new
-            // authoritative window — already deduped, sorted, head-anchored,
-            // and cap-trimmed. We render it directly via replaceWindow=true.
-            val page = paginateOlderIfSubscriptionActive(subscription) ?: return false
-            hasLoadedOlderPages = true
-            failedPageDirection = null
-            applyTimelinePage(page, replaceWindow = true, updatePagination = true)
-            protectedTimelineMessageIds.clear()
-            protectedTimelineMessageIds.addAll(timelineRecords.keys)
-            // "Made progress" = the window grew OR shifted to include older
-            // ids. paginateBackwards() returns a bounded/capped full window,
-            // so size can stay constant while content still advances backward.
-            timelineRecords.size > priorMessageIds.size ||
-                timelineRecords.keys.any { it !in priorMessageIds }
-        } catch (cancel: CancellationException) {
-            throw cancel
-        } catch (throwable: Throwable) {
-            failedPageDirection = ConversationSearchPageDirection.OLDER
-            pageError =
-                privacySafeErrorPresentation(
-                    "CONVERSATION_PAGE_OLDER",
-                    throwable,
-                    AppText.Resource(R.string.error_loaded_content_kept),
-                )
-            false
-        } finally {
-            isLoadingOlder = false
-        }
-    }
+    /**
+     * Pages the window older, keeping the reader's oldest visible row as the window anchor.
+     *
+     * True only when new rows arrived, so callers that page in a loop still stop on no progress.
+     */
+    private suspend fun loadOlderPage(anchorMessageIdHex: String? = null): Boolean = loadOlderPageInternal(anchorMessageIdHex) == ConversationPageLoad.ADVANCED
 
-    private suspend fun loadNewerPage(): Boolean {
-        val subscription = timelineSubscription
-        if (!hasMoreAfter || isLoadingOlder || subscription == null) return false
-        val priorMessageIds = timelineRecords.keys.toSet()
-        pageError = null
-        isLoadingOlder = true
-        return try {
-            val page = paginateNewerIfSubscriptionActive(subscription)
-            if (page == null) {
-                false
-            } else {
-                applyTimelinePage(page, replaceWindow = true, updatePagination = true)
-                failedPageDirection = null
-                protectedTimelineMessageIds.clear()
-                if (hasLoadedOlderPages) {
-                    protectedTimelineMessageIds.addAll(timelineRecords.keys)
-                }
-                timelineRecords.size > priorMessageIds.size ||
-                    timelineRecords.keys.any { it !in priorMessageIds }
-            }
-        } catch (cancel: CancellationException) {
-            throw cancel
-        } catch (throwable: Throwable) {
-            failedPageDirection = ConversationSearchPageDirection.NEWER
-            pageError =
-                privacySafeErrorPresentation(
-                    "CONVERSATION_PAGE_NEWER",
-                    throwable,
-                    AppText.Resource(R.string.error_loaded_content_kept),
-                )
-            false
-        } finally {
-            isLoadingOlder = false
-        }
-    }
+    private suspend fun loadNewerPage(): Boolean = loadNewerPageInternal() == ConversationPageLoad.ADVANCED
+
+    /**
+     * Whether an older page failed in a way the reader must retry.
+     *
+     * Scroll-driven prefetch reads this so a window that timed out is not asked again on every
+     * frame; the retry affordance, or any live replacement that clears [pageError], releases it.
+     */
+    val olderPageBlocked: Boolean
+        get() = pageError != null && failedPageDirection == ConversationSearchPageDirection.OLDER
 
     suspend fun retryLoadFailure() {
         if (subscriptionError?.retryable == false) return
         when (failedPageDirection?.takeIf { pageError != null }) {
+            // Retrying deliberately pages from the revision MDK still holds rather than re-reporting
+            // an anchor: the reader has not scrolled since the attempt they are retrying.
             ConversationSearchPageDirection.OLDER -> loadOlderPage()
             ConversationSearchPageDirection.NEWER -> loadNewerPage()
             null ->
@@ -10901,30 +10845,6 @@ class ConversationController(
                 }
         }
     }
-
-    private suspend fun paginateOlderIfSubscriptionActive(subscription: ConversationTimelineSubscriptionHandle): TimelinePageFfi? =
-        timelineSubscriptionActiveCallMutex.withLock {
-            val stillActive =
-                synchronized(liveSubscriptionLock) {
-                    !accountTeardownRequested && timelineSubscription === subscription
-                }
-            if (!stillActive) return@withLock null
-            withContext(Dispatchers.IO) {
-                subscription.paginateBackwards(ConversationTimelinePageLimit)
-            }
-        }
-
-    private suspend fun paginateNewerIfSubscriptionActive(subscription: ConversationTimelineSubscriptionHandle): TimelinePageFfi? =
-        timelineSubscriptionActiveCallMutex.withLock {
-            val stillActive =
-                synchronized(liveSubscriptionLock) {
-                    !accountTeardownRequested && timelineSubscription === subscription
-                }
-            if (!stillActive) return@withLock null
-            withContext(Dispatchers.IO) {
-                subscription.paginateForwards(ConversationTimelinePageLimit)
-            }
-        }
 
     /** Replaces the timeline only when no newer page or live update superseded the read. */
     private suspend fun refreshCurrentTimeline(
@@ -11018,6 +10938,21 @@ class ConversationController(
         )
     }
 
+    /**
+     * Retires a stream whose final record arrived in this window.
+     *
+     * Marking it removed stops a late `AgentStreamUpdateFfi.Finished` event recreating the
+     * optimistic preview as a duplicate. See #25.
+     */
+    private fun retireFinishedStream(actionRecord: AppMessageRecordFfi) {
+        if (!MessageProjector.isStreamFinal(actionRecord)) return
+        MessageProjector.streamId(actionRecord)?.let { streamId ->
+            activeStreamIds.remove(streamId)
+            removedStreamIds.add(streamId)
+            optimisticMessages.remove("stream:$streamId")
+        }
+    }
+
     /** Drops indexes owned by the previous authoritative bounded window. */
     private fun trimStateForWindowReplacement() {
         timelineRecords.clear()
@@ -11051,15 +10986,20 @@ class ConversationController(
         page: TimelinePageFfi,
         replaceWindow: Boolean,
         updatePagination: Boolean,
+        reconcileNewExtendedRecords: Boolean = false,
     ): List<String> {
         timelineWindowGeneration.advance()
         val installed = timelineSubscription?.latestInstalledWindow()
         val applied = installed?.page ?: page
         val pageMessages = applied.messages
+        // Settle the Markdown this timeline already parsed, and the rows the window dropped, before
+        // anything clears the indexes they are read from.
+        val plan = planWindowApply(applied, replaceWindow, reconcileNewExtendedRecords)
         if (replaceWindow) trimStateForWindowReplacement()
         authoritativeTimelineOrderByMessageId.clear()
         val profileIds = linkedSetOf<String>()
         val streamIds = mutableListOf<String>()
+        val appliedRecords = ArrayList<TimelineMessageRecordFfi>(pageMessages.size)
         pageMessages.forEachIndexed { index, record ->
             // Keep MDK's optimistic-head position for pending local projections.
             // Only terminally invalidated rows without accepted-history evidence
@@ -11068,11 +11008,14 @@ class ConversationController(
             if (record.usesAuthoritativePageOrder()) {
                 authoritativeTimelineOrderByMessageId[record.messageIdHex] = index.toULong()
             }
+            val reconciles = plan.reconciles(record.messageIdHex)
+            val carried = plan.carry(record, timelineRecords[record.messageIdHex])
+            appliedRecords.add(carried)
             val actionRecord =
                 upsertProjectedRecord(
-                    record,
-                    reconcileOptimistic = replaceWindow,
-                    allowDelayedProjection = replaceWindow,
+                    carried,
+                    reconcileOptimistic = reconciles,
+                    allowDelayedProjection = reconciles,
                 )
             profileIds.add(record.sender)
             record.replyPreview?.let { profileIds.add(it.sender) }
@@ -11081,15 +11024,7 @@ class ConversationController(
             if (record.deleted) {
                 deletedMessageIds = deletedMessageIds - record.messageIdHex
             }
-            if (MessageProjector.isStreamFinal(actionRecord)) {
-                MessageProjector.streamId(actionRecord)?.let { streamId ->
-                    activeStreamIds.remove(streamId)
-                    // Mark removed so a late AgentStreamUpdateFfi.Finished event
-                    // can't recreate the optimistic preview as a duplicate. See #25.
-                    removedStreamIds.add(streamId)
-                    optimisticMessages.remove("stream:$streamId")
-                }
-            }
+            retireFinishedStream(actionRecord)
         }
         appState.requestProfiles(profileIds)
         applyDurableStreamPositions(durableStreamDisplayPositions(timelineRecords.values.toList()))
@@ -11097,13 +11032,19 @@ class ConversationController(
             hasMoreBefore = applied.hasMoreBefore
             hasMoreAfter = applied.hasMoreAfter
         }
+        // Rows this page kept skip re-projection, so their projected items still carry the ordinal
+        // from where the window used to sit. Display sorts on that ordinal, so re-stamp it before
+        // publishing or a slid window would reorder history the reader is looking at.
+        if (!plan.replaces) refreshAuthoritativeOrder(applied)
         pruneReadAnchorsToWindow()
         pruneConfirmedOptimisticMessages()
         pruneRetentionAtSendToWindow()
         pruneConfirmedOptimisticReactions()
         pruneMessageOverlaysToWindow()
         installWindowFrame(installed?.frame)
-        recomputeReactions()
+        // A replacement rebuilt every row, so every tally is stale. An extended window only changed
+        // the rows it added, altered or dropped.
+        if (plan.replaces) recomputeReactions() else recomputeReactions(plan.touchedIds)
         // A non-replaceWindow page (older-history load once hasLoadedOlderPages
         // is set) skips the replaceWindow trim above, so prune messageById to the
         // current window + optimistic records here too (#373).
@@ -11116,9 +11057,9 @@ class ConversationController(
         val preparingInitialPresentation = !hasPreparedInitialPresentation
         hasPublishedAuthoritativeTimeline = true
         initialTimelineSeedActive = false
-        publishTimelinePageBeforeMarkdownHydration(pageMessages)
+        publishTimelinePageBeforeMarkdownHydration(appliedRecords)
         scheduleProfilePresentationWarm(
-            records = pageMessages,
+            records = appliedRecords,
             markInitialPresentationReady = preparingInitialPresentation,
         )
         return streamIds
@@ -11819,7 +11760,7 @@ class ConversationController(
     }
 
     /** Removes one projection and every controller-owned index keyed to it. */
-    private fun removeProjectedRecord(messageIdHex: String) {
+    internal fun removeProjectedRecord(messageIdHex: String) {
         val itemId = timelineRecords[messageIdHex]?.let(::projectedItemId) ?: "msg:$messageIdHex"
         timelineRecords.remove(messageIdHex)
         authoritativeTimelineOrderByMessageId.remove(messageIdHex)

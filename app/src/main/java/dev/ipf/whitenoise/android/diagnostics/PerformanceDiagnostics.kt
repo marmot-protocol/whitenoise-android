@@ -18,6 +18,7 @@ internal enum class PerformanceOperation(
     MEDIA_SEND("media_send"),
     ATTACHMENT_FETCH("attachment_fetch"),
     SYNC_CATCH_UP("sync_catch_up"),
+    CHAT_HISTORY_PAGE("chat_history_page"),
 }
 
 /** Source-confirmed triggers accepted by recovery diagnostics. */
@@ -89,6 +90,10 @@ internal enum class PerformancePhase(
     MANUAL_RETRY("manual_retry"),
     ECHO_RECONCILE("echo_reconcile"),
     EVENTS_DROPPED("events_dropped"),
+    PAGE_ANCHOR("page_anchor"),
+    PAGE_WINDOW("page_window"),
+    PAGE_APPLY("page_apply"),
+    PAGE_COMPLETE("page_complete"),
 }
 
 internal enum class PerformanceResult(

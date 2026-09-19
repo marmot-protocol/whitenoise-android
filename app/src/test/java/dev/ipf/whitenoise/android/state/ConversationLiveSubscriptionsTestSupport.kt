@@ -22,6 +22,7 @@ import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
+import dev.ipf.whitenoise.android.state.TimelinePageOutcome.Advanced
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import org.junit.Assert.assertEquals
@@ -36,9 +37,12 @@ internal class ScriptedConversationTimelineSubscription(
     private val snapshotPage: TimelinePageFfi?,
     private val backwardsPage: TimelinePageFfi = emptyTimelinePage(),
     private val forwardsPage: TimelinePageFfi = emptyTimelinePage(),
+    /** Outcomes handed to successive backward pages; the configured window is used once it runs dry. */
+    private val backwardsOutcomes: MutableList<TimelinePageOutcome> = mutableListOf(),
 ) : ConversationTimelineSubscriptionHandle {
     private val lifecycleEvents = CopyOnWriteArrayList<String>()
     private val windows = Channel<TimelinePageFfi>(Channel.UNLIMITED)
+    private val anchorCalls = CopyOnWriteArrayList<String>()
 
     val lifecycleEventOrder: List<String>
         get() = lifecycleEvents.toList()
@@ -74,11 +78,27 @@ internal class ScriptedConversationTimelineSubscription(
         check(windows.trySend(page).isSuccess) { "timeline window channel is closed" }
     }
 
-    /** Returns the configured backward-pagination window. */
-    override suspend fun paginateBackwards(count: UInt): TimelinePageFfi = backwardsPage
+    val backwardsCallCount: Int
+        get() = lifecycleEvents.count { it == "paginateBackwards" }
+
+    val anchorReports: List<String>
+        get() = anchorCalls.toList()
+
+    /** Returns the next scripted backward outcome, or the configured window once the script runs dry. */
+    override suspend fun paginateBackwards(count: UInt): TimelinePageOutcome {
+        lifecycleEvents += "paginateBackwards"
+        return backwardsOutcomes.removeFirstOrNull() ?: Advanced(backwardsPage)
+    }
+
+    /** Records the row reported as the window anchor and leaves the window where it is. */
+    override suspend fun setVisibleAnchor(messageIdHex: String): TimelinePageFfi? {
+        lifecycleEvents += "setVisibleAnchor"
+        anchorCalls += messageIdHex
+        return null
+    }
 
     /** Returns the configured forward-pagination window. */
-    override suspend fun paginateForwards(count: UInt): TimelinePageFfi = forwardsPage
+    override suspend fun paginateForwards(count: UInt): TimelinePageOutcome = Advanced(forwardsPage)
 
     /** Records closure and unblocks any pending live-window read. */
     override fun close() {

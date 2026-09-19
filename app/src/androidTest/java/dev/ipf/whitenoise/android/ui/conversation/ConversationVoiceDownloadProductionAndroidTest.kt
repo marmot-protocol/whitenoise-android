@@ -57,6 +57,7 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadNetwork
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
+import dev.ipf.whitenoise.android.state.TimelinePageOutcome.Advanced
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.media.LocalVoiceAttachmentPresentationRuntime
 import dev.ipf.whitenoise.android.ui.conversation.media.VoiceAttachmentMaterializationRequest
@@ -785,20 +786,16 @@ private class InstrumentedTimelineSubscription(
     override suspend fun nextWindow(): TimelinePageFfi? = windows.receiveCatching().getOrNull()
 
     /** Returns an empty terminal page so backward pagination cannot add fixture rows. */
-    override suspend fun paginateBackwards(count: UInt): TimelinePageFfi =
-        TimelinePageFfi(
-            messages = emptyList(),
-            hasMoreBefore = false,
-            hasMoreAfter = false,
-        )
+    override suspend fun paginateBackwards(count: UInt) = Advanced(terminalPage())
 
     /** Keeps forward pagination terminal so tail assertions cannot consume synthetic pages. */
-    override suspend fun paginateForwards(count: UInt): TimelinePageFfi =
-        TimelinePageFfi(
-            messages = emptyList(),
-            hasMoreBefore = false,
-            hasMoreAfter = false,
-        )
+    override suspend fun paginateForwards(count: UInt) = Advanced(terminalPage())
+
+    /** An exhausted window in both directions, so pagination can never add fixture rows. */
+    private fun terminalPage(): TimelinePageFfi {
+        val none = emptyList<TimelineMessageRecordFfi>()
+        return TimelinePageFfi(messages = none, hasMoreBefore = false, hasMoreAfter = false)
+    }
 
     /** Ends the live stream and unblocks a controller pump waiting in [nextWindow]. */
     override fun close() {

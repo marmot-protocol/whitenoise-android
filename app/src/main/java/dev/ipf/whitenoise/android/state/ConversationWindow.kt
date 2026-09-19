@@ -11,6 +11,8 @@ import dev.ipf.marmotkit.ConversationIdentityFfi
 import dev.ipf.marmotkit.ConversationMessageReferencesFfi
 import dev.ipf.marmotkit.ConversationOpenReadStateFfi
 import dev.ipf.marmotkit.ConversationPageDirectionFfi
+import dev.ipf.marmotkit.ConversationPageDirectionFfi.NEWER
+import dev.ipf.marmotkit.ConversationPageDirectionFfi.OLDER
 import dev.ipf.marmotkit.ConversationReactionsFfi
 import dev.ipf.marmotkit.ConversationWindowRevisionFfi
 import dev.ipf.marmotkit.ConversationWindowSnapshotFfi
@@ -19,6 +21,8 @@ import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.SelectedMessageDraftFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.core.ReactionTally
+import dev.ipf.whitenoise.android.state.TimelinePageOutcome.Advanced
+import dev.ipf.whitenoise.android.state.TimelinePageOutcome.Unchanged
 import kotlinx.coroutines.delay
 
 /** Rows requested per conversation page and at opening; MDK accepts 1–200 and retains at most 200. */
@@ -162,23 +166,52 @@ private class ConversationWindowInstaller {
     // Letting any of them escape would take the process down from a scroll-settle effect (seen on device
     // when an optimistic row's local id reached `setVisibleAnchor`).
     @Suppress("SwallowedException", "ReturnCount")
-    suspend fun command(
+    suspend fun commandOutcome(
         rethrowMissingTarget: Boolean = false,
         block: suspend (ConversationWindowRevisionFfi) -> ConversationWindowSnapshotFfi,
-    ): TimelinePageFfi? {
-        val revision = synchronized(lock) { cursor?.revision } ?: return null
+    ): TimelinePageOutcome {
+        val revision =
+            synchronized(lock) { cursor?.revision }
+                ?: return unchanged(ConversationWindowUnchangedReason.NO_WINDOW)
         val result =
             try {
                 block(revision)
             } catch (missing: MarmotKitException.ConversationWindowMessageNotRetained) {
                 if (rethrowMissingTarget) throw missing
-                return null
+                return unchanged(ConversationWindowUnchangedReason.SUPERSEDED)
             } catch (windowOutcome: MarmotKitException) {
-                return null
+                return unchanged(windowOutcome.unchangedReason())
             }
+        // A replacement the cursor refuses is one a newer install already overtook.
         return install(result)
+            ?.let(::Advanced)
+            ?: unchanged(ConversationWindowUnchangedReason.SUPERSEDED)
     }
+
+    /** The newly installed page, or null for every outcome that left the window where it was. */
+    suspend fun command(
+        rethrowMissingTarget: Boolean = false,
+        block: suspend (ConversationWindowRevisionFfi) -> ConversationWindowSnapshotFfi,
+    ): TimelinePageFfi? = (commandOutcome(rethrowMissingTarget, block) as? Advanced)?.page
+
+    /** Pairs an unchanged reason with the page the handle still holds. */
+    private fun unchanged(reason: ConversationWindowUnchangedReason): TimelinePageOutcome = Unchanged(reason, page)
 }
+
+/**
+ * Which unchanged reason a window error reports. Not-ready and timed-out are the two a caller can
+ * act on; every other window error means a newer revision or a closed window owns the answer.
+ */
+private fun MarmotKitException.unchangedReason(): ConversationWindowUnchangedReason =
+    when (this) {
+        is MarmotKitException.ConversationWindowNotReady -> ConversationWindowUnchangedReason.NOT_READY
+        is MarmotKitException.ConversationWindowTimedOut -> ConversationWindowUnchangedReason.TIMED_OUT
+        is MarmotKitException.ConversationWindowStale,
+        is MarmotKitException.ConversationWindowWrongGeneration,
+        is MarmotKitException.ConversationWindowAnchorOutside,
+        -> ConversationWindowUnchangedReason.SUPERSEDED
+        else -> ConversationWindowUnchangedReason.TERMINAL
+    }
 
 /**
  * Presents MDK's conversation window through the page-shaped timeline seam the controller already
@@ -216,16 +249,10 @@ internal class FfiConversationWindowHandle(
     }
 
     /** Extends the window towards older history from the installed revision. */
-    override suspend fun paginateBackwards(count: UInt): TimelinePageFfi {
-        val page = page(ConversationPageDirectionFfi.OLDER, count)
-        return page
-    }
+    override suspend fun paginateBackwards(count: UInt): TimelinePageOutcome = pageOutcome(OLDER, count)
 
     /** Extends the window towards newer history from the installed revision. */
-    override suspend fun paginateForwards(count: UInt): TimelinePageFfi {
-        val page = page(ConversationPageDirectionFfi.NEWER, count)
-        return page
-    }
+    override suspend fun paginateForwards(count: UInt): TimelinePageOutcome = pageOutcome(NEWER, count)
 
     /** Page and sidecar of the newest installed replacement as one revision. */
     override fun latestInstalledWindow(): InstalledConversationWindow? = installer.installed
@@ -268,16 +295,14 @@ internal class FfiConversationWindowHandle(
         }
     }
 
-    private suspend fun page(
+    private suspend fun pageOutcome(
         direction: ConversationPageDirectionFfi,
         count: UInt,
-    ): TimelinePageFfi {
+    ): TimelinePageOutcome {
         val rows = count.coerceIn(1u, CONVERSATION_WINDOW_MAX_ROWS)
-        val result =
-            installer.command { revision ->
-                window.page(revision, direction, rows, CONVERSATION_WINDOW_DEFAULT_DEADLINE)
-            }
-        return result ?: installer.page ?: TimelinePageFfi(emptyList(), false, false)
+        return installer.commandOutcome { revision ->
+            window.page(revision, direction, rows, CONVERSATION_WINDOW_DEFAULT_DEADLINE)
+        }
     }
 }
 

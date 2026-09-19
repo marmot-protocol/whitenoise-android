@@ -8,6 +8,7 @@ import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.TimelineMessagesSubscription
 import dev.ipf.marmotkit.TimelinePageFfi
+import dev.ipf.whitenoise.android.state.TimelinePageOutcome.Advanced
 import kotlinx.coroutines.CancellationException
 
 /**
@@ -22,11 +23,18 @@ internal interface ConversationTimelineSubscriptionHandle {
     /** Returns MDK's next authoritative, ordered, and bounded timeline window. */
     suspend fun nextWindow(): TimelinePageFfi?
 
-    /** Loads the preceding bounded window while retaining the live subscription. */
-    suspend fun paginateBackwards(count: UInt): TimelinePageFfi
+    /**
+     * Loads the preceding bounded window while retaining the live subscription, reporting why the
+     * window stayed put when it did.
+     *
+     * Seams without a real window (the legacy timeline subscription, test doubles) cannot tell a
+     * deadline from exhausted history, so they report every page as having advanced — which is what
+     * a page-shaped result already meant for them.
+     */
+    suspend fun paginateBackwards(count: UInt): TimelinePageOutcome
 
     /** Loads the following bounded window while retaining the live subscription. */
-    suspend fun paginateForwards(count: UInt): TimelinePageFfi
+    suspend fun paginateForwards(count: UInt): TimelinePageOutcome
 
     /** Releases the underlying MDK subscription. */
     fun close()
@@ -68,10 +76,16 @@ internal class FfiConversationTimelineSubscriptionHandle(
     override suspend fun nextWindow(): TimelinePageFfi? = subscription.next()
 
     /** Delegates backward pagination to the active MDK subscription. */
-    override suspend fun paginateBackwards(count: UInt): TimelinePageFfi = subscription.paginateBackwards(count)
+    override suspend fun paginateBackwards(count: UInt): TimelinePageOutcome {
+        val page = subscription.paginateBackwards(count)
+        return Advanced(page)
+    }
 
     /** Delegates forward pagination to the active MDK subscription. */
-    override suspend fun paginateForwards(count: UInt): TimelinePageFfi = subscription.paginateForwards(count)
+    override suspend fun paginateForwards(count: UInt): TimelinePageOutcome {
+        val page = subscription.paginateForwards(count)
+        return Advanced(page)
+    }
 
     /** Closes the UniFFI subscription handle. */
     override fun close() = subscription.close()

@@ -71,12 +71,12 @@ class ConversationWindowHandleTest {
             val handle = FfiConversationWindowHandle(fake, release = fake::release)
             val initial = handle.snapshot()
 
-            val paged = handle.paginateBackwards(50u)
+            val paged = handle.paginateBackwards(50u).pageOrCurrent()
             assertEquals(listOf(1uL to ConversationPageDirectionFfi.OLDER), fake.pageCalls)
             assertEquals(listOf("m1", "m1-older"), paged.messages.map { it.messageIdHex })
 
             fake.failNextCommandWith = MarmotKitException.ConversationWindowStale()
-            val fallback = handle.paginateForwards(50u)
+            val fallback = handle.paginateForwards(50u).pageOrCurrent()
             assertSame(paged, fallback)
             assertEquals(2uL, handle.latestWindowFrame()?.revision?.sequence)
             assertFalse(initial === fallback)
@@ -124,7 +124,7 @@ class ConversationWindowHandleTest {
             val handle = FfiConversationWindowHandle(fake, release = fake::release)
             handle.snapshot()
 
-            val paged = handle.paginateBackwards(50u)
+            val paged = handle.paginateBackwards(50u).pageOrCurrent()
             val installed = handle.latestInstalledWindow()
             assertSame(paged, installed?.page)
             assertEquals(2uL, installed?.frame?.revision?.sequence)
@@ -192,6 +192,70 @@ class ConversationWindowHandleTest {
             handle.close()
             assertTrue(fake.cancelled)
             assertTrue(fake.released)
+        }
+
+    /** A page that misses the window deadline reports TIMED_OUT and keeps the installed page. */
+    @Test
+    fun pageTimeoutReportsTimedOutAndKeepsInstalledPage() =
+        runBlocking {
+            val fake = FakeConversationWindow(snapshot(sequence = 1uL, messageIds = listOf("m1")))
+            val handle = FfiConversationWindowHandle(fake, release = fake::release)
+            val initial = handle.snapshot()
+            fake.failNextCommandWith = MarmotKitException.ConversationWindowTimedOut()
+
+            val outcome = handle.paginateBackwards(50u)
+
+            val unchanged = outcome as TimelinePageOutcome.Unchanged
+            assertEquals(ConversationWindowUnchangedReason.TIMED_OUT, unchanged.reason)
+            assertSame(initial, unchanged.current)
+        }
+
+    /** A not-ready page reports NOT_READY; this seam does not retry on the caller's behalf. */
+    @Test
+    fun pageNotReadyReportsNotReadyWithoutRetryingHere() =
+        runBlocking {
+            val fake = FakeConversationWindow(snapshot(sequence = 1uL, messageIds = listOf("m1")))
+            val handle = FfiConversationWindowHandle(fake, release = fake::release)
+            handle.snapshot()
+            fake.failNextCommandWith = MarmotKitException.ConversationWindowNotReady()
+
+            val outcome = handle.paginateBackwards(50u)
+
+            assertEquals(
+                ConversationWindowUnchangedReason.NOT_READY,
+                (outcome as TimelinePageOutcome.Unchanged).reason,
+            )
+            assertTrue(fake.pageCalls.isEmpty())
+        }
+
+    /** A superseded page reports SUPERSEDED and hands back the same installed page instance. */
+    @Test
+    fun pageStaleReportsSupersededWithTheSamePageInstance() =
+        runBlocking {
+            val fake = FakeConversationWindow(snapshot(sequence = 1uL, messageIds = listOf("m1")))
+            val handle = FfiConversationWindowHandle(fake, release = fake::release)
+            handle.snapshot()
+            val paged = handle.paginateBackwards(50u).pageOrCurrent()
+            fake.failNextCommandWith = MarmotKitException.ConversationWindowStale()
+
+            val outcome = handle.paginateForwards(50u)
+
+            val unchanged = outcome as TimelinePageOutcome.Unchanged
+            assertEquals(ConversationWindowUnchangedReason.SUPERSEDED, unchanged.reason)
+            assertSame(paged, unchanged.current)
+        }
+
+    /** The page-shaped call keeps returning the installed page for every unchanged outcome. */
+    @Test
+    fun legacyPaginateBackwardsStillFallsBackToCurrentPage() =
+        runBlocking {
+            val fake = FakeConversationWindow(snapshot(sequence = 1uL, messageIds = listOf("m1")))
+            val handle = FfiConversationWindowHandle(fake, release = fake::release)
+            handle.snapshot()
+            val paged = handle.paginateBackwards(50u).pageOrCurrent()
+            fake.failNextCommandWith = MarmotKitException.ConversationWindowTimedOut()
+
+            assertSame(paged, handle.paginateBackwards(50u).pageOrCurrent())
         }
 }
 
