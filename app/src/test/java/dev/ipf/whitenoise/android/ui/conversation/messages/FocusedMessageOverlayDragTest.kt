@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
@@ -135,6 +136,45 @@ class FocusedMessageOverlayDragTest {
         assertTrue("the stack must stay in the frame, bottom was " + stackBottom(), stackBottom() <= FRAME)
     }
 
+    /**
+     * A second drag moves the stack as the first one did.
+     *
+     * The preview carries the dismiss tap inside the drag in the modifier chain, and a tap detector
+     * claims the press it sees. If it claimed the press for good, the first gesture after the
+     * overlay opened would drag and every later one would be dead — which is what the overlay looked
+     * like on device.
+     */
+    @Test
+    fun theStackStillDragsOnASecondGesture() {
+        render(anchorTop = 600, anchorBottom = 680)
+        val resting = stackTop()
+
+        composeRule.onNodeWithTag(PREVIEW_TAG).performTouchInput { swipeUp() }
+        composeRule.waitForIdle()
+        val afterFirst = stackTop()
+        composeRule.onNodeWithTag(PREVIEW_TAG).performTouchInput { swipeDown() }
+        composeRule.waitForIdle()
+
+        assertTrue("the first drag must move the stack, rested at " + resting, afterFirst < resting)
+        assertTrue("the second drag must move it back, was " + afterFirst, stackTop() > afterFirst)
+    }
+
+    /** A drag still works after a gesture the tap detector handled. */
+    @Test
+    fun theStackStillDragsAfterATapIsHandled() {
+        var dismissals = 0
+        render(anchorTop = 600, anchorBottom = 680, onDismiss = { dismissals += 1 })
+        val resting = stackTop()
+
+        composeRule.onNodeWithTag(PREVIEW_TAG).performTouchInput { click() }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(PREVIEW_TAG).performTouchInput { swipeUp() }
+        composeRule.waitForIdle()
+
+        assertEquals("the tap must still dismiss", 1, dismissals)
+        assertTrue("the drag after a tap must move the stack, rested at " + resting, stackTop() < resting)
+    }
+
     private fun stackTop(): Float =
         composeRule
             .onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG)
@@ -150,6 +190,7 @@ class FocusedMessageOverlayDragTest {
     private fun render(
         anchorTop: Int,
         anchorBottom: Int,
+        onDismiss: () -> Unit = {},
     ) {
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -180,7 +221,7 @@ class FocusedMessageOverlayDragTest {
                     },
                     onReact = {},
                     onMoreReactions = {},
-                    onDismiss = {},
+                    onDismiss = onDismiss,
                 )
             }
         }
