@@ -3228,6 +3228,7 @@ private class AndroidConversationDictationRecognitionSession(
     private var callerAudioCapturing = false
     private val captureFinished = AtomicReference<(() -> Unit)?>(null)
     private val mainHandler = Handler(Looper.getMainLooper())
+
     /** One exactly-once fence for this recognition generation; createSession owns the next one. */
     private val callerAudioCompletionBarrier =
         ConversationDictationCallerAudioCompletionBarrier(::dispatchOnMain)
