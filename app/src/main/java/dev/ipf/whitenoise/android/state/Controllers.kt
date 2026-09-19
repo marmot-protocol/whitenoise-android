@@ -4673,9 +4673,12 @@ class ChatsController private constructor(
                     return null
                 }
             pagesScanned++
+            val nowMillis = System.currentTimeMillis()
             val match =
                 ChatListMessageSearch.firstEligibleBodyMatch(
-                    page.messages.map(::searchableTimelineRecord),
+                    page.messages
+                        .filterNot { isRetentionExpiredForSearch(it, nowMillis) }
+                        .map(::searchableTimelineRecord),
                     ciNeedle,
                     constraints,
                 )

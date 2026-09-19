@@ -187,6 +187,7 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.BatchMessageDeleteDia
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessageSheet
 import dev.ipf.whitenoise.android.ui.conversation.messages.KeptMessagesOverlay
 import dev.ipf.whitenoise.android.ui.conversation.messages.KeptMessagesOverlayState
+import dev.ipf.whitenoise.android.ui.conversation.messages.LocalConversationSearchNeedle
 import dev.ipf.whitenoise.android.ui.conversation.messages.LocalKeptMessages
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageDetailsScreen
 import dev.ipf.whitenoise.android.ui.conversation.messages.RestoredForwardRequestHost
@@ -3606,7 +3607,13 @@ internal fun ConversationScreen(
             )
         },
     ) { padding ->
-        CompositionLocalProvider(LocalKeptMessages provides keptMessagesController) {
+        CompositionLocalProvider(
+            LocalKeptMessages provides keptMessagesController,
+            // Bubbles mark their own matches while search is open, so a hit is obvious on any
+            // bubble colour rather than only on the one the jump happened to land on.
+            LocalConversationSearchNeedle provides
+                navigationState.searchQuery.takeIf { navigationState.searchOpen && it.isNotBlank() },
+        ) {
             val overlayPadding = timelineViewport.overlayPadding(density, timelineUnderlayEnabled)
             ConversationTransientNoticeLayout(
                 notice = appState.transientNotice,

@@ -286,7 +286,9 @@ private fun messageTargetHighlightModifier(
                     } else {
                         CornerRadius(15.dp.toPx(), 15.dp.toPx())
                     },
-                style = Stroke(width = 2.dp.toPx()),
+                // A hairline outline is easy to miss on a pale bubble, which is where a jumped-to
+                // search result usually lands. A custom border keeps its own weight.
+                style = Stroke(width = if (customBorderArgb != null) 2.dp.toPx() else 3.dp.toPx()),
             )
         }
     } else {

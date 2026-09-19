@@ -82,7 +82,10 @@ import dev.ipf.marmotkit.MarkdownNostrHrpFfi
 import dev.ipf.marmotkit.MarkdownTableCellFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
+import dev.ipf.whitenoise.android.ui.conversation.messages.MessageSearchHighlight
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudHighlightStyle
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageSearchHighlight
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageSearchMatchRanges
 import dev.ipf.whitenoise.android.ui.conversation.messages.rememberTtsReadAloudHighlightStyle
 import dev.ipf.whitenoise.android.ui.conversation.messages.ttsReadAloudHighlight
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
@@ -153,6 +156,7 @@ internal fun MarkdownMessageBody(
     ttsReadAloudHighlightStyle: TtsReadAloudHighlightStyle? = null,
     ttsSentenceLayoutReporter: TtsSentenceLayoutReporter? = null,
     ttsSentenceActions: TtsSentenceActions? = null,
+    searchHighlight: MessageSearchHighlight? = null,
 ) {
     val context = LocalContext.current
     // A tapped spoofable `[label](url)` link parks its destination here until
@@ -199,6 +203,7 @@ internal fun MarkdownMessageBody(
         LocalMarkdownLinkCopyHandler provides onCopyLink,
         LocalTtsSentenceActions provides ttsSentenceActions,
         LocalTtsLeafHighlightResolver provides ttsLeafHighlightResolver,
+        LocalMessageSearchHighlight provides searchHighlight,
         LocalTtsReadAloudHighlightStyle provides ttsReadAloudHighlightStyle,
         LocalTtsSentenceLayoutReporter provides ttsSentenceLayoutReporter,
     ) {
@@ -326,6 +331,22 @@ private val LocalSelectableTextLayoutReporter =
 
 private val LocalTtsSentenceActions = staticCompositionLocalOf<TtsSentenceActions?> { null }
 
+private val LocalMessageSearchHighlight = compositionLocalOf<MessageSearchHighlight?> { null }
+
+/** Marks this leaf's own search matches, or nothing at all when search is closed. */
+@Composable
+private fun rememberMessageSearchHighlightModifier(
+    layoutResult: TextLayoutResult?,
+    leafText: String,
+): Modifier {
+    val highlight = LocalMessageSearchHighlight.current
+    val ranges =
+        remember(highlight?.needle, leafText) {
+            highlight?.let { messageSearchMatchRanges(leafText, it.needle) }.orEmpty()
+        }
+    return Modifier.messageSearchHighlight(layoutResult, ranges, highlight)
+}
+
 private val LocalTtsLeafHighlightResolver =
     compositionLocalOf<TtsLeafHighlightResolver?> { null }
 
@@ -428,6 +449,7 @@ private fun MarkdownBodyText(
             modifier
                 .then(accessibilityModifier)
                 .ttsReadAloudHighlight(layoutResult, highlight, highlightStyle)
+                .then(rememberMessageSearchHighlightModifier(layoutResult, text.text))
                 .onGloballyPositioned { coordinates ->
                     tracker.coordinates = coordinates
                     reportIfReady()

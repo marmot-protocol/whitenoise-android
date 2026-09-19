@@ -127,9 +127,11 @@ private fun libraryItems(
     needle: String,
     constraints: MessageSearchConstraints?,
     kinds: Set<GlobalSearchContentKind>,
+    nowMillis: Long = System.currentTimeMillis(),
 ): List<GlobalAttachmentItem> {
     val eligible =
         !record.deleted &&
+            !isRetentionExpiredForSearch(record, nowMillis) &&
             MessageAttachments.hasAccepted(record.media) &&
             matchesNeedle(record, needle) &&
             (constraints == null || constraints.matches(searchableTimelineRecord(record)))

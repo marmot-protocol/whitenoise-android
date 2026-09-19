@@ -212,9 +212,14 @@ internal fun ColumnScope.BubbleMediaBlocks(
         ContactMessageBubble(contact = sharedContact)
     }
     if (sharedUser != null) {
+        // Resolve the shared npub the same way a mention of that person resolves, so a shared
+        // contact arrives as a name and a face instead of a key the reader has to look up.
+        val sharedUserAccountIdHex = remember(sharedUser.npub) { appState.accountIdHexForMention(sharedUser.npub) }
         UserMessageBubble(
             user = sharedUser,
             onOpen = { appState.presentProfile(sharedUser.npub) },
+            displayName = sharedUserAccountIdHex?.let { appState.displayName(it) },
+            pictureUrl = sharedUserAccountIdHex?.let { appState.avatarUrl(it) },
         )
     }
     if (!deleted && bubbleMedia.visuals.isNotEmpty()) {
@@ -611,8 +616,26 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
             }
         }
         val plainHighlight = presentedTtsLeafHighlightResolver?.invoke("plain", bodyText)
+        val searchNeedle = LocalConversationSearchNeedle.current
+        val searchHighlight =
+            remember(searchNeedle, bubbleContentColor) {
+                searchNeedle?.takeIf { it.isNotBlank() }?.let { needle ->
+                    // Tinting the bubble's own content colour keeps the marker readable on a white
+                    // incoming bubble, a tinted outgoing one and any custom colour.
+                    MessageSearchHighlight(
+                        needle = needle,
+                        fill = bubbleContentColor.copy(alpha = MESSAGE_SEARCH_HIGHLIGHT_ALPHA),
+                    )
+                }
+            }
+        val plainSearchRanges =
+            remember(searchHighlight?.needle, bodyText) {
+                searchHighlight?.let { messageSearchMatchRanges(bodyText, it.needle) }.orEmpty()
+            }
         val plainHighlightModifier =
-            Modifier.ttsReadAloudHighlight(plainLayoutResult, plainHighlight, highlightStyle)
+            Modifier
+                .ttsReadAloudHighlight(plainLayoutResult, plainHighlight, highlightStyle)
+                .messageSearchHighlight(plainLayoutResult, plainSearchRanges, searchHighlight)
         val messageTextBody: @Composable () -> Unit = {
             if (renderMarkdownBody) {
                 readAloudMessageSemantics(
@@ -655,6 +678,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                             },
                         ttsReadAloudHighlightStyle = highlightStyle,
                         ttsSentenceLayoutReporter = presentedTtsSentenceLayoutReporter,
+                        searchHighlight = searchHighlight,
                     )
                 }
             } else {

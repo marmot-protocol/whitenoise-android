@@ -22308,6 +22308,15 @@
         ]
       },
       {
+        "surface": "A message past its disappearing deadline stays out of every search surface",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/MessageBodySearchSupport.kt",
+        "anchor": "internal fun isRetentionExpiredForSearch(",
+        "test_ids": [
+          "GRP-017",
+          "CHL-002"
+        ]
+      },
+      {
         "surface": "notification-first-post:group_system_admin_added",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
         "anchor": "R.string.group_system_admin_added",
@@ -23638,6 +23647,14 @@
         "test_ids": [
           "MSG-007",
           "MSG-015"
+        ]
+      },
+      {
+        "surface": "Every non-action part of the focused-message overlay dismisses it, including the lifted message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "internal fun FocusedMessageActions(",
+        "test_ids": [
+          "MSG-004"
         ]
       },
       {
@@ -25233,14 +25250,6 @@
         "test_ids": [
           "ONB-017",
           "ONB-020"
-        ]
-      },
-      {
-        "surface": "Every non-action part of the focused-message overlay dismisses it, including the lifted message",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
-        "anchor": "internal fun FocusedMessageActions(",
-        "test_ids": [
-          "MSG-004"
         ]
       }
     ],
