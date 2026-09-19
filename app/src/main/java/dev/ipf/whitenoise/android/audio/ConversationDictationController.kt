@@ -259,6 +259,9 @@ internal interface ConversationDictationRecognitionSession {
     /** Releases the exact caller-audio chunk only after this generation's final was accepted. */
     fun acknowledgeCallerAudio(): Boolean = false
 
+    /** Stable identity for the exact caller-audio chunk claimed by this generation. */
+    fun callerAudioChunkId(): Long? = null
+
     /** Reports capture-side speech evidence for the exact caller-audio chunk, when available. */
     fun callerAudioContainsSpeech(): Boolean? = null
 
@@ -515,6 +518,8 @@ internal class ConversationDictationController internal constructor(
     private var generationHasSpeech = false
     private var consecutiveNoSpeechRestarts = 0
     private var retainedCallerAudioRetries = 0
+    private var rejectedCallerAudioChunkId: Long? = null
+    private var rejectedCallerAudioRetries = 0
     private var generationReadyAtElapsedMillis: Long? = null
     private var restartTimeoutHandle: ConversationDictationTimeoutHandle? = null
     private var restartId = 0L
@@ -1629,16 +1634,65 @@ internal class ConversationDictationController internal constructor(
                         }
                     if (!owns(sessionId, generationId)) return
                     unresolvedRecognitionFailure = failure
+                    val callerAudioChunkId = recognitionSession?.callerAudioChunkId()
+                    val callerAudioContainsSpeech = recognitionSession?.callerAudioContainsSpeech()
+                    val repeatedSpeechRejection =
+                        error == ConversationDictationFailure.NoSpeech &&
+                            callerAudioContainsSpeech == true &&
+                            callerAudioChunkId != null
+                    val advancedPastRejectedCallerAudio =
+                        repeatedSpeechRejection &&
+                            rejectedCallerAudioChunkId == callerAudioChunkId &&
+                            maxOf(rejectedCallerAudioRetries, retainedCallerAudioRetries) >=
+                            MAX_RETAINED_CALLER_AUDIO_RETRIES &&
+                            recognitionSession?.acknowledgeCallerAudio() == true
+                    val advancedPastConfirmedSilence =
+                        error == ConversationDictationFailure.NoSpeech &&
+                            callerAudioContainsSpeech == false &&
+                            recognitionSession?.acknowledgeCallerAudio() == true
                     val retainedCallerAudio =
-                        if (error == ConversationDictationFailure.NoSpeech) {
-                            recognitionSession?.retryCallerAudioWithFollowingAudio() == true
-                        } else {
+                        !advancedPastRejectedCallerAudio &&
+                            !advancedPastConfirmedSilence &&
                             recognitionSession?.retryCallerAudio() == true
+                    val retainedRejectedCallerAudio = repeatedSpeechRejection && retainedCallerAudio
+                    if (retainedRejectedCallerAudio) {
+                        if (rejectedCallerAudioChunkId != callerAudioChunkId) {
+                            rejectedCallerAudioChunkId = callerAudioChunkId
+                            rejectedCallerAudioRetries = 0
                         }
+                        rejectedCallerAudioRetries += 1
+                        retainedCallerAudioRetries += 1
+                    } else if (
+                        !advancedPastRejectedCallerAudio &&
+                        (
+                            callerAudioChunkId == null ||
+                                callerAudioChunkId != rejectedCallerAudioChunkId ||
+                                !retainedCallerAudio
+                        )
+                    ) {
+                        clearRejectedCallerAudioRetries()
+                    }
                     clearRecognitionGeneration(cancel = false)
                     val callerAudioPending =
                         retainedCallerAudio || runCatching(platform::callerAudioHasPending).getOrDefault(false)
                     when {
+                        advancedPastRejectedCallerAudio || advancedPastConfirmedSilence ->
+                            advancePastRejectedCallerAudio(
+                                sessionId,
+                                target,
+                                attempts = if (advancedPastRejectedCallerAudio) rejectedCallerAudioRetries + 1 else 1,
+                            )
+                        retainedRejectedCallerAudio -> {
+                            conversationDictationDiagnostic(
+                                "event=caller_audio_retry_scheduled failure=${failure.name} " +
+                                    "chunk=$callerAudioChunkId retry=$rejectedCallerAudioRetries",
+                            )
+                            if (finishRequested) {
+                                startRecognition(sessionId, target)
+                            } else {
+                                restartAfterNoSpeech(sessionId, target, readyAt)
+                            }
+                        }
                         finishRequested &&
                             callerAudioPending &&
                             failure.canRetryRetainedCallerAudio ->
@@ -1687,7 +1741,33 @@ internal class ConversationDictationController internal constructor(
         }
     }
 
-    /** Bounds automatic exact-chunk recovery without completing the chosen action on partial text. */
+    /** Drops one deterministically rejected chunk after bounded retries, then advances the queue. */
+    private fun advancePastRejectedCallerAudio(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+        attempts: Int,
+    ) {
+        conversationDictationDiagnostic(
+            "event=caller_audio_retry_exhausted failure=${ConversationDictationFailure.NoSpeech.name} " +
+                "attempts=$attempts action=advance",
+        )
+        retainedCallerAudioRetries = 0
+        clearRejectedCallerAudioRetries()
+        when {
+            runCatching(platform::callerAudioHasPending).getOrDefault(false) ->
+                startRecognition(sessionId, target)
+            finishRequested -> finalizeAccumulatedTranscript(sessionId, target)
+            else -> scheduleRestart(sessionId, target, GENERATION_RESTART_DELAY_MILLIS, "no_speech_advanced")
+        }
+    }
+
+    /** Clears retry accounting when the exact caller-audio chunk changes or resolves. */
+    private fun clearRejectedCallerAudioRetries() {
+        rejectedCallerAudioChunkId = null
+        rejectedCallerAudioRetries = 0
+    }
+
+    /** Bounds exact-chunk recovery, then completes safe accumulated text through the chosen action. */
     private fun retryRetainedCallerAudioOrFail(
         sessionId: Long,
         target: ConversationDictationTarget,
@@ -1739,6 +1819,7 @@ internal class ConversationDictationController internal constructor(
         // Reaching this helper means the previous chunk was resolved or there was no owned chunk.
         // Keep the recovery budget local to the next pending chunk instead of leaking it across the drain.
         retainedCallerAudioRetries = 0
+        clearRejectedCallerAudioRetries()
         if (runCatching(platform::callerAudioHasPending).getOrDefault(false)) {
             startRecognition(sessionId, target)
         } else {
@@ -1988,6 +2069,7 @@ internal class ConversationDictationController internal constructor(
         accumulatedTranscript = appendConversationDictationSegment(accumulatedTranscript, normalized)
         consecutiveNoSpeechRestarts = 0
         retainedCallerAudioRetries = 0
+        clearRejectedCallerAudioRetries()
         silenceDeadlineElapsedMillis = null
     }
 
@@ -2528,6 +2610,7 @@ internal class ConversationDictationController internal constructor(
         generationHasSpeech = false
         consecutiveNoSpeechRestarts = 0
         retainedCallerAudioRetries = 0
+        clearRejectedCallerAudioRetries()
         generationReadyAtElapsedMillis = null
         providerDisconnectRetries = 0
         permissionRetryUsed = false
@@ -3433,6 +3516,9 @@ private class AndroidConversationDictationRecognitionSession(
 
     /** Acknowledges only this recognizer generation’s caller-audio chunk after its final result. */
     override fun acknowledgeCallerAudio(): Boolean = callerAudio?.acknowledge() == true
+
+    /** Returns the stable identity of this recognizer generation's exact caller-audio chunk. */
+    override fun callerAudioChunkId(): Long? = callerAudio?.chunkId()
 
     /** Returns capture-side speech evidence for this recognizer generation's exact chunk. */
     override fun callerAudioContainsSpeech(): Boolean? = callerAudio?.containsSpeech()
