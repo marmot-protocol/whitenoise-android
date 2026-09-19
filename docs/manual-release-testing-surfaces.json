@@ -22200,6 +22200,15 @@
         ]
       },
       {
+        "surface": "An optimistically published chat-list preview carries no deletion evidence for the message just sent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "private fun sentPreview(",
+        "test_ids": [
+          "CON-004",
+          "CHL-002"
+        ]
+      },
+      {
         "surface": "Conversation replacements deduplicate profile requests and retain completed stream state",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "suspend fun applyTimelinePage(",
