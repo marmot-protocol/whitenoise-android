@@ -94,6 +94,27 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('if-no-files-found: error', self.compose_compiler)
         self.assertIn('android-ci-gradle-profiles-compose-compiler', self.compose_compiler)
 
+    def test_every_gradle_job_has_the_required_bootstrap(self):
+        """Extracted jobs retain the same toolchain and artifact preparation."""
+        required_steps = (
+            'Checkout',
+            'Configure MarmotKit cache directory',
+            'Set up JDK 17',
+            'Set up Gradle',
+            'Read MarmotKit artifact pin',
+            'Restore MarmotKit artifact',
+        )
+        for job_name, job in (
+            ('build-contracts', self.build_contracts),
+            ('compose-compiler', self.compose_compiler),
+            ('static-analysis', self.static_analysis),
+            ('screenshots', self.screenshots),
+            ('tests', self.tests_job),
+        ):
+            for step_name in required_steps:
+                with self.subTest(job=job_name, step=step_name):
+                    self.named_step(job, step_name)
+
     def test_static_analysis_isolated_by_flavor_without_duplicating_singletons(self):
         """Both lint variants run concurrently while ktlint and detekt run once."""
         self.assertIn("name: ktlint, detekt, and Android lint (${{ matrix.flavor }})", self.static_analysis)

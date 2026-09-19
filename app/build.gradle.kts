@@ -1149,9 +1149,10 @@ tasks.withType<Test>().configureEach {
     // Resource-backed Robolectric tests retain Android SDK sandboxes across the large unit suite.
     // Double Gradle's 512 MiB worker default while keeping one bounded, non-parallel process per task.
     maxHeapSize = "1g"
-    // CI runs these complete suites in Roborazzi verification mode. Explicitly
-    // include the repository's custom baseline directory in Gradle's input
-    // fingerprint so a baseline-only change cannot reuse stale test outputs.
+    // CI's filtered verifyRoborazzi tasks delegate to these variant test tasks.
+    // Include the custom baseline directory in Gradle's input fingerprint so a
+    // baseline-only change cannot reuse stale verification outputs. This also
+    // intentionally invalidates full-suite outputs on baseline-only commits.
     if (name in setOf("testDevZapstoreDebugUnitTest", "testDevPlayDebugUnitTest")) {
         inputs
             .files(layout.projectDirectory.dir("src/test/snapshots").asFileTree)

@@ -179,10 +179,14 @@ account switching, and other committed UI states across themes and accessibility
 configurations.
 
 Baseline PNGs live under `app/src/test/snapshots/` and are committed to git. CI
-runs the complete `:app:testDevZapstoreDebugUnitTest` and
-`:app:testDevPlayDebugUnitTest` suites with `-Proborazzi.test.verify=true`; on a
-mismatch the build fails and the
-diff/compare images are uploaded as workflow artifacts (`android-ci-reports-Zapstore` and `android-ci-reports-Play`).
+runs `:app:verifyRoborazziDevZapstoreDebug` and
+`:app:verifyRoborazziDevPlayDebug` in parallel jobs, filtered to the established
+committed-baseline owners. Tests named `*ScreenshotTest` are included
+automatically; a mixed-name test that owns committed baselines must also be added
+to the `--tests` allowlist in `.github/workflows/android-ci.yml`. On a mismatch,
+the build fails and diff/compare images are uploaded in
+`android-ci-reports-screenshots-Zapstore` and
+`android-ci-reports-screenshots-Play`.
 
 **Re-baseline after an intentional UI change.** When you deliberately change a
 covered composable, regenerate the baselines and commit the updated PNGs:
