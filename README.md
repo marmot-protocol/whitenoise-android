@@ -72,30 +72,32 @@ frozen in `config/detekt/detekt-baseline.xml`. The workflow runs both the
 `google-services.json`.
 
 Validation runs concurrently on separate runners: build/release/tooling contracts,
-one static-analysis job per distribution, and one test job per distribution.
+Compose compiler reports, one static-analysis job per distribution, one full unit
+and coverage job per distribution, and one curated screenshot job per distribution.
 Each static-analysis job runs its Android lint variant; the Play job also owns
-the flavor-independent ktlint and detekt checks. Each test job compiles its dev
-debug variant and runs the full unit suite once with Roborazzi verification
-enabled, so every committed screenshot baseline is checked without a second
-filtered test pass. The Zapstore job also enforces all Kover ratchets. Coverage
-invocations keep the same Roborazzi verification property so Gradle reuses the
-complete test results. Static-analysis and test jobs also reuse one runner-local
-Gradle daemon across their sequential invocations, avoiding repeated JVM startup
-and warm-up while retaining the existing test-worker heap and parallelism limits.
-The existing
+the flavor-independent ktlint and detekt checks. Unit jobs run the complete suite
+once, and the Zapstore job also enforces all Kover ratchets. Screenshot jobs keep
+the established committed-baseline allowlist and run beside the full suite instead
+of extending its critical path. The Play static-analysis job and both test jobs
+reuse one runner-local Gradle daemon across sequential invocations, avoiding
+repeated JVM startup and warm-up while retaining the existing test-worker heap and
+parallelism limits. Coverage reports run only after a successful unit step, so a
+failed suite cannot trigger a second full test execution. The existing
 `Compile, test, ktlint, detekt, Android lint` check aggregates every job, including
 the offline ZSP contract, and fails if any dependency fails, is cancelled, or skips.
 
 Coverage artifacts are `kover-coverage-report-Zapstore` and
 `kover-coverage-report-Play`. Failure reports and Gradle timing profiles use
 `android-ci-reports-<job>` and `android-ci-gradle-profiles-<job>`, where `<job>` is
-`build-contracts`, `static-analysis-Zapstore`, `static-analysis-Play`, `Zapstore`,
-or `Play`. Separate runners
+`build-contracts`, `compose-compiler`, `static-analysis-Zapstore`,
+`static-analysis-Play`, `screenshots-Zapstore`, `screenshots-Play`, `Zapstore`, or
+`Play`. Separate runners
 reduce the serial critical path but repeat some setup/compilation; compare both
 wall time and summed job durations when measuring CI performance. Only the Play
 test job writes Gradle cache state on master pushes and same-repository PRs;
-build contracts, static analysis, Zapstore tests, and all fork PR jobs restore
-caches read-only. This avoids publishing a separate Gradle cache state from
+build contracts, Compose reports, static analysis, screenshots, Zapstore tests,
+and all fork PR jobs restore caches read-only. The separate MarmotKit cache uses
+the same single-writer policy. This avoids publishing a separate cache state from
 every parallel job. GitHub's ephemeral runner bounds read-only daemon lifetime;
 the pinned Gradle setup action stops writable-job daemons before cache cleanup.
 
