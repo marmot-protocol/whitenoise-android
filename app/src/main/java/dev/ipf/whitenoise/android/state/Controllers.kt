@@ -7243,6 +7243,8 @@ class ConversationController(
     private suspend fun runConversationSubscriptionIteration(account: String): Pair<Boolean, Boolean> {
         var groupSubscription: ConversationGroupStateSubscriptionHandle? = null
         var timelineStream: ConversationTimelineSubscriptionHandle? = null
+        // A notification-routed group hides its transcript until the roster lands (#586).
+        val rosterPrefetch = conversationScope?.prefetchGroupRoster(group.groupIdHex, account, groupRosterReader)
         try {
             timelineStream =
                 initialTimelineSubscriptionRead.await {
@@ -7281,7 +7283,7 @@ class ConversationController(
                 }
             groupSnapshot?.let(::applyGroupState)
             refreshGroupRecoveryStatus()
-            refreshMembers()
+            refreshMembers(prefetchedRoster = rosterPrefetch)
             isLoading = false
             subscriptionError = null
             var connected = false
@@ -7342,6 +7344,7 @@ class ConversationController(
                 return true to false
             }
         } finally {
+            rosterPrefetch?.cancel() // A no-op once awaited; an early return must not leave it running.
             closeConversationSubscriptionHandles(groupSubscription, timelineStream)
         }
         return false to false
@@ -12240,7 +12243,10 @@ class ConversationController(
     }
 
     /** Publishes the latest authoritative roster while rejecting older refresh completions. */
-    private suspend fun refreshMembers(retryOnHydrationPending: Boolean = true) {
+    private suspend fun refreshMembers(
+        retryOnHydrationPending: Boolean = true,
+        prefetchedRoster: Deferred<Result<GroupRosterFfi>>? = null,
+    ) {
         val account = conversationAccountRef ?: return
         val refreshGeneration = beginMemberRosterRefresh() ?: return
         memberRosterLoadTracker.transition(GroupRosterRefreshEvent.STARTED)
@@ -12249,7 +12255,8 @@ class ConversationController(
                 if (!resolveInitialInviteConfirmation(account, refreshGeneration)) return@runCatchingCancellable
                 // One projection replaces the serialized groupMlsState() eviction and groupDetails() roster reads.
                 // It carries membership, admins, epoch/revision, lifecycle, and self-membership together.
-                val roster = groupRosterReader(account, group.groupIdHex)
+                // The hydration retry below reads again; the prefetched answer is the one that failed.
+                val roster = prefetchedRoster?.await()?.getOrThrow() ?: groupRosterReader(account, group.groupIdHex)
                 memberRosterRefreshGeneration.runIfCurrent(refreshGeneration) {
                     val applied = applyGroupRoster(account, roster) ?: return@runIfCurrent
                     appState.applyLocalGroupDetails(account, applied.group, applied.members)

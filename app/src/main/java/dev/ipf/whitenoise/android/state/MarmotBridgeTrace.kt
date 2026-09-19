@@ -28,6 +28,7 @@ internal object MarmotTraceSection {
     const val MEDIA_DOWNLOAD = "WhiteNoise.marmot.downloadMedia"
     const val MEDIA_LIST = "WhiteNoise.marmot.listMedia"
     const val TIMELINE_READ = "WhiteNoise.marmot.timelineMessages"
+    const val CONVERSATION_WINDOW_OPEN = "WhiteNoise.marmot.openConversationWindow"
     const val MESSAGE_SEARCH = "WhiteNoise.marmot.searchMessages"
     const val CHAT_LIST_READ = "WhiteNoise.marmot.chatList"
     const val CHAT_ROW_READ = "WhiteNoise.marmot.chatListRow"
@@ -58,6 +59,7 @@ internal object MarmotTraceSection {
             MEDIA_DOWNLOAD to "app_media_download",
             MEDIA_LIST to "app_media_list",
             TIMELINE_READ to "app_timeline_read",
+            CONVERSATION_WINDOW_OPEN to "app_conversation_window_open",
             MESSAGE_SEARCH to "app_message_search_page",
             CHAT_LIST_READ to "app_chat_list_read",
             CHAT_ROW_READ to "app_chat_row_read",
