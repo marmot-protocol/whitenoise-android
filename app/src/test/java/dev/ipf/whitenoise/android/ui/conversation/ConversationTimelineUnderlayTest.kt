@@ -112,6 +112,36 @@ class ConversationTimelineUnderlayTest {
         rule.onNodeWithTag("frame").captureRoboImage("src/test/snapshots/conversation_timeline_underlay.png")
     }
 
+    /**
+     * The read watermark follows the newest row the reader can actually see. Taken from the raw
+     * layout it would instead follow the row the composer covers, silently clearing an unread
+     * count for a message that never came into view.
+     */
+    @Test
+    fun theReadAnchorCandidateSkipsTheRowBehindTheComposer() {
+        foreground = 120
+        render()
+        rule.waitForIdle()
+        rule.runOnIdle { scope.launch { list.scrollToItem(0, COVERED_ROW_OVERLAP_PX) } }
+        rule.waitForIdle()
+        rule.runOnIdle {
+            // The anchor reads the first entry of whichever layout it is given; reversed emission
+            // makes that the newest row.
+            val rawCandidate = list.layoutInfo.visibleItemsInfo.first()
+            val readingCandidate = viewport.readingLayoutInfo().visibleItemsInfo.first()
+            assertEquals(COVERED_ROW_VALUE, rawCandidate.key)
+            assertEquals(COVERED_ROW_VALUE - 1, readingCandidate.key)
+            assertEquals(
+                TIMELINE_SIZE - 1,
+                conversationTimelineIndexForListIndex(rawCandidate.index, TIMELINE_SIZE, trailingRowCount = 0),
+            )
+            assertEquals(
+                TIMELINE_SIZE - 2,
+                conversationTimelineIndexForListIndex(readingCandidate.index, TIMELINE_SIZE, trailingRowCount = 0),
+            )
+        }
+    }
+
     /** Composer growth and keyboard/custom-panel exclusion preserve the native history bookmark and row instance. */
     @Test
     fun historyBookmarkSurvivesForegroundAndInputPanelChanges() {
@@ -382,6 +412,9 @@ class ConversationTimelineUnderlayTest {
  * that value is the covered row this harness exercises.
  */
 private const val COVERED_ROW_VALUE = 19
+
+/** The harness emits keys 0..19, so the timeline the read anchor indexes into is twenty rows long. */
+private const val TIMELINE_SIZE = 20
 
 /**
  * Pixels the newest row is slid under the composer so the overlay covers it whole.

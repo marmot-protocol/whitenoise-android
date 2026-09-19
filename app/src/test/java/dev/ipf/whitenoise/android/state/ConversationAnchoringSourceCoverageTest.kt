@@ -83,6 +83,20 @@ class ConversationAnchoringSourceCoverageTest {
         )
     }
 
+    @Test
+    fun readAnchorFollowsTheUnobstructedViewport() {
+        val source = conversationScreenSource().readText()
+        val helperIndex = source.indexOf("private fun rememberConversationReadAnchor(")
+        val helper =
+            source.substring(helperIndex, source.indexOf("@OptIn(ExperimentalMaterial3Api::class)", helperIndex))
+
+        assertTrue(
+            "the read watermark must ignore rows the composer covers rather than the raw layout",
+            helper.containsAll("timelineViewport.readingLayoutInfo().visibleItemsInfo") &&
+                "listState.layoutInfo" !in helper,
+        )
+    }
+
     private fun String.containsAll(vararg fragments: String): Boolean = fragments.all(::contains)
 
     private fun conversationScreenSource(): File =

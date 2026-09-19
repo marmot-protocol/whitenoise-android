@@ -28,7 +28,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListLayoutInfo
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -487,21 +486,24 @@ private fun rememberConversationReadAnchor(
     controller: ConversationController,
     entrySessionIdentity: Any,
     renderedTimeline: List<TimelineMessage>,
-    listState: LazyListState,
+    timelineViewport: ConversationTimelineViewport,
     trailingRowCount: Int,
     initialTimelineAnchored: Boolean,
 ): MutableState<String?> {
     val readAnchor = remember(entrySessionIdentity) { mutableStateOf(controller.lastReadMessageId) }
     val renderedSize = renderedTimeline.size
     val currentHighestVisibleTimelineIndex by
-        remember(listState, renderedSize, trailingRowCount) {
+        remember(timelineViewport, renderedSize, trailingRowCount) {
             derivedStateOf {
-                val visible = listState.layoutInfo.visibleItemsInfo
+                // The reading viewport rather than the raw layout: rows the composer covers are
+                // painted but cannot be read, so counting them would clear an unread badge for
+                // messages that never reached the reader's eyes.
+                val visible = timelineViewport.readingLayoutInfo().visibleItemsInfo
                 if (visible.isEmpty() || renderedSize == 0) return@derivedStateOf -1
                 // Reversed layout, bottom to top: [maybe bottom error]
                 // [timeline items, newest first][maybe older-loading]
                 // [maybe top error][maybe group recovery][top spacer].
-                // The lowest visible index is therefore the newest row shown.
+                // The lowest still-clear index is therefore the newest row actually shown.
                 conversationTimelineIndexForListIndex(
                     listIndex = visible.first().index,
                     timelineSize = renderedSize,
@@ -1340,7 +1342,7 @@ internal fun ConversationScreen(
             controller = controller,
             entrySessionIdentity = entryUnreadSessionIdentity,
             renderedTimeline = renderedTimeline,
-            listState = listState,
+            timelineViewport = timelineViewport,
             trailingRowCount = trailingRowCount,
             initialTimelineAnchored = initialTimelineAnchored,
         )
@@ -3731,7 +3733,16 @@ internal fun ConversationScreen(
                                         }.performanceTestTag(
                                             PerformanceTestTags.CONVERSATION_TRANSCRIPT_VISIBLE,
                                             enabled = transcriptReadyToReveal && renderedTimeline.isNotEmpty(),
-                                        ).onGloballyPositioned(timelineViewport::onPaintViewportMeasured),
+                                        ).onGloballyPositioned(timelineViewport::onPaintViewportMeasured)
+                                        // Rows dissolve as they reach the bar above and the
+                                        // composer below, so the transcript meets its chrome
+                                        // softly instead of being sliced off mid-bubble. The
+                                        // bottom band stops where the covered strip starts,
+                                        // otherwise the gradient would be spent out of sight.
+                                        .transcriptEdgeFade(
+                                            listState = listState,
+                                            bottomInset = overlayPadding,
+                                        ),
                                 // Bottom-anchored like every established chat
                                 // client: the viewport shrinking under the keyboard
                                 // moves rows up as a layout consequence, so the
