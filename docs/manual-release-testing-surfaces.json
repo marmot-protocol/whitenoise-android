@@ -11695,6 +11695,15 @@
         ]
       },
       {
+        "surface": "string:message_removed_by_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.message_removed_by_admin",
+        "test_ids": [
+          "MSG-004",
+          "CON-005"
+        ]
+      },
+      {
         "surface": "string:message_deleted_by_you",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
         "anchor": "R.string.message_deleted_by_you",

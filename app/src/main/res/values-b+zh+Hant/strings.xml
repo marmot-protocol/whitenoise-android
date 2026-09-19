@@ -1936,6 +1936,7 @@
     <string name="save_attachments">儲存附件</string>
     <string name="message_deleted_by_you">你已刪除此訊息。</string>
     <string name="message_deleted_by_other">此訊息已被刪除。</string>
+    <string name="message_removed_by_admin">管理員已移除這則訊息。</string>
     <string name="floating_keep">保留在螢幕上</string>
     <string name="floating_title">螢幕上保留的訊息</string>
     <string name="floating_expand">展開訊息</string>

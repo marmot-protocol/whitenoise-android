@@ -77,6 +77,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.ContentReportFfi
+import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MediaAttachmentOutcomeFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -598,8 +599,17 @@ internal fun MessageBubble(
     // responsible for the removal — because it authored the message, or because
     // it hid the message locally — and in the passive voice otherwise.
     val deletedByMe = mine || MessageProjector.isDeleted(record.messageIdHex, controller.deletedMessageIds)
+    // An admin removal outranks authorship: the engine carries who actually removed the message, so a
+    // message of this account's own that an admin took down must not read as "You deleted this message".
+    // A tombstone with no evidence stays UNKNOWN and keeps the passive voice it has always had.
     val deletedBodyText =
-        stringResource(if (deletedByMe) R.string.message_deleted_by_you else R.string.message_deleted_by_other)
+        stringResource(
+            when {
+                item.projected?.deletionSource == DeletionSourceFfi.ADMIN -> R.string.message_removed_by_admin
+                deletedByMe -> R.string.message_deleted_by_you
+                else -> R.string.message_deleted_by_other
+            },
+        )
     val invalidatedBodyText = stringResource(R.string.message_invalidated)
     val messageActionsLabel = stringResource(R.string.message_actions)
     val invalidationWarning =

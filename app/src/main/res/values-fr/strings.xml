@@ -1963,6 +1963,7 @@
     <string name="save_attachments">Enregistrer les pièces jointes</string>
     <string name="message_deleted_by_you">Vous avez supprimé ce message.</string>
     <string name="message_deleted_by_other">Ce message a été supprimé.</string>
+    <string name="message_removed_by_admin">Un administrateur a supprimé ce message.</string>
     <string name="floating_keep">Garder à l\'écran</string>
     <string name="floating_title">Gardé à l\'écran</string>
     <string name="floating_expand">Développer le message</string>

@@ -1961,6 +1961,7 @@
     <string name="save_attachments">Ekleri kaydet</string>
     <string name="message_deleted_by_you">Bu mesajı sildiniz.</string>
     <string name="message_deleted_by_other">Bu mesaj silindi.</string>
+    <string name="message_removed_by_admin">Bir yönetici bu mesajı kaldırdı.</string>
     <string name="floating_keep">Ekranda tut</string>
     <string name="floating_title">Ekranda tutulanlar</string>
     <string name="floating_expand">Mesajı genişlet</string>
