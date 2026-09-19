@@ -8,8 +8,6 @@ import subprocess
 import textwrap
 import unittest
 
-import yaml
-
 
 WORKFLOW = Path(__file__).resolve().parents[1] / '.github/workflows/android-ci.yml'
 APP_BUILD = Path(__file__).resolve().parents[1] / 'app/build.gradle.kts'
@@ -22,8 +20,6 @@ class AndroidCiGateTest(unittest.TestCase):
     def setUpClass(cls):
         """Read the actual inline shell gate, avoiding a separate test-only copy."""
         cls.workflow = WORKFLOW.read_text()
-        cls.workflow_config = yaml.safe_load(cls.workflow)
-        cls.jobs = cls.workflow_config['jobs']
         cls.gate = cls.workflow.split('\n  validate:\n', 1)[1]
         cls.static_analysis = cls.workflow.split('\n  static-analysis:\n', 1)[1].split('\n  tests:\n', 1)[0]
         cls.tests_job = cls.workflow.split('\n  tests:\n', 1)[1].split('\n  validate:\n', 1)[0]
@@ -34,11 +30,12 @@ class AndroidCiGateTest(unittest.TestCase):
 
     @staticmethod
     def named_step(job, name):
-        """Return one production workflow step by its stable display name."""
-        matches = [step for step in job['steps'] if step.get('name') == name]
-        if len(matches) != 1:
-            raise AssertionError(f'expected one {name!r} step, found {len(matches)}')
-        return matches[0]
+        """Return one step block, anchored by its stable display name."""
+        marker = f'      - name: {name}\n'
+        if job.count(marker) != 1:
+            raise AssertionError(f'expected one {name!r} step, found {job.count(marker)}')
+        remainder = job.split(marker, 1)[1]
+        return marker + remainder.split('\n      - ', 1)[0]
 
     def run_gate(self, outcomes):
         """Run the production shell with synthetic, untrusted JSON input."""
@@ -63,19 +60,18 @@ class AndroidCiGateTest(unittest.TestCase):
 
     def test_static_analysis_isolated_by_flavor_without_duplicating_singletons(self):
         """Both lint variants run concurrently while ktlint and detekt run once."""
-        job = self.jobs['static-analysis']
         self.assertIn("name: ktlint, detekt, and Android lint (${{ matrix.flavor }})", self.static_analysis)
-        self.assertFalse(job['strategy']['fail-fast'])
-        self.assertEqual(job['strategy']['matrix']['flavor'], ['Zapstore', 'Play'])
-        ktlint = self.named_step(job, 'ktlint')
-        detekt = self.named_step(job, 'detekt')
-        lint = self.named_step(job, 'Android lint')
-        self.assertEqual(ktlint['if'], "matrix.flavor == 'Play'")
-        self.assertEqual(detekt['if'], "matrix.flavor == 'Play'")
-        self.assertNotIn('if', lint)
-        self.assertIn(':app:ktlintCheck :benchmark:ktlintCheck', ktlint['run'])
-        self.assertIn(':app:detekt', detekt['run'])
-        self.assertIn(':app:lintDev${{ matrix.flavor }}Debug', lint['run'])
+        self.assertIn('      fail-fast: false\n', self.static_analysis)
+        self.assertIn('        flavor: [Zapstore, Play]\n', self.static_analysis)
+        ktlint = self.named_step(self.static_analysis, 'ktlint')
+        detekt = self.named_step(self.static_analysis, 'detekt')
+        lint = self.named_step(self.static_analysis, 'Android lint')
+        self.assertIn("        if: matrix.flavor == 'Play'\n", ktlint)
+        self.assertIn("        if: matrix.flavor == 'Play'\n", detekt)
+        self.assertNotIn('\n        if:', lint)
+        self.assertIn(':app:ktlintCheck :benchmark:ktlintCheck', ktlint)
+        self.assertIn(':app:detekt', detekt)
+        self.assertIn(':app:lintDev${{ matrix.flavor }}Debug', lint)
         self.assertNotIn(':app:lintDevZapstoreDebug :app:lintDevPlayDebug', self.static_analysis)
         self.assertIn('android-ci-reports-static-analysis-${{ matrix.flavor }}', self.static_analysis)
         self.assertIn('android-ci-gradle-profiles-static-analysis-${{ matrix.flavor }}', self.static_analysis)
@@ -83,17 +79,14 @@ class AndroidCiGateTest(unittest.TestCase):
 
     def test_full_unit_suite_owns_screenshot_verification_and_coverage_reuses_it(self):
         """Roborazzi verification runs once with every test and remains cache-correct."""
-        job = self.jobs['tests']
         expected_steps = {
             'Unit tests',
             'Coverage gate (Kover)',
             'Coverage report (Kover)',
         }
         test_invocations = {
-            step['name']: step['run']
-            for step in job['steps']
-            if 'run' in step and './gradlew' in step['run']
-            and ('UnitTest' in step['run'] or 'kover' in step['run'])
+            name: self.named_step(self.tests_job, name)
+            for name in expected_steps
         }
         self.assertEqual(set(test_invocations), expected_steps)
         for name, invocation in test_invocations.items():
@@ -113,14 +106,20 @@ class AndroidCiGateTest(unittest.TestCase):
 
     def test_only_play_tests_publish_gradle_cache_state(self):
         """Parallel analysis and fork runs cannot create competing cache writers."""
-        setup_gradle = self.named_step(self.jobs['tests'], 'Set up Gradle')
-        cache_policy = setup_gradle['with']['cache-read-only']
-        self.assertEqual(self.workflow.count('cache-read-only: true'), 2)
-        self.assertIn("matrix.flavor != 'Play'", cache_policy)
-        self.assertIn(
-            'github.event.pull_request.head.repo.full_name != github.repository',
-            cache_policy,
+        setup_gradle = self.named_step(self.tests_job, 'Set up Gradle')
+        expected_policy = """          cache-read-only: >-
+            ${{ matrix.flavor != 'Play' ||
+                (github.event_name == 'pull_request' &&
+                 github.event.pull_request.head.repo.full_name != github.repository) }}
+"""
+        self.assertIn(expected_policy, setup_gradle)
+        gradle_setup_steps = re.findall(
+            r'(?ms)^      - name: Set up Gradle\n.*?(?=^      - |^  [a-z]|\Z)',
+            self.workflow,
         )
+        self.assertEqual(len(gradle_setup_steps), 3)
+        for step in gradle_setup_steps:
+            self.assertIn('cache-read-only:', step)
 
     def test_all_successful_jobs_pass(self):
         """A complete green matrix permits the existing required check to pass."""
