@@ -16,7 +16,6 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
@@ -122,9 +121,9 @@ class ConversationDictationPersistentControlTest {
         composeRule.onNodeWithContentDescription("Pause").assertDoesNotExist()
     }
 
-    /** Verifies an ambiguous merge retains explicit copy, insert, and discard choices. */
+    /** A draft conflict is resolved automatically and never exposes a second edit action. */
     @Test
-    fun ambiguousMergeOffersExplicitCopyInsertOrDiscardReview() {
+    fun ambiguousMergeAppendsToLatestDraftWithoutAnEditAction() {
         val fixture = fixture(TextFieldValue("Original anchor", TextRange(8)))
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
         fixture.platform.listener.onReady()
@@ -133,20 +132,9 @@ class ConversationDictationPersistentControlTest {
         fixture.controller.stop()
         render(fixture)
 
-        composeRule.onNodeWithContentDescription("Review dictated text").performClick()
-
-        composeRule.onNodeWithTag(COMPOSER_DICTATION_REVIEW_DIALOG_TAG).assertIsDisplayed()
-        composeRule.onNodeWithText("dictated words").assertIsDisplayed()
-        composeRule.onNodeWithText("Copy").assertIsDisplayed()
-        composeRule.onNodeWithText("Discard").assertIsDisplayed()
-        composeRule.onNodeWithText("Copy").performClick()
-        assertTrue(fixture.controller.state is ConversationDictationState.ReviewRequired)
-        assertEquals("Rewritten draft", fixture.draft.text)
-        composeRule.onNodeWithContentDescription("Review dictated text").performClick()
-        composeRule.onNodeWithText("dictated words").assertIsDisplayed()
-        composeRule.onNodeWithText("Insert at end").performClick()
-
         assertEquals("Rewritten draft dictated words", fixture.draft.text)
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertDoesNotExist()
     }
 
     /** Verifies navigation-owned listening remains visible and can still be cancelled. */
@@ -170,28 +158,10 @@ class ConversationDictationPersistentControlTest {
         assertTrue(fixture.controller.state is ConversationDictationState.Idle)
     }
 
-    /** Verifies opening review from the root control never discards retained transcript text. */
-    @Test
-    fun rootBarReviewActionDoesNotDiscardTranscript() {
-        val fixture = fixture(TextFieldValue("Original anchor", TextRange(8)))
-        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
-        fixture.platform.listener.onReady()
-        fixture.platform.listener.onResult("dictated words")
-        fixture.edit(TextFieldValue("Rewritten draft", TextRange(15)))
-        fixture.controller.stop()
-        render(fixture)
-
-        composeRule.onNodeWithContentDescription("Review dictated text").performClick()
-
-        composeRule.onNodeWithTag(COMPOSER_DICTATION_REVIEW_DIALOG_TAG).assertIsDisplayed()
-        composeRule.onNodeWithText("dictated words").assertIsDisplayed()
-        assertTrue(fixture.controller.state is ConversationDictationState.ReviewRequired)
-    }
-
-    /** Copying an uncertain send preserves its warning and never offers automatic insertion or retry. */
+    /** An uncertain dispatch stays visible without an edit action or duplicate draft text. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun uncertainDeliveryCopyRetainsTranscriptUntilExplicitDiscard() =
+    fun uncertainDeliveryShowsStatusWithoutAnEditOrRetryAction() =
         runTest {
             var dispatches = 0
             val fixture =
@@ -209,16 +179,23 @@ class ConversationDictationPersistentControlTest {
             runCurrent()
             render(fixture)
 
-            composeRule.onNodeWithContentDescription("Review dictated text").performClick()
-            composeRule.onNodeWithText("Insert at end").assertDoesNotExist()
-            composeRule.onNodeWithText("Copy").performClick()
-            assertTrue(fixture.controller.state is ConversationDictationState.DeliveryUnknown)
-            composeRule.onNodeWithContentDescription("Review dictated text").performClick()
-            composeRule.onNodeWithText("dictated words").assertIsDisplayed()
-            composeRule.onNodeWithText("Discard").performClick()
-            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
             assertEquals("Draft", fixture.draft.text)
             assertEquals(1, dispatches)
+            val failed = fixture.controller.state as ConversationDictationState.Failed
+            assertEquals(ConversationDictationFailure.DeliveryUnknown, failed.reason)
+            assertEquals("dictated words", failed.retainedTranscript)
+            composeRule
+                .onNodeWithTag(APP_DICTATION_CONTROL_TAG)
+                .assert(
+                    SemanticsMatcher.expectValue(
+                        SemanticsProperties.StateDescription,
+                        "Delivery not confirmed",
+                    ),
+                )
+            composeRule.onNodeWithContentDescription("Retry").assertDoesNotExist()
+            composeRule.onNodeWithContentDescription("Review dictated text").assertDoesNotExist()
+            composeRule.onNodeWithContentDescription("Dismiss").performClick()
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
         }
 
     /** Verifies provider-readiness feedback and cancellation fit at large font in RTL. */
@@ -250,7 +227,6 @@ class ConversationDictationPersistentControlTest {
         render(fixture, fontScale = 2f, rtl = true)
 
         val root = composeRule.onNodeWithTag(ROOT_TAG).getUnclippedBoundsInRoot()
-        // An unusable provider offers its own setup, not a retry that cannot succeed.
         listOf("Open the speech service", "Dismiss").forEach { label ->
             val action = composeRule.onNodeWithContentDescription(label).assertIsDisplayed().getUnclippedBoundsInRoot()
             assertTrue(action.left >= root.left && action.right <= root.right)
@@ -260,7 +236,6 @@ class ConversationDictationPersistentControlTest {
         }
     }
 
-    /** Renders the app-root control under configurable density-direction conditions. */
     private fun render(
         fixture: Fixture,
         fontScale: Float = 1f,
@@ -284,7 +259,6 @@ class ConversationDictationPersistentControlTest {
         }
     }
 
-    /** Builds a mutable-draft controller fixture with optional deferred provider readiness. */
     private fun fixture(
         initial: TextFieldValue,
         deferActivityReadiness: Boolean = false,

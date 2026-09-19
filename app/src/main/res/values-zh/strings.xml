@@ -1659,11 +1659,6 @@
     <string name="dictation_audio_buffer_full">语音服务处理速度不足，听写已停止</string>
     <string name="dictation_timed_out">语音识别超时</string>
     <string name="dictation_failed">无法转写语音</string>
-    <string name="dictation_review_required">草稿已更改 — 请检查听写文本</string>
-    <string name="dictation_review_action">检查听写文本</string>
-    <string name="dictation_review_title">检查听写文本</string>
-    <string name="dictation_insert_at_end">插入末尾</string>
-    <string name="dictation_discard_transcript">丢弃听写文本</string>
     <string name="discard">丢弃</string>
     <string name="open_app_settings">打开应用设置</string>
     <string name="dictation_disclosure_title">外部语音识别</string>

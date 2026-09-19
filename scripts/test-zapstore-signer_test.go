@@ -16,7 +16,7 @@ import (
 	"github.com/nbd-wtf/go-nostr/nip46"
 )
 
-func TestReconnectRetainsOriginalInvitation(t *testing.T) {
+func TestReconnectOmitsConsumedInvitation(t *testing.T) {
 	key, clientKey := nostr.GeneratePrivateKey(), nostr.GeneratePrivateKey()
 	pub, _ := nostr.GetPublicKey(key)
 	clientPub, _ := nostr.GetPublicKey(clientKey)
@@ -59,8 +59,12 @@ func TestReconnectRetainsOriginalInvitation(t *testing.T) {
 				return
 			}
 			if req.Method == "connect" {
-				seen <- req.Params[1]
-				if req.Params[1] != "original-invitation" {
+				invitation := ""
+				if len(req.Params) > 1 {
+					invitation = req.Params[1]
+				}
+				seen <- invitation
+				if invitation != "" {
 					return
 				}
 			}
@@ -93,8 +97,8 @@ func TestReconnectRetainsOriginalInvitation(t *testing.T) {
 	if err := testSigner(); err != nil {
 		t.Fatal(err)
 	}
-	if <-seen != "original-invitation" {
-		t.Fatal("reconnect discarded invitation")
+	if <-seen != "" {
+		t.Fatal("reconnect reused consumed invitation")
 	}
 }
 

@@ -1683,11 +1683,6 @@
     <string name="dictation_audio_buffer_full">La dettatura è stata interrotta perché il servizio vocale non riusciva a tenere il passo</string>
     <string name="dictation_timed_out">Tempo scaduto per il riconoscimento vocale</string>
     <string name="dictation_failed">Impossibile trascrivere la voce</string>
-    <string name="dictation_review_required">Bozza modificata — controlla il testo dettato</string>
-    <string name="dictation_review_action">Controlla il testo dettato</string>
-    <string name="dictation_review_title">Controlla il testo dettato</string>
-    <string name="dictation_insert_at_end">Inserisci alla fine</string>
-    <string name="dictation_discard_transcript">Elimina il testo dettato</string>
     <string name="discard">Elimina</string>
     <string name="open_app_settings">Apri le impostazioni dell’app</string>
     <string name="dictation_disclosure_title">Riconoscimento vocale esterno</string>

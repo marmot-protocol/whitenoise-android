@@ -1406,11 +1406,6 @@
     <string name="dictation_audio_buffer_full">Dictation stopped because the speech service fell behind</string>
     <string name="dictation_timed_out">Speech recognition timed out</string>
     <string name="dictation_failed">Couldn’t transcribe speech</string>
-    <string name="dictation_review_required">Draft changed — review dictated text</string>
-    <string name="dictation_review_action">Review dictated text</string>
-    <string name="dictation_review_title">Review dictated text</string>
-    <string name="dictation_insert_at_end">Insert at end</string>
-    <string name="dictation_discard_transcript">Discard dictated text</string>
     <string name="discard">Discard</string>
     <string name="open_app_settings">Open app settings</string>
     <string name="dictation_disclosure_title">External speech recognition</string>

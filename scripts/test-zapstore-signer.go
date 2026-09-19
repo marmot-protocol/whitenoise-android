@@ -104,9 +104,13 @@ func testSigner() error {
 		return fmt.Errorf("persistent client identity changed")
 	}
 	fmt.Println("Verified offline signatures for kinds 3063, 30063, 32267")
-	// Reconnect exactly as the publisher does: same client key and bunker URI.
-	// Keycast accepts the consumed invitation for its original active client.
-	bunker, err := nip46.ConnectBunker(ctx, clientKey, connection, nil, func(string) {})
+	// Reconnect as a paired client: retain the same client key and bunker
+	// transport, but do not replay the one-use invitation secret.
+	reconnect := *u
+	query := reconnect.Query()
+	query.Del("secret")
+	reconnect.RawQuery = query.Encode()
+	bunker, err := nip46.ConnectBunker(ctx, clientKey, reconnect.String(), nil, func(string) {})
 	if err != nil {
 		return fmt.Errorf("paired-client reconnect failed (remote details withheld)")
 	}

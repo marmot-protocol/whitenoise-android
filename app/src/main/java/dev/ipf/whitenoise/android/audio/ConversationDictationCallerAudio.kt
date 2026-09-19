@@ -14,6 +14,7 @@ import java.io.IOException
 import java.util.Locale
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
@@ -35,7 +36,15 @@ private const val BUFFER_READS = 4
 private const val BYTE_MASK = 0xFF
 private const val HIGH_BYTE_SHIFT = 8
 private const val PIPE_RETRY_MILLIS = 10L
-private const val PIPE_STALL_TIMEOUT_MILLIS = 2_000L
+
+/** Allows an offline provider to finish binding/loading before declaring its caller-audio pipe dead. */
+private const val PIPE_STALL_TIMEOUT_MILLIS = 10_000L
+
+/** Retains the in-progress read plus five 100 ms reads after Paste or Send is requested. */
+private const val POST_ACTION_CAPTURE_DRAIN_READS = 6
+
+/** Bounds the tail drain even when recorder reads take longer than their nominal 100 ms. */
+private const val POST_ACTION_CAPTURE_DRAIN_MILLIS = 750L
 
 /** A terminal capture condition that must be surfaced to the owning recognition session. */
 internal enum class ConversationDictationCallerAudioFailure {
@@ -115,6 +124,8 @@ internal class ConversationDictationCallerAudio internal constructor(
     private val lastSpeechAt = AtomicLong(elapsedRealtime())
     private val recording = AtomicBoolean(false)
     private val finishing = AtomicBoolean(false)
+    private val postActionReadsRemaining = AtomicInteger(0)
+    private val postActionDrainDeadline = AtomicLong(Long.MAX_VALUE)
     private val captureClosed = AtomicBoolean(false)
     private val discarded = AtomicBoolean(false)
     private val captureClosedCallbacks = ConcurrentLinkedQueue<() -> Unit>()
@@ -142,7 +153,7 @@ internal class ConversationDictationCallerAudio internal constructor(
         }
         conversationDictationDiagnostic(
             "event=caller_audio_started sample_rate=$CALLER_AUDIO_SAMPLE_RATE_HZ " +
-                "channels=$CALLER_AUDIO_CHANNEL_COUNT encoding=pcm16 chunk_seconds=2-30 buffer_seconds=90",
+                "channels=$CALLER_AUDIO_CHANNEL_COUNT encoding=pcm16 chunk_seconds=10-30 buffer_seconds=90",
         )
         thread(name = "dictation-caller-audio-capture", isDaemon = true, block = ::capture)
         return true
@@ -167,14 +178,19 @@ internal class ConversationDictationCallerAudio internal constructor(
         }
     }
 
-    /** Stops microphone capture and seals the final short chunk, while queued audio keeps draining. */
+    /** Arms a bounded recorder drain before sealing the final short chunk. */
     fun finish(onClosed: () -> Unit) {
-        registerCaptureClosedCallback(onClosed)
-        if (finishing.compareAndSet(false, true)) {
-            conversationDictationDiagnostic("event=caller_audio_finish reason=stop")
-            if (!recording.compareAndSet(true, false)) {
-                buffer.finish()
-                releaseRecorder()
+        onCaptureClosed(onClosed)
+        synchronized(this) {
+            if (!finishing.get()) {
+                postActionReadsRemaining.set(POST_ACTION_CAPTURE_DRAIN_READS)
+                postActionDrainDeadline.set(elapsedRealtime() + POST_ACTION_CAPTURE_DRAIN_MILLIS)
+                finishing.set(true)
+                conversationDictationDiagnostic("event=caller_audio_finish reason=stop")
+                if (!recording.get()) {
+                    buffer.finish()
+                    releaseRecorder()
+                }
             }
         }
     }
@@ -182,12 +198,20 @@ internal class ConversationDictationCallerAudio internal constructor(
     /** Destroys volatile PCM after cancellation or logical-session completion. */
     @Synchronized
     fun discard(onClosed: () -> Unit = {}) {
-        registerCaptureClosedCallback(onClosed)
+        onCaptureClosed(onClosed)
         discarded.set(true)
         pendingFailure = null
         buffer.discard()
         activeStream.getAndSet(null)?.cancel(requeue = false)
-        if (finishing.compareAndSet(false, true) && !recording.compareAndSet(true, false)) releaseRecorder()
+        finishing.set(true)
+        postActionReadsRemaining.set(0)
+        postActionDrainDeadline.set(0L)
+        val wasRecording = recording.getAndSet(false)
+        if (wasRecording) {
+            runCatching(device::stop)
+        } else {
+            releaseRecorder()
+        }
     }
 
     /** Includes partial, queued, and in-flight audio until acknowledged or discarded. */
@@ -228,6 +252,17 @@ internal class ConversationDictationCallerAudio internal constructor(
                 } else {
                     currentChunkHasSpeech =
                         appendCapturedAudio(samples, read, encoded, progress, currentChunkHasSpeech)
+                    synchronized(this) {
+                        if (
+                            finishing.get() &&
+                            (
+                                postActionReadsRemaining.decrementAndGet() <= 0 ||
+                                    elapsedRealtime() >= postActionDrainDeadline.get()
+                            )
+                        ) {
+                            recording.set(false)
+                        }
+                    }
                 }
             }
         } finally {
@@ -276,7 +311,7 @@ internal class ConversationDictationCallerAudio internal constructor(
     }
 
     /** Runs a closure observer once, including registration racing with recorder release. */
-    private fun registerCaptureClosedCallback(callback: () -> Unit) {
+    internal fun onCaptureClosed(callback: () -> Unit) {
         if (captureClosed.get()) {
             callback()
             return
@@ -355,7 +390,7 @@ internal class ConversationDictationCallerAudio internal constructor(
     }
 }
 
-private const val MIN_SENTENCE_CHUNK_SECONDS = 2
+private const val MIN_SENTENCE_CHUNK_SECONDS = 10
 private const val MIN_SENTENCE_CHUNK_BYTES =
     CALLER_AUDIO_SAMPLE_RATE_HZ * BYTES_PER_FRAME * MIN_SENTENCE_CHUNK_SECONDS
 private const val SENTENCE_BOUNDARY_SILENCE_MILLIS = 500L
@@ -388,6 +423,9 @@ internal class ConversationDictationCallerAudioStream(
     /** Seals the logical capture while this generation continues feeding its owned chunk. */
     fun finishCapture(onClosed: () -> Unit) = capture.finish(onClosed)
 
+    /** Observes closure of the shared microphone capture, including its final partial chunk. */
+    fun onCaptureClosed(callback: () -> Unit) = capture.onCaptureClosed(callback)
+
     /** Registers an exactly-once observer, including when the feeder has already closed. */
     fun onFeedClosed(callback: () -> Unit) {
         if (feedClosed.get()) {
@@ -406,6 +444,9 @@ internal class ConversationDictationCallerAudioStream(
 
     /** Returns this generation’s chunk to the front of the queue without duplicating its byte accounting. */
     fun retry(): Boolean = settle(requeue = true)
+
+    /** Extends a no-speech chunk with following audio before returning it to the queue. */
+    fun retryWithFollowingAudio(): Boolean = settle(requeue = true, coalesceFollowingAudio = true)
 
     /** Closes the feeder and relinquishes its lease, retaining unacknowledged PCM by default. */
     fun cancel(requeue: Boolean = true) {
@@ -487,12 +528,16 @@ internal class ConversationDictationCallerAudioStream(
     }
 
     /** Releases the active-stream lease exactly once, even before a chunk has been acquired. */
-    private fun settle(requeue: Boolean): Boolean {
+    private fun settle(
+        requeue: Boolean,
+        coalesceFollowingAudio: Boolean = false,
+    ): Boolean {
         if (!settled.compareAndSet(false, true)) return false
         val owned = chunk.getAndSet(null)
         val changed =
             when {
                 owned == null -> false
+                requeue && coalesceFollowingAudio -> buffer.retryWithFollowingAudio(owned.chunkId)
                 requeue -> buffer.retry(owned.chunkId)
                 else -> buffer.acknowledge(owned.chunkId)
             }

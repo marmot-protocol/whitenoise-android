@@ -1735,11 +1735,6 @@
     <string name="dictation_audio_buffer_full">Диктовка остановлена, потому что сервис распознавания речи не успевал обрабатывать звук</string>
     <string name="dictation_timed_out">Время ожидания распознавания речи истекло</string>
     <string name="dictation_failed">Не удалось расшифровать речь</string>
-    <string name="dictation_review_required">Черновик изменён — проверьте продиктованный текст</string>
-    <string name="dictation_review_action">Проверить продиктованный текст</string>
-    <string name="dictation_review_title">Проверить продиктованный текст</string>
-    <string name="dictation_insert_at_end">Вставить в конец</string>
-    <string name="dictation_discard_transcript">Удалить продиктованный текст</string>
     <string name="discard">Удалить</string>
     <string name="open_app_settings">Открыть настройки приложения</string>
     <string name="dictation_disclosure_title">Внешнее распознавание речи</string>

@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.audio
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -12,6 +13,7 @@ import java.io.IOException
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
 @RunWith(RobolectricTestRunner::class)
@@ -48,6 +50,99 @@ class ConversationDictationCallerAudioTest {
         assertTrue(buffer.hasPending)
         assertNotNull(capture.openProviderStream())
         capture.discard {}
+    }
+
+    /** Finishing retains the in-progress read plus five native recorder tail reads. */
+    @Test
+    fun finishDrainsInProgressReadAndFiveTailReadsThenCloses() {
+        val device = FinishingReadCaptureDevice()
+        val writes = CopyOnWriteArrayList<Int>()
+        val buffer = ConversationDictationAudioChunkBuffer(sessionId = 7L, chunkBytes = 24, maxBufferedBytes = 24)
+        val capture =
+            callerAudio(
+                device = device,
+                buffer = buffer,
+                writer = ConversationDictationAudioPipeWriter { _, _, _, length -> length.also(writes::add) },
+            )
+        val stream = checkNotNull(capture.openProviderStream())
+        val captureClosed = CountDownLatch(1)
+        val duplicateFinishClosed = CountDownLatch(1)
+        val feedClosed = CountDownLatch(1)
+        stream.onFeedClosed(feedClosed::countDown)
+        try {
+            assertTrue(stream.start())
+            assertTrue(device.readStarted.await(2, TimeUnit.SECONDS))
+
+            stream.finishCapture(captureClosed::countDown)
+            stream.finishCapture(duplicateFinishClosed::countDown)
+            device.completeRead.countDown()
+
+            assertTrue(captureClosed.await(2, TimeUnit.SECONDS))
+            assertTrue(duplicateFinishClosed.await(2, TimeUnit.SECONDS))
+            assertTrue(feedClosed.await(2, TimeUnit.SECONDS))
+            assertEquals(6, device.readCount.get())
+            assertEquals(24, writes.sum())
+            assertEquals(true, stream.containsSpeech())
+            assertTrue(buffer.hasPending)
+        } finally {
+            device.completeRead.countDown()
+            stream.cancel()
+            stream.closeProviderEnd()
+            capture.discard {}
+        }
+    }
+
+    /** Cancellation during an armed tail drain cannot repopulate the discarded PCM buffer. */
+    @Test
+    fun discardDuringTailDrainWinsWithoutRetainingLaterReads() {
+        val device = FinishingReadCaptureDevice()
+        val buffer = ConversationDictationAudioChunkBuffer(sessionId = 8L, chunkBytes = 24, maxBufferedBytes = 24)
+        val capture = callerAudio(device = device, buffer = buffer)
+        val stream = checkNotNull(capture.openProviderStream())
+        val finishClosed = CountDownLatch(1)
+        val discardClosed = CountDownLatch(1)
+        try {
+            assertTrue(stream.start())
+            assertTrue(device.readStarted.await(2, TimeUnit.SECONDS))
+
+            stream.finishCapture(finishClosed::countDown)
+            capture.discard(discardClosed::countDown)
+            device.completeRead.countDown()
+
+            assertTrue(finishClosed.await(2, TimeUnit.SECONDS))
+            assertTrue(discardClosed.await(2, TimeUnit.SECONDS))
+            assertFalse(buffer.hasPending)
+        } finally {
+            device.completeRead.countDown()
+            stream.cancel()
+            stream.closeProviderEnd()
+            capture.discard {}
+        }
+    }
+
+    /** Slow successful recorder reads cannot extend the post-action drain beyond its deadline. */
+    @Test
+    fun finishBoundsTailDrainByElapsedTimeAsWellAsReadCount() {
+        val clock = FakeElapsedRealtime()
+        val device = DeadlineReadCaptureDevice(clock)
+        val capture = callerAudio(device = device, elapsedRealtime = clock::now)
+        val stream = checkNotNull(capture.openProviderStream())
+        val captureClosed = CountDownLatch(1)
+        try {
+            assertTrue(stream.start())
+            assertTrue(device.readStarted.await(2, TimeUnit.SECONDS))
+
+            stream.finishCapture(captureClosed::countDown)
+            device.completeRead.countDown()
+
+            assertTrue(captureClosed.await(2, TimeUnit.SECONDS))
+            assertEquals(2, device.readCount.get())
+        } finally {
+            device.completeRead.countDown()
+            stream.cancel()
+            stream.closeProviderEnd()
+            capture.discard {}
+        }
     }
 
     /** An attached provider must receive the typed overflow error when continuous capture exhausts its bound. */
@@ -148,9 +243,9 @@ class ConversationDictationCallerAudioTest {
         }
     }
 
-    /** A short utterance is sealed at its quiet boundary instead of accumulating a long silent tail. */
+    /** A short utterance remains one provider-safe tail chunk until explicit completion. */
     @Test
-    fun shortUtteranceSealsAfterQuietGapWithoutTenSecondTail() {
+    fun shortUtteranceWaitsForFinishBelowProviderSafeMinimum() {
         val clock = FakeElapsedRealtime()
         val device = ShortUtteranceGapCaptureDevice(clock)
         val writes = CopyOnWriteArrayList<Int>()
@@ -172,10 +267,18 @@ class ConversationDictationCallerAudioTest {
                 elapsedRealtime = clock::now,
             )
         val stream = checkNotNull(capture.openProviderStream())
+        val captureClosed = CountDownLatch(1)
+        val feedClosed = CountDownLatch(1)
+        stream.onFeedClosed(feedClosed::countDown)
         try {
             assertTrue(stream.start())
             assertTrue(device.waitingForEnd.await(2, TimeUnit.SECONDS))
-            await { writes.isNotEmpty() }
+            assertTrue(writes.isEmpty())
+
+            stream.finishCapture(captureClosed::countDown)
+            device.allowEnd.countDown()
+            assertTrue(captureClosed.await(2, TimeUnit.SECONDS))
+            assertTrue(feedClosed.await(2, TimeUnit.SECONDS))
 
             assertEquals(listOf(80_000), writes)
             assertEquals(true, stream.containsSpeech())
@@ -306,6 +409,67 @@ class ConversationDictationCallerAudioTest {
 
         fun advance(millis: Long) {
             this.millis.addAndGet(millis)
+        }
+    }
+
+    /** Holds one read across the terminal action, then exposes more native-buffered tail reads. */
+    private class FinishingReadCaptureDevice : ConversationDictationAudioCaptureDevice {
+        val readStarted = CountDownLatch(1)
+        val completeRead = CountDownLatch(1)
+        val readCount = AtomicInteger(0)
+
+        override val initialized: Boolean = true
+
+        override val recording: Boolean = true
+
+        override fun start() = Unit
+
+        override fun read(target: ShortArray): Int {
+            if (readCount.getAndIncrement() == 0) {
+                readStarted.countDown()
+                check(completeRead.await(2, TimeUnit.SECONDS))
+            }
+            target[0] = 1_000
+            target[1] = 1_000
+            return 2
+        }
+
+        override fun stop() = Unit
+
+        override fun release() {
+            completeRead.countDown()
+        }
+    }
+
+    /** Advances the injected clock by 400 ms for each successful native read. */
+    private class DeadlineReadCaptureDevice(
+        private val clock: FakeElapsedRealtime,
+    ) : ConversationDictationAudioCaptureDevice {
+        val readStarted = CountDownLatch(1)
+        val completeRead = CountDownLatch(1)
+        val readCount = AtomicInteger(0)
+
+        override val initialized: Boolean = true
+
+        override val recording: Boolean = true
+
+        override fun start() = Unit
+
+        override fun read(target: ShortArray): Int {
+            if (readCount.getAndIncrement() == 0) {
+                readStarted.countDown()
+                check(completeRead.await(2, TimeUnit.SECONDS))
+            }
+            clock.advance(400L)
+            target[0] = 1_000
+            target[1] = 1_000
+            return 2
+        }
+
+        override fun stop() = Unit
+
+        override fun release() {
+            completeRead.countDown()
         }
     }
 

@@ -1683,11 +1683,6 @@
     <string name="dictation_audio_buffer_full">O ditado foi interrompido porque o serviço de voz não conseguiu acompanhar</string>
     <string name="dictation_timed_out">O reconhecimento de voz atingiu o limite de tempo</string>
     <string name="dictation_failed">Não foi possível transcrever a fala</string>
-    <string name="dictation_review_required">O rascunho mudou — revise o texto ditado</string>
-    <string name="dictation_review_action">Revisar texto ditado</string>
-    <string name="dictation_review_title">Revisar texto ditado</string>
-    <string name="dictation_insert_at_end">Inserir no final</string>
-    <string name="dictation_discard_transcript">Descartar texto ditado</string>
     <string name="discard">Descartar</string>
     <string name="open_app_settings">Abrir configurações do aplicativo</string>
     <string name="dictation_disclosure_title">Reconhecimento de voz externo</string>
