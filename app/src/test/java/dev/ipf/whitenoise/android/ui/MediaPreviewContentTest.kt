@@ -127,7 +127,11 @@ class MediaPreviewContentTest {
     fun uncheckingAFrameAndPressingDoneRemovesItAndRenumbers() {
         // The shelf tap is the only production entry into this screen and it always previews.
         renderPreview(listOf(uri(1), uri(2), uri(3)), previewOnly = true)
-        composeRule.onAllNodesWithTag("conversation.media.inclusion.target").onFirst().performClick()
+        val inclusionTargets = composeRule.onAllNodesWithTag("conversation.media.inclusion.target")
+        composeRule.waitUntil(timeoutMillis = 5_000L) {
+            inclusionTargets.fetchSemanticsNodes().isNotEmpty()
+        }
+        inclusionTargets.onFirst().performClick()
         composeRule.onNodeWithText(string(R.string.done)).performClick()
         // Exclusions apply one frame at a time across recompositions, and a single idle pass
         // returned early on the Play flavour's dispatcher, so wait for the removal itself.
