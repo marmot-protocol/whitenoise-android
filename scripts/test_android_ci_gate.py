@@ -8,6 +8,8 @@ import subprocess
 import textwrap
 import unittest
 
+import yaml
+
 
 WORKFLOW = Path(__file__).resolve().parents[1] / '.github/workflows/android-ci.yml'
 APP_BUILD = Path(__file__).resolve().parents[1] / 'app/build.gradle.kts'
@@ -20,6 +22,8 @@ class AndroidCiGateTest(unittest.TestCase):
     def setUpClass(cls):
         """Read the actual inline shell gate, avoiding a separate test-only copy."""
         cls.workflow = WORKFLOW.read_text()
+        cls.workflow_config = yaml.safe_load(cls.workflow)
+        cls.jobs = cls.workflow_config['jobs']
         cls.gate = cls.workflow.split('\n  validate:\n', 1)[1]
         cls.static_analysis = cls.workflow.split('\n  static-analysis:\n', 1)[1].split('\n  tests:\n', 1)[0]
         cls.tests_job = cls.workflow.split('\n  tests:\n', 1)[1].split('\n  validate:\n', 1)[0]
@@ -27,6 +31,14 @@ class AndroidCiGateTest(unittest.TestCase):
         cls.script = textwrap.dedent(cls.gate.split('        run: |\n', 1)[1])
         match = re.search(r'^    needs: \[([^\]]+)\]$', cls.gate, re.MULTILINE)
         cls.dependencies = [job.strip() for job in match.group(1).split(',')]
+
+    @staticmethod
+    def named_step(job, name):
+        """Return one production workflow step by its stable display name."""
+        matches = [step for step in job['steps'] if step.get('name') == name]
+        if len(matches) != 1:
+            raise AssertionError(f'expected one {name!r} step, found {len(matches)}')
+        return matches[0]
 
     def run_gate(self, outcomes):
         """Run the production shell with synthetic, untrusted JSON input."""
@@ -51,13 +63,19 @@ class AndroidCiGateTest(unittest.TestCase):
 
     def test_static_analysis_isolated_by_flavor_without_duplicating_singletons(self):
         """Both lint variants run concurrently while ktlint and detekt run once."""
+        job = self.jobs['static-analysis']
         self.assertIn("name: ktlint, detekt, and Android lint (${{ matrix.flavor }})", self.static_analysis)
-        self.assertIn('fail-fast: false', self.static_analysis)
-        self.assertIn('flavor: [Zapstore, Play]', self.static_analysis)
-        self.assertEqual(self.static_analysis.count("if: matrix.flavor == 'Play'"), 2)
-        self.assertIn(':app:ktlintCheck :benchmark:ktlintCheck', self.static_analysis)
-        self.assertIn(':app:detekt', self.static_analysis)
-        self.assertIn(':app:lintDev${{ matrix.flavor }}Debug', self.static_analysis)
+        self.assertFalse(job['strategy']['fail-fast'])
+        self.assertEqual(job['strategy']['matrix']['flavor'], ['Zapstore', 'Play'])
+        ktlint = self.named_step(job, 'ktlint')
+        detekt = self.named_step(job, 'detekt')
+        lint = self.named_step(job, 'Android lint')
+        self.assertEqual(ktlint['if'], "matrix.flavor == 'Play'")
+        self.assertEqual(detekt['if'], "matrix.flavor == 'Play'")
+        self.assertNotIn('if', lint)
+        self.assertIn(':app:ktlintCheck :benchmark:ktlintCheck', ktlint['run'])
+        self.assertIn(':app:detekt', detekt['run'])
+        self.assertIn(':app:lintDev${{ matrix.flavor }}Debug', lint['run'])
         self.assertNotIn(':app:lintDevZapstoreDebug :app:lintDevPlayDebug', self.static_analysis)
         self.assertIn('android-ci-reports-static-analysis-${{ matrix.flavor }}', self.static_analysis)
         self.assertIn('android-ci-gradle-profiles-static-analysis-${{ matrix.flavor }}', self.static_analysis)
@@ -65,24 +83,44 @@ class AndroidCiGateTest(unittest.TestCase):
 
     def test_full_unit_suite_owns_screenshot_verification_and_coverage_reuses_it(self):
         """Roborazzi verification runs once with every test and remains cache-correct."""
+        job = self.jobs['tests']
+        expected_steps = {
+            'Unit tests',
+            'Coverage gate (Kover)',
+            'Coverage report (Kover)',
+        }
+        test_invocations = {
+            step['name']: step['run']
+            for step in job['steps']
+            if 'run' in step and './gradlew' in step['run']
+            and ('UnitTest' in step['run'] or 'kover' in step['run'])
+        }
+        self.assertEqual(set(test_invocations), expected_steps)
+        for name, invocation in test_invocations.items():
+            with self.subTest(step=name):
+                self.assertIn('-Proborazzi.test.verify=true', invocation)
         self.assertIn(
-            ':app:testDev${{ matrix.flavor }}DebugUnitTest -Proborazzi.test.verify=true',
-            self.tests_job,
+            ':app:testDev${{ matrix.flavor }}DebugUnitTest',
+            test_invocations['Unit tests'],
         )
-        self.assertEqual(self.tests_job.count('-Proborazzi.test.verify=true'), 3)
         self.assertNotIn('verifyRoborazziDev', self.tests_job)
         self.assertNotIn("--tests '", self.tests_job)
         self.assertIn('testDevZapstoreDebugUnitTest', self.app_build)
         self.assertIn('testDevPlayDebugUnitTest', self.app_build)
-        self.assertIn('dir(layout.projectDirectory.dir("src/test/snapshots"))', self.app_build)
+        self.assertIn('files(layout.projectDirectory.dir("src/test/snapshots").asFileTree)', self.app_build)
         self.assertIn('withPropertyName("roborazziSnapshots")', self.app_build)
         self.assertIn('withPathSensitivity(PathSensitivity.RELATIVE)', self.app_build)
 
     def test_only_play_tests_publish_gradle_cache_state(self):
         """Parallel analysis and fork runs cannot create competing cache writers."""
+        setup_gradle = self.named_step(self.jobs['tests'], 'Set up Gradle')
+        cache_policy = setup_gradle['with']['cache-read-only']
         self.assertEqual(self.workflow.count('cache-read-only: true'), 2)
-        self.assertIn("matrix.flavor != 'Play'", self.tests_job)
-        self.assertIn('github.event.pull_request.head.repo.full_name != github.repository', self.tests_job)
+        self.assertIn("matrix.flavor != 'Play'", cache_policy)
+        self.assertIn(
+            'github.event.pull_request.head.repo.full_name != github.repository',
+            cache_policy,
+        )
 
     def test_all_successful_jobs_pass(self):
         """A complete green matrix permits the existing required check to pass."""
