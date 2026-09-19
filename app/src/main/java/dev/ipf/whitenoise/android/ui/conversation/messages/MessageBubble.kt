@@ -605,7 +605,7 @@ internal fun MessageBubble(
     val deletedBodyText =
         stringResource(
             when {
-                item.projected?.deletionSource == DeletionSourceFfi.ADMIN -> R.string.message_removed_by_admin
+                item.projected?.deletionSource == DeletionSourceFfi.ADMIN -> R.string.message_deleted_by_admin
                 deletedByMe -> R.string.message_deleted_by_you
                 else -> R.string.message_deleted_by_other
             },

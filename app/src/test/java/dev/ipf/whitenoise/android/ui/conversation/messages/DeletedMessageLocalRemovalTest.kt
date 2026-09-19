@@ -301,7 +301,7 @@ class DeletedMessageLocalRemovalTest {
         render(failCommits = false, deletionSource = DeletionSourceFfi.ADMIN)
 
         composeRule
-            .onNodeWithText(string(R.string.message_removed_by_admin), substring = false)
+            .onNodeWithText(string(R.string.message_deleted_by_admin), substring = false)
             .assertIsDisplayed()
         composeRule.onNodeWithText(string(R.string.message_deleted_by_other), substring = false).assertDoesNotExist()
     }
@@ -321,7 +321,7 @@ class DeletedMessageLocalRemovalTest {
         render(failCommits = false, deletionSource = DeletionSourceFfi.UNKNOWN)
 
         placeholder().assertIsDisplayed()
-        composeRule.onNodeWithText(string(R.string.message_removed_by_admin), substring = false).assertDoesNotExist()
+        composeRule.onNodeWithText(string(R.string.message_deleted_by_admin), substring = false).assertDoesNotExist()
     }
 
     /** Composes the surface under test with the given fixture. */

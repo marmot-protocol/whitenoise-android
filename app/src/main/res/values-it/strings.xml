@@ -1963,7 +1963,7 @@
     <string name="save_attachments">Salva allegati</string>
     <string name="message_deleted_by_you">Hai eliminato questo messaggio.</string>
     <string name="message_deleted_by_other">Questo messaggio è stato eliminato.</string>
-    <string name="message_removed_by_admin">Un amministratore ha eliminato questo messaggio.</string>
+    <string name="message_deleted_by_admin">Un amministratore ha eliminato questo messaggio.</string>
     <string name="floating_keep">Mantieni sullo schermo</string>
     <string name="floating_title">Tenuto sullo schermo</string>
     <string name="floating_expand">Espandi messaggio</string>

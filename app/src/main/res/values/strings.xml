@@ -2061,7 +2061,7 @@
     <string name="save_attachments">Save attachments</string>
     <string name="message_deleted_by_you">You deleted this message.</string>
     <string name="message_deleted_by_other">This message was deleted.</string>
-    <string name="message_removed_by_admin">An admin deleted this message.</string>
+    <string name="message_deleted_by_admin">An admin deleted this message.</string>
     <string name="floating_keep">Keep on screen</string>
     <string name="floating_title">Kept on screen</string>
     <string name="floating_expand">Expand message</string>
