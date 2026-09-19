@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.settings.AuditLogExportDestinationDialog
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -41,6 +42,37 @@ class AuditLogExportScreenshotTest {
     fun auditLogControlsDark() {
         render(darkTheme = true)
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/audit_log_export_dark.png")
+    }
+
+    /** The destination choice the reader sees after acknowledging the export. */
+    @Test
+    fun auditLogExportDestinationLight() {
+        renderDestination(darkTheme = false)
+        composeRule
+            .onNodeWithTag(DESTINATION_TAG)
+            .captureRoboImage("src/test/snapshots/audit_log_export_destination_light.png")
+    }
+
+    /** The same choice in dark theme. */
+    @Test
+    fun auditLogExportDestinationDark() {
+        renderDestination(darkTheme = true)
+        composeRule
+            .onNodeWithTag(DESTINATION_TAG)
+            .captureRoboImage("src/test/snapshots/audit_log_export_destination_dark.png")
+    }
+
+    /** Renders the destination dialog's own surface, which is what the export change adds. */
+    private fun renderDestination(darkTheme: Boolean) {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = darkTheme) {
+                Surface {
+                    Column(modifier = Modifier.width(360.dp).testTag(DESTINATION_TAG)) {
+                        AuditLogExportDestinationDialog(onDismiss = {}, onSave = {}, onShare = {})
+                    }
+                }
+            }
+        }
     }
 
     /** Renders the two stored-log actions as one settings group. */
@@ -76,5 +108,6 @@ class AuditLogExportScreenshotTest {
 
     private companion object {
         const val TAG = "audit-log-export"
+        const val DESTINATION_TAG = "audit-log-export-destination"
     }
 }

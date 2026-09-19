@@ -2005,9 +2005,15 @@
     <string name="donate_open_failed">Bağış sayfası açılamadı. Tekrar deneyin veya Ayarlar’a dönün.</string>
     <string name="export_audit_logs_confirm_body">Tanılama günlükleri teknik tanımlayıcılar ve etkinlik ayrıntıları içerir. Bunları yalnızca güvendiğiniz kişilerle paylaşın.</string>
     <string name="export_audit_logs">Tanılama Günlüklerini Dışa Aktar</string>
-    <string name="export_audit_logs_subtitle">Bu cihazda saklanan tanılama günlüklerinin bir kopyasını paylaş</string>
+    <string name="export_audit_logs_subtitle">Bu cihazda saklanan tanılama günlüklerinin arşivini kaydedin veya paylaşın</string>
     <string name="export_audit_logs_confirm_title">Tanılama günlükleri dışa aktarılsın mı?</string>
-    <string name="export_audit_logs_confirm_action">Alıcı seç</string>
+    <string name="toast_couldnt_save_audit_logs">Tanılama günlükleri kaydedilemedi</string>
+    <string name="toast_audit_logs_saved">Tanılama günlükleri kaydedildi</string>
+    <string name="export_audit_logs_share">Paylaş</string>
+    <string name="export_audit_logs_save">Cihaza kaydet</string>
+    <string name="export_audit_logs_destination_body">Tanılama günlükleri tek bir .zip dosyasında toplanır. Bu cihaza kaydedin veya güvendiğiniz birine gönderin.</string>
+    <string name="export_audit_logs_destination_title">Tek arşiv olarak dışa aktar</string>
+    <string name="export_audit_logs_confirm_action">Devam</string>
     <string name="toast_couldnt_export_audit_logs">Tanılama günlükleri dışa aktarmaya hazırlanamadı</string>
     <string name="toast_no_audit_logs_to_export">Dışa aktarılacak tanılama günlüğü yok</string>
 </resources>

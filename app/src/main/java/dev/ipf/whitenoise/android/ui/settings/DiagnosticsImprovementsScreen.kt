@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,8 +26,11 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.AUDIT_LOG_ARCHIVE_MIME_TYPE
+import dev.ipf.whitenoise.android.state.AUDIT_LOG_ARCHIVE_NAME
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.auditLogShareChooserIntent
+import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
@@ -51,6 +56,8 @@ internal fun DiagnosticsImprovementsScreen(
     var confirmAuditUpload by remember { mutableStateOf(false) }
     var exportConfirmOpen by rememberSaveable { mutableStateOf(false) }
     var deleteConfirmOpen by rememberSaveable { mutableStateOf(false) }
+    // The archive staged by the acknowledged export, held until the reader picks a destination.
+    var stagedArchive by remember { mutableStateOf<java.io.File?>(null) }
     LaunchedEffect(appState.runtimeGeneration) { appState.refreshSecurityPrivacySettings() }
 
     /** Runs an audit-log mutation with the busy flag. */
@@ -150,19 +157,51 @@ internal fun DiagnosticsImprovementsScreen(
             }
         }
     }
+    val chooserTitle = stringResource(R.string.export_audit_logs)
+    // The picker runs outside this composition, so the archive it writes is the one held above;
+    // a cancelled pick is an ordinary no-op that simply clears the choice.
+    val saveLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.CreateDocument(AUDIT_LOG_ARCHIVE_MIME_TYPE),
+        ) { uri ->
+            val archive = stagedArchive
+            stagedArchive = null
+            if (uri != null && archive != null) {
+                runAuditMutation {
+                    runCatchingCancellable {
+                        saveAuditLogArchive(
+                            archive = archive,
+                            openOutput = { context.contentResolver.openOutputStream(uri, "wt") },
+                            discardOutput = { discardAuditLogArchiveDocument(context.contentResolver, uri) },
+                        )
+                    }.onSuccess { appState.present(R.string.toast_audit_logs_saved) }
+                        .onFailure { appState.present(R.string.toast_couldnt_save_audit_logs) }
+                }
+            }
+        }
     if (exportConfirmOpen) {
-        val chooserTitle = stringResource(R.string.export_audit_logs)
         AuditLogExportConsentDialog(
             onDismiss = { exportConfirmOpen = false },
             onConfirm = {
                 exportConfirmOpen = false
-                runAuditMutation {
-                    val files = appState.prepareAuditLogsForSharing()
-                    if (files.isNotEmpty()) {
-                        runCatching { context.startActivity(auditLogShareChooserIntent(context, files, chooserTitle)) }
-                            .onFailure { appState.present(R.string.toast_couldnt_export_audit_logs) }
+                runAuditMutation { stagedArchive = appState.prepareAuditLogArchiveForExport() }
+            },
+        )
+    }
+    stagedArchive?.let { archive ->
+        AuditLogExportDestinationDialog(
+            onDismiss = { stagedArchive = null },
+            onSave = {
+                runCatching { saveLauncher.launch(AUDIT_LOG_ARCHIVE_NAME) }
+                    .onFailure {
+                        stagedArchive = null
+                        appState.present(R.string.toast_couldnt_save_audit_logs)
                     }
-                }
+            },
+            onShare = {
+                stagedArchive = null
+                runCatching { context.startActivity(auditLogShareChooserIntent(context, archive, chooserTitle)) }
+                    .onFailure { appState.present(R.string.toast_couldnt_export_audit_logs) }
             },
         )
     }
@@ -225,6 +264,27 @@ private fun DiagnosticsDisclosure(appState: WhiteNoiseAppState) {
             }
         }
     }
+}
+
+/** Where the staged archive goes: this device, or a recipient through the normal chooser. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun AuditLogExportDestinationDialog(
+    onDismiss: () -> Unit,
+    onSave: () -> Unit,
+    onShare: () -> Unit,
+) {
+    WhiteNoiseAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.export_audit_logs_destination_title)) },
+        text = { Text(stringResource(R.string.export_audit_logs_destination_body)) },
+        confirmButton = {
+            TextButton(onClick = onSave) { Text(stringResource(R.string.export_audit_logs_save)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onShare) { Text(stringResource(R.string.export_audit_logs_share)) }
+        },
+    )
 }
 
 /** Export requires an explicit acknowledgement that technical diagnostic data is sensitive. */

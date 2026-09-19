@@ -2021,9 +2021,15 @@
     <string name="donate_open_failed">Die Spendenseite konnte nicht geöffnet werden. Versuche es erneut oder kehre zu den Einstellungen zurück.</string>
     <string name="export_audit_logs_confirm_body">Diagnoseprotokolle enthalten technische Kennungen und Aktivitätsdetails. Teile sie nur mit Personen, denen du vertraust.</string>
     <string name="export_audit_logs">Diagnoseprotokolle exportieren</string>
-    <string name="export_audit_logs_subtitle">Eine Kopie der auf diesem Gerät gespeicherten Diagnoseprotokolle teilen</string>
+    <string name="export_audit_logs_subtitle">Ein Archiv der auf diesem Gerät gespeicherten Diagnoseprotokolle speichern oder teilen</string>
     <string name="export_audit_logs_confirm_title">Diagnoseprotokolle exportieren?</string>
-    <string name="export_audit_logs_confirm_action">Empfänger auswählen</string>
+    <string name="toast_couldnt_save_audit_logs">Diagnoseprotokolle konnten nicht gespeichert werden</string>
+    <string name="toast_audit_logs_saved">Diagnoseprotokolle gespeichert</string>
+    <string name="export_audit_logs_share">Teilen</string>
+    <string name="export_audit_logs_save">Auf Gerät speichern</string>
+    <string name="export_audit_logs_destination_body">Die Diagnoseprotokolle werden in einer einzigen ZIP-Datei zusammengefasst. Speichere sie auf diesem Gerät oder sende sie an jemanden, dem du vertraust.</string>
+    <string name="export_audit_logs_destination_title">Als ein Archiv exportieren</string>
+    <string name="export_audit_logs_confirm_action">Weiter</string>
     <string name="toast_couldnt_export_audit_logs">Diagnoseprotokolle konnten nicht für den Export vorbereitet werden</string>
     <string name="toast_no_audit_logs_to_export">Keine Diagnoseprotokolle zum Exportieren vorhanden</string>
 </resources>
