@@ -275,7 +275,12 @@ internal class CoalescingMessageDraftWriter(
      * The save is conditional on the generation this pass captured. A send that durably
      * completes inside the debounce window advances the generation as part of its cleanup, and
      * writing anyway would restore the draft that cleanup deleted, putting the sent text back
-     * into the composer. A superseded pass therefore retires the queue entry without writing.
+     * into the composer.
+     *
+     * A superseded pass therefore retires the queue entry only when nothing newer is waiting.
+     * The generation also moves when a keystroke lands between this pass capturing its content
+     * and the store checking currency, and that edit still has to reach storage, so the loop
+     * repeats for it exactly as it does after an applied save.
      */
     private suspend fun drain(
         key: Key,
@@ -292,11 +297,18 @@ internal class CoalescingMessageDraftWriter(
                     generation = MessageDraftGeneration(generation),
                 )
             if (saved is MessageDraftConditionalSaveResult.Superseded) {
-                synchronized(lock) {
-                    state.job = null
-                    pending.remove(key, state)
-                }
-                return
+                val retired =
+                    synchronized(lock) {
+                        if (state.generation == generation) {
+                            state.job = null
+                            pending.remove(key, state)
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                if (retired) return
+                continue
             }
             val result = (saved as MessageDraftConditionalSaveResult.Applied).result
             val isLatest =
