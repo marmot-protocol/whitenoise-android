@@ -83,6 +83,24 @@ class ConversationAnchoringSourceCoverageTest {
         )
     }
 
+    @Test
+    fun readAnchorFollowsTheUnobstructedViewport() {
+        val source = conversationScreenSource().readText()
+        val helperIndex = source.indexOf("private fun rememberConversationReadAnchor(")
+        val helper =
+            source.substring(helperIndex, source.indexOf("@OptIn(ExperimentalMaterial3Api::class)", helperIndex))
+
+        assertTrue(
+            "the read watermark must ignore rows the composer covers rather than the raw layout",
+            helper.containsAll(
+                "timelineViewport.readingLayoutInfo().newestReadRow(",
+                // Structural rows map past the timeline, where the clamp would read them as newest.
+                "timelineListIndices = trailingRowCount until trailingRowCount + renderedSize",
+            ) &&
+                "listState.layoutInfo" !in helper,
+        )
+    }
+
     private fun String.containsAll(vararg fragments: String): Boolean = fragments.all(::contains)
 
     private fun conversationScreenSource(): File =

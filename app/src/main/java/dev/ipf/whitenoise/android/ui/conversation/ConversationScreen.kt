@@ -28,7 +28,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListLayoutInfo
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -481,29 +480,39 @@ private fun rememberConversationBatchSelectionUiState(
  * in the same list slot still advances the anchor to the confirmed message.
  * A missing durable watermark rebases only at the fully loaded tail; while a
  * newer page exists it may be off-window and must remain monotonic.
+ *
+ * A row only counts once it clears the composer outright. The transcript rests with the next
+ * message showing a sliver above the composer, and taking that sliver as read deducted a message
+ * from the unread badge that nobody had seen.
  */
 @Composable
 private fun rememberConversationReadAnchor(
     controller: ConversationController,
     entrySessionIdentity: Any,
     renderedTimeline: List<TimelineMessage>,
-    listState: LazyListState,
+    timelineViewport: ConversationTimelineViewport,
     trailingRowCount: Int,
     initialTimelineAnchored: Boolean,
 ): MutableState<String?> {
     val readAnchor = remember(entrySessionIdentity) { mutableStateOf(controller.lastReadMessageId) }
     val renderedSize = renderedTimeline.size
     val currentHighestVisibleTimelineIndex by
-        remember(listState, renderedSize, trailingRowCount) {
+        remember(timelineViewport, renderedSize, trailingRowCount) {
             derivedStateOf {
-                val visible = listState.layoutInfo.visibleItemsInfo
-                if (visible.isEmpty() || renderedSize == 0) return@derivedStateOf -1
+                // The reading viewport rather than the raw layout, and within it only a row that
+                // clears the composer outright. Counting a row the composer covers, or one left
+                // showing a sliver above it, clears an unread badge for a message nobody has read.
+                val newest =
+                    timelineViewport.readingLayoutInfo().newestReadRow(
+                        timelineListIndices = trailingRowCount until trailingRowCount + renderedSize,
+                    )
+                if (newest == null || renderedSize == 0) return@derivedStateOf -1
                 // Reversed layout, bottom to top: [maybe bottom error]
                 // [timeline items, newest first][maybe older-loading]
                 // [maybe top error][maybe group recovery][top spacer].
-                // The lowest visible index is therefore the newest row shown.
+                // The lowest fully clear index is therefore the newest row actually read.
                 conversationTimelineIndexForListIndex(
-                    listIndex = visible.first().index,
+                    listIndex = newest.index,
                     timelineSize = renderedSize,
                     trailingRowCount = trailingRowCount,
                 ).coerceIn(0, renderedSize - 1)
@@ -1340,7 +1349,7 @@ internal fun ConversationScreen(
             controller = controller,
             entrySessionIdentity = entryUnreadSessionIdentity,
             renderedTimeline = renderedTimeline,
-            listState = listState,
+            timelineViewport = timelineViewport,
             trailingRowCount = trailingRowCount,
             initialTimelineAnchored = initialTimelineAnchored,
         )
@@ -3731,7 +3740,15 @@ internal fun ConversationScreen(
                                         }.performanceTestTag(
                                             PerformanceTestTags.CONVERSATION_TRANSCRIPT_VISIBLE,
                                             enabled = transcriptReadyToReveal && renderedTimeline.isNotEmpty(),
-                                        ).onGloballyPositioned(timelineViewport::onPaintViewportMeasured),
+                                        ).onGloballyPositioned(timelineViewport::onPaintViewportMeasured)
+                                        // Rows dissolve into the bar above, and slide under the
+                                        // composer thinning away to nothing by the bottom of the
+                                        // screen, so the transcript meets its chrome softly
+                                        // instead of being sliced off mid-bubble.
+                                        .transcriptEdgeFade(
+                                            listState = listState,
+                                            composerOverlap = overlayPadding,
+                                        ),
                                 // Bottom-anchored like every established chat
                                 // client: the viewport shrinking under the keyboard
                                 // moves rows up as a layout consequence, so the
