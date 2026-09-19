@@ -25234,6 +25234,14 @@
           "ONB-017",
           "ONB-020"
         ]
+      },
+      {
+        "surface": "Every non-action part of the focused-message overlay dismisses it, including the lifted message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "internal fun FocusedMessageActions(",
+        "test_ids": [
+          "MSG-004"
+        ]
       }
     ],
     "notification_content_contracts": [

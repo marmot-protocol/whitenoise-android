@@ -368,7 +368,7 @@ class MessageActionMenuLayoutTest {
         renderMenu(fontScale = 1f, onDismiss = { dismissals++ })
 
         // The 8 dp gap between the preview and the menu is the column's own surface: a tap there
-        // touches neither a reaction, the inert preview nor a menu item, so it must dismiss.
+        // touches neither a reaction nor a menu item, so it must dismiss.
         val column = composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).fetchSemanticsNode().boundsInRoot
         val preview = composeRule.onNodeWithTag("message-actions-preview").fetchSemanticsNode().boundsInRoot
         val gapY = preview.bottom - column.top + with(composeRule.density) { 4.dp.toPx() }
@@ -377,16 +377,16 @@ class MessageActionMenuLayoutTest {
         assertEquals(1, dismissals)
     }
 
-    /** The inert preview neither dismisses nor acts when tapped. */
+    /** The preview dismisses when tapped, and still runs none of the menu's actions. */
     @Test
-    fun tapOnThePreviewStaysInert() {
+    fun tapOnThePreviewDismisses() {
         var dismissals = 0
         val callbacks = mutableListOf<String>()
         renderMenu(fontScale = 1f, callbacks = callbacks, onDismiss = { dismissals++ })
 
         composeRule.onNodeWithTag("message-actions-preview").performTouchInput { click() }
 
-        assertEquals(0, dismissals)
+        assertEquals(1, dismissals)
         assertTrue(callbacks.isEmpty())
     }
 
