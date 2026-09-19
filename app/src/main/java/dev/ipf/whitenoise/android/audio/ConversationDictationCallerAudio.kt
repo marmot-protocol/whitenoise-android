@@ -442,6 +442,9 @@ internal class ConversationDictationCallerAudioStream(
     /** Returns capture-side speech evidence for this generation's exact chunk, when claimed. */
     fun containsSpeech(): Boolean? = chunk.get()?.hasSpeech
 
+    /** Returns the stable identity of this generation's exact claimed chunk. */
+    fun chunkId(): Long? = chunk.get()?.chunkId
+
     /** Returns this generation’s chunk to the front of the queue without duplicating its byte accounting. */
     fun retry(): Boolean = settle(requeue = true)
 
