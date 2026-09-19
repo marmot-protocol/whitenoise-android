@@ -25200,6 +25200,32 @@
         "test_ids": [
           "SEC-007"
         ]
+      },
+      {
+        "surface": "A text or reply send publishes with one engine call and reads no draft",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/DraftSend.kt",
+        "anchor": "internal suspend fun MarmotInterface.sendComposerText(",
+        "test_ids": [
+          "CON-005",
+          "CON-008",
+          "CON-012"
+        ]
+      },
+      {
+        "surface": "A draft save whose generation was superseded never reaches storage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/editor/MessageDraftRepository.kt",
+        "anchor": "suspend fun saveAcceptedTextIfCurrent(",
+        "test_ids": [
+          "CON-008"
+        ]
+      },
+      {
+        "surface": "A debounced draft pass retires after send cleanup but keeps draining newer text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/editor/CoalescingMessageDraftWriter.kt",
+        "anchor": "private suspend fun drain(",
+        "test_ids": [
+          "CON-008"
+        ]
       }
     ],
     "notification_content_contracts": [

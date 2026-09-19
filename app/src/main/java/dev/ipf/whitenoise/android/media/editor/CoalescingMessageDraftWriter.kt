@@ -268,6 +268,20 @@ internal class CoalescingMessageDraftWriter(
         }
     }
 
+    /**
+     * Persists the coalesced text for [key] after the debounce interval, retrying while newer
+     * keystrokes keep arriving.
+     *
+     * The save is conditional on the generation this pass captured. A send that durably
+     * completes inside the debounce window advances the generation as part of its cleanup, and
+     * writing anyway would restore the draft that cleanup deleted, putting the sent text back
+     * into the composer.
+     *
+     * A superseded pass therefore retires the queue entry only when nothing newer is waiting.
+     * The generation also moves when a keystroke lands between this pass capturing its content
+     * and the store checking currency, and that edit still has to reach storage, so the loop
+     * repeats for it exactly as it does after an applied save.
+     */
     private suspend fun drain(
         key: Key,
         state: Pending,
@@ -275,7 +289,28 @@ internal class CoalescingMessageDraftWriter(
         delay(debounceMillis)
         while (true) {
             val (content, generation) = synchronized(lock) { state.content to state.generation }
-            val result = drafts.coordinated.saveAcceptedText(key.accountRef, key.groupIdHex, content)
+            val saved =
+                drafts.coordinated.saveAcceptedTextIfCurrent(
+                    accountRef = key.accountRef,
+                    groupIdHex = key.groupIdHex,
+                    content = content,
+                    generation = MessageDraftGeneration(generation),
+                )
+            if (saved is MessageDraftConditionalSaveResult.Superseded) {
+                val retired =
+                    synchronized(lock) {
+                        if (state.generation == generation) {
+                            state.job = null
+                            pending.remove(key, state)
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                if (retired) return
+                continue
+            }
+            val result = (saved as MessageDraftConditionalSaveResult.Applied).result
             val isLatest =
                 synchronized(lock) {
                     activeMerges[key]?.latestResult = result
