@@ -3,11 +3,12 @@ package dev.ipf.whitenoise.android.audio
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Holds a terminal recognizer callback until all caller-owned audio relevant to it is durable.
+ * Holds one recognition generation's terminal callback until its caller-owned audio is durable.
  *
  * A provider pipe can close before the microphone thread has sealed the final partial chunk. When
  * Paste or Send requested capture closure, waiting for both boundaries prevents the controller
  * from observing an empty queue and completing before the tail becomes available.
+ * A fresh barrier is owned by every [ConversationDictationRecognitionSession] generation.
  */
 internal class ConversationDictationCallerAudioCompletionBarrier(
     private val dispatch: (() -> Unit) -> Unit,

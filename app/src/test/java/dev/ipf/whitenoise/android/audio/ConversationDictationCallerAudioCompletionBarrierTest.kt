@@ -91,6 +91,20 @@ class ConversationDictationCallerAudioCompletionBarrierTest {
         assertEquals(1, fixture.deliveryCount)
     }
 
+    /** Exactly-once state belongs to one generation and cannot suppress the next generation. */
+    @Test
+    fun aNewRecognitionGenerationOwnsANewFence() {
+        val firstGeneration = BarrierFixture()
+        val secondGeneration = BarrierFixture()
+
+        firstGeneration.barrier.deliverImmediately(firstGeneration::recordDelivery)
+        firstGeneration.barrier.deliverImmediately(firstGeneration::recordDelivery)
+        secondGeneration.barrier.deliverImmediately(secondGeneration::recordDelivery)
+
+        assertEquals(1, firstGeneration.deliveryCount)
+        assertEquals(1, secondGeneration.deliveryCount)
+    }
+
     private class BarrierFixture {
         private val feed = ClosureSignal()
         private val capture = ClosureSignal()
