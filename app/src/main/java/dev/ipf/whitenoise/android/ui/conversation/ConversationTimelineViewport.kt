@@ -142,9 +142,15 @@ internal fun conversationReadingLayoutInfo(
  * with exactly that much of the next message showing. A row therefore has to clear the chrome
  * outright, unless it is taller than the clear viewport, in which case it is the only thing the
  * reader can be looking at.
+ *
+ * [timelineListIndices] admits only real message rows. The transcript also emits error, paging and
+ * spacer rows, and a trailing one of those maps past the end of the timeline, where the caller's
+ * clamp would silently resolve it to the newest message and mark the whole conversation read.
  */
-internal fun LazyListLayoutInfo.newestReadRow(): LazyListItemInfo? =
-    visibleItemsInfo.firstOrNull { it.offset >= viewportStartOffset || it.size >= viewportSize.height }
+internal fun LazyListLayoutInfo.newestReadRow(timelineListIndices: IntRange): LazyListItemInfo? =
+    visibleItemsInfo.firstOrNull {
+        it.index in timelineListIndices && (it.offset >= viewportStartOffset || it.size >= viewportSize.height)
+    }
 
 /** Records the exact padding passed through this native list measure, including unchanged-total transitions. */
 internal fun Modifier.measureConversationTimelinePadding(

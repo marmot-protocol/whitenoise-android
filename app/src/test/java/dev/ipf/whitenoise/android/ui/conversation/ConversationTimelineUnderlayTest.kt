@@ -128,7 +128,7 @@ class ConversationTimelineUnderlayTest {
             // The anchor reads the first entry of whichever layout it is given; reversed emission
             // makes that the newest row.
             val rawCandidate = list.layoutInfo.visibleItemsInfo.first()
-            val readingCandidate = checkNotNull(viewport.readingLayoutInfo().newestReadRow())
+            val readingCandidate = checkNotNull(viewport.readingLayoutInfo().newestReadRow(TIMELINE_LIST_INDICES))
             assertEquals(COVERED_ROW_VALUE, rawCandidate.key)
             // This slide buries the newest row whole and still leaves the one behind it clipped by
             // the composer, so the watermark has to fall back a further row to find one read.
@@ -161,7 +161,25 @@ class ConversationTimelineUnderlayTest {
             // The sliver keeps the row usable, which is what the shared projection is for.
             assertEquals(COVERED_ROW_VALUE, reading.visibleItemsInfo.first().key)
             // The watermark asks a stricter question and must refuse it.
-            assertEquals(COVERED_ROW_VALUE - 1, reading.newestReadRow()?.key)
+            assertEquals(COVERED_ROW_VALUE - 1, reading.newestReadRow(TIMELINE_LIST_INDICES)?.key)
+        }
+    }
+
+    /**
+     * The transcript emits error, paging and spacer rows alongside messages. A trailing one of
+     * those maps past the end of the timeline, where the caller's clamp would resolve it to the
+     * newest message and mark the whole conversation read, so it must never be the candidate.
+     */
+    @Test
+    fun aTrailingStructuralRowIsNeverTheReadCandidate() {
+        foreground = 120
+        render()
+        rule.waitForIdle()
+        rule.runOnIdle {
+            val reading = viewport.readingLayoutInfo()
+            assertEquals(COVERED_ROW_VALUE, reading.newestReadRow(TIMELINE_LIST_INDICES)?.key)
+            // Excluding the newest slot is what a trailing structural row does to the message range.
+            assertEquals(COVERED_ROW_VALUE - 1, reading.newestReadRow(1 until TIMELINE_SIZE)?.key)
         }
     }
 
@@ -175,7 +193,7 @@ class ConversationTimelineUnderlayTest {
         rule.waitForIdle()
         rule.runOnIdle {
             val reading = viewport.readingLayoutInfo()
-            val newest = reading.newestReadRow()
+            val newest = reading.newestReadRow(TIMELINE_LIST_INDICES)
             assertTrue(
                 "an oversized row must not leave the watermark with nothing to advance to",
                 newest != null,
@@ -456,6 +474,9 @@ private const val COVERED_ROW_VALUE = 19
 
 /** The harness emits keys 0..19, so the timeline the read anchor indexes into is twenty rows long. */
 private const val TIMELINE_SIZE = 20
+
+/** This harness emits no error, paging or spacer rows, so every list index is a message row. */
+private val TIMELINE_LIST_INDICES = 0 until TIMELINE_SIZE
 
 /**
  * Pixels the newest row is slid under the composer so the overlay covers it whole.

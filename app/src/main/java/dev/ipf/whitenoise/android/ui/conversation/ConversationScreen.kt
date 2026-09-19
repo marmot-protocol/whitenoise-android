@@ -502,7 +502,10 @@ private fun rememberConversationReadAnchor(
                 // The reading viewport rather than the raw layout, and within it only a row that
                 // clears the composer outright. Counting a row the composer covers, or one left
                 // showing a sliver above it, clears an unread badge for a message nobody has read.
-                val newest = timelineViewport.readingLayoutInfo().newestReadRow()
+                val newest =
+                    timelineViewport.readingLayoutInfo().newestReadRow(
+                        timelineListIndices = trailingRowCount until trailingRowCount + renderedSize,
+                    )
                 if (newest == null || renderedSize == 0) return@derivedStateOf -1
                 // Reversed layout, bottom to top: [maybe bottom error]
                 // [timeline items, newest first][maybe older-loading]

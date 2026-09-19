@@ -19,6 +19,7 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
+import com.github.takahirom.roborazzi.captureRoboImage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
@@ -52,6 +53,9 @@ class TranscriptEdgeFadeRenderTest {
         rule.runOnIdle { scope.launch { list.scrollToItem(MIDDLE_ROW) } }
         rule.waitForIdle()
         val pixels = rule.onNodeWithTag(FRAME).captureToImage().toPixelMap()
+        // The pixel assertions below state the intent; the baseline catches everything else the
+        // mask could change about how the transcript meets its chrome.
+        rule.onNodeWithTag(FRAME).captureRoboImage(SNAPSHOT)
 
         assertEquals("rows away from either edge stay untouched", ROW, pixels[COLUMN, 240])
         assertEquals("nothing may survive into the strip the composer covers", BACKGROUND, pixels[COLUMN, 450])
@@ -110,6 +114,7 @@ class TranscriptEdgeFadeRenderTest {
 
     private companion object {
         const val FRAME = "transcript-edge-fade-frame"
+        const val SNAPSHOT = "src/test/snapshots/transcript_edge_fade.png"
         const val ROW_COUNT = 40
         const val ROW_HEIGHT_DP = 40
         const val COVERED_STRIP_DP = 60

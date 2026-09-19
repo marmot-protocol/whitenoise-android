@@ -92,7 +92,11 @@ class ConversationAnchoringSourceCoverageTest {
 
         assertTrue(
             "the read watermark must ignore rows the composer covers rather than the raw layout",
-            helper.containsAll("timelineViewport.readingLayoutInfo().newestReadRow()") &&
+            helper.containsAll(
+                "timelineViewport.readingLayoutInfo().newestReadRow(",
+                // Structural rows map past the timeline, where the clamp would read them as newest.
+                "timelineListIndices = trailingRowCount until trailingRowCount + renderedSize",
+            ) &&
                 "listState.layoutInfo" !in helper,
         )
     }
