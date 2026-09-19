@@ -271,14 +271,14 @@ jobs:
 
       - name: ktlint
         if: matrix.flavor == 'Play'
-        run: ./gradlew :app:ktlintCheck :benchmark:ktlintCheck --build-cache --profile --no-daemon --stacktrace
+        run: ./gradlew :app:ktlintCheck :benchmark:ktlintCheck --build-cache --profile --daemon --stacktrace
 
       - name: detekt
         if: matrix.flavor == 'Play'
-        run: ./gradlew :app:detekt --build-cache --profile --no-daemon --stacktrace
+        run: ./gradlew :app:detekt --build-cache --profile --daemon --stacktrace
 
       - name: Android lint
-        run: ./gradlew :app:lintDev${{ matrix.flavor }}Debug --build-cache --profile --no-daemon --stacktrace
+        run: ./gradlew :app:lintDev${{ matrix.flavor }}Debug --build-cache --profile --daemon --stacktrace
 
       # Preserve failure diagnostics with a unique artifact name per job.
       - name: Upload reports
@@ -357,7 +357,7 @@ jobs:
       - name: Unit tests
         # Verify every committed Roborazzi baseline during the already-required
         # unfiltered suite instead of launching a second filtered test pass.
-        run: ./gradlew :app:testDev${{ matrix.flavor }}DebugUnitTest -Proborazzi.test.verify=true --build-cache --profile --no-daemon --stacktrace
+        run: ./gradlew :app:testDev${{ matrix.flavor }}DebugUnitTest -Proborazzi.test.verify=true --build-cache --profile --daemon --stacktrace
 
       # Coverage gate (phase 2): fail CI when overall line coverage drops below the
       # ratchet floor in app/build.gradle.kts. DevZapstoreDebug only — the aggregate
@@ -365,7 +365,7 @@ jobs:
       # guard (no signing in CI).
       - name: Coverage gate (Kover)
         if: matrix.flavor == 'Zapstore'
-        run: ./gradlew :app:koverVerifyDevZapstoreDebug -Proborazzi.test.verify=true --build-cache --profile --no-daemon --stacktrace
+        run: ./gradlew :app:koverVerifyDevZapstoreDebug -Proborazzi.test.verify=true --build-cache --profile --daemon --stacktrace
 
       # Coverage visibility (phase 1): generate HTML/XML reports and publish them as
       # an artifact. Non-blocking so report upload still runs when the gate above fails.
@@ -373,7 +373,7 @@ jobs:
       - name: Coverage report (Kover)
         if: always()
         continue-on-error: true
-        run: ./gradlew :app:koverXmlReportDev${{ matrix.flavor }}Debug :app:koverHtmlReportDev${{ matrix.flavor }}Debug -Proborazzi.test.verify=true --build-cache --profile --no-daemon --stacktrace
+        run: ./gradlew :app:koverXmlReportDev${{ matrix.flavor }}Debug :app:koverHtmlReportDev${{ matrix.flavor }}Debug -Proborazzi.test.verify=true --build-cache --profile --daemon --stacktrace
 
       - name: Upload coverage report
         if: always()

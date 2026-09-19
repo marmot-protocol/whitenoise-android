@@ -79,7 +79,10 @@ debug variant and runs the full unit suite once with Roborazzi verification
 enabled, so every committed screenshot baseline is checked without a second
 filtered test pass. The Zapstore job also enforces all Kover ratchets. Coverage
 invocations keep the same Roborazzi verification property so Gradle reuses the
-complete test results. The existing
+complete test results. Static-analysis and test jobs also reuse one runner-local
+Gradle daemon across their sequential invocations, avoiding repeated JVM startup
+and warm-up while retaining the existing test-worker heap and parallelism limits.
+The existing
 `Compile, test, ktlint, detekt, Android lint` check aggregates every job, including
 the offline ZSP contract, and fails if any dependency fails, is cancelled, or skips.
 
@@ -93,7 +96,8 @@ wall time and summed job durations when measuring CI performance. Only the Play
 test job writes Gradle cache state on master pushes and same-repository PRs;
 build contracts, static analysis, Zapstore tests, and all fork PR jobs restore
 caches read-only. This avoids publishing a separate Gradle cache state from
-every parallel job.
+every parallel job. GitHub's ephemeral runner bounds read-only daemon lifetime;
+the pinned Gradle setup action stops writable-job daemons before cache cleanup.
 
 Two security workflows run separately from the main Gradle validation so their
 permissions and results stay explicit:

@@ -121,6 +121,21 @@ class AndroidCiGateTest(unittest.TestCase):
         for step in gradle_setup_steps:
             self.assertIn('cache-read-only:', step)
 
+    def test_sequential_analysis_and_test_builds_reuse_the_gradle_daemon(self):
+        """Multi-invocation jobs avoid a fresh Gradle JVM for every phase."""
+        for job_name, job in (
+            ('static-analysis', self.static_analysis),
+            ('tests', self.tests_job),
+        ):
+            with self.subTest(job=job_name):
+                invocations = [
+                    line for line in job.splitlines()
+                    if line.lstrip().startswith('run: ./gradlew')
+                ]
+                self.assertGreaterEqual(len(invocations), 3)
+                self.assertTrue(all(' --daemon ' in line for line in invocations))
+                self.assertTrue(all(' --no-daemon ' not in line for line in invocations))
+
     def test_all_successful_jobs_pass(self):
         """A complete green matrix permits the existing required check to pass."""
         result = self.run_gate(self.successful_outcomes())
