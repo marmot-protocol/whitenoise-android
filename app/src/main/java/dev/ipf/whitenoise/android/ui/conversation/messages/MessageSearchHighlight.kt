@@ -12,12 +12,25 @@ import androidx.compose.ui.unit.dp
 import java.util.Locale
 
 /**
- * The conversation's live search term, or null when search is closed.
+ * What the conversation's open search is marking, or null when search is closed.
  *
- * Carried as a local so every rendered bubble can mark its own matches without the query being
- * threaded through each layer between the screen and a text leaf.
+ * [matchedMessageIds] is the same set the match counter and the navigation arrows use. A bubble
+ * outside it must not be marked even when the query appears in its displayed text: a reaction row,
+ * a deleted tombstone or an agent stream can show text that search itself never counts, and marking
+ * one would promise a result the arrows can never reach.
+ *
+ * Carried as a local so every rendered bubble can mark its own matches without this being threaded
+ * through each layer between the screen and a text leaf.
  */
-internal val LocalConversationSearchNeedle = compositionLocalOf<String?> { null }
+internal data class ConversationSearchMarking(
+    val needle: String,
+    val matchedMessageIds: Set<String>,
+) {
+    /** Whether this message is one search counted, and so one whose text may be marked. */
+    fun marks(messageIdHex: String): Boolean = messageIdHex in matchedMessageIds
+}
+
+internal val LocalConversationSearchMarking = compositionLocalOf<ConversationSearchMarking?> { null }
 
 /** Marker paint for search matches, resolved from the bubble the text sits on. */
 internal data class MessageSearchHighlight(

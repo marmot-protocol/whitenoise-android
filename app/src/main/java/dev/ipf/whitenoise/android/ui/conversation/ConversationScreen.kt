@@ -184,10 +184,11 @@ import dev.ipf.whitenoise.android.ui.conversation.media.removeAcceptedDocumentOc
 import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachments
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.BatchMessageDeleteDialog
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationSearchMarking
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessageSheet
 import dev.ipf.whitenoise.android.ui.conversation.messages.KeptMessagesOverlay
 import dev.ipf.whitenoise.android.ui.conversation.messages.KeptMessagesOverlayState
-import dev.ipf.whitenoise.android.ui.conversation.messages.LocalConversationSearchNeedle
+import dev.ipf.whitenoise.android.ui.conversation.messages.LocalConversationSearchMarking
 import dev.ipf.whitenoise.android.ui.conversation.messages.LocalKeptMessages
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageDetailsScreen
 import dev.ipf.whitenoise.android.ui.conversation.messages.RestoredForwardRequestHost
@@ -3611,8 +3612,10 @@ internal fun ConversationScreen(
             LocalKeptMessages provides keptMessagesController,
             // Bubbles mark their own matches while search is open, so a hit is obvious on any
             // bubble colour rather than only on the one the jump happened to land on.
-            LocalConversationSearchNeedle provides
-                navigationState.searchQuery.takeIf { navigationState.searchOpen && it.isNotBlank() },
+            LocalConversationSearchMarking provides
+                navigationState.searchQuery
+                    .takeIf { navigationState.searchOpen && it.isNotBlank() }
+                    ?.let { ConversationSearchMarking(it, effectiveSearchMatchIds.toSet()) },
         ) {
             val overlayPadding = timelineViewport.overlayPadding(density, timelineUnderlayEnabled)
             ConversationTransientNoticeLayout(
@@ -3672,12 +3675,7 @@ internal fun ConversationScreen(
                         ) ->
                         Column(modifier = Modifier.fillMaxSize()) {
                             ConversationGroupRecoveryCard(controller, appState)
-                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(
-                                    stringResource(R.string.no_messages_yet),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
+                            ConversationEmptyMessage(conversationEmptyState(controller.group.disappearingMessageSecs))
                         }
                     renderedTimeline.isEmpty() &&
                         !controller.hasMoreBefore &&
@@ -3700,12 +3698,7 @@ internal fun ConversationScreen(
                                 },
                             )
                         } else {
-                            Box(
-                                Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(stringResource(R.string.no_messages_yet), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
+                            ConversationEmptyMessage(conversationEmptyState(controller.group.disappearingMessageSecs))
                         }
                     }
                     else ->

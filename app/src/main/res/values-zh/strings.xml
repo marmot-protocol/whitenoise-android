@@ -149,6 +149,8 @@
     <string name="leave">退出</string>
     <string name="couldnt_load_conversation">无法加载对话</string>
     <string name="no_messages_yet">暂无消息</string>
+    <string name="conversation_empty_disappearing_title">没有可显示的消息</string>
+    <string name="conversation_empty_disappearing_body">已开启阅后即焚消息。此聊天中的新消息将在 %1$s 后消失。</string>
     <string name="group_empty_only_you_title">这个群组目前只有你</string>
     <string name="group_empty_invite_members">准备好后邀请其他人。</string>
     <string name="you_are_no_longer_a_member">你无法向此群组发送消息，因为你已不再是成员。</string>

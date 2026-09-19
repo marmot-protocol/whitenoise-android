@@ -616,7 +616,8 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
             }
         }
         val plainHighlight = presentedTtsLeafHighlightResolver?.invoke("plain", bodyText)
-        val searchNeedle = LocalConversationSearchNeedle.current
+        val searchMarking = LocalConversationSearchMarking.current
+        val searchNeedle = searchMarking?.needle?.takeIf { searchMarking.marks(record.messageIdHex) }
         val searchHighlight =
             remember(searchNeedle, bubbleContentColor) {
                 searchNeedle?.takeIf { it.isNotBlank() }?.let { needle ->

@@ -53,4 +53,14 @@ class MessageSearchHighlightTest {
         assertEquals(body.length, body.length)
         assertEquals(emptyList<IntRange>(), messageSearchMatchRanges(body, "stan"))
     }
+
+    /** Only the rows search actually counted may be marked, whatever their text happens to say. */
+    @Test
+    fun onlyCountedRowsAreMarked() {
+        val marking = ConversationSearchMarking(needle = "ferry", matchedMessageIds = setOf("a", "b"))
+
+        assertEquals(true, marking.marks("a"))
+        assertEquals(true, marking.marks("b"))
+        assertEquals("a row the arrows cannot reach is never marked", false, marking.marks("c"))
+    }
 }
