@@ -6,10 +6,10 @@ import android.content.Intent
 import androidx.core.content.FileProvider
 import androidx.test.core.app.ApplicationProvider
 import org.junit.After
-import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -19,6 +19,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.File
 import java.nio.file.Files
+import java.util.zip.ZipFile
 
 @RunWith(RobolectricTestRunner::class)
 class AuditLogShareTest {
@@ -37,84 +38,73 @@ class AuditLogShareTest {
         (cacheField.get(null) as MutableMap<String, *>).clear()
     }
 
+    /** One export yields one archive in private cache holding every confined log, byte for byte. */
     @Test
-    fun prepareAuditLogShareFilesCopiesRegularFilesIntoPrivateShareCache() {
-        val source = temporaryFolder.newFile("audit.jsonl").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+    fun prepareAuditLogArchiveWritesEveryConfinedLogIntoOneArchive() {
+        val first = temporaryFolder.newFile("audit.jsonl").apply { writeText("one") }
+        val second = temporaryFolder.newFile("audit-b.jsonl").apply { writeText("two") }
         val cache = temporaryFolder.newFolder("cache")
 
-        val shared = prepareAuditLogShareFiles(cache, temporaryFolder.root, listOf(source.absolutePath))
+        val archive =
+            prepareAuditLogArchive(cache, temporaryFolder.root, listOf(first.absolutePath, second.absolutePath))
 
-        assertEquals(1, shared.size)
-        assertEquals(File(cache, "audit_logs"), shared.single().parentFile?.parentFile)
-        assertTrue(
-            shared
-                .single()
-                .parentFile
-                ?.name
-                ?.isNotBlank() == true,
-        )
-        assertArrayEquals(source.readBytes(), shared.single().readBytes())
-        assertTrue(shared.single().isFile)
+        assertEquals(AUDIT_LOG_ARCHIVE_NAME, archive.name)
+        assertEquals(File(cache, "audit_logs"), archive.parentFile?.parentFile)
+        assertEquals(mapOf("audit.jsonl" to "one", "audit-b.jsonl" to "two"), archive.entries())
     }
 
+    /** An allowed root reached through a filesystem alias is still the same confined root. */
     @Test
-    fun prepareAuditLogShareFilesAcceptsTheConfiguredRootThroughItsFilesystemAlias() {
+    fun prepareAuditLogArchiveAcceptsTheConfiguredRootThroughItsFilesystemAlias() {
         val realRoot = temporaryFolder.newFolder("real-allowed")
         val source = File(realRoot, "audit.jsonl").apply { writeText("entry") }
         val rootAlias = File(temporaryFolder.root, "allowed-alias")
         Files.createSymbolicLink(rootAlias.toPath(), realRoot.toPath())
         val cache = temporaryFolder.newFolder("alias-cache")
 
-        val shared =
-            prepareAuditLogShareFiles(
-                cache,
-                rootAlias,
-                listOf(File(rootAlias, source.name).absolutePath),
-            )
+        val archive =
+            prepareAuditLogArchive(cache, rootAlias, listOf(File(rootAlias, source.name).absolutePath))
 
-        assertEquals(listOf("audit.jsonl"), shared.map(File::getName))
-        assertEquals(listOf("entry"), shared.map(File::readText))
+        assertEquals(mapOf("audit.jsonl" to "entry"), archive.entries())
     }
 
+    /**
+     * Export is complete or it fails. A symlink, a missing file, a source outside the root and one
+     * reached through an intermediate symlink each abort the whole archive, leaving nothing staged
+     * that a caller could present as a finished export.
+     */
     @Test
-    fun prepareAuditLogShareFilesRejectsSymlinksAndMissingFiles() {
-        val source = temporaryFolder.newFile("source.jsonl").apply { writeText("private") }
-        val link = File(temporaryFolder.root, "link.jsonl")
-        Files.createSymbolicLink(link.toPath(), source.toPath())
-        val cache = temporaryFolder.newFolder("cache")
-
-        val shared =
-            prepareAuditLogShareFiles(
-                cache,
-                temporaryFolder.root,
-                listOf(link.absolutePath, File(temporaryFolder.root, "missing.jsonl").absolutePath),
-            )
-
-        assertTrue(shared.isEmpty())
-        assertFalse(File(cache, "audit_logs/link.jsonl").exists())
-    }
-
-    @Test
-    fun prepareAuditLogShareFilesRejectsOutsideRootAndIntermediateSymlinks() {
+    fun prepareAuditLogArchiveFailsClosedInsteadOfWritingAPartialArchive() {
         val allowed = temporaryFolder.newFolder("allowed")
+        val good = File(allowed, "audit.jsonl").apply { writeText("kept") }
         val outside = temporaryFolder.newFolder("outside")
         val secret = File(outside, "secret.jsonl").apply { writeText("secret") }
+        val fileLink = File(allowed, "link.jsonl")
+        Files.createSymbolicLink(fileLink.toPath(), good.toPath())
         val linkedDirectory = File(allowed, "linked")
         Files.createSymbolicLink(linkedDirectory.toPath(), outside.toPath())
-        val cache = temporaryFolder.newFolder("confined-cache")
 
-        val shared =
-            prepareAuditLogShareFiles(
-                cache,
-                allowed,
-                listOf(secret.absolutePath, File(linkedDirectory, secret.name).absolutePath),
+        val rejected =
+            listOf(
+                fileLink.absolutePath,
+                File(allowed, "missing.jsonl").absolutePath,
+                secret.absolutePath,
+                File(linkedDirectory, secret.name).absolutePath,
             )
+        rejected.forEachIndexed { index, unsafe ->
+            val cache = temporaryFolder.newFolder("cache-$index")
+            val failure =
+                runCatching { prepareAuditLogArchive(cache, allowed, listOf(good.absolutePath, unsafe)) }
+                    .exceptionOrNull()
 
-        assertTrue(shared.isEmpty())
+            assertTrue("$unsafe must abort the export", failure != null)
+            assertFalse("$unsafe must leave no staged archive", File(cache, "audit_logs").exists())
+        }
     }
 
+    /** Entry names are safe, relative and unique, and a new export replaces the previous one. */
     @Test
-    fun prepareAuditLogShareFilesUsesDistinctSafeNamesAndClearsPriorExports() {
+    fun prepareAuditLogArchiveUsesDistinctSafeEntryNamesAndClearsPriorExports() {
         val firstDir = temporaryFolder.newFolder("first")
         val secondDir = temporaryFolder.newFolder("second")
         val first = File(firstDir, "../first/audit.jsonl").apply { writeText("one") }
@@ -126,31 +116,43 @@ class AuditLogShareTest {
                 writeText("stale")
             }
 
-        val shared =
-            prepareAuditLogShareFiles(
-                cache,
-                temporaryFolder.root,
-                listOf(first.absolutePath, second.absolutePath),
-            )
+        val archive =
+            prepareAuditLogArchive(cache, temporaryFolder.root, listOf(first.absolutePath, second.absolutePath))
 
-        assertEquals(listOf("audit.jsonl", "audit-2.jsonl"), shared.map(File::getName))
-        assertEquals(listOf("one", "two"), shared.map(File::readText))
+        assertEquals(mapOf("audit.jsonl" to "one", "audit-2.jsonl" to "two"), archive.entries())
+        archive.entries().keys.forEach { entry ->
+            assertFalse(entry.contains('/'))
+            assertFalse(entry.contains('\\'))
+            assertFalse(entry.contains(".."))
+        }
         assertFalse(stale.exists())
-        val firstSession = shared.first().parentFile!!.name
-        val nextShared = prepareAuditLogShareFiles(cache, temporaryFolder.root, listOf(first.absolutePath))
-        assertNotEquals(firstSession, nextShared.single().parentFile!!.name)
-        assertFalse(shared.first().exists())
+        val firstSession = archive.parentFile!!.name
+        val next = prepareAuditLogArchive(cache, temporaryFolder.root, listOf(first.absolutePath))
+        assertNotEquals(firstSession, next.parentFile!!.name)
+        assertFalse(archive.exists())
     }
 
+    /** A source name made entirely of unsafe characters still yields a usable entry name. */
+    @Test
+    fun prepareAuditLogArchiveNamesAnEntryEvenWhenTheSourceNameIsUnusable() {
+        val source = temporaryFolder.newFile("...").apply { writeText("body") }
+        val cache = temporaryFolder.newFolder("cache")
+
+        val archive = prepareAuditLogArchive(cache, temporaryFolder.root, listOf(source.absolutePath))
+
+        assertEquals(mapOf("audit-log.jsonl" to "body"), archive.entries())
+    }
+
+    /** Clearing removes every staged session, and reports that there was nothing left to remove. */
     @Test
     fun clearPreparedAuditLogSharesRemovesEveryStagedSession() {
         val cache = temporaryFolder.newFolder("cache")
         val first =
-            File(cache, "audit_logs/session-a/one.jsonl").apply {
+            File(cache, "audit_logs/session-a/one.zip").apply {
                 parentFile!!.mkdirs()
                 writeText("one")
             }
-        File(cache, "audit_logs/session-b/two.jsonl").apply {
+        File(cache, "audit_logs/session-b/two.zip").apply {
             parentFile!!.mkdirs()
             writeText("two")
         }
@@ -161,17 +163,17 @@ class AuditLogShareTest {
         assertFalse(clearPreparedAuditLogShares(cache))
     }
 
+    /** Sharing publishes exactly one read-only archive URI carrying sensitive-content metadata. */
     @Test
-    fun auditLogShareIntentMarksEveryUriReadOnlyAndSensitive() {
+    fun auditLogShareIntentPublishesOneReadOnlySensitiveArchive() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val shareDir = File(context.cacheDir, "audit_logs/session").apply { mkdirs() }
-        val first = File(shareDir, "first.jsonl").apply { writeText("one") }
-        val second = File(shareDir, "second.jsonl").apply { writeText("two") }
+        val archive = File(shareDir, AUDIT_LOG_ARCHIVE_NAME).apply { writeText("zip") }
 
-        val send = auditLogShareIntent(context, listOf(first, second))
+        val send = auditLogShareIntent(context, archive)
 
-        assertEquals(Intent.ACTION_SEND_MULTIPLE, send.action)
-        assertEquals("application/octet-stream", send.type)
+        assertEquals(Intent.ACTION_SEND, send.action)
+        assertEquals(AUDIT_LOG_ARCHIVE_MIME_TYPE, send.type)
         assertTrue(send.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
         assertEquals(0, send.flags and Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
         assertTrue(send.getBooleanExtra(ClipDescription.EXTRA_IS_SENSITIVE, false))
@@ -180,16 +182,24 @@ class AuditLogShareTest {
                 .description.extras!!
                 .getBoolean(ClipDescription.EXTRA_IS_SENSITIVE),
         )
-        assertEquals(2, send.clipData!!.itemCount)
-        val uris = send.getParcelableArrayListExtra<android.net.Uri>(Intent.EXTRA_STREAM)!!
-        assertEquals(2, uris.size)
-        uris.forEach { uri ->
-            assertEquals("content", uri.scheme)
-            assertEquals("${context.packageName}.fileprovider", uri.authority)
-            assertTrue(uri.pathSegments.take(2) == listOf("audit_logs", "session"))
-        }
-        val chooser = auditLogShareChooserIntent(context, listOf(first, second), "Export")
+        assertEquals(1, send.clipData!!.itemCount)
+        assertNull(send.getParcelableArrayListExtra<android.net.Uri>(Intent.EXTRA_STREAM))
+        val uri = send.getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM)!!
+        assertEquals("content", uri.scheme)
+        assertEquals("${context.packageName}.fileprovider", uri.authority)
+        assertEquals(listOf("audit_logs", "session"), uri.pathSegments.take(2))
+
+        val chooser = auditLogShareChooserIntent(context, archive, "Export")
         assertTrue(chooser.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
-        assertEquals(2, chooser.clipData!!.itemCount)
+        assertEquals(1, chooser.clipData!!.itemCount)
     }
+
+    /** Entry name to content, so a test can assert an archive's whole contents in one comparison. */
+    private fun File.entries(): Map<String, String> =
+        ZipFile(this).use { zip ->
+            zip
+                .entries()
+                .asSequence()
+                .associate { entry -> entry.name to zip.getInputStream(entry).bufferedReader().readText() }
+        }
 }

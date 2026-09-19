@@ -7,56 +7,80 @@ import android.content.Intent
 import android.os.PersistableBundle
 import androidx.core.content.FileProvider
 import java.io.File
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.Path
 import java.util.UUID
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 private const val AUDIT_LOG_SHARE_DIRECTORY = "audit_logs"
 private val unsafeAuditFileName = Regex("[^A-Za-z0-9._-]")
 
+/** Name of the single archive a manual export produces. Carries no account, group or device detail. */
+internal const val AUDIT_LOG_ARCHIVE_NAME = "white-noise-diagnostic-logs.zip"
+
+/** The archive's media type, so a recipient sees one archive rather than opaque attachments. */
+internal const val AUDIT_LOG_ARCHIVE_MIME_TYPE = "application/zip"
+
 /**
- * Stages engine-owned audit logs in the app cache for an explicit Android share.
- * Symlinks and non-regular files are rejected so a compromised path cannot make
- * the FileProvider expose an unrelated file. The directory is replaced for each
- * export so previously shared forensic data does not accumulate in cache.
+ * Stages engine-owned audit logs as one archive in the app cache for an explicit export.
+ *
+ * Symlinks and non-regular files are rejected so a compromised path cannot make the FileProvider
+ * expose an unrelated file, and entry names are sanitised to safe, unique, relative names so an
+ * archive can never carry an absolute path or a parent traversal to whatever opens it.
+ *
+ * The export is complete or it fails: a source that cannot be confined aborts the whole archive
+ * rather than yielding a partial one that looks complete. The staging directory is replaced on each
+ * export so previously exported forensic data does not accumulate in cache.
  */
-internal fun prepareAuditLogShareFiles(
+@Suppress("TooGenericExceptionCaught") // Any failure must clear the partial archive before rethrowing.
+internal fun prepareAuditLogArchive(
     cacheDir: File,
     allowedSourceRoot: File,
     sourcePaths: List<String>,
-): List<File> {
+): File {
+    require(sourcePaths.isNotEmpty()) { "At least one audit log is required" }
     val shareRoot = File(cacheDir, AUDIT_LOG_SHARE_DIRECTORY)
     clearPreparedAuditLogShares(cacheDir)
-    check(shareRoot.mkdirs() || shareRoot.isDirectory) {
-        "Unable to prepare audit log export"
-    }
+    check(shareRoot.mkdirs() || shareRoot.isDirectory) { "Unable to prepare audit log export" }
     val shareDirectory = File(shareRoot, UUID.randomUUID().toString())
     check(shareDirectory.mkdir()) { "Unable to prepare audit log export" }
 
     val allowedLexicalRoot = allowedSourceRoot.toPath().toAbsolutePath().normalize()
     val allowedRealRoot = allowedLexicalRoot.toRealPath()
-    val usedNames = mutableSetOf<String>()
-    return sourcePaths.mapNotNull { sourcePath ->
-        val source =
-            confinedRegularAuditFile(
-                candidate = File(sourcePath),
-                allowedLexicalRoot = allowedLexicalRoot,
-                allowedRealRoot = allowedRealRoot,
-            ) ?: return@mapNotNull null
-
-        val safeBaseName =
-            source.name
-                .replace(unsafeAuditFileName, "_")
-                .trim('.', '_')
-                .ifBlank { "audit-log.jsonl" }
-        val destinationName = uniqueAuditFileName(safeBaseName, usedNames)
-        val destination = File(shareDirectory, destinationName)
-        source.copyTo(destination, overwrite = false)
-        destination.setWritable(false, false)
-        destination
+    val archive = File(shareDirectory, AUDIT_LOG_ARCHIVE_NAME)
+    try {
+        val usedNames = mutableSetOf<String>()
+        ZipOutputStream(archive.outputStream().buffered()).use { zip ->
+            sourcePaths.forEach { sourcePath ->
+                val source =
+                    confinedRegularAuditFile(
+                        candidate = File(sourcePath),
+                        allowedLexicalRoot = allowedLexicalRoot,
+                        allowedRealRoot = allowedRealRoot,
+                    ) ?: throw IOException("An audit log could not be included")
+                zip.putNextEntry(ZipEntry(uniqueAuditFileName(safeAuditEntryName(source.name), usedNames)))
+                source.inputStream().buffered().use { it.copyTo(zip) }
+                zip.closeEntry()
+            }
+        }
+    } catch (failure: Throwable) {
+        // A partial archive must never be presented as a complete export.
+        runCatching { clearPreparedAuditLogShares(cacheDir) }
+        throw failure
     }
+    archive.setWritable(false, false)
+    return archive
 }
+
+/** A safe, relative entry name: no separators, traversal or provider-significant characters. */
+private fun safeAuditEntryName(sourceName: String): String =
+    sourceName
+        .replace(unsafeAuditFileName, "_")
+        .trim('.', '_')
+        .ifBlank { "audit-log.jsonl" }
 
 @Suppress("ReturnCount") // Every path/symlink/confinement guard fails closed before copying.
 private fun confinedRegularAuditFile(
@@ -111,32 +135,26 @@ private fun uniqueAuditFileName(
     }
 }
 
-/** Creates a read-only, user-initiated share intent without logging file names or contents. */
+/** Creates a read-only, user-initiated share of the single archive, logging no name or content. */
 internal fun auditLogShareIntent(
     context: Context,
-    files: List<File>,
+    archive: File,
 ): Intent {
-    require(files.isNotEmpty()) { "At least one audit log is required" }
-    val uris =
-        ArrayList(
-            files.map { file ->
-                FileProvider.getUriForFile(
-                    context,
-                    "${context.packageName}.fileprovider",
-                    file,
-                )
-            },
+    val uri =
+        FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            archive,
         )
-    val clipData = ClipData.newUri(context.contentResolver, "Audit logs", uris.first())
+    val clipData = ClipData.newUri(context.contentResolver, "Diagnostic logs", uri)
     clipData.description.extras =
         PersistableBundle().apply {
             putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true)
         }
-    uris.drop(1).forEach { clipData.addItem(ClipData.Item(it)) }
 
-    return Intent(Intent.ACTION_SEND_MULTIPLE).apply {
-        type = "application/octet-stream"
-        putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+    return Intent(Intent.ACTION_SEND).apply {
+        type = AUDIT_LOG_ARCHIVE_MIME_TYPE
+        putExtra(Intent.EXTRA_STREAM, uri)
         putExtra(ClipDescription.EXTRA_IS_SENSITIVE, true)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         this.clipData = clipData
@@ -145,10 +163,10 @@ internal fun auditLogShareIntent(
 
 internal fun auditLogShareChooserIntent(
     context: Context,
-    files: List<File>,
+    archive: File,
     title: String,
 ): Intent {
-    val send = auditLogShareIntent(context, files)
+    val send = auditLogShareIntent(context, archive)
     return Intent.createChooser(send, title).apply {
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         clipData = send.clipData

@@ -2006,9 +2006,15 @@
     <string name="donate_open_failed">No se pudo abrir la página de donaciones. Inténtalo de nuevo o vuelve a Ajustes.</string>
     <string name="export_audit_logs_confirm_body">Los registros de diagnóstico contienen identificadores técnicos y detalles de actividad. Compártelos solo con alguien de confianza.</string>
     <string name="export_audit_logs">Exportar registros de diagnóstico</string>
-    <string name="export_audit_logs_subtitle">Comparte una copia de los registros de diagnóstico almacenados en este dispositivo</string>
+    <string name="export_audit_logs_subtitle">Guarda o comparte un archivo con los registros de diagnóstico almacenados en este dispositivo</string>
     <string name="export_audit_logs_confirm_title">¿Exportar registros de diagnóstico?</string>
-    <string name="export_audit_logs_confirm_action">Elegir destinatario</string>
+    <string name="toast_couldnt_save_audit_logs">No se pudieron guardar los registros de diagnóstico</string>
+    <string name="toast_audit_logs_saved">Registros de diagnóstico guardados</string>
+    <string name="export_audit_logs_share">Compartir</string>
+    <string name="export_audit_logs_save">Guardar en el dispositivo</string>
+    <string name="export_audit_logs_destination_body">Los registros de diagnóstico se empaquetan en un único archivo .zip. Guárdalo en este dispositivo o envíaselo a alguien de confianza.</string>
+    <string name="export_audit_logs_destination_title">Exportar como un solo archivo</string>
+    <string name="export_audit_logs_confirm_action">Continuar</string>
     <string name="toast_couldnt_export_audit_logs">No se pudieron preparar los registros de diagnóstico para exportarlos</string>
     <string name="toast_no_audit_logs_to_export">No hay registros de diagnóstico para exportar</string>
 </resources>
