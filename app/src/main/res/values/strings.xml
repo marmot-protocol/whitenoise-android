@@ -549,10 +549,14 @@
     <string name="audit_logs">Audit logs</string>
     <string name="audit_logs_settings_subtitle">Create and export local group forensic audit files</string>
     <string name="export_audit_logs">Export Diagnostic Logs</string>
-    <string name="export_audit_logs_subtitle">Share a copy of the diagnostic logs stored on this device</string>
+    <string name="export_audit_logs_subtitle">Save or share one archive of the diagnostic logs stored on this device</string>
     <string name="export_audit_logs_confirm_title">Export diagnostic logs?</string>
     <string name="export_audit_logs_confirm_body">Diagnostic logs contain technical identifiers and activity details. Share them only with someone you trust.</string>
-    <string name="export_audit_logs_confirm_action">Choose recipient</string>
+    <string name="export_audit_logs_confirm_action">Continue</string>
+    <string name="export_audit_logs_destination_title">Export as one archive</string>
+    <string name="export_audit_logs_destination_body">The diagnostic logs are packaged into a single .zip file. Save it to this device, or send it to someone you trust.</string>
+    <string name="export_audit_logs_save">Save to device</string>
+    <string name="export_audit_logs_share">Share</string>
     <string name="delete_audit_logs">Clear Diagnostic Logs</string>
     <string name="delete_audit_logs_subtitle">Clearing diagnostic logs deletes logs from this device only. It does not delete copies already uploaded to White Noise servers or turn off recording and automatic uploads.</string>
     <string name="device_protection">Device protection</string>
@@ -1039,6 +1043,8 @@
     <string name="toast_no_audit_logs_to_delete">No diagnostic logs to clear</string>
     <string name="toast_couldnt_export_audit_logs">Couldn\'t prepare diagnostic logs for export</string>
     <string name="toast_no_audit_logs_to_export">No diagnostic logs to export</string>
+    <string name="toast_audit_logs_saved">Diagnostic logs saved</string>
+    <string name="toast_couldnt_save_audit_logs">Couldn\'t save diagnostic logs</string>
     <string name="toast_chat_created">Chat created</string>
     <string name="group_create_stage_creating">Creating group…</string>
     <string name="group_create_stage_applying_retention">Applying disappearing messages…</string>

@@ -1979,9 +1979,15 @@
     <string name="donate_open_failed">無法開啟捐款頁面。請重試或返回設定。</string>
     <string name="export_audit_logs_confirm_body">診斷日誌包含技術識別碼和活動詳情。請僅與您信任的人分享。</string>
     <string name="export_audit_logs">匯出診斷日誌</string>
-    <string name="export_audit_logs_subtitle">分享儲存在此裝置上的診斷日誌副本</string>
+    <string name="export_audit_logs_subtitle">儲存或分享本裝置上儲存的診斷日誌壓縮檔</string>
     <string name="export_audit_logs_confirm_title">匯出診斷日誌？</string>
-    <string name="export_audit_logs_confirm_action">選擇收件者</string>
+    <string name="toast_couldnt_save_audit_logs">無法儲存診斷日誌</string>
+    <string name="toast_audit_logs_saved">診斷日誌已儲存</string>
+    <string name="export_audit_logs_share">分享</string>
+    <string name="export_audit_logs_save">儲存到裝置</string>
+    <string name="export_audit_logs_destination_body">診斷日誌會打包成一個 .zip 檔案。你可以儲存到本裝置，或傳送給你信任的人。</string>
+    <string name="export_audit_logs_destination_title">匯出為單一壓縮檔</string>
+    <string name="export_audit_logs_confirm_action">繼續</string>
     <string name="toast_couldnt_export_audit_logs">無法準備要匯出的診斷日誌</string>
     <string name="toast_no_audit_logs_to_export">沒有可匯出的診斷日誌</string>
 </resources>

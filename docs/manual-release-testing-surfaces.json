@@ -3714,22 +3714,6 @@
         ]
       },
       {
-        "surface": "rememberFocusedStackTravel",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
-        "anchor": "fun rememberFocusedStackTravel(",
-        "test_ids": [
-          "MSG-004"
-        ]
-      },
-      {
-        "surface": "Modifier.focusedStackDrag",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
-        "anchor": "fun Modifier.focusedStackDrag(",
-        "test_ids": [
-          "MSG-004"
-        ]
-      },
-      {
         "surface": "FocusedMoreReactionsTarget",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
         "anchor": "fun FocusedMoreReactionsTarget(",
@@ -8095,11 +8079,16 @@
         ]
       },
       {
-        "surface": "Modifier.transcriptEdgeFade",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TranscriptEdgeFade.kt",
-        "anchor": "fun Modifier.transcriptEdgeFade(",
+        "surface": "AuditLogExportDestinationDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "fun AuditLogExportDestinationDialog(",
         "test_ids": [
-          "CON-002"
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
         ]
       }
     ],
@@ -21531,6 +21520,97 @@
           "SYS-008",
           "SYS-009"
         ]
+      },
+      {
+        "surface": "string:export_audit_logs_destination_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.export_audit_logs_destination_title",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:export_audit_logs_destination_body",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.export_audit_logs_destination_body",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:export_audit_logs_save",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.export_audit_logs_save",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:export_audit_logs_share",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.export_audit_logs_share",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:toast_audit_logs_saved",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.toast_audit_logs_saved",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:toast_couldnt_save_audit_logs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.toast_couldnt_save_audit_logs",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:toast_couldnt_export_audit_logs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.toast_couldnt_export_audit_logs",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
       }
     ],
     "manifest_permissions": [
@@ -23656,14 +23736,6 @@
         "surface": "Every non-action part of the focused-message overlay dismisses it, including the lifted message",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
         "anchor": "internal fun FocusedMessageActions(",
-        "test_ids": [
-          "MSG-004"
-        ]
-      },
-      {
-        "surface": "The lifted message drags and flings through the safe overlay frame and settles inside it",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
-        "anchor": "internal fun focusedStackTravelRange(",
         "test_ids": [
           "MSG-004"
         ]
