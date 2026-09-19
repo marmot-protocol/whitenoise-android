@@ -53,6 +53,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -209,9 +210,28 @@ internal fun FocusedMessageActions(
                             Modifier
                                 // The tag precedes clearAndSetSemantics, which wipes semantics set after it.
                                 .testTag("message-actions-preview")
-                                .clearAndSetSemantics { contentDescription = previewDescription }
-                                // The preview is inert: it neither dismisses nor acts on a tap.
-                                .pointerInput(Unit) { detectTapGestures { } },
+                                .clearAndSetSemantics {
+                                    contentDescription = previewDescription
+                                    // The same dismissal the tap performs, reachable without one: a
+                                    // screen reader could describe the lifted message but not leave it.
+                                    onClick(close) {
+                                        currentOnDismiss()
+                                        true
+                                    }
+                                }
+                                // The lifted message is a picture of what is being acted on, not a
+                                // control. Tapping it used to be swallowed, which made the overlay feel
+                                // as though it dismissed only in some places; it dismisses like the
+                                // scrim, and the actions beside it consume their own taps first.
+                                .pointerInput(Unit) {
+                                    // The overlay opens under the finger that long-pressed, so the
+                                    // release of that same press would otherwise land here as a tap and
+                                    // dismiss what it just opened. Wait for the gesture to end first.
+                                    awaitPointerEventScope {
+                                        while (currentEvent.changes.any { it.pressed }) awaitPointerEvent()
+                                    }
+                                    detectTapGestures { currentOnDismiss() }
+                                },
                     ) { preview() }
                 }
                 FocusedActionMenu(actions)
