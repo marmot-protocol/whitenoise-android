@@ -1655,6 +1655,10 @@ internal class ConversationDictationController internal constructor(
                             !advancedPastConfirmedSilence &&
                             recognitionSession?.retryCallerAudio() == true
                     val retainedRejectedCallerAudio = repeatedSpeechRejection && retainedCallerAudio
+                    val rejectedCallerAudioChangedOrResolved =
+                        callerAudioChunkId == null ||
+                            callerAudioChunkId != rejectedCallerAudioChunkId ||
+                            !retainedCallerAudio
                     if (retainedRejectedCallerAudio) {
                         if (rejectedCallerAudioChunkId != callerAudioChunkId) {
                             rejectedCallerAudioChunkId = callerAudioChunkId
@@ -1662,14 +1666,7 @@ internal class ConversationDictationController internal constructor(
                         }
                         rejectedCallerAudioRetries += 1
                         retainedCallerAudioRetries += 1
-                    } else if (
-                        !advancedPastRejectedCallerAudio &&
-                        (
-                            callerAudioChunkId == null ||
-                                callerAudioChunkId != rejectedCallerAudioChunkId ||
-                                !retainedCallerAudio
-                        )
-                    ) {
+                    } else if (!advancedPastRejectedCallerAudio && rejectedCallerAudioChangedOrResolved) {
                         clearRejectedCallerAudioRetries()
                     }
                     clearRecognitionGeneration(cancel = false)
