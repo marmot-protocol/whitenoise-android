@@ -1154,7 +1154,7 @@ tasks.withType<Test>().configureEach {
     // fingerprint so a baseline-only change cannot reuse stale test outputs.
     if (name in setOf("testDevZapstoreDebugUnitTest", "testDevPlayDebugUnitTest")) {
         inputs
-            .dir(layout.projectDirectory.dir("src/test/snapshots"))
+            .files(layout.projectDirectory.dir("src/test/snapshots").asFileTree)
             .withPropertyName("roborazziSnapshots")
             .withPathSensitivity(PathSensitivity.RELATIVE)
     }
