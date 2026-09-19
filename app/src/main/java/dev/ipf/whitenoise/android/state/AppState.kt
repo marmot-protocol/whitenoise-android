@@ -4398,11 +4398,10 @@ class WhiteNoiseAppState private constructor(
     /** Discards only an unsubmitted form or stale route; native accepted work remains intact. */
     internal fun dismissProfileSignUp(): Boolean = profileSignUp.dismiss()
 
-    /** Creates an account with app-owned attachment acquisition before activating it. */
     suspend fun createIdentity() {
         val startedAt = SystemClock.elapsedRealtime()
         try {
-            val summary = marmotIo { createIdentityWithAppOwnedAttachmentAcquisition() }
+            val summary = marmotIo { createIdentity(MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays) }
             activateCreatedIdentity(summary)
             phase = AppPhase.Ready
             presentTransient(R.string.toast_identity_created)
@@ -4639,7 +4638,7 @@ class WhiteNoiseAppState private constructor(
     /** Publishes the newest engine account snapshot and rejects older list reads. */
     private suspend fun refreshAccountSnapshot(): List<AccountSummaryFfi> {
         val requestToken = accountListLifetime.advance()
-        val refreshedAccounts = marmotIo(MarmotTraceSection.ACCOUNT_LIST) { listAccountsWithAppAttachmentPolicy() }
+        val refreshedAccounts = marmotIo(MarmotTraceSection.ACCOUNT_LIST) { listAccounts() }
         val setupAccounts = accountSetup.accountsState(refreshedAccounts)
         val bubbleColorMigrationSucceeded =
             withContext(Dispatchers.IO) {
@@ -9276,9 +9275,8 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /** Installs app-owned attachment acquisition plus independent privacy destinations. */
+    /** Installs independent telemetry, audit and product destinations before native startup. */
     private suspend fun MarmotInterface.configurePrivacyRuntime() {
-        enforceAppOwnedAttachmentAcquisitionForKnownAccounts()
         configureTelemetryRuntime()
         auditLogSettingsMutex.withLock {
             auditUploadConsent.prepare(this)

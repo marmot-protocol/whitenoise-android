@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.MarmotClient
 import dev.ipf.whitenoise.android.ui.onboarding.SignUpController
 import dev.ipf.whitenoise.android.ui.onboarding.SignUpOwner
 import dev.ipf.whitenoise.android.ui.onboarding.SignUpStage
@@ -40,7 +41,7 @@ internal class AppProfileSignUp(
                 ownerAvailable = ::ownerAvailable,
                 create = {
                     runCatchingCancellable {
-                        appState.marmotIo { createIdentityWithAppOwnedAttachmentAcquisition() }
+                        appState.marmotIo { createIdentity(MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays) }
                     }.onFailure {
                         appState.presentFailure(R.string.toast_couldnt_create_identity, "IDENTITY_CREATE", it)
                     }.getOrThrow()

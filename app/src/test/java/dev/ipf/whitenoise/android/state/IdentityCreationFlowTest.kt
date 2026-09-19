@@ -9,16 +9,13 @@ import org.junit.Test
 import java.io.File
 
 class IdentityCreationFlowTest {
-    /** Identity creation still supplies the full bootstrap set to both engine relay parameters. */
     @Test
     fun creationKeepsTheFullRelaySetOnTheEngineCall() {
-        val body =
-            appStateSource("MarmotAttachmentAcquisitionPolicy.kt")
-                .readText()
+        val body = appStateSource().readText().functionBody("createIdentity")
 
-        assertTrue(body.contains("createIdentityWithAppOwnedAttachmentAcquisition"))
-        assertTrue(body.contains("val relays = MarmotClient.bootstrapRelays"))
-        assertTrue(body.contains("createIdentity(relays, relays)"))
+        assertTrue(
+            body.contains("createIdentity(MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays)"),
+        )
         assertFalse(body.contains("take(1)"))
     }
 
