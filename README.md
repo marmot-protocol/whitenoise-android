@@ -72,18 +72,22 @@ frozen in `config/detekt/detekt-baseline.xml`. The workflow runs both the
 `google-services.json`.
 
 Validation runs concurrently on separate runners: build/release/tooling contracts,
-static analysis (ktlint, detekt, and both Android lint variants), and one test job
-per distribution. Each test job compiles its dev debug variant, runs the full
-unit suite, generates coverage, and then verifies screenshots. The Zapstore job
-also enforces all Kover ratchets. Coverage runs before the filtered screenshot
-invocation so it reuses the full unit-suite results. The existing
+one static-analysis job per distribution, and one test job per distribution.
+Each static-analysis job runs its Android lint variant; the Play job also owns
+the flavor-independent ktlint and detekt checks. Each test job compiles its dev
+debug variant and runs the full unit suite once with Roborazzi verification
+enabled, so every committed screenshot baseline is checked without a second
+filtered test pass. The Zapstore job also enforces all Kover ratchets. Coverage
+invocations keep the same Roborazzi verification property so Gradle reuses the
+complete test results. The existing
 `Compile, test, ktlint, detekt, Android lint` check aggregates every job, including
 the offline ZSP contract, and fails if any dependency fails, is cancelled, or skips.
 
 Coverage artifacts are `kover-coverage-report-Zapstore` and
 `kover-coverage-report-Play`. Failure reports and Gradle timing profiles use
 `android-ci-reports-<job>` and `android-ci-gradle-profiles-<job>`, where `<job>` is
-`build-contracts`, `static-analysis`, `Zapstore`, or `Play`. Separate runners
+`build-contracts`, `static-analysis-Zapstore`, `static-analysis-Play`, `Zapstore`,
+or `Play`. Separate runners
 reduce the serial critical path but repeat some setup/compilation; compare both
 wall time and summed job durations when measuring CI performance. Only the Play
 test job writes Gradle cache state on master pushes and same-repository PRs;
@@ -161,19 +165,17 @@ does not fight the BOMs.
 
 ## Screenshot tests
 
-A small [Roborazzi](https://github.com/takahirom/roborazzi) pilot guards Compose
-UI against visual regressions that compile cleanly and pass unit tests but ship
-a broken layout (issue #551). The tests render real composables on the JVM via
-Robolectric — no emulator — so they add no device-test runtime. The pilot
-covers two surfaces:
-
-- `WhiteNoiseThemeScreenshotTest` — a representative swatch through
-  `WhiteNoiseTheme` in light, dark, and AMOLED, guarding the theme color roles
-  (e.g. the AMOLED true-black audit, #446/#495).
-- `OnboardingContentScreenshotTest` — the onboarding entry screen, light theme.
+[Roborazzi](https://github.com/takahirom/roborazzi) guards Compose UI against
+visual regressions that compile cleanly and pass ordinary assertions but ship a
+broken layout. The tests render real composables on the JVM via Robolectric — no
+emulator — and cover onboarding, chat lists, conversations, settings, media,
+account switching, and other committed UI states across themes and accessibility
+configurations.
 
 Baseline PNGs live under `app/src/test/snapshots/` and are committed to git. CI
-runs `:app:verifyRoborazziDevZapstoreDebug` and `:app:verifyRoborazziDevPlayDebug`; on a mismatch the build fails and the
+runs the complete `:app:testDevZapstoreDebugUnitTest` and
+`:app:testDevPlayDebugUnitTest` suites with `-Proborazzi.test.verify=true`; on a
+mismatch the build fails and the
 diff/compare images are uploaded as workflow artifacts (`android-ci-reports-Zapstore` and `android-ci-reports-Play`).
 
 **Re-baseline after an intentional UI change.** When you deliberately change a

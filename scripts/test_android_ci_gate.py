@@ -10,6 +10,7 @@ import unittest
 
 
 WORKFLOW = Path(__file__).resolve().parents[1] / '.github/workflows/android-ci.yml'
+APP_BUILD = Path(__file__).resolve().parents[1] / 'app/build.gradle.kts'
 
 
 class AndroidCiGateTest(unittest.TestCase):
@@ -20,6 +21,9 @@ class AndroidCiGateTest(unittest.TestCase):
         """Read the actual inline shell gate, avoiding a separate test-only copy."""
         cls.workflow = WORKFLOW.read_text()
         cls.gate = cls.workflow.split('\n  validate:\n', 1)[1]
+        cls.static_analysis = cls.workflow.split('\n  static-analysis:\n', 1)[1].split('\n  tests:\n', 1)[0]
+        cls.tests_job = cls.workflow.split('\n  tests:\n', 1)[1].split('\n  validate:\n', 1)[0]
+        cls.app_build = APP_BUILD.read_text()
         cls.script = textwrap.dedent(cls.gate.split('        run: |\n', 1)[1])
         match = re.search(r'^    needs: \[([^\]]+)\]$', cls.gate, re.MULTILINE)
         cls.dependencies = [job.strip() for job in match.group(1).split(',')]
@@ -41,8 +45,44 @@ class AndroidCiGateTest(unittest.TestCase):
         jobs = set(re.findall(r'^  ([a-z][a-z-]+):$', self.workflow.split('\njobs:\n', 1)[1], re.MULTILINE))
         self.assertEqual(set(self.dependencies), jobs - {'validate'})
         self.assertIn('    if: always()\n', self.gate)
+        self.assertIn('    name: Compile, test, ktlint, detekt, Android lint\n', self.gate)
         self.assertIn('JOB_RESULTS: ${{ toJSON(needs) }}', self.gate)
         self.assertNotIn('continue-on-error:', self.gate)
+
+    def test_static_analysis_isolated_by_flavor_without_duplicating_singletons(self):
+        """Both lint variants run concurrently while ktlint and detekt run once."""
+        self.assertIn("name: ktlint, detekt, and Android lint (${{ matrix.flavor }})", self.static_analysis)
+        self.assertIn('fail-fast: false', self.static_analysis)
+        self.assertIn('flavor: [Zapstore, Play]', self.static_analysis)
+        self.assertEqual(self.static_analysis.count("if: matrix.flavor == 'Play'"), 2)
+        self.assertIn(':app:ktlintCheck :benchmark:ktlintCheck', self.static_analysis)
+        self.assertIn(':app:detekt', self.static_analysis)
+        self.assertIn(':app:lintDev${{ matrix.flavor }}Debug', self.static_analysis)
+        self.assertNotIn(':app:lintDevZapstoreDebug :app:lintDevPlayDebug', self.static_analysis)
+        self.assertIn('android-ci-reports-static-analysis-${{ matrix.flavor }}', self.static_analysis)
+        self.assertIn('android-ci-gradle-profiles-static-analysis-${{ matrix.flavor }}', self.static_analysis)
+        self.assertIn('cache-read-only: true', self.static_analysis)
+
+    def test_full_unit_suite_owns_screenshot_verification_and_coverage_reuses_it(self):
+        """Roborazzi verification runs once with every test and remains cache-correct."""
+        self.assertIn(
+            ':app:testDev${{ matrix.flavor }}DebugUnitTest -Proborazzi.test.verify=true',
+            self.tests_job,
+        )
+        self.assertEqual(self.tests_job.count('-Proborazzi.test.verify=true'), 3)
+        self.assertNotIn('verifyRoborazziDev', self.tests_job)
+        self.assertNotIn("--tests '", self.tests_job)
+        self.assertIn('testDevZapstoreDebugUnitTest', self.app_build)
+        self.assertIn('testDevPlayDebugUnitTest', self.app_build)
+        self.assertIn('dir(layout.projectDirectory.dir("src/test/snapshots"))', self.app_build)
+        self.assertIn('withPropertyName("roborazziSnapshots")', self.app_build)
+        self.assertIn('withPathSensitivity(PathSensitivity.RELATIVE)', self.app_build)
+
+    def test_only_play_tests_publish_gradle_cache_state(self):
+        """Parallel analysis and fork runs cannot create competing cache writers."""
+        self.assertEqual(self.workflow.count('cache-read-only: true'), 2)
+        self.assertIn("matrix.flavor != 'Play'", self.tests_job)
+        self.assertIn('github.event.pull_request.head.repo.full_name != github.repository', self.tests_job)
 
     def test_all_successful_jobs_pass(self):
         """A complete green matrix permits the existing required check to pass."""
