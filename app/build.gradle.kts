@@ -3,6 +3,7 @@ import groovy.json.JsonSlurper
 import kotlinx.kover.gradle.plugin.dsl.AggregationType
 import kotlinx.kover.gradle.plugin.dsl.CoverageUnit
 import org.gradle.api.tasks.Exec
+import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.testing.Test
 import java.net.URI
 import java.time.LocalDate
@@ -1148,6 +1149,16 @@ tasks.withType<Test>().configureEach {
     // Resource-backed Robolectric tests retain Android SDK sandboxes across the large unit suite.
     // Double Gradle's 512 MiB worker default while keeping one bounded, non-parallel process per task.
     maxHeapSize = "1g"
+    // CI's filtered verifyRoborazzi tasks delegate to these variant test tasks.
+    // Include the custom baseline directory in Gradle's input fingerprint so a
+    // baseline-only change cannot reuse stale verification outputs. This also
+    // intentionally invalidates full-suite outputs on baseline-only commits.
+    if (name in setOf("testDevZapstoreDebugUnitTest", "testDevPlayDebugUnitTest")) {
+        inputs
+            .files(layout.projectDirectory.dir("src/test/snapshots").asFileTree)
+            .withPropertyName("roborazziSnapshots")
+            .withPathSensitivity(PathSensitivity.RELATIVE)
+    }
     // A failed assertion's message (expected vs actual) must reach the CI log: the reports are not uploaded,
     // so the default short format left only "AssertionError at File.kt:162" to diagnose from.
     testLogging.exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
