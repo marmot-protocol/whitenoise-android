@@ -26,6 +26,7 @@ import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
+import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
@@ -532,6 +533,7 @@ class DeletedMessageLocalRemovalTest {
         edit = null,
         reactions = reactions,
         deleted = deleted,
+        deletionSource = DeletionSourceFfi.UNKNOWN,
         deletedByMessageIdHex = if (deleted) "delete-event" else null,
         invalidationStatus = null,
         sourceEpoch = null,

@@ -8,6 +8,7 @@ import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
@@ -847,6 +848,7 @@ private fun dmLatestMessage(sender: String) =
         kind = 1uL,
         timelineAt = 1uL,
         deleted = false,
+        deletionSource = DeletionSourceFfi.UNKNOWN,
         attachmentKind = null,
         attachmentCount = 0u,
         groupSystem = null,

@@ -9,6 +9,7 @@ import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.state.ChatListItem
@@ -74,6 +75,7 @@ internal object ChatRowPortFixtures {
                         kind = 9uL,
                         timelineAt = (System.currentTimeMillis() / 1000).toULong(),
                         deleted = deletedLastMessage,
+                        deletionSource = DeletionSourceFfi.UNKNOWN,
                         attachmentKind = null,
                         attachmentCount = 0u,
                         groupSystem = null,

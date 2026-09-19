@@ -48,6 +48,7 @@ import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
+import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.GroupMemberDetailsFfi
@@ -853,6 +854,7 @@ open class MessageBubbleFileAttachmentFixtures {
                 edit = null,
                 reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
                 deleted = false,
+                deletionSource = DeletionSourceFfi.UNKNOWN,
                 deletedByMessageIdHex = null,
                 invalidationStatus = invalidationStatus,
                 sourceEpoch = 1uL,
@@ -931,6 +933,7 @@ open class MessageBubbleFileAttachmentFixtures {
             media = emptyList(),
             agentTextStreamJson = null,
             deleted = false,
+            deletionSource = DeletionSourceFfi.UNKNOWN,
             invalidationStatus = null,
         )
 

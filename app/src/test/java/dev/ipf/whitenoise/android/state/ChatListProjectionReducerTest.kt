@@ -9,6 +9,7 @@ import dev.ipf.marmotkit.ChatListAvatarFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
@@ -592,6 +593,7 @@ class ChatListProjectionReducerTest {
         kind = kind,
         timelineAt = timelineAt,
         deleted = deleted,
+        deletionSource = DeletionSourceFfi.UNKNOWN,
         attachmentKind = null,
         attachmentCount = 0u,
         groupSystem = null,

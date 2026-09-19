@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.core
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
@@ -272,6 +273,7 @@ class ReplyNavigationTest {
                     media = emptyList(),
                     agentTextStreamJson = null,
                     deleted = false,
+                    deletionSource = DeletionSourceFfi.UNKNOWN,
                     invalidationStatus = null,
                 )
             },
@@ -283,6 +285,7 @@ class ReplyNavigationTest {
         edit = null,
         reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
         deleted = false,
+        deletionSource = DeletionSourceFfi.UNKNOWN,
         deletedByMessageIdHex = null,
         sourceEpoch = null,
         retentionSeconds = null,
