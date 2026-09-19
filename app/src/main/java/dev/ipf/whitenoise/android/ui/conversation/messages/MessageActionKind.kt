@@ -24,6 +24,9 @@ internal enum class MessageActionKind {
 }
 
 internal const val MESSAGE_ACTION_MENU_TEST_TAG = "message-action-menu"
+
+/** The safe frame the lifted stack travels inside; tagged so its resting placement can be captured. */
+internal const val FOCUSED_OVERLAY_FRAME_TEST_TAG = "focused-overlay-frame"
 internal const val MESSAGE_ACTION_REACTION_TEST_TAG = "message-action-reaction"
 internal val messageActionColumnGap = 2.dp
 private val actionSectionSpacing = 8.dp

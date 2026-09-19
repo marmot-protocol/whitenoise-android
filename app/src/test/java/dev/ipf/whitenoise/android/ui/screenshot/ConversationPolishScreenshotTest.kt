@@ -20,17 +20,22 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
+import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.conversation.media.FileTransferControl
 import dev.ipf.whitenoise.android.ui.conversation.media.attachmentTypeDescription
 import dev.ipf.whitenoise.android.ui.conversation.media.attachmentTypeLabel
 import dev.ipf.whitenoise.android.ui.conversation.media.fileIconFor
 import dev.ipf.whitenoise.android.ui.conversation.media.resolveAttachmentPresentation
+import dev.ipf.whitenoise.android.ui.conversation.messages.FOCUSED_OVERLAY_FRAME_TEST_TAG
+import dev.ipf.whitenoise.android.ui.conversation.messages.FocusedTextMessagePreview
 import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_ACTION_MENU_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageActionMenu
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubblePresentation
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -120,6 +125,69 @@ class ConversationPolishScreenshotTest {
     @Test
     fun attachmentTransferStatesAmoled() {
         captureAttachmentTransferStates("attachment_transfer_states_amoled", dark = true, amoled = true)
+    }
+
+    /**
+     * Where the lifted stack rests inside its safe frame, for a message anchored low in the window.
+     *
+     * The other overlay baselines capture the stack alone, so none of them would notice it resting
+     * in the wrong place. This one captures the frame it sits in.
+     */
+    @Test
+    fun focusedOverlayRestingPlacement() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                MessageActionMenu(
+                    expanded = true,
+                    // Inside the 360x780 test window, and high enough that the stack fits beneath
+                    // the lifted message: an anchor past the frame would only capture the clamp.
+                    anchorBoundsInWindow = IntRect(24, 260, 336, 340),
+                    anchorWindowYPx = 300f,
+                    canReply = true,
+                    canReact = true,
+                    canDelete = true,
+                    canEdit = false,
+                    canForward = true,
+                    canSelect = true,
+                    canCopyText = true,
+                    canSpeak = false,
+                    canSelectText = false,
+                    canSave = false,
+                    quickReactionEmojis = listOf("\uD83D\uDC4D", "\u2764\uFE0F", "\uD83D\uDE02"),
+                    onDismissRequest = {},
+                    onReact = {},
+                    onOpenEmojiPicker = {},
+                    onReply = {},
+                    onEdit = {},
+                    onForward = {},
+                    onSelect = {},
+                    onSelectText = {},
+                    onCopyText = {},
+                    onSpeak = {},
+                    onSave = {},
+                    onInfo = {},
+                    onDelete = {},
+                    previewDescription = "A lifted message",
+                    // Without a preview the stack falls back to its own middle, which is the
+                    // placement this baseline exists to catch a regression in.
+                    preview = {
+                        FocusedTextMessagePreview(
+                            presentation = messageBubblePresentation(deleted = false, mine = false),
+                            mine = false,
+                            text = "A lifted message",
+                            document = null,
+                            time = "12:34",
+                            status = MessageStatus.Received,
+                            showStatus = false,
+                        )
+                    },
+                )
+            }
+        }
+
+        composeRule
+            .onNodeWithTag(FOCUSED_OVERLAY_FRAME_TEST_TAG)
+            .captureRoboImage("src/test/snapshots/focused_overlay_resting_placement.png")
     }
 
     /** Captures action menu. */
