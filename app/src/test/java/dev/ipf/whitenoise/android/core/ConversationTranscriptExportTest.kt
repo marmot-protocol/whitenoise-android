@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.core
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.GroupSystemEventFfi
 import dev.ipf.marmotkit.GroupSystemEventProvenanceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
@@ -444,6 +445,7 @@ class ConversationTranscriptExportTest {
         edit = null,
         reactions = reactions,
         deleted = false,
+        deletionSource = DeletionSourceFfi.UNKNOWN,
         deletedByMessageIdHex = null,
         invalidationStatus = null,
         sourceEpoch = null,

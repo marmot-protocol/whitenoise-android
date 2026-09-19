@@ -4177,10 +4177,8 @@ class WhiteNoiseAppState private constructor(
     private fun configuredAccount(): AccountSummaryFfi? = accounts.firstOrNull { it.label == activeAccountRef }
 
     /**
-     * The process-owned listener attempt starts with Marmot itself; only its
-     * bounded readiness wait is deferred until a safe local shell (or
-     * onboarding) can render. Notification-sensitive runtime reads remain
-     * behind that barrier, while signer restoration happens before Ready.
+     * Starts the process-owned listener with Marmot while deferring only its bounded readiness wait until a safe
+     * local shell can render. Notification-sensitive reads remain behind that barrier and signer restoration.
      */
     private suspend fun completeReceiverGatedStartup() {
         val receiverReady = awaitNotificationReceiverForStartupWithin(notificationReceiverTimeoutMillis())

@@ -11695,6 +11695,15 @@
         ]
       },
       {
+        "surface": "string:message_deleted_by_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.message_deleted_by_admin",
+        "test_ids": [
+          "MSG-004",
+          "CON-005"
+        ]
+      },
+      {
         "surface": "string:message_deleted_by_you",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
         "anchor": "R.string.message_deleted_by_you",
@@ -22197,6 +22206,15 @@
         "test_ids": [
           "CON-004",
           "CON-005"
+        ]
+      },
+      {
+        "surface": "An optimistically published chat-list preview carries no deletion evidence for the message just sent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "private fun sentPreview(",
+        "test_ids": [
+          "CON-004",
+          "CHL-002"
         ]
       },
       {

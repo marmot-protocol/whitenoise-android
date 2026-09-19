@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.app.NotificationCompat
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.GroupSystemEventFfi
 import dev.ipf.marmotkit.GroupSystemEventProvenanceFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
@@ -718,6 +719,7 @@ class NotificationFirstPostIntegrationTest {
             edit = null,
             reactions = TimelineReactionSummaryFfi(emptyList(), emptyList()),
             deleted = false,
+            deletionSource = DeletionSourceFfi.UNKNOWN,
             deletedByMessageIdHex = null,
             invalidationStatus = null,
             sourceEpoch = null,

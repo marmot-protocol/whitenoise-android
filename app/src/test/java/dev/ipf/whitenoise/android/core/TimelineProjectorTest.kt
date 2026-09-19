@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.core
 
+import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MediaAttachmentOutcomeFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -156,6 +157,7 @@ class TimelineProjectorTest {
                         media = emptyList(),
                         agentTextStreamJson = null,
                         deleted = false,
+                        deletionSource = DeletionSourceFfi.UNKNOWN,
                         invalidationStatus = null,
                     ),
                 reactions =
@@ -552,6 +554,7 @@ class TimelineProjectorTest {
         media = MessageAttachments.acceptedOutcomes(media),
         agentTextStreamJson = null,
         deleted = deleted,
+        deletionSource = DeletionSourceFfi.UNKNOWN,
         invalidationStatus = invalidationStatus,
     )
 
@@ -611,6 +614,7 @@ class TimelineProjectorTest {
         edit = null,
         reactions = reactions,
         deleted = deleted,
+        deletionSource = DeletionSourceFfi.UNKNOWN,
         deletedByMessageIdHex = deletedByMessageIdHex,
         invalidationStatus = invalidationStatus,
         sourceEpoch = null,

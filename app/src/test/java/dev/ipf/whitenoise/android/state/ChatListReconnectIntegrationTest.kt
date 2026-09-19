@@ -568,6 +568,8 @@ private fun windowSnapshot(
 /** Pairs a chat row with deterministic selected title and avatar values. */
 private fun presentedRow(row: ChatListRowFfi) =
     PresentedChatRowFfi(
+        preview = emptyChatRowPreview(),
+        actions = noChatRowActions(),
         row = row,
         avatarAsset = null,
         presentation =

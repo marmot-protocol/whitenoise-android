@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
@@ -37,6 +38,7 @@ class TimelineRecordProfileSendersTest {
             media = emptyList(),
             agentTextStreamJson = null,
             deleted = false,
+            deletionSource = DeletionSourceFfi.UNKNOWN,
             invalidationStatus = null,
         )
 
@@ -70,6 +72,7 @@ class TimelineRecordProfileSendersTest {
                 userReactions = reactionSenders.map(::reaction),
             ),
         deleted = false,
+        deletionSource = DeletionSourceFfi.UNKNOWN,
         deletedByMessageIdHex = null,
         invalidationStatus = null,
         hasReports = false,

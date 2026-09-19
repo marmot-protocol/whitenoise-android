@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.BlockListSnapshotFfi
 import dev.ipf.marmotkit.BlockListSubscription
 import dev.ipf.marmotkit.ChatListAnchorOutcomeFfi
 import dev.ipf.marmotkit.ChatListPageDirectionFfi
+import dev.ipf.marmotkit.ChatListRowActionsFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListViewFfi
 import dev.ipf.marmotkit.ChatListWindowSnapshotFfi
@@ -26,6 +27,7 @@ import dev.ipf.marmotkit.PresentationSourceFfi
 import dev.ipf.marmotkit.PresentationTextFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
 import dev.ipf.marmotkit.SelectedAvatarFfi
+import dev.ipf.marmotkit.SelectedChatPreviewFfi
 import dev.ipf.marmotkit.SelectedMessageDraftFfi
 
 /**
@@ -131,6 +133,8 @@ internal object MarmotWindowTestFakes {
 
     private fun presentedRow(row: ChatListRowFfi) =
         PresentedChatRowFfi(
+            preview = emptyChatRowPreview(),
+            actions = noChatRowActions(),
             row = row,
             avatarAsset = null,
             presentation =
@@ -200,3 +204,27 @@ internal object MarmotWindowTestFakes {
         override fun close() = Unit
     }
 }
+
+/**
+ * Neutral chat-list row companions for fixtures that assert nothing about them.
+ *
+ * MarmotKit projects a preview and a row-action capability set beside every presented row. No surface
+ * consumes them yet, so a fixture states the absence of both rather than inventing capabilities the
+ * engine would have decided.
+ */
+internal fun emptyChatRowPreview(): SelectedChatPreviewFfi = SelectedChatPreviewFfi.Empty
+
+/** Every row action withheld: a fixture opts in explicitly when it exercises one. */
+internal fun noChatRowActions(): ChatListRowActionsFfi =
+    ChatListRowActionsFfi(
+        canMarkRead = false,
+        canMarkUnread = false,
+        canPin = false,
+        canUnpin = false,
+        canMute = false,
+        canUnmute = false,
+        canArchive = false,
+        canRestore = false,
+        canStartLeave = false,
+        canDeleteLocal = false,
+    )

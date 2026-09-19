@@ -9,6 +9,7 @@ import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
+import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.PresentationResolutionFfi
 import dev.ipf.marmotkit.PresentationSourceFfi
@@ -364,6 +365,7 @@ class ChatListTitleTest {
                 kind = 9uL,
                 timelineAt = 1uL,
                 deleted = false,
+                deletionSource = DeletionSourceFfi.UNKNOWN,
                 attachmentKind = null,
                 attachmentCount = 0u,
                 groupSystem = null,

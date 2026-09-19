@@ -2021,6 +2021,7 @@
     <string name="save_attachments">Сохранить вложения</string>
     <string name="message_deleted_by_you">Вы удалили это сообщение.</string>
     <string name="message_deleted_by_other">Это сообщение было удалено.</string>
+    <string name="message_deleted_by_admin">Администратор удалил это сообщение.</string>
     <string name="floating_keep">Оставить на экране</string>
     <string name="floating_title">На экране</string>
     <string name="floating_expand">Развернуть сообщение</string>

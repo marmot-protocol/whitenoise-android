@@ -27,6 +27,7 @@ import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.ChatPinStateFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
+import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.GroupDetailsFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.GroupManagementStateFfi
@@ -7896,6 +7897,8 @@ class ConversationController(
                             kind = 9uL,
                             timelineAt = now,
                             deleted = false,
+                            // A row we are optimistically publishing carries no deletion evidence.
+                            deletionSource = DeletionSourceFfi.UNKNOWN,
                             attachmentKind = null,
                             attachmentCount = 0u,
                             groupSystem = null,
@@ -8964,6 +8967,7 @@ class ConversationController(
             kind = 9uL,
             timelineAt = timelineAt,
             deleted = false,
+            deletionSource = DeletionSourceFfi.UNKNOWN,
             attachmentKind = null,
             attachmentCount = 0u,
             groupSystem = null,

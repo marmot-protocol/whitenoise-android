@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
@@ -63,6 +64,7 @@ private fun projectedRecordFor(record: AppMessageRecordFfi): TimelineMessageReco
         edit = null,
         reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
         deleted = false,
+        deletionSource = DeletionSourceFfi.UNKNOWN,
         deletedByMessageIdHex = null,
         invalidationStatus = null,
         sourceEpoch = null,

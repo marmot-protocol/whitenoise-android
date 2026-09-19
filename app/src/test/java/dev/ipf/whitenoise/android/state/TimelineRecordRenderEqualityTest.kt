@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
@@ -91,6 +92,7 @@ class TimelineRecordRenderEqualityTest {
             edit = null,
             reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
             deleted = false,
+            deletionSource = DeletionSourceFfi.UNKNOWN,
             deletedByMessageIdHex = null,
             invalidationStatus = null,
             sourceEpoch = null,

@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
@@ -622,6 +623,7 @@ class OptimisticMessageReconciliationTest {
             edit = null,
             reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
             deleted = false,
+            deletionSource = DeletionSourceFfi.UNKNOWN,
             deletedByMessageIdHex = null,
             invalidationStatus = invalidationStatus,
             sourceEpoch = null,

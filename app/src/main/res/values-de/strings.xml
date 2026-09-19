@@ -1977,6 +1977,7 @@
     <string name="save_attachments">Anhänge speichern</string>
     <string name="message_deleted_by_you">Du hast diese Nachricht gelöscht.</string>
     <string name="message_deleted_by_other">Diese Nachricht wurde gelöscht.</string>
+    <string name="message_deleted_by_admin">Ein Admin hat diese Nachricht gelöscht.</string>
     <string name="floating_keep">Auf dem Bildschirm behalten</string>
     <string name="floating_title">Am Bildschirm behalten</string>
     <string name="floating_expand">Nachricht ausklappen</string>

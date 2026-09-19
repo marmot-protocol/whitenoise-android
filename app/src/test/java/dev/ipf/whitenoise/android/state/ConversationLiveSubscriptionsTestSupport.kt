@@ -13,6 +13,7 @@ import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.GroupMemberDetailsFfi
@@ -189,6 +190,7 @@ internal fun timelineRecord(
         edit = null,
         reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
         deleted = false,
+        deletionSource = DeletionSourceFfi.UNKNOWN,
         deletedByMessageIdHex = null,
         invalidationStatus = null,
         sourceEpoch = null,
@@ -311,6 +313,7 @@ internal fun notifiedMessagePreview(): ChatListMessagePreviewFfi =
         kind = 9uL,
         timelineAt = 2uL,
         deleted = false,
+        deletionSource = DeletionSourceFfi.UNKNOWN,
         attachmentKind = null,
         attachmentCount = 0u,
         groupSystem = null,

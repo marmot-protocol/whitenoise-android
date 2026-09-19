@@ -212,6 +212,8 @@ private class FakeWindow(
 
 internal fun presentedRow(groupIdHex: String) =
     PresentedChatRowFfi(
+        preview = emptyChatRowPreview(),
+        actions = noChatRowActions(),
         row = chatRow(groupIdHex),
         avatarAsset = null,
         presentation =

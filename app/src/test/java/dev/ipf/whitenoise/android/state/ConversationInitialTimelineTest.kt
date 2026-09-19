@@ -4,6 +4,7 @@ import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.ChatListAttachmentKindFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
+import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -127,6 +128,7 @@ class ConversationInitialTimelineTest {
         kind = kind,
         timelineAt = 10uL,
         deleted = deleted,
+        deletionSource = DeletionSourceFfi.UNKNOWN,
         attachmentKind = attachmentKind,
         attachmentCount = attachmentCount,
         groupSystem = null,

@@ -9,6 +9,7 @@ import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
@@ -99,6 +100,7 @@ class ChatListProjectionEqualityTest {
             kind = 9uL,
             timelineAt = 1_700_000_000uL,
             deleted = false,
+            deletionSource = DeletionSourceFfi.UNKNOWN,
             attachmentKind = null,
             attachmentCount = 0u,
             groupSystem = null,

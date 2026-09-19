@@ -29,6 +29,7 @@ import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
+import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -518,6 +519,7 @@ class MessageBubbleLongPressDragTest {
                 edit = null,
                 reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
                 deleted = false,
+                deletionSource = DeletionSourceFfi.UNKNOWN,
                 deletedByMessageIdHex = null,
                 invalidationStatus = null,
                 sourceEpoch = record.sourceEpoch,

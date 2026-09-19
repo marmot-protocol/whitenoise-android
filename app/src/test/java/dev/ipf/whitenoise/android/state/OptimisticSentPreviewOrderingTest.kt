@@ -17,6 +17,7 @@ import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.ChatPinStateFfi
+import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
@@ -1407,6 +1408,7 @@ private fun preview(
         kind = 9uL,
         timelineAt = timelineAt,
         deleted = false,
+        deletionSource = DeletionSourceFfi.UNKNOWN,
         attachmentKind = null,
         attachmentCount = 0u,
         groupSystem = null,

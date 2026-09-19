@@ -9,23 +9,27 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.test.core.app.ApplicationProvider
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
+import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
@@ -56,6 +60,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import java.util.concurrent.atomic.AtomicInteger
 
 @RunWith(RobolectricTestRunner::class)
@@ -285,13 +290,50 @@ class DeletedMessageLocalRemovalTest {
     /** Resolves a string resource in the test context. */
     private fun string(resource: Int): String = app.getString(resource)
 
+    /**
+     * An admin takedown names the admin instead of the author.
+     *
+     * The engine carries who removed the message, so a received tombstone no longer has to read as an
+     * anonymous deletion when the group's admin is the one who removed it.
+     */
+    @Test
+    fun adminRemovalNamesTheAdminInsteadOfTheAuthor() {
+        render(failCommits = false, deletionSource = DeletionSourceFfi.ADMIN)
+
+        composeRule
+            .onNodeWithText(string(R.string.message_deleted_by_admin), substring = false)
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.message_deleted_by_other), substring = false).assertDoesNotExist()
+    }
+
+    /** Captures the authoritative admin-deletion copy in the production message bubble. */
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun adminRemovalBubbleLightScreenshot() {
+        render(failCommits = false, deletionSource = DeletionSourceFfi.ADMIN)
+
+        composeRule.onNodeWithTag(SCREENSHOT_TAG).captureRoboImage(SCREENSHOT_PATH)
+    }
+
+    /** A tombstone the engine cannot attribute keeps the passive voice it has always had. */
+    @Test
+    fun unattributedRemovalKeepsThePassiveVoice() {
+        render(failCommits = false, deletionSource = DeletionSourceFfi.UNKNOWN)
+
+        placeholder().assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.message_deleted_by_admin), substring = false).assertDoesNotExist()
+    }
+
     /** Composes the surface under test with the given fixture. */
     @Suppress("LongMethod")
-    private fun render(failCommits: Boolean): TestSurface {
+    private fun render(
+        failCommits: Boolean,
+        deletionSource: DeletionSourceFfi = DeletionSourceFfi.UNKNOWN,
+    ): TestSurface {
         val preferences = CommitControllablePreferences(backingPreferences, failCommits)
         val appState = appState(preferences)
         val controller = ConversationController(appState = appState, initialGroup = group())
-        val projected = deletedRecord()
+        val projected = deletedRecord(deletionSource)
         val item =
             TimelineMessage(
                 id = "msg:$MESSAGE_ID",
@@ -306,7 +348,7 @@ class DeletedMessageLocalRemovalTest {
         composeRule.setContent {
             var actionMenuOpen by remember { mutableStateOf(false) }
             WhiteNoiseTheme {
-                Box(Modifier.fillMaxWidth()) {
+                Box(Modifier.fillMaxWidth().testTag(SCREENSHOT_TAG)) {
                     controller.timeline.forEach { current ->
                         TimelineRowMessageBubble(
                             messageIdHex = current.record.messageIdHex,
@@ -499,12 +541,14 @@ class DeletedMessageLocalRemovalTest {
         }
     }
 
-    private fun deletedRecord() = messageRecord(body = LIVE_BODY, deleted = true)
+    private fun deletedRecord(deletionSource: DeletionSourceFfi = DeletionSourceFfi.UNKNOWN) =
+        messageRecord(body = LIVE_BODY, deleted = true, deletionSource = deletionSource)
 
     private fun messageRecord(
         body: String,
         deleted: Boolean,
         reactions: TimelineReactionSummaryFfi = emptyReactionSummary(),
+        deletionSource: DeletionSourceFfi = DeletionSourceFfi.UNKNOWN,
     ) = TimelineMessageRecordFfi(
         messageIdHex = MESSAGE_ID,
         sourceMessageIdHex = null,
@@ -532,6 +576,7 @@ class DeletedMessageLocalRemovalTest {
         edit = null,
         reactions = reactions,
         deleted = deleted,
+        deletionSource = deletionSource,
         deletedByMessageIdHex = if (deleted) "delete-event" else null,
         invalidationStatus = null,
         sourceEpoch = null,
@@ -671,5 +716,7 @@ class DeletedMessageLocalRemovalTest {
         val MESSAGE_ID = "05" + "00".repeat(31)
         const val LIVE_BODY = "secret body retained in protocol storage"
         const val ASYNC_TIMEOUT_MILLIS = 20_000L
+        const val SCREENSHOT_TAG = "message-bubble.admin-removal"
+        const val SCREENSHOT_PATH = "src/test/snapshots/message_bubble_admin_removal_light.png"
     }
 }
