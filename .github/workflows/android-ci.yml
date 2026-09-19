@@ -136,7 +136,7 @@ jobs:
           printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
 
       - name: Restore MarmotKit artifact
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/marmotkit-cache
           key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
@@ -182,23 +182,6 @@ jobs:
           app_apk="$(dirname "$metadata")/$output_file"
           bash scripts/verify-baseline-profile.sh "$app_apk"
 
-      # Release-mode Compose compiler output identifies unstable classes and
-      # restartable/skippable composables using the same optimizations users
-      # receive. Keep it opt-in locally; publish it on every CI build.
-      - name: Compose compiler metrics and stability reports
-        run: ./gradlew :app:compileStagingZapstoreReleaseKotlin -Pwhitenoise.enableComposeCompilerReports=true --build-cache --profile --no-daemon --stacktrace
-
-      - name: Upload Compose compiler reports
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: compose-compiler-reports
-          path: |
-            app/build/compose-metrics/
-            app/build/compose-reports/
-          if-no-files-found: error
-          retention-days: 14
-
       # Preserve failure diagnostics with a unique artifact name per job.
       - name: Upload reports
         if: failure()
@@ -219,6 +202,78 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: android-ci-gradle-profiles-build-contracts
+          path: build/reports/profile/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  compose-compiler:
+    name: Compose compiler metrics and stability reports
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Configure MarmotKit cache directory
+        shell: bash
+        run: printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$RUNNER_TEMP/marmotkit-cache" >> "$GITHUB_ENV"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-read-only: true
+
+      - name: Read MarmotKit artifact pin
+        id: marmotkit
+        shell: bash
+        run: |
+          sha="$(awk -F= '$1 == "artifact-sha256" { print $2 }' app/src/main/marmotkit/MARMOT_VERSION)"
+          [[ "$sha" =~ ^[0-9a-f]{64}$ ]] || { echo "Invalid MarmotKit artifact SHA-256" >&2; exit 1; }
+          printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Restore MarmotKit artifact
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/marmotkit-cache
+          key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
+
+      # Release-mode Compose compiler output identifies unstable classes and
+      # restartable/skippable composables using the same optimizations users
+      # receive. Keep it opt-in locally; publish it on every CI build.
+      - name: Compile Compose metrics and stability reports
+        run: ./gradlew :app:compileStagingZapstoreReleaseKotlin -Pwhitenoise.enableComposeCompilerReports=true --build-cache --profile --no-daemon --stacktrace
+
+      - name: Upload Compose compiler reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: compose-compiler-reports
+          path: |
+            app/build/compose-metrics/
+            app/build/compose-reports/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload reports
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: android-ci-reports-compose-compiler
+          path: app/build/reports/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload Gradle timing reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: android-ci-gradle-profiles-compose-compiler
           path: build/reports/profile/
           if-no-files-found: ignore
           retention-days: 7
@@ -264,7 +319,7 @@ jobs:
           printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
 
       - name: Restore MarmotKit artifact
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/marmotkit-cache
           key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
@@ -304,8 +359,93 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  screenshots:
+    name: Curated screenshot verification (${{ matrix.flavor }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        flavor: [Zapstore, Play]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Configure MarmotKit cache directory
+        shell: bash
+        run: printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$RUNNER_TEMP/marmotkit-cache" >> "$GITHUB_ENV"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-read-only: true
+
+      - name: Read MarmotKit artifact pin
+        id: marmotkit
+        shell: bash
+        run: |
+          sha="$(awk -F= '$1 == "artifact-sha256" { print $2 }' app/src/main/marmotkit/MARMOT_VERSION)"
+          [[ "$sha" =~ ^[0-9a-f]{64}$ ]] || { echo "Invalid MarmotKit artifact SHA-256" >&2; exit 1; }
+          printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Restore MarmotKit artifact
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/marmotkit-cache
+          key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
+
+      # Preserve the established baseline-owner allowlist. Other unit tests may
+      # capture diagnostic images without owning a committed golden file.
+      - name: Screenshot tests (Roborazzi)
+        run: |
+          ./gradlew \
+            :app:verifyRoborazziDev${{ matrix.flavor }}Debug \
+            --tests '*ScreenshotTest' \
+            --tests '*ConversationImeCollapseFocusTest' \
+            --tests '*NewGroupNameEmojiPickerTest' \
+            --tests '*ChatActionSheetTest' \
+            --tests '*ChatListPinnedBoundaryTest' \
+            --tests '*ChatListTtsTransportLayoutTest' \
+            --tests '*ChatListTopBarColdStartSelfProfileFirstFrameTest' \
+            --tests '*ConversationTtsFollowComposeTest' \
+            --tests '*BubbleCollapsibleFooterLayoutTest' \
+            --tests '*MessageBubbleEditedMarkdownTest' \
+            --tests '*GroupEditNameEmojiPickerTest' \
+            --tests '*MainShellTtsReturnTransitionTest' \
+            --tests '*ProfileAddToGroupsFlowTest' \
+            --tests '*AutoDownloadBacklogControlTest' \
+            --build-cache --profile --no-daemon \
+            --stacktrace
+
+      - name: Upload reports
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: android-ci-reports-screenshots-${{ matrix.flavor }}
+          path: |
+            app/build/reports/
+            app/build/test-results/
+            app/build/outputs/roborazzi/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload Gradle timing reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: android-ci-gradle-profiles-screenshots-${{ matrix.flavor }}
+          path: build/reports/profile/
+          if-no-files-found: ignore
+          retention-days: 7
+
   tests:
-    name: Unit, coverage, and screenshots (${{ matrix.flavor }})
+    name: Unit tests and coverage (${{ matrix.flavor }})
     runs-on: ubuntu-latest
     timeout-minutes: 40
     strategy:
@@ -349,15 +489,15 @@ jobs:
           printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
 
       - name: Restore MarmotKit artifact
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: marmotkit-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/marmotkit-cache
           key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
 
       - name: Unit tests
-        # Verify every committed Roborazzi baseline during the already-required
-        # unfiltered suite instead of launching a second filtered test pass.
-        run: ./gradlew :app:testDev${{ matrix.flavor }}DebugUnitTest -Proborazzi.test.verify=true --build-cache --profile --daemon --stacktrace
+        id: unit_tests
+        run: ./gradlew :app:testDev${{ matrix.flavor }}DebugUnitTest --build-cache --profile --daemon --stacktrace
 
       # Coverage gate (phase 2): fail CI when overall line coverage drops below the
       # ratchet floor in app/build.gradle.kts. DevZapstoreDebug only — the aggregate
@@ -365,15 +505,26 @@ jobs:
       # guard (no signing in CI).
       - name: Coverage gate (Kover)
         if: matrix.flavor == 'Zapstore'
-        run: ./gradlew :app:koverVerifyDevZapstoreDebug -Proborazzi.test.verify=true --build-cache --profile --daemon --stacktrace
+        run: ./gradlew :app:koverVerifyDevZapstoreDebug --build-cache --profile --daemon --stacktrace
 
       # Coverage visibility (phase 1): generate HTML/XML reports and publish them as
       # an artifact. Non-blocking so report upload still runs when the gate above fails.
       # Flavor-specific DevDebug variants only (see gate step).
       - name: Coverage report (Kover)
-        if: always()
+        if: ${{ !cancelled() && steps.unit_tests.outcome == 'success' }}
         continue-on-error: true
-        run: ./gradlew :app:koverXmlReportDev${{ matrix.flavor }}Debug :app:koverHtmlReportDev${{ matrix.flavor }}Debug -Proborazzi.test.verify=true --build-cache --profile --daemon --stacktrace
+        run: ./gradlew :app:koverXmlReportDev${{ matrix.flavor }}Debug :app:koverHtmlReportDev${{ matrix.flavor }}Debug --build-cache --profile --daemon --stacktrace
+
+      - name: Save MarmotKit artifact
+        if: >-
+          ${{ success() && matrix.flavor == 'Play' &&
+              (github.event_name != 'pull_request' ||
+               github.event.pull_request.head.repo.full_name == github.repository) &&
+              steps.marmotkit-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/marmotkit-cache
+          key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
 
       - name: Upload coverage report
         if: always()
@@ -414,7 +565,7 @@ jobs:
   # rather than a skipped check that GitHub can treat as passing.
   validate:
     name: Compile, test, ktlint, detekt, Android lint
-    needs: [offline-zsp, build-contracts, static-analysis, tests]
+    needs: [offline-zsp, build-contracts, compose-compiler, static-analysis, screenshots, tests]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
