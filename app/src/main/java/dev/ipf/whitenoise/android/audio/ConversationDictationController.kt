@@ -1634,6 +1634,23 @@ internal class ConversationDictationController internal constructor(
                         }
                     if (!owns(sessionId, generationId)) return
                     unresolvedRecognitionFailure = failure
+                    if (finishRequested) {
+                        val retainedCallerAudio =
+                            if (error == ConversationDictationFailure.NoSpeech) {
+                                recognitionSession?.retryCallerAudioWithFollowingAudio() == true
+                            } else {
+                                recognitionSession?.retryCallerAudio() == true
+                            }
+                        clearRecognitionGeneration(cancel = false)
+                        val callerAudioPending =
+                            retainedCallerAudio || runCatching(platform::callerAudioHasPending).getOrDefault(false)
+                        if (callerAudioPending && failure.canRetryRetainedCallerAudio) {
+                            retryRetainedCallerAudioOrFail(sessionId, target, failure)
+                        } else {
+                            failOrRetainTranscript(sessionId, target, failure)
+                        }
+                        return
+                    }
                     val callerAudioChunkId = recognitionSession?.callerAudioChunkId()
                     val callerAudioContainsSpeech = recognitionSession?.callerAudioContainsSpeech()
                     val repeatedSpeechRejection =
@@ -1670,8 +1687,6 @@ internal class ConversationDictationController internal constructor(
                         clearRejectedCallerAudioRetries()
                     }
                     clearRecognitionGeneration(cancel = false)
-                    val callerAudioPending =
-                        retainedCallerAudio || runCatching(platform::callerAudioHasPending).getOrDefault(false)
                     when {
                         advancedPastRejectedCallerAudio || advancedPastConfirmedSilence ->
                             advancePastRejectedCallerAudio(
@@ -1684,17 +1699,8 @@ internal class ConversationDictationController internal constructor(
                                 "event=caller_audio_retry_scheduled failure=${failure.name} " +
                                     "chunk=$callerAudioChunkId retry=$rejectedCallerAudioRetries",
                             )
-                            if (finishRequested) {
-                                startRecognition(sessionId, target)
-                            } else {
-                                restartAfterNoSpeech(sessionId, target, readyAt)
-                            }
+                            restartAfterNoSpeech(sessionId, target, readyAt)
                         }
-                        finishRequested &&
-                            callerAudioPending &&
-                            failure.canRetryRetainedCallerAudio ->
-                            retryRetainedCallerAudioOrFail(sessionId, target, failure)
-                        finishRequested -> failOrRetainTranscript(sessionId, target, failure)
                         error == ConversationDictationFailure.NoSpeech ->
                             restartAfterNoSpeech(sessionId, target, readyAt)
                         error == ConversationDictationFailure.PermissionDenied ->
