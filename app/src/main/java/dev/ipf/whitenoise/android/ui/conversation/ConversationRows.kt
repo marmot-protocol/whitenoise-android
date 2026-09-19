@@ -343,7 +343,53 @@ internal fun GroupSystemRow(
     }
 }
 
+/**
+ * The empty-conversation message, which explains the retention policy when one is in force.
+ *
+ * The wording never says history was lost: an empty timeline can equally mean nothing was ever sent
+ * here (#2674).
+ */
 @Composable
+@Suppress("FunctionNaming")
+internal fun ConversationEmptyMessage(
+    state: ConversationEmptyState,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+        when (state) {
+            ConversationEmptyState.NoMessages ->
+                Text(
+                    stringResource(R.string.no_messages_yet),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            is ConversationEmptyState.DisappearingMessages ->
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.semantics(mergeDescendants = true) {},
+                ) {
+                    Text(
+                        stringResource(R.string.conversation_empty_disappearing_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
+                    )
+                    Text(
+                        stringResource(
+                            R.string.conversation_empty_disappearing_body,
+                            disappearingMessagesLabel(state.retentionSeconds),
+                        ),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+        }
+    }
+}
+
+@Composable
+@Suppress("FunctionNaming")
 internal fun EmptyGroupConversation(onAddMembers: () -> Unit) {
     Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {

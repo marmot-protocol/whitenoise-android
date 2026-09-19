@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileLink
+import dev.ipf.whitenoise.android.ui.common.Avatar
 
 /**
  * A shared Nostr user — the actionable, identity-native counterpart to a phone
@@ -62,13 +63,28 @@ internal fun parseSharedUserFromText(text: String): SharedUser? {
 /** Produces a display-only identity summary without changing the actionable full npub. */
 private fun shortNpub(npub: String): String = if (npub.length > 20) "${npub.take(12)}…${npub.takeLast(5)}" else npub
 
-/** Renders one unambiguous shared-user reference as an actionable profile card. */
+/**
+ * Renders one unambiguous shared-user reference as an actionable profile card.
+ *
+ * [displayName] and [pictureUrl] come from the reader's own resolution of the npub, so a shared
+ * contact reads like a person rather than a key. The truncated npub stays on the card whenever a
+ * name is shown: a display name is self-asserted and could be anyone's, so it never replaces the
+ * identity the recipient would act on.
+ */
 @Composable
 internal fun UserMessageBubble(
     user: SharedUser,
     onOpen: () -> Unit,
     modifier: Modifier = Modifier,
+    displayName: String? = null,
+    pictureUrl: String? = null,
 ) {
+    val shortened = shortNpub(user.npub)
+    val resolvedName =
+        (displayName ?: user.name)
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() && it != shortened && it != user.npub }
+    val title = resolvedName ?: shortened
     Surface(
         modifier =
             modifier
@@ -82,23 +98,38 @@ internal fun UserMessageBubble(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
-                Icon(
-                    Icons.Default.Person,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.padding(10.dp).size(24.dp),
-                )
+            if (resolvedName != null || pictureUrl != null) {
+                Avatar(title = title, seed = user.npub, size = 44.dp, pictureUrl = pictureUrl)
+            } else {
+                // An unresolved reference gets a neutral glyph: an initial taken from "npub1"
+                // would read as a name the sender never supplied.
+                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
+                    Icon(
+                        Icons.Default.Person,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(10.dp).size(24.dp),
+                    )
+                }
             }
             Spacer(Modifier.width(12.dp))
             Column {
                 Text(
-                    user.name?.takeIf { it.isNotBlank() } ?: shortNpub(user.npub),
+                    title,
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (resolvedName != null) {
+                    Text(
+                        shortened,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 Text(
                     stringResource(R.string.share_user_view),
                     style = MaterialTheme.typography.labelMedium,

@@ -157,6 +157,8 @@
     <string name="leave">Quitter</string>
     <string name="couldnt_load_conversation">Impossible de charger la conversation</string>
     <string name="no_messages_yet">Pas encore de messages</string>
+    <string name="conversation_empty_disappearing_title">Aucun message à afficher</string>
+    <string name="conversation_empty_disappearing_body">Les messages éphémères sont activés. Les nouveaux messages de cette discussion disparaissent au bout de %1$s.</string>
     <string name="group_empty_only_you_title">Ce groupe ne contient que vous</string>
     <string name="group_empty_invite_members">Invitez des personnes quand vous êtes prêt.</string>
     <string name="you_are_no_longer_a_member">Vous ne pouvez plus envoyer de messages à ce groupe, car vous n’en êtes plus membre.</string>

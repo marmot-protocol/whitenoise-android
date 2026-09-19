@@ -4,6 +4,7 @@ import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.whitenoise.android.core.ChatListMessageSearch
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.isRetentionExpiredForSearch
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -85,10 +86,12 @@ private suspend fun scanHistoryForNeedle(
                 if (throwable is CancellationException) throw throwable
                 return@paginateHistoryMatches null
             }
+        val nowMillis = System.currentTimeMillis()
         val matches =
             page.messages
                 .filter {
-                    ChatListMessageSearch.isSearchableBody(it.kind, it.deleted, it.plaintext) &&
+                    !isRetentionExpiredForSearch(it, nowMillis) &&
+                        ChatListMessageSearch.isSearchableBody(it.kind, it.deleted, it.plaintext) &&
                         ChatListMessageSearch.bodyMatches(it.plaintext, ciNeedle)
                 }.map { it.timelineAt to it.messageIdHex }
         val oldest =

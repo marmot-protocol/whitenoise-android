@@ -18,6 +18,7 @@ import org.robolectric.annotation.GraphicsMode
 
 private const val USER_SHARE_CARD_TAG = "user-share-card"
 private const val USER_SHARE_CARD_SNAPSHOT = "src/test/snapshots/user_share_card_bare_reference_light.png"
+private const val USER_SHARE_RESOLVED_SNAPSHOT = "src/test/snapshots/user_share_card_resolved_identity_light.png"
 
 /** Visual regression for the unambiguous bare-reference user-share card. */
 @RunWith(RobolectricTestRunner::class)
@@ -43,6 +44,24 @@ class UserMessageBubbleScreenshotTest {
         }
 
         composeRule.onNodeWithTag(USER_SHARE_CARD_TAG).captureRoboImage(USER_SHARE_CARD_SNAPSHOT)
+    }
+
+    /** A resolved npub reads as a person: name and avatar, with the identity still on the card. */
+    @Test
+    fun resolvedIdentityShowsTheNameAndKeepsTheShortenedNpub() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                Surface(modifier = Modifier.padding(16.dp)) {
+                    UserMessageBubble(
+                        user = SharedUser(npub = TEST_NPUB, name = null),
+                        onOpen = {},
+                        modifier = Modifier.testTag(USER_SHARE_CARD_TAG),
+                        displayName = "Alice Kowalski",
+                    )
+                }
+            }
+        }
+        composeRule.onNodeWithTag(USER_SHARE_CARD_TAG).captureRoboImage(USER_SHARE_RESOLVED_SNAPSHOT)
     }
 }
 
