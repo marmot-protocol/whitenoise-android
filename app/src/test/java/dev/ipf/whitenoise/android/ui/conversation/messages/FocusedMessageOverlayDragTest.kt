@@ -52,6 +52,58 @@ class FocusedMessageOverlayDragTest {
         )
     }
 
+    /**
+     * The anchor is a window coordinate and the frame starts below the top inset.
+     *
+     * Without converting between them the stack rests a status bar too low, which is the whole
+     * difference between the lifted message sitting on its bubble and sitting just below it.
+     */
+    @Test
+    fun theRestingPlaceConvertsTheAnchorOutOfWindowCoordinates() {
+        val withoutInset = focusedStackRestingOffset(FRAME, STACK, anchorCenterPx = 640)
+
+        val withInset = focusedStackRestingOffset(FRAME, STACK, anchorCenterPx = 640, topInsetPx = 60)
+
+        assertEquals("the inset must move the stack up by exactly itself", withoutInset - 60f, withInset, 0f)
+    }
+
+    /** A lift with no anchor centres on the frame, so there is no window coordinate to convert. */
+    @Test
+    fun anUnanchoredLiftIgnoresTheInset() {
+        assertEquals(
+            focusedStackRestingOffset(FRAME, STACK, anchorCenterPx = null),
+            focusedStackRestingOffset(FRAME, STACK, anchorCenterPx = null, topInsetPx = 60),
+            0f,
+        )
+    }
+
+    /** The resting place is measured from the preview inside the stack, not the stack's middle. */
+    @Test
+    fun theRestingPlaceIsMeasuredFromThePreview() {
+        // An anchor high enough that neither placement is pushed against the frame's edge.
+        val byStackCentre = focusedStackRestingOffset(FRAME, STACK, anchorCenterPx = 300)
+
+        val byPreview =
+            focusedStackRestingOffset(FRAME, STACK, anchorCenterPx = 300, previewCenterInStackPx = 40)
+
+        assertEquals(
+            "placing by the preview must shift by the difference",
+            byStackCentre + (STACK / 2 - 40),
+            byPreview,
+            0f,
+        )
+    }
+
+    /** A lift that draws no preview falls back to the stack's middle. */
+    @Test
+    fun aLiftWithNoPreviewFallsBackToTheStackMiddle() {
+        assertEquals(
+            focusedStackRestingOffset(FRAME, STACK, anchorCenterPx = 640, previewCenterInStackPx = STACK / 2),
+            focusedStackRestingOffset(FRAME, STACK, anchorCenterPx = 640),
+            0f,
+        )
+    }
+
     /** A lift that reported neither a bubble nor a touch point centres on the frame. */
     @Test
     fun aLiftWithNoAnchorCentresOnTheFrame() {
@@ -175,6 +227,56 @@ class FocusedMessageOverlayDragTest {
         assertTrue("the drag after a tap must move the stack, rested at " + resting, stackTop() < resting)
     }
 
+    /**
+     * The lifted message opens on the bubble it came from, so nothing appears to jump.
+     *
+     * The stack is a short reaction rail, the lifted message, then a tall menu, so placing it by its
+     * own middle put the message far above its bubble — 538 px with a full menu — and the message
+     * visibly teleported as the overlay took over.
+     */
+    @Test
+    fun theLiftedMessageOpensOnTheBubbleItCameFrom() {
+        render(anchorTop = 250, anchorBottom = 330)
+
+        val preview = composeRule.onNodeWithTag(PREVIEW_TAG).fetchSemanticsNode().boundsInRoot
+        val previewCentre = (preview.top + preview.bottom) / 2
+
+        assertEquals("the lifted message must open on its bubble", 290f, previewCentre, 8f)
+    }
+
+    /**
+     * A bubble too low for the rest of the stack to fit beneath it keeps the stack in the frame.
+     *
+     * The lifted message cannot reach that bubble without hanging the menu off the bottom, so the
+     * clamp wins and the message opens above where it came from.
+     */
+    @Test
+    fun aBubbleTooLowToReachKeepsTheStackInTheFrame() {
+        render(anchorTop = 600, anchorBottom = 680)
+
+        val preview = composeRule.onNodeWithTag(PREVIEW_TAG).fetchSemanticsNode().boundsInRoot
+        val stack = composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).fetchSemanticsNode().boundsInRoot
+
+        assertTrue("the lifted message opens above a bubble it cannot reach", (preview.top + preview.bottom) / 2 < 640f)
+        assertTrue("and the stack stays inside the frame", stack.bottom <= FRAME)
+    }
+
+    /**
+     * A stack that fills its frame cannot reach the anchor, and this pins that it is a known gap.
+     *
+     * With every action showing there is no slack to place the stack with, so the lifted message
+     * stays where the clamp puts it. #1857 shortens the menu, which is what closes this.
+     */
+    @Test
+    fun aFrameFillingStackCannotReachItsAnchor() {
+        render(anchorTop = 600, anchorBottom = 680, actionCount = FRAME_FILLING_ACTIONS)
+
+        val preview = composeRule.onNodeWithTag(PREVIEW_TAG).fetchSemanticsNode().boundsInRoot
+
+        assertTrue("a frame-filling stack is pinned at the top", stackTop() == 0f)
+        assertTrue("so its lifted message cannot reach the anchor", (preview.top + preview.bottom) / 2 < 640f)
+    }
+
     private fun stackTop(): Float =
         composeRule
             .onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG)
@@ -191,6 +293,7 @@ class FocusedMessageOverlayDragTest {
         anchorTop: Int,
         anchorBottom: Int,
         onDismiss: () -> Unit = {},
+        actionCount: Int = REALISTIC_ACTIONS,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -199,16 +302,16 @@ class FocusedMessageOverlayDragTest {
                     touchY = anchorTop.toFloat(),
                     mine = true,
                     actions =
-                        listOf(
+                        List(actionCount) { index ->
                             FocusedMessageAction(
-                                label = "Reply",
+                                label = if (index == 0) "Reply" else "Action " + index,
                                 supportingLabel = null,
                                 enabled = true,
                                 destructive = false,
                                 icon = {},
                                 onClick = {},
-                            ),
-                        ),
+                            )
+                        },
                     quickReactions = listOf("👍"),
                     canReact = true,
                     selectedReactions = emptySet(),
@@ -232,5 +335,7 @@ class FocusedMessageOverlayDragTest {
         const val PREVIEW_TAG = "message-actions-preview"
         const val FRAME = 780
         const val STACK = 212
+        const val REALISTIC_ACTIONS = 6
+        const val FRAME_FILLING_ACTIONS = 12
     }
 }

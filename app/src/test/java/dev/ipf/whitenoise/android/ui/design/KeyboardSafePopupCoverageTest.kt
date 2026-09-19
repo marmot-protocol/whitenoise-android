@@ -181,7 +181,10 @@ class KeyboardSafePopupCoverageTest {
         )
         assertTrue(
             "Frozen message bounds and the original touch point must own where the stack rests",
-            "anchorCenterPx = sourceBounds?.center?.y ?: touchY?.roundToInt()" in focusedBody,
+            "anchorCenterPx = sourceBounds?.center?.y ?: touchY?.roundToInt()" in focusedBody &&
+                "topInsetPx = topInsetPx" in focusedBody &&
+                "WindowInsets.safeDrawing.getTop(LocalDensity.current)" in focusedBody &&
+                "previewCenterInStackPx = previewCenterInStackPx" in focusedBody,
         )
         assertTrue(
             "Tall action content must scroll within the keyboard-safe frame",

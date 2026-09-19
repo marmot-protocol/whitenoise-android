@@ -20,6 +20,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -29,6 +30,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.attachmentTypeDescriptio
 import dev.ipf.whitenoise.android.ui.conversation.media.attachmentTypeLabel
 import dev.ipf.whitenoise.android.ui.conversation.media.fileIconFor
 import dev.ipf.whitenoise.android.ui.conversation.media.resolveAttachmentPresentation
+import dev.ipf.whitenoise.android.ui.conversation.messages.FOCUSED_OVERLAY_FRAME_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_ACTION_MENU_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageActionMenu
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -120,6 +122,53 @@ class ConversationPolishScreenshotTest {
     @Test
     fun attachmentTransferStatesAmoled() {
         captureAttachmentTransferStates("attachment_transfer_states_amoled", dark = true, amoled = true)
+    }
+
+    /**
+     * Where the lifted stack rests inside its safe frame, for a message anchored low in the window.
+     *
+     * The other overlay baselines capture the stack alone, so none of them would notice it resting
+     * in the wrong place. This one captures the frame it sits in.
+     */
+    @Test
+    fun focusedOverlayRestingPlacement() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                MessageActionMenu(
+                    expanded = true,
+                    anchorBoundsInWindow = IntRect(24, 1500, 336, 1620),
+                    anchorWindowYPx = 1560f,
+                    canReply = true,
+                    canReact = true,
+                    canDelete = true,
+                    canEdit = false,
+                    canForward = true,
+                    canSelect = true,
+                    canCopyText = true,
+                    canSpeak = false,
+                    canSelectText = false,
+                    canSave = false,
+                    quickReactionEmojis = listOf("\uD83D\uDC4D", "\u2764\uFE0F", "\uD83D\uDE02"),
+                    onDismissRequest = {},
+                    onReact = {},
+                    onOpenEmojiPicker = {},
+                    onReply = {},
+                    onEdit = {},
+                    onForward = {},
+                    onSelect = {},
+                    onSelectText = {},
+                    onCopyText = {},
+                    onSpeak = {},
+                    onSave = {},
+                    onInfo = {},
+                    onDelete = {},
+                )
+            }
+        }
+
+        composeRule
+            .onNodeWithTag(FOCUSED_OVERLAY_FRAME_TEST_TAG)
+            .captureRoboImage("src/test/snapshots/focused_overlay_resting_placement.png")
     }
 
     /** Captures action menu. */

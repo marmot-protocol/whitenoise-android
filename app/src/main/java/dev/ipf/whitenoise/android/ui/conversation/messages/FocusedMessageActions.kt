@@ -59,7 +59,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -131,6 +134,15 @@ internal fun focusedStackTravelRange(
 /**
  * Where the stack rests before anyone moves it: centred on the message it lifted, held in the frame.
  *
+ * [anchorCenterPx] is a window coordinate, because that is what the lifted bubble reports, while the
+ * offset is applied inside a frame that starts below the top inset. [topInsetPx] converts between
+ * them; without it the stack rests a status bar too low.
+ *
+ * The stack is placed by its preview, not by its own middle: a short reaction rail sits above the
+ * lifted message and a tall menu below it, so centring the stack would put the lifted message well
+ * above the bubble it came from and the message would appear to jump as the overlay opened.
+ * [previewCenterInStackPx] defaults to the stack's middle for a lift that draws no preview.
+ *
  * A null [anchorCenterPx] means the lift reported no bubble and no touch point, so the stack has
  * nothing to sit beside and centres on the frame instead.
  */
@@ -138,10 +150,12 @@ internal fun focusedStackRestingOffset(
     frameHeightPx: Int,
     stackHeightPx: Int,
     anchorCenterPx: Int?,
+    topInsetPx: Int = 0,
+    previewCenterInStackPx: Int = stackHeightPx / 2,
 ): Float {
     val range = focusedStackTravelRange(frameHeightPx, stackHeightPx)
-    val centre = anchorCenterPx ?: (frameHeightPx / 2)
-    return (centre - stackHeightPx / 2).toFloat().coerceIn(range.start, range.endInclusive)
+    val centre = anchorCenterPx?.minus(topInsetPx) ?: (frameHeightPx / 2)
+    return (centre - previewCenterInStackPx).toFloat().coerceIn(range.start, range.endInclusive)
 }
 
 /** The lifted stack's vertical travel: where it sits now, and whether a gesture has claimed it. */
@@ -168,16 +182,26 @@ private fun rememberFocusedStackTravel(
     frameHeightPx: Int,
     stackHeightPx: Int,
     anchorCenterPx: Int?,
+    topInsetPx: Int,
+    previewCenterInStackPx: Int?,
 ): FocusedStackTravel {
     val travel = remember { FocusedStackTravel() }
-    LaunchedEffect(frameHeightPx, stackHeightPx, anchorCenterPx) {
+    LaunchedEffect(frameHeightPx, stackHeightPx, anchorCenterPx, topInsetPx, previewCenterInStackPx) {
         // A popup re-shown after an app switch reports a zero height on its first frame. Placing
         // the stack on that would put it at the frame's top and then jump it to where it belongs.
         if (stackHeightPx <= 0) return@LaunchedEffect
         val range = focusedStackTravelRange(frameHeightPx, stackHeightPx)
         travel.offset.updateBounds(range.start, range.endInclusive)
         if (!travel.moved) {
-            travel.offset.snapTo(focusedStackRestingOffset(frameHeightPx, stackHeightPx, anchorCenterPx))
+            travel.offset.snapTo(
+                focusedStackRestingOffset(
+                    frameHeightPx = frameHeightPx,
+                    stackHeightPx = stackHeightPx,
+                    anchorCenterPx = anchorCenterPx,
+                    topInsetPx = topInsetPx,
+                    previewCenterInStackPx = previewCenterInStackPx ?: (stackHeightPx / 2),
+                ),
+            )
         }
         travel.placed = true
     }
@@ -265,14 +289,21 @@ internal fun FocusedMessageActions(
                     .windowInsetsPadding(WindowInsets.safeDrawing)
                     // A tap reaching the frame landed beside the stack, on nothing, and dismisses
                     // exactly as the scrim underneath it would have before the frame covered it.
-                    .pointerInput(Unit) { detectTapGestures { currentOnDismiss() } },
+                    .pointerInput(Unit) { detectTapGestures { currentOnDismiss() } }
+                    .testTag(FOCUSED_OVERLAY_FRAME_TEST_TAG),
         ) {
+            // The lifted bubble reports a window coordinate; the frame below starts under the top
+            // inset. The stack would rest a status bar too low without converting between them.
+            val topInsetPx = WindowInsets.safeDrawing.getTop(LocalDensity.current)
             var stackHeightPx by remember { mutableIntStateOf(0) }
+            var previewCenterInStackPx by remember { mutableStateOf<Int?>(null) }
             val travel =
                 rememberFocusedStackTravel(
                     frameHeightPx = constraints.maxHeight,
                     stackHeightPx = stackHeightPx,
                     anchorCenterPx = sourceBounds?.center?.y ?: touchY?.roundToInt(),
+                    topInsetPx = topInsetPx,
+                    previewCenterInStackPx = previewCenterInStackPx,
                 )
             Column(
                 modifier =
@@ -318,7 +349,12 @@ internal fun FocusedMessageActions(
                             Modifier
                                 // The tag precedes clearAndSetSemantics, which wipes semantics set after it.
                                 .testTag("message-actions-preview")
-                                .focusedStackDrag(travel)
+                                // Where the lifted message sits inside the stack is what the stack is
+                                // placed by, so the message lands on the bubble it was lifted from.
+                                .onPlaced {
+                                    previewCenterInStackPx =
+                                        it.positionInParent().y.roundToInt() + it.size.height / 2
+                                }.focusedStackDrag(travel)
                                 .clearAndSetSemantics {
                                     contentDescription = previewDescription
                                     // The same dismissal the tap performs, reachable without one: a
