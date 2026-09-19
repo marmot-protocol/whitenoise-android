@@ -2,9 +2,15 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -14,11 +20,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -32,9 +43,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -68,6 +83,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiGlyph
 import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import dev.ipf.whitenoise.android.ui.theme.outlineSelectionColor
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 /** One visible native capability; dispatch remains in the owning message. */
@@ -81,42 +97,114 @@ internal data class FocusedMessageAction(
 )
 
 /**
- * Centers the measured stack around its frozen message anchor within the keyboard-safe popup frame.
- * The provider is remembered by the host, so the last measured content size survives the popup
- * window being torn down and re-shown on resume: the first post-resume frame lands exactly where
- * the stack was, instead of jumping once the content reports its size again.
+ * Gives the overlay the whole popup window rather than a window cut to its own content.
+ *
+ * The stack used to be its own window, sized to what it drew, so where it sat was a window
+ * position and nothing inside the overlay could change it. Handing it the window instead makes
+ * the resting place a layout decision, which is what lets the stack travel through the frame.
  */
-internal class FocusedMessageActionsPositionProvider(
-    private val sourceBounds: IntRect?,
-    private val touchY: Float?,
-) : PopupPositionProvider {
-    private var lastContentSize: IntSize = IntSize.Zero
-
-    /** Positions the actions above or below the focused bubble within the window. */
+internal object FocusedMessageOverlayFrameProvider : PopupPositionProvider {
+    /** The overlay always starts at the window origin; the stack positions itself within it. */
     override fun calculatePosition(
         anchorBounds: IntRect,
         windowSize: IntSize,
         layoutDirection: LayoutDirection,
         popupContentSize: IntSize,
-    ): IntOffset {
-        @Suppress("NAME_SHADOWING")
-        val popupContentSize = stableContentSize(popupContentSize)
-        val desiredY =
-            (sourceBounds?.center?.y ?: touchY?.roundToInt() ?: (windowSize.height / 2)) -
-                popupContentSize.height / 2
-        return IntOffset(
-            x = ((windowSize.width - popupContentSize.width) / 2).coerceAtLeast(0),
-            y = desiredY.coerceIn(0, (windowSize.height - popupContentSize.height).coerceAtLeast(0)),
-        )
-    }
+    ): IntOffset = IntOffset.Zero
+}
 
-    /** Remembers a measured size and substitutes it for the zero size of a not-yet-measured frame. */
-    private fun stableContentSize(measured: IntSize): IntSize =
-        if (measured.width > 0 && measured.height > 0) {
-            measured.also { lastContentSize = it }
-        } else {
-            lastContentSize
+/**
+ * The offsets the lifted stack may occupy inside a frame [frameHeightPx] tall.
+ *
+ * A stack shorter than its frame travels between the frame's edges; one that fills the frame has
+ * nowhere to go and keeps the scrolling it already had. Both are the same range, so there is no
+ * pair of models that have to agree about where the stack is.
+ */
+internal fun focusedStackTravelRange(
+    frameHeightPx: Int,
+    stackHeightPx: Int,
+): ClosedFloatingPointRange<Float> {
+    val slack = (frameHeightPx - stackHeightPx).toFloat()
+    return minOf(0f, slack)..maxOf(0f, slack)
+}
+
+/**
+ * Where the stack rests before anyone moves it: centred on the message it lifted, held in the frame.
+ *
+ * A null [anchorCenterPx] means the lift reported no bubble and no touch point, so the stack has
+ * nothing to sit beside and centres on the frame instead.
+ */
+internal fun focusedStackRestingOffset(
+    frameHeightPx: Int,
+    stackHeightPx: Int,
+    anchorCenterPx: Int?,
+): Float {
+    val range = focusedStackTravelRange(frameHeightPx, stackHeightPx)
+    val centre = anchorCenterPx ?: (frameHeightPx / 2)
+    return (centre - stackHeightPx / 2).toFloat().coerceIn(range.start, range.endInclusive)
+}
+
+/** The lifted stack's vertical travel: where it sits now, and whether a gesture has claimed it. */
+@Stable
+private class FocusedStackTravel {
+    val offset: Animatable<Float, AnimationVector1D> = Animatable(0f)
+
+    /** Once a gesture moves the stack, re-measuring must not drag it back to where it started. */
+    var moved by mutableStateOf(false)
+
+    /** False until the stack has a measured height and an offset to match it. */
+    var placed by mutableStateOf(false)
+}
+
+/**
+ * Tracks the stack's travel, keeping its bounds and its untouched resting place in step with layout.
+ *
+ * Measurement arrives a frame late and changes again with the font scale, a reaction being added or
+ * the frame itself resizing, so bounds are recomputed each time; the resting snap is skipped once a
+ * gesture has moved the stack, which would otherwise undo the move on the next measurement.
+ */
+@Composable
+private fun rememberFocusedStackTravel(
+    frameHeightPx: Int,
+    stackHeightPx: Int,
+    anchorCenterPx: Int?,
+): FocusedStackTravel {
+    val travel = remember { FocusedStackTravel() }
+    LaunchedEffect(frameHeightPx, stackHeightPx, anchorCenterPx) {
+        // A popup re-shown after an app switch reports a zero height on its first frame. Placing
+        // the stack on that would put it at the frame's top and then jump it to where it belongs.
+        if (stackHeightPx <= 0) return@LaunchedEffect
+        val range = focusedStackTravelRange(frameHeightPx, stackHeightPx)
+        travel.offset.updateBounds(range.start, range.endInclusive)
+        if (!travel.moved) {
+            travel.offset.snapTo(focusedStackRestingOffset(frameHeightPx, stackHeightPx, anchorCenterPx))
         }
+        travel.placed = true
+    }
+    return travel
+}
+
+/**
+ * The drag that carries the stack, hung on the lifted message so the gesture starts on the message.
+ *
+ * A drag only wins after touch slop, so the tap that dismisses from the same message survives it.
+ * The fling decays into the travel bounds and stops there, and the whole thing is scoped to the
+ * overlay's composition, so dismissal, Back, navigation or a stopped lifecycle end motion with it
+ * rather than leaving it to land on an overlay that is no longer there.
+ */
+@Composable
+private fun Modifier.focusedStackDrag(travel: FocusedStackTravel): Modifier {
+    val scope = rememberCoroutineScope()
+    val decay = rememberSplineBasedDecay<Float>()
+    return draggable(
+        orientation = Orientation.Vertical,
+        state =
+            rememberDraggableState { delta ->
+                travel.moved = true
+                scope.launch { travel.offset.snapTo(travel.offset.value + delta) }
+            },
+        onDragStopped = { velocity -> travel.offset.animateDecay(velocity, decay) },
+    )
 }
 
 private const val FOCUSED_BACKDROP_ALPHA = 0.88f
@@ -153,7 +241,6 @@ internal fun FocusedMessageActions(
     onMoreReactions: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val position = remember(sourceBounds, touchY) { FocusedMessageActionsPositionProvider(sourceBounds, touchY) }
     val title = stringResource(R.string.message_actions)
     val close = stringResource(R.string.close)
     // Saveable so a popup window re-shown after an app switch does not hide content it already
@@ -163,21 +250,42 @@ internal fun FocusedMessageActions(
     KeyboardSafePopup(
         expanded = true,
         onDismissRequest = onDismiss,
-        popupPositionProvider = position,
+        popupPositionProvider = FocusedMessageOverlayFrameProvider,
         scrimModifier =
             Modifier.background(
                 MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = FOCUSED_BACKDROP_ALPHA),
             ),
     ) {
-        BoxWithConstraints {
+        BoxWithConstraints(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    // The overlay owns the whole window now, so the travel range is the part of it
+                    // the stack may actually occupy rather than the part the system bars cover.
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
+                    // A tap reaching the frame landed beside the stack, on nothing, and dismisses
+                    // exactly as the scrim underneath it would have before the frame covered it.
+                    .pointerInput(Unit) { detectTapGestures { currentOnDismiss() } },
+        ) {
+            var stackHeightPx by remember { mutableIntStateOf(0) }
+            val travel =
+                rememberFocusedStackTravel(
+                    frameHeightPx = constraints.maxHeight,
+                    stackHeightPx = stackHeightPx,
+                    anchorCenterPx = sourceBounds?.center?.y ?: touchY?.roundToInt(),
+                )
             Column(
                 modifier =
                     Modifier
+                        .align(Alignment.TopCenter)
                         .widthIn(max = FocusedStackMaximumWidth)
                         .fillMaxWidth()
                         .heightIn(max = maxHeight)
-                        .onSizeChanged { measured = it.width > 0 && it.height > 0 }
-                        .graphicsLayer { alpha = if (measured && previewReady) 1f else 0f }
+                        .offset { IntOffset(0, travel.offset.value.roundToInt()) }
+                        .onSizeChanged {
+                            measured = it.width > 0 && it.height > 0
+                            stackHeightPx = it.height
+                        }.graphicsLayer { alpha = if (measured && previewReady && travel.placed) 1f else 0f }
                         // Children consume their own taps first, so a tap that reaches the column
                         // landed on empty stack space or its padding and dismisses like the scrim.
                         .pointerInput(Unit) { detectTapGestures { currentOnDismiss() } }
@@ -210,6 +318,7 @@ internal fun FocusedMessageActions(
                             Modifier
                                 // The tag precedes clearAndSetSemantics, which wipes semantics set after it.
                                 .testTag("message-actions-preview")
+                                .focusedStackDrag(travel)
                                 .clearAndSetSemantics {
                                     contentDescription = previewDescription
                                     // The same dismissal the tap performs, reachable without one: a

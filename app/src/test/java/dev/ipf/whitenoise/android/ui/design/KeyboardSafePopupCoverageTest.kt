@@ -170,27 +170,31 @@ class KeyboardSafePopupCoverageTest {
             )
         }
         assertTrue(
-            "Frozen message bounds and the original touch point must own positioning",
-            "remember(sourceBounds, touchY)" in focusedBody &&
-                "FocusedMessageActionsPositionProvider(sourceBounds, touchY)" in focusedBody &&
-                "popupPositionProvider = position" in focusedBody,
+            "The overlay must own the whole window so the stack can travel inside it",
+            "popupPositionProvider = FocusedMessageOverlayFrameProvider" in focusedBody &&
+                "): IntOffset = IntOffset.Zero" in focusedSource,
         )
-        val provider = focusedSource.functionBody("calculatePosition")
         assertTrue(
-            "The measured preview/action stack must center on its anchor and clamp within the usable window",
-            "sourceBounds?.center?.y ?: touchY?.roundToInt()" in provider &&
-                "popupContentSize.height / 2" in provider &&
-                "(windowSize.width - popupContentSize.width) / 2" in provider &&
-                "desiredY.coerceIn(0, (windowSize.height - popupContentSize.height).coerceAtLeast(0))" in provider,
+            "The travel range must be the frame the system bars and keyboard leave behind",
+            "windowInsetsPadding(WindowInsets.safeDrawing)" in focusedBody &&
+                "frameHeightPx = constraints.maxHeight" in focusedBody,
+        )
+        assertTrue(
+            "Frozen message bounds and the original touch point must own where the stack rests",
+            "anchorCenterPx = sourceBounds?.center?.y ?: touchY?.roundToInt()" in focusedBody,
         )
         assertTrue(
             "Tall action content must scroll within the keyboard-safe frame",
             ".heightIn(max = maxHeight)" in focusedBody && ".verticalScroll(rememberScrollState())" in focusedBody,
         )
         assertTrue(
-            "The stack must remain transparent until both its layout and the real preview are ready",
-            ".onSizeChanged { measured = it.width > 0 && it.height > 0 }" in focusedBody &&
-                "alpha = if (measured && previewReady) 1f else 0f" in focusedBody,
+            "The stack must remain transparent until its layout, its placement and the preview are ready",
+            "measured = it.width > 0 && it.height > 0" in focusedBody &&
+                "alpha = if (measured && previewReady && travel.placed) 1f else 0f" in focusedBody,
+        )
+        assertTrue(
+            "A re-shown popup reports no height on its first frame and must not be placed on it",
+            "if (stackHeightPx <= 0) return@LaunchedEffect" in focusedSource,
         )
     }
 

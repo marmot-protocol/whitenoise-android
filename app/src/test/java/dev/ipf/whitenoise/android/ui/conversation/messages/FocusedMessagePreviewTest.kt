@@ -10,9 +10,7 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
@@ -107,33 +105,14 @@ class FocusedMessagePreviewTest {
         assertEquals(source, layout.layoutInput.text.text)
     }
 
-    /** Focused stack centers on its source and clamps to the visible ime frame. */
+    /**
+     * Focused stack centers on its source and clamps to the visible ime frame.
+     *
+     * The frame is what the overlay may occupy, so an open keyboard shortens it and the stack
+     * settles against its bottom edge rather than sitting under the keyboard.
+     */
     @Test fun focusedStackCentersOnItsSourceAndClampsToTheVisibleImeFrame() {
-        val provider = FocusedMessageActionsPositionProvider(IntRect(20, 200, 220, 260), null)
-        val regular =
-            provider.calculatePosition(
-                IntRect.Zero,
-                IntSize(360, 780),
-                LayoutDirection.Ltr,
-                IntSize(360, 300),
-            )
-        val ime = provider.calculatePosition(IntRect.Zero, IntSize(360, 320), LayoutDirection.Rtl, IntSize(360, 300))
-        assertEquals(80, regular.y)
-        assertEquals(20, ime.y)
-        assertEquals(0, regular.x)
-        assertEquals(0, ime.x)
-    }
-
-    /** A re-shown popup reports a zero size on its first frame; the stack must not jump before it measures. */
-    @Test fun focusedStackKeepsItsMeasuredPlacementAcrossAnUnmeasuredFrame() {
-        val provider = FocusedMessageActionsPositionProvider(IntRect(20, 200, 220, 260), null)
-        val measured =
-            provider.calculatePosition(IntRect.Zero, IntSize(360, 780), LayoutDirection.Ltr, IntSize(328, 300))
-
-        val unmeasured = provider.calculatePosition(IntRect.Zero, IntSize(360, 780), LayoutDirection.Ltr, IntSize.Zero)
-
-        assertEquals(measured, unmeasured)
-        assertEquals(16, measured.x)
-        assertEquals(80, measured.y)
+        assertEquals(80f, focusedStackRestingOffset(frameHeightPx = 780, stackHeightPx = 300, anchorCenterPx = 230), 0f)
+        assertEquals(20f, focusedStackRestingOffset(frameHeightPx = 320, stackHeightPx = 300, anchorCenterPx = 230), 0f)
     }
 }
