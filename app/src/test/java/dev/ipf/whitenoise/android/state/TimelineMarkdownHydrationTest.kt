@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
@@ -107,6 +108,7 @@ class TimelineMarkdownHydrationTest {
             edit = null,
             reactions = TimelineReactionSummaryFfi(emptyList(), emptyList()),
             deleted = false,
+            deletionSource = DeletionSourceFfi.UNKNOWN,
             deletedByMessageIdHex = null,
             invalidationStatus = null,
             sourceEpoch = null,

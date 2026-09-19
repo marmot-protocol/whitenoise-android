@@ -4,6 +4,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotAndroid
@@ -109,6 +110,7 @@ class MarkdownAutolinkIntegrationTest {
         edit = null,
         reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
         deleted = false,
+        deletionSource = DeletionSourceFfi.UNKNOWN,
         deletedByMessageIdHex = null,
         invalidationStatus = null,
     )

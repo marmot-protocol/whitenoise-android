@@ -9,6 +9,7 @@ import dev.ipf.marmotkit.ChatListAttachmentKindFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
@@ -270,6 +271,7 @@ class ProjectedPreviewTextTest {
         kind = kind,
         timelineAt = 10uL,
         deleted = deleted,
+        deletionSource = DeletionSourceFfi.UNKNOWN,
         attachmentKind = attachmentKind,
         attachmentCount = attachmentCount,
         groupSystem = null,

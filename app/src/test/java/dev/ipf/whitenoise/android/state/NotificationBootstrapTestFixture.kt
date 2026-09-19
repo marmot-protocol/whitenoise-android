@@ -864,6 +864,8 @@ private fun presentedChatListSnapshot(rows: List<ChatListRowFfi>) =
         rows =
             rows.map { row ->
                 PresentedChatRowFfi(
+                    preview = emptyChatRowPreview(),
+                    actions = noChatRowActions(),
                     row = row,
                     avatarAsset = null,
                     presentation =

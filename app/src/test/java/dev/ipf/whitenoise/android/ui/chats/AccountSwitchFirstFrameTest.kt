@@ -37,7 +37,9 @@ import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.emptyChatRowPreview
 import dev.ipf.whitenoise.android.state.emptyGroupRecord
+import dev.ipf.whitenoise.android.state.noChatRowActions
 import dev.ipf.whitenoise.android.state.updateQuickAccountSwitching
 import dev.ipf.whitenoise.android.ui.account.otherAccountAvatarTag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -130,7 +132,16 @@ class AccountSwitchFirstFrameTest {
                 memberSnapshotLoader = { _, _ -> emptyList() },
                 initialLocalSnapshot =
                     snapshot(rawRow).copy(
-                        presentedRows = listOf(PresentedChatRowFfi(rawRow, presentation, avatarAsset = null)),
+                        presentedRows =
+                            listOf(
+                                PresentedChatRowFfi(
+                                    preview = emptyChatRowPreview(),
+                                    actions = noChatRowActions(),
+                                    row = rawRow,
+                                    presentation = presentation,
+                                    avatarAsset = null,
+                                ),
+                            ),
                     ),
             )
         appState.attachChatsController(controller)

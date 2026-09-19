@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.core
 
 import android.content.Context
+import dev.ipf.marmotkit.CursorPersistenceFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotAndroid
 import java.io.File
@@ -18,9 +19,18 @@ class MarmotClient(
             .apply { mkdirs() }
             .absolutePath
 
-    val marmot: Marmot = Marmot(rootPath, relayUrls)
+    val marmot: Marmot =
+        Marmot.newWithClientName(
+            rootPath = rootPath,
+            relayUrls = relayUrls,
+            clientName = CLIENT_NAME,
+            cursorPersistence = CursorPersistenceFfi.ADVANCE,
+            secretStore = null,
+        )
 
     companion object {
+        private const val CLIENT_NAME = "White Noise Android"
+
         val bootstrapRelays =
             listOf(
                 "wss://relay.us.whitenoise.chat",

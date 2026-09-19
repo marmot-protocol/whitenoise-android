@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
+import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MessageTagFfi
@@ -162,6 +163,7 @@ class ConversationRetentionPolicyTransitionTest {
             edit = null,
             reactions = reactions,
             deleted = false,
+            deletionSource = DeletionSourceFfi.UNKNOWN,
             deletedByMessageIdHex = null,
             invalidationStatus = null,
             sourceEpoch = null,

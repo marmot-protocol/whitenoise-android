@@ -39,6 +39,7 @@ import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
@@ -486,6 +487,7 @@ class ConversationImeCollapseFocusTest {
             kind = 9uL,
             timelineAt = 10uL,
             deleted = false,
+            deletionSource = DeletionSourceFfi.UNKNOWN,
             attachmentKind = null,
             attachmentCount = 0u,
             groupSystem = null,

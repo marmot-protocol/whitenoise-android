@@ -10,6 +10,7 @@ import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
@@ -111,6 +112,7 @@ class LauncherBadgeUnreadReconciliationTest {
                 kind = 9uL,
                 timelineAt = 100uL,
                 deleted = false,
+                deletionSource = DeletionSourceFfi.UNKNOWN,
                 attachmentKind = null,
                 attachmentCount = 0u,
                 groupSystem = null,
