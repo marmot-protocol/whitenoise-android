@@ -1752,6 +1752,39 @@ class ConversationDictationControllerTest {
         assertEquals(0, fixture.platform.sessions[3].acknowledgedCallerAudio)
     }
 
+    /** Recording-time no-speech recovery coalesces later PCM before retrying the rejected chunk. */
+    @Test
+    fun recordingNoSpeechCoalescesFollowingCallerAudioBeforeRetry() {
+        val fixture = fixture(draft = TextFieldValue(""))
+        fixture.platform.pendingCallerAudio = true
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        fixture.platform.session.providerError(ConversationDictationFailure.NoSpeech)
+
+        assertEquals(1, fixture.platform.session.retriedCallerAudioWithFollowingAudio)
+        assertEquals(1, fixture.platform.session.retriedCallerAudio)
+    }
+
+    /** Recording retries cannot spend the independent retry budget reserved for explicit completion. */
+    @Test
+    fun recordingRetriesDoNotConsumeExplicitCompletionRetryBudget() {
+        val fixture = fixture(draft = TextFieldValue(""))
+        fixture.platform.pendingCallerAudio = true
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        fixture.platform.session.providerError(ConversationDictationFailure.NoSpeech)
+        fixture.scheduler.runLatest()
+        fixture.controller.paste()
+
+        repeat(2) {
+            fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+            assertTrue(fixture.controller.state is ConversationDictationState.Starting)
+        }
+        fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+
+        assertTrue(fixture.controller.state is ConversationDictationState.Failed)
+    }
+
     /** Capture-confirmed silence advances immediately instead of spending the speech retry budget. */
     @Test
     fun noSpeechAdvancesConfirmedSilentCallerAudioWithoutRetryingIt() {
@@ -3970,6 +4003,7 @@ class ConversationDictationControllerTest {
         var destroyCalls = 0
         var acknowledgedCallerAudio = 0
         var retriedCallerAudio = 0
+        var retriedCallerAudioWithFollowingAudio = 0
         var callerAudioHasSpeech = true
         var callerAudioRetryAvailable = callerAudioOwned
         private val captureFinished = mutableListOf<() -> Unit>()
@@ -4062,6 +4096,12 @@ class ConversationDictationControllerTest {
             if (!callerAudioOwned || !callerAudioRetryAvailable) return false
             retriedCallerAudio += 1
             return true
+        }
+
+        /** Tracks coalescing separately from an exact-chunk retry. */
+        override fun retryCallerAudioWithFollowingAudio(): Boolean {
+            retriedCallerAudioWithFollowingAudio += 1
+            return retryCallerAudio()
         }
     }
 

@@ -1660,8 +1660,7 @@ internal class ConversationDictationController internal constructor(
                     val advancedPastRejectedCallerAudio =
                         repeatedSpeechRejection &&
                             rejectedCallerAudioChunkId == callerAudioChunkId &&
-                            maxOf(rejectedCallerAudioRetries, retainedCallerAudioRetries) >=
-                            MAX_RETAINED_CALLER_AUDIO_RETRIES &&
+                            rejectedCallerAudioRetries >= MAX_RETAINED_CALLER_AUDIO_RETRIES &&
                             recognitionSession?.acknowledgeCallerAudio() == true
                     val advancedPastConfirmedSilence =
                         error == ConversationDictationFailure.NoSpeech &&
@@ -1670,7 +1669,11 @@ internal class ConversationDictationController internal constructor(
                     val retainedCallerAudio =
                         !advancedPastRejectedCallerAudio &&
                             !advancedPastConfirmedSilence &&
-                            recognitionSession?.retryCallerAudio() == true
+                            if (error == ConversationDictationFailure.NoSpeech) {
+                                recognitionSession?.retryCallerAudioWithFollowingAudio() == true
+                            } else {
+                                recognitionSession?.retryCallerAudio() == true
+                            }
                     val retainedRejectedCallerAudio = repeatedSpeechRejection && retainedCallerAudio
                     val rejectedCallerAudioChangedOrResolved =
                         callerAudioChunkId == null ||
@@ -1682,7 +1685,6 @@ internal class ConversationDictationController internal constructor(
                             rejectedCallerAudioRetries = 0
                         }
                         rejectedCallerAudioRetries += 1
-                        retainedCallerAudioRetries += 1
                     } else if (!advancedPastRejectedCallerAudio && rejectedCallerAudioChangedOrResolved) {
                         clearRejectedCallerAudioRetries()
                     }
@@ -1754,7 +1756,6 @@ internal class ConversationDictationController internal constructor(
             "event=caller_audio_retry_exhausted failure=${ConversationDictationFailure.NoSpeech.name} " +
                 "attempts=$attempts action=advance",
         )
-        retainedCallerAudioRetries = 0
         clearRejectedCallerAudioRetries()
         when {
             runCatching(platform::callerAudioHasPending).getOrDefault(false) ->
