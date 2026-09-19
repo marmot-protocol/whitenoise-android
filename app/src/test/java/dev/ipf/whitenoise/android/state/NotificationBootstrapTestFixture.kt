@@ -654,9 +654,12 @@ internal class NotificationBootstrapTestFixture(
      * clock. Disabling clock advancement is rendering-only control, not
      * wall-clock or device-latency evidence.
      */
-    suspend fun awaitNotificationPosted(advanceMainClock: Boolean = true) {
+    suspend fun awaitNotificationPosted(
+        advanceMainClock: Boolean = true,
+        timeoutMillis: Long = 5_000L,
+    ) {
         val manager = appContext.getSystemService(NotificationManager::class.java)
-        withTimeout(5_000L) {
+        withTimeout(timeoutMillis) {
             while (manager.activeNotifications.none { it.tag == "account-a|group-a" }) {
                 val mainLooper = shadowOf(Looper.getMainLooper())
                 if (advanceMainClock) {

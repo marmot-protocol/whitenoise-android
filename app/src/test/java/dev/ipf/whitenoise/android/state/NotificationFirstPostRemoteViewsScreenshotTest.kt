@@ -173,7 +173,13 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
         fixture.releaseNotificationDispatch()
         // Use a controlled Android clock for deterministic rendering;
         // this fixture does not measure wall-clock or device latency.
-        fixture.awaitNotificationPosted(advanceMainClock = false)
+        // Hosted screenshot runners can spend more than the fixture's normal
+        // five-second bound loading Robolectric/RemoteViews classes. Keep the
+        // wait finite so a missing notification remains a hard failure.
+        fixture.awaitNotificationPosted(
+            advanceMainClock = false,
+            timeoutMillis = 15_000L,
+        )
         withTimeout(5_000L) {
             while (writes.get() < 1) delay(1L)
         }
