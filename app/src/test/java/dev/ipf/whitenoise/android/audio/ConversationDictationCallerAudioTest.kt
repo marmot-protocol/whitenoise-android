@@ -50,6 +50,42 @@ class ConversationDictationCallerAudioTest {
         capture.discard {}
     }
 
+    /** Finishing keeps the recorder read already in progress and seals it before reporting closure. */
+    @Test
+    fun finishIncludesTheReadInProgressAtTheActionBoundary() {
+        val device = FinishingReadCaptureDevice()
+        val writes = CopyOnWriteArrayList<Int>()
+        val buffer = ConversationDictationAudioChunkBuffer(sessionId = 7L, chunkBytes = 8, maxBufferedBytes = 16)
+        val capture =
+            callerAudio(
+                device = device,
+                buffer = buffer,
+                writer = ConversationDictationAudioPipeWriter { _, _, _, length -> length.also(writes::add) },
+            )
+        val stream = checkNotNull(capture.openProviderStream())
+        val captureClosed = CountDownLatch(1)
+        val feedClosed = CountDownLatch(1)
+        stream.onFeedClosed(feedClosed::countDown)
+        try {
+            assertTrue(stream.start())
+            assertTrue(device.readStarted.await(2, TimeUnit.SECONDS))
+
+            stream.finishCapture(captureClosed::countDown)
+            device.completeRead.countDown()
+
+            assertTrue(captureClosed.await(2, TimeUnit.SECONDS))
+            assertTrue(feedClosed.await(2, TimeUnit.SECONDS))
+            assertEquals(listOf(4), writes)
+            assertEquals(true, stream.containsSpeech())
+            assertTrue(buffer.hasPending)
+        } finally {
+            device.completeRead.countDown()
+            stream.cancel()
+            stream.closeProviderEnd()
+            capture.discard {}
+        }
+    }
+
     /** An attached provider must receive the typed overflow error when continuous capture exhausts its bound. */
     @Test
     fun bufferOverflowReportsTypedFailureInsteadOfLeavingCaptureApparentlyActive() {
@@ -306,6 +342,32 @@ class ConversationDictationCallerAudioTest {
 
         fun advance(millis: Long) {
             this.millis.addAndGet(millis)
+        }
+    }
+
+    /** Holds one read across the user's terminal action, then returns its final PCM samples. */
+    private class FinishingReadCaptureDevice : ConversationDictationAudioCaptureDevice {
+        val readStarted = CountDownLatch(1)
+        val completeRead = CountDownLatch(1)
+
+        override val initialized: Boolean = true
+
+        override val recording: Boolean = true
+
+        override fun start() = Unit
+
+        override fun read(target: ShortArray): Int {
+            readStarted.countDown()
+            check(completeRead.await(2, TimeUnit.SECONDS))
+            target[0] = 1_000
+            target[1] = 1_000
+            return 2
+        }
+
+        override fun stop() = Unit
+
+        override fun release() {
+            completeRead.countDown()
         }
     }
 

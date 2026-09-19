@@ -3228,6 +3228,8 @@ private class AndroidConversationDictationRecognitionSession(
     private var callerAudioCapturing = false
     private val captureFinished = AtomicReference<(() -> Unit)?>(null)
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val callerAudioCompletionBarrier =
+        ConversationDictationCallerAudioCompletionBarrier(::dispatchOnMain)
 
     init {
         recognizer.setRecognitionListener(
@@ -3341,6 +3343,7 @@ private class AndroidConversationDictationRecognitionSession(
         captureFinished.set(onAudioCaptureFinished)
         // Caller-audio requests finish on descriptor EOF; stopListening would race the final chunk.
         if (callerAudioCapturing) {
+            callerAudioCompletionBarrier.requireCaptureClosure()
             callerAudio?.finishCapture(::reportCaptureFinished)
         } else {
             recognizer.stopListening()
@@ -3354,12 +3357,20 @@ private class AndroidConversationDictationRecognitionSession(
     private fun deliverAfterCallerAudioCloses(delivery: () -> Unit) {
         if (!callerAudioCapturing) {
             reportCaptureFinished()
-            delivery()
+            callerAudioCompletionBarrier.deliverImmediately(delivery)
             return
         }
-        callerAudio?.onFeedClosed {
-            if (Looper.myLooper() == Looper.getMainLooper()) delivery() else mainHandler.post(delivery)
-        } ?: delivery()
+        val source = callerAudio
+        if (source == null) {
+            callerAudioCompletionBarrier.deliverImmediately(delivery)
+            return
+        }
+        callerAudioCompletionBarrier.deliver(source::onFeedClosed, source::onCaptureClosed, delivery)
+    }
+
+    /** Serializes terminal callback decisions with UI actions on Android's main thread. */
+    private fun dispatchOnMain(action: () -> Unit) {
+        if (Looper.myLooper() == Looper.getMainLooper()) action() else mainHandler.post(action)
     }
 
     /** Delivers the retained capture acknowledgement once on the main thread. */

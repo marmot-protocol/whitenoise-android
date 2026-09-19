@@ -169,7 +169,7 @@ internal class ConversationDictationCallerAudio internal constructor(
 
     /** Stops microphone capture and seals the final short chunk, while queued audio keeps draining. */
     fun finish(onClosed: () -> Unit) {
-        registerCaptureClosedCallback(onClosed)
+        onCaptureClosed(onClosed)
         if (finishing.compareAndSet(false, true)) {
             conversationDictationDiagnostic("event=caller_audio_finish reason=stop")
             if (!recording.compareAndSet(true, false)) {
@@ -182,7 +182,7 @@ internal class ConversationDictationCallerAudio internal constructor(
     /** Destroys volatile PCM after cancellation or logical-session completion. */
     @Synchronized
     fun discard(onClosed: () -> Unit = {}) {
-        registerCaptureClosedCallback(onClosed)
+        onCaptureClosed(onClosed)
         discarded.set(true)
         pendingFailure = null
         buffer.discard()
@@ -276,7 +276,7 @@ internal class ConversationDictationCallerAudio internal constructor(
     }
 
     /** Runs a closure observer once, including registration racing with recorder release. */
-    private fun registerCaptureClosedCallback(callback: () -> Unit) {
+    internal fun onCaptureClosed(callback: () -> Unit) {
         if (captureClosed.get()) {
             callback()
             return
@@ -387,6 +387,9 @@ internal class ConversationDictationCallerAudioStream(
 
     /** Seals the logical capture while this generation continues feeding its owned chunk. */
     fun finishCapture(onClosed: () -> Unit) = capture.finish(onClosed)
+
+    /** Observes closure of the shared microphone capture, including its final partial chunk. */
+    fun onCaptureClosed(callback: () -> Unit) = capture.onCaptureClosed(callback)
 
     /** Registers an exactly-once observer, including when the feeder has already closed. */
     fun onFeedClosed(callback: () -> Unit) {
