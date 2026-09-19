@@ -8090,6 +8090,30 @@
           "SEC-012",
           "SEC-013"
         ]
+      },
+      {
+        "surface": "rememberFocusedStackTravel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "fun rememberFocusedStackTravel(",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
+        "surface": "Modifier.focusedStackDrag",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "fun Modifier.focusedStackDrag(",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
+        "surface": "Modifier.transcriptEdgeFade",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TranscriptEdgeFade.kt",
+        "anchor": "fun Modifier.transcriptEdgeFade(",
+        "test_ids": [
+          "CON-002"
+        ]
       }
     ],
     "settings_controls": [
@@ -25333,6 +25357,14 @@
         "test_ids": [
           "ONB-017",
           "ONB-020"
+        ]
+      },
+      {
+        "surface": "The lifted message drags and flings through the safe overlay frame and settles inside it",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "internal fun focusedStackTravelRange(",
+        "test_ids": [
+          "MSG-004"
         ]
       }
     ],
