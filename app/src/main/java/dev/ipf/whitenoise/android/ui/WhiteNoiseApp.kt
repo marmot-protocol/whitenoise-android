@@ -105,8 +105,6 @@ internal fun shouldShowConversationDictationPersistentControl(
             is ConversationDictationState.ProviderActivityRequired,
             is ConversationDictationState.ProviderActivityActive,
             is ConversationDictationState.Failed,
-            is ConversationDictationState.ReviewRequired,
-            is ConversationDictationState.DeliveryUnknown,
             -> true
             ConversationDictationState.Idle,
             is ConversationDictationState.ProviderSelectionRequired,

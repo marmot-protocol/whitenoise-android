@@ -1683,11 +1683,6 @@
     <string name="dictation_audio_buffer_full">La dictée s’est arrêtée car le service vocal ne parvenait pas à suivre</string>
     <string name="dictation_timed_out">Le délai de reconnaissance vocale a expiré</string>
     <string name="dictation_failed">Impossible de transcrire la parole</string>
-    <string name="dictation_review_required">Brouillon modifié — vérifiez le texte dicté</string>
-    <string name="dictation_review_action">Vérifier le texte dicté</string>
-    <string name="dictation_review_title">Vérifier le texte dicté</string>
-    <string name="dictation_insert_at_end">Insérer à la fin</string>
-    <string name="dictation_discard_transcript">Supprimer le texte dicté</string>
     <string name="discard">Supprimer</string>
     <string name="open_app_settings">Ouvrir les paramètres de l’application</string>
     <string name="dictation_disclosure_title">Reconnaissance vocale externe</string>

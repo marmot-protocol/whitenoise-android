@@ -256,8 +256,8 @@ class ConversationDictationCoordinatorTest {
         targetAvailable = false
         lateListener.onResult("must not write")
 
-        val review = disappeared.controller.state as ConversationDictationState.ReviewRequired
-        assertEquals("must not write", review.transcript)
+        val review = disappeared.controller.state as ConversationDictationState.Failed
+        assertEquals("must not write", review.retainedTranscript)
         assertEquals("Keep", disappeared.draft.text)
         assertEquals(0, disappeared.writes)
         assertEquals(1, disappeared.releases)

@@ -1681,11 +1681,6 @@
     <string name="dictation_audio_buffer_full">Konuşma hizmeti yetişemediği için dikte durduruldu</string>
     <string name="dictation_timed_out">Konuşma tanıma zaman aşımına uğradı</string>
     <string name="dictation_failed">Konuşma metne dönüştürülemedi</string>
-    <string name="dictation_review_required">Taslak değişti — dikte edilen metni gözden geçir</string>
-    <string name="dictation_review_action">Dikte edilen metni gözden geçir</string>
-    <string name="dictation_review_title">Dikte edilen metni gözden geçir</string>
-    <string name="dictation_insert_at_end">Sona ekle</string>
-    <string name="dictation_discard_transcript">Dikte edilen metni sil</string>
     <string name="discard">Sil</string>
     <string name="open_app_settings">Uygulama ayarlarını aç</string>
     <string name="dictation_disclosure_title">Harici konuşma tanıma</string>

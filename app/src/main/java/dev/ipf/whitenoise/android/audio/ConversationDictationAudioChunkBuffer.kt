@@ -112,6 +112,47 @@ internal class ConversationDictationAudioChunkBuffer(
         return true
     }
 
+    /**
+     * Requeues one rejected chunk after extending it with contiguous audio captured after it.
+     *
+     * Some providers classify a short speech-bearing chunk as no-speech. Retrying the identical
+     * bytes can then block every later chunk. Coalescing preserves sample order and byte accounting
+     * while giving the provider more context, up to the normal maximum chunk size.
+     */
+    @Synchronized
+    fun retryWithFollowingAudio(chunkId: Long): Boolean {
+        val original = inFlight.remove(chunkId) ?: return false
+        if (currentSize > 0 && !finished) sealCurrent()
+        var merged = original
+        while (merged.pcm.size < chunkBytes && queued.isNotEmpty()) {
+            val following = queued.removeFirst()
+            if (following.firstSample != merged.lastSampleExclusive) {
+                queued.addFirst(following)
+                break
+            }
+            val consumedBytes = minOf(chunkBytes - merged.pcm.size, following.pcm.size)
+            val combined = ByteArray(merged.pcm.size + consumedBytes)
+            merged.pcm.copyInto(combined)
+            following.pcm.copyInto(combined, destinationOffset = merged.pcm.size, endIndex = consumedBytes)
+            merged =
+                merged.copy(
+                    lastSampleExclusive = merged.lastSampleExclusive + consumedBytes / 2L,
+                    hasSpeech = merged.hasSpeech || following.hasSpeech,
+                    pcm = combined,
+                )
+            if (consumedBytes < following.pcm.size) {
+                queued.addFirst(
+                    following.copy(
+                        firstSample = following.firstSample + consumedBytes / 2L,
+                        pcm = following.pcm.copyOfRange(consumedBytes, following.pcm.size),
+                    ),
+                )
+            }
+        }
+        queued.addFirst(merged)
+        return true
+    }
+
     /** Clears volatile audio after cancellation or an unrecoverable provider failure. */
     @Synchronized
     fun discard() {

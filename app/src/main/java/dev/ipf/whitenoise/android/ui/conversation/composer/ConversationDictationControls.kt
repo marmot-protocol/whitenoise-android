@@ -2,6 +2,8 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -22,20 +24,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentPaste
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -60,7 +60,6 @@ import kotlin.math.PI
 import kotlin.math.sin
 
 internal const val COMPOSER_DICTATION_STRIP_TAG = "composer-dictation-strip"
-internal const val COMPOSER_DICTATION_REVIEW_DIALOG_TAG = "composer-dictation-review-dialog"
 internal const val COMPOSER_DICTATION_COMPACT_ACTIONS_TAG = "composer-dictation-compact-actions"
 internal const val APP_DICTATION_CONTROL_TAG = "app-dictation-control"
 internal const val DICTATION_LISTENING_INDICATOR_TAG = "dictation-listening-indicator"
@@ -133,7 +132,7 @@ internal fun ConversationDictationCompactActions(
         } else {
             dictationStatusLabel(state, controller.captureInProgress)
         }
-    var reviewDialogOpen by remember(state.sessionId) { mutableStateOf(false) }
+
     Box(
         modifier =
             modifier
@@ -156,13 +155,45 @@ internal fun ConversationDictationCompactActions(
                     state = state,
                     controller = controller,
                     status = status,
-                    onReview = { reviewDialogOpen = true },
                 )
                 ConversationDictationDismissAction(state, controller)
             }
         }
     }
-    ConversationDictationSessionDialogs(state, controller, reviewDialogOpen) { reviewDialogOpen = false }
+    if (state is ConversationDictationState.Failed && state.reason == ConversationDictationFailure.MicrophoneMuted) {
+        val context = LocalContext.current
+        ConversationDictationMicrophoneDialog(
+            onDismiss = controller::dismissFailure,
+            onOpenSettings = {
+                controller.dismissFailure()
+                runCatching {
+                    context.startActivity(
+                        Intent(Settings.ACTION_PRIVACY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
+            },
+        )
+    }
+}
+
+/** Explains system microphone blocking before any silent recognition session starts. */
+@Composable
+internal fun ConversationDictationMicrophoneDialog(
+    onDismiss: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag("dictation-microphone-dialog"),
+        title = { Text(stringResource(R.string.dictation_microphone_muted)) },
+        text = { Text(stringResource(R.string.dictation_microphone_muted_help)) },
+        confirmButton = {
+            TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.open_settings)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        },
+    )
 }
 
 private val ConversationDictationState.hasActiveRecognitionActions: Boolean
@@ -286,24 +317,17 @@ private fun ConversationDictationListeningIndicator() {
     }
 }
 
-/** Shows recovery, review, or progress in the first compact action slot. */
+/** Shows recovery or progress in the first compact action slot. */
 @Composable
 private fun ConversationDictationPrimaryAction(
     state: ConversationDictationState,
     controller: ConversationDictationController,
     status: String,
-    onReview: () -> Unit,
 ) {
     when (state) {
-        is ConversationDictationState.Failed -> ConversationDictationFailureAction(state, controller)
-        is ConversationDictationState.ReviewRequired,
-        is ConversationDictationState.DeliveryUnknown,
-        ->
-            IconButton(onClick = onReview, modifier = Modifier.size(48.dp)) {
-                Icon(
-                    Icons.Default.Edit,
-                    contentDescription = stringResource(R.string.dictation_review_action),
-                )
+        is ConversationDictationState.Failed ->
+            if (state.reason != ConversationDictationFailure.DeliveryUnknown) {
+                ConversationDictationFailureAction(state, controller)
             }
         else ->
             CircularProgressIndicator(
@@ -363,15 +387,11 @@ private fun ConversationDictationDismissAction(
     val onClick =
         when (state) {
             is ConversationDictationState.Failed -> controller::dismissFailure
-            is ConversationDictationState.ReviewRequired -> controller::dismissReview
-            is ConversationDictationState.DeliveryUnknown -> controller::dismissDeliveryUnknown
             else -> controller::cancel
         }
     val label =
         when (state) {
             is ConversationDictationState.Failed -> R.string.dismiss
-            is ConversationDictationState.ReviewRequired -> R.string.dictation_discard_transcript
-            is ConversationDictationState.DeliveryUnknown -> R.string.dictation_discard_transcript
             else -> R.string.dictation_cancel
         }
     IconButton(onClick = onClick, modifier = Modifier.size(48.dp)) {
@@ -403,13 +423,12 @@ private fun dictationStatusLabel(
                 if (captureInProgress) R.string.dictation_listening else R.string.dictation_processing,
             )
         is ConversationDictationState.Failed -> dictationFailureLabel(state.reason)
-        is ConversationDictationState.ReviewRequired -> stringResource(R.string.dictation_review_required)
-        is ConversationDictationState.DeliveryUnknown -> stringResource(R.string.delivery_not_confirmed)
         is ConversationDictationState.Idle -> ""
     }
 
 /** Maps terminal recognition failures to actionable, localized status text. */
 @Composable
+@Suppress("CyclomaticComplexMethod") // Exhaustive enum-to-resource mapping is intentionally flat.
 private fun dictationFailureLabel(reason: ConversationDictationFailure): String =
     stringResource(
         when (reason) {
@@ -425,6 +444,7 @@ private fun dictationFailureLabel(reason: ConversationDictationFailure): String 
             ConversationDictationFailure.RecognizerBusy -> R.string.dictation_recognizer_busy
             ConversationDictationFailure.AudioBufferFull -> R.string.dictation_audio_buffer_full
             ConversationDictationFailure.TimedOut -> R.string.dictation_timed_out
+            ConversationDictationFailure.DeliveryUnknown -> R.string.delivery_not_confirmed
             ConversationDictationFailure.Unknown -> R.string.dictation_failed
         },
     )

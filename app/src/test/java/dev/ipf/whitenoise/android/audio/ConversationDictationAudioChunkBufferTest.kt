@@ -63,6 +63,33 @@ class ConversationDictationAudioChunkBufferTest {
         assertFalse(buffer.acknowledge(retried.chunkId))
     }
 
+    /** A rejected short chunk absorbs later PCM without gaps, duplication, or accounting changes. */
+    @Test
+    fun noSpeechRetryCoalescesFollowingAudioInExactSampleOrder() {
+        val buffer = ConversationDictationAudioChunkBuffer(sessionId = 13L, chunkBytes = 12, maxBufferedBytes = 24)
+        assertTrue(buffer.append(byteArrayOf(1, 2, 3, 4), 4, hasSpeech = true))
+        assertTrue(buffer.sealCurrentIfAtLeast(4))
+        val rejected = checkNotNull(buffer.poll())
+        assertTrue(buffer.append(byteArrayOf(5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16), 12, hasSpeech = true))
+
+        assertTrue(buffer.retryWithFollowingAudio(rejected.chunkId))
+        assertEquals(16, buffer.bufferedBytes)
+        val coalesced = checkNotNull(buffer.poll())
+        assertEquals(rejected.chunkId, coalesced.chunkId)
+        assertArrayEquals(byteArrayOf(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12), coalesced.pcm)
+        assertEquals(0L, coalesced.firstSample)
+        assertEquals(6L, coalesced.lastSampleExclusive)
+        assertTrue(buffer.acknowledge(coalesced.chunkId))
+
+        val remainder = checkNotNull(buffer.poll())
+        assertArrayEquals(byteArrayOf(13, 14, 15, 16), remainder.pcm)
+        assertEquals(coalesced.lastSampleExclusive, remainder.firstSample)
+        assertEquals(8L, remainder.lastSampleExclusive)
+        assertTrue(buffer.acknowledge(remainder.chunkId))
+        assertEquals(0, buffer.bufferedBytes)
+        assertFalse(buffer.hasPending)
+    }
+
     /** Speech evidence follows the exact sealed chunk across silent and voiced appends. */
     @Test
     fun sealedChunksPreserveCaptureSideSpeechEvidence() {

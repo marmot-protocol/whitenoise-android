@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
 import androidx.compose.ui.text.input.TextFieldValue
+import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
 import dev.ipf.whitenoise.android.audio.ConversationDictationMode
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.audio.ConversationDictationTarget
@@ -40,7 +41,7 @@ class WhiteNoiseAppDictationTest {
         )
         assertTrue(
             shouldShowConversationDictationPersistentControl(
-                state = ConversationDictationState.ReviewRequired(1L, target, "hello"),
+                state = ConversationDictationState.Failed(1L, target, ConversationDictationFailure.Unknown, "hello"),
                 originVisible = false,
                 appLockScreenVisible = false,
             ),

@@ -1683,11 +1683,6 @@
     <string name="dictation_audio_buffer_full">El dictado se detuvo porque el servicio de voz no pudo seguir el ritmo</string>
     <string name="dictation_timed_out">El reconocimiento de voz agotó el tiempo de espera</string>
     <string name="dictation_failed">No se pudo transcribir la voz</string>
-    <string name="dictation_review_required">El borrador cambió — revisa el texto dictado</string>
-    <string name="dictation_review_action">Revisar texto dictado</string>
-    <string name="dictation_review_title">Revisar texto dictado</string>
-    <string name="dictation_insert_at_end">Insertar al final</string>
-    <string name="dictation_discard_transcript">Descartar texto dictado</string>
     <string name="discard">Descartar</string>
     <string name="open_app_settings">Abrir ajustes de la aplicación</string>
     <string name="dictation_disclosure_title">Reconocimiento de voz externo</string>

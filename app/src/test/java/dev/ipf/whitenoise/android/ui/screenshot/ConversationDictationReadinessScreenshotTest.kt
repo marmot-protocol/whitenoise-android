@@ -7,10 +7,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -23,7 +20,6 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
-import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_DICTATION_REVIEW_DIALOG_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationNotificationNoticeContent
 import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationPersistentControl
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -86,7 +82,7 @@ class ConversationDictationReadinessScreenshotTest {
     }
 
     @Test
-    fun uncertainDeliveryOffersCopyAndDiscardOnly() {
+    fun uncertainDeliveryShowsStatusWithoutPenOrRetry() {
         val fixture = fixture(appOwned = true)
         val initial = fixture.controller.state as ConversationDictationState.Starting
         capture(
@@ -95,8 +91,12 @@ class ConversationDictationReadinessScreenshotTest {
             fontScale = 1f,
             rtl = false,
             state =
-                ConversationDictationState.DeliveryUnknown(initial.sessionId, initial.target, "Dictated test phrase"),
-            openReview = true,
+                ConversationDictationState.Failed(
+                    initial.sessionId,
+                    initial.target,
+                    ConversationDictationFailure.DeliveryUnknown,
+                    "Dictated test phrase",
+                ),
         )
     }
 
@@ -216,7 +216,6 @@ class ConversationDictationReadinessScreenshotTest {
         rtl: Boolean = true,
         darkTheme: Boolean = false,
         state: ConversationDictationState = fixture.controller.state,
-        openReview: Boolean = false,
     ) {
         composeRule.setContent {
             val density = LocalDensity.current
@@ -235,14 +234,7 @@ class ConversationDictationReadinessScreenshotTest {
             }
         }
 
-        if (openReview) {
-            composeRule.onNodeWithContentDescription("Review dictated text").performClick()
-            composeRule
-                .onNodeWithTag(COMPOSER_DICTATION_REVIEW_DIALOG_TAG)
-                .captureRoboImage("src/test/snapshots/$snapshotName")
-        } else {
-            composeRule.onRoot().captureRoboImage("src/test/snapshots/$snapshotName")
-        }
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/$snapshotName")
     }
 
     private data class Fixture(
