@@ -1,9 +1,10 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import android.os.Looper
+import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.isToggleable
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import dev.ipf.marmotkit.UsageDiagnosticsDecisionFfi
@@ -26,7 +27,7 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-rUS-w360dp-h780dp-mdpi")
 class UsageDiagnosticsPromptDismissTest {
-    @get:Rule val composeRule = createComposeRule()
+    @get:Rule val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     /** Closing reports done once, and the writes it starts afterwards do not report it again. */
     @Test

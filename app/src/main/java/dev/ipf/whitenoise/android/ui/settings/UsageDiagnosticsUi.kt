@@ -112,7 +112,6 @@ internal fun UsageDiagnosticsPrompt(
     val state = appState.diagnostics
     var loggingBusy by remember { mutableStateOf(false) }
     var closing by remember { mutableStateOf(false) }
-    var dismissalRefused by remember { mutableStateOf(false) }
     val settled = !state.busy && !state.failed && state.snapshot != null && !loggingBusy
     // `rememberModalBottomSheetState` keys its saved state on `confirmValueChange`, so a lambda that
     // captures `settled` gets a new identity the moment a choice starts writing — and the sheet state
@@ -148,7 +147,7 @@ internal fun UsageDiagnosticsPrompt(
         Unit
     }
     ModalBottomSheet(
-        onDismissRequest = { if (settled) finish() else dismissalRefused = true },
+        onDismissRequest = { if (settled) finish() },
         containerColor = amoledSheetContainerColor(),
         sheetState = sheetState,
     ) {
@@ -158,13 +157,6 @@ internal fun UsageDiagnosticsPrompt(
                 onClose = finish,
                 closeEnabled = settled,
             )
-            // A refused swipe used to spring back with no explanation. The sheet already knows why it
-            // is not ready; it says so where the gesture happened rather than leaving it a mystery.
-            if (dismissalRefused && !settled) {
-                Column(Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)) {
-                    UsageDiagnosticsFeedback(appState)
-                }
-            }
             UsageDiagnosticsPromptBody(appState, loggingBusy) { loggingBusy = it }
         }
     }
