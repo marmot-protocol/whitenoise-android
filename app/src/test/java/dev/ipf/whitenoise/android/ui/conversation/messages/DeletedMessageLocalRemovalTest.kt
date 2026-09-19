@@ -9,18 +9,21 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.test.core.app.ApplicationProvider
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
@@ -57,6 +60,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import java.util.concurrent.atomic.AtomicInteger
 
 @RunWith(RobolectricTestRunner::class)
@@ -302,6 +306,15 @@ class DeletedMessageLocalRemovalTest {
         composeRule.onNodeWithText(string(R.string.message_deleted_by_other), substring = false).assertDoesNotExist()
     }
 
+    /** Captures the authoritative admin-deletion copy in the production message bubble. */
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun adminRemovalBubbleLightScreenshot() {
+        render(failCommits = false, deletionSource = DeletionSourceFfi.ADMIN)
+
+        composeRule.onNodeWithTag(SCREENSHOT_TAG).captureRoboImage(SCREENSHOT_PATH)
+    }
+
     /** A tombstone the engine cannot attribute keeps the passive voice it has always had. */
     @Test
     fun unattributedRemovalKeepsThePassiveVoice() {
@@ -335,7 +348,7 @@ class DeletedMessageLocalRemovalTest {
         composeRule.setContent {
             var actionMenuOpen by remember { mutableStateOf(false) }
             WhiteNoiseTheme {
-                Box(Modifier.fillMaxWidth()) {
+                Box(Modifier.fillMaxWidth().testTag(SCREENSHOT_TAG)) {
                     controller.timeline.forEach { current ->
                         TimelineRowMessageBubble(
                             messageIdHex = current.record.messageIdHex,
@@ -703,5 +716,7 @@ class DeletedMessageLocalRemovalTest {
         val MESSAGE_ID = "05" + "00".repeat(31)
         const val LIVE_BODY = "secret body retained in protocol storage"
         const val ASYNC_TIMEOUT_MILLIS = 20_000L
+        const val SCREENSHOT_TAG = "message-bubble.admin-removal"
+        const val SCREENSHOT_PATH = "src/test/snapshots/message_bubble_admin_removal_light.png"
     }
 }

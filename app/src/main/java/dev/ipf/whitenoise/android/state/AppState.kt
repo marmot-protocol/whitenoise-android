@@ -4177,10 +4177,8 @@ class WhiteNoiseAppState private constructor(
     private fun configuredAccount(): AccountSummaryFfi? = accounts.firstOrNull { it.label == activeAccountRef }
 
     /**
-     * The process-owned listener attempt starts with Marmot itself; only its
-     * bounded readiness wait is deferred until a safe local shell (or
-     * onboarding) can render. Notification-sensitive runtime reads remain
-     * behind that barrier, while signer restoration happens before Ready.
+     * Starts the process-owned listener with Marmot while deferring only its bounded readiness wait until a safe
+     * local shell can render. Notification-sensitive reads remain behind that barrier and signer restoration.
      */
     private suspend fun completeReceiverGatedStartup() {
         val receiverReady = awaitNotificationReceiverForStartupWithin(notificationReceiverTimeoutMillis())
@@ -4400,10 +4398,11 @@ class WhiteNoiseAppState private constructor(
     /** Discards only an unsubmitted form or stale route; native accepted work remains intact. */
     internal fun dismissProfileSignUp(): Boolean = profileSignUp.dismiss()
 
+    /** Creates an account with app-owned attachment acquisition before activating it. */
     suspend fun createIdentity() {
         val startedAt = SystemClock.elapsedRealtime()
         try {
-            val summary = marmotIo { createIdentity(MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays) }
+            val summary = marmotIo { createIdentityWithAppOwnedAttachmentAcquisition() }
             activateCreatedIdentity(summary)
             phase = AppPhase.Ready
             presentTransient(R.string.toast_identity_created)
@@ -4640,7 +4639,7 @@ class WhiteNoiseAppState private constructor(
     /** Publishes the newest engine account snapshot and rejects older list reads. */
     private suspend fun refreshAccountSnapshot(): List<AccountSummaryFfi> {
         val requestToken = accountListLifetime.advance()
-        val refreshedAccounts = marmotIo(MarmotTraceSection.ACCOUNT_LIST) { listAccounts() }
+        val refreshedAccounts = marmotIo(MarmotTraceSection.ACCOUNT_LIST) { listAccountsWithAppAttachmentPolicy() }
         val setupAccounts = accountSetup.accountsState(refreshedAccounts)
         val bubbleColorMigrationSucceeded =
             withContext(Dispatchers.IO) {
@@ -9277,8 +9276,9 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /** Installs independent telemetry, audit and product destinations before native startup. */
+    /** Installs app-owned attachment acquisition plus independent privacy destinations. */
     private suspend fun MarmotInterface.configurePrivacyRuntime() {
+        enforceAppOwnedAttachmentAcquisitionForKnownAccounts()
         configureTelemetryRuntime()
         auditLogSettingsMutex.withLock {
             auditUploadConsent.prepare(this)
