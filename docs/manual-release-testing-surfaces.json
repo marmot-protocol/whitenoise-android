@@ -3697,11 +3697,27 @@
       },
       {
         "surface": "FocusedActionMenu",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActionGrid.kt",
         "anchor": "fun FocusedActionMenu(",
         "test_ids": [
           "MSG-004",
           "MSG-005"
+        ]
+      },
+      {
+        "surface": "FocusedActionColumn",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActionGrid.kt",
+        "anchor": "fun FocusedActionColumn(",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
+        "surface": "FocusedActionCell",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActionGrid.kt",
+        "anchor": "fun FocusedActionCell(",
+        "test_ids": [
+          "MSG-004"
         ]
       },
       {
@@ -23682,6 +23698,14 @@
         "surface": "Every non-action part of the focused-message overlay dismisses it, including the lifted message",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
         "anchor": "internal fun FocusedMessageActions(",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
+        "surface": "The long-press actions form a two-column labelled grid, falling back to one readable column",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActionGrid.kt",
+        "anchor": "fun FocusedActionMenu(",
         "test_ids": [
           "MSG-004"
         ]

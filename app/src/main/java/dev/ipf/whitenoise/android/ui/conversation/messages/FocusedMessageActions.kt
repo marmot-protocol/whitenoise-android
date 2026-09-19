@@ -33,14 +33,11 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.DropdownMenuGroup
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -244,8 +241,6 @@ private val FocusedReactionStateLayerSize = 40.dp
 private val FocusedReactionSelectedFillSize = 36.dp
 private val FocusedReactionEmojiSize = 28.dp
 private val FocusedMoreIconSize = 24.dp
-private val FocusedMenuMinimumWidth = 248.dp
-private val FocusedMenuMaximumWidth = 300.dp
 
 /** Prototype reaction rail, inert real-message preview and grouped command menu; preserves the host IME. */
 @Composable
@@ -518,50 +513,6 @@ private fun FocusedMoreReactionsTarget(onClick: () -> Unit) {
                 modifier = Modifier.size(FocusedMoreIconSize),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        }
-    }
-}
-
-/** Material's grouped menu: leading icon, label with an optional second line, error colours for destructive rows. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun FocusedActionMenu(actions: List<FocusedMessageAction>) {
-    DropdownMenuGroup(
-        shapes = MenuDefaults.groupShapes(),
-        border = amoledOutlineBorder(),
-        modifier = Modifier.widthIn(min = FocusedMenuMinimumWidth, max = FocusedMenuMaximumWidth),
-        shadowElevation = MenuDefaults.ShadowElevation,
-    ) {
-        Column {
-            actions.forEachIndexed { index, action ->
-                val contentColor =
-                    if (action.destructive) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    }
-                DropdownMenuItem(
-                    text = {
-                        Column {
-                            Text(action.label, style = MaterialTheme.typography.bodyLarge)
-                            if (action.supportingLabel != null) {
-                                Text(action.supportingLabel, style = MaterialTheme.typography.bodySmall)
-                            }
-                        }
-                    },
-                    onClick = action.onClick,
-                    shape = MenuDefaults.itemShape(index, actions.size).shape,
-                    leadingIcon = action.icon,
-                    enabled = action.enabled,
-                    colors =
-                        MenuDefaults.itemColors(
-                            textColor = contentColor,
-                            leadingIconColor = contentColor,
-                            disabledTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        ),
-                )
-            }
         }
     }
 }
