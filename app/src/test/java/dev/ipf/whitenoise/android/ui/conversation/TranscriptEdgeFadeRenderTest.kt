@@ -44,8 +44,8 @@ class TranscriptEdgeFadeRenderTest {
     private lateinit var scope: CoroutineScope
 
     /**
-     * Parked mid-history both edges have messages past them, so the transcript dissolves into the
-     * bar above and is gone before the composer below, leaving the middle untouched.
+     * Parked mid-history the transcript dissolves into the bar above, reaches the composer at full
+     * strength, and thins away behind it to nothing by the bottom of the screen.
      */
     @Test
     fun aTranscriptParkedMidHistoryDissolvesAtBothEdges() {
@@ -58,14 +58,22 @@ class TranscriptEdgeFadeRenderTest {
         rule.onNodeWithTag(FRAME).captureRoboImage(SNAPSHOT)
 
         assertEquals("rows away from either edge stay untouched", ROW, pixels[COLUMN, 240])
-        assertEquals("nothing may survive into the strip the composer covers", BACKGROUND, pixels[COLUMN, 450])
+        assertEquals(
+            "a row must reach the composer at full strength rather than dimming in front of it",
+            ROW,
+            pixels[COLUMN, COMPOSER_TOP_EDGE - 2],
+        )
         assertTrue(
             "the row must be half gone across the middle of the band below the bar",
             pixels[COLUMN, TOP_BAND_MIDPOINT].isPartlyFaded(),
         )
         assertTrue(
-            "the row must be half gone across the middle of the band above the composer",
-            pixels[COLUMN, BOTTOM_BAND_MIDPOINT].isPartlyFaded(),
+            "the row must be half gone halfway down behind the composer",
+            pixels[COLUMN, BEHIND_COMPOSER_MIDPOINT].isPartlyFaded(),
+        )
+        assertTrue(
+            "the row must be all but gone by the bottom of the screen",
+            pixels[COLUMN, 478].red > 0.9f,
         )
     }
 
@@ -101,7 +109,7 @@ class TranscriptEdgeFadeRenderTest {
                     modifier =
                         Modifier
                             .fillMaxSize()
-                            .transcriptEdgeFade(listState = list, bottomInset = COVERED_STRIP_DP.dp),
+                            .transcriptEdgeFade(listState = list, composerOverlap = COVERED_STRIP_DP.dp),
                 ) {
                     items((0 until ROW_COUNT).toList(), key = { it }) {
                         Box(Modifier.fillMaxWidth().height(ROW_HEIGHT_DP.dp).background(ROW))
@@ -124,8 +132,11 @@ class TranscriptEdgeFadeRenderTest {
         /** Halfway across the band under the bar, where the mask should be about half strength. */
         const val TOP_BAND_MIDPOINT = 14
 
-        /** Halfway across the band above the covered strip, which ends at 480 - 60. */
-        const val BOTTOM_BAND_MIDPOINT = 406
+        /** Where the composer starts, 480 - 60, and so where the bottom fade begins. */
+        const val COMPOSER_TOP_EDGE = 480 - COVERED_STRIP_DP
+
+        /** Halfway down the strip the composer covers, where the fade should be about half spent. */
+        const val BEHIND_COMPOSER_MIDPOINT = 450
         val ROW = Color.Cyan
         val BACKGROUND = Color.White
     }

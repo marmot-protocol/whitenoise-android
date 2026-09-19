@@ -3741,14 +3741,13 @@ internal fun ConversationScreen(
                                             PerformanceTestTags.CONVERSATION_TRANSCRIPT_VISIBLE,
                                             enabled = transcriptReadyToReveal && renderedTimeline.isNotEmpty(),
                                         ).onGloballyPositioned(timelineViewport::onPaintViewportMeasured)
-                                        // Rows dissolve as they reach the bar above and the
-                                        // composer below, so the transcript meets its chrome
-                                        // softly instead of being sliced off mid-bubble. The
-                                        // bottom band stops where the covered strip starts,
-                                        // otherwise the gradient would be spent out of sight.
+                                        // Rows dissolve into the bar above, and slide under the
+                                        // composer thinning away to nothing by the bottom of the
+                                        // screen, so the transcript meets its chrome softly
+                                        // instead of being sliced off mid-bubble.
                                         .transcriptEdgeFade(
                                             listState = listState,
-                                            bottomInset = overlayPadding,
+                                            composerOverlap = overlayPadding,
                                         ),
                                 // Bottom-anchored like every established chat
                                 // client: the viewport shrinking under the keyboard

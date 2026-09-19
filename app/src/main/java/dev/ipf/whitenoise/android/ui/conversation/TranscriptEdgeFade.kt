@@ -107,33 +107,31 @@ internal fun Modifier.transcriptEdgeFade(
         }
 
 /**
- * Dissolves the transcript into the chrome at whichever edge still has messages past it.
+ * Dissolves the transcript into the chrome above it and beneath the composer below it.
  *
- * An edge with nothing beyond it stays crisp. The newest message rests only [CONVERSATION_TIMELINE_TAIL_GAP]
- * above the composer and the oldest sits just under the bar, so a band that were always on would
- * hold both of them permanently dimmed, which reads as a rendering fault rather than as depth.
+ * The bottom fade spans the composer itself: content stays at full strength until the composer's
+ * top edge, then thins away to nothing by the bottom of the screen. Rows therefore slide under the
+ * composer and dissolve there, rather than meeting a cut line. Because that band begins where the
+ * content rests, the newest message is never dimmed and the bottom fade needs no gating.
  *
- * [bottomInset] is the strip the transcript paints beneath the composer. Masking it is what makes
- * the covered rows agree with the rest of the screen, which already withholds them from touch,
- * from TalkBack and from the read watermark.
+ * The top has no such luxury. The oldest message rests a few pixels under the bar, so an always-on
+ * band would hold it permanently dimmed, and that edge fades only while older messages remain.
+ *
+ * [composerOverlap] is how far the transcript paints beneath the composer, and so is both where the
+ * fade starts and how long it takes. A conversation with no overlap has nothing behind the composer
+ * and gets no bottom fade.
  */
 @Composable
 internal fun Modifier.transcriptEdgeFade(
     listState: LazyListState,
-    bottomInset: Dp,
+    composerOverlap: Dp,
     fadeHeight: Dp = TRANSCRIPT_EDGE_FADE_HEIGHT,
 ): Modifier {
-    // The transcript is reversed, so scrolling forward walks back through history towards the bar
-    // and scrolling backward returns to the newest message against the composer.
+    // The transcript is reversed, so scrolling forward walks back through history towards the bar.
     val topFade by
         animateDpAsState(
             targetValue = if (listState.canScrollForward) fadeHeight else 0.dp,
             label = "transcript-top-fade",
         )
-    val bottomFade by
-        animateDpAsState(
-            targetValue = if (listState.canScrollBackward) fadeHeight else 0.dp,
-            label = "transcript-bottom-fade",
-        )
-    return transcriptEdgeFade(topFade = topFade, bottomFade = bottomFade, bottomInset = bottomInset)
+    return transcriptEdgeFade(topFade = topFade, bottomFade = composerOverlap, bottomInset = 0.dp)
 }
