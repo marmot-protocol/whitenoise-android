@@ -186,6 +186,18 @@ class AccountSwitcherUnreadDotLayoutTest {
         composeRule.onNodeWithTag(OTHER_ACCOUNT_STACK_TAG).assertDoesNotExist()
     }
 
+    /** Active unread marker remains fully inside the circular button clip in LTR. */
+    @Test
+    fun activeAccountUnreadMarkerRemainsInsideButtonClipInLtr() {
+        assertActiveAccountUnreadMarkerInsideButtonClip(rtl = false)
+    }
+
+    /** Active unread marker remains fully inside the circular button clip in RTL. */
+    @Test
+    fun activeAccountUnreadMarkerRemainsInsideButtonClipInRtl() {
+        assertActiveAccountUnreadMarkerInsideButtonClip(rtl = true)
+    }
+
     /** Other account unread announces its count on the actual selector row. */
     @Test
     fun otherAccountUnreadAnnouncesItsCountOnTheActualSelectorRow() {
@@ -363,6 +375,38 @@ class AccountSwitcherUnreadDotLayoutTest {
             .onNodeWithTag(tag, useUnmergedTree = true)
             .fetchSemanticsNode()
             .boundsInRoot
+
+    /** Asserts the active marker is visible within the button's circular draw boundary. */
+    private fun assertActiveAccountUnreadMarkerInsideButtonClip(rtl: Boolean) {
+        renderTopBar(
+            appState = testAppState(accountCount = 1).also { it.updateAccountUnreadCount("personal", 1uL) },
+            rtl = rtl,
+        )
+
+        val button = boundsForTag("chats.switchProfile")
+        val marker = boundsForTag(ACTIVE_ACCOUNT_UNREAD_DOT_TAG)
+        val buttonRadius = minOf(button.width, button.height) / 2f
+        val markerRadius = minOf(marker.width, marker.height) / 2f
+        val centerDistance = (marker.center - button.center).getDistance()
+
+        assertTrue(
+            "marker must stay inside the button bounds in rtl=$rtl",
+            marker.left >= button.left &&
+                marker.top >= button.top &&
+                marker.right <= button.right &&
+                marker.bottom <= button.bottom,
+        )
+        assertTrue(
+            "marker must stay inside the circular button clip in rtl=$rtl",
+            centerDistance + markerRadius <= buttonRadius,
+        )
+        if (rtl) {
+            assertTrue("RTL marker must remain on the trailing edge", marker.center.x < button.center.x)
+        } else {
+            assertTrue("LTR marker must remain on the trailing edge", marker.center.x > button.center.x)
+        }
+        assertTrue("marker must remain on the lower edge", marker.center.y > button.center.y)
+    }
 
     /** Test tag of a profile row. */
     private fun profileRowTag(label: String): String = "profile_switcher.profile.$label"
