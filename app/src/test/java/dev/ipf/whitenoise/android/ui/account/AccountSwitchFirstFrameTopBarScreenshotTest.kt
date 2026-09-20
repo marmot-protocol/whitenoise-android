@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.account
 import android.content.Context
 import android.graphics.Color
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -12,12 +13,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -141,6 +144,59 @@ class AccountSwitchFirstFrameTopBarScreenshotTest {
     @Test
     fun allAccountTargetsRemainReachableInSelectorRtl() {
         captureAllAccountTargets(LayoutDirection.Rtl, "account_switch_overlapping_targets_rtl.png")
+    }
+
+    /** Active unread marker keeps its complete circular edge for photo and generated avatars in AMOLED. */
+    @Test
+    fun activeUnreadMarkerIsCompleteForPhotoAndGeneratedAvatarsInAmoled() =
+        runTest {
+            val photoState = appState(includeActiveProfile = true)
+            val generatedState = appState(includeActiveProfile = false)
+            photoState.warmProfilePresentationsBlocking(listOf(ACTIVE_ID))
+            AvatarImageLoader.putCached(ACTIVE_AVATAR, AvatarScreenshotFixtures.distinctAvatarBitmap(Color.GREEN))
+            photoState.updateAccountUnreadCount(ACTIVE_REF, 1uL)
+            generatedState.updateAccountUnreadCount(ACTIVE_REF, 1uL)
+
+            composeRule.setContent {
+                WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                    Surface(color = MaterialTheme.colorScheme.background) {
+                        Column(Modifier.fillMaxWidth().testTag(UNREAD_SCREENSHOT_TAG)) {
+                            AccountTopBar(photoState, LayoutDirection.Ltr)
+                            AccountTopBar(generatedState, LayoutDirection.Rtl)
+                        }
+                    }
+                }
+            }
+
+            composeRule
+                .onAllNodesWithTag(ACTIVE_ACCOUNT_UNREAD_DOT_TAG, useUnmergedTree = true)
+                .assertCountEquals(2)
+            composeRule
+                .onNodeWithTag(UNREAD_SCREENSHOT_TAG)
+                .captureRoboImage("src/test/snapshots/account_switch_active_unread_dot_amoled_ltr_rtl.png")
+        }
+
+    /** Renders the production chat-list header in the requested layout direction. */
+    @androidx.compose.runtime.Composable
+    private fun AccountTopBar(
+        appState: WhiteNoiseAppState,
+        layoutDirection: LayoutDirection,
+    ) {
+        CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
+            ChatListTopBar(
+                appState = remember { appState },
+                searchOpen = false,
+                searchQuery = "",
+                searchFocusRequester = remember { FocusRequester() },
+                onSearchQueryChange = {},
+                onSearchOpen = {},
+                onSearchClose = {},
+                onMic = {},
+                onOpenSettings = {},
+                onSwitchAccount = {},
+                connectivityState = ConnectivityBannerState.Hidden,
+            )
+        }
     }
 
     /** Records one baseline per account target. */
@@ -285,6 +341,7 @@ class AccountSwitchFirstFrameTopBarScreenshotTest {
 
     private companion object {
         const val SCREENSHOT_TAG = "account-switch-first-frame-seeded-profiles"
+        const val UNREAD_SCREENSHOT_TAG = "account-switch-active-unread-dot"
         const val ACTIVE_REF = "personal"
         const val STUDIO_REF = "studio"
         const val WORK_REF = "work"

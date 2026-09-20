@@ -74,6 +74,31 @@ class MessageBubbleChromeScreenshotTest {
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/message_bubble_chrome_dark.png")
     }
 
+    /** Long captions widen narrow portrait media while preserving directional media alignment. */
+    @Test
+    fun narrowMediaWithLongCaptionsUsesReadableSharedWidth() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                Surface(color = MaterialTheme.colorScheme.background) {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                            .testTag(NARROW_MEDIA_CAPTION_TAG),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        NarrowCaptionBubble(mine = false)
+                        NarrowCaptionBubble(mine = true, modifier = Modifier.align(Alignment.End))
+                    }
+                }
+            }
+        }
+
+        composeRule
+            .onNodeWithTag(NARROW_MEDIA_CAPTION_TAG)
+            .captureRoboImage("src/test/snapshots/message_bubble_narrow_media_long_caption_light.png")
+    }
+
     @Test
     fun acceptedPendingFooterLight() {
         composeRule.setContent {
@@ -412,6 +437,39 @@ class MessageBubbleChromeScreenshotTest {
 
     private companion object {
         const val TAG = "bubble-chrome"
+        const val NARROW_MEDIA_CAPTION_TAG = "narrow-media-caption-gallery"
+    }
+}
+
+/** Screenshot fixture for a portrait image whose substantial caption owns the shared width. */
+@Composable
+private fun NarrowCaptionBubble(
+    mine: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    MediaCaptionFrame(
+        presentation = messageBubblePresentation(deleted = false, mine = mine),
+        highlighted = false,
+        mine = mine,
+        mentionedSelf = false,
+        mentionedYouLabel = "Mentioned you",
+        alignEnd = mine,
+        modifier = modifier.widthIn(max = 290.dp),
+        media = {
+            Box(
+                Modifier
+                    .width(82.dp)
+                    .height(138.dp)
+                    .background(if (mine) Color(0xFF6A4C93) else Color(0xFF2A9D8F)),
+            )
+        },
+    ) {
+        Text("A substantial caption now uses the readable conversation width instead of a narrow image column.")
+        Text(
+            text = if (mine) "19:08" else "19:07",
+            style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.align(Alignment.End),
+        )
     }
 }
 

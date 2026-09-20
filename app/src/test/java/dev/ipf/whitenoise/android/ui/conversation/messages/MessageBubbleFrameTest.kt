@@ -406,6 +406,68 @@ class MessageBubbleFrameTest {
         }
     }
 
+    /** Substantial supplemental content widens a narrow media frame without stretching the media. */
+    @Test
+    fun substantialSupplementWidensNarrowMediaAndPreservesAlignment() {
+        composeRule.setContent {
+            Column {
+                listOf(false, true).forEach { alignEnd ->
+                    Box(Modifier.width(300.dp)) {
+                        MediaSupplementEnvelope(
+                            alignEnd = alignEnd,
+                            modifier = Modifier.testTag("wide-envelope-$alignEnd"),
+                            media = {
+                                Box(
+                                    Modifier
+                                        .width(80.dp)
+                                        .height(100.dp)
+                                        .testTag("narrow-media-$alignEnd"),
+                                )
+                            },
+                            supplement = { Box(Modifier.width(240.dp).height(40.dp)) },
+                        )
+                    }
+                }
+            }
+        }
+
+        listOf(false, true).forEach { alignEnd ->
+            composeRule.runOnIdle {
+                val envelope =
+                    composeRule.onNodeWithTag("wide-envelope-$alignEnd").fetchSemanticsNode().boundsInRoot
+                val media = composeRule.onNodeWithTag("narrow-media-$alignEnd").fetchSemanticsNode().boundsInRoot
+                assertEquals(240f, envelope.width, 1f)
+                assertEquals(80f, media.width, 1f)
+                if (alignEnd) {
+                    assertEquals(envelope.right, media.right, 1f)
+                } else {
+                    assertEquals(envelope.left, media.left, 1f)
+                }
+            }
+        }
+    }
+
+    /** A short supplement retains the compact media-led frame width. */
+    @Test
+    fun shortSupplementKeepsCompactMediaWidth() {
+        composeRule.setContent {
+            Box(Modifier.width(300.dp)) {
+                MediaSupplementEnvelope(
+                    alignEnd = false,
+                    modifier = Modifier.testTag(SHORT_SUPPLEMENT_ENVELOPE_TAG),
+                    media = { Box(Modifier.width(80.dp).height(100.dp)) },
+                    supplement = { Box(Modifier.width(40.dp).height(20.dp)) },
+                )
+            }
+        }
+
+        composeRule.runOnIdle {
+            val envelope =
+                composeRule.onNodeWithTag(SHORT_SUPPLEMENT_ENVELOPE_TAG).fetchSemanticsNode().boundsInRoot
+            assertEquals(80f, envelope.width, 1f)
+        }
+    }
+
     /** Non reply footer keeps natural width. */
     @Test
     fun nonReplyFooterKeepsNaturalWidth() {
@@ -475,6 +537,7 @@ class MessageBubbleFrameTest {
         const val MEDIA_REPLY_COLUMN_TAG = "media-reply-column"
         const val MEDIA_REPLY_MEDIA_TAG = "media-reply-media"
         const val MEDIA_REPLY_CAPTION_TAG = "media-reply-caption"
+        const val SHORT_SUPPLEMENT_ENVELOPE_TAG = "short-supplement-envelope"
         const val MEDIA_REPLY_FOOTER_TAG = "media-reply-footer"
         const val NON_REPLY_COLUMN_TAG = "non-reply-column"
         const val NON_REPLY_BODY_TAG = "non-reply-body"

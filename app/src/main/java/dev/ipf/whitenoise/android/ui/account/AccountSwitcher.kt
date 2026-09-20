@@ -42,6 +42,8 @@ import dev.ipf.whitenoise.android.state.otherAccountAvatars
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 
+internal const val ACTIVE_ACCOUNT_UNREAD_DOT_TAG = "active-account-unread-dot"
+
 /** Avatar that acts as the account button, with an optional unread dot in the account colour. */
 @Composable
 fun AccountAvatarButton(
@@ -89,8 +91,10 @@ fun AccountAvatarButton(
                     modifier =
                         Modifier
                             .align(Alignment.BottomEnd)
-                            .offset(x = 1.dp, y = 1.dp)
+                            // Keep the complete marker inside IconButton's circular clip.
+                            .offset(x = (-2).dp, y = (-2).dp)
                             .size(12.dp)
+                            .testTag(ACTIVE_ACCOUNT_UNREAD_DOT_TAG)
                             // Border in the bar background so the dot reads as
                             // a separate marker against a busy avatar.
                             .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape)

@@ -23,6 +23,7 @@ import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.ui.common.clampViewerPageIndex
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -202,6 +203,20 @@ class MediaViewerPagerRecompositionTest {
         composeRule.onNodeWithTag(CURRENT_PAGE_TAG).assertTextEquals("mixed:0:1")
         scrollToPage(selection, 1)
         composeRule.onNodeWithTag(CURRENT_PAGE_TAG).assertTextEquals("mixed:1:10")
+    }
+
+    /** Hidden image chrome survives image paging while a video page always restores controls. */
+    @Test
+    fun hiddenChromeSurvivesImagePagingAndRestoresForVideo() {
+        var visible = mediaViewerChromeVisibilityAfterPageChange(currentlyVisible = false, pageIsVideo = false)
+        assertFalse(visible)
+
+        visible = mediaViewerChromeVisibilityAfterPageChange(currentlyVisible = visible, pageIsVideo = false)
+        assertFalse(visible)
+
+        visible = mediaViewerChromeVisibilityAfterPageChange(currentlyVisible = visible, pageIsVideo = true)
+        assertTrue(visible)
+        assertTrue(mediaViewerChromeVisibilityAfterPageChange(currentlyVisible = true, pageIsVideo = false))
     }
 
     /** Scrolls the currently recreated pager and waits for its settled logical selection. */

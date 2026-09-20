@@ -49,6 +49,8 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.conversation.media.MEDIA_VIEWER_BOTTOM_CHROME_TAG
+import dev.ipf.whitenoise.android.ui.conversation.media.MEDIA_VIEWER_TOP_CHROME_TAG
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerFrame
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerGallery
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerLoadFailed
@@ -136,6 +138,45 @@ class MediaViewerScreenshotTest {
             }
         }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/media_viewer_default_frame.png")
+    }
+
+    /** Hidden viewer chrome leaves the image unobstructed and restores every action together. */
+    @Test
+    fun mediaViewerChromeHidesAndRestoresAsOneAccessibleSurface() {
+        var chromeVisible by mutableStateOf(true)
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                MediaViewerFrame(
+                    senderLabel = "Alex",
+                    recordedAtLabel = "Sep 20, 2026, 7:05 PM",
+                    onDismiss = {},
+                    onSave = {},
+                    onShare = {},
+                    onForwardMessage = {},
+                    snackbarHostState = remember { SnackbarHostState() },
+                    modifier = Modifier.fillMaxSize(),
+                    chromeVisible = chromeVisible,
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(Color(0xff27476f)),
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag(MEDIA_VIEWER_TOP_CHROME_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(MEDIA_VIEWER_BOTTOM_CHROME_TAG).assertIsDisplayed()
+        composeRule.runOnIdle { chromeVisible = false }
+        composeRule.onNodeWithTag(MEDIA_VIEWER_TOP_CHROME_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(MEDIA_VIEWER_BOTTOM_CHROME_TAG).assertDoesNotExist()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/media_viewer_chrome_hidden.png")
+
+        composeRule.runOnIdle { chromeVisible = true }
+        composeRule.onNodeWithTag(MEDIA_VIEWER_TOP_CHROME_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(MEDIA_VIEWER_BOTTOM_CHROME_TAG).assertIsDisplayed()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/media_viewer_chrome_restored.png")
     }
 
     /** Directly opened video offers save and share. */
