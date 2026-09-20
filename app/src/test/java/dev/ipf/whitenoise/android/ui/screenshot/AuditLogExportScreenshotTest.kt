@@ -66,7 +66,13 @@ class AuditLogExportScreenshotTest {
     private fun renderDestination(darkTheme: Boolean) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = darkTheme) {
-                AuditLogExportDestinationDialog(onDismiss = {}, onSave = {}, onShare = {})
+                // The host stays sized: an unconstrained dialog host renders into an unbounded
+                // window, and capturing that allocates a bitmap large enough to exhaust the heap.
+                Surface {
+                    Column(modifier = Modifier.width(360.dp)) {
+                        AuditLogExportDestinationDialog(onDismiss = {}, onSave = {}, onShare = {})
+                    }
+                }
             }
         }
     }
