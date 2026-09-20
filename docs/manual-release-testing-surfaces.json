@@ -21972,6 +21972,14 @@
         ]
       },
       {
+        "surface": "Dictation caller-audio chunks keep a stable identity across recognizer generations",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationCallerAudio.kt",
+        "anchor": "fun chunkId(): Long? = chunk.get()?.chunkId",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
         "surface": "Dictation completed-transcript target validation and retention",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
         "anchor": "internal enum class ConversationDictationTargetValidation",
@@ -21999,6 +22007,14 @@
         "surface": "Dictation automatic completion observes captured speech and drains the tail",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
         "anchor": "private fun finishAfterCallerAudioSilence(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "Dictation no-speech retries are bounded to the exact speech-bearing caller-audio chunk",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "private fun advancePastRejectedCallerAudio(",
         "test_ids": [
           "DIC-002"
         ]
