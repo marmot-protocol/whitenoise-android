@@ -1,0 +1,17 @@
+schema=1
+source=marmot-protocol/mdk
+mdk-sha=fcc85edd8dbd07c8293c899ee52230f72c54c897
+mdk-short-sha=fcc85edd
+mdk-branch=master
+features=otlp-export,product-analytics-export
+artifact-id=0.10.4
+artifact-tag=marmotkit-v0.10.4
+artifact-url=https://github.com/marmot-protocol/mdk/releases/download/marmotkit-v0.10.4/marmotkit-android-0.10.4.zip
+artifact-sha256=dcbb4e00c703cce2cf773c860f1f1d46b18ac49e81af5a5089902b8a31e0c16e
+archive-root=marmotkit-android-0.10.4
+manifest-schema=mdk-android-v1
+workspace-version=0.10.4
+android-api=26
+api-type-count=326
+api-checksum-count=322
+api-helper-declaration-count=5
