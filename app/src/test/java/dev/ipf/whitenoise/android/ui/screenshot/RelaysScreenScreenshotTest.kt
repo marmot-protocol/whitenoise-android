@@ -1,9 +1,15 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performTextInput
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.MissingRelayListKindFfi
+import dev.ipf.whitenoise.android.ui.settings.AddRelaySheet
 import dev.ipf.whitenoise.android.ui.settings.RelaysContent
 import dev.ipf.whitenoise.android.ui.settings.RelaysUiState
 import dev.ipf.whitenoise.android.ui.settings.relayLists
@@ -34,6 +40,27 @@ class RelaysScreenScreenshotTest {
     /** AMOLED: outlined groups on black. */
     @Test
     fun amoledTheme() = capture(darkTheme = true, amoled = true, name = "relay_settings_amoled.png")
+
+    /** Add Relay keeps its sheet visible and replaces the submit label while publication is in flight. */
+    @Test
+    fun addRelayLoading() {
+        val busy = mutableStateOf(false)
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false, amoled = false) {
+                AddRelaySheet(
+                    existing = emptyList(),
+                    busy = busy.value,
+                    rejectedUrl = null,
+                    onDismiss = {},
+                    onAdd = { _, _ -> },
+                )
+            }
+        }
+        composeRule.onNodeWithTag("relay.add.url").performTextInput("wss://relay.example.com")
+        composeRule.runOnIdle { busy.value = true }
+        composeRule.onNodeWithText("Publishing…").assertIsDisplayed()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/relay_add_loading_light.png")
+    }
 
     /** Renders the list content for one fixed projection and records the window. */
     private fun capture(
