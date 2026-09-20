@@ -84,6 +84,7 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
+@Suppress("LargeClass") // Production-route screenshot cases share one deterministic app/controller fixture.
 class ConversationComposerExpansionRetentionScreenshotTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
@@ -461,6 +462,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
      * after the optimistic row is published, then captures the settled result.
      */
     @Test
+    @Suppress("LongMethod") // One paused-clock lifecycle keeps publish, delayed growth, capture, and completion ordered.
     fun acceptedSendStaysVisibleWhenBottomInputGrowsNextFrame() {
         val publisherStarted = CompletableDeferred<Unit>()
         val releaseSuccess = CompletableDeferred<Unit>()

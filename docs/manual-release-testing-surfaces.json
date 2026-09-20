@@ -2125,7 +2125,8 @@
         "test_ids": [
           "CON-001",
           "NTF-009",
-          "GRP-021"
+          "GRP-021",
+          "DIC-002"
         ]
       },
       {
@@ -2143,7 +2144,8 @@
         "anchor": "fun ConversationScrollCoordinator.revealSentAtLiveTail(",
         "test_ids": [
           "CON-002",
-          "CON-005"
+          "CON-005",
+          "DIC-002"
         ]
       },
       {

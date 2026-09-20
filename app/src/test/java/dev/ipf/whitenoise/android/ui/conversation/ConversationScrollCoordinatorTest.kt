@@ -543,7 +543,10 @@ class ConversationScrollCoordinatorTest {
                     else -> SentTailGeometry(tailOffset = 0, viewportEnd = 432, padding = 64, viewportSize = 496)
                 }
 
-            assertFalse("the stale row begins inside the composer inset", currentLayout().asTailLayout().tailClearsViewportStart)
+            assertFalse(
+                "the stale row begins inside the composer inset",
+                currentLayout().asTailLayout().tailClearsViewportStart,
+            )
             assertTrue(
                 "an oversized row keeps the established visible-tail exception",
                 currentLayout().copy(tailSize = 600).asTailLayout().tailClearsViewportStart,
