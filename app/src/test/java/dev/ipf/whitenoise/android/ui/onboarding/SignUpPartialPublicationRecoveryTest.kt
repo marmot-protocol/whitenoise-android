@@ -171,6 +171,30 @@ class SignUpPartialPublicationRecoveryTest {
             assertEquals("Corrected", f.publications.single().name)
         }
 
+    /** Policy failure after native creation retries the same receipt and never activates it prematurely. */
+    @Test fun policyFailureAfterCreationRetriesWithoutCreatingAnotherIdentity() =
+        runTest {
+            val f = Fixture(this)
+            f.qualificationFails = true
+            f.controller.submit(DRAFT)
+            advanceUntilIdle()
+
+            assertEquals(SignUpStage.CreateFailed, f.controller.stage)
+            assertEquals(1, f.creations)
+            assertEquals(1, f.qualifications)
+            assertEquals(null, f.controller.acceptedIdentity)
+            assertEquals(null, f.owner.accountRef)
+
+            f.qualificationFails = false
+            f.controller.submit(DRAFT)
+            advanceUntilIdle()
+
+            assertEquals(1, f.creations)
+            assertEquals(2, f.qualifications)
+            assertEquals("created", f.controller.acceptedIdentity?.label)
+            assertEquals(SignUpStage.Complete, f.controller.stage)
+        }
+
     /** Test backend returns actual FFI receipt values and counts each stage independently. */
     private class Fixture(
         scope: CoroutineScope,
@@ -178,9 +202,11 @@ class SignUpPartialPublicationRecoveryTest {
         var owner = SignUpOwner(1, null)
         var available = true
         var createFails = false
+        var qualificationFails = false
         var uploadFails = false
         var publishSucceeds = true
         var creations = 0
+        var qualifications = 0
         var beforeCreateReturn: suspend () -> Unit = {}
         var afterUpload: () -> Unit = {}
         var afterPublish: () -> Unit = {}
@@ -198,6 +224,10 @@ class SignUpPartialPublicationRecoveryTest {
                     if (createFails) error("create failed")
                     beforeCreateReturn()
                     AccountSummaryFfi("created", "11".repeat(32), true, false, false, true)
+                },
+                qualify = {
+                    qualifications++
+                    if (qualificationFails) error("policy failed")
                 },
                 accept = { summary, captured ->
                     if (owner == captured && available) {

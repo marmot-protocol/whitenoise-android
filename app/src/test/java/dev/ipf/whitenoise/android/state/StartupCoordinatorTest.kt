@@ -9,6 +9,30 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class StartupCoordinatorTest {
+    /** Existing-account automatic requests are rejected before native workers can admit them. */
+    @Test
+    fun attachmentContainmentPreventsStartupRequestAdmission() =
+        runTest {
+            val coordinator = BootstrapRuntimeCoordinator<FakeAttachmentRuntime>()
+            val runtime = FakeAttachmentRuntime()
+
+            coordinator.open(
+                construct = { runtime },
+                configure = { opened ->
+                    enforceAppOwnedAttachmentAcquisitionPolicy(
+                        accountRefs = opened.accounts,
+                        readPolicy = { opened.policy },
+                        writePolicy = { _, policy -> opened.policy = policy },
+                    )
+                },
+                start = FakeAttachmentRuntime::start,
+                closeAfterFailure = {},
+            )
+
+            assertEquals(0, runtime.admittedAutomaticRequests)
+            assertEquals(false, runtime.policy.automatic)
+        }
+
     @Test
     fun timedOutRetryReusesTheRunningBootstrapAttempt() =
         runTest {
@@ -174,4 +198,15 @@ class StartupCoordinatorTest {
             assertEquals(1, starts)
             assertEquals(1, closes)
         }
+
+    /** Minimal native-worker model: startup admits one pending request only while automatic policy is enabled. */
+    private class FakeAttachmentRuntime {
+        val accounts = listOf("existing")
+        var policy = dev.ipf.marmotkit.AttachmentDownloadPolicyFfi(true, 2_000uL, 300uL, 40uL)
+        var admittedAutomaticRequests = 0
+
+        fun start() {
+            if (policy.automatic) admittedAutomaticRequests += 1
+        }
+    }
 }

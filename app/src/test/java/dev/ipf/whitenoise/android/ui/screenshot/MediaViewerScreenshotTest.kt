@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Rect
 import android.view.Gravity
 import android.view.View
@@ -27,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
@@ -51,6 +53,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerFrame
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerGallery
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerLoadFailed
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerPage
+import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerPendingFrame
 import dev.ipf.whitenoise.android.ui.conversation.media.visualMediaViewerGallery
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -233,6 +236,29 @@ class MediaViewerScreenshotTest {
             }
         }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/media_viewer_failed_frame.png")
+    }
+
+    /** A returning viewer paints a safe cached thumbnail while the current-page decode refines locally. */
+    @Test
+    fun mediaViewerCachedFirstFrameAvoidsBlankLoadingState() {
+        val pixels = IntArray(16) { index -> if (index % 2 == 0) 0xffc45b35.toInt() else 0xff355fc4.toInt() }
+        val thumbnail = Bitmap.createBitmap(pixels, 4, 4, Bitmap.Config.ARGB_8888).asImageBitmap()
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                MediaViewerFrame(
+                    senderLabel = "Alex",
+                    recordedAtLabel = "Jul 16, 2026, 3:45 PM",
+                    onDismiss = {},
+                    onSave = {},
+                    onShare = {},
+                    snackbarHostState = remember { SnackbarHostState() },
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    MediaViewerPendingFrame(thumbnail, null, "cached.jpg", failed = false, onRetry = {})
+                }
+            }
+        }
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/media_viewer_cached_first_frame.png")
     }
 
     @Test

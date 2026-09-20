@@ -2,11 +2,13 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -14,6 +16,9 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.unit.LayoutDirection
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.ui.common.clampViewerPageIndex
@@ -105,6 +110,30 @@ class MediaViewerPagerRecompositionTest {
                     "Media 2 of 3",
                 ),
             )
+    }
+
+    /** Viewer chronology stays spatially fixed in RTL: swiping left advances to the later page. */
+    @Test
+    fun rtlSwipeLeftAdvancesToTheLaterChronologicalPage() {
+        val pages = listOf(page("older"), page("current"), page("newer"))
+
+        composeRule.setContent {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                StableMediaViewerPager(
+                    pages = pages,
+                    selection = rememberMediaViewerPagerSelection(pages, startIndex = 1),
+                    modifier = Modifier.fillMaxSize().testTag(PAGER_TAG),
+                    pagePositionDescription = null,
+                    userScrollEnabled = true,
+                ) { page, isCurrent ->
+                    if (isCurrent) Text(page.messageIdHex, Modifier.testTag(CURRENT_PAGE_TAG))
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag(PAGER_TAG).performTouchInput { swipeLeft() }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(CURRENT_PAGE_TAG).assertTextEquals("newer")
     }
 
     /** Keeps repeated mixed-media selection stable while live references replace pager inputs. */

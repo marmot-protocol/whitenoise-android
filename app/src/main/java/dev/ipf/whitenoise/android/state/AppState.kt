@@ -4208,7 +4208,10 @@ class WhiteNoiseAppState private constructor(
                 configure = { runtime ->
                     appStateDebug { "bootstrap root=${runtime.rootPath}" }
                     startupPerformance.stage(PerformancePhase.PRIVACY_RUNTIME_CONFIGURATION) {
-                        withContext(Dispatchers.IO) { runtime.marmot.configurePrivacyRuntime() }
+                        withContext(Dispatchers.IO) {
+                            runtime.marmot.configurePrivacyRuntime()
+                            runtime.marmot.enforceAppOwnedAttachmentAcquisitionForKnownAccounts()
+                        }
                     }
                 },
                 start = { runtime ->
@@ -4398,20 +4401,8 @@ class WhiteNoiseAppState private constructor(
     /** Discards only an unsubmitted form or stale route; native accepted work remains intact. */
     internal fun dismissProfileSignUp(): Boolean = profileSignUp.dismiss()
 
-    suspend fun createIdentity() {
-        val startedAt = SystemClock.elapsedRealtime()
-        try {
-            val summary = marmotIo { createIdentity(MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays) }
-            activateCreatedIdentity(summary)
-            phase = AppPhase.Ready
-            presentTransient(R.string.toast_identity_created)
-            appStateDebug { "identity engine setup returned in ${SystemClock.elapsedRealtime() - startedAt}ms" }
-            launchIdentityPostCreateWarmup(summary)
-        } catch (error: Throwable) {
-            rethrowIfCancellation(error)
-            presentFailure(R.string.toast_couldnt_create_identity, "IDENTITY_CREATE", error)
-        }
-    }
+    /** Creates and contains a native identity before publishing it as the active Android account. */
+    suspend fun createIdentity() = profileSignUp.createIdentityWithoutProfile()
 
     /** Activates a newly created identity and invalidates older account-list reads atomically. */
     private fun activateCreatedIdentity(summary: AccountSummaryFfi) {
@@ -4519,7 +4510,9 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Qualifies a returned import receipt before Android publishes or activates the account. */
     private suspend fun activateImportedIdentity(summary: AccountSummaryFfi) {
+        marmotIo { enforceAppOwnedAttachmentAcquisitionPolicy(listOf(summary.label)) }
         refreshAccounts()
         setActiveAccount(summary.label)
         refreshLocalNotificationSettings()
@@ -4598,6 +4591,7 @@ class WhiteNoiseAppState private constructor(
                     amberSigner.buildSigner(pubkeyHex),
                 )
             }
+            marmotIo { enforceAppOwnedAttachmentAcquisitionPolicy(listOf(summary.label)) }
             refreshAccounts()
             setActiveAccount(summary.label)
             refreshLocalNotificationSettings()
@@ -4638,7 +4632,7 @@ class WhiteNoiseAppState private constructor(
     /** Publishes the newest engine account snapshot and rejects older list reads. */
     private suspend fun refreshAccountSnapshot(): List<AccountSummaryFfi> {
         val requestToken = accountListLifetime.advance()
-        val refreshedAccounts = marmotIo(MarmotTraceSection.ACCOUNT_LIST) { listAccounts() }
+        val refreshedAccounts = marmotIo(MarmotTraceSection.ACCOUNT_LIST) { listAccountsWithAppAttachmentPolicy() }
         val setupAccounts = accountSetup.accountsState(refreshedAccounts)
         val bubbleColorMigrationSucceeded =
             withContext(Dispatchers.IO) {

@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.functionBody
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -9,20 +10,47 @@ import org.junit.Test
 import java.io.File
 
 class IdentityCreationFlowTest {
+    /** Direct creation retains the native receipt when qualification fails and accepts it exactly once later. */
+    @Test
+    fun directCreationRetriesPolicyForTheSameReceipt() =
+        runTest {
+            val coordinator = IdentityPolicyQualification()
+            val account = account("created", "11")
+            var creations = 0
+            var qualifications = 0
+            var accepts = 0
+            val create = {
+                creations += 1
+                account
+            }
+            val qualify: suspend (AccountSummaryFfi) -> Unit = {
+                qualifications += 1
+                if (qualifications == 1) error("policy failed")
+            }
+            val accept: (AccountSummaryFfi) -> Unit = { accepts += 1 }
+
+            assertTrue(runCatching { coordinator.createQualifyAndAccept(create, qualify, accept) }.isFailure)
+            assertEquals(account, coordinator.createQualifyAndAccept(create, qualify, accept))
+            assertEquals(1, creations)
+            assertEquals(2, qualifications)
+            assertEquals(1, accepts)
+        }
+
+    /** Identity creation still supplies the full bootstrap set to both engine relay parameters. */
     @Test
     fun creationKeepsTheFullRelaySetOnTheEngineCall() {
-        val body = appStateSource().readText().functionBody("createIdentity")
+        val body = appStateSource("MarmotAttachmentAcquisitionPolicy.kt").readText()
 
-        assertTrue(
-            body.contains("createIdentity(MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays)"),
-        )
+        assertTrue(body.contains("createIdentityWithBootstrapRelays"))
+        assertTrue(body.contains("val relays = MarmotClient.bootstrapRelays"))
+        assertTrue(body.contains("createIdentity(relays, relays)"))
         assertFalse(body.contains("take(1)"))
     }
 
     @Test
     fun readyStatePrecedesPostCreateWarmup() {
-        val body = appStateSource().readText().functionBody("createIdentity")
-        val ready = body.indexOf("phase = AppPhase.Ready")
+        val body = appStateSource("AppProfileSignUp.kt").readText().functionBody("createIdentityWithoutProfile")
+        val ready = body.indexOf("markReady()")
         val warmup = body.indexOf("launchIdentityPostCreateWarmup(summary)")
 
         assertTrue("identity must become ready before best-effort warm-up starts", ready >= 0 && warmup > ready)

@@ -3313,6 +3313,15 @@
         ]
       },
       {
+        "surface": "BoxScope.MediaViewerPendingFrame",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerPendingFrame.kt",
+        "anchor": "fun BoxScope.MediaViewerPendingFrame(",
+        "test_ids": [
+          "MED-015",
+          "MED-017"
+        ]
+      },
+      {
         "surface": "StableMediaViewerPager",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
         "anchor": "fun StableMediaViewerPager(",
@@ -5295,7 +5304,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibrary.kt",
         "anchor": "fun MediaLibraryContent(",
         "test_ids": [
-          "GRP-018"
+          "GRP-018",
+          "MED-015"
         ]
       },
       {
@@ -22148,6 +22158,14 @@
         ]
       },
       {
+        "surface": "Native automatic attachment acquisition containment",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/MarmotAttachmentAcquisitionPolicy.kt",
+        "anchor": "suspend fun enforceAppOwnedAttachmentAcquisitionPolicy(",
+        "test_ids": [
+          "MED-019"
+        ]
+      },
+      {
         "surface": "R.string.toast_couldnt_create_identity",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppProfileSignUp.kt",
         "anchor": "R.string.toast_couldnt_create_identity",
@@ -22166,22 +22184,6 @@
       {
         "surface": "R.string.toast_identity_created",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppProfileSignUp.kt",
-        "anchor": "R.string.toast_identity_created",
-        "test_ids": [
-          "ONB-003"
-        ]
-      },
-      {
-        "surface": "Sign Up native feedback: toast_couldnt_create_identity",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "R.string.toast_couldnt_create_identity",
-        "test_ids": [
-          "ONB-003"
-        ]
-      },
-      {
-        "surface": "Sign Up native feedback: toast_identity_created",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "anchor": "R.string.toast_identity_created",
         "test_ids": [
           "ONB-003"
