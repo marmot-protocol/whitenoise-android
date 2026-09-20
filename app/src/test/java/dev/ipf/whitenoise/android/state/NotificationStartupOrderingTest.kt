@@ -334,18 +334,9 @@ class NotificationStartupOrderingTest {
     fun accountCacheLifetimeChangeAtTheFinalWriteBoundaryRejectsLateCorrection() =
         runBlocking {
             assertLateCorrectionRejectedAtFinalWrite(
-                accounts =
-                    listOf(
-                        signingAccount("account-a", "self"),
-                        signingAccount("account-b", "other-self"),
-                    ),
+                accounts = listOf(signingAccount("account-a", "self")),
             ) { fixture ->
-                assertTrue(
-                    fixture.appState.setActiveAccount(
-                        label = "account-b",
-                        preloadPolicy = AccountSwitchPreloadPolicy.TARGET_CONVERSATION_FIRST,
-                    ),
-                )
+                fixture.appState.clearCrossAccountCachesForTest()
             }
         }
 

@@ -115,11 +115,11 @@ Final settled-source results:
 
 | Check | Result |
 | --- | --- |
-| Change-aware completion gate, `--visual changed` | PASS; final rebased run 2m 54s |
+| Change-aware completion gate, `--visual changed` | PASS; final review follow-up run 2m 22s |
 | Both debug variants and instrumentation compilation | PASS |
 | Formatting, static analysis, alternate-variant Android lint | PASS |
-| Primary-variant focused tests | 223 passed, 0 failures/errors/skips; 23 suites |
-| Alternate-variant focused tests | 241 passed, 0 failures/errors/skips; 24 suites; 30s |
+| Primary-variant focused tests | 244 passed, 0 failures/errors/skips; 24 suites |
+| Alternate-variant focused tests | 241 recovery-focused tests plus the 21-test affected ordering class passed separately; 0 failures/errors/skips |
 | Locale resource parity | PASS; every translated resource set matches the default key set |
 | Visual baseline verification | PASS |
 | Manual inventory | 267 active IDs, 0 retired IDs |
@@ -133,11 +133,15 @@ generation coalescing, native-lane serialization, worker cancellation, completio
 acknowledgement races, delivery-mode cutover and rollback, battery-policy projection,
 diagnostic correlation/privacy, and updated settings behavior.
 
-The earlier hosted run exposed three stale source-ordering assertions after the recovery helper
-boundaries changed. Their maintained contracts now locate the final helper bodies, and the focused
-Play and alternate-flavor runs pass. A local unfiltered macOS run encountered an existing
-Robolectric image-encoding stall; current master completes the same unfiltered hosted jobs, so the
-new exact-head hosted matrix remains the authoritative full-suite result after push.
+An earlier hosted run exposed three stale source-ordering assertions after the recovery helper
+boundaries changed. Their maintained contracts now locate the final helper bodies. The next
+exact-head matrix revealed a deterministic circular wait in an existing notification-ordering
+test: it held a notification writer at its final gate while asking a complete account switch to
+settle, and account activation can itself await notification work. The test now invokes the real
+cross-account cache invalidation boundary directly. This preserves the intended proof that a
+cache-generation change rejects the held stale write without coupling the proof to unrelated
+account-switch settlement. The exact regression and all 21 tests in its class pass in both build
+variants. A new exact-head hosted matrix is required after this report is pushed.
 
 The completion/acknowledgement settlement regressions and their cancellation variants pass
 in both build variants. The current earlier-review probe bundle also passes. The supplied
@@ -218,7 +222,7 @@ installed. No device data was touched during the failed connection check.
 ## Source and artifacts
 
 The source/test patch relative to the base revision is SHA-256
-`7d09828b0695287b2293484260d7f044357df46c21cb2e47abfbda11e18f7e7a`.
+`858b09083eb4d80ad8492bb4e14d5340d32909f59ca7738cc02834869bf470e6`.
 This hashes `git diff origin/master --binary -- app/src`. The native dependency remains unchanged.
 
 Final qualification APK hashes:

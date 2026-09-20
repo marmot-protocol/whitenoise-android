@@ -5902,6 +5902,11 @@ class WhiteNoiseAppState private constructor(
         bumpAllProfileAccountRevisions()
     }
 
+    /** Exercises the production account-cache invalidation boundary without starting an account switch. */
+    internal fun clearCrossAccountCachesForTest() {
+        clearCrossAccountCaches()
+    }
+
     /**
      * Non-destructive MDK sign-out (#349, #2132). A thrown engine call keeps
      * the established local fail-open behavior; a structured unfinished-local
