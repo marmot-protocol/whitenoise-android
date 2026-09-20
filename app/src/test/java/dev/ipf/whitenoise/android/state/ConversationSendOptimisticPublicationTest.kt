@@ -182,6 +182,7 @@ class ConversationSendOptimisticPublicationTest {
                 assertTrue(
                     scrollCoordinator.revealSentAtLiveTail(
                         controller,
+                        captureLayout = { error("history reveal must not start the snap settle") },
                         awaitFrame = { error("a history reader is carried to the row without waiting for a frame") },
                     ),
                 )

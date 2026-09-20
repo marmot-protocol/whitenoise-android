@@ -1483,7 +1483,22 @@ internal fun ConversationScreen(
     /** Reveals the optimistic row using controller state published before the acceptance callback. */
     fun revealSentMessage() {
         scope.launch {
-            scrollCoordinator.revealSentAtLiveTail(controller)
+            scrollCoordinator.revealSentAtLiveTail(
+                controller = controller,
+                captureLayout = { tailIndex ->
+                    val layoutInfo = timelineViewport.readingLayoutInfo()
+                    val tailInfo = layoutInfo.visibleItemsInfo.firstOrNull { it.index == tailIndex }
+                    ConversationTailLayout(
+                        lastRowHeightPx = tailInfo?.size,
+                        tailOffsetPx = tailInfo?.offset,
+                        tailSizePx = tailInfo?.size,
+                        viewportStartOffsetPx = layoutInfo.viewportStartOffset,
+                        viewportEndOffsetPx = layoutInfo.viewportEndOffset,
+                        beforeContentPaddingPx = layoutInfo.beforeContentPadding,
+                        viewportSizePx = layoutInfo.viewportSize.height,
+                    )
+                },
+            )
         }
     }
 
@@ -2974,7 +2989,10 @@ internal fun ConversationScreen(
                         lastRowHeightPx = navigationState.timelineItemHeightsPx[lastMessageId],
                         tailOffsetPx = tailInfo?.offset,
                         tailSizePx = tailInfo?.size,
+                        viewportStartOffsetPx = layoutInfo.viewportStartOffset,
                         viewportEndOffsetPx = layoutInfo.viewportEndOffset,
+                        beforeContentPaddingPx = layoutInfo.beforeContentPadding,
+                        viewportSizePx = layoutInfo.viewportSize.height,
                     )
                 },
             )

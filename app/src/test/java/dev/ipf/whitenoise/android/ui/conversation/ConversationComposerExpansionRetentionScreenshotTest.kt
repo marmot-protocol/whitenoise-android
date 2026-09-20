@@ -40,6 +40,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
+import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
@@ -57,16 +58,20 @@ import dev.ipf.whitenoise.android.state.RetainedComposerExpansion
 import dev.ipf.whitenoise.android.state.RetainedComposerExpansionMode
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
+import dev.ipf.whitenoise.android.state.notificationChatListRow
+import dev.ipf.whitenoise.android.state.notifiedMessagePreview
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_GESTURE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_INDICATOR_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerOverlayBackRegistrar
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleRowTestTag
 import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -452,6 +457,94 @@ class ConversationComposerExpansionRetentionScreenshotTest {
     }
 
     /**
+     * Models the dictation-to-input handoff by growing the bottom input only
+     * after the optimistic row is published, then captures the settled result.
+     */
+    @Test
+    fun acceptedSendStaysVisibleWhenBottomInputGrowsNextFrame() {
+        val publisherStarted = CompletableDeferred<Unit>()
+        val releaseSuccess = CompletableDeferred<Unit>()
+        val draftStore = DraftStore(InMemoryDraftPersistence())
+        val appState = appState(draftStore)
+        val dictatedDraft = "This dictated message was sent as soon as transcription completed."
+        val seededPreview = notifiedMessagePreview()
+        assertNotEquals(CONFIRMED_MESSAGE_ID, seededPreview.messageIdHex)
+        assertNotEquals(dictatedDraft, seededPreview.plaintext)
+        draftStore.set(ACCOUNT_A, DICTATION_GROUP, TextFieldValue(dictatedDraft))
+        val fixture =
+            productionConversation(
+                appState = appState,
+                accountRef = ACCOUNT_A,
+                groupIdHex = DICTATION_GROUP,
+                initialPreview = seededPreview,
+                clockMillis = { DICTATION_TIMESTAMP_MILLIS },
+            ) { _, _, _, _ ->
+                publisherStarted.complete(Unit)
+                releaseSuccess.await()
+                successfulSendSummary()
+            }
+        showProductionConversation(appState, fixture)
+        composeRule
+            .onNodeWithTag(messageBubbleRowTestTag(seededPreview.messageIdHex), useUnmergedTree = true)
+            .assertIsDisplayed()
+        val compactComposerHeight = productionComposerPillContentHeight()
+
+        composeRule.mainClock.autoAdvance = false
+        try {
+            composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()
+            composeRule.waitUntil(timeoutMillis = 5_000) {
+                publisherStarted.isCompleted &&
+                    fixture.controller.timeline.any { it.record.plaintext == dictatedDraft }
+            }
+            val optimisticMessageId =
+                composeRule.runOnIdle {
+                    fixture.controller.timeline
+                        .single { it.record.plaintext == dictatedDraft }
+                        .record.messageIdHex
+                }
+            composeRule.runOnUiThread {
+                appState.composerExpansionStateRetention.update(
+                    ACCOUNT_A,
+                    DICTATION_GROUP,
+                    manualPreference(240f),
+                    draftGeneration = appState.composerDraftGeneration(ACCOUNT_A, DICTATION_GROUP),
+                )
+            }
+            repeat(30) { composeRule.mainClock.advanceTimeByFrame() }
+            composeRule.waitForIdle()
+
+            assertTrue(
+                "the synthetic post-send input must grow after the optimistic row is published",
+                productionComposerPillContentHeight() > compactComposerHeight + 100f,
+            )
+            val bubble =
+                composeRule
+                    .onNodeWithTag(messageBubbleRowTestTag(optimisticMessageId), useUnmergedTree = true)
+                    .assertIsDisplayed()
+                    .fetchSemanticsNode()
+                    .boundsInRoot
+            val composer = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).fetchSemanticsNode().boundsInRoot
+            assertTrue(
+                "the dictated bubble must settle above the delayed replacement input: $bubble vs $composer",
+                bubble.bottom <= composer.top,
+            )
+            composeRule.onNodeWithTag(CONVERSATION_INITIAL_LOADING_TEST_TAG).assertDoesNotExist()
+            composeRule.onRoot().captureRoboImage(
+                "src/test/snapshots/conversation_dictated_send_delayed_input_growth_light.png",
+            )
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+            releaseSuccess.complete(Unit)
+        }
+
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            fixture.controller.timeline.any { message ->
+                message.record.messageIdHex == CONFIRMED_MESSAGE_ID && message.status == MessageStatus.Sent
+            }
+        }
+    }
+
+    /**
      * A durable callback from an older accepted send cannot delete text or
      * full-screen geometry created while that publish was in flight.
      */
@@ -634,6 +727,8 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         appState: WhiteNoiseAppState,
         accountRef: String,
         groupIdHex: String,
+        initialPreview: ChatListMessagePreviewFfi? = null,
+        clockMillis: () -> Long = System::currentTimeMillis,
         textPublisher: suspend (String?, String, String, String) -> SendSummaryFfi =
             { _, _, _, _ -> successfulSendSummary() },
     ): ProductionConversation {
@@ -654,8 +749,10 @@ class ConversationComposerExpansionRetentionScreenshotTest {
                 appState = appState,
                 initialGroup = group,
                 initialMemberSnapshot = memberSnapshot,
+                initialTimelinePreview = initialPreview,
                 accountRefOverride = accountRef,
                 startOnConstruction = false,
+                clockMillis = clockMillis,
                 textPublisher = textPublisher,
                 markdownParser = { EMPTY_MARKDOWN_DOCUMENT },
             ).also { controllers += it }
@@ -668,6 +765,18 @@ class ConversationComposerExpansionRetentionScreenshotTest {
                     otherMemberAccount = null,
                     memberCount = 1,
                     memberSnapshot = memberSnapshot,
+                    projection =
+                        initialPreview?.let { preview ->
+                            notificationChatListRow().copy(
+                                groupIdHex = groupIdHex,
+                                lastMessage = preview,
+                                unreadCount = 0uL,
+                                hasUnread = false,
+                                firstUnreadMessageIdHex = null,
+                                lastReadMessageIdHex = preview.messageIdHex,
+                                lastReadTimelineAt = preview.timelineAt,
+                            )
+                        },
                 ),
             controller = controller,
         )
@@ -733,6 +842,8 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         const val ACCOUNT_B_ID = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
         const val GROUP_A = "group-a"
         const val GROUP_B = "group-b"
+        val DICTATION_GROUP = "d4".repeat(32)
+        const val DICTATION_TIMESTAMP_MILLIS = 1_700_000_000_000L
         val CONFIRMED_MESSAGE_ID = "c3".repeat(32)
         const val CHAT_LIST = "Chat list"
         const val COMPOSER = "retained-composer"
