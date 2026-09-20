@@ -209,7 +209,8 @@ internal class TtsPlaybackQueue(
                 units *
                     (1.0 - active.messageProgressFraction.coerceIn(0f, 1f))
             val millis = remainingUnits * msPerUnitAt1x / rate.coerceIn(0.1f, 10f)
-            kotlin.math.ceil(millis / 1_000.0).toInt().coerceAtLeast(0)
+            val seconds = kotlin.math.ceil(millis / 1_000.0).toInt()
+            seconds.coerceAtLeast(0)
         }
     }
 
