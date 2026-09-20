@@ -8166,6 +8166,14 @@
           "SEC-012",
           "SEC-013"
         ]
+      },
+      {
+        "surface": "rememberedMessageBubbleTime",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/CopyBundles.kt",
+        "anchor": "fun rememberedMessageBubbleTime(",
+        "test_ids": [
+          "CON-018"
+        ]
       }
     ],
     "settings_controls": [
