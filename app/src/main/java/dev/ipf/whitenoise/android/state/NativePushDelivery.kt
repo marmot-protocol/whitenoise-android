@@ -30,6 +30,76 @@ internal data class NativePushFallbackOwner(
     val intentGeneration: Long,
 )
 
+/** Exact device-wide owner of one notification-delivery transaction. */
+internal data class NotificationDeliveryModeOwner(
+    val activeAccountRef: String,
+    val accountRefs: List<String>,
+    val runtime: AppMarmotRuntime,
+    val runtimeGeneration: Int,
+    val accountSwitchGeneration: Long,
+    val intentGeneration: Long,
+)
+
+/** Activation result that carries both the selected mode and whether the device-wide invariant needs repair. */
+internal data class NotificationDeliveryActivationPlan(
+    val mode: NotificationDeliveryMode,
+    val requiresDeviceWideReconciliation: Boolean,
+)
+
+/** The only two user-facing notification delivery choices. */
+internal enum class NotificationDeliveryMode {
+    Fcm,
+    Local,
+}
+
+/** Projects one truthful choice from native settings and Android persistent-delivery ownership. */
+internal fun notificationDeliveryMode(
+    settings: dev.ipf.marmotkit.NotificationSettingsFfi?,
+    persistentConnectionEnabled: Boolean,
+    nativePushCapability: NativePushCapability,
+): NotificationDeliveryMode =
+    if (
+        nativePushCapability.isAvailable &&
+        settings?.nativePushEnabled == true &&
+        !persistentConnectionEnabled
+    ) {
+        NotificationDeliveryMode.Fcm
+    } else {
+        NotificationDeliveryMode.Local
+    }
+
+/** Orders mode cutover so the working path is disabled only after its replacement is confirmed. */
+internal suspend fun configureNotificationDeliveryMode(
+    mode: NotificationDeliveryMode,
+    enableRendering: suspend () -> Boolean,
+    enableNativePush: suspend () -> Boolean,
+    disableNativePush: suspend () -> Boolean,
+    enablePersistentDelivery: suspend () -> Boolean,
+    disablePersistentDelivery: suspend () -> Boolean,
+): Boolean {
+    if (!enableRendering()) return false
+    return when (mode) {
+        NotificationDeliveryMode.Fcm -> {
+            if (!enableNativePush()) {
+                false
+            } else if (disablePersistentDelivery()) {
+                true
+            } else {
+                val nativeDisabled = disableNativePush()
+                val persistentRestored = enablePersistentDelivery()
+                nativeDisabled && persistentRestored
+            }
+        }
+        NotificationDeliveryMode.Local -> {
+            if (!enablePersistentDelivery()) {
+                false
+            } else {
+                disableNativePush()
+            }
+        }
+    }
+}
+
 /** Resolves the first unavailable build or device prerequisite without reaching later SDKs. */
 internal fun nativePushCapabilityForContext(
     context: Context,

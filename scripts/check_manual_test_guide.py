@@ -216,7 +216,7 @@ SEMANTIC_OWNER_IDS = {
         "intent:android.speech.action.RECOGNIZE_SPEECH": {"DIC-001", "DIC-002"},
         "intent:application/*": {"SYS-004"},
         "intent:audio/*": {"SYS-004"},
-        "intent:com.google.firebase.MESSAGING_EVENT": {"NTF-002", "NTF-003", "NTF-006"},
+        "intent:com.google.firebase.MESSAGING_EVENT": {"NTF-002", "NTF-003", "NTF-006", "NTF-019", "NTF-020"},
         "intent:image/*": {"SYS-004"},
         "intent:marmot": {"SYS-006"},
         "intent:nostrsigner": {"ONB-010", "ONB-011", "ONB-012"},

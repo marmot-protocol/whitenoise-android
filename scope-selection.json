@@ -1,0 +1,126 @@
+{
+  "work_item": "Android notification recovery and tracker #2692 children #2503, #2675, #2676",
+  "base_revision": "0fe7a2d4239dee24598a58b3ad2035fa2f801a0e",
+  "mandatory": [
+    {
+      "capability": "priority-aware dispatch",
+      "selection": "included"
+    },
+    {
+      "capability": "durable rejected-start and bootstrap recovery",
+      "selection": "included"
+    },
+    {
+      "capability": "deleted-backlog recovery",
+      "selection": "included"
+    },
+    {
+      "capability": "generation-safe work coalescing",
+      "selection": "included"
+    },
+    {
+      "capability": "finite shared attempt budget",
+      "selection": "included"
+    },
+    {
+      "capability": "privacy-safe phase diagnostics",
+      "selection": "included"
+    },
+    {
+      "capability": "single FCM-or-Local notification delivery mode",
+      "selection": "included"
+    },
+    {
+      "capability": "registration-confirmed FCM cutover and service-acknowledged Local cutover",
+      "selection": "included"
+    },
+    {
+      "capability": "permission, capability, legacy-state, process-restoration, rapid-intent, and multi-account convergence",
+      "selection": "included"
+    },
+    {
+      "capability": "live notification permission and Android battery-policy status",
+      "selection": "included"
+    },
+    {
+      "capability": "user-initiated app battery settings with fallback and no exemption request",
+      "selection": "included"
+    },
+    {
+      "capability": "per-callback anonymous diagnostic correlation and bounded in-app export",
+      "selection": "included"
+    },
+    {
+      "capability": "light, dark, AMOLED, RTL, large-text, semantics, and whole-row mode-selection coverage",
+      "selection": "included"
+    },
+    {
+      "capability": "existing native source of truth and runtime ownership",
+      "selection": "included"
+    },
+    {
+      "capability": "notification preferences and suppression fences",
+      "selection": "included"
+    },
+    {
+      "capability": "no periodic or idle recovery work",
+      "selection": "included"
+    },
+    {
+      "capability": "no extra worker wake lock",
+      "selection": "included"
+    },
+    {
+      "capability": "focused scheduler/native race tests",
+      "selection": "included"
+    },
+    {
+      "capability": "completion gate",
+      "selection": "included"
+    },
+    {
+      "capability": "permanent manual tests",
+      "selection": "included"
+    },
+    {
+      "capability": "safe available device checks",
+      "selection": "included"
+    },
+    {
+      "capability": "battery and latency qualification report",
+      "selection": "included"
+    },
+    {
+      "capability": "Project 7 tracking and review checks",
+      "selection": "included",
+      "status": "blocked: authenticated CLI project/search requests return HTTP 401; public issue read alone cannot verify project state"
+    }
+  ],
+  "optional": [
+    {
+      "capability": "authoritative already-read notification suppression (#2065)",
+      "selection": "deferred"
+    },
+    {
+      "capability": "native library or protocol changes",
+      "selection": "deferred"
+    },
+    {
+      "capability": "push-server policy changes",
+      "selection": "deferred"
+    },
+    {
+      "capability": "worker-first high-priority replacement without paired evidence",
+      "selection": "deferred"
+    },
+    {
+      "capability": "Android-owned message or unread cache",
+      "selection": "deferred"
+    },
+    {
+      "capability": "attention-state notification policy outside tracker #2692 children",
+      "selection": "deferred"
+    }
+  ],
+  "qualification_constraint": "User requested safe device checks only; no disposable identity/sender setup. Full paired energy and end-to-end latency qualification remain unperformed."
+}

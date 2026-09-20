@@ -34,6 +34,7 @@ class DiagnosticsContentTest {
     private var sends = 0
     private var clears = 0
     private var performance: Boolean? = null
+    private var performanceCopies = 0
     private val entries = mutableStateOf(emptyList<DiagnosticLogEntry>())
     private val streaming = mutableStateOf(false)
 
@@ -123,6 +124,14 @@ class DiagnosticsContentTest {
         }
     }
 
+    /** Bounded performance evidence is copyable only after the session emitted an event. */
+    @Test fun performanceCopyRequiresRetainedEvidence() {
+        render(performanceAvailable = true, performanceEventCount = 1)
+        health()
+        composeRule.onNodeWithTag("diagnostics.performance.copy").performScrollTo().performClick()
+        composeRule.runOnIdle { assertEquals(1, performanceCopies) }
+    }
+
     /** Release builds omit performance controls and closing Health preserves the screen's back navigation. */
     @Test fun unavailableLoggingIsHiddenAndCloseDoesNotNavigateBack() {
         render()
@@ -159,6 +168,7 @@ class DiagnosticsContentTest {
         sending: Boolean = false,
         relay: DiagnosticsRelayHealth? = null,
         performanceAvailable: Boolean = false,
+        performanceEventCount: Int = 0,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -172,7 +182,7 @@ class DiagnosticsContentTest {
                             entries.value.size,
                             streaming.value,
                             sending,
-                            PerformanceDiagnosticStatus(performanceAvailable, false, 0L, 0, 0),
+                            PerformanceDiagnosticStatus(performanceAvailable, false, 0L, performanceEventCount, 0),
                         ),
                     entries = entries.value,
                     onBack = { backs++ },
@@ -183,6 +193,7 @@ class DiagnosticsContentTest {
                         entries.value = emptyList()
                     },
                     onPerformanceEnabledChange = { performance = it },
+                    onCopyPerformanceLogs = { performanceCopies++ },
                 )
             }
         }

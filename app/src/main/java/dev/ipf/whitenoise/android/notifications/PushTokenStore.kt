@@ -17,10 +17,21 @@ private const val KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC = "pending_native_pu
 private const val KEY_PENDING_PUSH_WAKE_CATCH_UP = "pending_push_wake_catch_up"
 private const val KEY_PENDING_PUSH_WAKE_CATCH_UP_GENERATION = "pending_push_wake_catch_up_generation"
 private const val KEY_PUSH_WAKE_CATCH_UP_SEQUENCE = "push_wake_catch_up_sequence"
+private const val KEY_WAKE_ATTEMPTS = "push_wake_attempts"
+private const val KEY_WAKE_RETRY_AT = "push_wake_retry_at"
+internal const val PUSH_WAKE_MAX_ATTEMPTS = 4
+internal const val PUSH_WAKE_BACKOFF_MS = 30_000L
+private const val PUSH_WAKE_MAX_BACKOFF_MS = 240_000L
 private const val KEY_PENDING_CLEARS = "pending_clears"
 private const val KEY_PENDING_DISABLES = "pending_native_push_disables"
 private const val NO_PENDING_PUSH_WAKE_CATCH_UP = 0L
 private const val LEGACY_PENDING_PUSH_WAKE_CATCH_UP_GENERATION = 1L
+
+/** Snapshot needed to undo a reserved attempt that loses its lifecycle fence before native work starts. */
+internal data class PushWakeAttemptClaim(
+    val priorAttempts: Int,
+    val priorRetryAtMs: Long,
+)
 
 /**
  * Persisted FCM token cache. The [MarmotFirebaseMessagingService] writes here
@@ -103,7 +114,7 @@ class PushTokenStore(
      * after an earlier marker was cleared.
      */
     @SuppressLint("ApplySharedPref")
-    fun recordPendingPushWakeCatchUp() {
+    fun recordPendingPushWakeCatchUp(): Boolean =
         synchronized(LOCK) {
             val previousGeneration =
                 maxOf(
@@ -118,7 +129,6 @@ class PushTokenStore(
                 .remove(KEY_PENDING_PUSH_WAKE_CATCH_UP)
                 .commit()
         }
-    }
 
     /** Clears the current pending wake while retaining its sequence for future distinct wake identities. */
     fun clearPendingPushWakeCatchUp() {
@@ -132,21 +142,103 @@ class PushTokenStore(
         if (generation == NO_PENDING_PUSH_WAKE_CATCH_UP) return false
         synchronized(LOCK) {
             if (pendingPushWakeCatchUpGenerationLocked() != generation) return false
-            clearPendingPushWakeCatchUpLocked()
-            return true
+            return clearPendingPushWakeCatchUpLocked()
         }
     }
 
     /** Removes both legacy and generation-based markers while the caller holds the process-wide lock. */
-    private fun clearPendingPushWakeCatchUpLocked() {
-        // apply() is intentionally enough for clears: losing a clear only causes
-        // a redundant catch-up retry, while losing a record would lose a wake.
+    @SuppressLint("ApplySharedPref")
+    private fun clearPendingPushWakeCatchUpLocked(): Boolean =
         preferences
             .edit()
             .remove(KEY_PENDING_PUSH_WAKE_CATCH_UP_GENERATION)
             .remove(KEY_PENDING_PUSH_WAKE_CATCH_UP)
-            .apply()
-    }
+            .remove(KEY_WAKE_ATTEMPTS)
+            .remove(KEY_WAKE_RETRY_AT)
+            .commit()
+
+    /** Returns the shared service/worker budget; changing owners never resets it. */
+    internal fun pushWakeAttempts(): Int = synchronized(LOCK) { preferences.getInt(KEY_WAKE_ATTEMPTS, 0) }
+
+    /** Reports a finite retry delay, tolerating wall-clock rollback without an indefinite lockout. */
+    internal fun pushWakeRetryDelay(nowMs: Long): Long =
+        synchronized(LOCK) {
+            (preferences.getLong(KEY_WAKE_RETRY_AT, 0L) - nowMs).takeIf { it in 1L..PUSH_WAKE_MAX_BACKOFF_MS } ?: 0L
+        }
+
+    /** Reserves one actual native attempt durably before entering the shared catch-up lane. */
+    @SuppressLint("ApplySharedPref")
+    internal fun claimPushWakeAttempt(nowMs: Long): PushWakeAttemptClaim? =
+        synchronized(LOCK) {
+            val priorAttempts = pushWakeAttempts()
+            val exhausted = priorAttempts >= PUSH_WAKE_MAX_ATTEMPTS
+            if (!pushWakeCatchUpPending() || exhausted || pushWakeRetryDelay(nowMs) > 0L) {
+                return@synchronized null
+            }
+            val priorRetryAtMs = preferences.getLong(KEY_WAKE_RETRY_AT, 0L)
+            val committed =
+                preferences
+                    .edit()
+                    .putInt(KEY_WAKE_ATTEMPTS, priorAttempts + 1)
+                    .apply {
+                        if (priorAttempts + 1 == PUSH_WAKE_MAX_ATTEMPTS) {
+                            putLong(KEY_WAKE_RETRY_AT, nowMs + PUSH_WAKE_MAX_BACKOFF_MS)
+                        }
+                    }.commit()
+            PushWakeAttemptClaim(priorAttempts, priorRetryAtMs).takeIf { committed }
+        }
+
+    /** Restores the exact budget snapshot when lifecycle changed before the reserved native attempt began. */
+    @SuppressLint("ApplySharedPref")
+    internal fun releasePushWakeAttempt(claim: PushWakeAttemptClaim): Boolean =
+        synchronized(LOCK) {
+            if (pushWakeAttempts() != claim.priorAttempts + 1) return@synchronized false
+            preferences
+                .edit()
+                .apply {
+                    if (claim.priorAttempts == 0) {
+                        remove(KEY_WAKE_ATTEMPTS)
+                    } else {
+                        putInt(KEY_WAKE_ATTEMPTS, claim.priorAttempts)
+                    }
+                    if (claim.priorRetryAtMs == 0L) {
+                        remove(KEY_WAKE_RETRY_AT)
+                    } else {
+                        putLong(KEY_WAKE_RETRY_AT, claim.priorRetryAtMs)
+                    }
+                }.commit()
+        }
+
+    /** Persists backoff for every owner, including pushes arriving during a failing episode. */
+    @SuppressLint("ApplySharedPref")
+    internal fun deferPushWakeRetry(nowMs: Long): Boolean =
+        synchronized(LOCK) {
+            val delayMs = PUSH_WAKE_BACKOFF_MS * (1L shl (pushWakeAttempts() - 1).coerceIn(0, 3))
+            preferences.edit().putLong(KEY_WAKE_RETRY_AT, nowMs + delayMs).commit()
+        }
+
+    /** Successful native settlement ends the failing episode even if a newer wake still needs a fresh fetch. */
+    @SuppressLint("ApplySharedPref")
+    internal fun completePushWakeAttempt(): Boolean =
+        synchronized(LOCK) {
+            preferences
+                .edit()
+                .remove(KEY_WAKE_ATTEMPTS)
+                .remove(KEY_WAKE_RETRY_AT)
+                .commit()
+        }
+
+    /** Only an external wake/lifecycle edge may reopen an exhausted episode after its cooldown. */
+    @SuppressLint("ApplySharedPref")
+    internal fun admitPushWakeEpisode(nowMs: Long): Boolean =
+        synchronized(LOCK) {
+            if (pushWakeAttempts() < PUSH_WAKE_MAX_ATTEMPTS || pushWakeRetryDelay(nowMs) > 0L) return@synchronized true
+            preferences
+                .edit()
+                .remove(KEY_WAKE_ATTEMPTS)
+                .remove(KEY_WAKE_RETRY_AT)
+                .commit()
+        }
 
     /** Interprets a legacy pending Boolean as the first generation until a newer durable wake is recorded. */
     private fun pendingPushWakeCatchUpGenerationLocked(): Long {

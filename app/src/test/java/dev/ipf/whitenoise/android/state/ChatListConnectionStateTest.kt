@@ -204,7 +204,10 @@ class ChatListConnectionStateTest {
                                 true
                             }
                         },
-                        onSucceeded = { markerCleared = true },
+                        onSucceeded = {
+                            markerCleared = true
+                            true
+                        },
                     )
                 }
             runCurrent()
@@ -232,7 +235,10 @@ class ChatListConnectionStateTest {
                         launches += 1
                         CompletableDeferred(AccountCatchUpResult(AccountCatchUpOutcome.Superseded))
                     },
-                    onSucceeded = { markerCleared = true },
+                    onSucceeded = {
+                        markerCleared = true
+                        true
+                    },
                     maxSupersededReplacements = 2,
                 )
 

@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.work.Configuration
 import androidx.work.Operation
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
+import dev.ipf.whitenoise.android.notifications.PushWakeRecoveryScheduler
 import dev.ipf.whitenoise.android.state.DisappearingMessageSweepWorker
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.applyApplicationLanguageTag
@@ -46,9 +47,14 @@ open class WhiteNoiseApplication :
      * state behind the same `applicationContext as WhiteNoiseApplication`
      * boundary the production workers use.
      */
-    open val appState: WhiteNoiseAppState by lazy {
-        WhiteNoiseAppState(this)
-    }
+    private val appStateDelegate =
+        lazy {
+            WhiteNoiseAppState(this)
+        }
+    open val appState: WhiteNoiseAppState by appStateDelegate
+
+    /** Inspects an existing runtime without bootstrapping solely to decide push ownership. */
+    internal fun initializedAppState(): WhiteNoiseAppState? = if (appStateDelegate.isInitialized()) appState else null
 
     val recentEmojiRecentsOwner by lazy {
         createRecentEmojiRecentsOwner()
@@ -94,6 +100,7 @@ open class WhiteNoiseApplication :
         // onCreate on API 32 and lower so it can wrap the Activity context.
         applyApplicationLanguageTag(persistedApplicationLanguageTag(this))
         VoicePlaybackController.attach(this)
+        applicationScope.launch { PushWakeRecoveryScheduler.schedule(this@WhiteNoiseApplication) }
     }
 
     @Suppress("TooGenericExceptionCaught")

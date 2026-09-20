@@ -129,12 +129,18 @@ import dev.ipf.whitenoise.android.notifications.NotificationReplySendOutcome
 import dev.ipf.whitenoise.android.notifications.NotificationReplyTimelinePage
 import dev.ipf.whitenoise.android.notifications.NotificationReplyTimelineRecord
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
+import dev.ipf.whitenoise.android.notifications.PUSH_WAKE_MAX_ATTEMPTS
 import dev.ipf.whitenoise.android.notifications.PushServerConfig
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
+import dev.ipf.whitenoise.android.notifications.PushWakeAttemptClaim
+import dev.ipf.whitenoise.android.notifications.PushWakeDiagnostics
+import dev.ipf.whitenoise.android.notifications.PushWakeEvent
+import dev.ipf.whitenoise.android.notifications.PushWakeRecoveryScheduler
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
 import dev.ipf.whitenoise.android.notifications.normalizeNotificationReaction
 import dev.ipf.whitenoise.android.notifications.notificationReplyRecoveryBoundary
 import dev.ipf.whitenoise.android.notifications.notificationReplySendWindowReady
+import dev.ipf.whitenoise.android.notifications.readNotificationBatteryPolicy
 import dev.ipf.whitenoise.android.share.CappedShareStreamStaging
 import dev.ipf.whitenoise.android.share.SHARE_STREAM_MAX_ITEMS
 import dev.ipf.whitenoise.android.share.ShareInboundStager
@@ -201,10 +207,12 @@ import java.net.InetAddress
 import java.net.URI
 import java.util.Locale
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.resume
 import dev.ipf.whitenoise.android.audio.ConversationDictationTargetValidation as TargetValidation
 import dev.ipf.whitenoise.android.notifications.notificationReplyCommitProbe as probeNotificationReplyCommit
+import dev.ipf.whitenoise.android.notifications.openNotificationBatterySettings as openSystemNotificationBatterySettings
 
 private const val NATIVE_ATTACHMENT_PERMISSION_RETRY_LIMIT = 3
 private const val NATIVE_ATTACHMENT_PERMISSION_RETRY_DELAY_MILLIS = 500L
@@ -1031,6 +1039,14 @@ private data class AccountUnreadFoldResult(
     val value: AccountUnreadValue,
 )
 
+private sealed interface PushWakeAdmission {
+    data object Rejected : PushWakeAdmission
+
+    data class Admitted(
+        val claim: PushWakeAttemptClaim?,
+    ) : PushWakeAdmission
+}
+
 class WhiteNoiseAppState private constructor(
     context: Context,
     val draftStore: DraftStore,
@@ -1047,12 +1063,17 @@ class WhiteNoiseAppState private constructor(
     private val notificationDispatcher: CoroutineDispatcher,
     private val notificationCardCancellationDispatcher: CoroutineDispatcher,
     private val notificationReceiverTimeoutMillis: () -> Long,
+    private val pushWakeNowMs: () -> Long,
+    private val pushWakeStorageDispatcher: CoroutineDispatcher,
+    private val schedulePushWakeRecovery: () -> Boolean,
     private val bootstrapActionableTimeoutMillis: () -> Long,
     private val notificationFirstPostTimingObserver: ((NotificationFirstPostTimingEvent) -> Unit)?,
     private val notificationNetworkRecoveryDiagnostics: NotificationNetworkRecoveryDiagnostics,
     private val inboundShareTextStager: ((String, String, String) -> Unit)?,
     private val messageDraftRepositoryOverride: MessageDraftRepository?,
     private val nativePushFallbackPlatform: NativePushFallbackPlatform,
+    private val pushServerConfigProvider: () -> PushServerConfig?,
+    private val nativePushCapabilityResolver: (PushServerConfig?) -> NativePushCapability,
     preferencesOverride: SharedPreferences?,
     initialAccounts: List<AccountSummaryFfi>,
     initialActiveAccountRef: String?,
@@ -1092,12 +1113,17 @@ class WhiteNoiseAppState private constructor(
             notificationDispatcher = Dispatchers.IO,
             notificationCardCancellationDispatcher = processNotificationCardCancellationDispatcher,
             notificationReceiverTimeoutMillis = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
+            pushWakeNowMs = System::currentTimeMillis,
+            pushWakeStorageDispatcher = Dispatchers.IO,
+            schedulePushWakeRecovery = { PushWakeRecoveryScheduler.schedule(context.applicationContext) },
             bootstrapActionableTimeoutMillis = { BOOTSTRAP_ACTIONABLE_TIMEOUT_MILLIS },
             notificationFirstPostTimingObserver = null,
             notificationNetworkRecoveryDiagnostics = NotificationNetworkRecoveryDiagnostics(),
             inboundShareTextStager = null,
             messageDraftRepositoryOverride = null,
             nativePushFallbackPlatform = AndroidNativePushFallbackPlatform(context),
+            pushServerConfigProvider = PushServerConfig::current,
+            nativePushCapabilityResolver = { nativePushCapabilityForContext(context.applicationContext, it) },
             preferencesOverride = null,
             initialAccounts = emptyList(),
             initialActiveAccountRef = null,
@@ -1121,6 +1147,9 @@ class WhiteNoiseAppState private constructor(
         notificationDispatcher: CoroutineDispatcher = Dispatchers.IO,
         notificationCardCancellationDispatcher: CoroutineDispatcher = processNotificationCardCancellationDispatcher,
         notificationReceiverTimeoutMillis: () -> Long = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
+        pushWakeNowMs: () -> Long = System::currentTimeMillis,
+        pushWakeStorageDispatcher: CoroutineDispatcher = Dispatchers.IO,
+        schedulePushWakeRecovery: () -> Boolean = { PushWakeRecoveryScheduler.schedule(context.applicationContext) },
         bootstrapActionableTimeoutMillis: () -> Long = { BOOTSTRAP_ACTIONABLE_TIMEOUT_MILLIS },
         notificationFirstPostTimingObserver: ((NotificationFirstPostTimingEvent) -> Unit)? = null,
         notificationNetworkRecoveryDiagnostics: NotificationNetworkRecoveryDiagnostics =
@@ -1128,6 +1157,10 @@ class WhiteNoiseAppState private constructor(
         inboundShareTextStager: ((String, String, String) -> Unit)? = null,
         messageDraftRepository: MessageDraftRepository? = null,
         nativePushFallbackPlatform: NativePushFallbackPlatform = AndroidNativePushFallbackPlatform(context),
+        pushServerConfigProvider: () -> PushServerConfig? = PushServerConfig::current,
+        nativePushCapabilityResolver: (PushServerConfig?) -> NativePushCapability = {
+            nativePushCapabilityForContext(context.applicationContext, it)
+        },
         preferences: SharedPreferences? = null,
     ) : this(
         context = context,
@@ -1145,12 +1178,17 @@ class WhiteNoiseAppState private constructor(
         notificationDispatcher = notificationDispatcher,
         notificationCardCancellationDispatcher = notificationCardCancellationDispatcher,
         notificationReceiverTimeoutMillis = notificationReceiverTimeoutMillis,
+        pushWakeNowMs = pushWakeNowMs,
+        pushWakeStorageDispatcher = pushWakeStorageDispatcher,
+        schedulePushWakeRecovery = schedulePushWakeRecovery,
         bootstrapActionableTimeoutMillis = bootstrapActionableTimeoutMillis,
         notificationFirstPostTimingObserver = notificationFirstPostTimingObserver,
         notificationNetworkRecoveryDiagnostics = notificationNetworkRecoveryDiagnostics,
         inboundShareTextStager = inboundShareTextStager,
         messageDraftRepositoryOverride = messageDraftRepository,
         nativePushFallbackPlatform = nativePushFallbackPlatform,
+        pushServerConfigProvider = pushServerConfigProvider,
+        nativePushCapabilityResolver = nativePushCapabilityResolver,
         preferencesOverride = preferences,
         initialAccounts = accounts,
         initialActiveAccountRef = activeAccountRef,
@@ -1427,6 +1465,8 @@ class WhiteNoiseAppState private constructor(
     private var bootstrapCompleted = false
     private val nativePushSyncMutex = Mutex()
     private val nativePushFallback = NativePushFallbackCoordinator(nativePushFallbackPlatform)
+    private val notificationDeliveryModeMutex = Mutex()
+    private val notificationDeliveryModeIntent = StalenessGuard()
     private val ttsRefreshMutex = Mutex()
     private val auditLogSettingsMutex = Mutex()
     private val auditUploadConsent = AuditUploadConsent(preferences)
@@ -1987,6 +2027,12 @@ class WhiteNoiseAppState private constructor(
         private set
 
     var backgroundConnectionEnabled by mutableStateOf(BackgroundConnectionPreferences.isEnabled(appContext))
+        private set
+
+    var notificationDeliveryModeBusy by mutableStateOf(false)
+        private set
+
+    internal var notificationBatteryPolicy by mutableStateOf(readNotificationBatteryPolicy(appContext))
         private set
 
     private var defaultNotificationsEnableAttempted by mutableStateOf(
@@ -3800,6 +3846,7 @@ class WhiteNoiseAppState private constructor(
     private fun launchAccountCatchUp(
         mustStartAfter: Long?,
         trigger: PerformanceTrigger,
+        publishReadiness: Boolean = true,
     ): Deferred<AccountCatchUpResult> =
         AccountCatchUpKey(
             accountRef = activeAccountRef,
@@ -3807,12 +3854,9 @@ class WhiteNoiseAppState private constructor(
             networkGeneration = connectivitySignalOwner.captureNetworkGeneration(),
         ).let { key ->
             val catchUp: suspend () -> Boolean = {
-                val succeeded = instrumentedCatchUpAccounts(trigger)
-                if (succeeded) recordStartupRelayCatchUpReady()
-                succeeded &&
-                    activeAccountRef == key.accountRef &&
-                    runtimeGeneration == key.runtimeGeneration &&
-                    connectivitySignalOwner.isNetworkGenerationCurrent(key.networkGeneration)
+                performAccountCatchUp(key, trigger).also { succeeded ->
+                    if (succeeded && publishReadiness) recordStartupRelayCatchUpReady()
+                }
             }
             if (mustStartAfter == null) {
                 accountCatchUpCoordinator.launch(key, catchUp)
@@ -3820,6 +3864,83 @@ class WhiteNoiseAppState private constructor(
                 accountCatchUpCoordinator.launchAfter(mustStartAfter, key, catchUp)
             }
         }
+
+    /** Checks queued work again at native admission and settlement, including destructive teardown. */
+    private fun isCatchUpKeyCurrent(key: AccountCatchUpKey): Boolean =
+        activeAccountRef == key.accountRef &&
+            runtimeGeneration == key.runtimeGeneration &&
+            connectivitySignalOwner.isNetworkGenerationCurrent(key.networkGeneration) &&
+            !networkNotificationRecoverySuppressed
+
+    /** Charges only executed native work; every owner shares this durable failure budget. */
+    private suspend fun performAccountCatchUp(
+        key: AccountCatchUpKey,
+        trigger: PerformanceTrigger,
+    ): Boolean =
+        if (!isCatchUpKeyCurrent(key)) {
+            false
+        } else {
+            when (val admission = reservePushWakeAttempt()) {
+                PushWakeAdmission.Rejected -> false
+                is PushWakeAdmission.Admitted -> {
+                    if (isCatchUpKeyCurrent(key)) {
+                        performAdmittedAccountCatchUp(key, trigger, admission.claim)
+                    } else {
+                        admission.claim?.let { reserved -> releasePushWakeAttempt(reserved) }
+                        false
+                    }
+                }
+            }
+        }
+
+    /** Reads and reserves the durable budget together on storage IO. */
+    private suspend fun reservePushWakeAttempt(): PushWakeAdmission =
+        withContext(pushWakeStorageDispatcher) {
+            if (!pushTokenStore.pushWakeCatchUpPending()) {
+                PushWakeAdmission.Admitted(claim = null)
+            } else {
+                val claim = pushTokenStore.claimPushWakeAttempt(pushWakeNowMs())
+                claim?.let(PushWakeAdmission::Admitted) ?: PushWakeAdmission.Rejected
+            }
+        }
+
+    /** Restores a reservation when a lifecycle fence changes while durable IO is suspended. */
+    private suspend fun releasePushWakeAttempt(claim: PushWakeAttemptClaim) {
+        withContext(pushWakeStorageDispatcher) {
+            if (!pushTokenStore.releasePushWakeAttempt(claim)) {
+                PushWakeDiagnostics.event(PushWakeEvent.PersistenceFailed)
+            }
+        }
+    }
+
+    /** Runs native catch-up only after admission and settles the same durable reservation. */
+    private suspend fun performAdmittedAccountCatchUp(
+        key: AccountCatchUpKey,
+        trigger: PerformanceTrigger,
+        claim: PushWakeAttemptClaim?,
+    ): Boolean {
+        val nativeSucceeded = instrumentedCatchUpAccounts(trigger)
+        var settlementSucceeded = nativeSucceeded && isCatchUpKeyCurrent(key)
+        if (claim != null) {
+            settlementSucceeded =
+                withContext(pushWakeStorageDispatcher) {
+                    val currentSuccess = nativeSucceeded && isCatchUpKeyCurrent(key)
+                    val persisted =
+                        if (currentSuccess) {
+                            pushTokenStore.completePushWakeAttempt()
+                        } else {
+                            pushTokenStore.deferPushWakeRetry(pushWakeNowMs())
+                        }
+                    check(persisted)
+                    currentSuccess
+                }
+        }
+        val succeeded = settlementSucceeded && isCatchUpKeyCurrent(key)
+        if (claim != null) {
+            PushWakeDiagnostics.event(if (succeeded) PushWakeEvent.AttemptSucceeded else PushWakeEvent.AttemptFailed)
+        }
+        return succeeded
+    }
 
     /** Runs catch-up work fresh enough to acknowledge the observed push-wake marker. */
     private suspend fun catchUpAfterObservedPushWake(
@@ -3830,11 +3951,22 @@ class WhiteNoiseAppState private constructor(
             return launchAccountCatchUp(mustStartAfter = null, trigger = trigger).await()
         }
         val observedStartSequence = accountCatchUpCoordinator.captureStartSequence()
-        return runCatchUpAfterTrigger(
-            observedStartSequence = observedStartSequence,
-            launchAfter = { sequence -> launchAccountCatchUp(mustStartAfter = sequence, trigger = trigger) },
-            onSucceeded = { clearPendingPushWakeCatchUpIfObserved(pendingGeneration) },
-        )
+        val result =
+            runCatchUpAfterTrigger(
+                observedStartSequence = observedStartSequence,
+                launchAfter = { sequence ->
+                    launchAccountCatchUp(
+                        mustStartAfter = sequence,
+                        trigger = trigger,
+                        publishReadiness = false,
+                    )
+                },
+                onSucceeded = { result ->
+                    result.key?.let { key -> acknowledgePendingPushWakeCatchUp(pendingGeneration, key) } == true
+                },
+            )
+        if (result.succeeded) recordStartupRelayCatchUpReady()
+        return result
     }
 
     /** Measures only native catch-up work admitted by the single-flight coordinator. */
@@ -3889,6 +4021,7 @@ class WhiteNoiseAppState private constructor(
         ) {
             return
         }
+        admitPushWakeEpisodeFromLifecycle()
         isForegroundCatchUpRunning = true
         try {
             val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
@@ -4378,6 +4511,119 @@ class WhiteNoiseAppState private constructor(
         return drainPendingPushWakeCatchUpIfNeeded()
     }
 
+    private val pushWakeAttemptMutex = kotlinx.coroutines.sync.Mutex()
+    private var acceptedPushWakeJob: Job? = null
+    private var acceptedPushWakeOwner: Any? = null
+    private var pushWakeServiceOwner: Any? = null
+
+    /** Fences teardown while preserving existing screen-lock notification redaction. */
+    internal fun pushWakeRecoveryAllowed(): Boolean = !networkNotificationRecoverySuppressed
+
+    /** Keeps storage failure in recovery bookkeeping from interrupting unlock or connectivity handling. */
+    private suspend fun admitPushWakeEpisodeFromLifecycle() {
+        if (!withContext(pushWakeStorageDispatcher) { pushTokenStore.admitPushWakeEpisode(pushWakeNowMs()) }) {
+            PushWakeDiagnostics.event(PushWakeEvent.PersistenceFailed)
+        }
+    }
+
+    /** Acknowledges the concrete foreground-service instance that currently owns background runtime. */
+    internal fun acknowledgePushWakeServiceOwner(owner: Any) {
+        assertMainThread { "acknowledgePushWakeServiceOwner" }
+        pushWakeServiceOwner = owner
+    }
+
+    /** Releases only the matching service lease and hands unresolved foreground work to durable scheduling. */
+    internal fun releasePushWakeServiceOwner(owner: Any) {
+        assertMainThread { "releasePushWakeServiceOwner" }
+        if (pushWakeServiceOwner !== owner) return
+        pushWakeServiceOwner = null
+        transferUnownedPushWakeRecovery()
+    }
+
+    /** Accepts a process-owned drain only while an Activity or acknowledged service owns its lifetime. */
+    internal fun acceptPushWakeRecovery(): Boolean {
+        assertMainThread { "acceptPushWakeRecovery" }
+        val ownsRuntime = bootstrapCompleted && (appInForeground || pushWakeServiceOwner != null)
+        return when {
+            !pushWakeRecoveryAllowed() || !ownsRuntime -> false
+            acceptedPushWakeJob?.isActive == true -> acceptedPushWakeOwner != null
+            else -> {
+                val owner = Any()
+                acceptedPushWakeOwner = owner
+                acceptedPushWakeJob =
+                    notificationScope.launch {
+                        try {
+                            runPushWakeRecoveryAttempt()
+                        } finally {
+                            if (acceptedPushWakeOwner === owner) {
+                                acceptedPushWakeOwner = null
+                                withContext(kotlinx.coroutines.NonCancellable + pushWakeStorageDispatcher) {
+                                    schedulePushWakeRecovery()
+                                }
+                            }
+                        }
+                    }
+                true
+            }
+        }
+    }
+
+    /** Revokes process ownership at its lifecycle boundary and immediately confirms a durable successor. */
+    private fun transferUnownedPushWakeRecovery() {
+        if (appInForeground || pushWakeServiceOwner != null) return
+        acceptedPushWakeOwner = null
+        acceptedPushWakeJob?.cancel()
+        acceptedPushWakeJob = null
+        notificationScope.launch(pushWakeStorageDispatcher) { schedulePushWakeRecovery() }
+    }
+
+    /**
+     * Shares service/worker ownership; cancellation leaves native settlement with AccountCatchUpCoordinator.
+     * Native/platform bootstrap failures preserve the shared retry obligation.
+     */
+    @Suppress("TooGenericExceptionCaught")
+    internal suspend fun runPushWakeRecoveryAttempt() {
+        pushWakeAttemptMutex.lock()
+        try {
+            val recoveryState =
+                withContext(pushWakeStorageDispatcher) {
+                    Triple(
+                        pushTokenStore.pushWakeCatchUpPending(),
+                        pushTokenStore.pushWakeAttempts(),
+                        pushTokenStore.pushWakeRetryDelay(pushWakeNowMs()),
+                    )
+                }
+            if (!pushWakeRecoveryAllowed() || !recoveryState.first) return
+            val generation = notificationRuntimeRecoveryGeneration()
+            val attempts = recoveryState.second
+            if (attempts >= PUSH_WAKE_MAX_ATTEMPTS || recoveryState.third > 0L) return
+            PushWakeDiagnostics.event(PushWakeEvent.AttemptStarted)
+            try {
+                ensureNotificationRuntimeStartedAndAwaitPushDrain()
+                val pending = withContext(pushWakeStorageDispatcher) { pushTokenStore.pushWakeCatchUpPending() }
+                if (notificationRuntimeRecoveryAllowed(generation) && !pending) {
+                    PushWakeDiagnostics.complete()
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                // Receiver/bootstrap failure must also consume this same finite episode.
+                if (notificationRuntimeRecoveryAllowed(generation)) {
+                    withContext(pushWakeStorageDispatcher) {
+                        if (pushTokenStore.pushWakeAttempts() == attempts) {
+                            checkNotNull(pushTokenStore.claimPushWakeAttempt(pushWakeNowMs()))
+                            check(pushTokenStore.deferPushWakeRetry(pushWakeNowMs()))
+                        }
+                    }
+                }
+                PushWakeDiagnostics.event(PushWakeEvent.AttemptFailed)
+                throw error
+            }
+        } finally {
+            pushWakeAttemptMutex.unlock()
+        }
+    }
+
     /** Captures the active notification-runtime recovery lifetime. */
     internal fun notificationRuntimeRecoveryGeneration(): Long = notificationRuntimeRecovery.capture()
 
@@ -4440,14 +4686,41 @@ class WhiteNoiseAppState private constructor(
         ).succeeded
     }
 
-    /** Clears only the durable wake generation acknowledged by successful fresh work. */
-    private fun clearPendingPushWakeCatchUpIfObserved(pendingGeneration: Long) {
-        if (pendingGeneration == 0L) return
-        if (pushTokenStore.clearPendingPushWakeCatchUp(pendingGeneration)) {
-            appStateDebug { "pending push wake catch-up drained" }
-        } else {
-            appStateDebug { "newer pending push wake catch-up remains queued" }
-        }
+    /**
+     * Clears only work whose recovery identity stays current across the durable acknowledgement commit.
+     * Cancellation is deferred across this bounded transaction so a committed clear cannot skip marker restoration.
+     */
+    private suspend fun acknowledgePendingPushWakeCatchUp(
+        pendingGeneration: Long,
+        key: AccountCatchUpKey,
+    ): Boolean {
+        if (pendingGeneration == 0L || !isCatchUpKeyCurrent(key)) return false
+        val acknowledged =
+            withContext(NonCancellable) {
+                val cleared =
+                    withContext(pushWakeStorageDispatcher) {
+                        pushTokenStore.clearPendingPushWakeCatchUp(pendingGeneration)
+                    }
+                if (!isCatchUpKeyCurrent(key)) {
+                    if (cleared) {
+                        val restored =
+                            withContext(pushWakeStorageDispatcher) {
+                                pushTokenStore.recordPendingPushWakeCatchUp()
+                            }
+                        check(restored) { "Unable to restore a push wake after its recovery identity became stale" }
+                    }
+                    false
+                } else {
+                    if (cleared) {
+                        appStateDebug { "pending push wake catch-up drained" }
+                    } else {
+                        appStateDebug { "newer pending push wake catch-up remains queued" }
+                    }
+                    true
+                }
+            }
+        currentCoroutineContext().ensureActive()
+        return acknowledged
     }
 
     private val profileSignUp =
@@ -5212,15 +5485,7 @@ class WhiteNoiseAppState private constructor(
         val requestGeneration = accountSwitchHandoff.beginRequest(label)
         try {
             val switchingAccounts = label != activeAccountRef
-            if (switchingAccounts && BuildConfig.DEBUG) {
-                pendingAccountSwitchTrace =
-                    PendingAccountSwitchTrace(
-                        accountRef = label,
-                        startedAtMs = SystemClock.elapsedRealtime(),
-                    )
-            } else if (pendingAccountSwitchTrace?.accountRef != label) {
-                pendingAccountSwitchTrace = null
-            }
+            updatePendingAccountSwitchTrace(label, switchingAccounts)
             val target = accounts.firstOrNull { it.label == label }
             if (!restoreSignedOutAccountForActivation(target, label, deferUnreadRefresh)) return false
             val activationStillWanted =
@@ -5263,10 +5528,34 @@ class WhiteNoiseAppState private constructor(
             onActivated()
             // Notification routes wait for their target frame, failure, or supersession; ordinary switches do not wait.
             awaitPostActivationWork()
-            refreshActivatedAccount(label, requestGeneration, activationRuntimeGeneration)
+            refreshActivatedAccount(
+                label = label,
+                requestGeneration = requestGeneration,
+                activationRuntimeGeneration = activationRuntimeGeneration,
+                includeBackgroundAccountModes =
+                    switchingAccounts && preloadPolicy != AccountSwitchPreloadPolicy.STARTUP_RESTORATION,
+                reconcileNotificationDelivery =
+                    preloadPolicy != AccountSwitchPreloadPolicy.STARTUP_RESTORATION || appInForeground,
+            )
             return true
         } finally {
             accountSwitchHandoff.finishRequest(requestGeneration)
+        }
+    }
+
+    /** Starts or clears the debug-only latency trace without adding policy branches to activation. */
+    private fun updatePendingAccountSwitchTrace(
+        label: String,
+        switchingAccounts: Boolean,
+    ) {
+        if (switchingAccounts && BuildConfig.DEBUG) {
+            pendingAccountSwitchTrace =
+                PendingAccountSwitchTrace(
+                    accountRef = label,
+                    startedAtMs = SystemClock.elapsedRealtime(),
+                )
+        } else if (pendingAccountSwitchTrace?.accountRef != label) {
+            pendingAccountSwitchTrace = null
         }
     }
 
@@ -5276,6 +5565,8 @@ class WhiteNoiseAppState private constructor(
         label: String,
         requestGeneration: Long,
         activationRuntimeGeneration: Int,
+        includeBackgroundAccountModes: Boolean,
+        reconcileNotificationDelivery: Boolean,
     ) {
         val isCurrent = {
             runtimeGeneration == activationRuntimeGeneration &&
@@ -5288,7 +5579,8 @@ class WhiteNoiseAppState private constructor(
         if (!isCurrent()) return
         refreshLocalNotificationSettings()
         if (!isCurrent()) return
-        syncNativePushRegistrationIfEnabled()
+        if (!reconcileNotificationDelivery) return
+        reconcileNotificationDeliveryModeAfterActivation(includeBackgroundAccountModes)
     }
 
     /**
@@ -6094,6 +6386,7 @@ class WhiteNoiseAppState private constructor(
         appLockScreenVisible = false
         appUnlockError = null
         resumePendingInviteNotificationIdentityRefreshes()
+        resumePushWakeEpisodeFromLifecycle()
         if (dismissRetainedVisibleConversation) {
             dismissVisibleConversationNotifications()
         }
@@ -7218,6 +7511,7 @@ class WhiteNoiseAppState private constructor(
         updateConnectivitySignals(hasValidatedInternet = recovery.hasUsableInternet)
         refreshNativeAttachmentPermissions()
         if (!recovery.restored) return
+        resumePushWakeEpisodeFromLifecycle()
         AvatarLoadRecovery.onNetworkRestored()
         validatedConnectivityRecoveryGenerationMutable.update { generation -> generation + 1 }
         notificationNetworkRecovery.noteNetworkRestored(validatedConnectivityRecoveryGenerationMutable.value)
@@ -7225,6 +7519,9 @@ class WhiteNoiseAppState private constructor(
 
     /** Starts push-wake catch-up only when network recovery does not own the receiver. */
     private fun schedulePendingPushWakeCatchUpDrain() {
+        if (pushTokenStore.pushWakeCatchUpPending() && !networkNotificationRecoverySuppressed) {
+            notificationScope.launch(pushWakeStorageDispatcher) { schedulePushWakeRecovery() }
+        }
         val pendingPushWakeGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
         val networkGeneration = validatedConnectivityRecoveryGenerationMutable.value
         val runtimeUnavailable =
@@ -7269,6 +7566,14 @@ class WhiteNoiseAppState private constructor(
                         }
                     }
                 }
+        }
+    }
+
+    /** Reopens an exhausted episode off-main before evaluating process and durable owners. */
+    private fun resumePushWakeEpisodeFromLifecycle() {
+        notificationScope.launch {
+            admitPushWakeEpisodeFromLifecycle()
+            schedulePendingPushWakeCatchUpDrain()
         }
     }
 
@@ -7365,6 +7670,7 @@ class WhiteNoiseAppState private constructor(
         // process cannot keep silencing that chat after the UI is gone (#821).
         updateNotificationSuppression(if (foreground) suppression.onForeground() else suppression.onBackground())
         AppUpdateForegroundState.isForeground = foreground
+        if (!foreground) transferUnownedPushWakeRecovery()
         diagnostics.setForeground(foreground)
         marmotRuntime?.marmot?.let { engine ->
             notificationScope.launch {
@@ -7394,14 +7700,21 @@ class WhiteNoiseAppState private constructor(
         }
         if (foreground) {
             refreshLocalNotificationPermission()
+            refreshNotificationBatteryPolicy()
             notificationScope.launch { catchUpAfterForegroundActivation() }
         }
-        if (foreground && backgroundConnectionEnabled) startBackgroundConnectionService()
-        if (foreground) notificationScope.launch { syncNativePushRegistrationIfEnabled() }
+        if (shouldStartBackgroundConnectionForForeground(foreground)) {
+            startBackgroundConnectionService()
+        }
+        if (foreground) notificationScope.launch { reconcileNotificationDeliveryMode() }
         if (!foreground) notificationScope.launch { refreshAppUpdateIfStale(notifyIfNewer = true) }
         if (foreground) notificationScope.launch { refreshAppUpdateIfStale(notifyIfNewer = false) }
         if (foreground) refreshAppSelfUpdateInstallPermission()
     }
+
+    /** Restarts a retained persistent mode only while the app can render its notifications. */
+    private fun shouldStartBackgroundConnectionForForeground(foreground: Boolean): Boolean =
+        foreground && backgroundConnectionEnabled && localNotificationPermissionGranted
 
     private fun scheduleTtsStopAtAppLockBoundary() {
         appLockTtsBoundaryJob?.cancel()
@@ -8054,6 +8367,571 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Projects the single delivery choice from the existing native and global runtime truths. */
+    internal fun notificationDeliveryMode(): NotificationDeliveryMode =
+        notificationDeliveryMode(
+            settings = localNotificationSettings,
+            persistentConnectionEnabled = backgroundConnectionEnabled,
+            nativePushCapability = nativePushCapability(),
+        )
+
+    /** Refreshes Android's live battery policy only on an explicit lifecycle or UI edge. */
+    fun refreshNotificationBatteryPolicy() {
+        notificationBatteryPolicy = readNotificationBatteryPolicy(appContext)
+    }
+
+    /** Opens the user-requested Android battery policy surface without requesting an exemption. */
+    fun openNotificationBatterySettings(context: Context = appContext) {
+        openSystemNotificationBatterySettings(context)
+    }
+
+    /**
+     * Applies one latest-wins delivery choice. Replacement delivery is confirmed before the prior
+     * path is disabled, and the existing native/global settings remain the only durable truth.
+     */
+    internal suspend fun setNotificationDeliveryMode(mode: NotificationDeliveryMode): Boolean {
+        val intentGeneration = notificationDeliveryModeIntent.advance()
+        if (mode == NotificationDeliveryMode.Local) nativePushFallback.invalidateAll()
+        notificationDeliveryModeBusy = true
+        return try {
+            notificationDeliveryModeMutex.withLock {
+                if (!notificationDeliveryModeIntent.isCurrent(intentGeneration)) return@withLock false
+                refreshLocalNotificationPermission()
+                if (!localNotificationPermissionGranted) {
+                    present(R.string.toast_notification_permission_needed)
+                    return@withLock false
+                }
+                val owner = captureNotificationDeliveryModeOwner(intentGeneration) ?: return@withLock false
+                if (!ensureNotificationRenderingEnabled(owner)) return@withLock false
+                when (mode) {
+                    NotificationDeliveryMode.Fcm -> selectFcmDelivery(owner)
+                    NotificationDeliveryMode.Local -> selectPersistentDelivery(owner)
+                }
+            }
+        } finally {
+            notificationDeliveryModeIntent.runIfCurrent(intentGeneration) {
+                notificationDeliveryModeBusy = false
+            }
+        }
+    }
+
+    /** Enables the shared rendering prerequisite while the delivery intent and account stay current. */
+    private suspend fun ensureNotificationRenderingEnabled(owner: NotificationDeliveryModeOwner): Boolean {
+        val alreadyEnabled = localNotificationSettings?.localNotificationsEnabled == true
+        return when {
+            alreadyEnabled -> ownsNotificationDeliveryMode(owner)
+            else -> {
+                val settings =
+                    runCatchingCancellable {
+                        withContext(Dispatchers.IO) {
+                            owner.runtime.marmot.setLocalNotificationsEnabled(owner.activeAccountRef, true)
+                        }
+                    }.onFailure {
+                        presentFailure(R.string.toast_couldnt_enable_notifications, "NOTIFICATION_ENABLE", it)
+                    }.getOrNull()
+                val stillOwned = settings != null && ownsNotificationDeliveryMode(owner)
+                settings?.takeIf { stillOwned }?.let { localNotificationSettings = it }
+                stillOwned && settings?.localNotificationsEnabled == true
+            }
+        }
+    }
+
+    /** Registers every notification-enabled account before the device-wide persistent path is stopped. */
+    @Suppress("ReturnCount", "TooGenericExceptionCaught")
+    private suspend fun selectFcmDelivery(owner: NotificationDeliveryModeOwner): Boolean {
+        val config = pushServerConfigProvider() ?: return false
+        if (!nativePushCapability(config).isAvailable) return false
+        val previousPersistent = backgroundConnectionEnabled
+        val previous = linkedMapOf<String, NotificationSettingsFfi>()
+        val persistentStopAttempted = AtomicBoolean(false)
+        return try {
+            val token = pushTokenStore.lastToken() ?: fetchFcmTokenOrNull() ?: return false
+            val registered = enableNativeDeliveryForAccounts(owner, config, token, previous)
+            if (!registered) {
+                rollbackNativePushMode(owner, previous)
+                return false
+            }
+            val preferenceStopped =
+                withContext(Dispatchers.IO) {
+                    nativePushFallbackPlatform.persistBackgroundConnectionEnabled(false) {
+                        ownsNotificationDeliveryMode(owner)
+                    }
+                }
+            if (!preferenceStopped || !ownsNotificationDeliveryMode(owner)) {
+                settleFailedFcmDelivery(owner, previousPersistent, previous, persistentStopAttempted.get())
+                return false
+            }
+            backgroundConnectionEnabled = false
+            nativePushFallback.invalidateAll()
+            val persistentStopped =
+                withContext(Dispatchers.IO) {
+                    persistentStopAttempted.set(true)
+                    nativePushFallbackPlatform.stopBackgroundConnection()
+                }
+            if (!persistentStopped || !ownsNotificationDeliveryMode(owner)) {
+                settleFailedFcmDelivery(owner, previousPersistent, previous, persistentStopAttempted.get())
+                false
+            } else {
+                true
+            }
+        } catch (cancelled: CancellationException) {
+            withContext(NonCancellable) {
+                settleFailedFcmDelivery(owner, previousPersistent, previous, persistentStopAttempted.get())
+            }
+            throw cancelled
+        } catch (failure: Throwable) {
+            appStateDebug(failure) { "native notification selection failed" }
+            withContext(NonCancellable) {
+                settleFailedFcmDelivery(owner, previousPersistent, previous, persistentStopAttempted.get())
+            }
+            false
+        }
+    }
+
+    /** Enables and registers the captured account set under the existing no-overlap native sync lock. */
+    private suspend fun enableNativeDeliveryForAccounts(
+        owner: NotificationDeliveryModeOwner,
+        config: PushServerConfig,
+        token: String,
+        previous: MutableMap<String, NotificationSettingsFfi>,
+    ): Boolean =
+        nativePushSyncMutex.withLock {
+            val allAccountsReady =
+                owner.accountRefs.all { account ->
+                    configureNativeDeliveryForAccount(owner, account, config, token, previous)
+                }
+            allAccountsReady && ownsNotificationDeliveryMode(owner)
+        }
+
+    /** Applies one account's authoritative notification preference and confirms its registration. */
+    @Suppress("ReturnCount")
+    private suspend fun configureNativeDeliveryForAccount(
+        owner: NotificationDeliveryModeOwner,
+        account: String,
+        config: PushServerConfig,
+        token: String,
+        previous: MutableMap<String, NotificationSettingsFfi>,
+    ): Boolean {
+        if (!ownsNotificationDeliveryMode(owner)) return false
+        val settings =
+            withContext(Dispatchers.IO) {
+                owner.runtime.marmot.notificationSettings(account)
+            }
+        if (!ownsNotificationDeliveryMode(owner)) return false
+        previous[account] = settings
+        val desiredNative = settings.localNotificationsEnabled
+        val updated =
+            if (settings.nativePushEnabled == desiredNative) {
+                settings
+            } else {
+                withContext(Dispatchers.IO) {
+                    owner.runtime.marmot.setNativePushEnabled(account, desiredNative)
+                }
+            }
+        if (!ownsNotificationDeliveryMode(owner) || updated.nativePushEnabled != desiredNative) return false
+        if (account == owner.activeAccountRef) localNotificationSettings = updated
+        return !desiredNative || syncPushForNotificationDeliveryOwner(owner, account, config, token)
+    }
+
+    /** Waits for the exact foreground-service acknowledgement before disabling native delivery. */
+    @Suppress("ReturnCount", "TooGenericExceptionCaught")
+    private suspend fun selectPersistentDelivery(owner: NotificationDeliveryModeOwner): Boolean {
+        val previousPersistent = backgroundConnectionEnabled
+        val nativeDisableCommitted = AtomicBoolean(false)
+        return try {
+            val fallbackOwner =
+                establishPersistentMode(owner) ?: run {
+                    restorePersistentPreference(owner, previousPersistent)
+                    return false
+                }
+            val disabled = disableNativePushForPersistentDelivery(owner, fallbackOwner, nativeDisableCommitted)
+            if (!disabled && ownsNotificationDeliveryMode(owner)) {
+                // Persistent delivery remains established when a per-account mutation fails; the
+                // unresolved account can be retried without creating a no-transport window.
+                return false
+            }
+            disabled
+        } catch (cancelled: CancellationException) {
+            withContext(NonCancellable) {
+                settleFailedPersistentDelivery(owner, previousPersistent, nativeDisableCommitted.get())
+            }
+            throw cancelled
+        } catch (failure: Throwable) {
+            appStateDebug(failure) { "persistent notification selection failed" }
+            settleFailedPersistentDelivery(owner, previousPersistent, nativeDisableCommitted.get())
+            false
+        }
+    }
+
+    /** Returns the exact acknowledged service owner or leaves both transports unchanged on rejection. */
+    private suspend fun establishPersistentMode(modeOwner: NotificationDeliveryModeOwner): NativePushFallbackOwner? {
+        val owner = captureNativePushFallbackOwner() ?: return null
+        val ready =
+            nativePushFallback.establishPersistentDelivery(
+                owner = owner,
+                ownerIsCurrent = {
+                    ownsNotificationDeliveryMode(modeOwner) && ownsNativePushFallback(owner)
+                },
+                publishEnabled = {
+                    if (ownsNotificationDeliveryMode(modeOwner) && ownsNativePushFallback(owner)) {
+                        backgroundConnectionEnabled = true
+                    }
+                },
+                onFailure = { failure ->
+                    appStateDebug(failure) { "persistent notification delivery failed" }
+                },
+            )
+        return owner.takeIf {
+            ready &&
+                ownsNotificationDeliveryMode(modeOwner) &&
+                ownsNativePushFallback(owner)
+        }
+    }
+
+    /** Disables native delivery for every captured signed-in account behind the acknowledged service. */
+    @Suppress("ReturnCount")
+    private suspend fun disableNativePushForPersistentDelivery(
+        modeOwner: NotificationDeliveryModeOwner,
+        fallbackOwner: NativePushFallbackOwner,
+        nativeDisableCommitted: AtomicBoolean,
+    ): Boolean {
+        for (account in modeOwner.accountRefs) {
+            if (!ownsNotificationDeliveryMode(modeOwner) || !nativePushFallback.isReady(fallbackOwner)) return false
+            val cleanupQueued =
+                withContext(Dispatchers.IO) {
+                    nativePushFallbackPlatform.recordPendingRegistrationClear(account)
+                }
+            if (!cleanupQueued || !ownsNotificationDeliveryMode(modeOwner)) return false
+            perAccountSyncedFingerprints.remove(account)
+            val settings =
+                withContext(Dispatchers.IO) {
+                    modeOwner.runtime.marmot.setNativePushEnabled(account, false).also { updated ->
+                        if (!updated.nativePushEnabled) nativeDisableCommitted.set(true)
+                    }
+                }
+            if (!ownsNotificationDeliveryMode(modeOwner) || settings.nativePushEnabled) return false
+            if (account == modeOwner.activeAccountRef) localNotificationSettings = settings
+            clearPushRegistrationForNotificationDeliveryOwner(modeOwner, account)
+            if (!ownsNotificationDeliveryMode(modeOwner)) return false
+        }
+        return true
+    }
+
+    /**
+     * Repairs legacy dual-on and capability-loss states, and restores rendering after permission returns.
+     * Capability restoration never changes a settled persistent-delivery choice.
+     */
+    private suspend fun reconcileNotificationDeliveryMode(): Boolean {
+        refreshLocalNotificationPermission()
+        val settings = localNotificationSettings
+        if (!localNotificationPermissionGranted) return pauseNotificationDeliveryReconciliation()
+        return if (settings == null) {
+            syncNativePushRegistrationIfEnabled()
+        } else {
+            val desired =
+                if (settings.nativePushEnabled && !backgroundConnectionEnabled && nativePushCapability().isAvailable) {
+                    NotificationDeliveryMode.Fcm
+                } else {
+                    NotificationDeliveryMode.Local
+                }
+            setNotificationDeliveryMode(desired)
+        }
+    }
+
+    /** Restores rendering for every activation, then reconciles the captured owner without blocking activation. */
+    @Suppress("ReturnCount") // Permission and owner-invalidated paths terminate before transport reconciliation.
+    private suspend fun reconcileNotificationDeliveryModeAfterActivation(
+        includeBackgroundAccountModes: Boolean,
+    ): Boolean {
+        refreshLocalNotificationPermission()
+        val settings = localNotificationSettings
+        if (!localNotificationPermissionGranted) return pauseNotificationDeliveryReconciliation()
+        if (settings == null) return syncNativePushRegistrationIfEnabled()
+        val intentGeneration = notificationDeliveryModeIntent.advance()
+        return notificationDeliveryModeMutex.withLock {
+            if (!notificationDeliveryModeIntent.isCurrent(intentGeneration)) return@withLock false
+            val owner = captureNotificationDeliveryModeOwner(intentGeneration) ?: return@withLock false
+            if (!ensureNotificationRenderingEnabled(owner)) return@withLock false
+            if (!ownsNotificationDeliveryMode(owner)) return@withLock false
+            val plan = notificationDeliveryActivationPlan(owner, includeBackgroundAccountModes)
+            if (!ownsNotificationDeliveryMode(owner)) return@withLock false
+            if (plan == null) return@withLock false
+            if (!plan.requiresDeviceWideReconciliation) return@withLock true
+            launchNotificationDeliveryModeReconciliation(
+                owner = owner,
+                mode = plan.mode,
+                applyDeviceWideMode = true,
+            )
+            true
+        }
+    }
+
+    /** Resolves the device mode from authoritative account settings and identifies any incomplete invariant. */
+    private suspend fun notificationDeliveryActivationPlan(
+        owner: NotificationDeliveryModeOwner,
+        includeBackgroundAccountModes: Boolean,
+    ): NotificationDeliveryActivationPlan? {
+        val settingsByAccount = readNotificationDeliverySettings(owner) ?: return null
+        val anyNativeEnabled = settingsByAccount.values.any { it.nativePushEnabled }
+        val mode = resolvedNotificationDeliveryMode(anyNativeEnabled)
+        val noTransportConfigured = !backgroundConnectionEnabled && !anyNativeEnabled
+        return NotificationDeliveryActivationPlan(
+            mode = mode,
+            requiresDeviceWideReconciliation =
+                includeBackgroundAccountModes ||
+                    noTransportConfigured ||
+                    !notificationDeliveryInvariantMatches(mode, settingsByAccount),
+        )
+    }
+
+    /** Reads every captured account without treating an unavailable setting as disabled. */
+    @Suppress("ReturnCount") // Missing settings, read failure, and owner invalidation abort the bounded scan.
+    private suspend fun readNotificationDeliverySettings(
+        owner: NotificationDeliveryModeOwner,
+    ): Map<String, NotificationSettingsFfi>? {
+        val settingsByAccount = linkedMapOf<String, NotificationSettingsFfi>()
+        for (account in owner.accountRefs) {
+            val settings =
+                if (account == owner.activeAccountRef) {
+                    localNotificationSettings
+                } else {
+                    runCatchingCancellable {
+                        withContext(Dispatchers.IO) { owner.runtime.marmot.notificationSettings(account) }
+                    }.onFailure {
+                        appStateDebug(it) { "notification activation settings read failed" }
+                    }.getOrNull()
+                }
+            if (!ownsNotificationDeliveryMode(owner)) return null
+            settingsByAccount[account] = settings ?: return null
+        }
+        return settingsByAccount
+    }
+
+    /** Projects one mode from the retained runtime preference and authoritative native settings. */
+    private fun resolvedNotificationDeliveryMode(anyNativeEnabled: Boolean): NotificationDeliveryMode =
+        when {
+            backgroundConnectionEnabled -> NotificationDeliveryMode.Local
+            anyNativeEnabled && nativePushCapability().isAvailable -> NotificationDeliveryMode.Fcm
+            else -> NotificationDeliveryMode.Local
+        }
+
+    /** Requires complete account alignment plus a live owner or confirmed in-process registrations. */
+    private fun notificationDeliveryInvariantMatches(
+        mode: NotificationDeliveryMode,
+        settingsByAccount: Map<String, NotificationSettingsFfi>,
+    ): Boolean {
+        val accountsMatchMode =
+            when (mode) {
+                NotificationDeliveryMode.Local -> settingsByAccount.values.none { it.nativePushEnabled }
+                NotificationDeliveryMode.Fcm ->
+                    settingsByAccount.values.all { it.nativePushEnabled == it.localNotificationsEnabled }
+            }
+        val runtimeMatchesMode =
+            when (mode) {
+                NotificationDeliveryMode.Local -> backgroundConnectionEnabled && pushWakeServiceOwner != null
+                NotificationDeliveryMode.Fcm ->
+                    !backgroundConnectionEnabled &&
+                        settingsByAccount
+                            .filterValues { it.nativePushEnabled }
+                            .keys
+                            .all(perAccountSyncedFingerprints::containsKey)
+            }
+        return accountsMatchMode && runtimeMatchesMode
+    }
+
+    /** Reuses safe capability sync for restoration and reserves device-wide cutover for a real account switch. */
+    private fun launchNotificationDeliveryModeReconciliation(
+        owner: NotificationDeliveryModeOwner,
+        mode: NotificationDeliveryMode,
+        applyDeviceWideMode: Boolean,
+    ) {
+        notificationDeliveryModeBusy = true
+        notificationScope.launch {
+            try {
+                notificationDeliveryModeMutex.withLock {
+                    if (!ownsNotificationDeliveryMode(owner)) return@withLock
+                    if (applyDeviceWideMode) {
+                        if (mode == NotificationDeliveryMode.Local) nativePushFallback.invalidateAll()
+                        when (mode) {
+                            NotificationDeliveryMode.Fcm -> selectFcmDelivery(owner)
+                            NotificationDeliveryMode.Local -> selectPersistentDelivery(owner)
+                        }
+                    } else {
+                        syncNativePushRegistrationIfEnabled()
+                    }
+                }
+            } finally {
+                notificationDeliveryModeIntent.runIfCurrent(owner.intentGeneration) {
+                    notificationDeliveryModeBusy = false
+                }
+            }
+        }
+    }
+
+    /** Captures every lifetime that can invalidate a device-wide delivery cutover. */
+    @Suppress("ReturnCount")
+    private fun captureNotificationDeliveryModeOwner(intentGeneration: Long): NotificationDeliveryModeOwner? {
+        val account = activeAccountRef ?: return null
+        val runtime = marmotRuntime ?: return null
+        val accountRefs =
+            accounts
+                .filter { it.isSignedInSigningAccount() && accountSetup.eligible(it) }
+                .map { it.label }
+        if (account !in accountRefs) return null
+        return NotificationDeliveryModeOwner(
+            activeAccountRef = account,
+            accountRefs = accountRefs,
+            runtime = runtime,
+            runtimeGeneration = runtimeGeneration,
+            accountSwitchGeneration = accountSwitchHandoff.capture(),
+            intentGeneration = intentGeneration,
+        )
+    }
+
+    /** Rejects account switches (including A-B-A), sign-in changes, runtime replacement, and newer intent. */
+    private fun ownsNotificationDeliveryMode(owner: NotificationDeliveryModeOwner): Boolean =
+        notificationDeliveryModeIntent.isCurrent(owner.intentGeneration) &&
+            activeAccountRef == owner.activeAccountRef &&
+            marmotRuntime === owner.runtime &&
+            runtimeGeneration == owner.runtimeGeneration &&
+            accountSwitchHandoff.isCurrent(owner.accountSwitchGeneration) &&
+            accounts
+                .filter { it.isSignedInSigningAccount() && accountSetup.eligible(it) }
+                .map { it.label } == owner.accountRefs
+
+    /** Registers one account using the runtime captured by the surrounding mode transaction. */
+    @Suppress("ReturnCount")
+    private suspend fun syncPushForNotificationDeliveryOwner(
+        owner: NotificationDeliveryModeOwner,
+        account: String,
+        config: PushServerConfig,
+        token: String,
+    ): Boolean {
+        val fingerprint =
+            PushFingerprint(
+                platform = PushPlatformFfi.FCM,
+                token = token,
+                serverPubkeyHex = config.serverPubkeyHex,
+                relayHint = config.relayHint,
+            )
+        if (perAccountSyncedFingerprints[account] == fingerprint) return ownsNotificationDeliveryMode(owner)
+        val outcome =
+            withContext(Dispatchers.IO) {
+                owner.runtime.marmot.upsertPushRegistration(
+                    accountRef = account,
+                    platform = PushPlatformFfi.FCM,
+                    rawToken = token,
+                    serverPubkeyHex = config.serverPubkeyHex,
+                    relayHint = config.relayHint,
+                )
+            }
+        logPushRegistrationShareOutcome("delivery mode upsert", account, outcome.share)
+        if (!ownsNotificationDeliveryMode(owner)) return false
+        val settingsAfter =
+            withContext(Dispatchers.IO) {
+                owner.runtime.marmot.notificationSettings(account)
+            }
+        if (!ownsNotificationDeliveryMode(owner) || !settingsAfter.nativePushEnabled) return false
+        perAccountSyncedFingerprints[account] = fingerprint
+        return true
+    }
+
+    /** Clears one registration while retaining durable cleanup when ownership or sharing fails. */
+    private suspend fun clearPushRegistrationForNotificationDeliveryOwner(
+        owner: NotificationDeliveryModeOwner,
+        account: String,
+    ) {
+        val result =
+            runCatchingCancellable {
+                withContext(Dispatchers.IO) {
+                    owner.runtime.marmot.clearPushRegistration(account)
+                }
+            }
+        result.onSuccess { outcome ->
+            logPushRegistrationShareOutcome("delivery mode clear", account, outcome)
+            if (ownsNotificationDeliveryMode(owner)) {
+                withContext(Dispatchers.IO) { pushTokenStore.clearPending(account) }
+            }
+        }
+        result.exceptionOrNull()?.let { failure ->
+            appStateDebug(failure) { "delivery mode registration clear remains pending" }
+        }
+    }
+
+    /** Restores only mutations made by this transaction while no newer user choice owns delivery. */
+    private suspend fun rollbackNativePushMode(
+        owner: NotificationDeliveryModeOwner,
+        previous: Map<String, NotificationSettingsFfi>,
+    ) {
+        if (!ownsNotificationDeliveryMode(owner)) return
+        previous.forEach { (account, settings) ->
+            if (!ownsNotificationDeliveryMode(owner)) return
+            val restored =
+                runCatchingCancellable {
+                    withContext(Dispatchers.IO) {
+                        owner.runtime.marmot.setNativePushEnabled(account, settings.nativePushEnabled)
+                    }
+                }.getOrNull() ?: return@forEach
+            if (account == owner.activeAccountRef && ownsNotificationDeliveryMode(owner)) {
+                localNotificationSettings = restored
+            }
+            if (!settings.nativePushEnabled) {
+                perAccountSyncedFingerprints.remove(account)
+                withContext(Dispatchers.IO) { pushTokenStore.recordPendingClear(account) }
+                clearPushRegistrationForNotificationDeliveryOwner(owner, account)
+            }
+        }
+    }
+
+    /** Restores the prior global preference while the same account/runtime/intent still owns settlement. */
+    private suspend fun restorePersistentPreference(
+        owner: NotificationDeliveryModeOwner,
+        enabled: Boolean,
+    ): Boolean {
+        val persisted =
+            withContext(NonCancellable + Dispatchers.IO) {
+                nativePushFallbackPlatform.persistBackgroundConnectionEnabled(enabled) {
+                    ownsNotificationDeliveryMode(owner)
+                }
+            }
+        if (!persisted || !ownsNotificationDeliveryMode(owner)) return false
+        backgroundConnectionEnabled = enabled
+        if (!enabled) {
+            nativePushFallback.invalidateAll()
+            nativePushFallbackPlatform.stopBackgroundConnection()
+        }
+        return true
+    }
+
+    /** Keeps the acknowledged Local owner once any native disable may have become durable. */
+    private suspend fun settleFailedPersistentDelivery(
+        owner: NotificationDeliveryModeOwner,
+        previousPersistent: Boolean,
+        nativeDisableCommitted: Boolean,
+    ) {
+        if (!ownsNotificationDeliveryMode(owner)) return
+        restorePersistentPreference(owner, enabled = previousPersistent || nativeDisableCommitted)
+    }
+
+    /** Restores the previous persistent side before native registration can be rolled back. */
+    private suspend fun settleFailedFcmDelivery(
+        owner: NotificationDeliveryModeOwner,
+        previousPersistent: Boolean,
+        previousNative: Map<String, NotificationSettingsFfi>,
+        persistentStopAttempted: Boolean,
+    ) {
+        if (!ownsNotificationDeliveryMode(owner)) return
+        val persistentSettled =
+            when {
+                !previousPersistent -> true
+                persistentStopAttempted -> establishPersistentMode(owner) != null
+                else -> restorePersistentPreference(owner, enabled = true)
+            }
+        if (persistentSettled && ownsNotificationDeliveryMode(owner)) {
+            rollbackNativePushMode(owner, previousNative)
+        }
+    }
+
     suspend fun setBackgroundConnectionEnabled(enabled: Boolean): Boolean {
         val account =
             activeAccountRef ?: run {
@@ -8126,8 +9004,8 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** Returns the first unmet native-push prerequisite without reaching later SDKs. */
-    internal fun nativePushCapability(config: PushServerConfig? = PushServerConfig.current()): NativePushCapability =
-        nativePushCapabilityForContext(appContext, config)
+    @Suppress("MaxLineLength")
+    internal fun nativePushCapability(config: PushServerConfig? = pushServerConfigProvider()): NativePushCapability = nativePushCapabilityResolver(config)
 
     /**
      * Persist the FCM token and trigger a re-sync against the runtime. Called
@@ -8152,6 +9030,16 @@ class WhiteNoiseAppState private constructor(
      */
     suspend fun syncNativePushRegistrationIfEnabled(): Boolean = nativePushSyncMutex.withLock { syncNativePushRegistrationIfEnabledLocked() }
 
+    /** Retains required sign-out cleanup while permission loss pauses registration and fallback mutation. */
+    private suspend fun pauseNotificationDeliveryReconciliation(): Boolean {
+        nativePushFallback.invalidateAll()
+        return nativePushSyncMutex.withLock {
+            drainPendingPushClears()
+            drainPendingPushDisables()
+            false
+        }
+    }
+
     private suspend fun hasConfirmedNativePushRegistration(account: String): Boolean =
         nativePushSyncMutex.withLock { perAccountSyncedFingerprints.containsKey(account) }
 
@@ -8165,6 +9053,11 @@ class WhiteNoiseAppState private constructor(
         // receive them. Only the upsert path is gated on config + GMS.
         drainPendingPushClears()
         drainPendingPushDisables()
+        refreshLocalNotificationPermission()
+        if (!localNotificationPermissionGranted) {
+            nativePushFallback.invalidateAll()
+            return false
+        }
         var accountRefs =
             accounts
                 .filter { it.isSignedInSigningAccount() && accountSetup.eligible(it) }
@@ -8185,7 +9078,7 @@ class WhiteNoiseAppState private constructor(
                 return true
             }
         }
-        val config = PushServerConfig.current()
+        val config = pushServerConfigProvider()
         val capability = nativePushCapability(config)
         if (!capability.isAvailable) return reconcileUnavailableNativePushFallback(capability, accountRefs)
         config ?: return false
@@ -8210,7 +9103,11 @@ class WhiteNoiseAppState private constructor(
                 accountRefs = accountRefs,
                 bindings =
                     NativePushFallbackBindings(
-                        ownerIsCurrent = ::ownsNativePushFallback,
+                        ownerIsCurrent = { owner ->
+                            localNotificationPermissionGranted &&
+                                localNotificationPresenter.canPostNotifications() &&
+                                ownsNativePushFallback(owner)
+                        },
                         readSettings = { request, account -> request.runtime.marmot.notificationSettings(account) },
                         publishActiveSettings = { localNotificationSettings = it },
                         publishPersistentConnectionEnabled = { backgroundConnectionEnabled = true },
@@ -8239,9 +9136,15 @@ class WhiteNoiseAppState private constructor(
     /** Accepts only the exact service generation that reached a successful supervised runtime boundary. */
     internal fun onNativePushFallbackRuntimeStarted(generation: Long): Job? {
         assertMainThread { "onNativePushFallbackRuntimeStarted" }
-        val owner = nativePushFallback.acknowledge(generation, ::ownsNativePushFallback) ?: return null
+        refreshLocalNotificationPermission()
+        val owner =
+            nativePushFallback.acknowledge(generation) { candidate ->
+                localNotificationPermissionGranted && ownsNativePushFallback(candidate)
+            } ?: return null
         return notificationScope.launch {
-            if (ownsNativePushFallback(owner)) syncNativePushRegistrationIfEnabled()
+            if (ownsNativePushFallback(owner) && !notificationDeliveryModeBusy) {
+                syncNativePushRegistrationIfEnabled()
+            }
         }
     }
 
@@ -8521,18 +9424,16 @@ class WhiteNoiseAppState private constructor(
      */
     suspend fun enableDefaultNotificationsIfReady(): Boolean {
         if (defaultNotificationsEnableAttempted) return false
-        val account = activeAccountRef ?: return false
+        activeAccountRef ?: return false
         refreshLocalNotificationPermission()
         if (!localNotificationPermissionGranted) return false
         markDefaultNotificationsEnableAttempted()
-        val settings = marmotIo { setLocalNotificationsEnabled(account, true) }
-        localNotificationSettings = settings
-        if (!settings.localNotificationsEnabled) return false
-        return configureDefaultNotificationDelivery(
-            nativePushCapability = nativePushCapability(),
-            enableNativePush = { setNativePushEnabled(true) },
-            disableNativePush = { setNativePushEnabled(false) },
-            setBackgroundConnectionEnabled = ::setBackgroundConnectionEnabled,
+        return setNotificationDeliveryMode(
+            if (nativePushCapability().isAvailable) {
+                NotificationDeliveryMode.Fcm
+            } else {
+                NotificationDeliveryMode.Local
+            },
         )
     }
 
@@ -9647,7 +10548,10 @@ class WhiteNoiseAppState private constructor(
             "notification eligibility outcome=${if (firstPost.shouldPost) "post" else "skip"} " +
                 "trigger=${update.trigger} app_lock=$appLockScreenVisible engine_muted=${firstPost.engineMuted}"
         }
-        if (!firstPost.shouldPost) return false
+        if (!firstPost.shouldPost) {
+            PushWakeDiagnostics.event(PushWakeEvent.Suppressed)
+            return false
+        }
 
         val redactContent = appLockScreenVisible
         val onNotificationWritten = {
@@ -9666,6 +10570,7 @@ class WhiteNoiseAppState private constructor(
             posted = showRedactedNotificationUpdate(update, firstPost, onNotificationWritten)
         }
         rememberPostedGroupInvite(update, firstPost, posted, postedRedacted)
+        PushWakeDiagnostics.event(if (posted) PushWakeEvent.Posted else PushWakeEvent.Suppressed)
         return posted
     }
 
@@ -9840,6 +10745,7 @@ class WhiteNoiseAppState private constructor(
 
     /** Posts and enriches one update under a foreground/app-lock eligibility epoch. */
     private suspend fun processNotificationUpdate(update: NotificationUpdateFfi) {
+        PushWakeDiagnostics.event(PushWakeEvent.Candidate)
         val receivedAtElapsedMs = SystemClock.elapsedRealtime()
         recordNotificationFirstPostTiming(
             stage = NotificationFirstPostTimingStage.Received,

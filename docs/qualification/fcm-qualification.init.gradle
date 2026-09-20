@@ -1,0 +1,8 @@
+// Local qualification only: keep personal Dev identities and databases untouched.
+gradle.beforeProject { project ->
+    project.plugins.withId('com.android.application') {
+        project.extensions.getByName('androidComponents').finalizeDsl { android ->
+            android.productFlavors.getByName('dev').applicationIdSuffix = '.fcmrecoveryqualification'
+        }
+    }
+}
