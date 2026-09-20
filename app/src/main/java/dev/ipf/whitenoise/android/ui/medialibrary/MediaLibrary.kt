@@ -419,29 +419,11 @@ internal fun SharedMediaSection(
     SharedContentCategories(tiles, onOpenCategory, modifier)
 }
 
-/** Chronological viewer pages, reversing message groups without reversing authored album slots. */
+/** Viewer pages follow the newest-first gallery while preserving authored album slots. */
 internal fun List<SharedMediaTile>.toViewerPages(): List<MediaViewerPage> =
-    newestFirstMessageGroupsToChronological().map {
+    map {
         MediaViewerPage(it.messageIdHex, it.attachmentIndex, it.reference, it.mine, it.sender, it.recordedAt)
     }
-
-/** Reverses contiguous newest-first message groups while keeping each group's item order stable. */
-private fun <T> List<T>.newestFirstMessageGroupsToChronological(messageId: (T) -> String): List<T> {
-    if (isEmpty()) return emptyList()
-    val groups = ArrayList<List<T>>()
-    var start = 0
-    for (index in 1..size) {
-        if (index == size || messageId(this[index]) != messageId(this[start])) {
-            groups += subList(start, index)
-            start = index
-        }
-    }
-    return groups.asReversed().flatten()
-}
-
-/** Shared-media specialization of stable newest-first message-group reversal. */
-private fun List<SharedMediaTile>.newestFirstMessageGroupsToChronological(): List<SharedMediaTile> =
-    newestFirstMessageGroupsToChronological(SharedMediaTile::messageIdHex)
 
 /** Opens one native per-chat category, with state isolated to its controller/account/runtime owner. */
 @Suppress("FunctionNaming", "LongParameterList")

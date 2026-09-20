@@ -74,10 +74,10 @@ class SharedMediaVisibilityTest {
         for (filter in SharedVisualFilter.entries) {
             val source = tiles.visualsFor(filter)
             val pages = source.toViewerPages()
-            assertEquals(source.asReversed().map { it.messageIdHex }, pages.map { it.messageIdHex })
-            assertEquals(source.asReversed().map { it.attachmentIndex }, pages.map { it.attachmentIndex })
-            assertEquals(source.asReversed().map { it.reference }, pages.map { it.reference })
-            assertEquals(source.asReversed().map { it.mine }, pages.map { it.mine })
+            assertEquals(source.map { it.messageIdHex }, pages.map { it.messageIdHex })
+            assertEquals(source.map { it.attachmentIndex }, pages.map { it.attachmentIndex })
+            assertEquals(source.map { it.reference }, pages.map { it.reference })
+            assertEquals(source.map { it.mine }, pages.map { it.mine })
         }
     }
 
@@ -90,8 +90,8 @@ class SharedMediaVisibilityTest {
 
         assertEquals(listOf("album", "album", "older"), tiles.visuals.map { it.messageIdHex })
         assertEquals(listOf(0, 1, 0), tiles.visuals.map { it.attachmentIndex })
-        assertEquals(listOf("older", "album", "album"), tiles.visuals.toViewerPages().map { it.messageIdHex })
-        assertEquals(listOf(0, 0, 1), tiles.visuals.toViewerPages().map { it.attachmentIndex })
+        assertEquals(listOf("album", "album", "older"), tiles.visuals.toViewerPages().map { it.messageIdHex })
+        assertEquals(listOf(0, 1, 0), tiles.visuals.toViewerPages().map { it.attachmentIndex })
     }
 
     /** Viewer keeps current page across loading and clears only confirmed removal. */

@@ -3935,12 +3935,12 @@ class WhiteNoiseAppState private constructor(
 
     /** True for retained plaintext in L1 or the authenticated encrypted L2 index. */
     internal suspend fun hasCachedAttachmentAfterHydration(request: AttachmentTransferRequest): Boolean =
-        hasNativeAttachment(request) ||
-            resolveAttachmentCacheAvailability(
-                cacheKey = request.run { mediaCacheKey(accountRef, groupIdHex, messageIdHex, attachmentIndex) },
-                memoryContains = { cachedMediaPlaintext(it) != null },
-                diskContains = diskMediaCache::containsAfterHydration,
-            )
+        resolveAttachmentCacheAvailability(
+            cacheKey = request.run { mediaCacheKey(accountRef, groupIdHex, messageIdHex, attachmentIndex) },
+            memoryContains = { cachedMediaPlaintext(it) != null },
+            diskContains = diskMediaCache::containsAfterHydration,
+        ) ||
+            hasNativeAttachment(request)
 
     /** Downloads through MDK and publishes plaintext into bounded L1 and encrypted L2 caches. */
     internal suspend fun downloadAttachmentPlaintext(
