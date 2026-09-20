@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
+import dev.ipf.whitenoise.android.media.editor.stagedPhotoAttachmentId
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -50,16 +51,65 @@ class ConversationAttachmentDraftTest {
         assertFalse(first == stagedDocumentAttachmentId("alice", "group-b", uri))
     }
 
-    /** Builds a minimal native draft descriptor for classification tests. */
-    private fun attachment(mediaType: String) =
-        MessageDraftAttachmentFfi(
-            id = "id-$mediaType",
-            fileName = "draft.bin",
-            mediaType = mediaType,
-            plaintext = byteArrayOf(9),
-            dim = null,
-            thumbhash = null,
-            durationSeconds = null,
-            waveformSamples = emptyList(),
+    /** Saved picker selections recover prepared native bytes without reopening dead provider grants. */
+    @Test
+    fun savedSelectionsReconcileWithNativeDraftBytesAfterProcessRecreation() {
+        val account = "alice"
+        val group = "group-a"
+        val slotId = "saved-video-slot"
+        val unreadableDocumentUri = "content://expired-picker/document/7"
+        val video =
+            attachment(
+                id = stagedPhotoAttachmentId(account, group, slotId),
+                mediaType = "video/mp4",
+                bytes = byteArrayOf(1, 2, 3),
+            )
+        val document =
+            attachment(
+                id = stagedDocumentAttachmentId(account, group, unreadableDocumentUri),
+                mediaType = "application/pdf",
+                bytes = byteArrayOf(4, 5, 6),
+            )
+
+        val reconciled =
+            reconcilePersistedDraftAttachments(
+                accountRef = account,
+                groupIdHex = group,
+                mediaSlotIds = listOf(slotId),
+                documentUriStrings = listOf(unreadableDocumentUri),
+                attachments = listOf(video, document),
+            )
+
+        assertEquals(
+            byteArrayOf(1, 2, 3).toList(),
+            reconciled.mediaBySlotId
+                .getValue(slotId)
+                .plaintext
+                .toList(),
         )
+        assertEquals(
+            byteArrayOf(4, 5, 6).toList(),
+            reconciled.documentsByUriString
+                .getValue(unreadableDocumentUri)
+                .plaintext
+                .toList(),
+        )
+        assertTrue(reconciled.unmatched.isEmpty())
+    }
+
+    /** Builds a minimal native draft descriptor for classification tests. */
+    private fun attachment(
+        mediaType: String,
+        id: String = "id-$mediaType",
+        bytes: ByteArray = byteArrayOf(9),
+    ) = MessageDraftAttachmentFfi(
+        id = id,
+        fileName = "draft.bin",
+        mediaType = mediaType,
+        plaintext = bytes,
+        dim = null,
+        thumbhash = null,
+        durationSeconds = null,
+        waveformSamples = emptyList(),
+    )
 }

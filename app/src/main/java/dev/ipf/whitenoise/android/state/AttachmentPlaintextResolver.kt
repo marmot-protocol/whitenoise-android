@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import java.io.IOException
 
 /** Checks L1, hydrated L2, then L1 again to cover a concurrent cache publication. */
 internal suspend fun resolveAttachmentCacheAvailability(
@@ -48,48 +49,96 @@ internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
     return resolveAttachmentPlaintext(
         loadMemory = { withContext(Dispatchers.Main.immediate) { cachedMediaPlaintext(cacheKey) } },
         loadDisk = { cancellationCheck, onAcquired ->
-            withContext(Dispatchers.IO) {
-                val loaded =
-                    diskMediaCache.getIfSmall(cacheKey)?.let(AttachmentPlaintext::Bytes)
-                        ?: diskMediaCache
-                            .materialize(cacheKey, cancellationCheck)
-                            ?.let(AttachmentPlaintext::Lease)
-                onAcquired(loaded)
-                loaded
-            }
+            loadAttachmentDiskPlaintext(cacheKey, cancellationCheck, onAcquired)
         },
         cacheMemory = { bytes ->
             withContext(Dispatchers.Main.immediate) { cacheMediaPlaintext(cacheKey, bytes) }
         },
         clearInteractiveIntent = {
-            if (priority == AttachmentDownloadPriority.Interactive && persistInteractiveIntent) {
-                clearInteractiveAttachmentDownloadIntent(request)
-            }
+            clearInteractiveAttachmentIntentAfterSuccess(request, priority, persistInteractiveIntent)
         },
         loadMiss = {
+            acquireAttachmentPlaintextSource(
+                cacheKey = cacheKey,
+                request = request,
+                reference = reference,
+                priority = priority,
+                persistInteractiveIntent = persistInteractiveIntent,
+                onCacheMiss = onCacheMiss,
+            )
+        },
+    )
+}
+
+/** Loads one Android-retained cache entry while exposing lease acquisition to cancellation cleanup. */
+private suspend fun WhiteNoiseAppState.loadAttachmentDiskPlaintext(
+    cacheKey: String,
+    cancellationCheck: () -> Unit,
+    onAcquired: (AttachmentPlaintext?) -> Unit,
+): AttachmentPlaintext? =
+    withContext(Dispatchers.IO) {
+        val loaded =
+            diskMediaCache.getIfSmall(cacheKey)?.let(AttachmentPlaintext::Bytes)
+                ?: diskMediaCache
+                    .materialize(cacheKey, cancellationCheck)
+                    ?.let(AttachmentPlaintext::Lease)
+        onAcquired(loaded)
+        loaded
+    }
+
+/** Clears durable interactive demand only for a successfully fulfilled explicit request. */
+private fun WhiteNoiseAppState.clearInteractiveAttachmentIntentAfterSuccess(
+    request: AttachmentTransferRequest,
+    priority: AttachmentDownloadPriority,
+    persistInteractiveIntent: Boolean,
+) {
+    if (priority == AttachmentDownloadPriority.Interactive && persistInteractiveIntent) {
+        clearInteractiveAttachmentDownloadIntent(request)
+    }
+}
+
+/** Shares network-path selection, then gives each native consumer an independent plaintext lease. */
+private suspend fun WhiteNoiseAppState.acquireAttachmentPlaintextSource(
+    cacheKey: String,
+    request: AttachmentTransferRequest,
+    reference: MediaAttachmentReferenceFfi,
+    priority: AttachmentDownloadPriority,
+    persistInteractiveIntent: Boolean,
+    onCacheMiss: (suspend () -> ByteArray)?,
+): AttachmentPlaintext {
+    val resolved =
+        memoizedAttachmentAcquisition(cacheKey, priority) {
             val qualifiedRequest =
                 resolveNativeAttachmentTarget(request)?.let { target ->
                     request.copy(sourceMessageIdHex = target.sourceMessageIdHex)
                 }
-            val native = qualifiedRequest?.let { openNativeAttachment(it) ?: acquireNativeAttachment(it, priority) }
-            if (native != null) {
-                try {
-                    if (priority == AttachmentDownloadPriority.Interactive && persistInteractiveIntent) {
-                        clearInteractiveAttachmentDownloadIntent(request)
-                    }
-                    native
-                } catch (failure: Throwable) {
-                    native.close()
-                    throw failure
-                }
+            if (qualifiedRequest != null && hasNativeAttachment(qualifiedRequest)) {
+                AttachmentAcquisitionOutcome.NativeRetained(qualifiedRequest)
             } else {
-                AttachmentPlaintext.Bytes(
-                    onCacheMiss?.invoke()
-                        ?: downloadLegacyAttachmentPlaintext(request, reference, priority, persistInteractiveIntent),
-                )
+                val native = qualifiedRequest?.let { acquireNativeAttachment(it, priority) }
+                if (native != null) {
+                    native.close()
+                    AttachmentAcquisitionOutcome.NativeRetained(checkNotNull(qualifiedRequest))
+                } else {
+                    AttachmentAcquisitionOutcome.LegacyBytes(
+                        onCacheMiss?.invoke()
+                            ?: downloadLegacyAttachmentPlaintext(
+                                request,
+                                reference,
+                                priority,
+                                persistInteractiveIntent,
+                            ),
+                    )
+                }
             }
-        },
-    )
+        }.await()
+    clearInteractiveAttachmentIntentAfterSuccess(request, priority, persistInteractiveIntent)
+    return when (resolved) {
+        is AttachmentAcquisitionOutcome.LegacyBytes -> AttachmentPlaintext.Bytes(resolved.bytes)
+        is AttachmentAcquisitionOutcome.NativeRetained ->
+            openNativeAttachment(resolved.request)
+                ?: throw IOException("native attachment acquisition completed without retained bytes")
+    }
 }
 
 /**

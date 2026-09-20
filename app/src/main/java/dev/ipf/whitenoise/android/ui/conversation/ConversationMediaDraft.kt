@@ -34,6 +34,7 @@ import dev.ipf.whitenoise.android.media.editor.PhotoEditorCommitter
 import dev.ipf.whitenoise.android.media.editor.PhotoEditorRenderer
 import dev.ipf.whitenoise.android.media.editor.PhotoEditorSourceFailure
 import dev.ipf.whitenoise.android.media.editor.editorDigest
+import dev.ipf.whitenoise.android.media.editor.stagedPhotoAttachmentId
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaQuality
@@ -352,47 +353,68 @@ internal class ConversationMediaDraftState(
 
     /** Rehydrates the composer shelf from authoritative native bytes after navigation or process recreation. */
     @Suppress("ReturnCount") // Guard returns avoid materializing incomplete or unowned native drafts.
-    suspend fun restorePersistedAttachments(): RestoredConversationAttachments? {
-        if (restoreAttempted) return null
-        restoreAttempted = true
-        val accountRef = currentAccountRef ?: return null
-        val attachments =
-            appState.messageDraftRepository
-                .draft(accountRef, controller.group.groupIdHex)
-                .getOrNull()
-                ?.mediaAttachments
-                .orEmpty()
-        if (attachments.isEmpty()) return null
+    suspend fun restorePersistedAttachments(): RestoredConversationAttachments? =
+        preparationMutex.withLock {
+            if (restoreAttempted) return@withLock null
+            val accountRef = currentAccountRef ?: return@withLock null
+            restoreAttempted = true
+            val attachments =
+                appState.messageDraftRepository
+                    .draft(accountRef, controller.group.groupIdHex)
+                    .getOrNull()
+                    ?.mediaAttachments
+                    .orEmpty()
+            if (attachments.isEmpty()) return@withLock null
 
-        val restored =
-            withContext(Dispatchers.IO) {
-                attachments.mapNotNull { attachment ->
-                    materializeDraftAttachment(context, attachment)?.let { attachment to it }
+            val reconciliation =
+                reconcilePersistedDraftAttachments(
+                    accountRef = accountRef,
+                    groupIdHex = controller.group.groupIdHex,
+                    mediaSlotIds = currentSlots.map(PendingMediaSlot::id),
+                    documentUriStrings = currentDocumentUris.map(Uri::toString),
+                    attachments = attachments,
+                )
+            val restoredPhotos =
+                reconciliation.mediaBySlotId.mapValues { (_, attachment) ->
+                    DraftPreparedPhoto(attachment, attachment.editorDigest())
+                }
+            val restoredDocuments =
+                reconciliation.documentsByUriString
+                    .mapKeys { (uri, _) -> Uri.parse(uri) }
+                    .mapValues { (_, attachment) ->
+                        DraftPreparedPhoto(attachment, attachment.editorDigest())
+                    }
+            restoredPhotos.forEach { (slotId, prepared) ->
+                if (prepared.attachment.mediaType.startsWith("image/", ignoreCase = true)) {
+                    nonEditableDescriptions += slotId to messages.sourceUnavailable
                 }
             }
-        if (restored.isEmpty()) return null
+            preparedPhotos += restoredPhotos
+            preparedDocuments += restoredDocuments
 
-        val media = mutableListOf<PendingMediaSlot>()
-        val documents = mutableListOf<Uri>()
-        val restoredPhotos = linkedMapOf<String, DraftPreparedPhoto>()
-        val restoredDocuments = linkedMapOf<Uri, DraftPreparedPhoto>()
-        restored.forEach { (attachment, uri) ->
-            val prepared = DraftPreparedPhoto(attachment, attachment.editorDigest())
-            if (attachment.isComposerVisual()) {
-                media += PendingMediaSlot(attachment.id, uri)
-                restoredPhotos[attachment.id] = prepared
-                if (attachment.mediaType.startsWith("image/", ignoreCase = true)) {
-                    nonEditableDescriptions += attachment.id to messages.sourceUnavailable
+            val materialized =
+                withContext(Dispatchers.IO) {
+                    reconciliation.unmatched.mapNotNull { attachment ->
+                        materializeDraftAttachment(context, attachment)?.let { attachment to it }
+                    }
                 }
-            } else {
-                documents += uri
-                restoredDocuments[uri] = prepared
+            val media = currentSlots.toMutableList()
+            val documents = currentDocumentUris.toMutableList()
+            materialized.forEach { (attachment, uri) ->
+                val prepared = DraftPreparedPhoto(attachment, attachment.editorDigest())
+                if (attachment.isComposerVisual()) {
+                    media += PendingMediaSlot(attachment.id, uri)
+                    preparedPhotos += attachment.id to prepared
+                    if (attachment.mediaType.startsWith("image/", ignoreCase = true)) {
+                        nonEditableDescriptions += attachment.id to messages.sourceUnavailable
+                    }
+                } else {
+                    documents += uri
+                    preparedDocuments += uri to prepared
+                }
             }
+            RestoredConversationAttachments(media, documents)
         }
-        preparedPhotos += restoredPhotos
-        preparedDocuments += restoredDocuments
-        return RestoredConversationAttachments(media, documents)
-    }
 
     /** Releases presentation resources without deleting the native attachment draft. */
     fun dispose() {
@@ -465,7 +487,7 @@ internal class ConversationMediaDraftState(
     ) {
         val pending = attachmentReader.readVisualDraft(slot.uri) ?: return
         val attachmentId =
-            dev.ipf.whitenoise.android.media.editor.stagedPhotoAttachmentId(
+            stagedPhotoAttachmentId(
                 accountRef,
                 controller.group.groupIdHex,
                 slot.id,

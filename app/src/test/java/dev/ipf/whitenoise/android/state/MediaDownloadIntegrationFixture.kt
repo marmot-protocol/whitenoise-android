@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.marmotkit.AttachmentLocalAssetFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -76,6 +77,7 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
         ) { proxy, method, args ->
             when (method.name.substringBefore('-')) {
                 "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
+                "attachmentLocalAssets" -> listOf(AttachmentLocalAssetFfi(null, 0u))
                 "downloadMedia" -> suspendDownload(checkNotNull(args))
                 "toString" -> "SyntheticMediaBoundary"
                 "hashCode" -> System.identityHashCode(proxy)
@@ -166,6 +168,16 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
             index: Int,
             account: String = ACCOUNT,
         ) = AttachmentTransferRequest(account, GROUP, "image-$index", 0)
+
+        /** Supplies a complete native identity while keeping the synthetic target network-free. */
+        fun qualifiedRequest(index: Int = 0) =
+            AttachmentTransferRequest(
+                accountRef = ACCOUNT,
+                groupIdHex = GROUP,
+                messageIdHex = (index + 17).toString(16).padStart(64, '0'),
+                attachmentIndex = 0,
+                sourceMessageIdHex = (index + 33).toString(16).padStart(64, '0'),
+            )
 
         /** Carries distinct media descriptors; no locator can reach a network endpoint. */
         fun reference(index: Int) =

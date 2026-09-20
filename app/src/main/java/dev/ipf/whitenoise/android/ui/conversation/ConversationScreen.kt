@@ -3083,12 +3083,9 @@ internal fun ConversationScreen(
         )
 
     LaunchedEffect(mediaDraftState, controller.boundAccountRef, chat.id) {
-        if (pendingMediaSlots.isNotEmpty() || pendingDocumentUris.isNotEmpty()) return@LaunchedEffect
         val restored = mediaDraftState.restorePersistedAttachments() ?: return@LaunchedEffect
-        if (pendingMediaSlots.isEmpty() && pendingDocumentUris.isEmpty()) {
-            pendingMediaSlots = restored.mediaSlots
-            pendingDocumentUris = restored.documentUris
-        }
+        pendingMediaSlots = restored.mediaSlots
+        pendingDocumentUris = restored.documentUris
     }
 
     var mediaPreviewIndex by rememberSaveable(controller.boundAccountRef, chat.id) { mutableStateOf<Int?>(null) }

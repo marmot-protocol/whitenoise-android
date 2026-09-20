@@ -2099,6 +2099,8 @@ class WhiteNoiseAppState private constructor(
     // Deferred instead of spawning a second Blossom fetch.
     private val inFlightDownloads = mutableMapOf<String, Deferred<ByteArray>>()
     private val inFlightDownloadsLock = Any()
+    private val inFlightAttachmentAcquisitions = mutableMapOf<String, Deferred<AttachmentAcquisitionOutcome>>()
+    private val inFlightAttachmentAcquisitionsLock = Any()
     private val inFlightMediaUploads = InFlightMediaUploads()
 
     // Bound attachment fetches without making a visible album wait for one
@@ -3841,6 +3843,37 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
+     * Chooses and owns exactly one network path before any native or legacy
+     * acquisition starts. A later explicit tap joins an automatic owner (and
+     * promotes its gate priority) instead of starting MarmotKit beside the
+     * already-running legacy download.
+     */
+    internal fun memoizedAttachmentAcquisition(
+        cacheKey: String,
+        priority: AttachmentDownloadPriority,
+        block: suspend CoroutineScope.() -> AttachmentAcquisitionOutcome,
+    ): Deferred<AttachmentAcquisitionOutcome> {
+        synchronized(inFlightAttachmentAcquisitionsLock) {
+            inFlightAttachmentAcquisitions[cacheKey]?.takeIf { it.isActive }?.let { active ->
+                if (priority == AttachmentDownloadPriority.Interactive) {
+                    attachmentDownloadGate.promote(cacheKey)
+                }
+                return active
+            }
+            val deferred = mutationsScope.async(block = block)
+            inFlightAttachmentAcquisitions[cacheKey] = deferred
+            deferred.invokeOnCompletion {
+                synchronized(inFlightAttachmentAcquisitionsLock) {
+                    if (inFlightAttachmentAcquisitions[cacheKey] === deferred) {
+                        inFlightAttachmentAcquisitions.remove(cacheKey)
+                    }
+                }
+            }
+            return deferred
+        }
+    }
+
+    /**
      * Cancels one account-scoped memoized source attempt after its forwarding
      * owner times out or is cancelled. The identity-safe completion hook leaves
      * any newer retry registered under the same cache key intact.
@@ -5391,11 +5424,16 @@ class WhiteNoiseAppState private constructor(
             acceptedPendingTextOptimisticIdsByConversation.values.forEach { it.clear() }
             acceptedPendingTextOptimisticIdsByConversation.clear()
         }
-        // Cancel any in-flight downloads (their Deferred holds the plaintext
-        // result) and drop the index so the next session starts cold.
+        // Cancel any in-flight downloads (their Deferred may hold plaintext or
+        // a retained-media outcome) and drop both indexes so the next session
+        // starts cold.
         synchronized(inFlightDownloadsLock) {
             inFlightDownloads.values.forEach { it.cancel() }
             inFlightDownloads.clear()
+        }
+        synchronized(inFlightAttachmentAcquisitionsLock) {
+            inFlightAttachmentAcquisitions.values.forEach { it.cancel() }
+            inFlightAttachmentAcquisitions.clear()
         }
     }
 

@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
+import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.qualifiedRequest
 import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.reference
 import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.request
 import kotlinx.coroutines.Dispatchers
@@ -134,6 +135,41 @@ class MediaDownloadHostRegressionTest {
             assertArrayEquals(expected, returning.await())
             sourceConsumer.await().use { assertArrayEquals(expected, (it as AttachmentPlaintext.Bytes).bytes) }
             assertArrayEquals(expected, download(0))
+            assertEquals(1, fixture.calls.size)
+        }
+
+    /** An explicit tap joins an automatic legacy owner before native-path selection can duplicate it. */
+    @Test
+    fun interactiveTapJoinsSuspendedAutomaticLegacyAcquisition() =
+        runTest(dispatcher) {
+            val request = qualifiedRequest()
+            val automatic =
+                async {
+                    fixture.state.downloadAttachmentPlaintext(
+                        request,
+                        reference(0),
+                        AttachmentDownloadPriority.Automatic,
+                        persistInteractiveIntent = false,
+                    )
+                }
+            val legacyCall = fixture.entered.receive()
+
+            val interactive =
+                async {
+                    fixture.state.downloadAttachmentPlaintext(
+                        request,
+                        reference(0),
+                        AttachmentDownloadPriority.Interactive,
+                        persistInteractiveIntent = false,
+                    )
+                }
+            runCurrent()
+            assertFalse(interactive.isCompleted)
+
+            val expected = bytes(reference(0).fileName)
+            legacyCall.succeed(expected)
+            assertArrayEquals(expected, automatic.await())
+            assertArrayEquals(expected, interactive.await())
             assertEquals(1, fixture.calls.size)
         }
 
