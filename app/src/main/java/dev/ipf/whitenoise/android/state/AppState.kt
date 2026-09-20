@@ -4256,6 +4256,7 @@ class WhiteNoiseAppState private constructor(
             "notification listener unavailable before Marmot startup"
         }
         runtimeStartResult.await().getOrThrowAtStartupStage(BootstrapStage.RUNTIME_START)
+        runtime.marmot.enforceAppOwnedAttachmentAcquisitionForKnownAccounts()
         runtime.marmot.emitAuditRuntimeReadinessAfterStart()
         runtimeMirrors.attention.start(this, runtime.marmot)
     }
@@ -4398,10 +4399,11 @@ class WhiteNoiseAppState private constructor(
     /** Discards only an unsubmitted form or stale route; native accepted work remains intact. */
     internal fun dismissProfileSignUp(): Boolean = profileSignUp.dismiss()
 
+    /** Creates and contains a native identity before publishing it as the active Android account. */
     suspend fun createIdentity() {
         val startedAt = SystemClock.elapsedRealtime()
         try {
-            val summary = marmotIo { createIdentity(MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays) }
+            val summary = marmotIo { createIdentityWithAppOwnedAttachmentAcquisition() }
             activateCreatedIdentity(summary)
             phase = AppPhase.Ready
             presentTransient(R.string.toast_identity_created)
@@ -4638,7 +4640,7 @@ class WhiteNoiseAppState private constructor(
     /** Publishes the newest engine account snapshot and rejects older list reads. */
     private suspend fun refreshAccountSnapshot(): List<AccountSummaryFfi> {
         val requestToken = accountListLifetime.advance()
-        val refreshedAccounts = marmotIo(MarmotTraceSection.ACCOUNT_LIST) { listAccounts() }
+        val refreshedAccounts = marmotIo(MarmotTraceSection.ACCOUNT_LIST) { listAccountsWithAppAttachmentPolicy() }
         val setupAccounts = accountSetup.accountsState(refreshedAccounts)
         val bubbleColorMigrationSucceeded =
             withContext(Dispatchers.IO) {
