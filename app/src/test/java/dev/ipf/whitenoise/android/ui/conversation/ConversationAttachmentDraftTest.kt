@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
-import android.net.Uri
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import org.junit.Assert.assertEquals
@@ -43,7 +42,7 @@ class ConversationAttachmentDraftTest {
     /** Document retry identity is deterministic within one account and conversation. */
     @Test
     fun documentIdentityIsStableButConversationScoped() {
-        val uri = Uri.parse("content://picker/document/7")
+        val uri = "content://picker/document/7"
 
         val first = stagedDocumentAttachmentId("alice", "group-a", uri)
 

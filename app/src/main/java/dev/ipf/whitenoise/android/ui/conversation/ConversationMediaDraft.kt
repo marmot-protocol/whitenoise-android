@@ -161,7 +161,12 @@ internal class ConversationMediaDraftState(
             if (slot.id !in trackedSlotIds) preparePhoto(slot)
         }
         currentDocumentUris.forEach { uri ->
-            val documentId = stagedDocumentAttachmentId(currentAccountRef ?: return, controller.group.groupIdHex, uri)
+            val documentId =
+                stagedDocumentAttachmentId(
+                    currentAccountRef ?: return,
+                    controller.group.groupIdHex,
+                    uri.toString(),
+                )
             if (uri !in preparedDocuments && documentId !in preparingSlotIds) prepareDocument(uri, documentId)
         }
     }

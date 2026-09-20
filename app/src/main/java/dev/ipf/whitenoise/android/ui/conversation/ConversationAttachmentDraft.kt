@@ -37,7 +37,7 @@ internal fun MessageDraftAttachmentFfi.isComposerVisual(): Boolean =
 internal fun stagedDocumentAttachmentId(
     accountRef: String,
     groupIdHex: String,
-    uri: android.net.Uri,
+    uri: String,
 ): String =
     "document-" +
         UUID.nameUUIDFromBytes(
