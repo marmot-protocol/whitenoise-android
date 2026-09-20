@@ -121,6 +121,7 @@ internal class ConversationMediaDraftState(
     private var currentAccountRef: String? = null
     private var restoreAttempted = false
     private val preparationMutex = Mutex()
+    private val documentRemovalFence = DraftDocumentRemovalFence()
 
     var backedPhotos by mutableStateOf<Map<String, DraftBackedPhoto>>(emptyMap())
         private set
@@ -142,6 +143,10 @@ internal class ConversationMediaDraftState(
         documentUris: List<Uri>,
         accountRef: String?,
     ) {
+        documentRemovalFence.updateInputs(
+            previousUris = currentDocumentUris.map(Uri::toString),
+            currentUris = documentUris.map(Uri::toString),
+        )
         currentSlots = slots
         currentDocumentUris = documentUris
         currentAccountRef = accountRef
@@ -168,7 +173,13 @@ internal class ConversationMediaDraftState(
                     controller.group.groupIdHex,
                     uri.toString(),
                 )
-            if (uri !in preparedDocuments && documentId !in preparingSlotIds) prepareDocument(uri, documentId)
+            if (
+                uri !in preparedDocuments &&
+                documentId !in preparingSlotIds &&
+                documentRemovalFence.canPublish(uri.toString(), currentDocumentUris.map(Uri::toString))
+            ) {
+                prepareDocument(uri, documentId)
+            }
         }
     }
 
@@ -332,6 +343,7 @@ internal class ConversationMediaDraftState(
 
     /** Removes a document only after an explicit shelf action, never because the screen was disposed. */
     fun releasePreparedDocument(uri: Uri) {
+        documentRemovalFence.recordRemoval(uri.toString())
         val document = preparedDocuments[uri] ?: return
         preparedDocuments -= uri
         val accountRef = currentAccountRef ?: return
@@ -402,14 +414,14 @@ internal class ConversationMediaDraftState(
             val documents = currentDocumentUris.toMutableList()
             materialized.forEach { (attachment, uri) ->
                 val prepared = DraftPreparedPhoto(attachment, attachment.editorDigest())
-                if (attachment.isComposerVisual()) {
+                if (attachment.isComposerVisual() && !attachment.isComposerDocument()) {
                     media += PendingMediaSlot(attachment.id, uri)
                     preparedPhotos += attachment.id to prepared
                     if (attachment.mediaType.startsWith("image/", ignoreCase = true)) {
                         nonEditableDescriptions += attachment.id to messages.sourceUnavailable
                     }
                 } else {
-                    documents += uri
+                    if (uri !in documents) documents += uri
                     preparedDocuments += uri to prepared
                 }
             }
@@ -511,7 +523,7 @@ internal class ConversationMediaDraftState(
         try {
             val pending = attachmentReader.readDocumentDraft(uri) ?: return
             val prepared = stageGenericAttachment(accountRef, attachmentId, pending) ?: return
-            if (uri in currentDocumentUris) {
+            if (documentRemovalFence.canPublish(uri.toString(), currentDocumentUris.map(Uri::toString))) {
                 preparedDocuments += uri to prepared
             } else {
                 stager.removePrepared(accountRef, controller.group.groupIdHex, prepared)

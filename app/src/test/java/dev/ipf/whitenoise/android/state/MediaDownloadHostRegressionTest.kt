@@ -173,6 +173,23 @@ class MediaDownloadHostRegressionTest {
             assertEquals(1, fixture.calls.size)
         }
 
+    /** An explicit stop reaches both shared Android owners instead of caching after cancellation. */
+    @Test
+    fun explicitCancellationStopsSharedLegacyAcquisition() =
+        runTest(dispatcher) {
+            val request = request(0)
+            val download = async { runCatching { download(0, AttachmentDownloadPriority.Interactive) } }
+            fixture.entered.receive()
+
+            fixture.state.cancelAttachmentDownload(request)
+            runCurrent()
+
+            assertTrue(download.await().exceptionOrNull() is kotlinx.coroutines.CancellationException)
+            assertEquals(0, fixture.active.get())
+            assertNull(fixture.state.cachedMediaPlaintext(request.cacheKey()))
+            assertNull(withContext(Dispatchers.IO) { fixture.disk.get(request.cacheKey()) })
+        }
+
     /** Timeout and integrity failures terminate once, leave both caches empty, and allow a later explicit retry. */
     @Test
     fun failedNativeOperationDoesNotPublishOrLoopBeforeAnExplicitRetry() =

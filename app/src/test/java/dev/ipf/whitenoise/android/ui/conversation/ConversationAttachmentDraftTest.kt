@@ -97,6 +97,48 @@ class ConversationAttachmentDraftTest {
         assertTrue(reconciled.unmatched.isEmpty())
     }
 
+    /** A document-picker image keeps its document shelf and never migrates into visual media. */
+    @Test
+    fun documentPickerImageReconcilesAsDocument() {
+        val account = "alice"
+        val group = "group-a"
+        val uri = "content://picker/document/image"
+        val imageDocument =
+            attachment(
+                id = stagedDocumentAttachmentId(account, group, uri),
+                mediaType = "image/png",
+            )
+
+        val reconciled =
+            reconcilePersistedDraftAttachments(
+                accountRef = account,
+                groupIdHex = group,
+                mediaSlotIds = emptyList(),
+                documentUriStrings = listOf(uri),
+                attachments = listOf(imageDocument),
+            )
+
+        assertEquals(imageDocument, reconciled.documentsByUriString[uri])
+        assertTrue(reconciled.mediaBySlotId.isEmpty())
+        assertTrue(reconciled.unmatched.isEmpty())
+        assertTrue(imageDocument.isComposerDocument())
+    }
+
+    /** A removal fence rejects a late prepare result until the URI is explicitly selected again. */
+    @Test
+    fun documentRemovalFenceRejectsLatePreparationAndAllowsReselection() {
+        val uri = "content://picker/document/late"
+        val fence = DraftDocumentRemovalFence()
+
+        fence.updateInputs(emptyList(), listOf(uri))
+        fence.recordRemoval(uri)
+
+        assertFalse(fence.canPublish(uri, listOf(uri)))
+        fence.updateInputs(listOf(uri), emptyList())
+        fence.updateInputs(emptyList(), listOf(uri))
+        assertTrue(fence.canPublish(uri, listOf(uri)))
+    }
+
     /** Builds a minimal native draft descriptor for classification tests. */
     private fun attachment(
         mediaType: String,

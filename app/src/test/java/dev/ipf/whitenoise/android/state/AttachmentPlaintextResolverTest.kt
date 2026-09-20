@@ -12,6 +12,26 @@ import org.junit.Test
 import java.io.File
 
 class AttachmentPlaintextResolverTest {
+    /** A failed native reopen must not erase the durable request that can retry it. */
+    @Test
+    fun failedNativeMaterializationPreservesInteractiveIntent() =
+        runBlocking {
+            var cleared = false
+            val request = MediaDownloadIntegrationFixture.qualifiedRequest()
+
+            val failure =
+                runCatching {
+                    materializeAttachmentAcquisition(
+                        outcome = AttachmentAcquisitionOutcome.NativeRetained(request),
+                        openNative = { null },
+                        afterSuccess = { cleared = true },
+                    )
+                }.exceptionOrNull()
+
+            assertTrue(failure is java.io.IOException)
+            assertFalse(cleared)
+        }
+
     /** Confirms an L1 hit bypasses disk and clears completed interactive intent. */
     @Test
     fun memoryHitSkipsDiskMissAndRepromotionButClearsInteractiveIntent() =

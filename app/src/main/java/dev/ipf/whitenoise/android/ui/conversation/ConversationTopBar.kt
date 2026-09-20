@@ -43,6 +43,7 @@ import dev.ipf.whitenoise.android.core.selectedChatPresentationTitle
 import dev.ipf.whitenoise.android.state.ChatListAvatarSeed
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.adoptableSelectedAvatarAsset
 import dev.ipf.whitenoise.android.ui.chats.ConversationSearchTopBar
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
@@ -158,8 +159,14 @@ internal fun ConversationTopBar(
                                 // conversation; a frozen route presentation keeps the row's picture instead.
                                 durableAvatar =
                                     controller.window.header
-                                        ?.avatarAsset
-                                        ?.takeUnless { freezeRoutePresentation },
+                                        ?.let { header ->
+                                            adoptableSelectedAvatarAsset(
+                                                asset = header.avatarAsset,
+                                                avatarSource = header.selected.avatarSource,
+                                                group = presentedGroup,
+                                                memberCount = presentedMemberCount,
+                                            )
+                                        }?.takeUnless { freezeRoutePresentation },
                             )
                         }
                         Column(verticalArrangement = Arrangement.spacedBy(CONVERSATION_TITLE_LINE_SPACING_DP.dp)) {

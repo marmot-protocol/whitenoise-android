@@ -2,7 +2,10 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AttachmentLocalAssetFfi
 import dev.ipf.marmotkit.AttachmentLocalBytesFfi
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -11,8 +14,39 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.util.concurrent.Executors
 
 class NativeAttachmentLocalAccessTest {
+    /** Directory, query, and streaming work leave a caller-confined UI dispatcher. */
+    @Test
+    fun `open confines native materialization to io`() =
+        runBlocking {
+            val caller = Executors.newSingleThreadExecutor { task -> Thread(task, "native-access-caller") }
+            val callerDispatcher = caller.asCoroutineDispatcher()
+            try {
+                val observedThreads = mutableListOf<String>()
+                withContext(callerDispatcher) {
+                    NativeAttachmentLocalAccess(
+                        cacheRoot = temporaryRoot(),
+                        queryAssets = {
+                            observedThreads += Thread.currentThread().name
+                            listOf(AttachmentLocalAssetFfi("empty", 0u))
+                        },
+                        readAsset = { _, _, _ ->
+                            observedThreads += Thread.currentThread().name
+                            AttachmentLocalBytesFfi(true, byteArrayOf())
+                        },
+                    ).open(listOf(target())).single()?.close()
+                }
+
+                assertTrue(observedThreads.isNotEmpty())
+                assertTrue(observedThreads.none { it == "native-access-caller" })
+            } finally {
+                callerDispatcher.close()
+                caller.shutdownNow()
+            }
+        }
+
     /** Native targets never substitute a display ID for their source ID. */
     @Test
     fun `target preserves display id source id and original album index`() {

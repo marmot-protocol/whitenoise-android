@@ -132,12 +132,35 @@ private suspend fun WhiteNoiseAppState.acquireAttachmentPlaintextSource(
                 }
             }
         }.await()
-    clearInteractiveAttachmentIntentAfterSuccess(request, priority, persistInteractiveIntent)
-    return when (resolved) {
-        is AttachmentAcquisitionOutcome.LegacyBytes -> AttachmentPlaintext.Bytes(resolved.bytes)
-        is AttachmentAcquisitionOutcome.NativeRetained ->
-            openNativeAttachment(resolved.request)
-                ?: throw IOException("native attachment acquisition completed without retained bytes")
+    return materializeAttachmentAcquisition(
+        outcome = resolved,
+        openNative = ::openNativeAttachment,
+        afterSuccess = {
+            clearInteractiveAttachmentIntentAfterSuccess(request, priority, persistInteractiveIntent)
+        },
+    )
+}
+
+/** Clears durable demand only after the selected retained source is open and caller-owned. */
+internal suspend fun materializeAttachmentAcquisition(
+    outcome: AttachmentAcquisitionOutcome,
+    openNative: suspend (AttachmentTransferRequest) -> AttachmentPlaintext?,
+    afterSuccess: suspend () -> Unit,
+): AttachmentPlaintext {
+    val source =
+        when (outcome) {
+            is AttachmentAcquisitionOutcome.LegacyBytes -> AttachmentPlaintext.Bytes(outcome.bytes)
+            is AttachmentAcquisitionOutcome.NativeRetained ->
+                openNative(outcome.request)
+                    ?: throw IOException("native attachment acquisition completed without retained bytes")
+        }
+    var completed = false
+    try {
+        afterSuccess()
+        completed = true
+        return source
+    } finally {
+        if (!completed) source.close()
     }
 }
 

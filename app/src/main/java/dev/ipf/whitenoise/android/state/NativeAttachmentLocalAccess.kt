@@ -6,8 +6,10 @@ import dev.ipf.marmotkit.AttachmentLocalTargetFfi
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.DiskByteCacheLease
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -49,14 +51,15 @@ internal class NativeAttachmentLocalAccess(
     private val readAsset: suspend (String, ULong, UInt) -> AttachmentLocalBytesFfi,
 ) {
     /** Returns one result for every target, preserving target order and duplicates. */
-    suspend fun open(targets: List<NativeAttachmentTarget>): List<AttachmentPlaintext?> {
-        require(targets.size <= NATIVE_ATTACHMENT_TARGET_LIMIT) { "native attachment target batch exceeds 64" }
-        if (targets.isEmpty()) return emptyList()
-        prepareLeaseDirectory()
-        val assets = queryAssets(targets.map(NativeAttachmentTarget::toFfi))
-        check(assets.size == targets.size) { "native local asset response changed target cardinality" }
-        return assets.map { asset -> materialize(asset) }
-    }
+    suspend fun open(targets: List<NativeAttachmentTarget>): List<AttachmentPlaintext?> =
+        withContext(Dispatchers.IO) {
+            require(targets.size <= NATIVE_ATTACHMENT_TARGET_LIMIT) { "native attachment target batch exceeds 64" }
+            if (targets.isEmpty()) return@withContext emptyList()
+            prepareLeaseDirectory()
+            val assets = queryAssets(targets.map(NativeAttachmentTarget::toFfi))
+            check(assets.size == targets.size) { "native local asset response changed target cardinality" }
+            assets.map { asset -> materialize(asset) }
+        }
 
     /** Removes process-orphaned plaintext once before creating the first new lease. */
     private fun prepareLeaseDirectory() {

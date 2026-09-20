@@ -2099,8 +2099,6 @@ class WhiteNoiseAppState private constructor(
     // Deferred instead of spawning a second Blossom fetch.
     private val inFlightDownloads = mutableMapOf<String, Deferred<ByteArray>>()
     private val inFlightDownloadsLock = Any()
-    private val inFlightAttachmentAcquisitions = mutableMapOf<String, Deferred<AttachmentAcquisitionOutcome>>()
-    private val inFlightAttachmentAcquisitionsLock = Any()
     private val inFlightMediaUploads = InFlightMediaUploads()
 
     // Bound attachment fetches without making a visible album wait for one
@@ -2169,6 +2167,8 @@ class WhiteNoiseAppState private constructor(
     private val profileRefreshFanoutGate = Semaphore(PROFILE_REFRESH_FANOUT)
     internal val mutationsScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
+    private val inFlightAttachmentAcquisitions =
+        InFlightAttachmentAcquisitions(mutationsScope, attachmentDownloadGate::promote)
     internal val attachmentOpens =
         AttachmentOpenCoordinator(
             intentStore = attachmentDownloadIntents,
@@ -3852,26 +3852,7 @@ class WhiteNoiseAppState private constructor(
         cacheKey: String,
         priority: AttachmentDownloadPriority,
         block: suspend CoroutineScope.() -> AttachmentAcquisitionOutcome,
-    ): Deferred<AttachmentAcquisitionOutcome> {
-        synchronized(inFlightAttachmentAcquisitionsLock) {
-            inFlightAttachmentAcquisitions[cacheKey]?.takeIf { it.isActive }?.let { active ->
-                if (priority == AttachmentDownloadPriority.Interactive) {
-                    attachmentDownloadGate.promote(cacheKey)
-                }
-                return active
-            }
-            val deferred = mutationsScope.async(block = block)
-            inFlightAttachmentAcquisitions[cacheKey] = deferred
-            deferred.invokeOnCompletion {
-                synchronized(inFlightAttachmentAcquisitionsLock) {
-                    if (inFlightAttachmentAcquisitions[cacheKey] === deferred) {
-                        inFlightAttachmentAcquisitions.remove(cacheKey)
-                    }
-                }
-            }
-            return deferred
-        }
-    }
+    ): Deferred<AttachmentAcquisitionOutcome> = inFlightAttachmentAcquisitions.acquire(cacheKey, priority, block)
 
     /**
      * Cancels one account-scoped memoized source attempt after its forwarding
@@ -3932,6 +3913,8 @@ class WhiteNoiseAppState private constructor(
         attachmentDownloadIntents.suppressAutomatic(request)
         attachmentDownloadIntents.setInteractive(request, interactive = false)
         AttachmentDownloadWorker.cancelForRequest(appContext, request)
+        cancelMemoizedAttachmentDownload(request)
+        inFlightAttachmentAcquisitions.cancel(request.cacheKey(), AttachmentTransferCancelledByUserException())
         mutationsScope.launch { cancelNativeAttachmentBounded(request) }
         attachmentDownloadPolicyRevision += 1
     }
@@ -5431,10 +5414,7 @@ class WhiteNoiseAppState private constructor(
             inFlightDownloads.values.forEach { it.cancel() }
             inFlightDownloads.clear()
         }
-        synchronized(inFlightAttachmentAcquisitionsLock) {
-            inFlightAttachmentAcquisitions.values.forEach { it.cancel() }
-            inFlightAttachmentAcquisitions.clear()
-        }
+        inFlightAttachmentAcquisitions.cancelAll()
     }
 
     /**

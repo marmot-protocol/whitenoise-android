@@ -75,6 +75,31 @@ class ChatListFirstFrameEncryptedGroupAvatarScreenshotTest {
         captureEncryptedGroupAvatar(darkTheme = true, amoled = true, themeName = "amoled")
     }
 
+    /** A named group without its own image keeps the group monogram on the chat row. */
+    @Test
+    fun namedGroupWithoutOwnAvatarUsesMonogram() {
+        val appState = appState()
+
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                Surface(color = MaterialTheme.colorScheme.background) {
+                    Box(Modifier.fillMaxWidth().testTag(SCREENSHOT_TAG)) {
+                        ChatRow(
+                            item = encryptedGroupItem(hash = null),
+                            appState = appState,
+                            interactionsEnabled = false,
+                            onClick = {},
+                            onOpenProfile = {},
+                        )
+                    }
+                }
+            }
+        }
+        composeRule
+            .onNodeWithTag(SCREENSHOT_TAG)
+            .captureRoboImage("src/test/snapshots/chat_list_named_group_monogram_light.png")
+    }
+
     @Test
     fun accountAEncryptedGroupAvatarFirstFrame() {
         val appState = appState()
@@ -332,7 +357,7 @@ class ChatListFirstFrameEncryptedGroupAvatarScreenshotTest {
     }
 
     private fun encryptedGroupItem(
-        hash: String = IMAGE_HASH_A,
+        hash: String? = IMAGE_HASH_A,
         avatarUrl: String? = null,
         pendingConfirmation: Boolean = false,
         firstFrameAvatar: ChatListAvatarSeed? = null,
@@ -355,7 +380,7 @@ class ChatListFirstFrameEncryptedGroupAvatarScreenshotTest {
     )
 
     private fun encryptedGroup(
-        hash: String,
+        hash: String?,
         avatarUrl: String? = null,
         pendingConfirmation: Boolean = false,
     ) = AppGroupRecordFfi(

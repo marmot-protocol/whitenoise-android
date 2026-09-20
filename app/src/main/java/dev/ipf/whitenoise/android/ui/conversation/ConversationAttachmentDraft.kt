@@ -6,6 +6,8 @@ import dev.ipf.whitenoise.android.state.PendingAttachment
 import java.nio.charset.StandardCharsets
 import java.util.UUID
 
+private const val DOCUMENT_ATTACHMENT_ID_PREFIX = "document-"
+
 /** Converts send-ready bytes into the native draft representation that owns unsent attachment data. */
 internal fun PendingAttachment.toMessageDraftAttachment(id: String): MessageDraftAttachmentFfi =
     MessageDraftAttachmentFfi(
@@ -34,13 +36,16 @@ internal fun MessageDraftAttachmentFfi.isComposerVisual(): Boolean =
     mediaType.startsWith("image/", ignoreCase = true) ||
         mediaType.startsWith("video/", ignoreCase = true)
 
+/** Stable document identity wins over MIME so document-picker images stay documents. */
+internal fun MessageDraftAttachmentFfi.isComposerDocument(): Boolean = id.startsWith(DOCUMENT_ATTACHMENT_ID_PREFIX)
+
 /** Stable identity lets URI restoration and duplicate mutation retries resolve the same native attachment. */
 internal fun stagedDocumentAttachmentId(
     accountRef: String,
     groupIdHex: String,
     uri: String,
 ): String =
-    "document-" +
+    DOCUMENT_ATTACHMENT_ID_PREFIX +
         UUID.nameUUIDFromBytes(
             "$accountRef\u0000$groupIdHex\u0000$uri".toByteArray(StandardCharsets.UTF_8),
         )
@@ -72,14 +77,15 @@ internal fun reconcilePersistedDraftAttachments(
     val unmatched = mutableListOf<MessageDraftAttachmentFfi>()
 
     attachments.forEach { attachment ->
+        val isDocument = attachment.isComposerDocument()
         val mediaSlotId =
-            if (attachment.isComposerVisual()) {
+            if (!isDocument && attachment.isComposerVisual()) {
                 mediaSlotIds.firstOrNull { it == attachment.id } ?: mediaSlotByAttachmentId[attachment.id]
             } else {
                 null
             }
         val documentUri =
-            if (attachment.isComposerVisual()) null else documentUriByAttachmentId[attachment.id]
+            if (isDocument || !attachment.isComposerVisual()) documentUriByAttachmentId[attachment.id] else null
         when {
             mediaSlotId != null -> mediaBySlotId[mediaSlotId] = attachment
             documentUri != null -> documentsByUriString[documentUri] = attachment
@@ -87,4 +93,28 @@ internal fun reconcilePersistedDraftAttachments(
         }
     }
     return PersistedDraftAttachmentReconciliation(mediaBySlotId, documentsByUriString, unmatched)
+}
+
+/** Fences preparation results that complete after their document was explicitly removed. */
+internal class DraftDocumentRemovalFence {
+    private val removedUris = mutableSetOf<String>()
+
+    /** A newly selected URI starts a fresh lifetime; unchanged projections keep their tombstone. */
+    fun updateInputs(
+        previousUris: List<String>,
+        currentUris: List<String>,
+    ) {
+        removedUris.removeAll(currentUris.toSet() - previousUris.toSet())
+    }
+
+    /** Records intent before any prepared value lookup can return early. */
+    fun recordRemoval(uri: String) {
+        removedUris += uri
+    }
+
+    /** Allows publication only while the URI is selected in its current lifetime. */
+    fun canPublish(
+        uri: String,
+        currentUris: List<String>,
+    ): Boolean = uri in currentUris && uri !in removedUris
 }

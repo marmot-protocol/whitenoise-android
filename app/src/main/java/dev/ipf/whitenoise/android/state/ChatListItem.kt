@@ -100,7 +100,13 @@ internal fun chatListItemFromProjection(
             !displayGroup.selfMembership.isNonMember() &&
                 (group?.let { it.pendingConfirmation != row.pendingConfirmation } ?: row.pendingConfirmation),
         selectedPresentation = selectedPresentation,
-        selectedAvatarAsset = selectedAvatarAsset,
+        selectedAvatarAsset =
+            adoptableSelectedAvatarAsset(
+                asset = selectedAvatarAsset,
+                avatarSource = selectedPresentation?.avatarSource,
+                group = displayGroup,
+                memberCount = resolvedMemberCount,
+            ),
         selectedPreview = selectedPreview,
         actions = actions,
         previewTokens = previewTokens,
