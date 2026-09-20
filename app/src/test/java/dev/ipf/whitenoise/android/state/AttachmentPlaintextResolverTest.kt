@@ -47,7 +47,6 @@ class AttachmentPlaintextResolverTest {
                     cacheMemory = { promoted = true },
                     clearInteractiveIntent = { cleared = true },
                     loadMiss = { error("cache miss must not run") },
-                    loadSourceMiss = { error("native demand must not precede existing memory") },
                 )
 
             assertFalse(promoted)
@@ -72,7 +71,6 @@ class AttachmentPlaintextResolverTest {
                     cacheMemory = { promoted = it },
                     clearInteractiveIntent = { cleared = true },
                     loadMiss = { error("cache miss must not run") },
-                    loadSourceMiss = { error("native demand must not precede authenticated disk") },
                 )
 
             assertArrayEquals(expected, promoted)

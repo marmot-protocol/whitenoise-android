@@ -9,6 +9,29 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConversationAttachmentDraftTest {
+    /** Removed saved documents are neither rebound nor materialized as unmatched native drafts. */
+    @Test
+    fun removalDuringRestoreExcludesNativeDocumentBeforeAndAfterShelfUpdate() {
+        val uri = "content://picker/document/removed"
+        val id = stagedDocumentAttachmentId("alice", "group", uri)
+        val native = attachment("application/pdf", id)
+        val fence = DraftDocumentRemovalFence()
+        fence.recordRemoval(uri)
+        for (selected in listOf(listOf(uri), emptyList())) {
+            val restored =
+                reconcilePersistedDraftAttachments(
+                    accountRef = "alice",
+                    groupIdHex = "group",
+                    mediaSlotIds = emptyList(),
+                    documentUriStrings = selected,
+                    attachments = listOf(native),
+                    removedAttachmentIds = fence.removedAttachmentIds("alice", "group"),
+                )
+            assertTrue(restored.documentsByUriString.isEmpty())
+            assertTrue(restored.unmatched.isEmpty())
+        }
+    }
+
     /** Native staging preserves every send-relevant field and the stable shelf identity. */
     @Test
     fun pendingAttachmentRoundTripsThroughNativeDraft() {

@@ -344,11 +344,23 @@ internal class ConversationMediaDraftState(
     /** Removes a document only after an explicit shelf action, never because the screen was disposed. */
     fun releasePreparedDocument(uri: Uri) {
         documentRemovalFence.recordRemoval(uri.toString())
-        val document = preparedDocuments[uri] ?: return
+        val document = preparedDocuments[uri]
         preparedDocuments -= uri
         val accountRef = currentAccountRef ?: return
         appState.launchMutation {
-            stager.removePrepared(accountRef, controller.group.groupIdHex, document)
+            preparationMutex.withLock {
+                val groupId = controller.group.groupIdHex
+                val attachmentId = document?.attachment?.id ?: stagedDocumentAttachmentId(accountRef, groupId, uri.toString())
+                if (documentRemovalFence.canPublish(uri.toString(), currentDocumentUris.map(Uri::toString))) return@withLock
+                val removed =
+                    document ?: appState.messageDraftRepository
+                        .draft(accountRef, groupId)
+                        .getOrNull()
+                        ?.mediaAttachments
+                        ?.firstOrNull { it.id == attachmentId }
+                        ?.let { DraftPreparedPhoto(it, it.editorDigest()) }
+                if (removed != null) stager.removePrepared(accountRef, groupId, removed)
+            }
         }
     }
 
@@ -385,6 +397,7 @@ internal class ConversationMediaDraftState(
                     mediaSlotIds = currentSlots.map(PendingMediaSlot::id),
                     documentUriStrings = currentDocumentUris.map(Uri::toString),
                     attachments = attachments,
+                    removedAttachmentIds = documentRemovalFence.removedAttachmentIds(accountRef, controller.group.groupIdHex),
                 )
             val restoredPhotos =
                 reconciliation.mediaBySlotId.mapValues { (_, attachment) ->
@@ -413,6 +426,9 @@ internal class ConversationMediaDraftState(
             val media = currentSlots.toMutableList()
             val documents = currentDocumentUris.toMutableList()
             materialized.forEach { (attachment, uri) ->
+                if (attachment.id in documentRemovalFence.removedAttachmentIds(accountRef, controller.group.groupIdHex)) {
+                    return@forEach
+                }
                 val prepared = DraftPreparedPhoto(attachment, attachment.editorDigest())
                 if (attachment.isComposerVisual() && !attachment.isComposerDocument()) {
                     media += PendingMediaSlot(attachment.id, uri)

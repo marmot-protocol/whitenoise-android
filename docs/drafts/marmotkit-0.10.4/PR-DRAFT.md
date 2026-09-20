@@ -1,5 +1,11 @@
 # Proposed title
 
+> Current checkpoint (2026-09-21): #2691 is merged and this branch is rebased onto
+> `33a1aee78675f87948f74a79cb22a3c7b3350566` on master. The user requested a push
+> now for review; keep draft while the 16 current detekt findings and remaining
+> validation are completed. The old stacked-publication instructions below are
+> historical and superseded. See `IMPLEMENTATION-STATUS.md` for current evidence.
+
 Adopt MarmotKit 0.10.4 with host-managed attachment downloads
 
 ## Draft publication and merge hold

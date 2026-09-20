@@ -5,16 +5,11 @@ import dev.ipf.marmotkit.AttachmentTransferSnapshotFfi
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.AttachmentTransferStatusFfi
 import dev.ipf.marmotkit.AttachmentTransferSubscription
-import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.Closeable
 import java.io.IOException
-
-private const val NATIVE_ATTACHMENT_IN_MEMORY_LIMIT_BYTES = 32L * 1024L * 1024L
 
 private const val NATIVE_ATTACHMENT_CANCEL_TIMEOUT_MILLIS = 5_000L
 
@@ -68,8 +63,10 @@ internal interface NativeTransferFeed : Closeable {
 private class MarmotNativeTransferFeed(
     private val subscription: AttachmentTransferSubscription,
 ) : NativeTransferFeed {
+    /** Waits for a native replacement without granting or cancelling acquisition. */
     override suspend fun next(): AttachmentTransferSnapshotFfi? = subscription.next()
 
+    /** Wakes pending observation and releases its native handle. */
     override fun close() {
         subscription.cancel()
         subscription.close()
@@ -86,12 +83,12 @@ internal suspend fun WhiteNoiseAppState.acquireNativeAttachment(
     request: AttachmentTransferRequest,
     priority: AttachmentDownloadPriority,
     allowExplicitRetry: Boolean = true,
-): AttachmentPlaintext? {
+): AttachmentTransferRequest {
     val target =
         request.nativeTarget() ?: findNativeAttachment(request)?.target
             ?: throw AttachmentReferenceNotReadyException()
     val resolved = request.copy(sourceMessageIdHex = target.sourceMessageIdHex)
-    openNativeAttachment(resolved)?.let { return it }
+    if (hasNativeAttachment(resolved)) return resolved
 
     val ffiTarget = target.toFfi()
     val initial =
@@ -99,7 +96,7 @@ internal suspend fun WhiteNoiseAppState.acquireNativeAttachment(
             attachmentTransferSnapshot(request.accountRef, request.groupIdHex, listOf(ffiTarget))
         }
     initial.items.singleOrNull()?.takeIf { it.state == AttachmentTransferStateFfi.READY }?.let {
-        openNativeAttachment(resolved)?.let { return it }
+        if (hasNativeAttachment(resolved)) return resolved
     }
 
     val feed =
@@ -125,8 +122,7 @@ internal suspend fun WhiteNoiseAppState.acquireNativeAttachment(
             }
         }
     }
-    return openNativeAttachment(resolved)
-        ?: throw IOException("native attachment was ready without readable bytes")
+    return resolved
 }
 
 /** Lexically owns observation even if demand fails or its caller stops waiting. */
@@ -170,6 +166,7 @@ internal suspend fun WhiteNoiseAppState.cancelNativeAttachmentBounded(request: A
 @Suppress("ReturnCount") // Missing target/status/reference are distinct harmless stale-handle outcomes.
 internal suspend fun WhiteNoiseAppState.cancelNativeAttachment(
     request: AttachmentTransferRequest,
+    resolvedTarget: NativeAttachmentTarget? = null,
 ): Boolean {
     val target = resolvedTarget ?: resolveNativeAttachmentTarget(request) ?: return false
     val status =
@@ -179,20 +176,3 @@ internal suspend fun WhiteNoiseAppState.cancelNativeAttachment(
     val reference = status?.reference ?: return false
     return marmotIo { controlAttachment(request.accountRef, reference, AttachmentControlFfi.CANCEL) }
 }
-
-/** Materializes only bounded native plaintext for legacy byte-array consumers. */
-internal suspend fun WhiteNoiseAppState.acquireNativeAttachmentBytes(
-    request: AttachmentTransferRequest,
-    priority: AttachmentDownloadPriority,
-): ByteArray? =
-    acquireNativeAttachment(request, priority)?.use { source ->
-        if (source.size > NATIVE_ATTACHMENT_IN_MEMORY_LIMIT_BYTES) {
-            throw IOException("native attachment exceeds the bounded in-memory consumer limit")
-        }
-        withContext(Dispatchers.IO) {
-            ByteArrayOutputStream(source.size.toInt()).use { output ->
-                source.copyTo(output)
-                output.toByteArray()
-            }
-        }
-    }

@@ -1,5 +1,11 @@
 # MarmotKit 0.10.4 — waiting Android upgrade draft
 
+**2026-09-21 integration update:** #2691 is merged. The user authorized rebasing
+this PR onto master, carrying both final review fixes, and completing it for
+review. See the **Current integration** section in `IMPLEMENTATION-STATUS.md`
+for current state and evidence. The older stacked-branch instructions below
+remain historical context and must not be replayed onto the rebased branch.
+
 Prepared 2026-09-20 for an implementation agent. Read this before changing the
 runtime pin. This is an execution assessment, not a second product backlog.
 

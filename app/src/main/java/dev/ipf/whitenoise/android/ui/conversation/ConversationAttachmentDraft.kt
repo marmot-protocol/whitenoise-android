@@ -67,6 +67,7 @@ internal fun reconcilePersistedDraftAttachments(
     mediaSlotIds: List<String>,
     documentUriStrings: List<String>,
     attachments: List<MessageDraftAttachmentFfi>,
+    removedAttachmentIds: Set<String> = emptySet(),
 ): PersistedDraftAttachmentReconciliation {
     val mediaSlotByAttachmentId =
         mediaSlotIds.associateBy { slotId -> stagedPhotoAttachmentId(accountRef, groupIdHex, slotId) }
@@ -77,6 +78,7 @@ internal fun reconcilePersistedDraftAttachments(
     val unmatched = mutableListOf<MessageDraftAttachmentFfi>()
 
     attachments.forEach { attachment ->
+        if (attachment.id in removedAttachmentIds) return@forEach
         val isDocument = attachment.isComposerDocument()
         val mediaSlotId =
             if (!isDocument && attachment.isComposerVisual()) {
@@ -111,6 +113,12 @@ internal class DraftDocumentRemovalFence {
     fun recordRemoval(uri: String) {
         removedUris += uri
     }
+
+    /** Maps removal intent to native identity even before prepared bytes have been restored. */
+    fun removedAttachmentIds(
+        accountRef: String,
+        groupIdHex: String,
+    ): Set<String> = removedUris.mapTo(mutableSetOf()) { stagedDocumentAttachmentId(accountRef, groupIdHex, it) }
 
     /** Allows publication only while the URI is selected in its current lifetime. */
     fun canPublish(

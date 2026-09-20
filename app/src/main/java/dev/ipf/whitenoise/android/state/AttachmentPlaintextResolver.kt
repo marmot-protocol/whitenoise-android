@@ -104,13 +104,17 @@ private suspend fun WhiteNoiseAppState.acquireAttachmentPlaintextSource(
     persistInteractiveIntent: Boolean,
     allowExplicitRetry: Boolean,
 ): AttachmentPlaintext {
+    if (priority == AttachmentDownloadPriority.Interactive && allowExplicitRetry && hasActiveAttachmentAcquisition(cacheKey)) {
+        val target = resolveNativeAttachmentTarget(request) ?: throw AttachmentReferenceNotReadyException()
+        marmotIo { downloadAttachmentAgain(request.accountRef, request.groupIdHex, target.toFfi()) }
+            ?: throw IOException("native attachment promotion was rejected")
+    }
     val resolved =
-        memoizedAttachmentAcquisition(cacheKey, priority) {
+        memoizedAttachmentAcquisition(cacheKey, request, priority) {
             val target = resolveNativeAttachmentTarget(request) ?: throw AttachmentReferenceNotReadyException()
             val qualifiedRequest = request.copy(sourceMessageIdHex = target.sourceMessageIdHex)
             if (!hasNativeAttachment(qualifiedRequest)) {
-                acquireNativeAttachment(qualifiedRequest, priority, allowExplicitRetry)?.close()
-                    ?: throw AttachmentReferenceNotReadyException()
+                acquireNativeAttachment(qualifiedRequest, priority, allowExplicitRetry)
             }
             AttachmentAcquisitionOutcome.NativeRetained(qualifiedRequest)
         }.await()

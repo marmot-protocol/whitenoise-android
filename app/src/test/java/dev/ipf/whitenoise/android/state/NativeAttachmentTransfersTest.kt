@@ -52,7 +52,8 @@ class NativeAttachmentTransfersTest {
         val acquisition = source.functionBody("WhiteNoiseAppState.acquireNativeAttachment")
         val explicitCancellation = appStateSource().readText().functionBody("cancelAttachmentDownload")
 
-        assertTrue(acquisition.indexOf("feed.use") < acquisition.indexOf("downloadAttachmentAgain"))
+        assertTrue(acquisition.indexOf("awaitNativeAttachment(feed)") < acquisition.indexOf("downloadAttachmentAgain"))
+        assertTrue("feed.use" in source.functionBody("awaitNativeAttachment"))
         assertFalse("cancelNativeAttachment(" in acquisition)
         assertTrue("cancelNativeAttachmentBounded(request)" in explicitCancellation)
         assertTrue("withContext(NonCancellable)" in source)

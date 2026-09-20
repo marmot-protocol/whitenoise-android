@@ -13,6 +13,9 @@ internal class InFlightAttachmentAcquisitions(
     private val lock = Any()
     private val entries = mutableMapOf<String, Deferred<AttachmentAcquisitionOutcome>>()
 
+    /** Identifies a joined automatic owner so a deliberate tap can upgrade its native demand. */
+    fun isActive(cacheKey: String): Boolean = synchronized(lock) { entries[cacheKey]?.isActive == true }
+
     /** Joins active work, promoting interactive demand without choosing a second network path. */
     fun acquire(
         cacheKey: String,
@@ -46,9 +49,7 @@ internal class InFlightAttachmentAcquisitions(
 
     /** Cancels and forgets every owner when the enclosing app-state session closes. */
     fun cancelAll() {
-        synchronized(lock) {
-            entries.values.forEach { it.cancel() }
-            entries.clear()
-        }
+        val owners = synchronized(lock) { entries.values.toList().also { entries.clear() } }
+        owners.forEach { it.cancel() }
     }
 }

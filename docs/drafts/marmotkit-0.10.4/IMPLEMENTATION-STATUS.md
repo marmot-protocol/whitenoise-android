@@ -1,4 +1,53 @@
-# Local 0.10.4 implementation checkpoint
+# MarmotKit 0.10.4 integration checkpoint
+
+## Current integration — 2026-09-21
+
+The user requested completion and readiness after merging #2691. The branch has
+been transplanted onto its merge commit, `33a1aee78675f87948f74a79cb22a3c7b3350566`,
+replaying only the four upgrade commits after `cf4d1a147`. Five media conflicts
+were resolved; the merged image-slider, cache-first, source-identity, cancellation,
+and draft-reconciliation changes are retained.
+
+The two final #2691 review findings are included here:
+
+- Native plaintext leases remain tracked outside the IO dispatcher and are closed
+  after a cancelled handoff or a later batch failure. Permanent regressions:
+  `NativeAttachmentLeaseCleanupTest`.
+- Removing a document during restoration fences both matched and unmatched native
+  attachments and serializes native draft cleanup behind restoration. Permanent
+  regressions: `ConversationDraftRestoreRemovalTest` and
+  `ConversationAttachmentDraftTest`.
+
+The shared host acquisition owner now routes cache misses exclusively to native
+acquisition. Existing authenticated Android cache hits remain eligible. Explicit
+promotion joins the durable native job; observer disposal does not cancel it.
+Native readiness returns identity, avoiding a redundant full plaintext read
+before the caller opens its own lease. Forwarding's separate deliberate,
+bounded legacy fallback remains supported; this is not an automatic fallback.
+
+The media integration fixture models metadata-only reads, native admission,
+observation, terminal-state preservation, explicit cancellation, and retained
+ranged reads. It fails on any legacy network call. Generated native test handles
+use the repository's constructor-free stub convention, not real JNI cleaners.
+
+The user requested an immediate review checkpoint push before the remaining
+validation completes. Keep the PR draft: the latest offline fast gate failed
+detekt with 16 findings (line length, throw count, method length and test-fixture
+complexity). Both-flavor production compilation completed; the gate did not
+complete its remaining test/lint tasks. An earlier focused run passed the two
+lease regressions and real composer-removal regression but had two transfer
+fixture failures; those fixtures were corrected and still need a successful
+rerun. The 30 artifact-preparation tests and 33 manual-guide validator tests
+passed; the guide has 265 active IDs. No passing final-head gate is claimed.
+
+The emulator showed a System UI ANR before candidate
+installation and was stopped without wiping app data. No candidate-device,
+in-place schema migration, real transport-byte, or durable-send interruption
+qualification is claimed. Project 7 still lists this PR and #2493 In Progress.
+
+## Historical preparation evidence
+
+The following records describe the pre-rebase draft, not current-head validation.
 
 Updated 2026-09-20. **Draft publication authorized; do not merge or call release-qualified.**
 

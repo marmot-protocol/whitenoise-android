@@ -3901,9 +3901,23 @@ class WhiteNoiseAppState private constructor(
      */
     internal fun memoizedAttachmentAcquisition(
         cacheKey: String,
+        request: AttachmentTransferRequest,
         priority: AttachmentDownloadPriority,
         block: suspend CoroutineScope.() -> AttachmentAcquisitionOutcome,
-    ): Deferred<AttachmentAcquisitionOutcome> = inFlightAttachmentAcquisitions.acquire(cacheKey, priority, block)
+    ): Deferred<AttachmentAcquisitionOutcome> =
+        inFlightAttachmentAcquisitions.acquire(cacheKey, priority) {
+            val owner = this
+            attachmentDownloadGate.withPermit(cacheKey, request.accountRef, priority) {
+                val cached =
+                    cachedMediaPlaintext(cacheKey)
+                        ?: withContext(Dispatchers.IO) { diskMediaCache.get(cacheKey) }
+                        ?: cachedMediaPlaintext(cacheKey)
+                cached?.let(AttachmentAcquisitionOutcome::LegacyBytes) ?: owner.block()
+            }
+        }
+
+    /** Exposes only active owner lifetime, never a second retained attachment record. */
+    internal fun hasActiveAttachmentAcquisition(cacheKey: String): Boolean = inFlightAttachmentAcquisitions.isActive(cacheKey)
 
     /**
      * Cancels one account-scoped memoized source attempt after its forwarding
@@ -4012,7 +4026,6 @@ class WhiteNoiseAppState private constructor(
             diskContains = diskMediaCache::containsAfterHydration,
         ) ||
             hasNativeAttachment(request)
-
 
     /** Ensures durable work consumes large cache hits as leases instead of full heap copies. */
     internal suspend fun downloadAttachmentForDurableWork(

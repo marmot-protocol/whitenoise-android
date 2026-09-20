@@ -136,8 +136,8 @@ class AttachmentDownloadProductionWiringTest {
                 "internal suspend fun ConversationController.downloadAttachmentSource(",
             )
         assertTrue(
-            "File-backed cache misses must retain controller single-flight and transfer-state bookkeeping",
-            "onCacheMiss = { requestAttachmentTransfer(" in sourceDownload,
+            "File-backed consumers share the native-aware acquisition owner",
+            "appState.downloadAttachmentPlaintextSource(" in sourceDownload && "memoizedAttachmentAcquisition(" in resolver,
         )
         val durableDownload =
             appState
