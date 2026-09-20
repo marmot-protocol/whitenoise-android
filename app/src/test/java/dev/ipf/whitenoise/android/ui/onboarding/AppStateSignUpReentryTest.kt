@@ -9,6 +9,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.AttachmentDownloadPolicyFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.RelayListFfi
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
@@ -83,6 +84,8 @@ class AppStateSignUpReentryTest {
                         Unit
                     }
                     "listAccounts" -> listOf(created)
+                    "attachmentDownloadPolicy" -> AttachmentDownloadPolicyFfi(true, 2_000uL, 300uL, 40uL)
+                    "setAttachmentDownloadPolicy" -> Unit
                     "toString" -> "SignUpNativeTestDouble"
                     "hashCode" -> System.identityHashCode(proxy)
                     "equals" -> proxy === args?.firstOrNull()
