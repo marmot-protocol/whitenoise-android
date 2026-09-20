@@ -22148,6 +22148,22 @@
         ]
       },
       {
+        "surface": "Native automatic attachment acquisition containment",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/MarmotAttachmentAcquisitionPolicy.kt",
+        "anchor": "suspend fun enforceAppOwnedAttachmentAcquisitionPolicy(",
+        "test_ids": [
+          "MED-019"
+        ]
+      },
+      {
+        "surface": "Attachment body-not-retained terminal failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt",
+        "anchor": "durable_attachment_not_retained",
+        "test_ids": [
+          "MED-019"
+        ]
+      },
+      {
         "surface": "R.string.toast_couldnt_create_identity",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppProfileSignUp.kt",
         "anchor": "R.string.toast_couldnt_create_identity",
