@@ -9,16 +9,25 @@ import org.junit.Test
 import java.io.File
 
 class AttachmentPolicyStartupOrderingTest {
-    /** Runtime policy I/O follows readiness without widening the passive notification boundary. */
+    /** Runtime policy I/O precedes startup without widening the passive notification boundary. */
     @Test
-    fun existingAccountsAreContainedAfterStartBeforeReadinessPublication() {
+    fun existingAccountsAreContainedBeforeStartAndListenerStillFollowsImmediately() {
+        val bootstrap = source("AppState.kt").readText().functionBody("startBootstrapRuntime")
+        val configure = bootstrap.indexOf("enforceAppOwnedAttachmentAcquisitionForKnownAccounts()")
+        val startCall = bootstrap.indexOf("startMarmotWithNotificationListener(runtime)")
         val body = source("AppState.kt").readText().functionBody("startMarmotWithNotificationListener")
         val start = body.indexOf("runtime.marmot.start()")
         val publishStart = body.indexOf("runtimeStartResult.complete(Result.success(Unit))")
         val listener = body.indexOf("runNotificationListenerLoop(runtime.marmot)")
-        val awaitStart = body.indexOf("runtimeStartResult.await().getOrThrowAtStartupStage")
-        val containment = body.indexOf("enforceAppOwnedAttachmentAcquisitionForKnownAccounts()")
-        val auditReady = body.indexOf("emitAuditRuntimeReadinessAfterStart()")
+
+        assertTrue(
+            "containment must be part of configure, before native start",
+            configure >= 0 && startCall > configure,
+        )
+        assertTrue(
+            "post-start policy I/O would reopen the admission race",
+            !body.contains("enforceAppOwnedAttachmentAcquisition"),
+        )
 
         assertTrue(
             "the listener must follow start without policy I/O in the no-replay gap",
@@ -28,25 +37,18 @@ class AttachmentPolicyStartupOrderingTest {
             "the listener loop must begin immediately after publishing native readiness",
             listener > publishStart,
         )
-        assertTrue(
-            "policy enforcement must follow the awaited native readiness result",
-            awaitStart > listener && containment > awaitStart,
-        )
-        assertTrue(
-            "policy I/O must use the off-main Marmot bridge",
-            body.substring(awaitStart, containment).contains("marmotIo {"),
-        )
-        assertTrue("startup audit/mirror publication must remain behind containment", auditReady > containment)
     }
 
     /** Both identity creation entry points install containment before accepting the new account. */
     @Test
     fun createdIdentitiesAreContainedBeforeActivation() {
-        val appState = source("AppState.kt").readText().functionBody("createIdentity")
-        assertOrdered(appState, "createIdentityWithAppOwnedAttachmentAcquisition()", "activateCreatedIdentity(summary)")
+        val direct = source("AppProfileSignUp.kt").readText().functionBody("createIdentityWithoutProfile")
+        assertOrdered(direct, "createIdentityWithBootstrapRelays()", "enforceAppOwnedAttachmentAcquisitionPolicy")
+        assertOrdered(direct, "enforceAppOwnedAttachmentAcquisitionPolicy", "accept = activateCreatedIdentity")
 
         val profileSignUp = source("AppProfileSignUp.kt").readText().functionBody("begin")
-        assertTrue(profileSignUp.contains("createIdentityWithAppOwnedAttachmentAcquisition()"))
+        assertTrue(profileSignUp.contains("createIdentityWithBootstrapRelays()"))
+        assertTrue(profileSignUp.contains("qualify ="))
     }
 
     /** Imported and external identities pass through policy-aware account refresh before activation. */
@@ -54,9 +56,11 @@ class AttachmentPolicyStartupOrderingTest {
     fun importedIdentitiesAreContainedBeforeActivation() {
         val appState = source("AppState.kt").readText()
         val imported = appState.functionBody("activateImportedIdentity")
+        assertOrdered(imported, "enforceAppOwnedAttachmentAcquisitionPolicy", "refreshAccounts()")
         assertOrdered(imported, "refreshAccounts()", "setActiveAccount(summary.label)")
 
         val amber = appState.functionBody("loginWithAmber")
+        assertOrdered(amber, "enforceAppOwnedAttachmentAcquisitionPolicy", "refreshAccounts()")
         assertOrdered(amber, "refreshAccounts()", "setActiveAccount(summary.label)")
 
         val refresh = appState.functionBody("refreshAccountSnapshot")

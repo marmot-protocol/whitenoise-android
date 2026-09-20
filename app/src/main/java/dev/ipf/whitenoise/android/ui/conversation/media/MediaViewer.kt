@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -34,6 +33,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -49,12 +49,14 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -63,6 +65,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -243,22 +246,24 @@ internal fun StableMediaViewerPager(
         } else {
             modifier.semantics { stateDescription = pagePositionDescription }
         }
-    HorizontalPager(
-        state = selection.pagerState,
-        modifier = pagerModifier,
-        key = { page -> pages[clampViewerPageIndex(page, pages.size)].saveableKey() },
-        userScrollEnabled = userScrollEnabled,
-    ) { page ->
-        val pageDescriptor = pages[clampViewerPageIndex(page, pages.size)]
-        pageContent(pageDescriptor, pageDescriptor.key() == currentPageKey)
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        HorizontalPager(
+            state = selection.pagerState,
+            modifier = pagerModifier,
+            key = { page -> pages[clampViewerPageIndex(page, pages.size)].saveableKey() },
+            userScrollEnabled = userScrollEnabled,
+        ) { page ->
+            val pageDescriptor = pages[clampViewerPageIndex(page, pages.size)]
+            pageContent(pageDescriptor, pageDescriptor.key() == currentPageKey)
+        }
     }
 }
 
 /**
  * Select the gallery opened by an inline visual attachment.
  *
- * Visual messages use the conversation's shared-media image/video order
- * (newest first). The current message pages are merged when the asynchronous
+ * Visual messages use chronological message traversal with authored attachment slots.
+ * The current message pages are merged when the asynchronous
  * shared projection has not caught up yet, which keeps optimistic own sends
  * openable.
  */
@@ -281,13 +286,11 @@ internal fun visualMediaViewerGallery(
                 if (currentMessageFullyProjected) {
                     conversationVisualPages
                 } else {
-                    // buildTiles() reverses the flattened timeline projection, so an
-                    // album's attachment order is reversed in the shared-media grid.
-                    val currentPages = messagePages.asReversed()
+                    val currentPages = messagePages
                     val otherPages = conversationVisualPages.filterNot { it.messageIdHex == currentMessageId }
                     val insertAt =
                         otherPages
-                            .indexOfFirst { it.recordedAt < tappedPage.recordedAt }
+                            .indexOfFirst { it.recordedAt > tappedPage.recordedAt }
                             .takeIf { it >= 0 }
                             ?: otherPages.size
                     otherPages.subList(0, insertAt) + currentPages + otherPages.subList(insertAt, otherPages.size)
@@ -801,6 +804,14 @@ internal fun ViewerPage(
     // its first decrypt at epoch 0 (typed reference not yet loaded) re-keys
     // and retries when the real reference arrives.
     val pageKey = "$messageIdHex#$attachmentIndex#${reference.sourceEpoch}"
+    val cachedThumbnail =
+        remember(pageKey) {
+            controller
+                .thumbnailFor(messageIdHex, attachmentIndex)
+                ?.takeIf { MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType) }
+                ?.asImageBitmap()
+        }
+    val thumbhashImage = rememberThumbhashImage(reference.thumbhash)
     var presentation by remember(pageKey) { mutableStateOf<DecodedAttachmentPresentation?>(null) }
     var viewerFailed by remember(pageKey) { mutableStateOf(false) }
     var viewerReloadToken by remember(pageKey) { mutableIntStateOf(0) }
@@ -918,18 +929,13 @@ internal fun ViewerPage(
                     modifier = viewerGestureModifier,
                 )
             null ->
-                when {
-                    viewerFailed ->
-                        MediaViewerLoadFailed(
-                            onRetry = { viewerReloadToken += 1 },
-                            modifier = Modifier.align(Alignment.Center),
-                        )
-                    else ->
-                        CircularProgressIndicator(
-                            modifier = Modifier.align(Alignment.Center),
-                            color = MaterialTheme.colorScheme.onBackground,
-                        )
-                }
+                MediaViewerPendingFrame(
+                    cachedThumbnail = cachedThumbnail,
+                    thumbhashImage = thumbhashImage,
+                    displayName = MediaPipeline.safeDisplayName(reference.fileName),
+                    failed = viewerFailed,
+                    onRetry = { viewerReloadToken += 1 },
+                )
         }
     }
 }

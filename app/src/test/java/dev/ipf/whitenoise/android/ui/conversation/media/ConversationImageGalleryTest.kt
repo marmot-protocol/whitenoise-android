@@ -15,12 +15,12 @@ class ConversationImageGalleryTest {
 
         val gallery =
             visualMediaViewerGallery(
-                conversationVisualPages = listOf(newest, tapped, oldest),
+                conversationVisualPages = listOf(oldest, tapped, newest),
                 messagePages = listOf(tapped),
                 tappedAttachmentIndex = 0,
             )
 
-        assertEquals(listOf("newest", "middle", "oldest"), gallery.pages.map { it.messageIdHex })
+        assertEquals(listOf("oldest", "middle", "newest"), gallery.pages.map { it.messageIdHex })
         assertEquals(1, gallery.startIndex)
     }
 
@@ -30,17 +30,17 @@ class ConversationImageGalleryTest {
         val albumFirst = page("album", attachmentIndex = 0, recordedAt = 200uL)
         val albumSecond = page("album", attachmentIndex = 1, recordedAt = 200uL)
         val older = page("older", attachmentIndex = 0, recordedAt = 100uL)
-        val sharedMediaOrder = listOf(newer, albumSecond, albumFirst, older)
+        val chronologicalViewerOrder = listOf(older, albumFirst, albumSecond, newer)
 
         val gallery =
             visualMediaViewerGallery(
-                conversationVisualPages = sharedMediaOrder,
+                conversationVisualPages = chronologicalViewerOrder,
                 messagePages = listOf(albumFirst, albumSecond),
                 tappedAttachmentIndex = 0,
             )
 
-        assertEquals(sharedMediaOrder, gallery.pages)
-        assertEquals(2, gallery.startIndex)
+        assertEquals(chronologicalViewerOrder, gallery.pages)
+        assertEquals(1, gallery.startIndex)
     }
 
     @Test
@@ -59,7 +59,7 @@ class ConversationImageGalleryTest {
     }
 
     @Test
-    fun optimisticImageMissingFromTheProjectionIsInsertedNewestFirst() {
+    fun optimisticImageMissingFromTheProjectionIsInsertedChronologically() {
         val optimistic = page("optimistic", attachmentIndex = 0, recordedAt = 300uL, mine = true)
         val confirmed = page("confirmed", attachmentIndex = 0, recordedAt = 100uL)
 
@@ -70,9 +70,9 @@ class ConversationImageGalleryTest {
                 tappedAttachmentIndex = 0,
             )
 
-        assertEquals(listOf("optimistic", "confirmed"), gallery.pages.map { it.messageIdHex })
-        assertTrue(gallery.pages.first().mine)
-        assertEquals(0, gallery.startIndex)
+        assertEquals(listOf("confirmed", "optimistic"), gallery.pages.map { it.messageIdHex })
+        assertTrue(gallery.pages.last().mine)
+        assertEquals(1, gallery.startIndex)
     }
 
     @Test
@@ -81,17 +81,17 @@ class ConversationImageGalleryTest {
         val image = page("mixed", attachmentIndex = 0, recordedAt = 200uL)
         val video = page("mixed", attachmentIndex = 1, recordedAt = 200uL, mediaType = "video/mp4")
         val otherImage = page("other", attachmentIndex = 0, recordedAt = 100uL)
-        val conversationVisualOrder = listOf(newerVideo, video, image, otherImage)
+        val chronologicalViewerOrder = listOf(otherImage, image, video, newerVideo)
 
         val gallery =
             visualMediaViewerGallery(
-                conversationVisualPages = conversationVisualOrder,
+                conversationVisualPages = chronologicalViewerOrder,
                 messagePages = listOf(image, video),
                 tappedAttachmentIndex = 1,
             )
 
-        assertEquals(conversationVisualOrder, gallery.pages)
-        assertEquals(1, gallery.startIndex)
+        assertEquals(chronologicalViewerOrder, gallery.pages)
+        assertEquals(2, gallery.startIndex)
     }
 
     private fun page(

@@ -30,7 +30,7 @@ internal suspend fun MarmotInterface.enforceAppOwnedAttachmentAcquisitionPolicy(
     )
 }
 
-/** Applies containment to every existing account after the native runtime reports local readiness. */
+/** Applies containment to every existing account while local policy storage is available. */
 internal suspend fun MarmotInterface.enforceAppOwnedAttachmentAcquisitionForKnownAccounts() {
     enforceAppOwnedAttachmentAcquisitionPolicy(listAccounts().map(AccountSummaryFfi::label))
 }
@@ -42,10 +42,8 @@ internal suspend fun MarmotInterface.listAccountsWithAppAttachmentPolicy(): List
     return accounts
 }
 
-/** Creates an identity and installs containment before the Android account model can activate it. */
-internal suspend fun MarmotInterface.createIdentityWithAppOwnedAttachmentAcquisition(): AccountSummaryFfi {
+/** Creates an identity with White Noise's full bootstrap relay set and returns its durable native receipt. */
+internal suspend fun MarmotInterface.createIdentityWithBootstrapRelays(): AccountSummaryFfi {
     val relays = MarmotClient.bootstrapRelays
-    val account = createIdentity(relays, relays)
-    enforceAppOwnedAttachmentAcquisitionPolicy(listOf(account.label))
-    return account
+    return createIdentity(relays, relays)
 }

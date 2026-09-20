@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import android.os.SystemClock
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -21,6 +22,8 @@ internal class AppProfileSignUp(
     private val warmProfile: (String) -> Unit,
     private val markReady: () -> Unit,
 ) {
+    private val directIdentityQualification = IdentityPolicyQualification()
+
     /** Accepted native receipt survives recreation; only this adapter can replace it. */
     var pending by mutableStateOf<SignUpController?>(null)
         private set
@@ -40,10 +43,13 @@ internal class AppProfileSignUp(
                 ownerAvailable = ::ownerAvailable,
                 create = {
                     runCatchingCancellable {
-                        appState.marmotIo { createIdentityWithAppOwnedAttachmentAcquisition() }
+                        appState.marmotIo { createIdentityWithBootstrapRelays() }
                     }.onFailure {
                         appState.presentFailure(R.string.toast_couldnt_create_identity, "IDENTITY_CREATE", it)
                     }.getOrThrow()
+                },
+                qualify = { account ->
+                    appState.marmotIo { enforceAppOwnedAttachmentAcquisitionPolicy(listOf(account.label)) }
                 },
                 accept = ::accept,
                 upload = { account, image ->
@@ -62,6 +68,29 @@ internal class AppProfileSignUp(
                 },
                 finish = ::finish,
             )
+    }
+
+    /** Creates a policy-qualified identity for the legacy no-profile action without duplicating a retained receipt. */
+    @Suppress("TooGenericExceptionCaught")
+    suspend fun createIdentityWithoutProfile() {
+        val startedAt = SystemClock.elapsedRealtime()
+        try {
+            val summary =
+                directIdentityQualification.createQualifyAndAccept(
+                    create = { appState.marmotIo { createIdentityWithBootstrapRelays() } },
+                    qualify = { account ->
+                        appState.marmotIo { enforceAppOwnedAttachmentAcquisitionPolicy(listOf(account.label)) }
+                    },
+                    accept = activateCreatedIdentity,
+                )
+            markReady()
+            appState.presentTransient(R.string.toast_identity_created)
+            appStateDebug { "identity engine setup returned in ${SystemClock.elapsedRealtime() - startedAt}ms" }
+            launchIdentityPostCreateWarmup(summary)
+        } catch (error: Throwable) {
+            rethrowIfCancellation(error)
+            appState.presentFailure(R.string.toast_couldnt_create_identity, "IDENTITY_CREATE", error)
+        }
     }
 
     /** Teardown and retained-account reactivation cannot acquire the profile form's ownership. */
