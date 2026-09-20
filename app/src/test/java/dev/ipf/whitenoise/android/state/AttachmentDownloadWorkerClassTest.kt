@@ -13,6 +13,8 @@ import androidx.work.testing.WorkManagerTestInitHelper
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -27,6 +29,7 @@ private typealias DownloadOverride = PerformDurableAttachmentDownload
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], application = WhiteNoiseApplication::class)
+@OptIn(ExperimentalCoroutinesApi::class)
 class AttachmentDownloadWorkerClassTest {
     private lateinit var application: WhiteNoiseApplication
     private lateinit var appContext: Context
@@ -138,7 +141,8 @@ class AttachmentDownloadWorkerClassTest {
     fun explicitRequestCanRetryAfterBodyWasNotRetained() =
         runTest {
             assertEquals(Result.failure(), buildWorkerWithDownloadOverride({ _, _, _ -> false }).doWork())
-            AttachmentDownloadWorker.enqueue(appContext, testRequest(), AttachmentDownloadPriority.Interactive)
+            AttachmentDownloadIntentStore(appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE))
+                .setInteractive(testRequest(), interactive = true)
             val retry =
                 buildWorkerWithDownloadOverride(
                     downloadOverride = { _, _, priority ->
@@ -147,6 +151,15 @@ class AttachmentDownloadWorkerClassTest {
                     },
                 )
             assertEquals(Result.success(), retry.doWork())
+        }
+
+    @Test
+    fun nonRetentionAfterTheLastAttemptHasNoAdditionalHold() =
+        runTest {
+            val worker = buildWorkerWithDownloadOverride({ _, _, _ -> false }, runAttemptCount = 1)
+            val startedAt = currentTime
+            assertEquals(Result.failure(), worker.doWork())
+            assertEquals(startedAt, currentTime)
         }
 
     @Test

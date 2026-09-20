@@ -16,6 +16,7 @@ import androidx.work.workDataOf
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -154,9 +155,6 @@ internal fun attachmentDownloadWorkState(
 
 internal class AttachmentReferenceNotReadyException : IllegalStateException("attachment reference is not projected yet")
 
-/** A completed body was not retained; local absence is not evidence of a transient transport failure. */
-internal class AttachmentNotRetainedException : IllegalStateException("attachment did not reach encrypted cache")
-
 internal typealias PerformDurableAttachmentDownload = suspend (
     WhiteNoiseApplication,
     AttachmentTransferRequest,
@@ -212,14 +210,11 @@ class AttachmentDownloadWorker : CoroutineWorker {
     ): Result =
         try {
             if (!durableDownload(application, request, priority)) {
-                // A cache publication failure (or eviction before this probe)
-                // is not a transport failure. Do not spend the bounded network
-                // retry downloading an already completed body again. Durable
-                // suppression across new work generations belongs to MDK.
-                throw AttachmentNotRetainedException()
+                finishUnretainedDownload(request, intentStore)
+            } else {
+                intentStore.setInteractive(request, interactive = false)
+                Result.success()
             }
-            intentStore.setInteractive(request, interactive = false)
-            Result.success()
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (expectedFailure: Throwable) {
@@ -235,6 +230,25 @@ class AttachmentDownloadWorker : CoroutineWorker {
                 Result.failure()
             }
         }
+
+    /** Keeps KEEP's former backoff window occupied without another automatic body transfer. */
+    private suspend fun finishUnretainedDownload(
+        request: AttachmentTransferRequest,
+        intentStore: AttachmentDownloadIntentStore,
+    ): Result {
+        Log.w(TAG, "durable_attachment_download_not_retained")
+        intentStore.setInteractive(request, interactive = false)
+        if (runAttemptCount < MAX_RETRY_ATTEMPTS) {
+            // Returning failure immediately would let another automatic enqueue
+            // replace this work during the old retry's 30-second KEEP window.
+            // Suspend only this worker; cancellation still propagates normally.
+            delay(TimeUnit.SECONDS.toMillis(BACKOFF_SECONDS))
+        }
+        // A deliberate tap during the hold may have joined the pending unique
+        // work. Preserve that fresh intent and its durable safety net; automatic
+        // enqueues never set this flag. The foreground caller can already fetch.
+        return if (intentStore.isInteractive(request)) Result.retry() else Result.failure()
+    }
 
     private suspend fun durableDownload(
         application: WhiteNoiseApplication,

@@ -21908,7 +21908,7 @@
       {
         "surface": "Attachment worker completed-body retention failure",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt",
-        "anchor": "throw AttachmentNotRetainedException()",
+        "anchor": "private suspend fun finishUnretainedDownload(",
         "test_ids": [
           "MED-017"
         ]
