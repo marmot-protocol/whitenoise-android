@@ -23711,6 +23711,15 @@
         ]
       },
       {
+        "surface": "Keep on screen leads the long-press actions and Report closes them",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActionKind.kt",
+        "anchor": "internal fun messageActionKinds(",
+        "test_ids": [
+          "MSG-004",
+          "MSG-016"
+        ]
+      },
+      {
         "surface": "The lifted message drags and flings through the safe overlay frame and settles inside it",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
         "anchor": "internal fun focusedStackTravelRange(",
