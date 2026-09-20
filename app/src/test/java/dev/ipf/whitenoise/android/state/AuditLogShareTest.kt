@@ -72,6 +72,9 @@ class AuditLogShareTest {
      * Export is complete or it fails. A symlink, a missing file, a source outside the root and one
      * reached through an intermediate symlink each abort the whole archive, leaving nothing staged
      * that a caller could present as a finished export.
+     *
+     * Aborting clears only the failed export. An archive already handed to a recipient survives,
+     * because its content URI may still be unopened and this export failing is unrelated to it.
      */
     @Test
     fun prepareAuditLogArchiveFailsClosedInsteadOfWritingAPartialArchive() {
@@ -93,12 +96,19 @@ class AuditLogShareTest {
             )
         rejected.forEachIndexed { index, unsafe ->
             val cache = temporaryFolder.newFolder("cache-$index")
+            val shared = prepareAuditLogArchive(cache, allowed, listOf(good.absolutePath))
+
             val failure =
                 runCatching { prepareAuditLogArchive(cache, allowed, listOf(good.absolutePath, unsafe)) }
                     .exceptionOrNull()
 
             assertTrue("$unsafe must abort the export", failure != null)
-            assertFalse("$unsafe must leave no staged archive", File(cache, "audit_logs").exists())
+            assertTrue("$unsafe must not destroy an archive already handed out", shared.exists())
+            assertEquals(
+                "$unsafe must leave no session of its own",
+                listOf(shared.parentFile!!.name),
+                File(cache, "audit_logs").listFiles().orEmpty().map { it.name },
+            )
         }
     }
 

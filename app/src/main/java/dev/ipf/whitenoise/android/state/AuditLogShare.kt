@@ -46,7 +46,7 @@ internal const val AUDIT_LOG_ARCHIVE_MIME_TYPE = "application/zip"
  * rather than yielding a partial one that looks complete. The staging directory is replaced on each
  * export so previously exported forensic data does not accumulate in cache.
  */
-@Suppress("TooGenericExceptionCaught") // Any failure must clear the partial archive before rethrowing.
+@Suppress("TooGenericExceptionCaught") // Any failure must clear this export's partial archive before rethrowing.
 internal fun prepareAuditLogArchive(
     cacheDir: File,
     allowedSourceRoot: File,
@@ -78,8 +78,10 @@ internal fun prepareAuditLogArchive(
             }
         }
     } catch (failure: Throwable) {
-        // A partial archive must never be presented as a complete export.
-        runCatching { clearPreparedAuditLogShares(cacheDir) }
+        // A partial archive must never be presented as a complete export, so only this export's own
+        // directory goes. The retained previous session stays: it may still back a share URI whose
+        // recipient has not opened it yet, and this export failing is no reason to break that one.
+        runCatching { shareDirectory.deleteRecursively() }
         throw failure
     }
     archive.setWritable(false, false)
