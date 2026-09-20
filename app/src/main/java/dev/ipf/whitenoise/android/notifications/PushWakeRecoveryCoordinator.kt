@@ -26,8 +26,9 @@ internal class PushWakeRecoveryCoordinator(
         deleted: Boolean = false,
     ): PushWakeDispatch {
         PushWakeDiagnostics.received(priority, originalPriority, deleted)
-        val persisted = store.recordPendingPushWakeCatchUp() && store.admitPushWakeEpisode(nowMs())
-        val ready = store.pushWakeRetryDelay(nowMs()) == 0L
+        val now = nowMs()
+        val persisted = store.recordPendingPushWakeCatchUpAndAdmitEpisode(now)
+        val ready = store.pushWakeRetryDelay(now) == 0L
         val highPriority = !deleted && priority == PushWakePriority.High
         return when {
             !persisted -> {

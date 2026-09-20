@@ -202,8 +202,8 @@ class NotificationPushWakeDrainCoverageTest {
 
         assertTrue(
             "an accepted foreground start can still fail in-runtime, so every wake must be durable before start()",
-            "recordPendingPushWakeCatchUp()" in wake &&
-                wake.indexOf("recordPendingPushWakeCatchUp()") <
+            "recordPendingPushWakeCatchUpAndAdmitEpisode(now)" in wake &&
+                wake.indexOf("recordPendingPushWakeCatchUpAndAdmitEpisode(now)") <
                 wake.indexOf("runCatching(startService)"),
         )
     }

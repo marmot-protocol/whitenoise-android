@@ -130,6 +130,29 @@ class PushTokenStore(
                 .commit()
         }
 
+    /** Records a new wake and reopens an eligible exhausted episode in one durable transaction. */
+    @SuppressLint("ApplySharedPref")
+    internal fun recordPendingPushWakeCatchUpAndAdmitEpisode(nowMs: Long): Boolean =
+        synchronized(LOCK) {
+            val previousGeneration =
+                maxOf(
+                    pendingPushWakeCatchUpGenerationLocked(),
+                    preferences.getLong(KEY_PUSH_WAKE_CATCH_UP_SEQUENCE, NO_PENDING_PUSH_WAKE_CATCH_UP),
+                )
+            val nextGeneration = nextPushWakeCatchUpGeneration(previousGeneration)
+            preferences
+                .edit()
+                .putLong(KEY_PUSH_WAKE_CATCH_UP_SEQUENCE, nextGeneration)
+                .putLong(KEY_PENDING_PUSH_WAKE_CATCH_UP_GENERATION, nextGeneration)
+                .remove(KEY_PENDING_PUSH_WAKE_CATCH_UP)
+                .apply {
+                    if (pushWakeAttempts() >= PUSH_WAKE_MAX_ATTEMPTS && pushWakeRetryDelay(nowMs) == 0L) {
+                        remove(KEY_WAKE_ATTEMPTS)
+                        remove(KEY_WAKE_RETRY_AT)
+                    }
+                }.commit()
+        }
+
     /** Clears the current pending wake while retaining its sequence for future distinct wake identities. */
     fun clearPendingPushWakeCatchUp() {
         synchronized(LOCK) {

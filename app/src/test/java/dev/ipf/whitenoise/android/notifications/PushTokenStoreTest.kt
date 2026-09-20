@@ -20,6 +20,44 @@ class PushTokenStoreTest {
         assertEquals(2, preferences.commitCalls)
     }
 
+    /** A new generation and its eligible exhausted-budget reset must share one commit. */
+    @Test
+    fun wakeRecordAndEpisodeAdmissionCommitAtomically() {
+        val preferences = FakeSharedPreferences()
+        val store = PushTokenStore(preferences)
+        assertTrue(store.recordPendingPushWakeCatchUp())
+        repeat(PUSH_WAKE_MAX_ATTEMPTS) {
+            assertTrue(store.claimPushWakeAttempt(1_000L) != null)
+        }
+        val exhaustedGeneration = store.pendingPushWakeCatchUpGeneration()
+        val commitsBeforeWake = preferences.commitCalls
+
+        assertTrue(store.recordPendingPushWakeCatchUpAndAdmitEpisode(241_001L))
+
+        assertEquals(commitsBeforeWake + 1, preferences.commitCalls)
+        assertTrue(store.pendingPushWakeCatchUpGeneration() > exhaustedGeneration)
+        assertEquals(0, store.pushWakeAttempts())
+        assertEquals(0L, store.pushWakeRetryDelay(241_001L))
+    }
+
+    /** A failed combined commit cannot report a recorded wake while leaving the exhausted budget durable. */
+    @Test
+    fun wakeRecordAndEpisodeAdmissionShareTheSameFailureResult() {
+        val commitResults = ArrayDeque<Boolean>()
+        repeat(1 + PUSH_WAKE_MAX_ATTEMPTS) { commitResults += true }
+        commitResults += false
+        val preferences = FakeSharedPreferences(commitResults)
+        val store = PushTokenStore(preferences)
+        assertTrue(store.recordPendingPushWakeCatchUp())
+        repeat(PUSH_WAKE_MAX_ATTEMPTS) {
+            assertTrue(store.claimPushWakeAttempt(1_000L) != null)
+        }
+
+        assertFalse(store.recordPendingPushWakeCatchUpAndAdmitEpisode(241_001L))
+
+        assertEquals(2 + PUSH_WAKE_MAX_ATTEMPTS, preferences.commitCalls)
+    }
+
     /** Native work must not run when reserving its finite budget fails on disk. */
     @Test
     fun wakeBudgetReportsCommitFailure() {
