@@ -863,7 +863,7 @@ internal fun ConversationScreen(
     var seededTailAlignmentCommitted by seededTailState.committed
     var seededTailAlignmentRecoveryVisible by seededTailState.recoveryVisible
     var seededTailAlignmentRetryGeneration by seededTailState.retryGeneration
-    val transcriptVisibilityCommitted by
+    val transcriptVisibilityEligible by
         remember(controller, notificationOpenRequestId, listState, firstFrameSeed.anchorTailImmediately) {
             derivedStateOf {
                 conversationTranscriptVisibilityCommitted(
@@ -875,6 +875,14 @@ internal fun ConversationScreen(
                 )
             }
         }
+    var transcriptVisibilityLatched by
+        remember(controller, notificationOpenRequestId) { mutableStateOf(false) }
+    LaunchedEffect(transcriptVisibilityEligible) {
+        if (transcriptVisibilityEligible) transcriptVisibilityLatched = true
+    }
+    // Once a transcript has painted, transient send-time list geometry must not
+    // hide it behind the initial-loading overlay again.
+    val transcriptVisibilityCommitted = transcriptVisibilityEligible || transcriptVisibilityLatched
     // A completed empty page has no row to anchor. Commit that presentation
     // directly, but keep every loading, error, ownership, and roster gate.
     val authoritativeEmptyPresentationReady =
