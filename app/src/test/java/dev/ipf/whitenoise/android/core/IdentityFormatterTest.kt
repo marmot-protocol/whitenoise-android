@@ -366,8 +366,7 @@ class IdentityFormatterTest {
             .epochSecond
             .toULong()
 
-    // ---- messageBubbleTime (bubble footer timestamps) -----------------------
-    // The prototype's bubble footer is the clock time; the date headers carry day changes.
+    // ---- messageBubbleTime (bubble footer timestamps, #1513) ----------------
 
     /** Message bubble time empty for unset sentinel. */
     @Test
@@ -375,14 +374,48 @@ class IdentityFormatterTest {
         assertEquals("", IdentityFormatter.messageBubbleTime(0uL))
     }
 
-    /** Message bubble time shows clock time for recent messages. */
+    /** Message bubble time shows now during the first minute. */
     @Test
-    fun messageBubbleTimeShowsClockTimeForRecentMessages() {
-        val zone = ZoneId.of("UTC")
-        val sentAt = Instant.parse("2025-06-30T14:15:00Z")
+    fun messageBubbleTimeShowsNowWithinFirstMinute() {
+        val now = Instant.parse("2025-06-30T15:00:00Z")
+        val sentAt = now.minusSeconds(59L)
+
+        assertEquals("now", IdentityFormatter.messageBubbleTime(sentAt.epochSecond.toULong(), now = now))
+    }
+
+    /** Small peer-clock skew keeps the friendly now label. */
+    @Test
+    fun messageBubbleTimeTreatsSlightFutureSkewAsNow() {
+        val now = Instant.parse("2025-06-30T15:00:00Z")
+        val sentAt = now.plusSeconds(60L)
+
+        assertEquals("now", IdentityFormatter.messageBubbleTime(sentAt.epochSecond.toULong(), now = now))
+    }
+
+    /** Minute copy remains localized and plural-aware throughout the first hour. */
+    @Test
+    fun messageBubbleTimeShowsLocalizedMinutesWithinFirstHour() {
+        val now = Instant.parse("2025-06-30T15:00:00Z")
+        val copy =
+            RelativeTimeCopy(
+                future = "future",
+                now = "now",
+                yesterday = "yesterday",
+                minutes = { count -> "minutes=$count" },
+                hours = { count -> "hours=$count" },
+            )
+
         assertEquals(
-            shortClock(sentAt, zone),
-            IdentityFormatter.messageBubbleTime(sentAt.epochSecond.toULong(), locale = Locale.US, zone = zone),
+            "minutes=1",
+            IdentityFormatter.messageBubbleTime(now.minusSeconds(60L).epochSecond.toULong(), copy = copy, now = now),
+        )
+        assertEquals(
+            "minutes=59",
+            IdentityFormatter.messageBubbleTime(
+                now.minusSeconds(3_599L).epochSecond.toULong(),
+                copy = copy,
+                now = now,
+            ),
         )
     }
 
@@ -390,22 +423,34 @@ class IdentityFormatterTest {
     @Test
     fun messageBubbleTimeShowsClockTimeAtOneHourBoundary() {
         val zone = ZoneId.of("UTC")
-        val sentAt = Instant.parse("2025-06-30T14:00:00Z")
+        val now = Instant.parse("2025-06-30T15:00:00Z")
+        val sentAt = now.minusSeconds(3_600L)
         assertEquals(
             shortClock(sentAt, zone),
-            IdentityFormatter.messageBubbleTime(sentAt.epochSecond.toULong(), locale = Locale.US, zone = zone),
+            IdentityFormatter.messageBubbleTime(
+                sentAt.epochSecond.toULong(),
+                locale = Locale.US,
+                now = now,
+                zone = zone,
+            ),
         )
     }
 
-    /** Message bubble time shows clock time for future skew. */
+    /** Future timestamps beyond the skew tolerance use explicit copy. */
     @Test
-    fun messageBubbleTimeShowsClockTimeForFutureSkew() {
-        val zone = ZoneId.of("UTC")
-        val sentAt = Instant.parse("2025-06-30T16:00:00Z")
-        assertEquals(
-            shortClock(sentAt, zone),
-            IdentityFormatter.messageBubbleTime(sentAt.epochSecond.toULong(), locale = Locale.US, zone = zone),
-        )
+    fun messageBubbleTimeUsesFutureLabelBeyondSkewTolerance() {
+        val now = Instant.parse("2025-06-30T15:00:00Z")
+        val sentAt = now.plusSeconds(61L)
+
+        assertEquals("future", IdentityFormatter.messageBubbleTime(sentAt.epochSecond.toULong(), now = now))
+    }
+
+    /** Untrusted high-bit epochs stay clamped and render without crashing. */
+    @Test
+    fun messageBubbleTimeSafelyFormatsExtremeTimestamp() {
+        val now = Instant.parse("2025-06-30T15:00:00Z")
+
+        assertTrue(IdentityFormatter.messageBubbleTime(ULong.MAX_VALUE, now = now).isNotBlank())
     }
 
     /** Formats a short clock label for the test locale. */

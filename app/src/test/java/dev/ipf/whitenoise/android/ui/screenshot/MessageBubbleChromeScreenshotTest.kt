@@ -125,6 +125,29 @@ class MessageBubbleChromeScreenshotTest {
             .captureRoboImage("src/test/snapshots/message_bubble_accepted_pending_light.png")
     }
 
+    /** Recent labels stay compact beside incoming and outgoing delivery chrome. */
+    @Test
+    fun recentElapsedTimeFootersLight() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                Surface(color = MaterialTheme.colorScheme.background) {
+                    Column(
+                        modifier = Modifier.width(360.dp).padding(16.dp).testTag(RECENT_TIME_TAG),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        DirectionalBubble(text = "Just sent", time = "now", mine = true)
+                        DirectionalBubble(text = "Recent reply", time = "1m", mine = false)
+                        DirectionalBubble(text = "Approaching clock time", time = "59m", mine = true)
+                    }
+                }
+            }
+        }
+
+        composeRule
+            .onNodeWithTag(RECENT_TIME_TAG)
+            .captureRoboImage("src/test/snapshots/message_bubble_recent_elapsed_times_light.png")
+    }
+
     @Test
     fun bubbleChromeAmoledDirectionAccents() {
         composeRule.setContent {
@@ -438,6 +461,7 @@ class MessageBubbleChromeScreenshotTest {
     private companion object {
         const val TAG = "bubble-chrome"
         const val NARROW_MEDIA_CAPTION_TAG = "narrow-media-caption-gallery"
+        const val RECENT_TIME_TAG = "recent-time-gallery"
     }
 }
 

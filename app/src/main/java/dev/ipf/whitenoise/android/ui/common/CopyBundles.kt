@@ -200,14 +200,18 @@ internal fun relativeTimeRefreshDelayMillis(now: Instant): Long {
 /** Remembered bubble time label for an epoch-second stamp in the current locale and zone. */
 @Composable
 internal fun rememberedMessageBubbleTime(epochSeconds: ULong): String {
+    val copy = rememberRelativeTimeCopy()
     val locale = LocalConfiguration.current.locales[0]
     val zone = ZoneId.systemDefault()
+    val currentTime = rememberRelativeTimeNow()
     // The clock must honor Android's explicit 12/24-hour setting, same as the standalone clock-time path.
     val use24Hour = DateFormat.is24HourFormat(LocalContext.current)
-    return remember(epochSeconds, locale, use24Hour) {
+    return remember(epochSeconds, copy, locale, currentTime, use24Hour) {
         IdentityFormatter.messageBubbleTime(
             epochSeconds = epochSeconds,
+            copy = copy,
             locale = locale,
+            now = currentTime,
             zone = zone,
             force24Hour = use24Hour,
         )
