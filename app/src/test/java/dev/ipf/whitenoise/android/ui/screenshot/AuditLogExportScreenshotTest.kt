@@ -6,6 +6,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
@@ -48,29 +49,24 @@ class AuditLogExportScreenshotTest {
     @Test
     fun auditLogExportDestinationLight() {
         renderDestination(darkTheme = false)
-        composeRule
-            .onNodeWithTag(DESTINATION_TAG)
-            .captureRoboImage("src/test/snapshots/audit_log_export_destination_light.png")
+        composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/audit_log_export_destination_light.png")
     }
 
     /** The same choice in dark theme. */
     @Test
     fun auditLogExportDestinationDark() {
         renderDestination(darkTheme = true)
-        composeRule
-            .onNodeWithTag(DESTINATION_TAG)
-            .captureRoboImage("src/test/snapshots/audit_log_export_destination_dark.png")
+        composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/audit_log_export_destination_dark.png")
     }
 
-    /** Renders the destination dialog's own surface, which is what the export change adds. */
+    /**
+     * Renders the destination dialog. It is captured through [isDialog] rather than a tag on a
+     * parent, because Material 3 renders a dialog in its own window a parent tag cannot reach.
+     */
     private fun renderDestination(darkTheme: Boolean) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = darkTheme) {
-                Surface {
-                    Column(modifier = Modifier.width(360.dp).testTag(DESTINATION_TAG)) {
-                        AuditLogExportDestinationDialog(onDismiss = {}, onSave = {}, onShare = {})
-                    }
-                }
+                AuditLogExportDestinationDialog(onDismiss = {}, onSave = {}, onShare = {})
             }
         }
     }
@@ -108,6 +104,5 @@ class AuditLogExportScreenshotTest {
 
     private companion object {
         const val TAG = "audit-log-export"
-        const val DESTINATION_TAG = "audit-log-export-destination"
     }
 }

@@ -287,9 +287,17 @@ private fun AuditLogExportFlow(
                 onConfirmOpenChange(false)
                 onInFlightChange(true)
                 runAuditMutation {
-                    val archive = appState.prepareAuditLogArchiveForExport()
-                    onStagedArchivePathChange(archive?.absolutePath)
-                    if (archive == null) onInFlightChange(false)
+                    // Preparation rethrows cancellation, so release the flag in a finally: leaving
+                    // it set would disable the export row for the life of the retained screen
+                    // state with no way for the reader to retry.
+                    var staged = false
+                    try {
+                        val archive = appState.prepareAuditLogArchiveForExport()
+                        onStagedArchivePathChange(archive?.absolutePath)
+                        staged = archive != null
+                    } finally {
+                        if (!staged) onInFlightChange(false)
+                    }
                 }
             },
         )
