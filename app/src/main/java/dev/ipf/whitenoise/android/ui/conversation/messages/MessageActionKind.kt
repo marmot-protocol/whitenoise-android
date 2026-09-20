@@ -129,7 +129,7 @@ internal fun messageActionIconRes(kind: MessageActionKind): Int =
         MessageActionKind.Reply -> R.drawable.ic_reply
         MessageActionKind.Edit -> R.drawable.ic_edit
         MessageActionKind.Select -> R.drawable.ic_check
-        MessageActionKind.SelectText -> R.drawable.ic_content_copy
+        MessageActionKind.SelectText -> R.drawable.ic_text_fields
         MessageActionKind.CopyText -> R.drawable.ic_content_copy
         MessageActionKind.Speak, MessageActionKind.SpeakCodeLiterally -> R.drawable.ic_volume_up
         MessageActionKind.Forward -> R.drawable.ic_forward

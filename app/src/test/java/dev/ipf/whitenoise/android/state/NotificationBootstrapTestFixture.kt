@@ -644,9 +644,21 @@ internal class NotificationBootstrapTestFixture(
 
     /** Waits for the fake engine update to cross the subscription boundary, before Android posting is required. */
     suspend fun awaitUpdateConsumed() {
-        withTimeout(5_000L) {
+        withTimeout(FIXTURE_AWAIT_TIMEOUT_MS) {
             while (consumedUpdates.get() == 0) delay(10L)
         }
+    }
+
+    /**
+     * How long a fixture wait may take before it is called a failure.
+     *
+     * These waits spin Robolectric's looper until a condition holds, so this is a deadline for
+     * giving up and not a claim about how long posting a notification should take. Five seconds of
+     * wall clock was enough on a developer machine and not on a loaded CI runner, where the same
+     * waits timed out on master with nothing wrong with the code under test.
+     */
+    private companion object {
+        const val FIXTURE_AWAIT_TIMEOUT_MS = 60_000L
     }
 
     /**
@@ -656,7 +668,7 @@ internal class NotificationBootstrapTestFixture(
      */
     suspend fun awaitNotificationPosted(advanceMainClock: Boolean = true) {
         val manager = appContext.getSystemService(NotificationManager::class.java)
-        withTimeout(5_000L) {
+        withTimeout(FIXTURE_AWAIT_TIMEOUT_MS) {
             while (manager.activeNotifications.none { it.tag == "account-a|group-a" }) {
                 val mainLooper = shadowOf(Looper.getMainLooper())
                 if (advanceMainClock) {
@@ -672,7 +684,7 @@ internal class NotificationBootstrapTestFixture(
     /** Waits until the active fixture card carries the expected user-visible body. */
     suspend fun awaitNotificationBody(expected: String) {
         val manager = appContext.getSystemService(NotificationManager::class.java)
-        withTimeout(5_000L) {
+        withTimeout(FIXTURE_AWAIT_TIMEOUT_MS) {
             while (
                 manager.activeNotifications
                     .firstOrNull { it.tag == "account-a|group-a" }
@@ -689,14 +701,14 @@ internal class NotificationBootstrapTestFixture(
 
     /** Waits until the post-first-write avatar group lookup has begun. */
     suspend fun awaitNotificationEnrichmentAttempt() {
-        withTimeout(5_000L) {
+        withTimeout(FIXTURE_AWAIT_TIMEOUT_MS) {
             while (notificationGroupDetailsCalls.get() == 0) delay(1L)
         }
     }
 
     /** Waits for a precise minimum of local sender identity reads. */
     suspend fun awaitSenderDisplayNameCalls(expected: Int) {
-        withTimeout(5_000L) {
+        withTimeout(FIXTURE_AWAIT_TIMEOUT_MS) {
             while (senderDisplayNameCalls.get() < expected) {
                 shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
                 delay(1L)
