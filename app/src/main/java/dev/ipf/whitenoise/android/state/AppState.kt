@@ -1169,7 +1169,9 @@ class WhiteNoiseAppState private constructor(
             targetAvailable = { accountRef, _ ->
                 accounts.any { it.label == accountRef && it.signedOut != true }
             },
-            targetReplyAvailable = ::conversationDictationReplyTargetAvailable,
+            targetReplyAvailable = { account, group, reply ->
+                conversationDictationReplyTargetResolution(account, group, reply).available
+            },
             targetValidator = { account, group ->
                 val cached =
                     synchronized(conversationControllerLock) {
@@ -2464,51 +2466,78 @@ class WhiteNoiseAppState private constructor(
     ): Boolean = composerDraftExpansionBridge.setDraftIfCurrent(accountRef, groupIdHex, expectedRevision, value)
 
     /** Dictation conditionally empties only its unchanged origin; failed or unknown sends restore that exact text. */
-    internal suspend fun sendDictationTranscriptIfOriginUnchanged(request: ConversationDictationSendRequest): Boolean =
-        matchingConversationControllerForReply(
-            request.accountRef,
-            request.groupIdHex,
-            request.replyToMessageIdHex,
-        )?.let { controller ->
-            val current = conversationDictationDraftSnapshot(request.accountRef, request.groupIdHex)
-            if (
-                current.revision != request.expectedDraftRevision ||
-                current.value.text != request.expectedDraftText ||
-                !request.beginDispatch()
-            ) {
-                false
-            } else {
-                val replyTarget = controller.replyingTo
-                var durablyAccepted = false
-                try {
-                    durablyAccepted = sendConversationText(controller, request.payload, request.onPendingShown)
-                    durablyAccepted
-                } finally {
-                    if (!durablyAccepted && replyTarget != null && controller.replyingTo == null) {
-                        controller.replyingTo = replyTarget
-                    }
+    internal suspend fun sendDictationTranscriptIfOriginUnchanged(request: ConversationDictationSendRequest): Boolean {
+        val current = conversationDictationDraftSnapshot(request.accountRef, request.groupIdHex)
+        val initialReply =
+            conversationDictationReplyTargetResolution(
+                request.accountRef,
+                request.groupIdHex,
+                request.replyToMessageIdHex,
+            )
+        val draftMatches =
+            current.revision == request.expectedDraftRevision &&
+                current.value.text == request.expectedDraftText
+        val replyOriginAvailable =
+            when (initialReply) {
+                ConversationDictationReplyTargetResolution.Detached -> request.replyToMessageIdHex == null
+                ConversationDictationReplyTargetResolution.Mismatch -> false
+                is ConversationDictationReplyTargetResolution.Mounted -> true
+            }
+        val dispatchStarted = draftMatches && replyOriginAvailable && request.beginDispatch()
+        if (!dispatchStarted) return false
+        return when (
+            val liveReply =
+                conversationDictationReplyTargetResolution(
+                    request.accountRef,
+                    request.groupIdHex,
+                    request.replyToMessageIdHex,
+                )
+        ) {
+            ConversationDictationReplyTargetResolution.Detached ->
+                if (request.replyToMessageIdHex == null) {
+                    sendDetachedDictationText(request)
+                } else {
+                    rejectDictationDispatchBeforeTransport(request)
                 }
+            ConversationDictationReplyTargetResolution.Mismatch -> rejectDictationDispatchBeforeTransport(request)
+            is ConversationDictationReplyTargetResolution.Mounted ->
+                sendDictationThroughMountedController(liveReply.controller, request)
+        }
+    }
+
+    private fun rejectDictationDispatchBeforeTransport(request: ConversationDictationSendRequest): Boolean {
+        request.onDispatchRejectedBeforeTransport()
+        return false
+    }
+
+    private suspend fun sendDictationThroughMountedController(
+        controller: ConversationController,
+        request: ConversationDictationSendRequest,
+    ): Boolean {
+        val replyTarget = controller.replyingTo
+        var durablyAccepted = false
+        return try {
+            durablyAccepted = sendConversationText(controller, request.payload, request.onPendingShown)
+            durablyAccepted
+        } finally {
+            if (!durablyAccepted && replyTarget != null && controller.replyingTo == null) {
+                controller.replyingTo = replyTarget
             }
-        } ?: false
+        }
+    }
 
-    private fun conversationDictationReplyTargetAvailable(
+    private fun conversationDictationReplyTargetResolution(
         accountRef: String,
         groupIdHex: String,
         replyToMessageIdHex: String?,
-    ): Boolean = matchingConversationControllerForReply(accountRef, groupIdHex, replyToMessageIdHex) != null
-
-    private fun matchingConversationControllerForReply(
-        accountRef: String,
-        groupIdHex: String,
-        replyToMessageIdHex: String?,
-    ): ConversationController? =
+    ): ConversationDictationReplyTargetResolution =
         synchronized(conversationControllerLock) {
-            newestMatchingController(conversationControllers) { controller ->
-                controller.matchesConversation(accountRef, groupIdHex) &&
-                    controller.replyingTo
-                        ?.messageIdHex
-                        .equals(replyToMessageIdHex, ignoreCase = true)
-            }
+            resolveConversationDictationReplyTarget(
+                conversationControllers,
+                accountRef,
+                groupIdHex,
+                replyToMessageIdHex,
+            )
         }
 
     /** Hydrates the selected composer from MDK without retaining attachment plaintext in Android state. */

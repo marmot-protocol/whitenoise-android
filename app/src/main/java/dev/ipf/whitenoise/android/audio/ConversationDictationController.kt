@@ -104,7 +104,9 @@ internal data class ConversationDictationSendRequest(
     val replyToMessageIdHex: String? = null,
     /** Called under the origin commit lock immediately before dispatch; false cancels an uncommitted send. */
     val beginDispatch: () -> Boolean = { true },
-    /** Called after the pending bubble is published, when dictation UI can release ownership. */
+    /** Releases a successful claim when a fresh ownership check rejects the request before transport. */
+    val onDispatchRejectedBeforeTransport: () -> Unit = {},
+    /** Called after the send is visibly pending or natively accepted, when dictation UI can release ownership. */
     val onPendingShown: () -> Unit = {},
 )
 
@@ -401,7 +403,7 @@ internal class ConversationDictationController internal constructor(
         accountRef: String,
         groupIdHex: String,
         replyToMessageIdHex: String?,
-    ) -> Boolean = { _, _, _ -> true },
+    ) -> Boolean? = { _, _, _ -> true },
     private val targetValidator: (
         suspend (accountRef: String, groupIdHex: String) -> ConversationDictationTargetValidation
     )? = null,
@@ -437,7 +439,7 @@ internal class ConversationDictationController internal constructor(
             value: TextFieldValue,
         ) -> Boolean,
         targetAvailable: (accountRef: String, groupIdHex: String) -> Boolean,
-        targetReplyAvailable: (accountRef: String, groupIdHex: String, replyToMessageIdHex: String?) -> Boolean =
+        targetReplyAvailable: (accountRef: String, groupIdHex: String, replyToMessageIdHex: String?) -> Boolean? =
             { _, _, _ -> true },
         targetValidator: suspend (accountRef: String, groupIdHex: String) -> ConversationDictationTargetValidation,
         targetValidationScope: CoroutineScope,
@@ -711,10 +713,21 @@ internal class ConversationDictationController internal constructor(
                 target.mode == mode
         } == true
 
-    /** Reply identity is part of the immutable origin, not mutable composer decoration. */
-    private fun targetAvailable(target: ConversationDictationTarget): Boolean =
-        targetAvailable(target.accountRef, target.groupIdHex) &&
+    /**
+     * Reply identity is part of the immutable origin, not mutable composer decoration. A mounted controller must
+     * still match both null and non-null reply origins. With no mounted controller, only a non-reply session may
+     * continue: a real reply's composer context is not durable, and pasting it as standalone text would retarget it.
+     */
+    private fun targetAvailable(target: ConversationDictationTarget): Boolean {
+        if (!targetAvailable(target.accountRef, target.groupIdHex)) return false
+        return when (
             targetReplyAvailable(target.accountRef, target.groupIdHex, target.replyToMessageIdHex)
+        ) {
+            true -> true
+            false -> false
+            null -> target.replyToMessageIdHex == null
+        }
+    }
 
     /** A completed transcript treats a failed local check as indeterminate, never as permission to erase text. */
     private fun completedTargetValidation(target: ConversationDictationTarget): ConversationDictationTargetValidation =
@@ -2373,29 +2386,14 @@ internal class ConversationDictationController internal constructor(
         sendRequest: ConversationDictationSendRequest,
         scope: CoroutineScope,
     ) {
-        var emptiedRevision: Long? = null
+        val claim = ConversationDictationDispatchClaim()
         val guardedRequest =
             sendRequest.copy(
-                beginDispatch = {
-                    if (state.sessionId != sessionId || dispatchedSessionId != null) {
-                        false
-                    } else {
-                        dispatchedSessionId = sessionId
-                        emptiedRevision = emptyDraftForDispatch(target)
-                        (emptiedRevision != null).also { claimed ->
-                            if (!claimed) dispatchedSessionId = null
-                        }
-                    }
+                beginDispatch = { beginDictationDispatch(sessionId, target, claim) },
+                onDispatchRejectedBeforeTransport = {
+                    rejectDictationDispatchBeforeTransport(sessionId, target, claim)
                 },
-                onPendingShown = {
-                    if (state.sessionId == sessionId && dispatchedSessionId == sessionId) {
-                        conversationDictationDiagnostic("event=send_outcome outcome=pending_visible")
-                        // The conversation controller now owns the pending send. Detach this job before
-                        // completing dictation so clearRecognitionSession does not cancel its transport.
-                        sendJob = null
-                        complete(target)
-                    }
-                },
+                onPendingShown = { completePendingDictationDispatch(sessionId, target) },
             )
         sendJob =
             scope.launch(start = CoroutineStart.LAZY) {
@@ -2405,25 +2403,67 @@ internal class ConversationDictationController internal constructor(
                     if (state.sessionId != sessionId) return@launch
                     if (accepted == true) {
                         conversationDictationDiagnostic("event=send_outcome outcome=accepted")
-                        if (emptiedRevision == null) emptyDraftForDispatch(target)
+                        if (claim.emptiedRevision == null) emptyDraftForDispatch(target)
                         complete(target)
                     } else {
                         val reason = if (accepted == null) "timeout" else "rejected"
                         conversationDictationDiagnostic(
                             "event=send_outcome outcome=retained reason=$reason",
                         )
-                        restoreDraftAfterFailedDispatch(target, emptiedRevision)
+                        restoreDraftAfterFailedDispatch(target, claim.emptiedRevision)
                         retainUndeliveredTranscript(sessionId, target, transcript)
                     }
                 } finally {
                     if (state.sessionId == sessionId && state is ConversationDictationState.Processing) {
                         conversationDictationDiagnostic("event=send_outcome outcome=retained reason=interrupted")
-                        restoreDraftAfterFailedDispatch(target, emptiedRevision)
+                        restoreDraftAfterFailedDispatch(target, claim.emptiedRevision)
                         retainUndeliveredTranscript(sessionId, target, transcript)
                     }
                 }
             }
         sendJob?.start()
+    }
+
+    private class ConversationDictationDispatchClaim(
+        var emptiedRevision: Long? = null,
+    )
+
+    private fun beginDictationDispatch(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+        claim: ConversationDictationDispatchClaim,
+    ): Boolean {
+        if (state.sessionId != sessionId || dispatchedSessionId != null) return false
+        dispatchedSessionId = sessionId
+        claim.emptiedRevision = emptyDraftForDispatch(target)
+        return (claim.emptiedRevision != null).also { claimed ->
+            if (!claimed) dispatchedSessionId = null
+        }
+    }
+
+    private fun rejectDictationDispatchBeforeTransport(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+        claim: ConversationDictationDispatchClaim,
+    ) {
+        if (state.sessionId != sessionId || dispatchedSessionId != sessionId) return
+        conversationDictationDiagnostic("event=send_outcome outcome=rejected_before_transport")
+        val rejectedRevision = claim.emptiedRevision
+        dispatchedSessionId = null
+        claim.emptiedRevision = null
+        restoreDraftAfterFailedDispatch(target, rejectedRevision)
+    }
+
+    private fun completePendingDictationDispatch(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+    ) {
+        if (state.sessionId != sessionId || dispatchedSessionId != sessionId) return
+        conversationDictationDiagnostic("event=send_outcome outcome=pending_visible")
+        // The conversation controller now owns the pending send. Detach this job before
+        // completing dictation so clearRecognitionSession does not cancel its transport.
+        sendJob = null
+        complete(target)
     }
 
     /**
@@ -2493,6 +2533,13 @@ internal class ConversationDictationController internal constructor(
         transcript: String,
     ) {
         pendingCompletedTranscript = transcript
+        if (usesLocalDraftOnlyDelivery(target)) {
+            conversationDictationDiagnostic(
+                "event=target_validation phase=delivery result=Available source=draft_only",
+            )
+            deliverTranscript(sessionId, target, transcript)
+            return
+        }
         val validator = targetValidator
         val validationScope = targetValidationScope
         if (validator == null || validationScope == null) {
@@ -2540,6 +2587,11 @@ internal class ConversationDictationController internal constructor(
             deliverTranscript(sessionId, target, transcript)
         }
     }
+
+    /** An explicit in-app Paste is local-only, so a transient MDK membership read must not block it. */
+    private fun usesLocalDraftOnlyDelivery(target: ConversationDictationTarget): Boolean =
+        target.mode == ConversationDictationMode.InApp &&
+            requestedDeliveryMode == ConversationDictationDeliveryMode.PasteIntoDraft
 
     /** Bounds the authoritative origin-membership probe without misreporting failures as removal. */
     private suspend fun validateTargetAuthoritatively(

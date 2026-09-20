@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.MessageDraftRevisionFfi
 import dev.ipf.marmotkit.SelectedMessageDraftContentFfi
 import dev.ipf.marmotkit.SelectedMessageDraftFfi
 import dev.ipf.marmotkit.SendSummaryFfi
+import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
 
 /**
  * Publishes the composer's text with one engine call, the way the app sent before 0.10.0.
@@ -33,6 +34,25 @@ internal suspend fun MarmotInterface.sendComposerText(
     } else {
         sendText(accountRef, groupIdHex, text)
     }
+
+/** Publishes a completed non-reply dictation after its conversation UI controller has detached. */
+internal suspend fun WhiteNoiseAppState.sendDetachedDictationText(request: ConversationDictationSendRequest): Boolean {
+    val pendingClear = captureDraftForSend(request.accountRef, request.groupIdHex)
+    val summary =
+        withConversationTextSendOrder(request.accountRef, request.groupIdHex) {
+            retryPendingConversationSend(validatedConnectivityRecoveryGeneration) {
+                withGroupCommitLock(request.accountRef, request.groupIdHex) {
+                    marmotIo(MarmotTraceSection.TEXT_SEND) {
+                        sendComposerText(request.accountRef, request.groupIdHex, null, request.payload)
+                    }
+                }
+            }
+        }
+    if (summary.messageIds.isEmpty()) return false
+    pendingClear?.let(::clearDraftAfterSuccessfulSend)
+    runCatching(request.onPendingShown)
+    return true
+}
 
 /** Media variant of [sendComposerText]: the draft must describe every uploaded reference in order. */
 internal suspend fun MarmotInterface.sendComposerMedia(
