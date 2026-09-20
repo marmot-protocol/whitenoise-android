@@ -1,7 +1,7 @@
 # Android push recovery qualification — 2026-09-20
 
 Implementation source: isolated branch `fix/fcm-durable-recovery`, based on refreshed
-master `ea64ab41a03372cbb7d37b76a5af001b0718feac`. The original checkout and native
+master `6a9f2434c02d55c358c23ee99b1ff4e0f09b9f7d`. The original checkout and native
 dependency pin are unchanged. This report covers the Android implementation and does
 not establish a fix for the reported 2026.9.17 open-chat symptom.
 
@@ -90,6 +90,10 @@ not establish a fix for the reported 2026.9.17 open-chat symptom.
     revalidates the account/runtime/switch owner, and only then reads the device-wide delivery
     invariant. An account that began rendering-off/all-off can no longer reuse stale state to skip
     push registration or persistent-owner convergence.
+13. **Atomic wake admission.** Recording a new wake generation and reopening an eligible exhausted
+    attempt budget now use one durable transaction. A successful generation write can no longer be
+    followed by a failed admission write that returns without an owner or durable dispatch. Tests
+    prove both the single-commit success path and the shared commit-failure result.
 
 Repository regressions cover the external review reproductions directly. They hold the
 completion and acknowledgement dispatches, advance the real network generation, and prove
@@ -111,11 +115,11 @@ Final settled-source results:
 
 | Check | Result |
 | --- | --- |
-| Change-aware completion gate, `--visual changed` | PASS; rebased production-source run 3m 04s |
+| Change-aware completion gate, `--visual changed` | PASS; final rebased run 2m 54s |
 | Both debug variants and instrumentation compilation | PASS |
 | Formatting, static analysis, alternate-variant Android lint | PASS |
-| Primary-variant focused tests | 221 passed, 0 failures/errors/skips; 23 suites |
-| Alternate-variant focused tests | 221 passed, 0 failures/errors/skips; 23 suites; 50s |
+| Primary-variant focused tests | 223 passed, 0 failures/errors/skips; 23 suites |
+| Alternate-variant focused tests | 241 passed, 0 failures/errors/skips; 24 suites; 30s |
 | Locale resource parity | PASS; every translated resource set matches the default key set |
 | Visual baseline verification | PASS |
 | Manual inventory | 267 active IDs, 0 retired IDs |
@@ -128,6 +132,12 @@ owner acceptance and loss, scheduling database states, marker reopening, retry e
 generation coalescing, native-lane serialization, worker cancellation, completion and
 acknowledgement races, delivery-mode cutover and rollback, battery-policy projection,
 diagnostic correlation/privacy, and updated settings behavior.
+
+The earlier hosted run exposed three stale source-ordering assertions after the recovery helper
+boundaries changed. Their maintained contracts now locate the final helper bodies, and the focused
+Play and alternate-flavor runs pass. A local unfiltered macOS run encountered an existing
+Robolectric image-encoding stall; current master completes the same unfiltered hosted jobs, so the
+new exact-head hosted matrix remains the authoritative full-suite result after push.
 
 The completion/acknowledgement settlement regressions and their cancellation variants pass
 in both build variants. The current earlier-review probe bundle also passes. The supplied
@@ -184,12 +194,11 @@ job start/stop. Each qualification UID retained identical recorded job, wake-loc
 available CPU/running-time totals. No statistics were reset. This supports the no-pending-work
 fast exit only; it does not measure energy impact.
 
-The normal Dev APK built from the same rebased app sources was installed in place on physical
-user 0 after a fresh readable private backup. Its signing certificate and every packaged arm64
-native library matched the installed app. The pulled-back APK matches the candidate SHA-256
-`70d0e2969c4c115762b637420db416aaba092d4493793349d72b35efe7b0e70c`; the original
-first-install timestamp and all three account records remain present. Dev was left stopped and
-was not launched or exercised after installation.
+The final review-follow-up Dev APK was built for arm64 with SHA-256
+`8c4d88c7e38a92178ac2df44729b298255ba3bde97ebf2d236873c8f323ae50b`. It reports the
+expected Dev package/version and signing certificate. The physical Pixel disconnected before the
+required fresh backup and in-place update could begin, so this exact candidate is not yet claimed
+installed. No device data was touched during the failed connection check.
 
 ## Unperformed and deferred checks
 
@@ -203,13 +212,13 @@ was not launched or exercised after installation.
   this candidate under the original open-chat reproduction, so that issue is not claimed fixed.
 - Authoritative already-read notification suppression remains deferred with its native
   dependency. Existing eligibility and cancellation behavior remains unchanged.
-- Remote issue assignment, project state updates/readback, and review reconciliation require
-  renewed command-line authentication. No merge or release was created.
+- Issue and pull-request ownership and Project 7 `In Progress` state were verified. No merge or
+  release was created.
 
 ## Source and artifacts
 
 The source/test patch relative to the base revision is SHA-256
-`b1ba3639848ff24f1f87faf55aca8f70bef2f77d12414ffd3721177d74476d75`.
+`7d09828b0695287b2293484260d7f044357df46c21cb2e47abfbda11e18f7e7a`.
 This hashes `git diff origin/master --binary -- app/src`. The native dependency remains unchanged.
 
 Final qualification APK hashes:
