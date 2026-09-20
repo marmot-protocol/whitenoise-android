@@ -129,7 +129,36 @@ class AuditLogShareTest {
         val firstSession = archive.parentFile!!.name
         val next = prepareAuditLogArchive(cache, temporaryFolder.root, listOf(first.absolutePath))
         assertNotEquals(firstSession, next.parentFile!!.name)
-        assertFalse(archive.exists())
+    }
+
+    /**
+     * A shared archive is handed over as a content URI, so it must outlive the next export long
+     * enough for the recipient to open it — while cache growth stays bounded.
+     */
+    @Test
+    fun prepareAuditLogArchiveKeepsThePreviousSessionAndPrunesOlderOnes() {
+        val source = temporaryFolder.newFile("audit.jsonl").apply { writeText("body") }
+        val cache = temporaryFolder.newFolder("cache")
+        val paths = listOf(source.absolutePath)
+
+        val first = prepareAuditLogArchive(cache, temporaryFolder.root, paths)
+        first.parentFile!!.setLastModified(1_000L)
+        val second = prepareAuditLogArchive(cache, temporaryFolder.root, paths)
+        second.parentFile!!.setLastModified(2_000L)
+
+        assertTrue("the just-shared archive must survive the next export", first.exists())
+        assertTrue(second.exists())
+
+        val third = prepareAuditLogArchive(cache, temporaryFolder.root, paths)
+        third.parentFile!!.setLastModified(3_000L)
+
+        assertTrue(third.exists())
+        assertTrue(second.exists())
+        assertFalse("older sessions must not accumulate", first.exists())
+        assertEquals(
+            RETAINED_AUDIT_EXPORT_SESSIONS,
+            File(cache, "audit_logs").listFiles().orEmpty().count { it.isDirectory },
+        )
     }
 
     /** A source name made entirely of unsafe characters still yields a usable entry name. */

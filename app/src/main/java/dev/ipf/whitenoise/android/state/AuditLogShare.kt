@@ -18,6 +18,17 @@ import java.util.zip.ZipOutputStream
 private const val AUDIT_LOG_SHARE_DIRECTORY = "audit_logs"
 private val unsafeAuditFileName = Regex("[^A-Za-z0-9._-]")
 
+/**
+ * How many staged export sessions survive a new export, including the one being written.
+ *
+ * A shared archive is handed to the recipient as a content URI, not as bytes, so the file must
+ * still exist when that app gets round to opening it. Deleting every prior session on the next
+ * export — which is what the export did before — could pull the archive out from under a recipient
+ * that had not read it yet. Retaining the immediately previous session covers that hand-off while
+ * still bounding how much forensic data sits in cache; **Clear Diagnostic Logs** removes all of it.
+ */
+internal const val RETAINED_AUDIT_EXPORT_SESSIONS = 2
+
 /** Name of the single archive a manual export produces. Carries no account, group or device detail. */
 internal const val AUDIT_LOG_ARCHIVE_NAME = "white-noise-diagnostic-logs.zip"
 
@@ -43,8 +54,8 @@ internal fun prepareAuditLogArchive(
 ): File {
     require(sourcePaths.isNotEmpty()) { "At least one audit log is required" }
     val shareRoot = File(cacheDir, AUDIT_LOG_SHARE_DIRECTORY)
-    clearPreparedAuditLogShares(cacheDir)
     check(shareRoot.mkdirs() || shareRoot.isDirectory) { "Unable to prepare audit log export" }
+    pruneAuditLogShareSessions(shareRoot, RETAINED_AUDIT_EXPORT_SESSIONS - 1)
     val shareDirectory = File(shareRoot, UUID.randomUUID().toString())
     check(shareDirectory.mkdir()) { "Unable to prepare audit log export" }
 
@@ -108,6 +119,26 @@ private fun confinedRegularAuditFile(
     val real = runCatching { lexical.toRealPath() }.getOrNull() ?: return null
     if (!real.startsWith(allowedRealRoot) || !Files.isRegularFile(real, LinkOption.NOFOLLOW_LINKS)) return null
     return real.toFile()
+}
+
+/**
+ * Keeps the [retain] newest session directories and removes the rest, plus any stray file directly
+ * under the share root. Symlinked entries are unlinked rather than followed.
+ */
+private fun pruneAuditLogShareSessions(
+    shareRoot: File,
+    retain: Int,
+) {
+    val entries = shareRoot.listFiles().orEmpty()
+    entries.filterNot { it.isDirectory }.forEach { it.delete() }
+    entries
+        .filter { it.isDirectory && !Files.isSymbolicLink(it.toPath()) }
+        // Newest first. Names break a tie so two sessions created inside one filesystem
+        // timestamp tick still prune in a stable order rather than arbitrarily.
+        .sortedWith(compareByDescending<File> { it.lastModified() }.thenByDescending { it.name })
+        .drop(retain.coerceAtLeast(0))
+        .forEach { it.deleteRecursively() }
+    entries.filter { Files.isSymbolicLink(it.toPath()) }.forEach { it.delete() }
 }
 
 internal fun clearPreparedAuditLogShares(cacheDir: File): Boolean {
