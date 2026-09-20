@@ -97,6 +97,13 @@
     <string name="key_package_relay_history">История релеев</string>
     <string name="key_package_current">Текущий</string>
     <string name="key_package_superseded">Заменён</string>
+    <string name="key_package_local_state">Локальное состояние</string>
+    <string name="key_package_local_state_not_local">Не сохранён локально</string>
+    <string name="key_package_local_state_current">Текущий локальный пакет</string>
+    <string name="key_package_local_state_pending_replacement">Ожидает замены</string>
+    <string name="key_package_local_state_retained">Сохранённый приватный материал</string>
+    <string name="key_package_local_state_other_owned">Другой собственный материал</string>
+    <string name="key_packages_refresh_failed_preserved">Не удалось обновить. Ранее загруженные локальные пакеты ключей по-прежнему отображаются.</string>
     <string name="key_package_relay_event_summary">Опубликован %1$s на %2$s</string>
     <string name="toast_chat_deleted_local">Чат удалён с этого устройства</string>
     <string name="toast_couldnt_delete_chat">Не удалось удалить чат</string>

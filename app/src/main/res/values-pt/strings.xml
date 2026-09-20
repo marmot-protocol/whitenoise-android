@@ -95,6 +95,13 @@
     <string name="key_package_relay_history">Histórico de relays</string>
     <string name="key_package_current">Atual</string>
     <string name="key_package_superseded">Substituído</string>
+    <string name="key_package_local_state">Estado local</string>
+    <string name="key_package_local_state_not_local">Não armazenado localmente</string>
+    <string name="key_package_local_state_current">Pacote local atual</string>
+    <string name="key_package_local_state_pending_replacement">Substituição pendente</string>
+    <string name="key_package_local_state_retained">Material privado retido</string>
+    <string name="key_package_local_state_other_owned">Outro material próprio</string>
+    <string name="key_packages_refresh_failed_preserved">A atualização falhou. Os pacotes de chaves locais carregados anteriormente continuam visíveis.</string>
     <string name="key_package_relay_event_summary">Publicado %1$s em %2$s</string>
     <string name="toast_chat_deleted_local">Conversa excluída deste dispositivo</string>
     <string name="toast_couldnt_delete_chat">Não foi possível excluir a conversa</string>

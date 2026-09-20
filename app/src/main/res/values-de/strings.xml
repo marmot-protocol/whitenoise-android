@@ -95,6 +95,13 @@
     <string name="key_package_relay_history">Relay-Verlauf</string>
     <string name="key_package_current">Aktuell</string>
     <string name="key_package_superseded">Ersetzt</string>
+    <string name="key_package_local_state">Lokaler Status</string>
+    <string name="key_package_local_state_not_local">Nicht lokal gespeichert</string>
+    <string name="key_package_local_state_current">Aktuelles lokales Paket</string>
+    <string name="key_package_local_state_pending_replacement">Austausch ausstehend</string>
+    <string name="key_package_local_state_retained">Aufbewahrtes privates Material</string>
+    <string name="key_package_local_state_other_owned">Anderes eigenes Material</string>
+    <string name="key_packages_refresh_failed_preserved">Aktualisierung fehlgeschlagen. Zuvor geladene lokale Schlüsselpakete werden weiterhin angezeigt.</string>
     <string name="key_package_relay_event_summary">Veröffentlicht %1$s auf %2$s</string>
     <string name="toast_chat_deleted_local">Chat von diesem Gerät gelöscht</string>
     <string name="toast_couldnt_delete_chat">Chat konnte nicht gelöscht werden</string>

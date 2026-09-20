@@ -95,6 +95,13 @@
     <string name="key_package_relay_history">Historial de relés</string>
     <string name="key_package_current">Actual</string>
     <string name="key_package_superseded">Sustituido</string>
+    <string name="key_package_local_state">Estado local</string>
+    <string name="key_package_local_state_not_local">No almacenado localmente</string>
+    <string name="key_package_local_state_current">Paquete local actual</string>
+    <string name="key_package_local_state_pending_replacement">Sustitución pendiente</string>
+    <string name="key_package_local_state_retained">Material privado conservado</string>
+    <string name="key_package_local_state_other_owned">Otro material propio</string>
+    <string name="key_packages_refresh_failed_preserved">La actualización falló. Los paquetes de claves locales cargados anteriormente siguen mostrándose.</string>
     <string name="key_package_relay_event_summary">Publicado %1$s en %2$s</string>
     <string name="toast_chat_deleted_local">Chat eliminado de este dispositivo</string>
     <string name="toast_couldnt_delete_chat">No se pudo eliminar el chat</string>

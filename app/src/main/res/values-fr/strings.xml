@@ -95,6 +95,13 @@
     <string name="key_package_relay_history">Historique des relais</string>
     <string name="key_package_current">Actuel</string>
     <string name="key_package_superseded">Remplacé</string>
+    <string name="key_package_local_state">État local</string>
+    <string name="key_package_local_state_not_local">Non stocké localement</string>
+    <string name="key_package_local_state_current">Paquet local actuel</string>
+    <string name="key_package_local_state_pending_replacement">Remplacement en attente</string>
+    <string name="key_package_local_state_retained">Matériel privé conservé</string>
+    <string name="key_package_local_state_other_owned">Autre matériel détenu</string>
+    <string name="key_packages_refresh_failed_preserved">Échec de l’actualisation. Les paquets de clés locaux chargés précédemment restent affichés.</string>
     <string name="key_package_relay_event_summary">Publié %1$s sur %2$s</string>
     <string name="toast_chat_deleted_local">Discussion supprimée de cet appareil</string>
     <string name="toast_couldnt_delete_chat">Impossible de supprimer la discussion</string>

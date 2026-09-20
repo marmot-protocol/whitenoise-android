@@ -94,6 +94,13 @@
     <string name="key_package_relay_history">中继历史</string>
     <string name="key_package_current">当前</string>
     <string name="key_package_superseded">已替换</string>
+    <string name="key_package_local_state">本地状态</string>
+    <string name="key_package_local_state_not_local">未存储在本地</string>
+    <string name="key_package_local_state_current">当前本地密钥包</string>
+    <string name="key_package_local_state_pending_replacement">等待替换</string>
+    <string name="key_package_local_state_retained">已保留的私密材料</string>
+    <string name="key_package_local_state_other_owned">其他自有材料</string>
+    <string name="key_packages_refresh_failed_preserved">刷新失败。仍显示之前加载的本地密钥包。</string>
     <string name="key_package_relay_event_summary">%1$s 发布于 %2$s</string>
     <string name="toast_chat_deleted_local">已从此设备删除聊天</string>
     <string name="toast_couldnt_delete_chat">无法删除聊天</string>
