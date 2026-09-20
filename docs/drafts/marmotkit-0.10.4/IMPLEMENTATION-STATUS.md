@@ -6,6 +6,7 @@ Worktree: `/Users/user/Workspace/marmot-protocol/wn-marmotkit-0.10.4`.
 Branch: `build/marmotkit-0.10.4`.
 Stack base: `cf4d1a147855829182221297cf68d5093f153f2a` (the local #2691 rebase,
 not its final reviewed head). Preparation commit: `14698e077`.
+Implementation checkpoint: `47c604377`.
 Last live check: #2691 remains OPEN at `8cb10a9d21773695a3e17648f1148f25a4c970bd`;
 master is `2226fbc2654e38c92bfc90b8477059cf259bb94f`. The newer #2691 fixes are not
 silently included in this older preparation base.
@@ -82,8 +83,9 @@ Do not change the concurrently active `wn-complete-marmotkit-adoption` checkout.
 - Both app flavors and Android-test sources compile on the final source. Ktlint,
   detekt, and focused Play screenshot verification pass. The fast gate's initial
   online run was stopped while lint waited on Google Maven version metadata;
-  its complete Gradle task set was restarted with `--offline`. Android lint is
-  still pending; do not describe the entire fast gate as passed yet.
+  its complete Gradle task set was restarted with `--offline` and **passed**:
+  `BUILD SUCCESSFUL in 17m 12s`, 96 tasks (22 executed, 74 up-to-date), including
+  Android lint. Remote dependency freshness was not checked in this offline run.
 - Diff whitespace check: passed.
 - No APK install, emulator migration, byte-count experiment, or personal-device
   operation has been performed. No app data was cleared or uninstalled.
