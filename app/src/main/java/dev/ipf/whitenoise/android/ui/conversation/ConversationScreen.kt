@@ -3485,7 +3485,9 @@ internal fun ConversationScreen(
                                 },
                                 onRemoveDocument = { index ->
                                     if (!attachmentSendPending) {
-                                        pendingDocumentUris.getOrNull(index)?.let(mediaDraftState::releasePreparedDocument)
+                                        pendingDocumentUris
+                                            .getOrNull(index)
+                                            ?.let(mediaDraftState::releasePreparedDocument)
                                         pendingDocumentUris = pendingDocumentUris.filterIndexed { i, _ -> i != index }
                                     }
                                 },

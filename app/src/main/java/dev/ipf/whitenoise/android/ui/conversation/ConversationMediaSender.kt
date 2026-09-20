@@ -40,6 +40,7 @@ internal data class VisualReadOutcome(
     val albumOverflowed: Boolean,
 )
 
+@Suppress("TooManyFunctions") // MIME-specific readers share one byte-budget and sanitization policy.
 internal class ConversationAttachmentReader(
     private val appState: WhiteNoiseAppState,
     private val context: Context,
@@ -296,7 +297,10 @@ internal class ConversationAttachmentReader(
         }
 
     /** Reads one document pick through the same MIME and byte limits used at send time. */
-    suspend fun readDocumentDraft(uri: android.net.Uri): PendingAttachment? = readPickedDocuments(listOf(uri)).attachments.singleOrNull()
+    suspend fun readDocumentDraft(uri: android.net.Uri): PendingAttachment? {
+        val outcome = readPickedDocuments(listOf(uri))
+        return outcome.attachments.singleOrNull()
+    }
 
     private fun readVisualAttachment(
         uri: android.net.Uri,

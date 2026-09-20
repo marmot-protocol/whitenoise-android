@@ -324,7 +324,10 @@ internal class ConversationMediaDraftState(
             preparedPhotos.mapValues { (_, photo) -> photo.pendingAttachment() }
 
     /** Returns native-owned document bytes in the URI order used by the shelf. */
-    fun preparedDocumentAttachments(): Map<Uri, PendingAttachment> = preparedDocuments.mapValues { (_, document) -> document.pendingAttachment() }
+    fun preparedDocumentAttachments(): Map<Uri, PendingAttachment> {
+        val documents = preparedDocuments
+        return documents.mapValues { (_, document) -> document.pendingAttachment() }
+    }
 
     /** Removes a document only after an explicit shelf action, never because the screen was disposed. */
     fun releasePreparedDocument(uri: Uri) {
@@ -348,6 +351,7 @@ internal class ConversationMediaDraftState(
     }
 
     /** Rehydrates the composer shelf from authoritative native bytes after navigation or process recreation. */
+    @Suppress("ReturnCount") // Guard returns avoid materializing incomplete or unowned native drafts.
     suspend fun restorePersistedAttachments(): RestoredConversationAttachments? {
         if (restoreAttempted) return null
         restoreAttempted = true
@@ -475,6 +479,7 @@ internal class ConversationMediaDraftState(
     }
 
     /** Persists one document before its picker grant can be revoked. */
+    @Suppress("ReturnCount") // Missing owner, unreadable picker data, and draft failure are distinct no-op exits.
     private suspend fun prepareDocument(
         uri: Uri,
         attachmentId: String,
