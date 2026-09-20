@@ -376,7 +376,7 @@ class MediaViewerScreenshotTest {
     @Test
     fun mediaViewerPagedGalleryShowsTheCurrentPagesMetadata() {
         val gallery = loadedConversationGallery()
-        val oldestPageIndex = gallery.pages.lastIndex
+        val oldestPageIndex = 0
 
         assertEquals("oldest", gallery.pages[oldestPageIndex].messageIdHex)
         captureGallery(
@@ -425,7 +425,7 @@ class MediaViewerScreenshotTest {
         val tapped = page("tapped", sender = "Blair", recordedAt = 200uL)
         val oldest = page("oldest", sender = "Casey", recordedAt = 100uL)
         return visualMediaViewerGallery(
-            conversationVisualPages = listOf(newest, tapped, oldest),
+            conversationVisualPages = listOf(oldest, tapped, newest),
             messagePages = listOf(tapped),
             tappedAttachmentIndex = tapped.attachmentIndex,
         )

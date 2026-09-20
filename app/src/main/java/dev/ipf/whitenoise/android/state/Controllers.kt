@@ -22,6 +22,7 @@ import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
+import dev.ipf.marmotkit.ChatListRowActionsFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
@@ -44,6 +45,7 @@ import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
+import dev.ipf.marmotkit.SelectedChatPreviewFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
@@ -3006,6 +3008,8 @@ class ChatsController private constructor(
     private var selectedAvatarAssetsByGroup: Map<String, AvatarAssetFfi> = emptyMap()
 
     private var selectedPresentationsByGroup = emptyMap<String, ConversationPresentationFfi>()
+    private var selectedPreviewsByGroup = emptyMap<String, SelectedChatPreviewFfi>()
+    private var selectedActionsByGroup = emptyMap<String, ChatListRowActionsFfi>()
     internal val chatRows: Collection<ChatListRowFfi>
         get() = chatRowsByGroup.values
     private var groupRecordsById = mapOf<String, AppGroupRecordFfi>()
@@ -4130,6 +4134,8 @@ class ChatsController private constructor(
                 row = row,
                 selectedPresentation = selectedPresentationsByGroup[chatRowKey(row.groupIdHex)],
                 selectedAvatarAsset = selectedAvatarAssetsByGroup[chatRowKey(row.groupIdHex)],
+                selectedPreview = selectedPreviewsByGroup[chatRowKey(row.groupIdHex)],
+                actions = selectedActionsByGroup[chatRowKey(row.groupIdHex)],
                 group = optimisticArchiveGroup(row.groupIdHex, groupRecordsById[row.groupIdHex]),
                 activeAccountIdHex = activeAccountIdHex,
                 members = memberCacheByGroup[row.groupIdHex],
@@ -4155,6 +4161,8 @@ class ChatsController private constructor(
             row = row,
             selectedPresentation = selectedPresentationsByGroup[chatRowKey(row.groupIdHex)],
             selectedAvatarAsset = selectedAvatarAssetsByGroup[chatRowKey(row.groupIdHex)],
+            selectedPreview = selectedPreviewsByGroup[chatRowKey(row.groupIdHex)],
+            actions = selectedActionsByGroup[chatRowKey(row.groupIdHex)],
             group = optimisticArchiveGroup(row.groupIdHex, groupRecordsById[row.groupIdHex]),
             activeAccountIdHex = activeAccountIdHex,
             members = memberCacheByGroup[row.groupIdHex],
@@ -4376,6 +4384,10 @@ class ChatsController private constructor(
                 .mapNotNull { presented ->
                     presented.avatarAsset?.let { chatRowKey(presented.row.groupIdHex) to it }
                 }.toMap()
+        selectedPreviewsByGroup =
+            rows.associate { presented -> chatRowKey(presented.row.groupIdHex) to presented.preview }
+        selectedActionsByGroup =
+            rows.associate { presented -> chatRowKey(presented.row.groupIdHex) to presented.actions }
         rows.forEach { requestChatRowProfiles(it.row) }
         replaceChatRows(rows.map(PresentedChatRowFfi::row))
     }
@@ -4538,6 +4550,8 @@ class ChatsController private constructor(
         val removedRow = chatRowsByGroup.remove(rowKey)
         if (removedRow != null) {
             selectedPresentationsByGroup = selectedPresentationsByGroup - rowKey
+            selectedPreviewsByGroup = selectedPreviewsByGroup - rowKey
+            selectedActionsByGroup = selectedActionsByGroup - rowKey
             activitySequenceByGroup.remove(rowKey)
             optimisticChatListPreviewByGroup.remove(rowKey)
             cancelMemberSnapshotRetry(removedRow.groupIdHex)
@@ -5366,6 +5380,8 @@ class ChatsController private constructor(
     private fun resetBackingState() {
         replaceChatRows(emptyList())
         selectedPresentationsByGroup = emptyMap()
+        selectedPreviewsByGroup = emptyMap()
+        selectedActionsByGroup = emptyMap()
         groupRecordsById = emptyMap()
         activitySequenceByGroup.clear()
         nextActivitySequence = 0uL
@@ -9014,6 +9030,20 @@ class ConversationController(
         attachmentIndex: Int,
     ): String = mediaCacheKey(account, group.groupIdHex, messageIdHex, attachmentIndex)
 
+    /** Builds a durable identity without guessing when display and source message ids differ. */
+    private fun attachmentRequest(
+        account: String,
+        messageIdHex: String,
+        attachmentIndex: Int,
+    ): AttachmentTransferRequest =
+        AttachmentTransferRequest(
+            accountRef = account,
+            groupIdHex = group.groupIdHex,
+            messageIdHex = messageIdHex,
+            attachmentIndex = attachmentIndex,
+            sourceMessageIdHex = nativeAttachmentSourceId(messageIdHex),
+        )
+
     private fun mediaUploadSessionStillCurrent(account: String): Boolean =
         shouldAcceptMediaUploadForAccount(
             account,
@@ -9103,7 +9133,7 @@ class ConversationController(
     ): Boolean {
         val account = conversationAccountRef ?: return false
         return appState.hasCachedAttachmentAfterHydration(
-            AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
+            attachmentRequest(account, messageIdHex, attachmentIndex),
         )
     }
 
@@ -9149,7 +9179,7 @@ class ConversationController(
         val account = conversationAccountRef
         if (retainedPlaintext == null && reference.sourceEpoch != 0uL && account != null) {
             appState.enqueueAttachmentDownload(
-                AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
+                attachmentRequest(account, messageIdHex, attachmentIndex),
                 priority,
             )
         }
@@ -9172,7 +9202,7 @@ class ConversationController(
     ): Boolean {
         val account = conversationAccountRef ?: return false
         return appState.attachmentOpens.requestOpen(
-            AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
+            attachmentRequest(account, messageIdHex, attachmentIndex),
         )
     }
 
@@ -9182,7 +9212,7 @@ class ConversationController(
     ): AttachmentOpenRequest? {
         val account = conversationAccountRef ?: return null
         return appState.attachmentOpens.openRequest(
-            AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
+            attachmentRequest(account, messageIdHex, attachmentIndex),
         )
     }
 
@@ -9218,7 +9248,7 @@ class ConversationController(
     ): MediaAttachmentReferenceFfi {
         if (fallback.sourceEpoch != 0uL) return fallback
         val account = conversationAccountRef ?: error("no active account")
-        val request = AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex)
+        val request = attachmentRequest(account, messageIdHex, attachmentIndex)
         repeat(ATTACHMENT_REFERENCE_RESOLVE_ATTEMPTS) { attempt ->
             appState
                 .resolveAttachmentReference(request)
@@ -9238,7 +9268,7 @@ class ConversationController(
         priority: AttachmentDownloadPriority,
     ): ByteArray {
         val account = conversationAccountRef ?: error("no active account")
-        val request = AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex)
+        val request = attachmentRequest(account, messageIdHex, attachmentIndex)
         if (priority == AttachmentDownloadPriority.Interactive) {
             appState.enqueueAttachmentDownload(request, priority)
         }

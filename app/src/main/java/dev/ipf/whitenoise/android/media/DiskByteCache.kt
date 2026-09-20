@@ -123,6 +123,9 @@ internal class DiskByteCache(
     private val maxInMemoryEntryBytes: Long = LEGACY_SINGLE_PAYLOAD_MAX_BYTES.toLong(),
     private val afterLeasePlaintextWritten: () -> Unit = {},
 ) {
+    /** Returns the private cache root shared by encrypted entries and ephemeral leases. */
+    internal fun siblingCacheRoot(): File = cacheDir.parentFile ?: cacheDir
+
     // accessOrder = true → LinkedHashMap iterates in LRU order for eviction.
     private val index = LinkedHashMap<String, Entry>(8, 0.75f, true)
 

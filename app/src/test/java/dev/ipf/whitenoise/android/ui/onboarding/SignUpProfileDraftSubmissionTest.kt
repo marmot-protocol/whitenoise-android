@@ -70,10 +70,11 @@ class SignUpProfileDraftSubmissionTest {
                         scope,
                         { owner },
                         { true },
-                        create = {
+                        create = { _ ->
                             creations++
                             AccountSummaryFfi("new", "11".repeat(32), true, false, false, true)
                         },
+                        hasPendingIdentityReceipt = { false },
                         qualify = {},
                         accept = { account, old ->
                             owner = old.copy(accountRef = account.label)
@@ -112,10 +113,11 @@ class SignUpProfileDraftSubmissionTest {
                         scope,
                         { SignUpOwner(1, null) },
                         { true },
-                        create = {
+                        create = { _ ->
                             creations++
                             error("Offline must not create")
                         },
+                        hasPendingIdentityReceipt = { false },
                         qualify = {},
                         accept = { _, _ -> false },
                         upload = { _, _ -> error("Offline must not upload") },

@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.PresentationSourceFfi
@@ -108,6 +109,21 @@ private fun adoptableSelectedAvatar(
 }
 
 /** True for the two presentation sources that resolve to a member rather than the group itself. */
-private fun PresentationSourceFfi.isPeerSourced(): Boolean =
+internal fun PresentationSourceFfi.isPeerSourced(): Boolean =
     this == PresentationSourceFfi.PEER_PROFILE ||
         this == PresentationSourceFfi.PEER_FALLBACK
+
+/**
+ * Keeps a durable selected avatar only when its presentation source belongs to this conversation.
+ * A named group remains a group even when its roster has one counterparty, so a peer asset must not
+ * override that group's own avatar or monogram.
+ */
+internal fun adoptableSelectedAvatarAsset(
+    asset: AvatarAssetFfi?,
+    avatarSource: PresentationSourceFfi?,
+    group: AppGroupRecordFfi,
+    memberCount: Int,
+): AvatarAssetFfi? =
+    asset?.takeIf {
+        avatarSource?.isPeerSourced() != true || GroupProjector.lendsPeerAvatar(group, memberCount)
+    }

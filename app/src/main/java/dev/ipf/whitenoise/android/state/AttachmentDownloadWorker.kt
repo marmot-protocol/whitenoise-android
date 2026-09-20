@@ -38,7 +38,14 @@ internal data class AttachmentTransferRequest(
     val groupIdHex: String,
     val messageIdHex: String,
     val attachmentIndex: Int,
+    val sourceMessageIdHex: String? = null,
 )
+
+/** Returns the exact native target when the authoritative source id is known. */
+internal fun AttachmentTransferRequest.nativeTarget(): NativeAttachmentTarget? =
+    sourceMessageIdHex?.let { sourceId ->
+        NativeAttachmentTarget(messageIdHex, sourceId, attachmentIndex)
+    }
 
 /** Returns the encrypted-cache key for this protocol-owned attachment identity. */
 internal fun AttachmentTransferRequest.cacheKey(): String =
@@ -54,6 +61,7 @@ internal object AttachmentDownloadWorkData {
     private const val KEY_GROUP_ID_HEX = "group_id_hex"
     private const val KEY_MESSAGE_ID_HEX = "message_id_hex"
     private const val KEY_ATTACHMENT_INDEX = "attachment_index"
+    private const val KEY_SOURCE_MESSAGE_ID_HEX = "source_message_id_hex"
 
     /** Encodes only the minimal identity needed for MDK to resolve the attachment again. */
     fun encode(request: AttachmentTransferRequest): Data =
@@ -62,6 +70,7 @@ internal object AttachmentDownloadWorkData {
             KEY_GROUP_ID_HEX to request.groupIdHex,
             KEY_MESSAGE_ID_HEX to request.messageIdHex,
             KEY_ATTACHMENT_INDEX to request.attachmentIndex,
+            KEY_SOURCE_MESSAGE_ID_HEX to request.sourceMessageIdHex,
         )
 
     /** Rejects malformed WorkManager input before it can reach MDK or cache paths. */
@@ -70,13 +79,15 @@ internal object AttachmentDownloadWorkData {
         val groupIdHex = data.getString(KEY_GROUP_ID_HEX).orEmpty()
         val messageIdHex = data.getString(KEY_MESSAGE_ID_HEX).orEmpty()
         val attachmentIndex = data.getInt(KEY_ATTACHMENT_INDEX, -1)
+        val sourceMessageIdHex = data.getString(KEY_SOURCE_MESSAGE_ID_HEX)
         val valid =
             accountRef.isNotBlank() &&
                 ATTACHMENT_GROUP_ID_HEX.matches(groupIdHex) &&
                 ATTACHMENT_MESSAGE_ID_HEX.matches(messageIdHex) &&
+                (sourceMessageIdHex == null || ATTACHMENT_MESSAGE_ID_HEX.matches(sourceMessageIdHex)) &&
                 attachmentIndex >= 0
         return if (valid) {
-            AttachmentTransferRequest(accountRef, groupIdHex, messageIdHex, attachmentIndex)
+            AttachmentTransferRequest(accountRef, groupIdHex, messageIdHex, attachmentIndex, sourceMessageIdHex)
         } else {
             null
         }

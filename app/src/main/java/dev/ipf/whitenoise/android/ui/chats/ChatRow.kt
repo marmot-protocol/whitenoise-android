@@ -50,6 +50,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import dev.ipf.marmotkit.ChatListAttachmentKindFfi
+import dev.ipf.marmotkit.SelectedChatPreviewFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MessageBodyMatch
@@ -340,9 +341,14 @@ internal fun ChatRow(
         },
         supportingContent = supportingContent@{
             val draft =
-                appState
-                    .chatRowDraftFor(accountRef, item.group.groupIdHex)
-                    ?.takeIf { it.isNotBlank() }
+                chatRowDraftPreview(
+                    item = item,
+                    legacyDraft = appState.chatRowDraftFor(accountRef, item.group.groupIdHex),
+                )
+            val invitation =
+                item.selectedPreview == SelectedChatPreviewFfi.Invitation ||
+                    (item.selectedPreview == null && item.group.pendingConfirmation)
+            val empty = item.selectedPreview == SelectedChatPreviewFfi.Empty
             // Tokens only ever describe the last message's body, so they're
             // ignored whenever the line shows something else (invite copy,
             // draft). When the controller hasn't parsed yet (or the parse
@@ -350,7 +356,13 @@ internal fun ChatRow(
             // parsing happens here — composition stays parse-free.
             val markdownPreview =
                 item.previewTokens
-                    ?.takeIf { !item.group.pendingConfirmation && draft == null && it.blocks.isNotEmpty() }
+                    ?.takeIf {
+                        !invitation &&
+                            !empty &&
+                            draft == null &&
+                            it.blocks.isNotEmpty() &&
+                            (item.selectedPreview == null || item.selectedPreview == SelectedChatPreviewFfi.Message)
+                    }
             val preview =
                 if (markdownPreview != null) {
                     rememberMarkdownPreviewText(
@@ -363,13 +375,22 @@ internal fun ChatRow(
                 } else {
                     AnnotatedString(
                         when {
-                            item.group.pendingConfirmation ->
+                            invitation ->
                                 stringResource(
                                     R.string.invited_to_chat_by,
                                     avatarAccount?.let { appState.chatMemberTitle(it) }
                                         ?: stringResource(R.string.someone),
                                 )
-                            draft != null -> stringResource(R.string.chat_row_draft_prefix) + draft
+                            draft != null -> {
+                                val draftText =
+                                    draft.text
+                                        ?: draft.attachmentKind
+                                            ?.let { kind ->
+                                                messageTextCopy.attachmentLabel(kind, draft.attachmentCount)
+                                            }.orEmpty()
+                                chatRowDraftText(stringResource(R.string.chat_row_draft_prefix), draftText)
+                            }
+                            empty -> stringResource(R.string.no_messages_yet)
                             else ->
                                 item.projectedPreviewText(
                                     copy = messageTextCopy,
@@ -403,18 +424,24 @@ internal fun ChatRow(
                     preview = preview,
                     fontStyle = if (draft != null) FontStyle.Italic else FontStyle.Normal,
                     attachmentKind =
-                        item.projection
-                            ?.lastMessage
-                            ?.takeIf {
-                                draft == null &&
-                                    !item.group.pendingConfirmation &&
-                                    !it.deleted &&
-                                    (
-                                        it.kind == LEGACY_NOTE_KIND ||
-                                            it.kind == CHAT_MESSAGE_KIND ||
-                                            it.kind == AGENT_STREAM_FINAL_KIND
-                                    )
-                            }?.attachmentKind,
+                        draft?.attachmentKind
+                            ?: item.projection
+                                ?.lastMessage
+                                ?.takeIf {
+                                    draft == null &&
+                                        !invitation &&
+                                        !empty &&
+                                        (
+                                            item.selectedPreview == null ||
+                                                item.selectedPreview == SelectedChatPreviewFfi.Message
+                                        ) &&
+                                        !it.deleted &&
+                                        (
+                                            it.kind == LEGACY_NOTE_KIND ||
+                                                it.kind == CHAT_MESSAGE_KIND ||
+                                                it.kind == AGENT_STREAM_FINAL_KIND
+                                        )
+                                }?.attachmentKind,
                 )
             }
         },

@@ -8,6 +8,7 @@ import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
+import dev.ipf.marmotkit.ChatListRowActionsFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
@@ -72,6 +73,35 @@ class ChatListProjectionEqualityTest {
         val row = row(lastMessage = preview())
 
         assertEquals(project(row, null), project(row, null))
+    }
+
+    /** Every native row capability survives equality-sensitive projection updates. */
+    @Test
+    fun projectionPreservesAllTenNativeRowCapabilities() {
+        val actions =
+            ChatListRowActionsFfi(
+                canMarkRead = true,
+                canMarkUnread = false,
+                canPin = true,
+                canUnpin = false,
+                canMute = true,
+                canUnmute = false,
+                canArchive = true,
+                canRestore = false,
+                canStartLeave = true,
+                canDeleteLocal = false,
+            )
+
+        val item =
+            chatListItemFromProjection(
+                row = row(lastMessage = preview()),
+                actions = actions,
+                group = group(),
+                activeAccountIdHex = ACTIVE_ACCOUNT,
+                members = members(),
+            )
+
+        assertEquals(actions, item.actions)
     }
 
     private fun project(

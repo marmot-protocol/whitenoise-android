@@ -9,6 +9,9 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountKeyPackageFfi
+import dev.ipf.marmotkit.AccountKeyPackageInventoryEntryFfi
+import dev.ipf.marmotkit.AccountKeyPackageLocalStateFfi
+import dev.ipf.marmotkit.AccountKeyPackageRelayEventFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
@@ -86,10 +89,60 @@ class KeyPackagesDeletionFlowTest {
         assertEquals(1, loads.get())
     }
 
+    /** An explicit network failure leaves the already rendered local inventory intact. */
+    @Test
+    fun refreshFailurePreservesLocalInventoryAndShowsAnErrorState() {
+        val target = relayPackage()
+        val loads = AtomicInteger()
+
+        render(
+            load = { refresh ->
+                loads.incrementAndGet()
+                if (refresh) error("relay unavailable") else listOf(target)
+            },
+            delete = { _, _, _ -> false },
+        )
+        waitForLoads(1, loads)
+
+        composeRule.onNodeWithText(context.getString(R.string.refresh)).performClick()
+        waitForLoads(2, loads)
+
+        composeRule.onNodeWithText(IdentityFormatter.short(target.keyPackageId)).assertExists()
+        composeRule.onNodeWithText(context.getString(R.string.key_packages_refresh_failed_preserved)).assertExists()
+    }
+
+    /** A relay-history failure cannot discard inventory fetched earlier in the same refresh. */
+    @Test
+    fun relayHistoryFailureKeepsTheNewInventory() {
+        val initial = relayPackage()
+        val refreshed = initial.copy(keyPackageId = "refreshed-key-package", keyPackageRefHex = "56".repeat(32))
+        var inventory = listOf(initial)
+        var failRelayHistory = false
+
+        render(
+            load = { inventory },
+            loadRelayEvents = {
+                if (failRelayHistory) error("relay history unavailable")
+                emptyList()
+            },
+            delete = { _, _, _ -> false },
+        )
+        composeRule.onNodeWithText(IdentityFormatter.short(initial.keyPackageId)).assertExists()
+
+        inventory = listOf(refreshed)
+        failRelayHistory = true
+        composeRule.onNodeWithText(context.getString(R.string.refresh)).performClick()
+
+        composeRule.onNodeWithText(IdentityFormatter.short(refreshed.keyPackageId)).assertExists()
+        composeRule.onNodeWithText(IdentityFormatter.short(initial.keyPackageId)).assertDoesNotExist()
+        composeRule.onNodeWithText(context.getString(R.string.key_packages_refresh_failed_preserved)).assertExists()
+    }
+
     /** Renders the production account-scoped screen with controllable MDK load and delete boundaries. */
     private fun render(
         load: suspend (Boolean) -> List<AccountKeyPackageFfi>,
         delete: suspend (String, String, List<String>) -> Boolean,
+        loadRelayEvents: suspend (Boolean) -> List<AccountKeyPackageRelayEventFfi> = { emptyList() },
     ) {
         val appState =
             WhiteNoiseAppState(
@@ -105,8 +158,16 @@ class KeyPackagesDeletionFlowTest {
                     KeyPackagesScreen(
                         appState = appState,
                         onBack = {},
-                        loadKeyPackages = load,
+                        loadKeyPackages = { refresh ->
+                            load(refresh).map { record ->
+                                AccountKeyPackageInventoryEntryFfi(
+                                    record,
+                                    AccountKeyPackageLocalStateFfi.CURRENT,
+                                )
+                            }
+                        },
                         deleteKeyPackage = delete,
+                        loadRelayEvents = loadRelayEvents,
                     )
                 }
             }

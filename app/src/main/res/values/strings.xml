@@ -139,6 +139,13 @@
     <string name="key_package_relay_history">Relay history</string>
     <string name="key_package_current">Current</string>
     <string name="key_package_superseded">Superseded</string>
+    <string name="key_package_local_state">Local state</string>
+    <string name="key_package_local_state_not_local">Not stored locally</string>
+    <string name="key_package_local_state_current">Current local package</string>
+    <string name="key_package_local_state_pending_replacement">Pending replacement</string>
+    <string name="key_package_local_state_retained">Retained private material</string>
+    <string name="key_package_local_state_other_owned">Other owned material</string>
+    <string name="key_packages_refresh_failed_preserved">Refresh failed. Previously loaded local key packages are still shown.</string>
     <string name="key_package_relay_event_summary">Published %1$s to %2$s</string>
     <string name="toast_chat_deleted_local">Chat deleted from this device</string>
     <string name="toast_couldnt_delete_chat">Couldn\'t delete chat</string>

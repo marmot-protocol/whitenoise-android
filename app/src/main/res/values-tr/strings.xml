@@ -95,6 +95,13 @@
     <string name="key_package_relay_history">Relay geçmişi</string>
     <string name="key_package_current">Güncel</string>
     <string name="key_package_superseded">Değiştirildi</string>
+    <string name="key_package_local_state">Yerel durum</string>
+    <string name="key_package_local_state_not_local">Yerel olarak saklanmıyor</string>
+    <string name="key_package_local_state_current">Geçerli yerel paket</string>
+    <string name="key_package_local_state_pending_replacement">Değiştirme bekleniyor</string>
+    <string name="key_package_local_state_retained">Saklanan özel malzeme</string>
+    <string name="key_package_local_state_other_owned">Diğer sahip olunan malzeme</string>
+    <string name="key_packages_refresh_failed_preserved">Yenileme başarısız oldu. Daha önce yüklenen yerel anahtar paketleri gösterilmeye devam ediyor.</string>
     <string name="key_package_relay_event_summary">%1$s, %2$s üzerinde yayımlandı</string>
     <string name="toast_chat_deleted_local">Sohbet bu cihazdan silindi</string>
     <string name="toast_couldnt_delete_chat">Sohbet silinemedi</string>

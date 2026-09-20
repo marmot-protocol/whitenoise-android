@@ -17,7 +17,13 @@ internal fun ConversationController.cancelAttachmentTransfer(
     val transferRequest = attachmentTransferRequest(messageIdHex, attachmentIndex)
     boundAccountRef?.let { account ->
         appState.cancelAttachmentDownload(
-            AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
+            AttachmentTransferRequest(
+                accountRef = account,
+                groupIdHex = group.groupIdHex,
+                messageIdHex = messageIdHex,
+                attachmentIndex = attachmentIndex,
+                sourceMessageIdHex = nativeAttachmentSourceId(messageIdHex),
+            ),
         )
     }
     attachmentTransfers.cancel(attachmentTransferKey(messageIdHex, attachmentIndex))
@@ -32,6 +38,12 @@ internal fun ConversationController.automaticAttachmentDownloadSuppressed(
 ): Boolean {
     val account = boundAccountRef ?: return false
     return appState.automaticAttachmentDownloadSuppressed(
-        AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
+        AttachmentTransferRequest(
+            accountRef = account,
+            groupIdHex = group.groupIdHex,
+            messageIdHex = messageIdHex,
+            attachmentIndex = attachmentIndex,
+            sourceMessageIdHex = nativeAttachmentSourceId(messageIdHex),
+        ),
     )
 }

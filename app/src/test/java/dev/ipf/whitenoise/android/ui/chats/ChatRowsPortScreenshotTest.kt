@@ -13,7 +13,10 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.marmotkit.ChatListAttachmentKindFfi
+import dev.ipf.marmotkit.ChatListDraftPreviewFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
+import dev.ipf.marmotkit.SelectedChatPreviewFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
@@ -64,6 +67,42 @@ class ChatRowsPortScreenshotTest {
     @Test
     fun emptySearchLargeRtl() {
         capture("chat_rows_empty_search_large_rtl", dark = true, largeRtl = true, empty = Empty.Search)
+    }
+
+    /** Production rows render native draft, invitation, and empty preview variants. */
+    @Test
+    fun nativePreviewStates() {
+        val state = ChatRowPortFixtures.state(context)
+        val draft =
+            ChatRowPortFixtures.item().copy(
+                selectedPreview =
+                    SelectedChatPreviewFfi.Draft(
+                        ChatListDraftPreviewFfi("Native draft", false, 0uL, null),
+                    ),
+            )
+        val attachmentDraft =
+            ChatRowPortFixtures.item().copy(
+                selectedPreview =
+                    SelectedChatPreviewFfi.Draft(
+                        ChatListDraftPreviewFfi("", false, 2uL, ChatListAttachmentKindFfi.PHOTO),
+                    ),
+            )
+        val invitation =
+            ChatRowPortFixtures.item(pending = true).copy(selectedPreview = SelectedChatPreviewFfi.Invitation)
+        val empty = ChatRowPortFixtures.item().copy(selectedPreview = SelectedChatPreviewFfi.Empty)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
+                    Column {
+                        listOf(draft, attachmentDraft, invitation, empty).forEach { row ->
+                            ChatRow(row, state, onClick = {}, onOpenProfile = {})
+                        }
+                    }
+                }
+            }
+        }
+
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/chat_rows_native_preview_states.png")
     }
 
     /** The five materially different real-row states share the same native ListItem text/gesture surface. */

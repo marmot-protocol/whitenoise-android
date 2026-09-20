@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
+import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.qualifiedRequest
 import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.reference
 import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.request
 import kotlinx.coroutines.Dispatchers
@@ -135,6 +136,58 @@ class MediaDownloadHostRegressionTest {
             sourceConsumer.await().use { assertArrayEquals(expected, (it as AttachmentPlaintext.Bytes).bytes) }
             assertArrayEquals(expected, download(0))
             assertEquals(1, fixture.calls.size)
+        }
+
+    /** An explicit tap joins an automatic legacy owner before native-path selection can duplicate it. */
+    @Test
+    fun interactiveTapJoinsSuspendedAutomaticLegacyAcquisition() =
+        runTest(dispatcher) {
+            val request = qualifiedRequest()
+            val automatic =
+                async {
+                    fixture.state.downloadAttachmentPlaintext(
+                        request,
+                        reference(0),
+                        AttachmentDownloadPriority.Automatic,
+                        persistInteractiveIntent = false,
+                    )
+                }
+            val legacyCall = fixture.entered.receive()
+
+            val interactive =
+                async {
+                    fixture.state.downloadAttachmentPlaintext(
+                        request,
+                        reference(0),
+                        AttachmentDownloadPriority.Interactive,
+                        persistInteractiveIntent = false,
+                    )
+                }
+            runCurrent()
+            assertFalse(interactive.isCompleted)
+
+            val expected = bytes(reference(0).fileName)
+            legacyCall.succeed(expected)
+            assertArrayEquals(expected, automatic.await())
+            assertArrayEquals(expected, interactive.await())
+            assertEquals(1, fixture.calls.size)
+        }
+
+    /** An explicit stop reaches both shared Android owners instead of caching after cancellation. */
+    @Test
+    fun explicitCancellationStopsSharedLegacyAcquisition() =
+        runTest(dispatcher) {
+            val request = request(0)
+            val download = async { runCatching { download(0, AttachmentDownloadPriority.Interactive) } }
+            fixture.entered.receive()
+
+            fixture.state.cancelAttachmentDownload(request)
+            runCurrent()
+
+            assertTrue(download.await().exceptionOrNull() is kotlinx.coroutines.CancellationException)
+            assertEquals(0, fixture.active.get())
+            assertNull(fixture.state.cachedMediaPlaintext(request.cacheKey()))
+            assertNull(withContext(Dispatchers.IO) { fixture.disk.get(request.cacheKey()) })
         }
 
     /** Timeout and integrity failures terminate once, leave both caches empty, and allow a later explicit retry. */

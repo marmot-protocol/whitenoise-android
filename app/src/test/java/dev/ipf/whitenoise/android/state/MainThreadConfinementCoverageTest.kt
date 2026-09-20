@@ -88,12 +88,14 @@ class MainThreadConfinementCoverageTest {
         }
 
         val appState = appStateSource().readText()
-        val download = appState.functionSection("downloadAttachmentPlaintext")
+        val resolver = sourceFile("AttachmentPlaintextResolver.kt").readText()
+        val download = resolver.functionSection("downloadAttachmentPlaintextSource")
         assertTrue(
             "downloadAttachmentPlaintext must dispatch caller-context L1 operations to Main",
             Regex("""withContext\(Dispatchers\.Main\.immediate\)""").findAll(download).count() >= 2,
         )
-        assertTrue("downloadAttachmentPlaintext must keep disk access on IO", "withContext(Dispatchers.IO)" in download)
+        val diskLoad = resolver.functionSection("loadAttachmentDiskPlaintext")
+        assertTrue("downloadAttachmentPlaintext must keep disk access on IO", "withContext(Dispatchers.IO)" in diskLoad)
         assertTrue(
             "memoized download publication must run on the main-confined mutation scope",
             "mutationsScope.async" in appState.functionSection("memoizedDownload"),

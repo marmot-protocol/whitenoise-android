@@ -10,6 +10,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import dev.ipf.marmotkit.ChatListRowActionsFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAnchoredMenu
@@ -41,23 +42,24 @@ internal fun ChatContextMenu(
     focusable: Boolean = true,
     modifier: Modifier = Modifier,
     canRunAction: () -> Boolean = { true },
+    actions: ChatListRowActionsFfi? = null,
 ) {
     val items =
         buildList {
-            if (hasUnread) {
+            if (hasUnread && actions?.canMarkRead != false) {
                 add(
                     chatMenuItem(R.string.chat_row_action_mark_read, R.drawable.ic_check, "Read") {
                         onMarkRead()
                     },
                 )
-            } else if (canMarkUnread) {
+            } else if (canMarkUnread && actions?.canMarkUnread != false) {
                 add(
                     chatMenuItem(R.string.chat_row_action_mark_unread, R.drawable.ic_mark_unread, "Unread") {
                         onMarkUnread()
                     },
                 )
             }
-            if (showPinToggle) {
+            if (showPinToggle && if (pinned) actions?.canUnpin != false else actions?.canPin != false) {
                 add(
                     chatMenuItem(
                         if (pinned) R.string.chat_row_action_unpin else R.string.chat_row_action_pin,
@@ -66,21 +68,27 @@ internal fun ChatContextMenu(
                     ) { onPinToggle() },
                 )
             }
-            add(
-                chatMenuItem(
-                    if (muted) R.string.chat_row_action_unmute else R.string.chat_row_action_mute,
-                    if (muted) R.drawable.ic_settings_notifications else R.drawable.ic_notifications_off,
-                    if (muted) "Unmute" else "Mute",
-                ) { onMuteToggle() },
-            )
-            add(
-                chatMenuItem(
-                    if (archived) R.string.chat_row_action_unarchive else R.string.chat_row_action_archive,
-                    if (archived) R.drawable.ic_unarchive else R.drawable.ic_archive,
-                    if (archived) "Unarchive" else "Archive",
-                ) { onArchiveToggle() },
-            )
-            add(chatMenuItem(R.string.delete, R.drawable.ic_delete, "Delete", destructive = true) { onDelete() })
+            if (if (muted) actions?.canUnmute != false else actions?.canMute != false) {
+                add(
+                    chatMenuItem(
+                        if (muted) R.string.chat_row_action_unmute else R.string.chat_row_action_mute,
+                        if (muted) R.drawable.ic_settings_notifications else R.drawable.ic_notifications_off,
+                        if (muted) "Unmute" else "Mute",
+                    ) { onMuteToggle() },
+                )
+            }
+            if (if (archived) actions?.canRestore != false else actions?.canArchive != false) {
+                add(
+                    chatMenuItem(
+                        if (archived) R.string.chat_row_action_unarchive else R.string.chat_row_action_archive,
+                        if (archived) R.drawable.ic_unarchive else R.drawable.ic_archive,
+                        if (archived) "Unarchive" else "Archive",
+                    ) { onArchiveToggle() },
+                )
+            }
+            if (actions?.canDeleteLocal != false) {
+                add(chatMenuItem(R.string.delete, R.drawable.ic_delete, "Delete", destructive = true) { onDelete() })
+            }
             add(
                 chatMenuItem(R.string.chat_list_action_add_to_folder, R.drawable.ic_folder, "Folder") {
                     onAddToFolder()

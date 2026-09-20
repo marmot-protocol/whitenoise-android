@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.ui.onboarding
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
+import dev.ipf.whitenoise.android.state.SignUpIdentityCoordinator
+import dev.ipf.whitenoise.android.state.SignUpIdentityReconciliation
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -214,27 +216,33 @@ class SignUpPartialPublicationRecoveryTest {
         val publishedAccounts = mutableListOf<String>()
         val uploadedAccounts = mutableListOf<String>()
         val finished = mutableListOf<String>()
+        private val identityCoordinator = SignUpIdentityCoordinator()
         val controller =
             SignUpController(
                 scope,
                 { owner },
                 { available },
-                create = {
-                    creations++
-                    if (createFails) error("create failed")
-                    beforeCreateReturn()
-                    AccountSummaryFfi("created", "11".repeat(32), true, false, false, true)
+                create = { captured ->
+                    identityCoordinator.createOrReuse(captured) {
+                        creations++
+                        if (createFails) error("create failed")
+                        beforeCreateReturn()
+                        AccountSummaryFfi("created", "11".repeat(32), true, false, false, true)
+                    }
                 },
+                hasPendingIdentityReceipt = identityCoordinator::hasPendingReceipt,
                 qualify = {
                     qualifications++
                     if (qualificationFails) error("policy failed")
                 },
-                accept = { summary, captured ->
-                    if (owner == captured && available) {
-                        owner = captured.copy(accountRef = summary.label)
-                        true
-                    } else {
-                        false
+                accept = { summary, _ ->
+                    identityCoordinator.reconcile(summary) { captured ->
+                        if (owner == captured && available) {
+                            owner = captured.copy(accountRef = summary.label)
+                            SignUpIdentityReconciliation(receiptHandled = true, activated = true)
+                        } else {
+                            SignUpIdentityReconciliation(receiptHandled = true, activated = false)
+                        }
                     }
                 },
                 upload = { account, _ ->

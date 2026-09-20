@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import androidx.work.WorkInfo
+import androidx.work.workDataOf
 import dev.ipf.marmotkit.MarmotKitException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -8,6 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AttachmentDownloadWorkerTest {
+    /** Backlog stop removes only queued automatic work without interactive intent. */
     @Test
     fun backlogStopCancelsOnlyQueuedAutomaticWork() {
         assertTrue(shouldCancelQueuedAutomaticWork(WorkInfo.State.ENQUEUED, hasInteractiveIntent = false))
@@ -17,6 +19,7 @@ class AttachmentDownloadWorkerTest {
         assertFalse(shouldCancelQueuedAutomaticWork(WorkInfo.State.SUCCEEDED, hasInteractiveIntent = false))
     }
 
+    /** WorkManager stores only the minimal validated native lookup identity. */
     @Test
     fun workDataRoundTripsOnlyTheMdkLookupIdentity() {
         val request =
@@ -25,6 +28,7 @@ class AttachmentDownloadWorkerTest {
                 groupIdHex = "ab".repeat(16),
                 messageIdHex = "cd".repeat(32),
                 attachmentIndex = 3,
+                sourceMessageIdHex = "ef".repeat(32),
             )
 
         val encoded = AttachmentDownloadWorkData.encode(request)
@@ -36,6 +40,26 @@ class AttachmentDownloadWorkerTest {
         assertFalse(serialized.contains("nonce"))
     }
 
+    /** Work persisted by the prior release remains decodable without a source ID. */
+    @Test
+    fun legacyWorkDataWithoutASourceMessageIdStillDecodes() {
+        val decoded =
+            AttachmentDownloadWorkData.decode(
+                workDataOf(
+                    "account_ref" to "account-a",
+                    "group_id_hex" to "ab".repeat(16),
+                    "message_id_hex" to "cd".repeat(32),
+                    "attachment_index" to 3,
+                ),
+            )
+
+        assertEquals(
+            AttachmentTransferRequest("account-a", "ab".repeat(16), "cd".repeat(32), 3),
+            decoded,
+        )
+    }
+
+    /** Durable names and tags hash every private conversation identifier. */
     @Test
     fun uniqueWorkNameDoesNotExposeConversationIdentifiers() {
         val request =
@@ -61,6 +85,22 @@ class AttachmentDownloadWorkerTest {
         assertTrue(accountTag != attachmentAutomaticAccountTag("other-account"))
     }
 
+    /** Source projection upgrades retain the same durable cancellation and suppression identity. */
+    @Test
+    fun sourceQualifiedRequestKeepsTheSourceLessWorkIdentity() {
+        val sourceLess =
+            AttachmentTransferRequest("account", "ab".repeat(16), "cd".repeat(32), 2)
+        val sourceQualified = sourceLess.copy(sourceMessageIdHex = "ef".repeat(32))
+
+        assertEquals(attachmentDownloadWorkName(sourceLess), attachmentDownloadWorkName(sourceQualified))
+        assertEquals(attachmentIdentityTag(sourceLess), attachmentIdentityTag(sourceQualified))
+        assertEquals(
+            "attachment_download_5bed766117bdd9260a266b7ce5644ca2c79084d78fe97ddb4ef86389ca6ff31d",
+            attachmentDownloadWorkName(sourceLess),
+        )
+    }
+
+    /** Retry policy permits one transient follow-up without restoring long retry loops. */
     @Test
     fun durableWorkerRetriesOneLaterAttemptWithoutRestoringTheOldThreeMinuteLoop() {
         val timeout = MarmotKitException.Runtime("request timed out")

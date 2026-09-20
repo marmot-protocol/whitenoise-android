@@ -119,12 +119,18 @@ class AttachmentDownloadProductionWiringTest {
         val appState = projectSource("state/AppState.kt").normalized()
         val worker = projectSource("state/AttachmentDownloadWorker.kt").normalized()
 
+        assertTrue("appState.enqueueAttachmentDownload(request, priority)" in controller)
+        assertTrue("return appState.downloadAttachmentPlaintext(" in controller)
+        val resolver = projectSource("state/AttachmentPlaintextResolver.kt").normalized()
+        val byteDownload =
+            resolver
+                .substringAfter("internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintext(")
+                .substringBefore("internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(")
         assertTrue(
-            "Interactive controller downloads must enqueue durable work before the direct transfer",
-            "if (priority == AttachmentDownloadPriority.Interactive) { " +
-                "appState.enqueueAttachmentDownload(request, priority) } " +
-                "return appState.downloadAttachmentPlaintext(" in controller,
+            "Every byte-returning consumer must pass through the native-aware source resolver",
+            "downloadAttachmentPlaintextSource(" in byteDownload && ".use" in byteDownload,
         )
+        assertFalse("downloadMedia(" in byteDownload)
         val sourceDownload =
             sourceController.substringAfter(
                 "internal suspend fun ConversationController.downloadAttachmentSource(",
@@ -162,6 +168,23 @@ class AttachmentDownloadProductionWiringTest {
         assertTrue(
             "Retained outgoing documents must preserve transfer state and encrypted-cache seeding",
             "requestAttachmentTransfer(" in retainedBranch && "retainedPlaintext = retained" in retainedBranch,
+        )
+    }
+
+    /** The native draft, not a screen-owned URI list, owns unsent attachment bytes. */
+    @Test
+    fun conversationAttachmentDraftSurvivesScreenDisposal() {
+        val draftSource = projectSource("ui/conversation/ConversationMediaDraft.kt")
+
+        assertTrue(draftSource.contains("restorePersistedAttachments"))
+        assertTrue(draftSource.contains("stageGenericAttachment"))
+        val disposal =
+            draftSource
+                .substringAfter("fun dispose()")
+                .substringBefore("private suspend fun preparePhoto")
+        assertFalse(
+            "screen disposal must not delete the authoritative native draft",
+            disposal.contains("stager.remove"),
         )
     }
 

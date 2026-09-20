@@ -20,7 +20,6 @@ import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.text.input.TextFieldValue
 import com.google.firebase.messaging.FirebaseMessaging
-import dev.ipf.marmotkit.AccountKeyPackageFfi
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupMemberIdsFfi
@@ -2168,6 +2167,8 @@ class WhiteNoiseAppState private constructor(
     private val profileRefreshFanoutGate = Semaphore(PROFILE_REFRESH_FANOUT)
     internal val mutationsScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
+    private val inFlightAttachmentAcquisitions =
+        InFlightAttachmentAcquisitions(mutationsScope, attachmentDownloadGate::promote)
     internal val attachmentOpens =
         AttachmentOpenCoordinator(
             intentStore = attachmentDownloadIntents,
@@ -3842,6 +3843,18 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
+     * Chooses and owns exactly one network path before any native or legacy
+     * acquisition starts. A later explicit tap joins an automatic owner (and
+     * promotes its gate priority) instead of starting MarmotKit beside the
+     * already-running legacy download.
+     */
+    internal fun memoizedAttachmentAcquisition(
+        cacheKey: String,
+        priority: AttachmentDownloadPriority,
+        block: suspend CoroutineScope.() -> AttachmentAcquisitionOutcome,
+    ): Deferred<AttachmentAcquisitionOutcome> = inFlightAttachmentAcquisitions.acquire(cacheKey, priority, block)
+
+    /**
      * Cancels one account-scoped memoized source attempt after its forwarding
      * owner times out or is cancelled. The identity-safe completion hook leaves
      * any newer retry registered under the same cache key intact.
@@ -3867,12 +3880,8 @@ class WhiteNoiseAppState private constructor(
      * intentionally the only recovery path used by durable Android work: the
      * WorkManager request stores identity, never a duplicate media reference.
      */
-    internal suspend fun resolveAttachmentReference(request: AttachmentTransferRequest): MediaAttachmentReferenceFfi? =
-        marmotIo(MarmotTraceSection.MEDIA_LIST) { listMedia(request.accountRef, request.groupIdHex, null) }
-            .firstOrNull { record ->
-                record.messageIdHex.equals(request.messageIdHex, ignoreCase = true) &&
-                    record.attachmentIndex.toInt() == request.attachmentIndex
-            }?.reference
+    @Suppress("MaxLineLength") // Kept as an expression body by ktlint's formatter.
+    internal suspend fun resolveAttachmentReference(request: AttachmentTransferRequest): MediaAttachmentReferenceFfi? = findNativeAttachment(request)?.reference
 
     /** Persists durable work and promotes explicit requests above automatic-download policy. */
     internal fun enqueueAttachmentDownload(
@@ -3904,6 +3913,9 @@ class WhiteNoiseAppState private constructor(
         attachmentDownloadIntents.suppressAutomatic(request)
         attachmentDownloadIntents.setInteractive(request, interactive = false)
         AttachmentDownloadWorker.cancelForRequest(appContext, request)
+        cancelMemoizedAttachmentDownload(request)
+        inFlightAttachmentAcquisitions.cancel(request.cacheKey(), AttachmentTransferCancelledByUserException())
+        mutationsScope.launch { cancelNativeAttachmentBounded(request) }
         attachmentDownloadPolicyRevision += 1
     }
 
@@ -3944,10 +3956,11 @@ class WhiteNoiseAppState private constructor(
             cacheKey = request.run { mediaCacheKey(accountRef, groupIdHex, messageIdHex, attachmentIndex) },
             memoryContains = { cachedMediaPlaintext(it) != null },
             diskContains = diskMediaCache::containsAfterHydration,
-        )
+        ) ||
+            hasNativeAttachment(request)
 
-    /** Downloads through MDK and publishes plaintext into bounded L1 and encrypted L2 caches. */
-    internal suspend fun downloadAttachmentPlaintext(
+    /** Legacy fallback used only after Android and MarmotKit retained stores both miss. */
+    internal suspend fun downloadLegacyAttachmentPlaintext(
         request: AttachmentTransferRequest,
         reference: MediaAttachmentReferenceFfi,
         priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Interactive,
@@ -3995,33 +4008,33 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /** Downloads once through MDK and publishes non-empty plaintext into both cache tiers. */
+    /** Downloads through the legacy byte API and publishes non-empty plaintext into both cache tiers. */
     private suspend fun downloadAndCacheAttachment(
         request: AttachmentTransferRequest,
         reference: MediaAttachmentReferenceFfi,
         cacheKey: String,
     ): ByteArray {
         val publicationToken = diskMediaCache.capturePublicationToken()
-        val result =
+        val plaintext =
             runCatchingCancellable {
                 marmotIo(MarmotTraceSection.MEDIA_DOWNLOAD) {
                     downloadMedia(request.accountRef, request.groupIdHex, reference)
-                }
+                }.plaintext
             }.onFailure { failure ->
                 logAttachmentDownloadFailure(request, failure)
             }.getOrThrow()
-        if (result.plaintext.isNotEmpty()) {
-            cacheMediaPlaintext(cacheKey, result.plaintext)
+        if (plaintext.isNotEmpty()) {
+            cacheMediaPlaintext(cacheKey, plaintext)
             withContext(Dispatchers.IO) {
                 diskMediaCache.put(
                     cacheKey,
-                    result.plaintext,
+                    plaintext,
                     publicationToken,
                     reference.ciphertextSha256,
                 )
             }
         }
-        return result.plaintext
+        return plaintext
     }
 
     /** Logs attachment failures without exposing full identifiers in release builds. */
@@ -5394,12 +5407,14 @@ class WhiteNoiseAppState private constructor(
             acceptedPendingTextOptimisticIdsByConversation.values.forEach { it.clear() }
             acceptedPendingTextOptimisticIdsByConversation.clear()
         }
-        // Cancel any in-flight downloads (their Deferred holds the plaintext
-        // result) and drop the index so the next session starts cold.
+        // Cancel any in-flight downloads (their Deferred may hold plaintext or
+        // a retained-media outcome) and drop both indexes so the next session
+        // starts cold.
         synchronized(inFlightDownloadsLock) {
             inFlightDownloads.values.forEach { it.cancel() }
             inFlightDownloads.clear()
         }
+        inFlightAttachmentAcquisitions.cancelAll()
     }
 
     /**
@@ -5427,18 +5442,9 @@ class WhiteNoiseAppState private constructor(
                     .onFailure {
                         appStateDebug { "disk media cache wipe failed: ${it.readableMessage()}" }
                     }
-                runCatchingCancellable { java.io.File(appContext.cacheDir, dev.ipf.whitenoise.android.media.MediaCacheDirs.VOICE).deleteRecursively() }
-                    .onFailure {
-                        appStateDebug { "voice attachment wipe failed: ${it.readableMessage()}" }
-                    }
-                runCatchingCancellable { java.io.File(appContext.cacheDir, dev.ipf.whitenoise.android.media.MediaCacheDirs.VIDEO).deleteRecursively() }
-                    .onFailure {
-                        appStateDebug { "video attachment wipe failed: ${it.readableMessage()}" }
-                    }
-                runCatchingCancellable { java.io.File(appContext.cacheDir, dev.ipf.whitenoise.android.media.MediaCacheDirs.COMPOSER_PASTE).deleteRecursively() }
-                    .onFailure {
-                        appStateDebug { "composer paste media wipe failed: ${it.readableMessage()}" }
-                    }
+                dev.ipf.whitenoise.android.media.wipeSessionAttachmentPlaintext(appContext.cacheDir) { name, failure ->
+                    appStateDebug { "$name plaintext wipe failed: ${failure.readableMessage()}" }
+                }
                 // The single pending-forward entry can hold the wiped account's
                 // message plaintext; a destructive wipe drops it unconditionally.
                 runCatchingCancellable { forwardRequestPersistence.clear() }
@@ -5861,18 +5867,6 @@ class WhiteNoiseAppState private constructor(
         }
 
     fun bootstrapRelayCount(): Int = MarmotClient.bootstrapRelays.size
-
-    suspend fun fetchKeyPackages(refreshFromNetwork: Boolean = false): List<AccountKeyPackageFfi> {
-        val account = activeAccountRef ?: return emptyList()
-        return runCatching {
-            val bootstrapRelays = if (refreshFromNetwork) MarmotClient.bootstrapRelays else emptyList()
-            marmotIo { accountKeyPackages(account, bootstrapRelays) }
-        }.getOrElse {
-            if (it is CancellationException) throw it
-            presentFailure(R.string.toast_couldnt_load_key_packages, "KEY_PACKAGE_LOAD", it)
-            emptyList()
-        }
-    }
 
     /** Deletes a KeyPackage only for its still-active account through safe MDK-provided sources. */
     suspend fun deleteKeyPackage(

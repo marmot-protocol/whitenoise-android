@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.media
 
+import java.io.ByteArrayOutputStream
 import java.io.Closeable
 import java.io.File
 import java.io.OutputStream
@@ -43,3 +44,17 @@ internal interface AttachmentPlaintext : Closeable {
         override fun close() = lease.close()
     }
 }
+
+/** Materializes the source only for legacy callers whose public contract requires a byte array. */
+internal fun AttachmentPlaintext.toByteArray(): ByteArray =
+    when (this) {
+        is AttachmentPlaintext.Bytes -> bytes
+        is AttachmentPlaintext.Lease -> file.readBytes()
+        else -> {
+            require(size <= Int.MAX_VALUE) { "attachment plaintext is too large for a byte array" }
+            ByteArrayOutputStream(size.toInt()).use { output ->
+                copyTo(output)
+                output.toByteArray()
+            }
+        }
+    }

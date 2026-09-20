@@ -28,19 +28,20 @@ import kotlinx.coroutines.withContext
 private const val MEDIA_ATTACHMENT_MAX_BYTES = ConversationController.MEDIA_RETAINED_MAX_BYTES
 private const val MEDIA_ALBUM_MAX_TOTAL_BYTES = ConversationController.MEDIA_RETAINED_MAX_BYTES
 
-private data class DocumentReadOutcome(
+internal data class DocumentReadOutcome(
     val attachments: List<PendingAttachment>,
     val rejected: Boolean,
     val albumOverflowed: Boolean,
     val totalBytes: Long,
 )
 
-private data class VisualReadOutcome(
+internal data class VisualReadOutcome(
     val attachments: List<PendingAttachment>,
     val albumOverflowed: Boolean,
 )
 
-private class ConversationAttachmentReader(
+@Suppress("TooManyFunctions") // MIME-specific readers share one byte-budget and sanitization policy.
+internal class ConversationAttachmentReader(
     private val appState: WhiteNoiseAppState,
     private val context: Context,
 ) {
@@ -289,6 +290,18 @@ private class ConversationAttachmentReader(
             VisualReadOutcome(attachments, overflowed)
         }
 
+    /** Reads one visual pick through the same transform and byte limits used at send time. */
+    suspend fun readVisualDraft(uri: android.net.Uri): PendingAttachment? =
+        withContext(Dispatchers.Default) {
+            readVisualAttachment(uri, MEDIA_ALBUM_MAX_TOTAL_BYTES).attachment
+        }
+
+    /** Reads one document pick through the same MIME and byte limits used at send time. */
+    suspend fun readDocumentDraft(uri: android.net.Uri): PendingAttachment? {
+        val outcome = readPickedDocuments(listOf(uri))
+        return outcome.attachments.singleOrNull()
+    }
+
     private fun readVisualAttachment(
         uri: android.net.Uri,
         remainingBytes: Long,
@@ -419,6 +432,7 @@ internal class ConversationMediaSender(
         documentUris: List<android.net.Uri>,
         caption: String,
         preparedImageAttachments: Map<String, PendingAttachment> = emptyMap(),
+        preparedDocumentAttachments: Map<android.net.Uri, PendingAttachment> = emptyMap(),
         onAccepted: () -> Unit = {},
         onRejected: () -> Unit = {},
         onAfterSend: () -> Unit = {},
@@ -433,7 +447,13 @@ internal class ConversationMediaSender(
         appState.launchMutation {
             var accepted = false
             try {
-                val prepared = prepareStagedAttachments(imageSlots, documentUris, preparedImageAttachments)
+                val prepared =
+                    prepareStagedAttachments(
+                        imageSlots,
+                        documentUris,
+                        preparedImageAttachments,
+                        preparedDocumentAttachments,
+                    )
                 if (!acceptPreparedAttachments(prepared, imageSlots.size)) {
                     return@launchMutation
                 }
@@ -472,6 +492,7 @@ internal class ConversationMediaSender(
         imageSlots: List<PendingMediaSlot>,
         documentUris: List<android.net.Uri>,
         preparedImageAttachments: Map<String, PendingAttachment>,
+        preparedDocumentAttachments: Map<android.net.Uri, PendingAttachment>,
     ): PreparedStagedAttachments {
         val rawImages = readStagedImages(imageSlots, preparedImageAttachments)
         val images = limitAttachmentsToBudget(rawImages.attachments, MEDIA_ALBUM_MAX_TOTAL_BYTES)
@@ -480,7 +501,7 @@ internal class ConversationMediaSender(
             if (documentUris.isEmpty()) {
                 DocumentReadOutcome(emptyList(), rejected = false, albumOverflowed = false, totalBytes = 0L)
             } else {
-                attachmentReader.readPickedDocuments(documentUris, documentBudget)
+                readStagedDocuments(documentUris, preparedDocumentAttachments, documentBudget)
             }
         val pickHasVideo =
             imageSlots.any {
@@ -493,6 +514,41 @@ internal class ConversationMediaSender(
             visualFailureToast =
                 if (pickHasVideo) R.string.toast_couldnt_process_video else R.string.toast_couldnt_decode_image,
         )
+    }
+
+    /** Reuses native-draft bytes and reads only picks that have not finished staging. */
+    private suspend fun readStagedDocuments(
+        documentUris: List<android.net.Uri>,
+        preparedDocumentAttachments: Map<android.net.Uri, PendingAttachment>,
+        bytesBudget: Long,
+    ): DocumentReadOutcome {
+        val attachments = mutableListOf<PendingAttachment>()
+        var totalBytes = 0L
+        var rejected = false
+        var overflowed = false
+        documentUris.forEach { uri ->
+            val remaining = (bytesBudget - totalBytes).coerceAtLeast(0L)
+            if (remaining == 0L) {
+                overflowed = true
+                return@forEach
+            }
+            val staged = preparedDocumentAttachments[uri]
+            if (staged != null) {
+                if (staged.plaintextBytes.size.toLong() > remaining) {
+                    overflowed = true
+                } else {
+                    attachments += staged
+                    totalBytes += staged.plaintextBytes.size
+                }
+            } else {
+                val read = attachmentReader.readPickedDocuments(listOf(uri), remaining)
+                attachments += read.attachments
+                totalBytes += read.totalBytes
+                rejected = rejected || read.rejected
+                overflowed = overflowed || read.albumOverflowed
+            }
+        }
+        return DocumentReadOutcome(attachments, rejected, overflowed, totalBytes)
     }
 
     private suspend fun readStagedImages(

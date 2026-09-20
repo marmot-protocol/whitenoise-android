@@ -4,6 +4,9 @@ import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.AvatarAcquisitionStateFfi
+import dev.ipf.marmotkit.AvatarAssetFfi
+import dev.ipf.marmotkit.AvatarAvailabilityFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
@@ -14,6 +17,7 @@ import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Test
 
 /**
@@ -28,17 +32,29 @@ class ChatListPeerAvatarTest {
     /** A named two-member group keeps its own (absent) avatar instead of the peer's photo. */
     @Test
     fun namedGroupIgnoresPeerSourcedAvatar() {
-        val item = item(groupName = "Design review", avatarSource = PresentationSourceFfi.PEER_PROFILE)
+        val item =
+            item(
+                groupName = "Design review",
+                avatarSource = PresentationSourceFfi.PEER_PROFILE,
+                selectedAvatarAsset = peerAsset,
+            )
 
         assertNull(item.group.avatarUrl)
+        assertNull(item.selectedAvatarAsset)
     }
 
     /** An unnamed pair is a direct chat, so the peer's picture is the row's avatar. */
     @Test
     fun unnamedPairAdoptsPeerSourcedAvatar() {
-        val item = item(groupName = "", avatarSource = PresentationSourceFfi.PEER_PROFILE)
+        val item =
+            item(
+                groupName = "",
+                avatarSource = PresentationSourceFfi.PEER_PROFILE,
+                selectedAvatarAsset = peerAsset,
+            )
 
         assertEquals(peerAvatar, item.group.avatarUrl)
+        assertSame(peerAsset, item.selectedAvatarAsset)
     }
 
     /** A pending welcome shows the inviter, named group or not. */
@@ -57,19 +73,27 @@ class ChatListPeerAvatarTest {
     /** A group's own remote image is adopted whatever the group is called. */
     @Test
     fun namedGroupKeepsGroupSourcedAvatar() {
-        val item = item(groupName = "Design review", avatarSource = PresentationSourceFfi.GROUP)
+        val item =
+            item(
+                groupName = "Design review",
+                avatarSource = PresentationSourceFfi.GROUP,
+                selectedAvatarAsset = peerAsset,
+            )
 
         assertEquals(peerAvatar, item.group.avatarUrl)
+        assertSame(peerAsset, item.selectedAvatarAsset)
     }
 
     private fun item(
         groupName: String,
         avatarSource: PresentationSourceFfi,
         pendingConfirmation: Boolean = false,
+        selectedAvatarAsset: AvatarAssetFfi? = null,
     ): ChatListItem =
         chatListItemFromProjection(
             row = row(groupName = groupName, pendingConfirmation = pendingConfirmation),
             selectedPresentation = presentation(groupName, avatarSource),
+            selectedAvatarAsset = selectedAvatarAsset,
             group = group(name = groupName, pendingConfirmation = pendingConfirmation),
             activeAccountIdHex = ME,
             members = listOf(member(ME, local = true), member(PEER, local = false)),
@@ -190,5 +214,14 @@ class ChatListPeerAvatarTest {
         const val GROUP_ID = "peer-avatar-group"
         val ME = "a".repeat(64)
         val PEER = "b".repeat(64)
+        val peerAsset =
+            AvatarAssetFfi(
+                target = "peer-avatar",
+                reference = "peer-avatar-reference",
+                availability = AvatarAvailabilityFfi.READY,
+                acquisition = AvatarAcquisitionStateFfi.IDLE,
+                contentRevision = 1uL,
+                byteCount = 1_024uL,
+            )
     }
 }

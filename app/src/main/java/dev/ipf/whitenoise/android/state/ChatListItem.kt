@@ -5,12 +5,14 @@ import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AvatarAssetFfi
+import dev.ipf.marmotkit.ChatListRowActionsFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.PresentationTextFfi
 import dev.ipf.marmotkit.SelectedAvatarFfi
+import dev.ipf.marmotkit.SelectedChatPreviewFfi
 import dev.ipf.whitenoise.android.core.EMPTY_MARKDOWN_DOCUMENT
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupSystemEvents
@@ -44,6 +46,8 @@ internal fun chatListItemFromProjection(
     row: ChatListRowFfi,
     selectedPresentation: ConversationPresentationFfi? = null,
     selectedAvatarAsset: AvatarAssetFfi? = null,
+    selectedPreview: SelectedChatPreviewFfi? = null,
+    actions: ChatListRowActionsFfi? = null,
     group: AppGroupRecordFfi? = null,
     activeAccountIdHex: String? = null,
     members: List<AppGroupMemberRecordFfi>? = null,
@@ -96,7 +100,15 @@ internal fun chatListItemFromProjection(
             !displayGroup.selfMembership.isNonMember() &&
                 (group?.let { it.pendingConfirmation != row.pendingConfirmation } ?: row.pendingConfirmation),
         selectedPresentation = selectedPresentation,
-        selectedAvatarAsset = selectedAvatarAsset,
+        selectedAvatarAsset =
+            adoptableSelectedAvatarAsset(
+                asset = selectedAvatarAsset,
+                avatarSource = selectedPresentation?.avatarSource,
+                group = displayGroup,
+                memberCount = resolvedMemberCount,
+            ),
+        selectedPreview = selectedPreview,
+        actions = actions,
         previewTokens = previewTokens,
         resolvedMediaPreviewFallback = resolvedMediaPreviewFallback,
         removed = removed,
@@ -128,6 +140,10 @@ data class ChatListItem(
     val selectedPresentation: ConversationPresentationFfi? = null,
     /** MarmotKit's durably stored avatar for this row (0.10.1); preferred over fetching its URL. */
     val selectedAvatarAsset: AvatarAssetFfi? = null,
+    /** MarmotKit-selected message, draft, invitation, or empty preview for this row. */
+    val selectedPreview: SelectedChatPreviewFfi? = null,
+    /** All ten advisory row capabilities from the same native snapshot as [projection]. */
+    val actions: ChatListRowActionsFfi? = null,
     /**
      * Bounded snapshot of decoded pixels that were already in a presentation
      * loader when this row was published. Holding the hit on the immutable row
