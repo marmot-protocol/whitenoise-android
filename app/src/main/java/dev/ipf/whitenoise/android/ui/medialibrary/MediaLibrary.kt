@@ -419,8 +419,9 @@ internal fun sharedMediaFallbackContent(
 internal fun SharedMediaSection(
     tiles: SharedMediaTiles,
     onOpenCategory: (SharedContentCategory) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    SharedContentCategories(tiles, onOpenCategory)
+    SharedContentCategories(tiles, onOpenCategory, modifier)
 }
 
 // Project resolved image/video tiles onto the per-page descriptors the

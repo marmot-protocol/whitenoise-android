@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.group
 
 import dev.ipf.whitenoise.android.functionBody
-import dev.ipf.whitenoise.android.kotlinBlockFrom
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -41,20 +40,14 @@ class GroupDetailsPushDebugCoverageTest {
     @Test
     fun pushDebugSectionRendersOnlyInsideDeveloperModeBlock() {
         val screen = groupDetailsSource().readText()
-        val pushSectionCall = screen.indexOf("PushDeliveryDebugSection(")
-        check(pushSectionCall >= 0) { "Missing PushDeliveryDebugSection call" }
-        val developerModeStart = screen.lastIndexOf("if (appState.developerMode) {", pushSectionCall)
-        check(developerModeStart >= 0) { "Missing developer-mode block around PushDeliveryDebugSection" }
-        val developerModeBrace = screen.indexOf('{', developerModeStart)
-        val developerModeBody =
-            screen.kotlinBlockFrom(
-                developerModeBrace,
-                "GroupDetailsScreen developer-mode block",
-            )
+        val developerPanelsBody = screen.functionBody("developerPanels")
+        val developerGate = developerPanelsBody.indexOf("if (!appState.developerMode) return")
+        val pushSection = developerPanelsBody.indexOf("PushDeliveryDebugSection(")
 
         assertTrue(
             "push delivery diagnostics must only render from inside developer mode",
-            "PushDeliveryDebugSection(" in developerModeBody &&
+            developerPanelsBody.removePrefix("{").trimStart().startsWith("if (!appState.developerMode) return") &&
+                developerGate in 0 until pushSection &&
                 "R.string.push_delivery" in screen.functionBody("PushDeliveryDebugSection"),
         )
     }

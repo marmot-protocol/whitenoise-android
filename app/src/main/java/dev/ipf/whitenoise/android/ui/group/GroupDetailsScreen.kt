@@ -933,10 +933,10 @@ internal fun GroupDetailsScreen(
     }
     val memberContent: @Composable () -> Unit = {
         if (!isDm) {
-            // Keep the member header, add action, identities and technical
-            // info in one contiguous list section. ContactRow already provides
-            // Material touch heights and internal padding.
-            Column {
+            // Keep the member header, identities, pending invitations and the
+            // full-roster action in one contiguous primary section. ContactRow
+            // already provides Material touch heights and internal padding.
+            Column(Modifier.testTag("chat_info.members")) {
                 if (!rosterReady) {
                     GroupRosterLoadStatus(
                         state = controller.memberRosterState,
@@ -1325,9 +1325,43 @@ internal fun GroupDetailsScreen(
                 }
             }
 
+            memberContent()
+
+            if (!isDm && canEdit) {
+                SettingsGroup(
+                    modifier = Modifier.padding(top = WhiteNoiseSpacing.Section).testTag("chat_info.management"),
+                ) {
+                    row("edit_group") { rowContext ->
+                        SettingsLink(
+                            context = rowContext,
+                            title = stringResource(R.string.edit_group_info_title),
+                            onClick = { showEditGroup = true },
+                            enabled = activeMutation == null && !controller.mutationInFlight,
+                            leading = { Icon(painterResource(R.drawable.ic_edit), contentDescription = null) },
+                        )
+                    }
+                    row("add_member") { rowContext ->
+                        SettingsLink(
+                            context = rowContext,
+                            title = stringResource(R.string.add_member),
+                            onClick = { showAddMember = true },
+                            modifier = Modifier.testTag("chat_info.add_people"),
+                            enabled =
+                                memberAdministrationPresentable(
+                                    controller.memberRosterState,
+                                    controller.seededSelfMember,
+                                ) &&
+                                    !mutationsBlocked,
+                            leading = { Icon(painterResource(R.drawable.ic_group_add), contentDescription = null) },
+                        )
+                    }
+                }
+            }
+
             SharedMediaSection(
                 tiles = sharedMediaTiles,
                 onOpenCategory = { mediaLibraryCategory = it },
+                modifier = Modifier.testTag("chat_info.shared_media"),
             )
 
             // Custom folders containing this chat — manual membership or a
@@ -1544,39 +1578,10 @@ internal fun GroupDetailsScreen(
                 }
             }
 
-            SettingsGroup(modifier = Modifier.padding(top = WhiteNoiseSpacing.Section).testTag("chat_info.technical")) {
-                row("relays") { rowContext ->
-                    SettingsLink(
-                        context = rowContext,
-                        title = stringResource(R.string.relays),
-                        onClick = { showChatRelays = true },
-                        modifier = Modifier.testTag("chat_info.relays"),
-                        subtitle =
-                            pluralStringResource(
-                                R.plurals.chat_relay_count,
-                                controller.group.relays.size,
-                                controller.group.relays.size,
-                            ),
-                        leading = { Icon(painterResource(R.drawable.ic_tune), contentDescription = null) },
-                    )
-                }
-                row("developer_tools") { rowContext ->
-                    SettingsLink(
-                        context = rowContext,
-                        title = stringResource(R.string.developer_tools),
-                        onClick = { showGroupInfo = true },
-                        modifier = Modifier.testTag("chat_info.developer_tools"),
-                        leading = { Icon(painterResource(R.drawable.ic_bug_report), contentDescription = null) },
-                    )
-                }
-                if (isDm) {
-                    folderRow()
-                    archiveRow()
-                    leaveRow()
-                }
-            }
-
-            if (appState.developerMode) {
+            /** Developer-only transcript and transport diagnostics. */
+            @Composable
+            fun developerPanels() {
+                if (!appState.developerMode) return
                 Column(
                     Modifier.padding(top = WhiteNoiseSpacing.Related),
                     verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
@@ -1629,38 +1634,38 @@ internal fun GroupDetailsScreen(
                 }
             }
 
-            memberContent()
-
-            if (!isDm && canEdit) {
-                SettingsGroup(
-                    modifier = Modifier.padding(top = WhiteNoiseSpacing.Section).testTag("chat_info.management"),
-                ) {
-                    row("edit_group") { rowContext ->
+            SettingsGroup(modifier = Modifier.padding(top = WhiteNoiseSpacing.Section).testTag("chat_info.technical")) {
+                row("relays") { rowContext ->
+                    SettingsLink(
+                        context = rowContext,
+                        title = stringResource(R.string.relays),
+                        onClick = { showChatRelays = true },
+                        modifier = Modifier.testTag("chat_info.relays"),
+                        subtitle =
+                            pluralStringResource(
+                                R.plurals.chat_relay_count,
+                                controller.group.relays.size,
+                                controller.group.relays.size,
+                            ),
+                        leading = { Icon(painterResource(R.drawable.ic_tune), contentDescription = null) },
+                    )
+                }
+                if (isDm) {
+                    row("developer_tools") { rowContext ->
                         SettingsLink(
                             context = rowContext,
-                            title = stringResource(R.string.edit_group_info_title),
-                            onClick = { showEditGroup = true },
-                            enabled = activeMutation == null && !controller.mutationInFlight,
-                            leading = { Icon(painterResource(R.drawable.ic_edit), contentDescription = null) },
+                            title = stringResource(R.string.developer_tools),
+                            onClick = { showGroupInfo = true },
+                            modifier = Modifier.testTag("chat_info.developer_tools"),
+                            leading = { Icon(painterResource(R.drawable.ic_bug_report), contentDescription = null) },
                         )
                     }
-                    row("add_member") { rowContext ->
-                        SettingsLink(
-                            context = rowContext,
-                            title = stringResource(R.string.add_member),
-                            onClick = { showAddMember = true },
-                            modifier = Modifier.testTag("chat_info.add_people"),
-                            enabled =
-                                memberAdministrationPresentable(
-                                    controller.memberRosterState,
-                                    controller.seededSelfMember,
-                                ) &&
-                                    !mutationsBlocked,
-                            leading = { Icon(painterResource(R.drawable.ic_group_add), contentDescription = null) },
-                        )
-                    }
+                    folderRow()
+                    archiveRow()
+                    leaveRow()
                 }
             }
+            if (isDm) developerPanels()
 
             // Danger zone (#416): leave routes through requestLeave so the
             // sole-admin and sole-member cases get their own confirm copy. On
@@ -1803,6 +1808,24 @@ internal fun GroupDetailsScreen(
                     },
                 )
             }
+
+            if (!isDm) {
+                SettingsGroup(
+                    modifier = Modifier.padding(top = WhiteNoiseSpacing.Section).testTag("chat_info.developer"),
+                ) {
+                    row("developer_tools") { rowContext ->
+                        SettingsLink(
+                            context = rowContext,
+                            title = stringResource(R.string.developer_tools),
+                            onClick = { showGroupInfo = true },
+                            modifier = Modifier.testTag("chat_info.developer_tools"),
+                            leading = { Icon(painterResource(R.drawable.ic_bug_report), contentDescription = null) },
+                        )
+                    }
+                }
+            }
+
+            if (!isDm) developerPanels()
         }
     }
 }

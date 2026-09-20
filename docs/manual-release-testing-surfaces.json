@@ -4928,6 +4928,14 @@
         ]
       },
       {
+        "surface": "developerPanels",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "fun developerPanels()",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
         "surface": "GroupDetailsHeader",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "fun GroupDetailsHeader(",

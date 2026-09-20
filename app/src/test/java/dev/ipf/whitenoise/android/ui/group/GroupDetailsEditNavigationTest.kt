@@ -104,6 +104,70 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNodeWithText(context.getString(R.string.mute_for)).assertIsDisplayed()
     }
 
+    /** Group details prioritize people and administration, then files, while developer tools remain last. */
+    @Test
+    fun overviewSectionsFollowThePrimaryActionOrder() {
+        render(controller(group(), verifiedRoster = true))
+
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/group_details_primary_order_light.png")
+
+        val sectionTops =
+            listOf(
+                "chat_info.members",
+                "chat_info.management",
+                "chat_info.shared_media",
+                "chat_info.actions",
+                "chat_info.technical",
+                "chat_info.lifecycle",
+                "chat_info.developer",
+            ).map(::contentTop)
+        assertTrue(
+            "Expected group-detail sections in primary-action order, got $sectionTops",
+            sectionTops.zipWithNext().all { (first, second) -> first < second },
+        )
+    }
+
+    /** Non-admin groups keep the same priority order while omitting member-management actions. */
+    @Test
+    fun nonAdminOverviewOmitsManagementWithoutReorderingSections() {
+        render(controller(group(admin = false), verifiedRoster = true))
+
+        composeRule.onNodeWithTag("chat_info.management").assertDoesNotExist()
+        val sectionTops =
+            listOf(
+                "chat_info.members",
+                "chat_info.shared_media",
+                "chat_info.actions",
+                "chat_info.technical",
+                "chat_info.lifecycle",
+                "chat_info.developer",
+            ).map(::contentTop)
+        assertTrue(sectionTops.zipWithNext().all { (first, second) -> first < second })
+    }
+
+    /** Direct-message details retain their existing order and do not gain group-only sections. */
+    @Test
+    fun directMessageOverviewKeepsItsExistingSectionOrder() {
+        render(
+            controller(
+                group(name = ""),
+                verifiedRoster = true,
+                membersOverride = listOf(member(SELF_HEX, local = true), member("member-b")),
+            ),
+        )
+
+        composeRule.onNodeWithTag("chat_info.members").assertDoesNotExist()
+        composeRule.onNodeWithTag("chat_info.management").assertDoesNotExist()
+        composeRule.onNodeWithTag("chat_info.developer").assertDoesNotExist()
+        val sectionTops =
+            listOf(
+                "chat_info.shared_media",
+                "chat_info.actions",
+                "chat_info.technical",
+            ).map(::contentTop)
+        assertTrue(sectionTops.zipWithNext().all { (first, second) -> first < second })
+    }
+
     /** A native technical-info round trip retains the actual overview viewport and scrolled identity. */
     @Test
     fun detailsRoundTripRetainsScrolledIdentityAndViewport() {
@@ -282,6 +346,12 @@ class GroupDetailsEditNavigationTest {
             .config[SemanticsProperties.VerticalScrollAxisRange]
             .value()
 
+    /** Returns a section's stable position in scroll-content coordinates. */
+    private fun contentTop(tag: String): Float {
+        val node = composeRule.onNodeWithTag(tag).performScrollTo()
+        return overviewScrollOffset() + node.fetchSemanticsNode().boundsInRoot.top
+    }
+
     /** Management edit row and add description open the same editor. */
     @Test
     fun managementEditRowAndAddDescriptionOpenTheSameEditor() {
@@ -379,11 +449,15 @@ class GroupDetailsEditNavigationTest {
         group: AppGroupRecordFfi,
         extraMembers: Int = 0,
         verifiedRoster: Boolean = false,
+        membersOverride: List<AppGroupMemberRecordFfi>? = null,
     ): TestController {
         val appState = testAppState()
         val members =
-            listOf(member(SELF_HEX, local = true), member("member-b"), member("member-c")) +
-                ('d'..'z').take(extraMembers).map { member("member-$it") }
+            membersOverride
+                ?: (
+                    listOf(member(SELF_HEX, local = true), member("member-b"), member("member-c")) +
+                        ('d'..'z').take(extraMembers).map { member("member-$it") }
+                )
         val controller =
             ConversationController(
                 appState = appState,
