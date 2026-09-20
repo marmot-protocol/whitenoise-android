@@ -6110,7 +6110,8 @@ class WhiteNoiseAppState private constructor(
     suspend fun refreshSecurityPrivacySettings() {
         diagnostics.refresh(marmot())
         auditLogSettingsMutex.withLock {
-            auditLogSettings = runCatchingCancellable { marmotIo { auditLogSettings() } }.getOrNull()
+            // A failed re-read keeps what is on screen rather than presenting a settled choice as off.
+            runCatchingCancellable { marmotIo { auditLogSettings() } }.getOrNull()?.let { auditLogSettings = it }
         }
     }
 
@@ -6168,38 +6169,38 @@ class WhiteNoiseAppState private constructor(
         }
 
     /**
-     * Copies current audit files into the app cache for a user-confirmed share.
-     * The engine paths and file names are never logged or included in failures.
+     * Archives the current audit files into the app cache for a user-confirmed export.
+     *
+     * The engine paths, file names and archive entries are never logged or included in failures.
+     * Returns null when there is nothing to export or the archive could not be prepared in full;
+     * a partial archive is never returned, so the caller cannot present one as a complete export.
      */
     @Suppress("ReturnCount") // Each engine/cache failure is a distinct fail-closed export outcome.
-    suspend fun prepareAuditLogsForSharing(): List<java.io.File> {
+    suspend fun prepareAuditLogArchiveForExport(): java.io.File? {
         val sourcePaths =
             runCatching { marmotIo { auditLogFiles().map { it.path } } }
                 .getOrElse {
                     if (it is CancellationException) throw it
                     present(R.string.toast_couldnt_export_audit_logs)
-                    return emptyList()
+                    return null
                 }
         if (sourcePaths.isEmpty()) {
             presentTransient(R.string.toast_no_audit_logs_to_export)
-            return emptyList()
+            return null
         }
 
-        val staged =
-            runCatchingCancellable {
-                withContext(Dispatchers.IO) {
-                    prepareAuditLogShareFiles(
-                        cacheDir = appContext.cacheDir,
-                        allowedSourceRoot = java.io.File(appContext.filesDir, "Marmot"),
-                        sourcePaths = sourcePaths,
-                    )
-                }
-            }.getOrElse {
-                present(R.string.toast_couldnt_export_audit_logs)
-                return emptyList()
+        return runCatchingCancellable {
+            withContext(Dispatchers.IO) {
+                prepareAuditLogArchive(
+                    cacheDir = appContext.cacheDir,
+                    allowedSourceRoot = java.io.File(appContext.filesDir, "Marmot"),
+                    sourcePaths = sourcePaths,
+                )
             }
-        if (staged.isEmpty()) present(R.string.toast_couldnt_export_audit_logs)
-        return staged
+        }.getOrElse {
+            present(R.string.toast_couldnt_export_audit_logs)
+            return null
+        }
     }
 
     /**

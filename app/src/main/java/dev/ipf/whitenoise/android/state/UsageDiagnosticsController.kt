@@ -16,8 +16,8 @@ import kotlinx.coroutines.withContext
 internal class UsageDiagnosticsController {
     var snapshot by mutableStateOf<UsageDiagnosticsSnapshot?>(null)
         private set
-    var busy by mutableStateOf(false)
-        private set
+    private var writing by mutableStateOf(false)
+    private var reading by mutableStateOf(false)
     var failed by mutableStateOf(false)
         private set
     val observations = ProductObservationGate()
@@ -26,6 +26,17 @@ internal class UsageDiagnosticsController {
     private var revision = 0L
     private var foreground = false
     private var pendingChoice by mutableStateOf<Boolean?>(null)
+
+    /**
+     * Whether the row must present work in place of a settled control.
+     *
+     * Writing always counts, because the reader is waiting on a choice they just made. A passive
+     * re-read only counts while there is nothing to present yet — otherwise simply opening the
+     * screen would swap every settled switch for an indicator and dim its text for as long as the
+     * native read takes, which reads as the page assembling itself in front of the reader.
+     */
+    val busy: Boolean
+        get() = writing || (reading && snapshot == null)
 
     val requiresChoice: Boolean
         get() = snapshot?.settings?.decision == UsageDiagnosticsDecisionFfi.ACCEPTANCE_REQUIRED
@@ -78,6 +89,14 @@ internal class UsageDiagnosticsController {
         if (choice == null) refresh(engine) else choose(engine, choice)
     }
 
+    /** Records a native call as in flight, keeping a reader's own write distinct from a re-read. */
+    private fun markInFlight(
+        write: Boolean,
+        inFlight: Boolean,
+    ) {
+        if (write) writing = inFlight else reading = inFlight
+    }
+
     /** Serializes native receipt access and publishes only the current runtime's completed result. */
     private suspend fun update(
         engine: MarmotInterface,
@@ -86,7 +105,8 @@ internal class UsageDiagnosticsController {
         val capturedRevision = revision
         return mutex.withLock {
             if (runtime !== engine || revision != capturedRevision) return@withLock false
-            busy = true
+            val write = choice != null
+            markInFlight(write, true)
             try {
                 val result =
                     runCatchingCancellable {
@@ -115,7 +135,7 @@ internal class UsageDiagnosticsController {
                 }
                 result.isSuccess
             } finally {
-                busy = false
+                markInFlight(write, false)
             }
         }
     }

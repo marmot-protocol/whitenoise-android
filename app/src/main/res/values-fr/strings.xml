@@ -2007,9 +2007,15 @@
     <string name="donate_open_failed">Impossible d’ouvrir la page de dons. Réessayez ou revenez aux paramètres.</string>
     <string name="export_audit_logs_confirm_body">Les journaux de diagnostic contiennent des identifiants techniques et des détails d’activité. Partagez-les uniquement avec une personne de confiance.</string>
     <string name="export_audit_logs">Exporter les journaux de diagnostic</string>
-    <string name="export_audit_logs_subtitle">Partager une copie des journaux de diagnostic stockés sur cet appareil</string>
+    <string name="export_audit_logs_subtitle">Enregistrer ou partager une archive des journaux de diagnostic stockés sur cet appareil</string>
     <string name="export_audit_logs_confirm_title">Exporter les journaux de diagnostic ?</string>
-    <string name="export_audit_logs_confirm_action">Choisir le destinataire</string>
+    <string name="toast_couldnt_save_audit_logs">Impossible d\'enregistrer les journaux de diagnostic</string>
+    <string name="toast_audit_logs_saved">Journaux de diagnostic enregistrés</string>
+    <string name="export_audit_logs_share">Partager</string>
+    <string name="export_audit_logs_save">Enregistrer sur l\'appareil</string>
+    <string name="export_audit_logs_destination_body">Les journaux de diagnostic sont regroupés dans un seul fichier .zip. Enregistrez-le sur cet appareil ou envoyez-le à une personne de confiance.</string>
+    <string name="export_audit_logs_destination_title">Exporter en une seule archive</string>
+    <string name="export_audit_logs_confirm_action">Continuer</string>
     <string name="toast_couldnt_export_audit_logs">Impossible de préparer les journaux de diagnostic pour l’exportation</string>
     <string name="toast_no_audit_logs_to_export">Aucun journal de diagnostic à exporter</string>
 </resources>
