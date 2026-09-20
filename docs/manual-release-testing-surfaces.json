@@ -21906,6 +21906,14 @@
     ],
     "source_coverage": [
       {
+        "surface": "Attachment worker completed-body retention failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt",
+        "anchor": "durable_attachment_download_not_retained",
+        "test_ids": [
+          "MED-017"
+        ]
+      },
+      {
         "surface": "source:app/src/main/java/dev/ipf/whitenoise/android/MainActivity.kt",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/MainActivity.kt",
         "anchor": "WhiteNoiseApp",

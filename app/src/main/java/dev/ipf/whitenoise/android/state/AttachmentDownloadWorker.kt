@@ -209,10 +209,13 @@ class AttachmentDownloadWorker : CoroutineWorker {
     ): Result =
         try {
             if (!durableDownload(application, request, priority)) {
-                throw java.io.IOException("attachment did not reach encrypted cache")
+                Log.w(TAG, "durable_attachment_download_not_retained")
+                intentStore.setInteractive(request, interactive = false)
+                Result.failure()
+            } else {
+                intentStore.setInteractive(request, interactive = false)
+                Result.success()
             }
-            intentStore.setInteractive(request, interactive = false)
-            Result.success()
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (expectedFailure: Throwable) {
