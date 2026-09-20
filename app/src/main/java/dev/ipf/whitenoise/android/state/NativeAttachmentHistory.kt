@@ -65,12 +65,12 @@ private sealed interface NativeAttachmentHistoryRead {
     data object Restart : NativeAttachmentHistoryRead
 }
 
-/** Reads pages while retaining the original version handle as the only baseline. */
-// Native handles require lexical close scopes around every outcome.
-@Suppress("LongMethod", "NestedBlockDepth", "ReturnCount")
-private suspend fun WhiteNoiseAppState.findNativeAttachmentGeneration(
-    request: AttachmentTransferRequest,
-): NativeAttachmentHistoryRead {
+/**
+ * Reads pages while retaining the original version handle as the only baseline.
+ * Native handles require lexical close scopes around every outcome.
+ */
+@Suppress("LongMethod", "MaxLineLength", "NestedBlockDepth", "ReturnCount")
+private suspend fun WhiteNoiseAppState.findNativeAttachmentGeneration(request: AttachmentTransferRequest): NativeAttachmentHistoryRead {
     val baseline = marmotIo { attachmentHistoryVersion(request.accountRef, request.groupIdHex) }
     var cursor: AttachmentHistoryCursor? = null
     try {
