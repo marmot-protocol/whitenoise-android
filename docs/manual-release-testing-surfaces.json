@@ -3,6 +3,70 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "Key package inventory load failure toast",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateKeyPackageInventory.kt",
+        "anchor": "R.string.toast_couldnt_load_key_packages",
+        "test_ids": [
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "Key package typed local state label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.key_package_local_state",
+        "test_ids": [
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "Key package not-local state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.key_package_local_state_not_local",
+        "test_ids": [
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "Key package current local state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.key_package_local_state_current",
+        "test_ids": [
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "Key package pending replacement state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.key_package_local_state_pending_replacement",
+        "test_ids": [
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "Key package retained private material state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.key_package_local_state_retained",
+        "test_ids": [
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "Key package other owned material state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.key_package_local_state_other_owned",
+        "test_ids": [
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "Key package refresh failure preserves rows",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackagesScreen.kt",
+        "anchor": "R.string.key_packages_refresh_failed_preserved",
+        "test_ids": [
+          "ACC-018"
+        ]
+      },
+      {
         "surface": "TtsTrustWarningDialog",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/tts/TtsTrustWarning.kt",
         "anchor": "fun TtsTrustWarningDialog(",
