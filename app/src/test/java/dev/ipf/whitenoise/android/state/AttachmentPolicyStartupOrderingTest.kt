@@ -49,6 +49,10 @@ class AttachmentPolicyStartupOrderingTest {
         val profileSignUp = source("AppProfileSignUp.kt").readText().functionBody("begin")
         assertTrue(profileSignUp.contains("createIdentityWithBootstrapRelays()"))
         assertTrue(profileSignUp.contains("qualify ="))
+        val qualification = profileSignUp.substringAfter("qualify =").substringBefore("accept =")
+        assertOrdered(qualification, "runCatchingCancellable", "enforceAppOwnedAttachmentAcquisitionPolicy")
+        assertOrdered(qualification, "enforceAppOwnedAttachmentAcquisitionPolicy", "presentFailure")
+        assertOrdered(qualification, "presentFailure", "getOrThrow()")
     }
 
     /** Imported and external identities pass through policy-aware account refresh before activation. */

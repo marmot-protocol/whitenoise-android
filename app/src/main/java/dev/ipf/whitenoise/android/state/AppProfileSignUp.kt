@@ -49,7 +49,11 @@ internal class AppProfileSignUp(
                     }.getOrThrow()
                 },
                 qualify = { account ->
-                    appState.marmotIo { enforceAppOwnedAttachmentAcquisitionPolicy(listOf(account.label)) }
+                    runCatchingCancellable {
+                        appState.marmotIo { enforceAppOwnedAttachmentAcquisitionPolicy(listOf(account.label)) }
+                    }.onFailure {
+                        appState.presentFailure(R.string.toast_couldnt_create_identity, "IDENTITY_CREATE", it)
+                    }.getOrThrow()
                 },
                 accept = ::accept,
                 upload = { account, image ->
