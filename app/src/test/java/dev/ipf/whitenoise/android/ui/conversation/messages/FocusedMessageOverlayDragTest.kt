@@ -262,19 +262,23 @@ class FocusedMessageOverlayDragTest {
     }
 
     /**
-     * A stack that fills its frame cannot reach the anchor, and this pins that it is a known gap.
+     * A full menu leaves the stack somewhere to sit, rather than pinning it to the frame's top.
      *
-     * With every action showing there is no slack to place the stack with, so the lifted message
-     * stays where the clamp puts it. #1857 shortens the menu, which is what closes this.
+     * #2679 had to pin the opposite: every action in one column filled the frame, there was no
+     * slack to place the stack with, and the lifted message could not move toward its bubble.
+     * The two-column grid halves the rows, which is what closed it.
      */
     @Test
-    fun aFrameFillingStackCannotReachItsAnchor() {
+    fun aFullMenuLeavesTheStackSomewhereToSit() {
         render(anchorTop = 600, anchorBottom = 680, actionCount = FRAME_FILLING_ACTIONS)
 
         val preview = composeRule.onNodeWithTag(PREVIEW_TAG).fetchSemanticsNode().boundsInRoot
 
-        assertTrue("a frame-filling stack is pinned at the top", stackTop() == 0f)
-        assertTrue("so its lifted message cannot reach the anchor", (preview.top + preview.bottom) / 2 < 640f)
+        assertTrue("a full menu is no longer pinned to the frame top, was " + stackTop(), stackTop() > 0f)
+        assertTrue(
+            "and its lifted message moves down with it",
+            (preview.top + preview.bottom) / 2 > stackTop(),
+        )
     }
 
     private fun stackTop(): Float =

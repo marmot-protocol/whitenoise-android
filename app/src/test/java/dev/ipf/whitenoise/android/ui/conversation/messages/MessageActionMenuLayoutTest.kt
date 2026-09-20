@@ -341,24 +341,22 @@ class MessageActionMenuLayoutTest {
 
     /** Maximum menu uses prototype single column with delete last. */
     @Test
-    fun maximumMenuUsesPrototypeSingleColumnWithDeleteLast() {
+    fun maximumMenuUsesTwoBalancedColumnsWithDeleteLast() {
         renderMenu(fontScale = 1f)
 
-        val reply = bounds("Reply")
         val edit = bounds("Edit")
-        val select = bounds("Select")
         val selectText = bounds("Select text")
+        val reply = bounds("Reply")
         val delete = bounds("Delete")
-
-        assertTrue(selectText.top > edit.top)
-        assertEquals(reply.left, edit.left, 0.5f)
-        assertTrue(reply.top > selectText.top)
-        assertTrue(select.top > reply.top)
-        val save = bounds("Save attachments")
         val info = bounds("Info")
-        assertTrue(info.top > save.top)
-        assertTrue(delete.top > info.top)
-        assertEquals(reply.width, delete.width, 0.5f)
+
+        assertEquals("the first two actions share a row", edit.top, selectText.top, 0.5f)
+        assertTrue("and sit in different columns", selectText.left > edit.left)
+        assertEquals("columns are balanced", edit.width, selectText.width, 0.5f)
+        assertTrue("later actions come below the first row", reply.top > edit.top)
+        assertEquals("the left column stays aligned", edit.left, reply.left, 0.5f)
+        assertEquals("delete ends the grid beside the last action", info.top, delete.top, 0.5f)
+        assertTrue("with delete on the right", delete.left > info.left)
     }
 
     /** A tap on the stack's empty padding dismisses the actions like the scrim does. */
