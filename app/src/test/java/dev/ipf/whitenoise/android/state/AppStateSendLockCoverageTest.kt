@@ -17,11 +17,12 @@ class AppStateSendLockCoverageTest {
     @Test
     fun dictationSendRecordsTiming() {
         val body = appStateFunctionBody("sendDictationTranscriptIfOriginUnchanged")
+        val mountedControllerBody = appStateFunctionBody("sendDictationThroughMountedController")
 
         assertTrue(
-            "Dictation must send through the ordinary controller path, whose text publisher " +
-                "records TEXT_SEND/TEXT_REPLY timing inside marmotIo",
-            "sendConversationText(controller, request.payload, request.onPendingShown)" in body,
+            "Mounted dictation must dispatch through the ordinary controller path",
+            "sendDictationThroughMountedController(liveReply.controller, request)" in body &&
+                "sendConversationText(controller, request.payload, request.onPendingShown)" in mountedControllerBody,
         )
         assertTrue(
             "The ordinary text publisher must record its marmotIo timing section",
