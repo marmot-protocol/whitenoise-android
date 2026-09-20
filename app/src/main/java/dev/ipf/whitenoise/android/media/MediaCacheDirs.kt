@@ -21,9 +21,13 @@ internal fun wipeSessionAttachmentPlaintext(
     cacheRoot: java.io.File,
     onFailure: (String, Throwable) -> Unit,
 ) {
-    listOf(MediaCacheDirs.VOICE, MediaCacheDirs.VIDEO, MediaCacheDirs.COMPOSER_PASTE, MediaCacheDirs.NATIVE_ATTACHMENT_LEASES)
-        .forEach { name ->
-            runCatching { java.io.File(cacheRoot, name).deleteRecursively() }
-                .onFailure { failure -> onFailure(name, failure) }
-        }
+    listOf(
+        MediaCacheDirs.VOICE,
+        MediaCacheDirs.VIDEO,
+        MediaCacheDirs.COMPOSER_PASTE,
+        MediaCacheDirs.NATIVE_ATTACHMENT_LEASES,
+    ).forEach { name ->
+        runCatching { java.io.File(cacheRoot, name).deleteRecursively() }
+            .onFailure { failure -> onFailure(name, failure) }
+    }
 }

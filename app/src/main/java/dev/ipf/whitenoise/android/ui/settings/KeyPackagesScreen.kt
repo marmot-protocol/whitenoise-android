@@ -316,7 +316,10 @@ internal fun KeyPackagesContent(
                     )
                 }
             }
-            itemsIndexed(published, key = { index, entry -> "published-${entry.record.eventIdHex}:$index" }) { _, entry ->
+            itemsIndexed(
+                published,
+                key = { index, entry -> "published-${entry.record.eventIdHex}:$index" },
+            ) { _, entry ->
                 PublishedKeyPackage(
                     entry.record,
                     state.packageActionsEnabled,

@@ -69,6 +69,7 @@ private class MarmotNativeTransferFeed(
  * the legacy WorkManager path because MarmotKit's global automatic flag cannot
  * express White Noise's per-type and per-network matrix.
  */
+@Suppress("ReturnCount", "ThrowsCount") // Native terminal states map directly to explicit demand outcomes.
 internal suspend fun WhiteNoiseAppState.acquireNativeAttachment(
     request: AttachmentTransferRequest,
     priority: AttachmentDownloadPriority,
@@ -99,7 +100,9 @@ internal suspend fun WhiteNoiseAppState.acquireNativeAttachment(
         feed.use { updates ->
             var ready = false
             while (!ready) {
-                val status = updates.next()?.items?.singleOrNull() ?: throw IOException("native attachment transfer closed")
+                val status =
+                    updates.next()?.items?.singleOrNull()
+                        ?: throw IOException("native attachment transfer closed")
                 if (status.state == AttachmentTransferStateFfi.READY) {
                     ready = true
                 }
@@ -117,7 +120,10 @@ internal suspend fun WhiteNoiseAppState.acquireNativeAttachment(
 }
 
 /** Cancels the current native job by its ephemeral reference, when one exists. */
-internal suspend fun WhiteNoiseAppState.cancelNativeAttachment(request: AttachmentTransferRequest): Boolean {
+@Suppress("ReturnCount") // Missing target/status/reference are distinct harmless stale-handle outcomes.
+internal suspend fun WhiteNoiseAppState.cancelNativeAttachment(
+    request: AttachmentTransferRequest,
+): Boolean {
     val target = request.nativeTarget() ?: return false
     val status =
         marmotIo {

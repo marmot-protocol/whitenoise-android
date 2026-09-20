@@ -26,8 +26,16 @@ class NativeAttachmentHistoryTest {
     fun `history lookup rejects a display source or index mismatch`() {
         val entry = entry(index = 4)
 
-        assertNull(entry.matchingAttachment(AttachmentTransferRequest("account", GROUP_ID, "33".repeat(32), 4, SOURCE_ID)))
-        assertNull(entry.matchingAttachment(AttachmentTransferRequest("account", GROUP_ID, DISPLAY_ID, 4, "44".repeat(32))))
+        assertNull(
+            entry.matchingAttachment(
+                AttachmentTransferRequest("account", GROUP_ID, "33".repeat(32), 4, SOURCE_ID),
+            ),
+        )
+        assertNull(
+            entry.matchingAttachment(
+                AttachmentTransferRequest("account", GROUP_ID, DISPLAY_ID, 4, "44".repeat(32)),
+            ),
+        )
         assertNull(entry.matchingAttachment(AttachmentTransferRequest("account", GROUP_ID, DISPLAY_ID, 3, SOURCE_ID)))
     }
 

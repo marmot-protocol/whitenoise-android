@@ -422,7 +422,10 @@ internal fun ChatRow(
                                 draft == null &&
                                     !invitation &&
                                     !empty &&
-                                    (item.selectedPreview == null || item.selectedPreview == SelectedChatPreviewFfi.Message) &&
+                                    (
+                                        item.selectedPreview == null ||
+                                            item.selectedPreview == SelectedChatPreviewFfi.Message
+                                    ) &&
                                     !it.deleted &&
                                     (
                                         it.kind == LEGACY_NOTE_KIND ||
@@ -452,17 +455,6 @@ internal fun ChatRow(
             },
     )
 }
-
-/** Prefers MarmotKit's atomic row preview while retaining old-row compatibility. */
-internal fun chatRowDraftPreviewText(
-    item: ChatListItem,
-    legacyDraft: String?,
-): String? =
-    when (val selected = item.selectedPreview) {
-        is SelectedChatPreviewFfi.Draft -> selected.draft.text
-        null -> legacyDraft
-        else -> null
-    }?.takeIf { it.isNotBlank() }
 
 /** Quiet title-adjacent native status marker; descriptions distinguish muted, timed and ended membership. */
 @Suppress("FunctionNaming")

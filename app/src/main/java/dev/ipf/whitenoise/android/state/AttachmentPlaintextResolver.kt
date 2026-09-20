@@ -19,6 +19,7 @@ internal suspend fun resolveAttachmentCacheAvailability(
         withContext(Dispatchers.Main.immediate) { memoryContains(cacheKey) }
 
 /** Returns bounded memory or an owner-private file lease that the caller must close. */
+@Suppress("ReturnCount") // Fast native hits must close over their own lease before legacy fallback setup.
 internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
     request: AttachmentTransferRequest,
     reference: MediaAttachmentReferenceFfi,

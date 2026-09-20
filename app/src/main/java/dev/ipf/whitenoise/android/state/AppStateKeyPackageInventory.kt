@@ -7,7 +7,10 @@ import dev.ipf.whitenoise.android.core.MarmotClient
 import kotlinx.coroutines.CancellationException
 
 /** Reads typed local provenance first and performs network refresh only on explicit demand. */
-internal suspend fun WhiteNoiseAppState.fetchKeyPackageInventory(refreshFromNetwork: Boolean = false): List<AccountKeyPackageInventoryEntryFfi> {
+@Suppress("TooGenericExceptionCaught") // Preserve loaded UI state for every native/transport failure shape.
+internal suspend fun WhiteNoiseAppState.fetchKeyPackageInventory(
+    refreshFromNetwork: Boolean = false,
+): List<AccountKeyPackageInventoryEntryFfi> {
     val account = activeAccountRef ?: return emptyList()
     return try {
         marmotIo {
@@ -26,5 +29,6 @@ internal suspend fun WhiteNoiseAppState.fetchKeyPackageInventory(refreshFromNetw
 }
 
 /** Compatibility projection for callers that do not render typed provenance. */
+@Suppress("MaxLineLength") // Kept as an expression body by ktlint's formatter.
 internal suspend fun WhiteNoiseAppState.fetchKeyPackages(refreshFromNetwork: Boolean = false): List<AccountKeyPackageFfi> =
     fetchKeyPackageInventory(refreshFromNetwork).map { it.record }

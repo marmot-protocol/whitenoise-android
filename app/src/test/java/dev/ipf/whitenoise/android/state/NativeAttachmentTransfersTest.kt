@@ -19,11 +19,26 @@ class NativeAttachmentTransfersTest {
 
     @Test
     fun `native transfer states preserve terminal and active meaning`() {
-        assertEquals(AttachmentTransferState.Available, status(AttachmentTransferStateFfi.READY).toPresentationState())
-        assertEquals(AttachmentTransferState.Failed, status(AttachmentTransferStateFfi.FAILED).toPresentationState())
-        assertEquals(AttachmentTransferState.Cancelled, status(AttachmentTransferStateFfi.CANCELLED).toPresentationState())
-        assertEquals(AttachmentTransferState.Downloading, status(AttachmentTransferStateFfi.VERIFYING_PLAINTEXT).toPresentationState())
-        assertEquals(AttachmentTransferState.Remote, status(AttachmentTransferStateFfi.POLICY_BLOCKED).toPresentationState())
+        assertEquals(
+            AttachmentTransferState.Available,
+            status(AttachmentTransferStateFfi.READY).toPresentationState(),
+        )
+        assertEquals(
+            AttachmentTransferState.Failed,
+            status(AttachmentTransferStateFfi.FAILED).toPresentationState(),
+        )
+        assertEquals(
+            AttachmentTransferState.Cancelled,
+            status(AttachmentTransferStateFfi.CANCELLED).toPresentationState(),
+        )
+        assertEquals(
+            AttachmentTransferState.Downloading,
+            status(AttachmentTransferStateFfi.VERIFYING_PLAINTEXT).toPresentationState(),
+        )
+        assertEquals(
+            AttachmentTransferState.Remote,
+            status(AttachmentTransferStateFfi.POLICY_BLOCKED).toPresentationState(),
+        )
     }
 
     private fun status(state: AttachmentTransferStateFfi) =

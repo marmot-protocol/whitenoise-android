@@ -82,7 +82,11 @@ class NativeAttachmentLocalAccessTest {
                     queryAssets = { listOf(AttachmentLocalAssetFfi("opaque", 8u)) },
                     readAsset = { _, _, _ ->
                         reads++
-                        if (reads == 1) AttachmentLocalBytesFfi(true, byteArrayOf(1, 2, 3, 4)) else AttachmentLocalBytesFfi(false, byteArrayOf())
+                        if (reads == 1) {
+                            AttachmentLocalBytesFfi(true, byteArrayOf(1, 2, 3, 4))
+                        } else {
+                            AttachmentLocalBytesFfi(false, byteArrayOf())
+                        }
                     },
                 ).open(listOf(target())).single()
 
@@ -103,7 +107,11 @@ class NativeAttachmentLocalAccessTest {
 
     private fun target(index: Int = 0) = NativeAttachmentTarget(DISPLAY_ID, SOURCE_ID, index)
 
-    private fun temporaryRoot(): File = File(System.getProperty("java.io.tmpdir"), "native-attachment-${System.nanoTime()}").apply { mkdirs() }
+    private fun temporaryRoot(): File =
+        File(
+            System.getProperty("java.io.tmpdir"),
+            "native-attachment-${System.nanoTime()}",
+        ).apply { mkdirs() }
 
     private companion object {
         val DISPLAY_ID = "11".repeat(32)

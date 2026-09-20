@@ -16,9 +16,17 @@ internal data class NativeAttachmentHistoryMatch(
 )
 
 /** Returns an accepted history row only when its display, source, and original index agree. */
-internal fun AttachmentEntryFfi.matchingAttachment(request: AttachmentTransferRequest): NativeAttachmentHistoryMatch? {
+@Suppress("ReturnCount") // Each identity guard fails closed before exposing a reference.
+internal fun AttachmentEntryFfi.matchingAttachment(
+    request: AttachmentTransferRequest,
+): NativeAttachmentHistoryMatch? {
     if (!messageIdHex.equals(request.messageIdHex, ignoreCase = true)) return null
-    if (request.sourceMessageIdHex != null && !sourceMessageIdHex.equals(request.sourceMessageIdHex, ignoreCase = true)) return null
+    if (
+        request.sourceMessageIdHex != null &&
+        !sourceMessageIdHex.equals(request.sourceMessageIdHex, ignoreCase = true)
+    ) {
+        return null
+    }
     val accepted = attachment as? MediaAttachmentOutcomeFfi.Accepted ?: return null
     if (accepted.attachmentIndex.toInt() != request.attachmentIndex) return null
     return NativeAttachmentHistoryMatch(
@@ -31,6 +39,7 @@ internal fun AttachmentEntryFfi.matchingAttachment(request: AttachmentTransferRe
  * Searches one stable native history generation. Any mutation or cursor
  * invalidation restarts at the head without mixing generations.
  */
+@Suppress("ReturnCount") // The bounded restart loop returns each terminal native outcome directly.
 internal suspend fun WhiteNoiseAppState.findNativeAttachment(
     request: AttachmentTransferRequest,
     restartBudget: Int = 1,
@@ -57,7 +66,11 @@ private sealed interface NativeAttachmentHistoryRead {
 }
 
 /** Reads pages while retaining the original version handle as the only baseline. */
-private suspend fun WhiteNoiseAppState.findNativeAttachmentGeneration(request: AttachmentTransferRequest): NativeAttachmentHistoryRead {
+// Native handles require lexical close scopes around every outcome.
+@Suppress("LongMethod", "NestedBlockDepth", "ReturnCount")
+private suspend fun WhiteNoiseAppState.findNativeAttachmentGeneration(
+    request: AttachmentTransferRequest,
+): NativeAttachmentHistoryRead {
     val baseline = marmotIo { attachmentHistoryVersion(request.accountRef, request.groupIdHex) }
     var cursor: AttachmentHistoryCursor? = null
     try {
@@ -101,7 +114,9 @@ private suspend fun WhiteNoiseAppState.findNativeAttachmentGeneration(request: A
                                 NativeAttachmentHistoryRead.Restart
                             }
                         }
-                        cursor = page.nextCursor ?: throw IOException("native attachment history omitted its next cursor")
+                        cursor =
+                            page.nextCursor
+                                ?: throw IOException("native attachment history omitted its next cursor")
                     } finally {
                         page.version.close()
                     }

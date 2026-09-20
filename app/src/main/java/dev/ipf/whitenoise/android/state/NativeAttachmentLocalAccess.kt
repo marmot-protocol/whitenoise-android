@@ -70,6 +70,7 @@ internal class NativeAttachmentLocalAccess(
     }
 
     /** Streams one verified native asset without allocating its full plaintext on the heap. */
+    @Suppress("ReturnCount") // Unavailable chunks invalidate and delete the partial lease immediately.
     private suspend fun materialize(asset: AttachmentLocalAssetFfi): AttachmentPlaintext? {
         val reference = asset.reference ?: return null
         require(asset.byteCount <= Long.MAX_VALUE.toULong()) { "native attachment is too large for Android file APIs" }

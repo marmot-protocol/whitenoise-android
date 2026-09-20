@@ -3866,6 +3866,7 @@ class WhiteNoiseAppState private constructor(
      * intentionally the only recovery path used by durable Android work: the
      * WorkManager request stores identity, never a duplicate media reference.
      */
+    @Suppress("MaxLineLength") // Kept as an expression body by ktlint's formatter.
     internal suspend fun resolveAttachmentReference(request: AttachmentTransferRequest): MediaAttachmentReferenceFfi? = findNativeAttachment(request)?.reference
 
     /** Persists durable work and promotes explicit requests above automatic-download policy. */
