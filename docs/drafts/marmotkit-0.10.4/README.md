@@ -5,19 +5,21 @@ runtime pin. This is an execution assessment, not a second product backlog.
 
 ## Status and publication boundary
 
-- Local implementation draft only. No upgrade PR has been opened or branch pushed.
+- The user authorized a published draft PR on 2026-09-20. Keep it draft, based on
+  #2691's branch, pending final-parent reconciliation and the master rebase.
 - Worktree: `/Users/user/Workspace/marmot-protocol/wn-marmotkit-0.10.4`.
 - Branch: `build/marmotkit-0.10.4`.
 - Preparation base: `cf4d1a147855829182221297cf68d5093f153f2a`, the committed local
   rebase of #2691 onto master containing #2688 and #2684. It is NOT #2691's final
   reviewed or merged head. Published #2691 was `f1fc27041` during this assessment.
-- The #2691 worktree has active uncommitted review fixes. None were copied or
-  changed. This draft must inherit their final merged result before publication.
+- At preparation time #2691 had active review fixes. They were not copied or
+  changed. Its live head at draft publication preparation is `2f37d7944`; this
+  older upgrade branch must inherit its final merged result before readiness.
 - The isolated branch now activates the verified 0.10.4 lock. Implementation is
   underway; see `IMPLEMENTATION-STATUS.md` for exact coverage and pending gates.
   The candidate file remains a reproducible copy of the same artifact cohort.
-- User instruction: keep the next PR unpublished until the user merges #2691.
-  This document does not establish a background merge watcher.
+- The explicit draft-publication request supersedes the earlier unpublished hold.
+  It does not authorize merging or establish a background merge watcher.
 
 Related authoritative work: [#2686](https://github.com/marmot-protocol/whitenoise-android/issues/2686)
 for uncontrolled/repeated downloads, [#2045](https://github.com/marmot-protocol/whitenoise-android/issues/2045)
@@ -279,13 +281,14 @@ traffic evidence. Engine budgets are limits, not measurements or proof of that c
    Start from `IMPLEMENTATION-STATUS.md`; update evidence against the rebased code.
 4. Finish the remaining qualification checkpoints as one PR. Recheck the Project 7
    issues and exact-head review threads; close only outcomes actually delivered.
-5. Only then push/open the PR, attach it to the task and Project 7 as In Progress,
-   publish exact-head visual evidence and verify rendered image links. Do not mark
+5. Update the existing draft PR and retarget it to master; keep it attached to the
+   task and Project 7 as In Progress. Refresh exact-head visual evidence and verify
+   rendered image links. Do not mark
    ready until actionable CodeRabbit threads and required tracked baselines are resolved.
 
 See [PR body draft](PR-DRAFT.md). For a new implementation agent:
 
 > Read IMPLEMENTATION-STATUS.md, this README and PR-DRAFT.md, then verify the live #2691 state. Work only in
-> wn-marmotkit-0.10.4, preserve other worktrees, and keep the PR unpublished until
-> #2691 is merged. Use the Android CLI and applicable skills. Adopt exact native
+> wn-marmotkit-0.10.4, preserve other worktrees, and keep the PR draft until
+> #2691 is merged and the upgrade is rebased and qualified. Use the Android CLI and applicable skills. Adopt exact native
 > contracts, preserve user data, and report verification and remaining scope honestly.

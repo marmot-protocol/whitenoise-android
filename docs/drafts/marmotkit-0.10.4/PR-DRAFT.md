@@ -2,12 +2,20 @@
 
 Adopt MarmotKit 0.10.4 with host-managed attachment downloads
 
-## Publication hold
+## Draft publication and merge hold
 
-LOCAL DRAFT ONLY. Do not submit this body until #2691 is merged and the implementation
-has been rebased/transplanted onto that final master. The implementation is saved
-locally; see `IMPLEMENTATION-STATUS.md` for its exact scope and verification limits.
-Refresh every pending verification with final rebased-head evidence before publication.
+The user authorized publishing this work as a **draft** on 2026-09-20, superseding
+the earlier local-only hold. Base this PR on #2691's branch,
+`codex/complete-marmotkit-adoption-20260920`, while that PR remains open.
+
+This saved implementation starts at the older parent checkpoint `cf4d1a147`, not
+#2691's current reviewed head `2f37d7944`. The stacked diff therefore still includes
+older parent commits. **Do not merge or treat it as integration-ready.** After
+#2691 merges, transplant only the upgrade commits onto master, preserve its final
+fixes, retarget this PR to master, and repeat validation. In particular, reconcile
+automatic-to-interactive transfer ownership and native draft recovery after process
+recreation, as well as the fixed slider ordering, cancellation and terminal retries.
+See `IMPLEMENTATION-STATUS.md` for implementation and qualification boundaries.
 
 ## Draft summary
 
@@ -35,16 +43,18 @@ acceptance criteria are satisfied.
 - Candidate API signature: 326 types / 322 checksums / 5 helper declarations.
 - Account schema migrations: 87–89. Backups required; downgrade unsupported.
 
-## Verification to fill before publication
+## Verification and remaining readiness gates
 
 - Final source head and merged #2691 base: pending.
 - Active lock, prepared artifact and generated signature agreement: locally verified;
   recheck after rebase.
-- Both-flavor consumer compilation and regression tests: pending.
+- Saved source checkpoint: both-flavor compilation, focused Play regression tests
+  (54 tests), static analysis and the complete offline fast-gate task set passed.
+  This is not the full unit/CI matrix or verification of a rebased implementation.
 - Counted transfer/cache/upgrade tests: pending.
 - In-place emulator upgrade, restart and retained-local-media evidence: pending.
-- Manual test guide/inventory validation and completion gate: pending.
-- Exact-head Roborazzi baseline links and rendered evidence: pending.
+- Manual test guide/inventory validation: passed; repeat after rebase.
+- Tracked expiry baseline: `app/src/test/snapshots/chat_row_expired_selected_preview.png`.
 - Native/runtime/release CI: pending PR publication.
 
 ## Boundaries

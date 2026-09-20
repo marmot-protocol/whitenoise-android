@@ -1,6 +1,14 @@
 # Local 0.10.4 implementation checkpoint
 
-Updated 2026-09-20. **Unpublished draft; do not merge or call release-qualified.**
+Updated 2026-09-20. **Draft publication authorized; do not merge or call release-qualified.**
+
+Publication update: the user now requests a draft PR stacked against #2691's branch,
+`codex/complete-marmotkit-adoption-20260920` (live head `2f37d7944` at publication
+preparation). This supersedes the earlier local-only instruction below. Source is
+unchanged from the saved implementation; it has NOT been rebased onto that new
+parent. Parent reconciliation, final master rebase, complete regression checks and
+device/byte-count qualification remain required before readiness. The older stack
+base below is the exclusion boundary for transplanting only the upgrade commits.
 
 Worktree: `/Users/user/Workspace/marmot-protocol/wn-marmotkit-0.10.4`.
 Branch: `build/marmotkit-0.10.4`.
@@ -10,8 +18,8 @@ Implementation checkpoint: `47c604377`.
 Last live check: #2691 remains OPEN at `8cb10a9d21773695a3e17648f1148f25a4c970bd`;
 master is `2226fbc2654e38c92bfc90b8477059cf259bb94f`. The newer #2691 fixes are not
 silently included in this older preparation base.
-The user explicitly asked to consume the bindings now and keep the work locally;
-do not push/open a PR until #2691 is merged and this branch has been rebased.
+Originally the user asked to consume the bindings and keep the work locally; that
+publication hold is superseded by the explicit draft-PR request above.
 Do not change the concurrently active `wn-complete-marmotkit-adoption` checkout.
 
 ## Implemented draft surface
@@ -90,7 +98,7 @@ Do not change the concurrently active `wn-complete-marmotkit-adoption` checkout.
 - No APK install, emulator migration, byte-count experiment, or personal-device
   operation has been performed. No app data was cleared or uninstalled.
 
-## Required before publication
+## Required before marking the draft ready
 
 For reproducibility, the final-source local Gradle invocation used JDK 21 at
 `/Users/user/.gradle/jdks/eclipse_adoptium-21-x86_64-os_x.2/jdk-21.0.7+6/Contents/Home`
