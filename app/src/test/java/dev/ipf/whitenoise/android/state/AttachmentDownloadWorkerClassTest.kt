@@ -128,7 +128,9 @@ class AttachmentDownloadWorkerClassTest {
                         runAttemptCount = 0,
                     )
 
+                val startedAt = currentTime
                 assertEquals(Result.failure(), worker.doWork())
+                assertEquals(startedAt, currentTime)
                 assertEquals(1, completedBodies)
                 assertFalse(intents.isInteractive(request))
                 // A failed retention result must not be stored as acquired,
@@ -154,7 +156,7 @@ class AttachmentDownloadWorkerClassTest {
         }
 
     @Test
-    fun nonRetentionAfterTheLastAttemptHasNoAdditionalHold() =
+    fun nonRetentionAfterTheLastAttemptFailsImmediately() =
         runTest {
             val worker = buildWorkerWithDownloadOverride({ _, _, _ -> false }, runAttemptCount = 1)
             val startedAt = currentTime
