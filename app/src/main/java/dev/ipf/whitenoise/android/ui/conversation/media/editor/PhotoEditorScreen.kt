@@ -532,6 +532,9 @@ private fun PhotoEditorCanvas(
     val density = LocalDensity.current
     val handleRadiusPx = with(density) { 24.dp.toPx() }
     var activeCropCorner by remember { mutableStateOf<Int?>(null) }
+    // A drag that took hold of the rectangle's inside rather than a corner, with where it began, so
+    // the move is measured from the press and not accumulated frame by frame.
+    var cropDragOrigin by remember { mutableStateOf<Pair<NormalizedRect, NormalizedPoint>?>(null) }
     var transientCrop by remember { mutableStateOf<NormalizedRect?>(null) }
     var transientStroke by remember { mutableStateOf<List<NormalizedPoint>>(emptyList()) }
     val canvasDescription = stringResource(R.string.photo_editor_image_description)
@@ -569,7 +572,20 @@ private fun PhotoEditorCanvas(
                     detectDragGestures(
                         onDragStart = { position ->
                             if (cropMode) {
-                                activeCropCorner = nearestCropCorner(position, state.recipe.crop, geometry, viewTransform, handleRadiusPx)
+                                activeCropCorner =
+                                    nearestCropCorner(position, state.recipe.crop, geometry, viewTransform, handleRadiusPx)
+                                // Missing a corner used to leave the drag doing nothing at all. A press
+                                // inside the rectangle moves it instead, so every crop drag has an effect.
+                                cropDragOrigin =
+                                    if (activeCropCorner == null) {
+                                        val start =
+                                            geometry.viewToOriented(EditorPoint(position.x, position.y), viewTransform).clamped()
+                                        state.recipe.crop
+                                            .takeIf { it.contains(start) }
+                                            ?.let { it to start }
+                                    } else {
+                                        null
+                                    }
                             } else {
                                 strokePoints.clear()
                                 strokePoints += geometry.viewToOriented(EditorPoint(position.x, position.y), viewTransform).clamped()
@@ -581,7 +597,16 @@ private fun PhotoEditorCanvas(
                             val point = geometry.viewToOriented(EditorPoint(change.position.x, change.position.y), viewTransform).clamped()
                             if (cropMode) {
                                 activeCropCorner?.let { corner ->
-                                    transientCrop = movedCropCorner(state.recipe.crop, corner, point, minimumCropFraction(sourceInfo.orientedSize))
+                                    transientCrop =
+                                        movedCropCorner(
+                                            state.recipe.crop,
+                                            corner,
+                                            point,
+                                            minimumCropFraction(sourceInfo.orientedSize),
+                                        )
+                                }
+                                cropDragOrigin?.let { (startCrop, startPoint) ->
+                                    transientCrop = startCrop.translated(point.x - startPoint.x, point.y - startPoint.y)
                                 }
                             } else {
                                 strokePoints += point
@@ -592,12 +617,14 @@ private fun PhotoEditorCanvas(
                             transientCrop?.let(onFreeCrop)
                             if (strokePoints.isNotEmpty()) onStroke(strokePoints)
                             activeCropCorner = null
+                            cropDragOrigin = null
                             transientCrop = null
                             transientStroke = emptyList()
                             strokePoints.clear()
                         },
                         onDragCancel = {
                             activeCropCorner = null
+                            cropDragOrigin = null
                             transientCrop = null
                             transientStroke = emptyList()
                             strokePoints.clear()

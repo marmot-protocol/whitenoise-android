@@ -42,6 +42,24 @@ internal data class NormalizedRect(
     val height: Float
         get() = bottom - top
 
+    /** True when [point] falls inside this rectangle, which is what a drag takes hold of to move it. */
+    fun contains(point: NormalizedPoint): Boolean = point.x in left..right && point.y in top..bottom
+
+    /**
+     * The same rectangle moved by ([dx], [dy]), keeping its size and staying on the image.
+     *
+     * The delta is clamped rather than the result, so a drag that runs past an edge slides along it
+     * instead of shrinking the crop or stopping dead.
+     */
+    fun translated(
+        dx: Float,
+        dy: Float,
+    ): NormalizedRect {
+        val clampedDx = dx.coerceIn(-left, 1f - right)
+        val clampedDy = dy.coerceIn(-top, 1f - bottom)
+        return NormalizedRect(left + clampedDx, top + clampedDy, right + clampedDx, bottom + clampedDy)
+    }
+
     companion object {
         val Full = NormalizedRect(0f, 0f, 1f, 1f)
 
