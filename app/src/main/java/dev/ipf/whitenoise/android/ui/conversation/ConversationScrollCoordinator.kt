@@ -155,20 +155,59 @@ internal data class ConversationInitialAnchorLayout(
         get() = viewportHeight > 0 && targetItemSize != null
 }
 
-/** Measured tail geometry used to settle same-row height changes. */
+/** Measured tail and viewport geometry used to settle row or bottom-input changes. */
 internal data class ConversationTailLayout(
     val lastRowHeightPx: Int?,
     val tailOffsetPx: Int?,
     val tailSizePx: Int?,
     val viewportEndOffsetPx: Int,
+    val viewportStartOffsetPx: Int = 0,
+    val beforeContentPaddingPx: Int = 0,
+    val viewportSizePx: Int = viewportEndOffsetPx - viewportStartOffsetPx,
 ) {
     val isReady: Boolean
         get() =
             lastRowHeightPx != null &&
                 tailOffsetPx != null &&
                 tailSizePx != null &&
-                viewportEndOffsetPx > 0
+                viewportEndOffsetPx > 0 &&
+                viewportEndOffsetPx > viewportStartOffsetPx &&
+                viewportSizePx > 0
+
+    /**
+     * In the reversed transcript, before-content padding occupies the
+     * composer-adjacent scroll-axis start. The row clears that inset only at
+     * [viewportStartOffsetPx] + [beforeContentPaddingPx], normally offset zero.
+     */
+    val tailClearsViewportStart: Boolean
+        get() =
+            isReady &&
+                (
+                    requireNotNull(tailOffsetPx) >= viewportStartOffsetPx + beforeContentPaddingPx ||
+                        requireNotNull(tailSizePx) >= viewportSizePx
+                )
+
+    val bottomGeometry: ConversationTailBottomGeometry
+        get() =
+            ConversationTailBottomGeometry(
+                viewportStartOffsetPx = viewportStartOffsetPx,
+                viewportEndOffsetPx = viewportEndOffsetPx,
+                beforeContentPaddingPx = beforeContentPaddingPx,
+                viewportSizePx = viewportSizePx,
+            )
 }
+
+internal enum class ConversationTailSettleTrigger {
+    RowHeight,
+    BottomGeometry,
+}
+
+internal data class ConversationTailBottomGeometry(
+    val viewportStartOffsetPx: Int,
+    val viewportEndOffsetPx: Int,
+    val beforeContentPaddingPx: Int,
+    val viewportSizePx: Int,
+)
 
 /**
  * Baselines layout state at the hidden initial anchor. Startup materialization
@@ -479,20 +518,25 @@ internal class ConversationScrollCoordinator(
     }
 
     /**
-     * Keeps the physical tail pinned while an existing last row is remeasured.
+     * Keeps the physical tail pinned while its row or viewport is remeasured.
      *
      * Reaction projections can arrive before their chip's final Compose
      * measurement. A single next-frame scroll can therefore use the old list
-     * extent. This bounded settle follows the tail until the measured row and
-     * viewport geometry remain stable, then applies one final correction. The
-     * coordinator's normal command ownership makes the chase cancellable by a
-     * drag, navigation, conversation replacement, or disposal.
+     * extent. Accepted sends can likewise clear dictation/composer chrome only
+     * after the optimistic row appears. This bounded settle follows the tail
+     * until the measured row and viewport geometry remain stable, then applies
+     * one final correction. The coordinator's normal command ownership makes
+     * the chase cancellable by a drag, navigation, conversation replacement,
+     * or disposal.
      */
     suspend fun settleTailAfterLayoutChange(
         resolveTailIndex: () -> Int,
         captureLayout: () -> ConversationTailLayout,
         reason: ConversationScrollReason = ConversationScrollReason.ReactionLayout,
         maxSettleFrames: Int = DEFAULT_TAIL_LAYOUT_SETTLE_FRAMES,
+        minimumSettleFrames: Int = MIN_TAIL_LAYOUT_SETTLE_FRAMES,
+        settleTrigger: ConversationTailSettleTrigger = ConversationTailSettleTrigger.RowHeight,
+        requireTailClearance: Boolean = false,
         awaitFrame: suspend () -> Unit = { withFrameNanos { } },
     ): Boolean {
         if (!isFollowingTail || mode !is ConversationScrollMode.FollowingTail) return false
@@ -502,8 +546,10 @@ internal class ConversationScrollCoordinator(
             resultingMode = ConversationScrollMode.FollowingTail,
         ) {
             var previousLayout: ConversationTailLayout? = null
-            var baselineRowHeightPx = captureLayout().lastRowHeightPx
-            var observedRowHeightChange = false
+            val baselineLayout = captureLayout()
+            var baselineRowHeightPx = baselineLayout.lastRowHeightPx
+            val baselineBottomGeometry = baselineLayout.bottomGeometry
+            var observedSettleTrigger = false
             var stableFrames = 0
             var frame = 0
             scrollToTail(resolveTailIndex())
@@ -513,11 +559,18 @@ internal class ConversationScrollCoordinator(
                 val currentRowHeightPx = currentLayout.lastRowHeightPx
                 if (baselineRowHeightPx == null) {
                     baselineRowHeightPx = currentRowHeightPx
-                } else if (currentRowHeightPx != null && currentRowHeightPx != baselineRowHeightPx) {
-                    observedRowHeightChange = true
+                }
+                if (
+                    currentLayout.observesSettleTrigger(
+                        trigger = settleTrigger,
+                        baselineRowHeightPx = baselineRowHeightPx,
+                        baselineBottomGeometry = baselineBottomGeometry,
+                    )
+                ) {
+                    observedSettleTrigger = true
                 }
                 stableFrames =
-                    if (currentLayout.isReady && currentLayout == previousLayout) {
+                    if (currentLayout.isStableAfter(previousLayout, settleTrigger)) {
                         stableFrames + 1
                     } else {
                         0
@@ -526,15 +579,60 @@ internal class ConversationScrollCoordinator(
                 scrollToTail(resolveTailIndex())
                 frame++
                 if (
-                    observedRowHeightChange &&
-                    frame >= MIN_TAIL_LAYOUT_SETTLE_FRAMES &&
-                    stableFrames >= REQUIRED_STABLE_TAIL_LAYOUT_FRAMES
+                    currentLayout.canFinishSettle(
+                        observedSettleTrigger = observedSettleTrigger,
+                        frame = frame,
+                        minimumSettleFrames = minimumSettleFrames,
+                        stableFrames = stableFrames,
+                        requireTailClearance = requireTailClearance,
+                    )
                 ) {
                     break
                 }
             }
         }
     }
+
+    /** Preserves reaction geometry; an unready layout or absent prior frame is not stable. */
+    private fun ConversationTailLayout.isStableAfter(
+        previous: ConversationTailLayout?,
+        trigger: ConversationTailSettleTrigger,
+    ): Boolean {
+        if (!isReady || previous == null) return false
+        return when (trigger) {
+            ConversationTailSettleTrigger.RowHeight ->
+                lastRowHeightPx == previous.lastRowHeightPx &&
+                    tailOffsetPx == previous.tailOffsetPx &&
+                    tailSizePx == previous.tailSizePx &&
+                    viewportEndOffsetPx == previous.viewportEndOffsetPx
+            ConversationTailSettleTrigger.BottomGeometry -> this == previous
+        }
+    }
+
+    /** Separates trigger-specific change detection from the bounded settle loop. */
+    private fun ConversationTailLayout.observesSettleTrigger(
+        trigger: ConversationTailSettleTrigger,
+        baselineRowHeightPx: Int?,
+        baselineBottomGeometry: ConversationTailBottomGeometry,
+    ): Boolean =
+        when (trigger) {
+            ConversationTailSettleTrigger.RowHeight ->
+                lastRowHeightPx != null && baselineRowHeightPx != null && lastRowHeightPx != baselineRowHeightPx
+            ConversationTailSettleTrigger.BottomGeometry -> bottomGeometry != baselineBottomGeometry
+        }
+
+    /** Requires the trigger, stable geometry, frame budget and optional composer clearance together. */
+    private fun ConversationTailLayout.canFinishSettle(
+        observedSettleTrigger: Boolean,
+        frame: Int,
+        minimumSettleFrames: Int,
+        stableFrames: Int,
+        requireTailClearance: Boolean,
+    ): Boolean =
+        observedSettleTrigger &&
+            frame >= minimumSettleFrames.coerceAtLeast(1) &&
+            stableFrames >= REQUIRED_STABLE_TAIL_LAYOUT_FRAMES &&
+            (!requireTailClearance || tailClearsViewportStart)
 
     /** Runs an explicit jump under the shared latest-wins scroll-command fence. */
     suspend fun programmaticJump(

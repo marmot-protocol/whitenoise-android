@@ -875,6 +875,10 @@ internal fun ConversationScreen(
                 )
             }
         }
+    var acceptedSendRevealedTranscript by
+        remember(controller, notificationOpenRequestId) { mutableStateOf(false) }
+    val transcriptPresentationCommitted =
+        transcriptVisibilityCommitted || acceptedSendRevealedTranscript
     // A completed empty page has no row to anchor. Commit that presentation
     // directly, but keep every loading, error, ownership, and roster gate.
     val authoritativeEmptyPresentationReady =
@@ -896,7 +900,7 @@ internal fun ConversationScreen(
     val transcriptReadyToReveal =
         conversationTranscriptReadyToReveal(
             initialPresentationCommitted =
-                transcriptVisibilityCommitted || authoritativeEmptyPresentationReady,
+                transcriptPresentationCommitted || authoritativeEmptyPresentationReady,
             notificationOpenRequestId = notificationOpenRequestId,
             transcriptPresentationKnown = controller.hasKnownTranscriptPresentation,
         )
@@ -1483,7 +1487,22 @@ internal fun ConversationScreen(
     /** Reveals the optimistic row using controller state published before the acceptance callback. */
     fun revealSentMessage() {
         scope.launch {
-            scrollCoordinator.revealSentAtLiveTail(controller)
+            scrollCoordinator.revealSentAtLiveTail(
+                controller = controller,
+                captureLayout = { tailIndex ->
+                    val layoutInfo = timelineViewport.readingLayoutInfo()
+                    val tailInfo = layoutInfo.visibleItemsInfo.firstOrNull { it.index == tailIndex }
+                    ConversationTailLayout(
+                        lastRowHeightPx = tailInfo?.size,
+                        tailOffsetPx = tailInfo?.offset,
+                        tailSizePx = tailInfo?.size,
+                        viewportStartOffsetPx = layoutInfo.viewportStartOffset,
+                        viewportEndOffsetPx = layoutInfo.viewportEndOffset,
+                        beforeContentPaddingPx = layoutInfo.beforeContentPadding,
+                        viewportSizePx = layoutInfo.viewportSize.height,
+                    )
+                },
+            )
         }
     }
 
@@ -2974,7 +2993,10 @@ internal fun ConversationScreen(
                         lastRowHeightPx = navigationState.timelineItemHeightsPx[lastMessageId],
                         tailOffsetPx = tailInfo?.offset,
                         tailSizePx = tailInfo?.size,
+                        viewportStartOffsetPx = layoutInfo.viewportStartOffset,
                         viewportEndOffsetPx = layoutInfo.viewportEndOffset,
+                        beforeContentPaddingPx = layoutInfo.beforeContentPadding,
+                        viewportSizePx = layoutInfo.viewportSize.height,
                     )
                 },
             )
@@ -3506,7 +3528,10 @@ internal fun ConversationScreen(
                                 attachmentSendPending = false
                                 onResult(false)
                             },
-                            onAfterSend = { revealSentMessage() },
+                            onAfterSend = {
+                                acceptedSendRevealedTranscript = true
+                                revealSentMessage()
+                            },
                         )
                         dispatched = true
                     } finally {
@@ -3514,6 +3539,7 @@ internal fun ConversationScreen(
                     }
                 },
                 onAfterSend = {
+                    acceptedSendRevealedTranscript = true
                     revealSentMessage()
                 },
                 onPickFromGallery = {
