@@ -214,11 +214,10 @@ class ConversationTtsFollowComposeTest {
 
         restorationTester.emulateSavedInstanceStateRestore()
         composeRule.runOnIdle {
-            val passage = requireNotNull(state.passage)
             state =
                 (state as TtsState.Speaking).copy(
-                    sentenceIndexWithinMessage = 2,
-                    passage = passage.copy(sentenceIndex = 2),
+                    messageProgressFraction = 0.5f,
+                    messageProgressGeneration = state.messageProgressGeneration + 1,
                 )
         }
 
