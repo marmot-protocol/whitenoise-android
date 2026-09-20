@@ -386,7 +386,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/AccountSwitcher.kt",
         "anchor": "fun AccountAvatarButton(",
         "test_ids": [
-          "ACC-001"
+          "ACC-001",
+          "NAV-004"
         ]
       },
       {
@@ -3301,7 +3302,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
         "anchor": "fun FullScreenMediaViewer(",
         "test_ids": [
-          "MED-001"
+          "MED-001",
+          "MED-015"
         ]
       },
       {
@@ -3309,7 +3311,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
         "anchor": "fun MediaViewerFrame(",
         "test_ids": [
-          "MED-001"
+          "MED-001",
+          "MED-015"
         ]
       },
       {
@@ -3334,7 +3337,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
         "anchor": "fun ViewerPage(",
         "test_ids": [
-          "MED-001"
+          "MED-001",
+          "MED-015"
         ]
       },
       {
@@ -4096,6 +4100,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleFrame.kt",
         "anchor": "fun MediaSupplementEnvelope(",
         "test_ids": [
+          "MED-003",
           "MED-017"
         ]
       },

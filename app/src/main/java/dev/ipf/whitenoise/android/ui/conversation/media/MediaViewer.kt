@@ -653,6 +653,12 @@ internal fun MediaViewerFrame(
     var moreExpanded by remember(actionOwner) { mutableStateOf(false) }
     var bottomChromeHeight by remember { mutableStateOf(0.dp) }
     val density = LocalDensity.current
+    val snackbarInsetSides =
+        if (chromeVisible) {
+            WindowInsetsSides.Horizontal
+        } else {
+            WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal
+        }
     LaunchedEffect(chromeVisible) {
         if (!chromeVisible) moreExpanded = false
     }
@@ -784,7 +790,7 @@ internal fun MediaViewerFrame(
                 Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = if (chromeVisible) bottomChromeHeight else 0.dp)
-                    .windowInsetsPadding(contentWindowInsets.only(WindowInsetsSides.Horizontal)),
+                    .windowInsetsPadding(contentWindowInsets.only(snackbarInsetSides)),
             snackbar = { SwipeDismissibleSnackbar(it) },
         )
     }
@@ -886,15 +892,7 @@ internal fun ViewerPage(
     val viewerGestureModifier =
         Modifier
             .fillMaxSize()
-            .viewerTapGestureModifier(
-                gestureKey = pageKey,
-                onSingleTap = { latestOnChromeToggle() },
-                onDoubleTap = {
-                    val reset = resetViewerTransform()
-                    latestOnScaleChange(reset.scale)
-                    latestOnOffsetChange(reset.offset)
-                },
-            ).pointerInput(pageKey) {
+            .pointerInput(pageKey) {
                 awaitEachGesture {
                     do {
                         val event = awaitPointerEvent()
@@ -932,7 +930,20 @@ internal fun ViewerPage(
                 translationY = offset.y,
             )
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .viewerTapGestureModifier(
+                    gestureKey = pageKey,
+                    onSingleTap = { latestOnChromeToggle() },
+                    onDoubleTap = {
+                        val reset = resetViewerTransform()
+                        latestOnScaleChange(reset.scale)
+                        latestOnOffsetChange(reset.offset)
+                    },
+                ).testTag(MEDIA_VIEWER_PAGE_GESTURE_TAG),
+    ) {
         when (val current = presentation) {
             is DecodedAttachmentPresentation.Static ->
                 Image(

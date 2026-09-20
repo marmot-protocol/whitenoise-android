@@ -20,6 +20,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -177,6 +178,39 @@ class MediaViewerScreenshotTest {
         composeRule.onNodeWithTag(MEDIA_VIEWER_TOP_CHROME_TAG).assertIsDisplayed()
         composeRule.onNodeWithTag(MEDIA_VIEWER_BOTTOM_CHROME_TAG).assertIsDisplayed()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/media_viewer_chrome_restored.png")
+    }
+
+    /** Hidden chrome leaves snackbar feedback above the synthetic navigation safe area. */
+    @Test
+    fun hiddenChromeSnackbarStaysAboveBottomSafeArea() {
+        val bottomInset = 48.dp
+        val snackbarText = "Image saved"
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                val snackbarHostState = remember { SnackbarHostState() }
+                LaunchedEffect(snackbarHostState) {
+                    snackbarHostState.showSnackbar(snackbarText)
+                }
+                MediaViewerFrame(
+                    senderLabel = "Alex",
+                    recordedAtLabel = "Sep 20, 2026, 7:05 PM",
+                    onDismiss = {},
+                    onSave = {},
+                    onShare = {},
+                    snackbarHostState = snackbarHostState,
+                    contentWindowInsets = WindowInsets(bottom = bottomInset),
+                    modifier = Modifier.fillMaxSize(),
+                    chromeVisible = false,
+                ) {}
+            }
+        }
+
+        val snackbarBounds =
+            composeRule
+                .onNodeWithText(snackbarText)
+                .assertIsDisplayed()
+                .getUnclippedBoundsInRoot()
+        assertTrue(snackbarBounds.bottom <= 780.dp - bottomInset)
     }
 
     /** Directly opened video offers save and share. */

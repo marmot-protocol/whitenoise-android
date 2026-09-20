@@ -6,6 +6,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 
 internal const val MEDIA_VIEWER_TOP_CHROME_TAG = "conversation.media.viewer.topChrome"
 internal const val MEDIA_VIEWER_BOTTOM_CHROME_TAG = "conversation.media.viewer.bottomChrome"
+internal const val MEDIA_VIEWER_PAGE_GESTURE_TAG = "conversation.media.viewer.pageGesture"
 
 /** Arbitrates image single-tap chrome toggles against double-tap transform resets. */
 internal fun Modifier.viewerTapGestureModifier(
