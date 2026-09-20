@@ -74,6 +74,7 @@ class SignUpProfileDraftSubmissionTest {
                             creations++
                             AccountSummaryFfi("new", "11".repeat(32), true, false, false, true)
                         },
+                        qualify = {},
                         accept = { account, old ->
                             owner = old.copy(accountRef = account.label)
                             true
@@ -115,6 +116,7 @@ class SignUpProfileDraftSubmissionTest {
                             creations++
                             error("Offline must not create")
                         },
+                        qualify = {},
                         accept = { _, _ -> false },
                         upload = { _, _ -> error("Offline must not upload") },
                         publish = { _, _ -> false },

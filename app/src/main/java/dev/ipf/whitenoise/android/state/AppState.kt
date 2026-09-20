@@ -4237,7 +4237,10 @@ class WhiteNoiseAppState private constructor(
                 configure = { runtime ->
                     appStateDebug { "bootstrap root=${runtime.rootPath}" }
                     startupPerformance.stage(PerformancePhase.PRIVACY_RUNTIME_CONFIGURATION) {
-                        withContext(Dispatchers.IO) { runtime.marmot.configurePrivacyRuntime() }
+                        withContext(Dispatchers.IO) {
+                            runtime.marmot.configurePrivacyRuntime()
+                            runtime.marmot.enforceAppOwnedAttachmentAcquisitionForKnownAccounts()
+                        }
                     }
                 },
                 start = { runtime ->
@@ -4427,20 +4430,8 @@ class WhiteNoiseAppState private constructor(
     /** Discards only an unsubmitted form or stale route; native accepted work remains intact. */
     internal fun dismissProfileSignUp(): Boolean = profileSignUp.dismiss()
 
-    suspend fun createIdentity() {
-        val startedAt = SystemClock.elapsedRealtime()
-        try {
-            val summary = marmotIo { createIdentity(MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays) }
-            activateCreatedIdentity(summary)
-            phase = AppPhase.Ready
-            presentTransient(R.string.toast_identity_created)
-            appStateDebug { "identity engine setup returned in ${SystemClock.elapsedRealtime() - startedAt}ms" }
-            launchIdentityPostCreateWarmup(summary)
-        } catch (error: Throwable) {
-            rethrowIfCancellation(error)
-            presentFailure(R.string.toast_couldnt_create_identity, "IDENTITY_CREATE", error)
-        }
-    }
+    /** Creates and contains a native identity before publishing it as the active Android account. */
+    suspend fun createIdentity() = profileSignUp.createIdentityWithoutProfile()
 
     /** Activates a newly created identity and invalidates older account-list reads atomically. */
     private fun activateCreatedIdentity(summary: AccountSummaryFfi) {
@@ -4548,7 +4539,9 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Qualifies a returned import receipt before Android publishes or activates the account. */
     private suspend fun activateImportedIdentity(summary: AccountSummaryFfi) {
+        marmotIo { enforceAppOwnedAttachmentAcquisitionPolicy(listOf(summary.label)) }
         refreshAccounts()
         setActiveAccount(summary.label)
         refreshLocalNotificationSettings()
@@ -4627,6 +4620,7 @@ class WhiteNoiseAppState private constructor(
                     amberSigner.buildSigner(pubkeyHex),
                 )
             }
+            marmotIo { enforceAppOwnedAttachmentAcquisitionPolicy(listOf(summary.label)) }
             refreshAccounts()
             setActiveAccount(summary.label)
             refreshLocalNotificationSettings()
@@ -4667,7 +4661,7 @@ class WhiteNoiseAppState private constructor(
     /** Publishes the newest engine account snapshot and rejects older list reads. */
     private suspend fun refreshAccountSnapshot(): List<AccountSummaryFfi> {
         val requestToken = accountListLifetime.advance()
-        val refreshedAccounts = marmotIo(MarmotTraceSection.ACCOUNT_LIST) { listAccounts() }
+        val refreshedAccounts = marmotIo(MarmotTraceSection.ACCOUNT_LIST) { listAccountsWithAppAttachmentPolicy() }
         val setupAccounts = accountSetup.accountsState(refreshedAccounts)
         val bubbleColorMigrationSucceeded =
             withContext(Dispatchers.IO) {
@@ -6145,7 +6139,8 @@ class WhiteNoiseAppState private constructor(
     suspend fun refreshSecurityPrivacySettings() {
         diagnostics.refresh(marmot())
         auditLogSettingsMutex.withLock {
-            auditLogSettings = runCatchingCancellable { marmotIo { auditLogSettings() } }.getOrNull()
+            // A failed re-read keeps what is on screen rather than presenting a settled choice as off.
+            runCatchingCancellable { marmotIo { auditLogSettings() } }.getOrNull()?.let { auditLogSettings = it }
         }
     }
 
@@ -6203,38 +6198,38 @@ class WhiteNoiseAppState private constructor(
         }
 
     /**
-     * Copies current audit files into the app cache for a user-confirmed share.
-     * The engine paths and file names are never logged or included in failures.
+     * Archives the current audit files into the app cache for a user-confirmed export.
+     *
+     * The engine paths, file names and archive entries are never logged or included in failures.
+     * Returns null when there is nothing to export or the archive could not be prepared in full;
+     * a partial archive is never returned, so the caller cannot present one as a complete export.
      */
     @Suppress("ReturnCount") // Each engine/cache failure is a distinct fail-closed export outcome.
-    suspend fun prepareAuditLogsForSharing(): List<java.io.File> {
+    suspend fun prepareAuditLogArchiveForExport(): java.io.File? {
         val sourcePaths =
             runCatching { marmotIo { auditLogFiles().map { it.path } } }
                 .getOrElse {
                     if (it is CancellationException) throw it
                     present(R.string.toast_couldnt_export_audit_logs)
-                    return emptyList()
+                    return null
                 }
         if (sourcePaths.isEmpty()) {
             presentTransient(R.string.toast_no_audit_logs_to_export)
-            return emptyList()
+            return null
         }
 
-        val staged =
-            runCatchingCancellable {
-                withContext(Dispatchers.IO) {
-                    prepareAuditLogShareFiles(
-                        cacheDir = appContext.cacheDir,
-                        allowedSourceRoot = java.io.File(appContext.filesDir, "Marmot"),
-                        sourcePaths = sourcePaths,
-                    )
-                }
-            }.getOrElse {
-                present(R.string.toast_couldnt_export_audit_logs)
-                return emptyList()
+        return runCatchingCancellable {
+            withContext(Dispatchers.IO) {
+                prepareAuditLogArchive(
+                    cacheDir = appContext.cacheDir,
+                    allowedSourceRoot = java.io.File(appContext.filesDir, "Marmot"),
+                    sourcePaths = sourcePaths,
+                )
             }
-        if (staged.isEmpty()) present(R.string.toast_couldnt_export_audit_logs)
-        return staged
+        }.getOrElse {
+            present(R.string.toast_couldnt_export_audit_logs)
+            return null
+        }
     }
 
     /**

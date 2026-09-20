@@ -107,7 +107,7 @@ class LoadFailurePlacementTest {
         assertTrue("seededTailAlignmentCommitted = seededTailAlignmentCommitted" in transcriptVisibilityOwner)
         assertTrue(
             "initialPresentationCommitted =\n" +
-                "                transcriptVisibilityCommitted || authoritativeEmptyPresentationReady" in screen,
+                "                transcriptPresentationCommitted || authoritativeEmptyPresentationReady" in screen,
         )
         assertTrue("if (!transcriptReadyToReveal) hideFromAccessibility()" in screen)
     }

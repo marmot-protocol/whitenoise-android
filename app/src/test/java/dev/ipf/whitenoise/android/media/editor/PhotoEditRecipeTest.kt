@@ -184,4 +184,72 @@ class PhotoEditRecipeTest {
             val position = if (count == 1) 0f else index.toFloat() / (count - 1)
             NormalizedPoint(position, position)
         }
+
+    /** A drag inside the crop moves it without changing its size. */
+    @Test
+    fun translatingKeepsTheCropSize() {
+        val crop = NormalizedRect(0.1f, 0.2f, 0.5f, 0.6f)
+
+        val moved = crop.translated(0.2f, 0.1f)
+
+        assertEquals(0.3f, moved.left, 1e-6f)
+        assertEquals(0.3f, moved.top, 1e-6f)
+        assertEquals(crop.width, moved.width, 1e-6f)
+        assertEquals(crop.height, moved.height, 1e-6f)
+    }
+
+    /**
+     * A drag past an edge slides along it rather than stopping or shrinking.
+     *
+     * The delta is clamped, not the result: clamping the result would let the far edge keep moving
+     * and quietly resize the crop the user was only trying to reposition.
+     */
+    @Test
+    fun translatingPastAnEdgeSlidesAlongIt() {
+        val crop = NormalizedRect(0.1f, 0.2f, 0.5f, 0.6f)
+
+        val moved = crop.translated(5f, 0.05f)
+
+        assertEquals("it stops against the right edge", 1f, moved.right, 1e-6f)
+        assertEquals("keeping its width", crop.width, moved.width, 1e-6f)
+        assertEquals("while the other axis still moves", 0.25f, moved.top, 1e-6f)
+    }
+
+    /** A crop already filling the image cannot be moved anywhere. */
+    @Test
+    fun aFullCropHasNowhereToTranslate() {
+        assertEquals(NormalizedRect.Full, NormalizedRect.Full.translated(0.3f, -0.4f))
+    }
+
+    /** Containment is what tells a drag it has taken hold of the crop rather than missed it. */
+    @Test
+    fun containsMarksTheInteriorOfTheCrop() {
+        val crop = NormalizedRect(0.25f, 0.25f, 0.75f, 0.75f)
+
+        assertTrue(crop.contains(NormalizedPoint(0.5f, 0.5f)))
+        assertTrue("its own edge counts as held", crop.contains(NormalizedPoint(0.25f, 0.5f)))
+        assertFalse(crop.contains(NormalizedPoint(0.1f, 0.5f)))
+        assertFalse(crop.contains(NormalizedPoint(0.5f, 0.9f)))
+    }
+
+    /**
+     * A move and the resize before it undo one at a time.
+     *
+     * #2608 asks for each completed gesture to be one undoable operation. The canvas commits once
+     * when a drag ends, and each commit is its own history entry, so this pins both halves.
+     */
+    @Test
+    fun aResizeAndAMoveUndoSeparately() {
+        val resized = NormalizedRect(0.1f, 0.1f, 0.6f, 0.6f)
+        val moved = resized.translated(0.2f, 0.2f)
+        val history = PhotoEditHistory().setCrop(resized).setCrop(moved)
+
+        assertEquals(moved, history.current.crop)
+        assertEquals("undo returns to the resize", resized, history.undo().current.crop)
+        assertEquals(
+            "and again to the untouched image",
+            PhotoEditRecipe.Original,
+            history.undo().undo().current,
+        )
+    }
 }

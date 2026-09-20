@@ -18,32 +18,66 @@ import dev.ipf.whitenoise.android.state.ConversationController
  */
 internal suspend fun ConversationScrollCoordinator.revealSentAtLiveTail(
     controller: ConversationController,
+    captureLayout: ((tailIndex: Int) -> ConversationTailLayout)? = null,
+    awaitFrame: suspend () -> Unit = { withFrameNanos { } },
+): Boolean =
+    revealSentAtLiveTail(
+        resolveTailIndex = {
+            val renderedTimelineSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
+            conversationTimelineTailListIndex(
+                timelineSize = renderedTimelineSize,
+                trailingRowCount = controller.conversationTrailingRowCount(renderedTimelineSize),
+            ) ?: 0
+        },
+        captureLayout = captureLayout,
+        awaitFrame = awaitFrame,
+    )
+
+/**
+ * Testable send-reveal transaction whose tail resolver remains live while the
+ * optimistic row and bottom input finish measuring.
+ */
+internal suspend fun ConversationScrollCoordinator.revealSentAtLiveTail(
+    resolveTailIndex: () -> Int,
+    captureLayout: ((tailIndex: Int) -> ConversationTailLayout)? = null,
     awaitFrame: suspend () -> Unit = { withFrameNanos { } },
 ): Boolean {
-    /** Maps the controller's newest non-edit projection to its current lazy-list row. */
-    fun liveTailIndex(): Int {
-        val renderedTimelineSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
-        return conversationTimelineTailListIndex(
-            timelineSize = renderedTimelineSize,
-            trailingRowCount = controller.conversationTrailingRowCount(renderedTimelineSize),
-        ) ?: 0
-    }
-
     // Read the settled intent before the jump replaces it with its transient mode.
     val readerFollowsTail = isFollowingTail
-    return programmaticJump(
-        targetMessageId = null,
-        reason = ConversationScrollReason.Send,
-        resultingMode = ConversationScrollMode.FollowingTail,
-    ) {
-        if (readerFollowsTail) {
-            awaitFrame()
-            scrollToTail(liveTailIndex())
-        } else {
-            animateScrollToTail(
-                index = liveTailIndex(),
-                resolveIndex = ::liveTailIndex,
-            )
+    val revealed =
+        programmaticJump(
+            targetMessageId = null,
+            reason = ConversationScrollReason.Send,
+            resultingMode = ConversationScrollMode.FollowingTail,
+        ) {
+            if (readerFollowsTail) {
+                awaitFrame()
+                scrollToTail(resolveTailIndex())
+            } else {
+                animateScrollToTail(
+                    index = resolveTailIndex(),
+                    resolveIndex = { resolveTailIndex() },
+                )
+            }
         }
-    }
+    if (!revealed || !readerFollowsTail || captureLayout == null) return revealed
+
+    // Dictation completion can dismiss its controls after the optimistic row
+    // has entered the list. Keep the accepted-send owner alive across that
+    // bounded bottom-geometry transition so the final bubble settles above the
+    // measured composer rather than behind a stale one-frame inset.
+    settleTailAfterLayoutChange(
+        resolveTailIndex = resolveTailIndex,
+        captureLayout = { captureLayout(resolveTailIndex()) },
+        reason = ConversationScrollReason.Send,
+        maxSettleFrames = SEND_TAIL_LAYOUT_SETTLE_FRAMES,
+        minimumSettleFrames = SEND_TAIL_MINIMUM_SETTLE_FRAMES,
+        settleTrigger = ConversationTailSettleTrigger.BottomGeometry,
+        requireTailClearance = true,
+        awaitFrame = awaitFrame,
+    )
+    return revealed
 }
+
+private const val SEND_TAIL_LAYOUT_SETTLE_FRAMES = 24
+private const val SEND_TAIL_MINIMUM_SETTLE_FRAMES = 8

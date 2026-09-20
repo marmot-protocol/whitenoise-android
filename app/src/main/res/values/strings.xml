@@ -549,10 +549,14 @@
     <string name="audit_logs">Audit logs</string>
     <string name="audit_logs_settings_subtitle">Create and export local group forensic audit files</string>
     <string name="export_audit_logs">Export Diagnostic Logs</string>
-    <string name="export_audit_logs_subtitle">Share a copy of the diagnostic logs stored on this device</string>
+    <string name="export_audit_logs_subtitle">Save or share one archive of the diagnostic logs stored on this device</string>
     <string name="export_audit_logs_confirm_title">Export diagnostic logs?</string>
     <string name="export_audit_logs_confirm_body">Diagnostic logs contain technical identifiers and activity details. Share them only with someone you trust.</string>
-    <string name="export_audit_logs_confirm_action">Choose recipient</string>
+    <string name="export_audit_logs_confirm_action">Continue</string>
+    <string name="export_audit_logs_destination_title">Export as one archive</string>
+    <string name="export_audit_logs_destination_body">The diagnostic logs are packaged into a single .zip file. Save it to this device, or send it to someone you trust.</string>
+    <string name="export_audit_logs_save">Save to device</string>
+    <string name="export_audit_logs_share">Share</string>
     <string name="delete_audit_logs">Clear Diagnostic Logs</string>
     <string name="delete_audit_logs_subtitle">Clearing diagnostic logs deletes logs from this device only. It does not delete copies already uploaded to White Noise servers or turn off recording and automatic uploads.</string>
     <string name="device_protection">Device protection</string>
@@ -611,7 +615,7 @@
     <string name="agent_connector_codex_subtitle">OpenAI Codex CLI coding agent</string>
     <string name="agent_connector_codex_prompt">This is an installation prompt for connecting this Codex setup to White Noise through Marmot. Read the authoritative Codex harness guide at https://github.com/marmot-protocol/mdk/blob/master/integrations/codex/marmot/README.md and the evergreen connector guide at https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Explain to me how the connector works and what the installation will change. Confirm prerequisites: Codex CLI is installed, authenticated, and available on PATH, and this machine uses the same public relay set as my phone. Then propose the installation steps for my public npub: %1$s, and ask for my approval before making any changes. Once I approve, use the checksum-verified install-codex-marmot.sh release flow, bootstrap wn-agent for that npub with the allowed welcomer, and verify wn-codex --version. Then reply with your agent npub and ask me to invite it from White Noise and send a test message from this allowed npub over the configured relays. Do not report setup complete until wn-codex returns a reply through White Noise; if that round trip cannot be verified automatically, clearly mark device verification required.</string>
     <string name="help">Help</string>
-    <string name="report_message">Report message</string>
+    <string name="report_message">Report</string>
     <string name="report_message_title">Report this message</string>
     <string name="report_message_detail">Your report goes to this group\'s admins, encrypted like any other message. They will see who reported it.</string>
     <string name="report_message_explanation_hint">Anything the admins should know (optional)</string>
@@ -1039,6 +1043,8 @@
     <string name="toast_no_audit_logs_to_delete">No diagnostic logs to clear</string>
     <string name="toast_couldnt_export_audit_logs">Couldn\'t prepare diagnostic logs for export</string>
     <string name="toast_no_audit_logs_to_export">No diagnostic logs to export</string>
+    <string name="toast_audit_logs_saved">Diagnostic logs saved</string>
+    <string name="toast_couldnt_save_audit_logs">Couldn\'t save diagnostic logs</string>
     <string name="toast_chat_created">Chat created</string>
     <string name="group_create_stage_creating">Creating group…</string>
     <string name="group_create_stage_applying_retention">Applying disappearing messages…</string>
@@ -2058,7 +2064,7 @@
     <string name="mute_for">Mute for</string>
     <string name="group_member_updating">Updating member…</string>
     <string name="read_aloud">Read Aloud</string>
-    <string name="save_attachments">Save attachments</string>
+    <string name="save_attachments">Save</string>
     <string name="message_deleted_by_you">You deleted this message.</string>
     <string name="message_deleted_by_other">This message was deleted.</string>
     <string name="message_deleted_by_admin">An admin deleted this message.</string>

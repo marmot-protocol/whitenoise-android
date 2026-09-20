@@ -149,6 +149,9 @@ case "$FAKE_SCENARIO:$attempt" in
   http-401:*)
     respond 401 '{"error":"unauthorized"}'
     ;;
+  http-403-existing:*)
+    respond 403 '{"error":"forbidden"}'
+    ;;
   always-503:*)
     respond 503 '{"error":"unavailable"}'
     ;;
@@ -236,6 +239,21 @@ printf 'ok - sends an explicit APK MIME type with scoped BUD-11 authorization\n'
 
 assert_success_after_retry http-502
 printf 'ok - retries an HTTP 502 and succeeds without leaking the upload secret\n'
+
+run_uploader http-403-existing 'application/vnd.android.package-archive'
+[[ "$status" == '0' ]]
+[[ "$(<"$stdout")" == "https://example.test/${expected_sha}.apk" ]]
+[[ "$(<"$state")" == '1' ]]
+[[ "$(<"$curl_state")" == '1' ]]
+[[ "$(<"$stderr")" == *'verified the expected APK is already served'* ]]
+[[ "$(<"$stderr")" != *'test-secret-must-not-leak'* ]]
+printf 'ok - reconciles an already-served APK after a failed upload response\n'
+
+run_uploader http-403-existing
+[[ "$status" != '0' ]]
+[[ "$(<"$state")" == '1' ]]
+[[ "$(<"$stderr")" != *'verified the expected APK is already served'* ]]
+printf 'ok - keeps a failed upload fatal when the expected APK is unavailable\n'
 
 assert_success_after_retry transport
 printf 'ok - retries a transient connection reset\n'

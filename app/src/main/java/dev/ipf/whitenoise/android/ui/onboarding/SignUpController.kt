@@ -51,6 +51,7 @@ internal class SignUpController(
     private val currentOwner: () -> SignUpOwner,
     private val ownerAvailable: () -> Boolean,
     private val create: suspend () -> AccountSummaryFfi,
+    private val qualify: suspend (AccountSummaryFfi) -> Unit,
     private val accept: (AccountSummaryFfi, SignUpOwner) -> Boolean,
     private val upload: suspend (String, ImageUploadDraft) -> String,
     private val publish: suspend (String, UserProfileMetadataFfi) -> Boolean,
@@ -63,6 +64,7 @@ internal class SignUpController(
     var acceptedIdentity by mutableStateOf<AccountSummaryFfi?>(null)
         private set
     private var discarded = false
+    private var createdIdentityReceipt: AccountSummaryFfi? = null
     private val openingOwner = currentOwner()
     private var owner: SignUpOwner? = null
     private var uploadedPhotoUrl: String? = null
@@ -115,7 +117,7 @@ internal class SignUpController(
 
     /** Back before accepted creation discards only the local draft and never issues a native command. */
     fun discardUnsubmitted(): Boolean {
-        if (stage.busy || acceptedIdentity != null) return false
+        if (stage.busy || createdIdentityReceipt != null || acceptedIdentity != null) return false
         discarded = true
         draft = null
         owner = null
@@ -155,12 +157,13 @@ internal class SignUpController(
         }
     }
 
-    /** Keep the native receipt before activation; retrying a later stage never creates another identity. */
+    /** Retains native creation before fallible policy qualification, then activates only a qualified receipt. */
     private suspend fun ensureAcceptedIdentity(): Boolean {
         if (acceptedIdentity != null) return true
         val captured = checkNotNull(owner)
         return if (ownerAvailable() && currentOwner() == captured) {
-            val created = create()
+            val created = createdIdentityReceipt ?: create().also { createdIdentityReceipt = it }
+            qualify(created)
             acceptedIdentity = created
             accept(created, captured)
         } else {

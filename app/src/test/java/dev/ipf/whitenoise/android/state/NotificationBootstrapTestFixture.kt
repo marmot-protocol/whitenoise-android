@@ -10,6 +10,7 @@ import dev.ipf.marmotkit.AppGroupMemberIdsFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.AttachmentDownloadPolicyFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.ChatListAnchorOutcomeFfi
 import dev.ipf.marmotkit.ChatListPageDirectionFfi
@@ -360,6 +361,7 @@ internal class NotificationBootstrapTestFixture(
                     "npub1coldidentityfallback"
                 }
                 "listAccounts" -> accounts
+                "attachmentDownloadPolicy" -> AttachmentDownloadPolicyFfi(false, 2_000uL, 300uL, 40uL)
                 "openChatListWindow" -> {
                     val view = arguments?.get(1) as ChatListViewFfi
                     if (view == ChatListViewFfi.CHATS) localSnapshotSubscriptionCalls.incrementAndGet()

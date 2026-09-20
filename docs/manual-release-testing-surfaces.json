@@ -386,7 +386,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/AccountSwitcher.kt",
         "anchor": "fun AccountAvatarButton(",
         "test_ids": [
-          "ACC-001"
+          "ACC-001",
+          "NAV-004"
         ]
       },
       {
@@ -2125,7 +2126,8 @@
         "test_ids": [
           "CON-001",
           "NTF-009",
-          "GRP-021"
+          "GRP-021",
+          "DIC-002"
         ]
       },
       {
@@ -2143,7 +2145,8 @@
         "anchor": "fun ConversationScrollCoordinator.revealSentAtLiveTail(",
         "test_ids": [
           "CON-002",
-          "CON-005"
+          "CON-005",
+          "DIC-002"
         ]
       },
       {
@@ -3301,7 +3304,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
         "anchor": "fun FullScreenMediaViewer(",
         "test_ids": [
-          "MED-001"
+          "MED-001",
+          "MED-015"
         ]
       },
       {
@@ -3309,7 +3313,17 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
         "anchor": "fun MediaViewerFrame(",
         "test_ids": [
-          "MED-001"
+          "MED-001",
+          "MED-015"
+        ]
+      },
+      {
+        "surface": "BoxScope.MediaViewerPendingFrame",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerPendingFrame.kt",
+        "anchor": "fun BoxScope.MediaViewerPendingFrame(",
+        "test_ids": [
+          "MED-015",
+          "MED-017"
         ]
       },
       {
@@ -3325,7 +3339,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
         "anchor": "fun ViewerPage(",
         "test_ids": [
-          "MED-001"
+          "MED-001",
+          "MED-015"
         ]
       },
       {
@@ -4087,6 +4102,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleFrame.kt",
         "anchor": "fun MediaSupplementEnvelope(",
         "test_ids": [
+          "MED-003",
           "MED-017"
         ]
       },
@@ -4928,6 +4944,14 @@
         ]
       },
       {
+        "surface": "developerPanels",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "fun developerPanels()",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
         "surface": "GroupDetailsHeader",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "fun GroupDetailsHeader(",
@@ -5287,7 +5311,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibrary.kt",
         "anchor": "fun MediaLibraryContent(",
         "test_ids": [
-          "GRP-018"
+          "GRP-018",
+          "MED-015"
         ]
       },
       {
@@ -8116,6 +8141,40 @@
         "anchor": "fun Modifier.transcriptEdgeFade(",
         "test_ids": [
           "CON-002"
+        ]
+      },
+      {
+        "surface": "AuditLogExportDestinationDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "fun AuditLogExportDestinationDialog(",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "AuditLogExportFlow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "fun AuditLogExportFlow(",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "rememberedMessageBubbleTime",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/CopyBundles.kt",
+        "anchor": "fun rememberedMessageBubbleTime(",
+        "test_ids": [
+          "CON-018"
         ]
       }
     ],
@@ -20211,6 +20270,14 @@
         ]
       },
       {
+        "surface": "string:relay_list_publishing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.relay_list_publishing",
+        "test_ids": [
+          "SYS-003"
+        ]
+      },
+      {
         "surface": "string:relay_list_refresh",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
         "anchor": "R.string.relay_list_refresh",
@@ -21556,6 +21623,97 @@
           "SYS-008",
           "SYS-009"
         ]
+      },
+      {
+        "surface": "string:export_audit_logs_destination_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.export_audit_logs_destination_title",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:export_audit_logs_destination_body",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.export_audit_logs_destination_body",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:export_audit_logs_save",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.export_audit_logs_save",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:export_audit_logs_share",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.export_audit_logs_share",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:toast_audit_logs_saved",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.toast_audit_logs_saved",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:toast_couldnt_save_audit_logs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.toast_couldnt_save_audit_logs",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:toast_couldnt_export_audit_logs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.toast_couldnt_export_audit_logs",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
       }
     ],
     "manifest_permissions": [
@@ -22140,6 +22298,14 @@
         ]
       },
       {
+        "surface": "Native automatic attachment acquisition containment",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/MarmotAttachmentAcquisitionPolicy.kt",
+        "anchor": "suspend fun enforceAppOwnedAttachmentAcquisitionPolicy(",
+        "test_ids": [
+          "MED-019"
+        ]
+      },
+      {
         "surface": "R.string.toast_couldnt_create_identity",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppProfileSignUp.kt",
         "anchor": "R.string.toast_couldnt_create_identity",
@@ -22158,22 +22324,6 @@
       {
         "surface": "R.string.toast_identity_created",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppProfileSignUp.kt",
-        "anchor": "R.string.toast_identity_created",
-        "test_ids": [
-          "ONB-003"
-        ]
-      },
-      {
-        "surface": "Sign Up native feedback: toast_couldnt_create_identity",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "R.string.toast_couldnt_create_identity",
-        "test_ids": [
-          "ONB-003"
-        ]
-      },
-      {
-        "surface": "Sign Up native feedback: toast_identity_created",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "anchor": "R.string.toast_identity_created",
         "test_ids": [
           "ONB-003"
@@ -23748,6 +23898,15 @@
         "anchor": "fun FocusedActionMenu(",
         "test_ids": [
           "MSG-004"
+        ]
+      },
+      {
+        "surface": "Keep on screen leads the long-press actions and Report closes them",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActionKind.kt",
+        "anchor": "internal fun messageActionKinds(",
+        "test_ids": [
+          "MSG-004",
+          "MSG-016"
         ]
       },
       {
@@ -25351,6 +25510,14 @@
         "test_ids": [
           "ONB-017",
           "ONB-020"
+        ]
+      },
+      {
+        "surface": "The crop rectangle moves when dragged inside it and slides along the image edge",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/editor/PhotoEditRecipe.kt",
+        "anchor": "fun translated(",
+        "test_ids": [
+          "MED-006"
         ]
       }
     ],

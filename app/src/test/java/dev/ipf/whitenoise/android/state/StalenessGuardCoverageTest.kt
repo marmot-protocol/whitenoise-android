@@ -182,6 +182,8 @@ class StalenessGuardCoverageTest {
                 "AppState.kt:startBootstrapRuntime" to "mutex-owned runtime lifecycle",
                 // Identity creation is an accepted engine mutation, not a replaceable cache read.
                 "AppState.kt:createIdentity" to "authoritative identity command result",
+                // A successful import receipt owns its policy qualification and activation sequence.
+                "AppState.kt:activateImportedIdentity" to "authoritative imported identity command result",
                 // One external-signer login completion creates and activates its own account.
                 "AppState.kt:loginWithAmber" to "authoritative identity command result",
                 // Durable per-account clears are idempotent and fenced against later contact writes.

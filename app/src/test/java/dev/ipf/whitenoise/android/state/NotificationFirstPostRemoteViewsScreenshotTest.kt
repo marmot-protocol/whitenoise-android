@@ -174,7 +174,7 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
         // Use a controlled Android clock for deterministic rendering;
         // this fixture does not measure wall-clock or device latency.
         fixture.awaitNotificationPosted(advanceMainClock = false)
-        withTimeout(5_000L) {
+        withTimeout(WRITE_AWAIT_TIMEOUT_MS) {
             while (writes.get() < 1) delay(1L)
         }
         delay(100L)
@@ -264,6 +264,15 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
     private fun notificationManager(): NotificationManager = context.getSystemService(NotificationManager::class.java)
 
     private companion object {
+        /**
+         * How long the wait for the first write may take before it is called a failure.
+         *
+         * The loop spins until the write lands, so this is a deadline for giving up rather than a
+         * claim about how fast rendering should be. Five seconds of wall clock was enough on a
+         * developer machine and not on a loaded CI runner, where this timed out on unrelated pull
+         * requests and on master. Matches the fixture's own await deadline.
+         */
+        const val WRITE_AWAIT_TIMEOUT_MS = 60_000L
         const val SNAPSHOT_PATH = "src/test/snapshots/notification_first_post_remote_views_api30.png"
         const val AVATAR_SNAPSHOT_PATH = "src/test/snapshots/notification_first_post_cached_avatar_api30.png"
         const val GROUP_AVATAR_SNAPSHOT_PATH = "src/test/snapshots/notification_first_post_group_avatar_api30.png"

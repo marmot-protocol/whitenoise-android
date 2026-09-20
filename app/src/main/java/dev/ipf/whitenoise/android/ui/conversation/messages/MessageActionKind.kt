@@ -54,11 +54,13 @@ internal fun messageActionKinds(
     canReport: Boolean = false,
 ): List<MessageActionKind> =
     buildList {
+        // Keep on screen leads, so in a two-column grid it always lands in the first row where it
+        // can be found without reading the whole menu.
+        if (canKeepOnScreen) add(MessageActionKind.KeepOnScreen)
         if (canEdit) add(MessageActionKind.Edit)
         if (canSelectText) add(MessageActionKind.SelectText)
         if (canReply) add(MessageActionKind.Reply)
         if (canForward) add(MessageActionKind.Forward)
-        if (canKeepOnScreen) add(MessageActionKind.KeepOnScreen)
         if (canShare) add(MessageActionKind.Share)
         if (canSave) add(MessageActionKind.Save)
         if (canCopyText) add(MessageActionKind.CopyText)

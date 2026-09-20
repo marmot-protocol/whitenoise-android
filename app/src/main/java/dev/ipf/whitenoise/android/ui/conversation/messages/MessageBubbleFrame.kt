@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.constrainWidth
@@ -177,13 +178,13 @@ internal fun MediaCaptionFrame(
 }
 
 /**
- * Measures media first, then gives its supplement exactly the same width.
+ * Measures media first, then lets a wider supplement establish the bounded shared width.
  *
  * Media children intentionally retain their existing sizing policy: a
  * landscape image, grid, or voice note may consume the available width while
- * a portrait image can keep its fixed card width. Measuring the caption from
- * intrinsic widths would collapse fill-width media to its loading indicator,
- * so the real media measurement is the source of truth instead.
+ * a portrait image can keep its fixed card width. The real media measurement
+ * remains one source of truth; the supplement's intrinsic width can only widen
+ * the shared frame and never resizes or stretches the media child.
  */
 @Composable
 @Suppress("FunctionNaming")
@@ -204,12 +205,14 @@ internal fun MediaSupplementEnvelope(
                     content = media,
                 )
             }.single().measure(relaxedConstraints)
-        val envelopeWidth = constraints.constrainWidth(mediaPlaceable.width)
-
-        val supplementPlaceable =
+        val supplementMeasurable =
             subcompose(MediaEnvelopeSlot.Supplement) {
                 Column(content = supplement)
-            }.single().measure(
+            }.single()
+        val supplementWidth = supplementMeasurable.maxIntrinsicWidth(Constraints.Infinity)
+        val envelopeWidth = constraints.constrainWidth(maxOf(mediaPlaceable.width, supplementWidth))
+        val supplementPlaceable =
+            supplementMeasurable.measure(
                 relaxedConstraints.copy(
                     minWidth = envelopeWidth,
                     maxWidth = envelopeWidth,

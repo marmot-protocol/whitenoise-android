@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Rect
 import android.view.Gravity
 import android.view.View
@@ -19,6 +20,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
@@ -47,10 +50,13 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.conversation.media.MEDIA_VIEWER_BOTTOM_CHROME_TAG
+import dev.ipf.whitenoise.android.ui.conversation.media.MEDIA_VIEWER_TOP_CHROME_TAG
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerFrame
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerGallery
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerLoadFailed
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerPage
+import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerPendingFrame
 import dev.ipf.whitenoise.android.ui.conversation.media.visualMediaViewerGallery
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -133,6 +139,78 @@ class MediaViewerScreenshotTest {
             }
         }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/media_viewer_default_frame.png")
+    }
+
+    /** Hidden viewer chrome leaves the image unobstructed and restores every action together. */
+    @Test
+    fun mediaViewerChromeHidesAndRestoresAsOneAccessibleSurface() {
+        var chromeVisible by mutableStateOf(true)
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                MediaViewerFrame(
+                    senderLabel = "Alex",
+                    recordedAtLabel = "Sep 20, 2026, 7:05 PM",
+                    onDismiss = {},
+                    onSave = {},
+                    onShare = {},
+                    onForwardMessage = {},
+                    snackbarHostState = remember { SnackbarHostState() },
+                    modifier = Modifier.fillMaxSize(),
+                    chromeVisible = chromeVisible,
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(Color(0xff27476f)),
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag(MEDIA_VIEWER_TOP_CHROME_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(MEDIA_VIEWER_BOTTOM_CHROME_TAG).assertIsDisplayed()
+        composeRule.runOnIdle { chromeVisible = false }
+        composeRule.onNodeWithTag(MEDIA_VIEWER_TOP_CHROME_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(MEDIA_VIEWER_BOTTOM_CHROME_TAG).assertDoesNotExist()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/media_viewer_chrome_hidden.png")
+
+        composeRule.runOnIdle { chromeVisible = true }
+        composeRule.onNodeWithTag(MEDIA_VIEWER_TOP_CHROME_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(MEDIA_VIEWER_BOTTOM_CHROME_TAG).assertIsDisplayed()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/media_viewer_chrome_restored.png")
+    }
+
+    /** Hidden chrome leaves snackbar feedback above the synthetic navigation safe area. */
+    @Test
+    fun hiddenChromeSnackbarStaysAboveBottomSafeArea() {
+        val bottomInset = 48.dp
+        val snackbarText = "Image saved"
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                val snackbarHostState = remember { SnackbarHostState() }
+                LaunchedEffect(snackbarHostState) {
+                    snackbarHostState.showSnackbar(snackbarText)
+                }
+                MediaViewerFrame(
+                    senderLabel = "Alex",
+                    recordedAtLabel = "Sep 20, 2026, 7:05 PM",
+                    onDismiss = {},
+                    onSave = {},
+                    onShare = {},
+                    snackbarHostState = snackbarHostState,
+                    contentWindowInsets = WindowInsets(bottom = bottomInset),
+                    modifier = Modifier.fillMaxSize(),
+                    chromeVisible = false,
+                ) {}
+            }
+        }
+
+        val snackbarBounds =
+            composeRule
+                .onNodeWithText(snackbarText)
+                .assertIsDisplayed()
+                .getUnclippedBoundsInRoot()
+        assertTrue(snackbarBounds.bottom <= 780.dp - bottomInset)
     }
 
     /** Directly opened video offers save and share. */
@@ -233,6 +311,29 @@ class MediaViewerScreenshotTest {
             }
         }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/media_viewer_failed_frame.png")
+    }
+
+    /** A returning viewer paints a safe cached thumbnail while the current-page decode refines locally. */
+    @Test
+    fun mediaViewerCachedFirstFrameAvoidsBlankLoadingState() {
+        val pixels = IntArray(16) { index -> if (index % 2 == 0) 0xffc45b35.toInt() else 0xff355fc4.toInt() }
+        val thumbnail = Bitmap.createBitmap(pixels, 4, 4, Bitmap.Config.ARGB_8888).asImageBitmap()
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                MediaViewerFrame(
+                    senderLabel = "Alex",
+                    recordedAtLabel = "Jul 16, 2026, 3:45 PM",
+                    onDismiss = {},
+                    onSave = {},
+                    onShare = {},
+                    snackbarHostState = remember { SnackbarHostState() },
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    MediaViewerPendingFrame(thumbnail, null, "cached.jpg", failed = false, onRetry = {})
+                }
+            }
+        }
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/media_viewer_cached_first_frame.png")
     }
 
     @Test

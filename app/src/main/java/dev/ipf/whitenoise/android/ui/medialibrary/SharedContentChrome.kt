@@ -66,9 +66,10 @@ internal fun SharedMediaTiles.visualsFor(filter: SharedVisualFilter): List<Share
 internal fun SharedContentCategories(
     tiles: SharedMediaTiles,
     onOpen: (SharedContentCategory) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     SettingsSection(stringResource(R.string.shared_content_in_chat))
-    SettingsGroup {
+    SettingsGroup(modifier = modifier) {
         SharedContentCategory.entries.forEach { category ->
             row(key = category.name) {
                 val count =

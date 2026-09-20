@@ -1527,7 +1527,7 @@
     <string name="agent_connector_codex_subtitle">OpenAI Codex CLI-Coding-Agent</string>
     <string name="agent_connector_codex_prompt">Dies ist eine Installationsanweisung, um diese Codex-Einrichtung über Marmot mit White Noise zu verbinden. Lies den maßgeblichen Codex-Harness-Leitfaden unter https://github.com/marmot-protocol/mdk/blob/master/integrations/codex/marmot/README.md und den dauerhaften Konnektor-Leitfaden unter https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Erkläre mir, wie der Konnektor funktioniert und was die Installation ändern wird. Bestätige die Voraussetzungen: Die Codex-CLI ist installiert, authentifiziert und auf PATH verfügbar, und dieser Rechner nutzt dasselbe öffentliche Relay-Set wie mein Telefon. Schlage dann die Installationsschritte für meine öffentliche npub vor: %1$s, und bitte um meine Zustimmung, bevor du Änderungen vornimmst. Sobald ich zugestimmt habe, verwende den checksummenverifizierten install-codex-marmot.sh-Release-Flow, bootstrap wn-agent für diese npub mit dem zugelassenen Welcomer und überprüfe wn-codex --version. Antworte dann mit deiner Agenten-npub und bitte mich, sie in White Noise einzuladen und von dieser zugelassenen npub über die konfigurierten Relays eine Testnachricht zu senden. Melde die Einrichtung erst dann als abgeschlossen, wenn wn-codex über White Noise geantwortet hat; falls dieser Rundlauf nicht automatisch verifiziert werden kann, kennzeichne klar, dass eine Geräteverifizierung erforderlich ist.</string>
     <string name="help">Hilfe</string>
-    <string name="report_message">Nachricht melden</string>
+    <string name="report_message">Melden</string>
     <string name="report_message_title">Diese Nachricht melden</string>
     <string name="report_message_detail">Deine Meldung geht an die Admins dieser Gruppe, verschlüsselt wie jede andere Nachricht. Sie sehen, wer gemeldet hat.</string>
     <string name="report_message_explanation_hint">Was die Admins wissen sollten (optional)</string>
@@ -1974,7 +1974,7 @@
     <string name="mute_for">Stummschalten für</string>
     <string name="group_member_updating">Mitglied wird aktualisiert…</string>
     <string name="read_aloud">Vorlesen</string>
-    <string name="save_attachments">Anhänge speichern</string>
+    <string name="save_attachments">Speichern</string>
     <string name="message_deleted_by_you">Du hast diese Nachricht gelöscht.</string>
     <string name="message_deleted_by_other">Diese Nachricht wurde gelöscht.</string>
     <string name="message_deleted_by_admin">Ein Admin hat diese Nachricht gelöscht.</string>
@@ -2021,9 +2021,15 @@
     <string name="donate_open_failed">Die Spendenseite konnte nicht geöffnet werden. Versuche es erneut oder kehre zu den Einstellungen zurück.</string>
     <string name="export_audit_logs_confirm_body">Diagnoseprotokolle enthalten technische Kennungen und Aktivitätsdetails. Teile sie nur mit Personen, denen du vertraust.</string>
     <string name="export_audit_logs">Diagnoseprotokolle exportieren</string>
-    <string name="export_audit_logs_subtitle">Eine Kopie der auf diesem Gerät gespeicherten Diagnoseprotokolle teilen</string>
+    <string name="export_audit_logs_subtitle">Ein Archiv der auf diesem Gerät gespeicherten Diagnoseprotokolle speichern oder teilen</string>
     <string name="export_audit_logs_confirm_title">Diagnoseprotokolle exportieren?</string>
-    <string name="export_audit_logs_confirm_action">Empfänger auswählen</string>
+    <string name="toast_couldnt_save_audit_logs">Diagnoseprotokolle konnten nicht gespeichert werden</string>
+    <string name="toast_audit_logs_saved">Diagnoseprotokolle gespeichert</string>
+    <string name="export_audit_logs_share">Teilen</string>
+    <string name="export_audit_logs_save">Auf Gerät speichern</string>
+    <string name="export_audit_logs_destination_body">Die Diagnoseprotokolle werden in einer einzigen ZIP-Datei zusammengefasst. Speichere sie auf diesem Gerät oder sende sie an jemanden, dem du vertraust.</string>
+    <string name="export_audit_logs_destination_title">Als ein Archiv exportieren</string>
+    <string name="export_audit_logs_confirm_action">Weiter</string>
     <string name="toast_couldnt_export_audit_logs">Diagnoseprotokolle konnten nicht für den Export vorbereitet werden</string>
     <string name="toast_no_audit_logs_to_export">Keine Diagnoseprotokolle zum Exportieren vorhanden</string>
 </resources>

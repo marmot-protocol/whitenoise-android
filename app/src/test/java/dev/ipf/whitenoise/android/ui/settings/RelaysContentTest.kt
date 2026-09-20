@@ -1,7 +1,12 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -10,6 +15,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.MissingRelayListKindFfi
@@ -160,6 +166,42 @@ class RelaysContentTest {
         )
         composeRule.onNodeWithTag("relay.publication.refresh").assertIsNotEnabled()
         composeRule.onNodeWithTag("relay.publication.publish").assertIsNotEnabled()
+    }
+
+    /** Submitting the real Add Relay sheet enters its labelled, disabled progress state without throwing. */
+    @Test
+    fun addRelayShowsLabelledProgressWhilePublishing() {
+        val busy = mutableStateOf(false)
+        var submittedUrl: String? = null
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                AddRelaySheet(
+                    existing = emptyList(),
+                    busy = busy.value,
+                    rejectedUrl = null,
+                    onDismiss = {},
+                    onAdd = { url, _ ->
+                        submittedUrl = url
+                        busy.value = true
+                    },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("relay.add.url").performTextInput(A)
+        composeRule.onNodeWithTag("relay.add.submit").assertIsEnabled().performClick()
+
+        composeRule.runOnIdle { assertEquals(A, submittedUrl) }
+        composeRule.onNodeWithText(app.getString(R.string.relay_list_publishing)).assertIsDisplayed()
+        composeRule
+            .onNodeWithTag("relay.add.submit")
+            .assertIsNotEnabled()
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.StateDescription,
+                    app.getString(R.string.button_in_progress),
+                ),
+            )
     }
 
     /** After one role was added, retry adds only the remaining selected role instead of rejecting the URL. */

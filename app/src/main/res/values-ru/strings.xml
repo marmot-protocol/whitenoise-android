@@ -2018,7 +2018,7 @@
     <string name="mute_for">Отключить уведомления на</string>
     <string name="group_member_updating">Обновление участника…</string>
     <string name="read_aloud">Читать вслух</string>
-    <string name="save_attachments">Сохранить вложения</string>
+    <string name="save_attachments">Сохранить</string>
     <string name="message_deleted_by_you">Вы удалили это сообщение.</string>
     <string name="message_deleted_by_other">Это сообщение было удалено.</string>
     <string name="message_deleted_by_admin">Администратор удалил это сообщение.</string>
@@ -2065,9 +2065,15 @@
     <string name="donate_open_failed">Не удалось открыть страницу пожертвований. Попробуйте снова или вернитесь в настройки.</string>
     <string name="export_audit_logs_confirm_body">Диагностические журналы содержат технические идентификаторы и сведения об активности. Делитесь ими только с теми, кому доверяете.</string>
     <string name="export_audit_logs">Экспортировать диагностические журналы</string>
-    <string name="export_audit_logs_subtitle">Поделиться копией диагностических журналов, хранящихся на этом устройстве</string>
+    <string name="export_audit_logs_subtitle">Сохраните или отправьте архив диагностических журналов, хранящихся на этом устройстве</string>
     <string name="export_audit_logs_confirm_title">Экспортировать диагностические журналы?</string>
-    <string name="export_audit_logs_confirm_action">Выбрать получателя</string>
+    <string name="toast_couldnt_save_audit_logs">Не удалось сохранить диагностические журналы</string>
+    <string name="toast_audit_logs_saved">Диагностические журналы сохранены</string>
+    <string name="export_audit_logs_share">Поделиться</string>
+    <string name="export_audit_logs_save">Сохранить на устройство</string>
+    <string name="export_audit_logs_destination_body">Диагностические журналы упаковываются в один файл .zip. Сохраните его на этом устройстве или отправьте тому, кому доверяете.</string>
+    <string name="export_audit_logs_destination_title">Экспорт одним архивом</string>
+    <string name="export_audit_logs_confirm_action">Продолжить</string>
     <string name="toast_couldnt_export_audit_logs">Не удалось подготовить диагностические журналы к экспорту</string>
     <string name="toast_no_audit_logs_to_export">Нет диагностических журналов для экспорта</string>
 </resources>

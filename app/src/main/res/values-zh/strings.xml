@@ -1505,7 +1505,7 @@
     <string name="agent_connector_codex_subtitle">OpenAI Codex CLI 编码代理</string>
     <string name="agent_connector_codex_prompt">这是一条安装提示，用于通过 Marmot 将此 Codex 设置连接到 White Noise。请阅读权威 Codex harness 指南：https://github.com/marmot-protocol/mdk/blob/master/integrations/codex/marmot/README.md，以及长期有效的连接器指南：https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md。请向我解释连接器的工作方式以及安装会带来哪些更改。确认前提条件：Codex CLI 已安装、已认证并可在 PATH 中使用，且此机器使用与手机相同的公共中继集合。然后针对我的公开 npub 提出安装步骤：%1$s，并在进行任何更改之前请求我的批准。我批准后，请使用经过校验和验证的 install-codex-marmot.sh 发布流程，为该 npub 引导 wn-agent 并使用允许的 welcomer，然后验证 wn-codex --version。接下来回复你的代理 npub，请我在 White Noise 中邀请它，并通过已配置的中继从这个允许的 npub 发送测试消息。在 wn-codex 通过 White Noise 回复之前，不要声称设置已完成；如果无法自动验证这一往返流程，请明确标记仍需设备验证。</string>
     <string name="help">帮助</string>
-    <string name="report_message">举报消息</string>
+    <string name="report_message">举报</string>
     <string name="report_message_title">举报此消息</string>
     <string name="report_message_detail">举报会像其他消息一样加密发送给该群管理员。他们会看到是谁举报的。</string>
     <string name="report_message_explanation_hint">管理员需要了解的信息（可选）</string>
@@ -1933,7 +1933,7 @@
     <string name="mute_for">静音时长</string>
     <string name="group_member_updating">正在更新成员…</string>
     <string name="read_aloud">大声朗读</string>
-    <string name="save_attachments">保存附件</string>
+    <string name="save_attachments">保存</string>
     <string name="message_deleted_by_you">你已删除此消息。</string>
     <string name="message_deleted_by_other">此消息已被删除。</string>
     <string name="message_deleted_by_admin">管理员删除了这条消息。</string>
@@ -1980,9 +1980,15 @@
     <string name="donate_open_failed">无法打开捐赠页面。请重试或返回设置。</string>
     <string name="export_audit_logs_confirm_body">诊断日志包含技术标识符和活动详情。请仅与您信任的人分享。</string>
     <string name="export_audit_logs">导出诊断日志</string>
-    <string name="export_audit_logs_subtitle">分享此设备上存储的诊断日志副本</string>
+    <string name="export_audit_logs_subtitle">保存或分享本设备上存储的诊断日志压缩包</string>
     <string name="export_audit_logs_confirm_title">导出诊断日志？</string>
-    <string name="export_audit_logs_confirm_action">选择接收人</string>
+    <string name="toast_couldnt_save_audit_logs">无法保存诊断日志</string>
+    <string name="toast_audit_logs_saved">诊断日志已保存</string>
+    <string name="export_audit_logs_share">分享</string>
+    <string name="export_audit_logs_save">保存到设备</string>
+    <string name="export_audit_logs_destination_body">诊断日志会打包成一个 .zip 文件。你可以保存到本设备，或发送给你信任的人。</string>
+    <string name="export_audit_logs_destination_title">导出为单个压缩包</string>
+    <string name="export_audit_logs_confirm_action">继续</string>
     <string name="toast_couldnt_export_audit_logs">无法准备要导出的诊断日志</string>
     <string name="toast_no_audit_logs_to_export">没有可导出的诊断日志</string>
 </resources>

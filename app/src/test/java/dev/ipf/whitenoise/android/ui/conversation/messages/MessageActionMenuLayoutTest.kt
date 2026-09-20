@@ -54,11 +54,12 @@ class MessageActionMenuLayoutTest {
     fun actionModelPreservesCapabilityOrder() {
         assertEquals(
             listOf(
+                // Leads so a two-column grid always puts it in the first row.
+                MessageActionKind.KeepOnScreen,
                 MessageActionKind.Edit,
                 MessageActionKind.SelectText,
                 MessageActionKind.Reply,
                 MessageActionKind.Forward,
-                MessageActionKind.KeepOnScreen,
                 MessageActionKind.Share,
                 MessageActionKind.Save,
                 MessageActionKind.CopyText,
@@ -344,17 +345,19 @@ class MessageActionMenuLayoutTest {
     fun maximumMenuUsesTwoBalancedColumnsWithDeleteLast() {
         renderMenu(fontScale = 1f)
 
+        val keepOnScreen = bounds("Keep on screen")
         val edit = bounds("Edit")
         val selectText = bounds("Select text")
         val reply = bounds("Reply")
         val delete = bounds("Delete")
         val info = bounds("Info")
 
-        assertEquals("the first two actions share a row", edit.top, selectText.top, 0.5f)
-        assertTrue("and sit in different columns", selectText.left > edit.left)
-        assertEquals("columns are balanced", edit.width, selectText.width, 0.5f)
-        assertTrue("later actions come below the first row", reply.top > edit.top)
-        assertEquals("the left column stays aligned", edit.left, reply.left, 0.5f)
+        assertEquals("the first two actions share a row", keepOnScreen.top, edit.top, 0.5f)
+        assertTrue("and sit in different columns", edit.left > keepOnScreen.left)
+        assertEquals("columns are balanced", keepOnScreen.width, edit.width, 0.5f)
+        assertTrue("later actions come below the first row", selectText.top > keepOnScreen.top)
+        assertEquals("the left column stays aligned", keepOnScreen.left, selectText.left, 0.5f)
+        assertEquals("and the row below pairs in order", selectText.top, reply.top, 0.5f)
         assertEquals("delete ends the grid beside the last action", info.top, delete.top, 0.5f)
         assertTrue("with delete on the right", delete.left > info.left)
     }
@@ -446,7 +449,7 @@ class MessageActionMenuLayoutTest {
             "Forward",
             "Keep on screen",
             "Share",
-            "Save attachments",
+            "Save",
             "Copy",
             "Read Aloud",
             "Select",

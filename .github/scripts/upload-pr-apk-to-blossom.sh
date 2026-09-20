@@ -187,6 +187,18 @@ for (( attempt = 1; attempt <= max_attempts; attempt++ )); do
     status=22
   fi
 
+  # A proxy can return an error after the origin has already committed the
+  # content-addressed blob. Reconcile the expected digest URL before retrying
+  # the write: some servers reject that retry even though the exact APK is now
+  # available. The caller still downloads the returned URL and compares its
+  # SHA-256 with the signed local file before publishing it.
+  url=$(printf '%s/%s.apk' "${BLOSSOM_SERVER%/}" "$apk_sha256")
+  if verify_served_apk "$url"; then
+    printf 'Blossom upload response was inconclusive; verified the expected APK is already served.\n' >&2
+    printf '%s\n' "$url"
+    exit 0
+  fi
+
   transient=false
   if (( status == 124 )); then
     transient=true

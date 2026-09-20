@@ -273,7 +273,7 @@ internal fun buildVisibleSharedMediaTiles(
 // background dispatcher. Projected rows carry authoritative typed media;
 // optimistic/compatibility records alone fall back to MarmotKit tag parsing.
 
-/** Builds the visual, voice, file and link tiles from the messages. */
+/** Builds newest-first visual, voice, file, and link rows while preserving authored attachment order. */
 private fun buildTiles(
     messages: List<TimelineMessage>,
     myAccountId: String?,
@@ -283,7 +283,7 @@ private fun buildTiles(
     val videos = ArrayList<SharedMediaTile>()
     val voice = ArrayList<SharedMediaRow>()
     val files = ArrayList<SharedMediaRow>()
-    for (message in messages) {
+    for (message in messages.asReversed()) {
         val record = message.record
         val mine = MessageProjector.isMine(record, myAccountId)
         message.mediaAttachments().forEach { (index, reference) ->
@@ -304,12 +304,7 @@ private fun buildTiles(
             }
         }
     }
-    // Newest first for the grids and the vertical lists.
-    visuals.reverse()
-    images.reverse()
-    videos.reverse()
-    voice.reverse()
-    files.reverse()
+    // Messages are newest first for grids/lists while each album retains its authored attachment slots.
     // URLs are sorted newest-first to match the lists; the inventory keeps
     // them in timeline order (oldest first).
     val urls = MediaInventory.urls(messages.map { it.record }).asReversed()
@@ -419,17 +414,34 @@ internal fun sharedMediaFallbackContent(
 internal fun SharedMediaSection(
     tiles: SharedMediaTiles,
     onOpenCategory: (SharedContentCategory) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    SharedContentCategories(tiles, onOpenCategory)
+    SharedContentCategories(tiles, onOpenCategory, modifier)
 }
 
-// Project resolved image/video tiles onto the per-page descriptors the
-// full-screen viewer pages over. Order is preserved (the tiles are already
-// newest-first), so the gallery swipes newest → oldest matching the grid.
-
-/** Viewer pages for the tiles. */
+/** Chronological viewer pages, reversing message groups without reversing authored album slots. */
 internal fun List<SharedMediaTile>.toViewerPages(): List<MediaViewerPage> =
-    map { MediaViewerPage(it.messageIdHex, it.attachmentIndex, it.reference, it.mine, it.sender, it.recordedAt) }
+    newestFirstMessageGroupsToChronological().map {
+        MediaViewerPage(it.messageIdHex, it.attachmentIndex, it.reference, it.mine, it.sender, it.recordedAt)
+    }
+
+/** Reverses contiguous newest-first message groups while keeping each group's item order stable. */
+private fun <T> List<T>.newestFirstMessageGroupsToChronological(messageId: (T) -> String): List<T> {
+    if (isEmpty()) return emptyList()
+    val groups = ArrayList<List<T>>()
+    var start = 0
+    for (index in 1..size) {
+        if (index == size || messageId(this[index]) != messageId(this[start])) {
+            groups += subList(start, index)
+            start = index
+        }
+    }
+    return groups.asReversed().flatten()
+}
+
+/** Shared-media specialization of stable newest-first message-group reversal. */
+private fun List<SharedMediaTile>.newestFirstMessageGroupsToChronological(): List<SharedMediaTile> =
+    newestFirstMessageGroupsToChronological(SharedMediaTile::messageIdHex)
 
 /** Opens one native per-chat category, with state isolated to its controller/account/runtime owner. */
 @Suppress("FunctionNaming", "LongParameterList")

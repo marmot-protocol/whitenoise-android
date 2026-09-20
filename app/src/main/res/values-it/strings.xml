@@ -1529,7 +1529,7 @@
     <string name="agent_connector_codex_subtitle">Agente di codifica CLI OpenAI Codex</string>
     <string name="agent_connector_codex_prompt">Questo è un prompt di installazione per collegare questa configurazione Codex a White Noise tramite Marmot. Leggi la guida autorevole del harness Codex all’indirizzo https://github.com/marmot-protocol/mdk/blob/master/integrations/codex/marmot/README.md e la guida permanente del connettore all’indirizzo https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Spiegami come funziona il connettore e cosa cambierà l’installazione. Conferma i prerequisiti: la CLI Codex è installata, autenticata e disponibile in PATH, e questa macchina usa lo stesso set di relay pubblici del mio telefono. Quindi proponi i passaggi di installazione per la mia npub pubblica: %1$s e chiedi la mia approvazione prima di apportare qualsiasi modifica. Dopo la mia approvazione, usa il flusso di release install-codex-marmot.sh verificato tramite checksum, avvia wn-agent per quella npub con il welcomer consentito e verifica wn-codex --version. Quindi rispondi con la npub del tuo agente e chiedimi di invitarlo da White Noise e inviare un messaggio di prova da questa npub consentita tramite i relay configurati. Non dichiarare completata la configurazione finché wn-codex non risponde tramite White Noise; se non è possibile verificare automaticamente questo percorso di andata e ritorno, indica chiaramente che è necessaria la verifica sul dispositivo.</string>
     <string name="help">Aiuto</string>
-    <string name="report_message">Segnala messaggio</string>
+    <string name="report_message">Segnala</string>
     <string name="report_message_title">Segnala questo messaggio</string>
     <string name="report_message_detail">La tua segnalazione va agli amministratori di questo gruppo, cifrata come ogni altro messaggio. Vedranno chi l’ha inviata.</string>
     <string name="report_message_explanation_hint">Cosa dovrebbero sapere gli amministratori (facoltativo)</string>
@@ -1960,7 +1960,7 @@
     <string name="mute_for">Silenzia per</string>
     <string name="group_member_updating">Aggiornamento membro…</string>
     <string name="read_aloud">Leggi ad alta voce</string>
-    <string name="save_attachments">Salva allegati</string>
+    <string name="save_attachments">Salva</string>
     <string name="message_deleted_by_you">Hai eliminato questo messaggio.</string>
     <string name="message_deleted_by_other">Questo messaggio è stato eliminato.</string>
     <string name="message_deleted_by_admin">Un amministratore ha eliminato questo messaggio.</string>
@@ -2007,9 +2007,15 @@
     <string name="donate_open_failed">Impossibile aprire la pagina delle donazioni. Riprova o torna alle impostazioni.</string>
     <string name="export_audit_logs_confirm_body">I log diagnostici contengono identificatori tecnici e dettagli delle attività. Condividili solo con persone di cui ti fidi.</string>
     <string name="export_audit_logs">Esporta log diagnostici</string>
-    <string name="export_audit_logs_subtitle">Condividi una copia dei log diagnostici memorizzati su questo dispositivo</string>
+    <string name="export_audit_logs_subtitle">Salva o condividi un archivio dei log diagnostici memorizzati su questo dispositivo</string>
     <string name="export_audit_logs_confirm_title">Esportare i log diagnostici?</string>
-    <string name="export_audit_logs_confirm_action">Scegli destinatario</string>
+    <string name="toast_couldnt_save_audit_logs">Impossibile salvare i log diagnostici</string>
+    <string name="toast_audit_logs_saved">Log diagnostici salvati</string>
+    <string name="export_audit_logs_share">Condividi</string>
+    <string name="export_audit_logs_save">Salva sul dispositivo</string>
+    <string name="export_audit_logs_destination_body">I log diagnostici vengono raccolti in un unico file .zip. Salvalo su questo dispositivo oppure invialo a una persona di cui ti fidi.</string>
+    <string name="export_audit_logs_destination_title">Esporta come un unico archivio</string>
+    <string name="export_audit_logs_confirm_action">Continua</string>
     <string name="toast_couldnt_export_audit_logs">Impossibile preparare i log diagnostici per l’esportazione</string>
     <string name="toast_no_audit_logs_to_export">Nessun log diagnostico da esportare</string>
 </resources>

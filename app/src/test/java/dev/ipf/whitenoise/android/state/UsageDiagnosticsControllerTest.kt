@@ -144,11 +144,94 @@ class UsageDiagnosticsControllerTest {
             assertTrue(state.requiresChoice)
         }
 
+    /**
+     * Reopening a screen re-reads the receipt, and a settled row must not present that read as
+     * work: swapping the switch for an indicator and dimming its text is what makes the page look
+     * like it assembles itself in front of the reader.
+     */
+    @Test
+    fun passiveRereadLeavesASettledRowSettled() =
+        runBlocking {
+            val native = NativeReceipt()
+            val state = UsageDiagnosticsController()
+            state.refresh(native.engine)
+            val settled = state.snapshot
+            assertNotNull(settled)
+
+            val entered = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            native.beforeRead = {
+                entered.countDown()
+                check(release.await(30, TimeUnit.SECONDS))
+            }
+            val reread = async { state.refresh(native.engine) }
+            try {
+                withContext(Dispatchers.IO) { assertTrue(entered.await(5, TimeUnit.SECONDS)) }
+                assertFalse("a re-read must not present a settled row as busy", state.busy)
+                assertSame(settled, state.snapshot)
+            } finally {
+                release.countDown()
+            }
+            reread.await()
+            assertFalse(state.busy)
+        }
+
+    /** With no receipt to present yet, the first read does show work rather than a settled control. */
+    @Test
+    fun firstReadPresentsWorkUntilAReceiptArrives() =
+        runBlocking {
+            val native = NativeReceipt()
+            val state = UsageDiagnosticsController()
+            val entered = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            native.beforeRead = {
+                entered.countDown()
+                check(release.await(30, TimeUnit.SECONDS))
+            }
+            val load = async { state.refresh(native.engine) }
+            try {
+                withContext(Dispatchers.IO) { assertTrue(entered.await(5, TimeUnit.SECONDS)) }
+                assertNull(state.snapshot)
+                assertTrue("the first read has nothing to present yet", state.busy)
+            } finally {
+                release.countDown()
+            }
+            load.await()
+            assertFalse(state.busy)
+        }
+
+    /** A choice the reader just made is still presented as work, settled receipt or not. */
+    @Test
+    fun writingAChoicePresentsWorkEvenOnASettledRow() =
+        runBlocking {
+            val native = NativeReceipt()
+            val state = UsageDiagnosticsController()
+            state.refresh(native.engine)
+            assertNotNull(state.snapshot)
+
+            val entered = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            native.beforeWrite = {
+                entered.countDown()
+                check(release.await(30, TimeUnit.SECONDS))
+            }
+            val save = async { state.choose(native.engine, true) }
+            try {
+                withContext(Dispatchers.IO) { assertTrue(entered.await(5, TimeUnit.SECONDS)) }
+                assertTrue(state.busy)
+            } finally {
+                release.countDown()
+            }
+            assertTrue(save.await())
+            assertFalse(state.busy)
+        }
+
     /** Tiny native boundary with independently controllable settings and delivery capability. */
     private class NativeReceipt {
         var fail = false
         var configured = true
         var beforeWrite: () -> Unit = {}
+        var beforeRead: () -> Unit = {}
         private var decision = UsageDiagnosticsDecisionFfi.ACCEPTANCE_REQUIRED
         val engine =
             Proxy.newProxyInstance(
@@ -167,7 +250,10 @@ class UsageDiagnosticsControllerTest {
                             }
                         settings()
                     }
-                    "usageDiagnosticsSettings" -> settings()
+                    "usageDiagnosticsSettings" -> {
+                        beforeRead()
+                        settings()
+                    }
                     "usageDiagnosticsStatus" ->
                         UsageDiagnosticsStatusFfi(
                             decision,

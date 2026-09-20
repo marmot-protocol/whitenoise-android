@@ -6,7 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -25,7 +24,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -34,6 +32,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -49,12 +48,14 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -63,6 +64,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -243,22 +245,24 @@ internal fun StableMediaViewerPager(
         } else {
             modifier.semantics { stateDescription = pagePositionDescription }
         }
-    HorizontalPager(
-        state = selection.pagerState,
-        modifier = pagerModifier,
-        key = { page -> pages[clampViewerPageIndex(page, pages.size)].saveableKey() },
-        userScrollEnabled = userScrollEnabled,
-    ) { page ->
-        val pageDescriptor = pages[clampViewerPageIndex(page, pages.size)]
-        pageContent(pageDescriptor, pageDescriptor.key() == currentPageKey)
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        HorizontalPager(
+            state = selection.pagerState,
+            modifier = pagerModifier,
+            key = { page -> pages[clampViewerPageIndex(page, pages.size)].saveableKey() },
+            userScrollEnabled = userScrollEnabled,
+        ) { page ->
+            val pageDescriptor = pages[clampViewerPageIndex(page, pages.size)]
+            pageContent(pageDescriptor, pageDescriptor.key() == currentPageKey)
+        }
     }
 }
 
 /**
  * Select the gallery opened by an inline visual attachment.
  *
- * Visual messages use the conversation's shared-media image/video order
- * (newest first). The current message pages are merged when the asynchronous
+ * Visual messages use chronological message traversal with authored attachment slots.
+ * The current message pages are merged when the asynchronous
  * shared projection has not caught up yet, which keeps optimistic own sends
  * openable.
  */
@@ -281,13 +285,11 @@ internal fun visualMediaViewerGallery(
                 if (currentMessageFullyProjected) {
                     conversationVisualPages
                 } else {
-                    // buildTiles() reverses the flattened timeline projection, so an
-                    // album's attachment order is reversed in the shared-media grid.
-                    val currentPages = messagePages.asReversed()
+                    val currentPages = messagePages
                     val otherPages = conversationVisualPages.filterNot { it.messageIdHex == currentMessageId }
                     val insertAt =
                         otherPages
-                            .indexOfFirst { it.recordedAt < tappedPage.recordedAt }
+                            .indexOfFirst { it.recordedAt > tappedPage.recordedAt }
                             .takeIf { it >= 0 }
                             ?: otherPages.size
                     otherPages.subList(0, insertAt) + currentPages + otherPages.subList(insertAt, otherPages.size)
@@ -431,16 +433,19 @@ internal fun FullScreenMediaViewer(
     val currentAttachmentIndex = currentPage.attachmentIndex
     val currentMessageIdHex = currentPage.messageIdHex
     val currentMine = currentPage.mine
+    val currentPageIsVideo = MediaReferenceSupport.isVideoMedia(currentReference)
+    var chromeVisible by remember { mutableStateOf(true) }
     // Zoom state is hoisted to the viewer scope (not per-page) so the pager
     // can read it to gate horizontal swipe. Without this gate, the page's
     // `detectTransformGestures` claims every horizontal drag and the pager
     // never moves. Page change resets to identity below.
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
-    LaunchedEffect(currentPage.messageIdHex, currentPage.attachmentIndex) {
+    LaunchedEffect(currentPage.messageIdHex, currentPage.attachmentIndex, currentPageIsVideo) {
         val reset = resetViewerTransform()
         scale = reset.scale
         offset = reset.offset
+        chromeVisible = mediaViewerChromeVisibilityAfterPageChange(chromeVisible, currentPageIsVideo)
     }
 
     val currentRecordedAtLabel =
@@ -582,6 +587,7 @@ internal fun FullScreenMediaViewer(
                 }
             },
             snackbarHostState = snackbarHostState,
+            chromeVisible = chromeVisible,
         ) {
             StableMediaViewerPager(
                 pages = pages,
@@ -616,6 +622,7 @@ internal fun FullScreenMediaViewer(
                         onOffsetChange = { if (isCurrent) offset = it },
                         mine = pageDescriptor.mine,
                         isCurrent = isCurrent,
+                        onChromeToggle = { if (isCurrent) chromeVisible = !chromeVisible },
                     )
                 }
             }
@@ -640,121 +647,139 @@ internal fun MediaViewerFrame(
     actionOwner: Any? = null,
     onGoToMessage: (() -> Unit)? = null,
     onForwardMessage: (() -> Unit)? = null,
+    chromeVisible: Boolean = true,
     body: @Composable BoxScope.() -> Unit,
 ) {
     var moreExpanded by remember(actionOwner) { mutableStateOf(false) }
     var bottomChromeHeight by remember { mutableStateOf(0.dp) }
     val density = LocalDensity.current
+    val snackbarInsetSides =
+        if (chromeVisible) {
+            WindowInsetsSides.Horizontal
+        } else {
+            WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal
+        }
+    LaunchedEffect(chromeVisible) {
+        if (!chromeVisible) moreExpanded = false
+    }
     Box(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         body()
-        Surface(
-            modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter),
-            color = MaterialTheme.colorScheme.background,
-            contentColor = MaterialTheme.colorScheme.onBackground,
-        ) {
-            Row(
+        if (chromeVisible) {
+            Surface(
                 modifier =
                     Modifier
-                        .windowInsetsPadding(
-                            contentWindowInsets.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
-                        ).fillMaxWidth()
-                        .heightIn(min = 64.dp)
-                        .padding(horizontal = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                        .fillMaxWidth()
+                        .align(Alignment.TopCenter)
+                        .testTag(MEDIA_VIEWER_TOP_CHROME_TAG),
+                color = MaterialTheme.colorScheme.background,
+                contentColor = MaterialTheme.colorScheme.onBackground,
             ) {
-                IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
-                    Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.close))
-                }
-                Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
-                    Text(
-                        text = senderLabel,
-                        modifier = Modifier.testTag("conversation.media.viewer.sender"),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text =
-                            stringResource(
-                                R.string.media_viewer_metadata,
-                                recordedAtLabel,
-                                currentPosition,
-                                pageCount,
-                            ),
-                        modifier = Modifier.testTag("conversation.media.viewer.position"),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                Box {
-                    IconButton(onClick = { moreExpanded = true }, modifier = Modifier.size(48.dp)) {
-                        Icon(
-                            painterResource(R.drawable.ic_more_vert),
-                            contentDescription = stringResource(R.string.more_options),
+                Row(
+                    modifier =
+                        Modifier
+                            .windowInsetsPadding(
+                                contentWindowInsets.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
+                            ).fillMaxWidth()
+                            .heightIn(min = 64.dp)
+                            .padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
+                        Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.close))
+                    }
+                    Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
+                        Text(
+                            text = senderLabel,
+                            modifier = Modifier.testTag("conversation.media.viewer.sender"),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text =
+                                stringResource(
+                                    R.string.media_viewer_metadata,
+                                    recordedAtLabel,
+                                    currentPosition,
+                                    pageCount,
+                                ),
+                            modifier = Modifier.testTag("conversation.media.viewer.position"),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    WhiteNoiseDropdownMenu(
-                        expanded = moreExpanded,
-                        onDismissRequest = { moreExpanded = false },
-                        items =
-                            buildList {
-                                add(
-                                    WhiteNoiseMenuItem(
-                                        label = stringResource(R.string.media_save),
-                                        icon = R.drawable.ic_download,
-                                        onClick = onSave,
-                                    ),
-                                )
-                                if (onGoToMessage != null) {
+                    Box {
+                        IconButton(onClick = { moreExpanded = true }, modifier = Modifier.size(48.dp)) {
+                            Icon(
+                                painterResource(R.drawable.ic_more_vert),
+                                contentDescription = stringResource(R.string.more_options),
+                            )
+                        }
+                        WhiteNoiseDropdownMenu(
+                            expanded = moreExpanded,
+                            onDismissRequest = { moreExpanded = false },
+                            items =
+                                buildList {
                                     add(
                                         WhiteNoiseMenuItem(
-                                            label = stringResource(R.string.shared_content_go_to_message),
-                                            icon = R.drawable.ic_settings_chat_bubble_outline,
-                                            onClick = onGoToMessage,
+                                            label = stringResource(R.string.media_save),
+                                            icon = R.drawable.ic_download,
+                                            onClick = onSave,
                                         ),
                                     )
-                                }
-                            },
-                    )
+                                    if (onGoToMessage != null) {
+                                        add(
+                                            WhiteNoiseMenuItem(
+                                                label = stringResource(R.string.shared_content_go_to_message),
+                                                icon = R.drawable.ic_settings_chat_bubble_outline,
+                                                onClick = onGoToMessage,
+                                            ),
+                                        )
+                                    }
+                                },
+                        )
+                    }
                 }
             }
-        }
-        Surface(
-            modifier =
-                Modifier.fillMaxWidth().align(Alignment.BottomCenter).onSizeChanged {
-                    bottomChromeHeight = with(density) { it.height.toDp() }
-                },
-            color = MaterialTheme.colorScheme.background,
-            contentColor = MaterialTheme.colorScheme.onBackground,
-        ) {
-            Row(
+            Surface(
                 modifier =
                     Modifier
-                        .windowInsetsPadding(
-                            contentWindowInsets.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal),
-                        ).fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .testTag(MEDIA_VIEWER_BOTTOM_CHROME_TAG)
+                        .onSizeChanged { bottomChromeHeight = with(density) { it.height.toDp() } },
+                color = MaterialTheme.colorScheme.background,
+                contentColor = MaterialTheme.colorScheme.onBackground,
             ) {
-                IconButton(
-                    onClick = onShare,
-                    modifier = Modifier.size(48.dp).testTag("conversation.media.viewer.share"),
+                Row(
+                    modifier =
+                        Modifier
+                            .windowInsetsPadding(
+                                contentWindowInsets.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal),
+                            ).fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(painterResource(R.drawable.ic_share), contentDescription = stringResource(R.string.share))
-                }
-                if (onForwardMessage != null) {
                     IconButton(
-                        onClick = onForwardMessage,
-                        modifier = Modifier.size(48.dp).testTag("conversation.media.viewer.forward"),
+                        onClick = onShare,
+                        modifier = Modifier.size(48.dp).testTag("conversation.media.viewer.share"),
                     ) {
-                        Icon(
-                            painterResource(R.drawable.ic_forward),
-                            contentDescription = stringResource(R.string.media_viewer_forward_message),
-                        )
+                        Icon(painterResource(R.drawable.ic_share), contentDescription = stringResource(R.string.share))
+                    }
+                    if (onForwardMessage != null) {
+                        IconButton(
+                            onClick = onForwardMessage,
+                            modifier = Modifier.size(48.dp).testTag("conversation.media.viewer.forward"),
+                        ) {
+                            Icon(
+                                painterResource(R.drawable.ic_forward),
+                                contentDescription = stringResource(R.string.media_viewer_forward_message),
+                            )
+                        }
                     }
                 }
             }
@@ -764,8 +789,8 @@ internal fun MediaViewerFrame(
             modifier =
                 Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = bottomChromeHeight)
-                    .windowInsetsPadding(contentWindowInsets.only(WindowInsetsSides.Horizontal)),
+                    .padding(bottom = if (chromeVisible) bottomChromeHeight else 0.dp)
+                    .windowInsetsPadding(contentWindowInsets.only(snackbarInsetSides)),
             snackbar = { SwipeDismissibleSnackbar(it) },
         )
     }
@@ -784,6 +809,7 @@ internal fun ViewerPage(
     onOffsetChange: (Offset) -> Unit,
     mine: Boolean,
     isCurrent: Boolean,
+    onChromeToggle: () -> Unit,
 ) {
     // `pointerInput(pageKey)` only restarts when the key changes — its
     // coroutine outlives any single gesture. Function parameters
@@ -797,10 +823,19 @@ internal fun ViewerPage(
     val latestOffset by rememberUpdatedState(offset)
     val latestOnScaleChange by rememberUpdatedState(onScaleChange)
     val latestOnOffsetChange by rememberUpdatedState(onOffsetChange)
+    val latestOnChromeToggle by rememberUpdatedState(onChromeToggle)
     // `sourceEpoch` is folded into the page key so a viewer that failed
     // its first decrypt at epoch 0 (typed reference not yet loaded) re-keys
     // and retries when the real reference arrives.
     val pageKey = "$messageIdHex#$attachmentIndex#${reference.sourceEpoch}"
+    val cachedThumbnail =
+        remember(pageKey) {
+            controller
+                .thumbnailFor(messageIdHex, attachmentIndex)
+                ?.takeIf { MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType) }
+                ?.asImageBitmap()
+        }
+    val thumbhashImage = rememberThumbhashImage(reference.thumbhash)
     var presentation by remember(pageKey) { mutableStateOf<DecodedAttachmentPresentation?>(null) }
     var viewerFailed by remember(pageKey) { mutableStateOf(false) }
     var viewerReloadToken by remember(pageKey) { mutableIntStateOf(0) }
@@ -858,12 +893,6 @@ internal fun ViewerPage(
         Modifier
             .fillMaxSize()
             .pointerInput(pageKey) {
-                detectTapGestures(onDoubleTap = {
-                    val reset = resetViewerTransform()
-                    latestOnScaleChange(reset.scale)
-                    latestOnOffsetChange(reset.offset)
-                })
-            }.pointerInput(pageKey) {
                 awaitEachGesture {
                     do {
                         val event = awaitPointerEvent()
@@ -901,7 +930,20 @@ internal fun ViewerPage(
                 translationY = offset.y,
             )
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .viewerTapGestureModifier(
+                    gestureKey = pageKey,
+                    onSingleTap = { latestOnChromeToggle() },
+                    onDoubleTap = {
+                        val reset = resetViewerTransform()
+                        latestOnScaleChange(reset.scale)
+                        latestOnOffsetChange(reset.offset)
+                    },
+                ).testTag(MEDIA_VIEWER_PAGE_GESTURE_TAG),
+    ) {
         when (val current = presentation) {
             is DecodedAttachmentPresentation.Static ->
                 Image(
@@ -918,18 +960,13 @@ internal fun ViewerPage(
                     modifier = viewerGestureModifier,
                 )
             null ->
-                when {
-                    viewerFailed ->
-                        MediaViewerLoadFailed(
-                            onRetry = { viewerReloadToken += 1 },
-                            modifier = Modifier.align(Alignment.Center),
-                        )
-                    else ->
-                        CircularProgressIndicator(
-                            modifier = Modifier.align(Alignment.Center),
-                            color = MaterialTheme.colorScheme.onBackground,
-                        )
-                }
+                MediaViewerPendingFrame(
+                    cachedThumbnail = cachedThumbnail,
+                    thumbhashImage = thumbhashImage,
+                    displayName = MediaPipeline.safeDisplayName(reference.fileName),
+                    failed = viewerFailed,
+                    onRetry = { viewerReloadToken += 1 },
+                )
         }
     }
 }

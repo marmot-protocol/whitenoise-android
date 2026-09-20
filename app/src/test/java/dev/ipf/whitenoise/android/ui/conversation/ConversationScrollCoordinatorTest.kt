@@ -530,6 +530,105 @@ class ConversationScrollCoordinatorTest {
         }
 
     @Test
+    fun sentTailStaysPinnedUntilTheOptimisticRowClearsSettledBottomInputGeometry() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            var frame = 0
+
+            fun currentLayout() =
+                when {
+                    frame < 10 -> SentTailGeometry(tailOffset = -8, viewportEnd = 424, padding = 72, viewportSize = 496)
+                    frame < 13 -> SentTailGeometry(tailOffset = -8, viewportEnd = 432, padding = 64, viewportSize = 496)
+                    else -> SentTailGeometry(tailOffset = 0, viewportEnd = 432, padding = 64, viewportSize = 496)
+                }
+
+            assertFalse(
+                "the stale row begins inside the composer inset",
+                currentLayout().asTailLayout().tailClearsViewportStart,
+            )
+            assertTrue(
+                "an oversized row keeps the established visible-tail exception",
+                currentLayout().copy(tailSize = 600).asTailLayout().tailClearsViewportStart,
+            )
+
+            val revealed =
+                coordinator.revealSentAtLiveTail(
+                    resolveTailIndex = { 0 },
+                    captureLayout = { currentLayout().asTailLayout() },
+                    awaitFrame = { frame++ },
+                )
+
+            assertTrue(revealed)
+            assertEquals("a delayed bottom transition must not be mistaken for settled geometry", 15, frame)
+            assertTrue(
+                "the outgoing row must clear the measured composer edge",
+                currentLayout().asTailLayout().tailClearsViewportStart,
+            )
+            assertEquals(frame + 1, writer.writes.size)
+            assertTrue(writer.writes.all { it == ScrollWrite.Snap(0, 0) })
+        }
+
+    @Test
+    fun unmeasuredViewportIsNotReadyEvenWithBeforeContentPadding() {
+        val layout =
+            ConversationTailLayout(
+                lastRowHeightPx = 64,
+                tailOffsetPx = 0,
+                tailSizePx = 64,
+                viewportStartOffsetPx = -72,
+                viewportEndOffsetPx = 0,
+                beforeContentPaddingPx = 72,
+                viewportSizePx = 72,
+            )
+
+        assertFalse(layout.isReady)
+    }
+
+    @Test
+    fun userGestureCancelsSentTailSettleWithoutChangingTheSuccessfulRevealResult() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            val frames = Channel<Unit>(Channel.UNLIMITED)
+            val settleAwaitingFrame = CompletableDeferred<Unit>()
+            var awaitedFrames = 0
+            var revealResult = false
+            val reveal =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    revealResult =
+                        coordinator.revealSentAtLiveTail(
+                            resolveTailIndex = { 0 },
+                            captureLayout = {
+                                SentTailGeometry(
+                                    tailOffset = 0,
+                                    viewportEnd = 424,
+                                    padding = 72,
+                                    viewportSize = 496,
+                                ).asTailLayout()
+                            },
+                            awaitFrame = {
+                                awaitedFrames++
+                                if (awaitedFrames == 2) settleAwaitingFrame.complete(Unit)
+                                frames.receive()
+                            },
+                        )
+                }
+
+            frames.send(Unit)
+            settleAwaitingFrame.await()
+            assertEquals(listOf(ScrollWrite.Snap(0, 0), ScrollWrite.Snap(0, 0)), writer.writes)
+
+            coordinator.onUserGestureStarted(anchor(messageId = "reader", listIndex = 10, pixelOffset = 24))
+            repeat(24) { frames.trySend(Unit) }
+            reveal.join()
+
+            assertTrue("the optimistic row was revealed before the reader cancelled settling", revealResult)
+            assertEquals(listOf(ScrollWrite.Snap(0, 0), ScrollWrite.Snap(0, 0)), writer.writes)
+            assertEquals(ConversationScrollMode.ReadingHistory("reader", 24), coordinator.mode)
+        }
+
+    @Test
     fun userGestureCancelsReactionTailSettleBeforeAnotherCorrection() =
         runTest {
             val writer = RecordingScrollWriter()
@@ -1409,6 +1508,25 @@ class ConversationScrollCoordinatorTest {
             rowKeys = messageIds.map { messageId -> "msg:$messageId" to messageId },
             olderHeaderCount = 0,
         )
+
+    private data class SentTailGeometry(
+        val tailOffset: Int,
+        val viewportEnd: Int,
+        val padding: Int,
+        val viewportSize: Int,
+        val tailSize: Int = 64,
+    ) {
+        fun asTailLayout() =
+            ConversationTailLayout(
+                lastRowHeightPx = tailSize,
+                tailOffsetPx = tailOffset,
+                tailSizePx = tailSize,
+                viewportStartOffsetPx = -padding,
+                viewportEndOffsetPx = viewportEnd,
+                beforeContentPaddingPx = padding,
+                viewportSizePx = viewportSize,
+            )
+    }
 
     private sealed interface ScrollWrite {
         data class Snap(
