@@ -23519,6 +23519,30 @@
         ]
       },
       {
+        "surface": "R.string.tts_bar_return_to_source",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
+        "anchor": "R.string.tts_bar_return_to_source",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "R.string.tts_bar_skip_next",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
+        "anchor": "R.string.tts_bar_skip_next",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "R.string.tts_bar_skip_previous",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
+        "anchor": "R.string.tts_bar_skip_previous",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
+      {
         "surface": "R.string.tts_bar_stop",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
         "anchor": "R.string.tts_bar_stop",
