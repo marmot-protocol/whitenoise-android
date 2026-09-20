@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -15,6 +16,65 @@ import (
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip46"
 )
+
+type loopbackRelay struct {
+	mu          sync.Mutex
+	response    *nostr.Event
+	subscribers map[string]func(...any)
+}
+
+func newLoopbackRelay() *loopbackRelay {
+	return &loopbackRelay{subscribers: map[string]func(...any){}}
+}
+
+func (r *loopbackRelay) subscribe(id string, send func(...any)) {
+	r.mu.Lock()
+	r.subscribers[id] = send
+	response := r.response
+	r.mu.Unlock()
+	if response != nil {
+		send("EVENT", id, *response)
+	}
+}
+
+func (r *loopbackRelay) unsubscribe(id string) {
+	r.mu.Lock()
+	delete(r.subscribers, id)
+	r.mu.Unlock()
+}
+
+func (r *loopbackRelay) publish(response nostr.Event) {
+	r.mu.Lock()
+	r.response = &response
+	subscribers := make(map[string]func(...any), len(r.subscribers))
+	for id, send := range r.subscribers {
+		subscribers[id] = send
+	}
+	r.mu.Unlock()
+	for id, send := range subscribers {
+		send("EVENT", id, response)
+	}
+}
+
+func TestLoopbackRelayReplaysResponsePublishedBeforeSubscription(t *testing.T) {
+	response := nostr.Event{Kind: 24133, ID: strings.Repeat("a", 64)}
+	relay := newLoopbackRelay()
+	relay.publish(response)
+
+	var frames [][]any
+	relay.subscribe("late-subscription", func(values ...any) {
+		frames = append(frames, values)
+	})
+
+	if len(frames) != 1 || len(frames[0]) != 3 || frames[0][0] != "EVENT" ||
+		frames[0][1] != "late-subscription" {
+		t.Fatalf("cached response was not replayed to late subscriber: %#v", frames)
+	}
+	replayed, ok := frames[0][2].(nostr.Event)
+	if !ok || replayed.ID != response.ID {
+		t.Fatalf("cached response payload was not preserved: %#v", frames[0][2])
+	}
+}
 
 func TestReconnectOmitsConsumedInvitation(t *testing.T) {
 	key, clientKey := nostr.GeneratePrivateKey(), nostr.GeneratePrivateKey()
@@ -24,6 +84,7 @@ func TestReconnectOmitsConsumedInvitation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	seen := make(chan string, 1)
+	relay := newLoopbackRelay()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		conn, err := websocket.Accept(w, r, nil)
 		if err != nil {
@@ -31,7 +92,14 @@ func TestReconnectOmitsConsumedInvitation(t *testing.T) {
 		}
 		defer conn.CloseNow()
 		sub := ""
-		send := func(values ...any) { data, _ := json.Marshal(values); _ = conn.Write(ctx, websocket.MessageText, data) }
+		var writeMu sync.Mutex
+		send := func(values ...any) {
+			data, _ := json.Marshal(values)
+			writeMu.Lock()
+			defer writeMu.Unlock()
+			_ = conn.Write(ctx, websocket.MessageText, data)
+		}
+		defer func() { relay.unsubscribe(sub) }()
 		for {
 			_, raw, err := conn.Read(ctx)
 			if err != nil {
@@ -45,6 +113,7 @@ func TestReconnectOmitsConsumedInvitation(t *testing.T) {
 			_ = json.Unmarshal(parts[0], &kind)
 			if kind == "REQ" {
 				_ = json.Unmarshal(parts[1], &sub)
+				relay.subscribe(sub, send)
 				send("EOSE", sub)
 			}
 			if kind != "EVENT" {
@@ -69,7 +138,7 @@ func TestReconnectOmitsConsumedInvitation(t *testing.T) {
 				}
 			}
 			send("OK", event.ID, true, "")
-			send("EVENT", sub, response)
+			relay.publish(response)
 		}
 	}))
 	defer server.Close()
