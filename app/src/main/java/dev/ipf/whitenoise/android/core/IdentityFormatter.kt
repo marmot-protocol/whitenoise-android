@@ -111,6 +111,7 @@ object IdentityFormatter {
     private fun isLetter(grapheme: String): Boolean = grapheme.isNotEmpty() && Character.isLetter(grapheme.codePointAt(0))
 
     private const val CLOCK_SKEW_TOLERANCE_SECONDS = 60L
+    private const val BUBBLE_RELATIVE_TIME_WINDOW_SECONDS = 3_600L
 
     // Upper bound for a displayable timestamp: 9999-12-31T23:59:59Z. `epochSeconds`
     // is untrusted peer input, and `ULong.toLong()` wraps any high-bit value to a
@@ -187,15 +188,27 @@ object IdentityFormatter {
         }.getOrDefault("")
     }
 
-    /** Bubble footers carry the clock time only, the prototype's rule; day changes belong to the date headers. */
+    /**
+     * Compact bubble-footer time: elapsed copy for the first hour, then the localized clock time.
+     *
+     * The conversation's day separators keep ownership of the date while [now] makes the recent
+     * label deterministic and lets the Compose owner advance it only when the screen is resumed.
+     */
     fun messageBubbleTime(
         epochSeconds: ULong,
+        copy: RelativeTimeCopy = RelativeTimeCopy.Default,
         locale: Locale = Locale.getDefault(),
+        now: Instant = Instant.now(),
         zone: ZoneId = ZoneId.systemDefault(),
         force24Hour: Boolean? = null,
     ): String {
         if (epochSeconds == 0uL) return ""
-        return clockTime(epochSeconds, locale, zone, force24Hour)
+        val seconds = epochSeconds.toLong().coerceIn(0L, MAX_DISPLAYABLE_EPOCH_SECONDS)
+        return if (now.epochSecond - seconds < BUBBLE_RELATIVE_TIME_WINDOW_SECONDS) {
+            relativeTime(epochSeconds, copy, locale, now, zone)
+        } else {
+            clockTime(epochSeconds, locale, zone, force24Hour)
+        }
     }
 
     private fun localizedDateWithoutYearFormatter(locale: Locale): DateTimeFormatter =

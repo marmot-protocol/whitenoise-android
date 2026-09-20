@@ -232,10 +232,16 @@ class FreshSweepCoverageTest {
     @Test
     fun relativeTimeRefreshesOnResumeAndMinuteBoundaries() {
         val source = source("ui/common/CopyBundles.kt")
+        val bubbleTime = source.section("internal fun rememberedMessageBubbleTime", "internal fun rememberedClockTime")
 
         assertTrue(source.contains("Lifecycle.Event.ON_RESUME"))
         assertTrue(source.contains("Lifecycle.Event.ON_PAUSE"))
         assertTrue(source.contains("delay(relativeTimeRefreshDelayMillis(Instant.now()))"))
+        assertTrue(
+            "bubble times must observe the lifecycle-aware minute clock",
+            bubbleTime.contains("rememberRelativeTimeNow()"),
+        )
+        assertTrue("bubble times must feed that clock into the formatter", bubbleTime.contains("now = currentTime"))
         assertEquals(60_000L, relativeTimeRefreshDelayMillis(Instant.ofEpochMilli(120_000L)))
         assertEquals(1L, relativeTimeRefreshDelayMillis(Instant.ofEpochMilli(179_999L)))
     }
