@@ -19,7 +19,7 @@ internal suspend fun resolveAttachmentCacheAvailability(
         withContext(Dispatchers.Main.immediate) { memoryContains(cacheKey) }
 
 /** Returns bounded memory or an owner-private file lease that the caller must close. */
-@Suppress("ReturnCount") // Fast native hits must close over their own lease before legacy fallback setup.
+@Suppress("ReturnCount", "TooGenericExceptionCaught")
 internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
     request: AttachmentTransferRequest,
     reference: MediaAttachmentReferenceFfi,
@@ -27,13 +27,6 @@ internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
     persistInteractiveIntent: Boolean = true,
     onCacheMiss: (suspend () -> ByteArray)? = null,
 ): AttachmentPlaintext {
-    openNativeAttachment(request)?.let { native ->
-        if (priority == AttachmentDownloadPriority.Interactive && persistInteractiveIntent) {
-            clearInteractiveAttachmentDownloadIntent(request)
-        }
-        return native
-    }
-    acquireNativeAttachment(request, priority)?.let { return it }
     val cacheKey = request.run { mediaCacheKey(accountRef, groupIdHex, messageIdHex, attachmentIndex) }
     return resolveAttachmentPlaintext(
         loadMemory = { withContext(Dispatchers.Main.immediate) { cachedMediaPlaintext(cacheKey) } },
@@ -57,8 +50,27 @@ internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
             }
         },
         loadMiss = {
-            onCacheMiss?.invoke()
-                ?: downloadAttachmentPlaintext(request, reference, priority, persistInteractiveIntent)
+            val qualifiedRequest =
+                resolveNativeAttachmentTarget(request)?.let { target ->
+                    request.copy(sourceMessageIdHex = target.sourceMessageIdHex)
+                }
+            val native = qualifiedRequest?.let { openNativeAttachment(it) ?: acquireNativeAttachment(it, priority) }
+            if (native != null) {
+                try {
+                    if (priority == AttachmentDownloadPriority.Interactive && persistInteractiveIntent) {
+                        clearInteractiveAttachmentDownloadIntent(request)
+                    }
+                    native
+                } catch (failure: Throwable) {
+                    native.close()
+                    throw failure
+                }
+            } else {
+                AttachmentPlaintext.Bytes(
+                    onCacheMiss?.invoke()
+                        ?: downloadAttachmentPlaintext(request, reference, priority, persistInteractiveIntent),
+                )
+            }
         },
     )
 }
@@ -78,7 +90,7 @@ internal suspend fun resolveAttachmentPlaintext(
     ) -> AttachmentPlaintext?,
     cacheMemory: suspend (ByteArray) -> Unit,
     clearInteractiveIntent: suspend () -> Unit,
-    loadMiss: suspend () -> ByteArray,
+    loadMiss: suspend () -> AttachmentPlaintext,
 ): AttachmentPlaintext {
     val memory = loadMemory()
     val callerContext = currentCoroutineContext()
@@ -106,5 +118,5 @@ internal suspend fun resolveAttachmentPlaintext(
         (source ?: pendingSource)?.close()
         throw error
     }
-    return AttachmentPlaintext.Bytes(loadMiss())
+    return loadMiss()
 }

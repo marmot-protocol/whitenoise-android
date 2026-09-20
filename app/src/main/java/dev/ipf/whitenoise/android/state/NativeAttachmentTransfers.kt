@@ -7,11 +7,13 @@ import dev.ipf.marmotkit.AttachmentTransferStatusFfi
 import dev.ipf.marmotkit.AttachmentTransferSubscription
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import kotlinx.coroutines.CancellationException
-import java.io.ByteArrayOutputStream
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.Closeable
 import java.io.IOException
 
-private const val NATIVE_ATTACHMENT_IN_MEMORY_LIMIT_BYTES = 32L * 1024L * 1024L
+private const val NATIVE_ATTACHMENT_CANCEL_TIMEOUT_MILLIS = 5_000L
 
 private val NATIVE_TRANSFER_TERMINAL_FAILURES =
     setOf(
@@ -56,8 +58,10 @@ private interface NativeTransferFeed : Closeable {
 private class MarmotNativeTransferFeed(
     private val subscription: AttachmentTransferSubscription,
 ) : NativeTransferFeed {
+    /** Waits for the next transfer snapshot from the owned subscription. */
     override suspend fun next(): AttachmentTransferSnapshotFfi? = subscription.next()
 
+    /** Stops observation and releases the native subscription handle. */
     override fun close() {
         subscription.cancel()
         subscription.close()
@@ -74,10 +78,11 @@ internal suspend fun WhiteNoiseAppState.acquireNativeAttachment(
     request: AttachmentTransferRequest,
     priority: AttachmentDownloadPriority,
 ): AttachmentPlaintext? {
-    val target = request.nativeTarget()
+    val target = resolveNativeAttachmentTarget(request)
     if (!shouldUseNativeExplicitDemand(priority, target)) return null
     requireNotNull(target)
-    openNativeAttachment(request)?.let { return it }
+    val qualifiedRequest = request.copy(sourceMessageIdHex = target.sourceMessageIdHex)
+    openNativeAttachment(qualifiedRequest)?.let { return it }
 
     val ffiTarget = target.toFfi()
     val initial =
@@ -85,7 +90,7 @@ internal suspend fun WhiteNoiseAppState.acquireNativeAttachment(
             attachmentTransferSnapshot(request.accountRef, request.groupIdHex, listOf(ffiTarget))
         }
     initial.items.singleOrNull()?.takeIf { it.state == AttachmentTransferStateFfi.READY }?.let {
-        return openNativeAttachment(request)
+        return openNativeAttachment(qualifiedRequest)
     }
 
     val feed =
@@ -95,9 +100,9 @@ internal suspend fun WhiteNoiseAppState.acquireNativeAttachment(
             },
         )
     return try {
-        marmotIo { downloadAttachmentAgain(request.accountRef, request.groupIdHex, ffiTarget) }
-            ?: throw IOException("native attachment demand was rejected")
         feed.use { updates ->
+            marmotIo { downloadAttachmentAgain(request.accountRef, request.groupIdHex, ffiTarget) }
+                ?: throw IOException("native attachment demand was rejected")
             var ready = false
             while (!ready) {
                 val status =
@@ -111,10 +116,14 @@ internal suspend fun WhiteNoiseAppState.acquireNativeAttachment(
                 }
             }
         }
-        openNativeAttachment(request)
+        openNativeAttachment(qualifiedRequest)
             ?: throw IOException("native attachment was ready without readable bytes")
     } catch (cancelled: CancellationException) {
-        cancelNativeAttachment(request)
+        withContext(NonCancellable) {
+            withTimeoutOrNull(NATIVE_ATTACHMENT_CANCEL_TIMEOUT_MILLIS) {
+                runCatching { cancelNativeAttachment(request, target) }
+            }
+        }
         throw cancelled
     }
 }
@@ -123,8 +132,9 @@ internal suspend fun WhiteNoiseAppState.acquireNativeAttachment(
 @Suppress("ReturnCount") // Missing target/status/reference are distinct harmless stale-handle outcomes.
 internal suspend fun WhiteNoiseAppState.cancelNativeAttachment(
     request: AttachmentTransferRequest,
+    resolvedTarget: NativeAttachmentTarget? = null,
 ): Boolean {
-    val target = request.nativeTarget() ?: return false
+    val target = resolvedTarget ?: resolveNativeAttachmentTarget(request) ?: return false
     val status =
         marmotIo {
             attachmentTransferSnapshot(request.accountRef, request.groupIdHex, listOf(target.toFfi()))
@@ -132,18 +142,3 @@ internal suspend fun WhiteNoiseAppState.cancelNativeAttachment(
     val reference = status?.reference ?: return false
     return marmotIo { controlAttachment(request.accountRef, reference, AttachmentControlFfi.CANCEL) }
 }
-
-/** Materializes only bounded native plaintext for legacy byte-array consumers. */
-internal suspend fun WhiteNoiseAppState.acquireNativeAttachmentBytes(
-    request: AttachmentTransferRequest,
-    priority: AttachmentDownloadPriority,
-): ByteArray? =
-    acquireNativeAttachment(request, priority)?.use { source ->
-        if (source.size > NATIVE_ATTACHMENT_IN_MEMORY_LIMIT_BYTES) {
-            throw IOException("native attachment exceeds the bounded in-memory consumer limit")
-        }
-        ByteArrayOutputStream(source.size.toInt()).use { output ->
-            source.copyTo(output)
-            output.toByteArray()
-        }
-    }

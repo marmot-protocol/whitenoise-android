@@ -23,6 +23,7 @@ internal class AppProfileSignUp(
     private val markReady: () -> Unit,
 ) {
     private val directIdentityQualification = IdentityPolicyQualification()
+    private val profileIdentityCoordinator = SignUpIdentityCoordinator()
 
     /** Accepted native receipt survives recreation; only this adapter can replace it. */
     var pending by mutableStateOf<SignUpController?>(null)
@@ -41,13 +42,16 @@ internal class AppProfileSignUp(
                 scope = appState.mutationsScope,
                 currentOwner = { SignUpOwner(appState.runtimeGeneration, appState.activeAccountRef) },
                 ownerAvailable = ::ownerAvailable,
-                create = {
-                    runCatchingCancellable {
-                        appState.marmotIo { createIdentityWithBootstrapRelays() }
-                    }.onFailure {
-                        appState.presentFailure(R.string.toast_couldnt_create_identity, "IDENTITY_CREATE", it)
-                    }.getOrThrow()
+                create = { owner ->
+                    profileIdentityCoordinator.createOrReuse(owner) {
+                        runCatchingCancellable {
+                            appState.marmotIo { createIdentityWithBootstrapRelays() }
+                        }.onFailure {
+                            appState.presentFailure(R.string.toast_couldnt_create_identity, "IDENTITY_CREATE", it)
+                        }.getOrThrow()
+                    }
                 },
+                hasPendingIdentityReceipt = profileIdentityCoordinator::hasPendingReceipt,
                 qualify = { account ->
                     runCatchingCancellable {
                         appState.marmotIo { enforceAppOwnedAttachmentAcquisitionPolicy(listOf(account.label)) }
@@ -104,19 +108,22 @@ internal class AppProfileSignUp(
     }
 
     /** A late creation is refreshed into the account list without stealing the selected identity. */
-    private fun accept(
+    private suspend fun accept(
         summary: AccountSummaryFfi,
-        owner: SignUpOwner,
-    ): Boolean {
-        val ownsSource = appState.runtimeGeneration == owner.runtime && appState.activeAccountRef == owner.accountRef
-        return if (ownsSource && ownerAvailable()) {
-            activateCreatedIdentity(summary)
-            true
-        } else {
-            appState.launchMutation { appState.refreshAccounts() }
-            false
+        @Suppress("UNUSED_PARAMETER") controllerOwner: SignUpOwner,
+    ): Boolean =
+        profileIdentityCoordinator.reconcile(summary) { creationOwner ->
+            val ownsSource =
+                appState.runtimeGeneration == creationOwner.runtime &&
+                    appState.activeAccountRef == creationOwner.accountRef
+            if (ownsSource && ownerAvailable()) {
+                activateCreatedIdentity(summary)
+                SignUpIdentityReconciliation(receiptHandled = true, activated = true)
+            } else {
+                appState.refreshAccounts()
+                SignUpIdentityReconciliation(receiptHandled = true, activated = false)
+            }
         }
-    }
 
     /** Only the accepted identity in the original runtime may complete the form and enter Ready. */
     private fun finish(

@@ -245,6 +245,7 @@ internal fun StableMediaViewerPager(
         } else {
             modifier.semantics { stateDescription = pagePositionDescription }
         }
+    val pageContentLayoutDirection = LocalLayoutDirection.current
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         HorizontalPager(
             state = selection.pagerState,
@@ -253,7 +254,9 @@ internal fun StableMediaViewerPager(
             userScrollEnabled = userScrollEnabled,
         ) { page ->
             val pageDescriptor = pages[clampViewerPageIndex(page, pages.size)]
-            pageContent(pageDescriptor, pageDescriptor.key() == currentPageKey)
+            CompositionLocalProvider(LocalLayoutDirection provides pageContentLayoutDirection) {
+                pageContent(pageDescriptor, pageDescriptor.key() == currentPageKey)
+            }
         }
     }
 }

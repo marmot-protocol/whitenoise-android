@@ -9041,7 +9041,7 @@ class ConversationController(
             groupIdHex = group.groupIdHex,
             messageIdHex = messageIdHex,
             attachmentIndex = attachmentIndex,
-            sourceMessageIdHex = timelineRecords[messageIdHex]?.sourceMessageIdHex,
+            sourceMessageIdHex = nativeAttachmentSourceId(messageIdHex),
         )
 
     private fun mediaUploadSessionStillCurrent(account: String): Boolean =

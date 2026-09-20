@@ -27,7 +27,10 @@ internal fun wipeSessionAttachmentPlaintext(
         MediaCacheDirs.COMPOSER_PASTE,
         MediaCacheDirs.NATIVE_ATTACHMENT_LEASES,
     ).forEach { name ->
-        runCatching { java.io.File(cacheRoot, name).deleteRecursively() }
-            .onFailure { failure -> onFailure(name, failure) }
+        runCatching {
+            check(java.io.File(cacheRoot, name).deleteRecursively()) {
+                "failed to delete session plaintext directory"
+            }
+        }.onFailure { failure -> onFailure(name, failure) }
     }
 }

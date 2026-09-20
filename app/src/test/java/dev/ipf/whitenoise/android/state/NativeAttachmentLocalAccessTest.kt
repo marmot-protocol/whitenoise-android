@@ -13,6 +13,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 
 class NativeAttachmentLocalAccessTest {
+    /** Native targets never substitute a display ID for their source ID. */
     @Test
     fun `target preserves display id source id and original album index`() {
         val target = NativeAttachmentTarget(DISPLAY_ID, SOURCE_ID, 7)
@@ -24,6 +25,7 @@ class NativeAttachmentLocalAccessTest {
         assertEquals(7u, ffi.attachmentIndex)
     }
 
+    /** Large retained assets stream through bounded reads and closeable leases. */
     @Test
     fun `reader uses bounded chunks and deletes lease when closed`() =
         runTest {
@@ -56,6 +58,7 @@ class NativeAttachmentLocalAccessTest {
             root.deleteRecursively()
         }
 
+    /** A zero-length retained asset is represented by a valid empty lease. */
     @Test
     fun `available empty chunk is eof including zero byte attachment`() =
         runTest {
@@ -71,6 +74,7 @@ class NativeAttachmentLocalAccessTest {
             source.close()
         }
 
+    /** An unavailable later chunk deletes every byte of the partial lease. */
     @Test
     fun `unavailable chunk invalidates and removes partial file`() =
         runTest {
@@ -95,6 +99,28 @@ class NativeAttachmentLocalAccessTest {
             root.deleteRecursively()
         }
 
+    /** A same-process sign-out wipe recreates the previously prepared lease root safely. */
+    @Test
+    fun `removed prepared directory is recreated before the next lease`() =
+        runTest {
+            val root = temporaryRoot()
+            val access =
+                NativeAttachmentLocalAccess(
+                    cacheRoot = root,
+                    queryAssets = { listOf(AttachmentLocalAssetFfi("empty", 0u)) },
+                    readAsset = { _, _, _ -> AttachmentLocalBytesFfi(true, byteArrayOf()) },
+                )
+            access.open(listOf(target())).single()?.close()
+            val directory = File(root, "native_attachment_leases")
+            assertTrue(directory.deleteRecursively())
+
+            access.open(listOf(target())).single()?.close()
+
+            assertTrue(directory.isDirectory)
+            root.deleteRecursively()
+        }
+
+    /** Native local-access batches enforce the MarmotKit request bound. */
     @Test(expected = IllegalArgumentException::class)
     fun `query batches are capped at sixty four`() =
         runTest {
@@ -105,8 +131,10 @@ class NativeAttachmentLocalAccessTest {
             ).open(List(65) { target(index = it) })
         }
 
+    /** Builds an exact native target for one authored attachment slot. */
     private fun target(index: Int = 0) = NativeAttachmentTarget(DISPLAY_ID, SOURCE_ID, index)
 
+    /** Creates an isolated lease root for one local-access scenario. */
     private fun temporaryRoot(): File =
         File(
             System.getProperty("java.io.tmpdir"),

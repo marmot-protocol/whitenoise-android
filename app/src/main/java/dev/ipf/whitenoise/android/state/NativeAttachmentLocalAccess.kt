@@ -62,10 +62,10 @@ internal class NativeAttachmentLocalAccess(
     private fun prepareLeaseDirectory() {
         val directory = File(cacheRoot, MediaCacheDirs.NATIVE_ATTACHMENT_LEASES)
         synchronized(preparedNativeAttachmentRoots) {
-            if (preparedNativeAttachmentRoots.add(directory.absolutePath)) {
-                directory.deleteRecursively()
-                directory.mkdirs()
-            }
+            if (directory.absolutePath in preparedNativeAttachmentRoots && directory.isDirectory) return
+            check(directory.deleteRecursively()) { "failed to remove orphaned native attachment plaintext" }
+            check(directory.mkdirs() || directory.isDirectory) { "failed to create native attachment lease directory" }
+            preparedNativeAttachmentRoots.add(directory.absolutePath)
         }
     }
 
@@ -74,7 +74,8 @@ internal class NativeAttachmentLocalAccess(
     private suspend fun materialize(asset: AttachmentLocalAssetFfi): AttachmentPlaintext? {
         val reference = asset.reference ?: return null
         require(asset.byteCount <= Long.MAX_VALUE.toULong()) { "native attachment is too large for Android file APIs" }
-        val directory = File(cacheRoot, MediaCacheDirs.NATIVE_ATTACHMENT_LEASES).apply { mkdirs() }
+        val directory = File(cacheRoot, MediaCacheDirs.NATIVE_ATTACHMENT_LEASES)
+        check(directory.isDirectory) { "native attachment lease directory is unavailable" }
         val file = File(directory, "lease-${nativeAttachmentLeaseCounter.incrementAndGet()}.tmp")
         var completed = false
         try {
@@ -110,7 +111,7 @@ internal fun AttachmentPlaintext.leaseFileForTesting(): File? = (this as? Attach
 
 /** Reads one native-retained asset without making its opaque locator durable. */
 internal suspend fun WhiteNoiseAppState.openNativeAttachment(request: AttachmentTransferRequest): AttachmentPlaintext? {
-    val target = request.nativeTarget() ?: return null
+    val target = resolveNativeAttachmentTarget(request) ?: return null
     return NativeAttachmentLocalAccess(
         cacheRoot = diskMediaCache.siblingCacheRoot(),
         queryAssets = { targets ->
@@ -124,8 +125,14 @@ internal suspend fun WhiteNoiseAppState.openNativeAttachment(request: Attachment
 
 /** Returns whether MarmotKit currently owns verified readable plaintext for this exact target. */
 internal suspend fun WhiteNoiseAppState.hasNativeAttachment(request: AttachmentTransferRequest): Boolean {
-    val target = request.nativeTarget() ?: return false
+    val target = resolveNativeAttachmentTarget(request) ?: return false
     return marmotIo {
         attachmentLocalAssets(request.accountRef, request.groupIdHex, listOf(target.toFfi()))
     }.single().reference != null
 }
+
+/** Resolves legacy source-less requests through native history before local access. */
+@Suppress("MaxLineLength") // Kept as an expression body by ktlint's formatter.
+internal suspend fun WhiteNoiseAppState.resolveNativeAttachmentTarget(request: AttachmentTransferRequest): NativeAttachmentTarget? =
+    request.nativeTarget()
+        ?: runCatchingCancellable { findNativeAttachment(request)?.target }.getOrNull()

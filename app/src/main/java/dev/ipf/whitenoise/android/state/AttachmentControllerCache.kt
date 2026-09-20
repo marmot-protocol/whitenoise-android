@@ -70,3 +70,4 @@ internal suspend fun ConversationController.downloadAttachmentSource(
 /** Returns the authoritative source id for a loaded projection, never the display id as a fallback. */
 internal fun ConversationController.nativeAttachmentSourceId(messageIdHex: String): String? =
     timeline.firstOrNull { it.record.messageIdHex == messageIdHex }?.projected?.sourceMessageIdHex
+        ?: timelineRecords[messageIdHex]?.sourceMessageIdHex

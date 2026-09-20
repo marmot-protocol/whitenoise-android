@@ -10,6 +10,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class NativeAttachmentHistoryTest {
+    /** A matched row retains both display/source identities and the authored slot. */
     @Test
     fun `history lookup preserves source identity and original album index`() {
         val entry = entry(index = 4)
@@ -22,6 +23,20 @@ class NativeAttachmentHistoryTest {
         assertEquals(4, match.target.attachmentIndex)
     }
 
+    /** Legacy source-less requests recover the authoritative source identity from native history. */
+    @Test
+    fun `history lookup qualifies a source-less request`() {
+        val match =
+            requireNotNull(
+                entry(index = 4).matchingAttachment(
+                    AttachmentTransferRequest("account", GROUP_ID, DISPLAY_ID, 4),
+                ),
+            )
+
+        assertEquals(SOURCE_ID, match.target.sourceMessageIdHex)
+    }
+
+    /** A mismatched display, source, or slot is rejected fail-closed. */
     @Test
     fun `history lookup rejects a display source or index mismatch`() {
         val entry = entry(index = 4)
@@ -39,6 +54,7 @@ class NativeAttachmentHistoryTest {
         assertNull(entry.matchingAttachment(AttachmentTransferRequest("account", GROUP_ID, DISPLAY_ID, 3, SOURCE_ID)))
     }
 
+    /** Builds one accepted native history entry. */
     private fun entry(index: Int): AttachmentEntryFfi =
         AttachmentEntryFfi(
             messageIdHex = DISPLAY_ID,
@@ -51,6 +67,7 @@ class NativeAttachmentHistoryTest {
             attachment = MediaAttachmentOutcomeFfi.Accepted(index.toUInt(), reference()),
         )
 
+    /** Builds the retained attachment reference carried by a history row. */
     private fun reference() =
         MediaAttachmentReferenceFfi(
             locators = emptyList(),

@@ -145,7 +145,7 @@ class AttachmentPlaintextResolverTest {
                     loadDisk = { _, onAcquired -> null.also(onAcquired) },
                     cacheMemory = {},
                     clearInteractiveIntent = { cleared = true },
-                    loadMiss = { expected },
+                    loadMiss = { AttachmentPlaintext.Bytes(expected) },
                 )
 
             assertTrue(resolved is AttachmentPlaintext.Bytes)

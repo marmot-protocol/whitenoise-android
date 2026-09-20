@@ -93,13 +93,13 @@ private suspend fun WhiteNoiseAppState.findNativeAttachmentGeneration(request: A
             when (read) {
                 is AttachmentPageReadFfi.Page -> {
                     val page = read.page
+                    val nextCursor = page.nextCursor
+                    var transferredNextCursor = false
                     try {
                         if (page.version.changeSince(baseline) != AttachmentHistoryChangeFfi.UNCHANGED) {
-                            page.nextCursor?.close()
                             return NativeAttachmentHistoryRead.Restart
                         }
                         page.entries.firstNotNullOfOrNull { it.matchingAttachment(request) }?.let { match ->
-                            page.nextCursor?.close()
                             return if (attachmentHistoryStillUnchanged(request, baseline)) {
                                 NativeAttachmentHistoryRead.Found(match)
                             } else {
@@ -107,7 +107,6 @@ private suspend fun WhiteNoiseAppState.findNativeAttachmentGeneration(request: A
                             }
                         }
                         if (!page.hasMore) {
-                            page.nextCursor?.close()
                             return if (attachmentHistoryStillUnchanged(request, baseline)) {
                                 NativeAttachmentHistoryRead.Complete
                             } else {
@@ -115,9 +114,11 @@ private suspend fun WhiteNoiseAppState.findNativeAttachmentGeneration(request: A
                             }
                         }
                         cursor =
-                            page.nextCursor
+                            nextCursor
                                 ?: throw IOException("native attachment history omitted its next cursor")
+                        transferredNextCursor = true
                     } finally {
+                        if (!transferredNextCursor) nextCursor?.close()
                         page.version.close()
                     }
                 }

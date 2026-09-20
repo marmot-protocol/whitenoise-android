@@ -341,7 +341,7 @@ internal fun ChatRow(
         },
         supportingContent = supportingContent@{
             val draft =
-                chatRowDraftPreviewText(
+                chatRowDraftPreview(
                     item = item,
                     legacyDraft = appState.chatRowDraftFor(accountRef, item.group.groupIdHex),
                 )
@@ -381,7 +381,15 @@ internal fun ChatRow(
                                     avatarAccount?.let { appState.chatMemberTitle(it) }
                                         ?: stringResource(R.string.someone),
                                 )
-                            draft != null -> stringResource(R.string.chat_row_draft_prefix) + draft
+                            draft != null -> {
+                                val draftText =
+                                    draft.text
+                                        ?: draft.attachmentKind
+                                            ?.let { kind ->
+                                                messageTextCopy.attachmentLabel(kind, draft.attachmentCount)
+                                            }.orEmpty()
+                                chatRowDraftText(stringResource(R.string.chat_row_draft_prefix), draftText)
+                            }
                             empty -> stringResource(R.string.no_messages_yet)
                             else ->
                                 item.projectedPreviewText(
@@ -416,23 +424,24 @@ internal fun ChatRow(
                     preview = preview,
                     fontStyle = if (draft != null) FontStyle.Italic else FontStyle.Normal,
                     attachmentKind =
-                        item.projection
-                            ?.lastMessage
-                            ?.takeIf {
-                                draft == null &&
-                                    !invitation &&
-                                    !empty &&
-                                    (
-                                        item.selectedPreview == null ||
-                                            item.selectedPreview == SelectedChatPreviewFfi.Message
-                                    ) &&
-                                    !it.deleted &&
-                                    (
-                                        it.kind == LEGACY_NOTE_KIND ||
-                                            it.kind == CHAT_MESSAGE_KIND ||
-                                            it.kind == AGENT_STREAM_FINAL_KIND
-                                    )
-                            }?.attachmentKind,
+                        draft?.attachmentKind
+                            ?: item.projection
+                                ?.lastMessage
+                                ?.takeIf {
+                                    draft == null &&
+                                        !invitation &&
+                                        !empty &&
+                                        (
+                                            item.selectedPreview == null ||
+                                                item.selectedPreview == SelectedChatPreviewFfi.Message
+                                        ) &&
+                                        !it.deleted &&
+                                        (
+                                            it.kind == LEGACY_NOTE_KIND ||
+                                                it.kind == CHAT_MESSAGE_KIND ||
+                                                it.kind == AGENT_STREAM_FINAL_KIND
+                                        )
+                                }?.attachmentKind,
                 )
             }
         },

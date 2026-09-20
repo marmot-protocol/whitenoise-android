@@ -50,9 +50,10 @@ internal class SignUpController(
     private val scope: CoroutineScope,
     private val currentOwner: () -> SignUpOwner,
     private val ownerAvailable: () -> Boolean,
-    private val create: suspend () -> AccountSummaryFfi,
+    private val create: suspend (SignUpOwner) -> AccountSummaryFfi,
+    private val hasPendingIdentityReceipt: () -> Boolean,
     private val qualify: suspend (AccountSummaryFfi) -> Unit,
-    private val accept: (AccountSummaryFfi, SignUpOwner) -> Boolean,
+    private val accept: suspend (AccountSummaryFfi, SignUpOwner) -> Boolean,
     private val upload: suspend (String, ImageUploadDraft) -> String,
     private val publish: suspend (String, UserProfileMetadataFfi) -> Boolean,
     private val finish: (AccountSummaryFfi, SignUpOwner) -> Boolean,
@@ -64,7 +65,6 @@ internal class SignUpController(
     var acceptedIdentity by mutableStateOf<AccountSummaryFfi?>(null)
         private set
     private var discarded = false
-    private var createdIdentityReceipt: AccountSummaryFfi? = null
     private val openingOwner = currentOwner()
     private var owner: SignUpOwner? = null
     private var uploadedPhotoUrl: String? = null
@@ -117,7 +117,7 @@ internal class SignUpController(
 
     /** Back before accepted creation discards only the local draft and never issues a native command. */
     fun discardUnsubmitted(): Boolean {
-        if (stage.busy || createdIdentityReceipt != null || acceptedIdentity != null) return false
+        if (stage.busy || hasPendingIdentityReceipt() || acceptedIdentity != null) return false
         discarded = true
         draft = null
         owner = null
@@ -162,7 +162,7 @@ internal class SignUpController(
         if (acceptedIdentity != null) return true
         val captured = checkNotNull(owner)
         return if (ownerAvailable() && currentOwner() == captured) {
-            val created = createdIdentityReceipt ?: create().also { createdIdentityReceipt = it }
+            val created = create(captured)
             qualify(created)
             acceptedIdentity = created
             accept(created, captured)

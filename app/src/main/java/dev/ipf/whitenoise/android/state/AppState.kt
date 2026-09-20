@@ -3982,7 +3982,7 @@ class WhiteNoiseAppState private constructor(
 
         val deferred =
             memoizedDownload(cacheKey, request, priority) {
-                downloadAndCacheAttachment(request, reference, cacheKey, priority)
+                downloadAndCacheAttachment(request, reference, cacheKey)
             }
         return deferred.await().also {
             if (tracksInteractiveIntent) {
@@ -3991,23 +3991,21 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /** Downloads once through MDK and publishes non-empty plaintext into both cache tiers. */
+    /** Downloads through the legacy byte API and publishes non-empty plaintext into both cache tiers. */
     private suspend fun downloadAndCacheAttachment(
         request: AttachmentTransferRequest,
         reference: MediaAttachmentReferenceFfi,
         cacheKey: String,
-        priority: AttachmentDownloadPriority,
     ): ByteArray {
         val publicationToken = diskMediaCache.capturePublicationToken()
         val plaintext =
-            acquireNativeAttachmentBytes(request, priority)
-                ?: runCatchingCancellable {
-                    marmotIo(MarmotTraceSection.MEDIA_DOWNLOAD) {
-                        downloadMedia(request.accountRef, request.groupIdHex, reference)
-                    }.plaintext
-                }.onFailure { failure ->
-                    logAttachmentDownloadFailure(request, failure)
-                }.getOrThrow()
+            runCatchingCancellable {
+                marmotIo(MarmotTraceSection.MEDIA_DOWNLOAD) {
+                    downloadMedia(request.accountRef, request.groupIdHex, reference)
+                }.plaintext
+            }.onFailure { failure ->
+                logAttachmentDownloadFailure(request, failure)
+            }.getOrThrow()
         if (plaintext.isNotEmpty()) {
             cacheMediaPlaintext(cacheKey, plaintext)
             withContext(Dispatchers.IO) {

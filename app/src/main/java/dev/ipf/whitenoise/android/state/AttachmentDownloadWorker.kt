@@ -101,7 +101,6 @@ internal fun attachmentDownloadWorkName(request: AttachmentTransferRequest): Str
             request.accountRef,
             request.groupIdHex.lowercase(),
             request.messageIdHex.lowercase(),
-            request.sourceMessageIdHex?.lowercase().orEmpty(),
             request.attachmentIndex.toString(),
         ).joinToString("\u0000")
     return "attachment_download_${attachmentIdentityDigest(canonical)}"

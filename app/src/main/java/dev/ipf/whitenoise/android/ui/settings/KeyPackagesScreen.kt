@@ -144,12 +144,10 @@ private fun KeyPackagesScreenForAccount(
     suspend fun reload(refreshFromNetwork: Boolean = false) {
         loading = true
         try {
-            val refreshedInventory = loadKeyPackages(refreshFromNetwork)
-            val refreshedRelayEvents = loadRelayEvents(refreshFromNetwork)
-            inventory = refreshedInventory
-            relayEvents = refreshedRelayEvents
+            inventory = loadKeyPackages(refreshFromNetwork)
             loaded = true
             refreshFailed = false
+            relayEvents = loadRelayEvents(refreshFromNetwork)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Throwable) {

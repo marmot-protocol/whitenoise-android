@@ -75,6 +75,7 @@ class ChatListProjectionEqualityTest {
         assertEquals(project(row, null), project(row, null))
     }
 
+    /** Every native row capability survives equality-sensitive projection updates. */
     @Test
     fun projectionPreservesAllTenNativeRowCapabilities() {
         val actions =

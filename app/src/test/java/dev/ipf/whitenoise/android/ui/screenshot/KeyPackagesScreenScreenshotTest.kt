@@ -31,11 +31,13 @@ class KeyPackagesScreenScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Default dark state shows publication controls without invented inventory. */
     @Test
     fun keyPackagesScreenDefaultDark() {
         capture(packages = emptyList(), path = "src/test/snapshots/key_packages_screen_default_dark.png")
     }
 
+    /** Dark inventory distinguishes relay publication from retained local material. */
     @Test
     fun keyPackagesScreenWithRetainedLocalMaterialDark() {
         val published =
@@ -83,6 +85,20 @@ class KeyPackagesScreenScreenshotTest {
         capture(emptyList(), "src/test/snapshots/key_packages_empty_rtl_large_font.png", rtl = true, fontScale = 2f)
     }
 
+    /** A failed relay refresh keeps retained inventory visible with its recovery explainer. */
+    @Test
+    fun keyPackagesRefreshFailureKeepsInventoryVisible() {
+        capture(
+            packages =
+                listOf(
+                    keyPackage("34".repeat(32), "ab".repeat(32), true),
+                    keyPackage("56".repeat(32), "", false),
+                ),
+            path = "src/test/snapshots/key_packages_refresh_failure_dark.png",
+            refreshFailed = true,
+        )
+    }
+
     /** Renders the fixture and records its screenshot baseline. */
     private fun capture(
         packages: List<AccountKeyPackageFfi>,
@@ -91,6 +107,7 @@ class KeyPackagesScreenScreenshotTest {
         amoled: Boolean = false,
         rtl: Boolean = false,
         fontScale: Float = 1f,
+        refreshFailed: Boolean = false,
     ) {
         val originalTimeZone = TimeZone.getDefault()
         try {
@@ -110,6 +127,7 @@ class KeyPackagesScreenScreenshotTest {
                                         loading = false,
                                         working = false,
                                         packageCount = packages.count { it.relay },
+                                        refreshFailed = refreshFailed,
                                     ),
                                 packages = packages,
                                 onBack = {},
