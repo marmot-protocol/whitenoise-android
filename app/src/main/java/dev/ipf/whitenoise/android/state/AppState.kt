@@ -4256,7 +4256,7 @@ class WhiteNoiseAppState private constructor(
             "notification listener unavailable before Marmot startup"
         }
         runtimeStartResult.await().getOrThrowAtStartupStage(BootstrapStage.RUNTIME_START)
-        runtime.marmot.enforceAppOwnedAttachmentAcquisitionForKnownAccounts()
+        marmotIo { enforceAppOwnedAttachmentAcquisitionForKnownAccounts() }
         runtime.marmot.emitAuditRuntimeReadinessAfterStart()
         runtimeMirrors.attention.start(this, runtime.marmot)
     }

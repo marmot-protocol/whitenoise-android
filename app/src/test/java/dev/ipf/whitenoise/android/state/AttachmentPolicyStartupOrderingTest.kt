@@ -32,6 +32,10 @@ class AttachmentPolicyStartupOrderingTest {
             "policy enforcement must follow the awaited native readiness result",
             awaitStart > listener && containment > awaitStart,
         )
+        assertTrue(
+            "policy I/O must use the off-main Marmot bridge",
+            body.substring(awaitStart, containment).contains("marmotIo {"),
+        )
         assertTrue("startup audit/mirror publication must remain behind containment", auditReady > containment)
     }
 
