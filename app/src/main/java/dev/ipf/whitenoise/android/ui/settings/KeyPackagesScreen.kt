@@ -27,14 +27,18 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AccountKeyPackageFfi
+import dev.ipf.marmotkit.AccountKeyPackageInventoryEntryFfi
+import dev.ipf.marmotkit.AccountKeyPackageLocalStateFfi
 import dev.ipf.marmotkit.AccountKeyPackageRelayEventFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.fetchKeyPackageInventory
 import dev.ipf.whitenoise.android.state.keyPackageRelayHistory
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 internal enum class KeyPackagesSection {
@@ -49,6 +53,7 @@ internal data class KeyPackagesState(
     val actionsEnabled: Boolean,
     val packageActionsEnabled: Boolean,
     val showLoadingIndicator: Boolean,
+    val showRefreshError: Boolean = false,
     val packageCount: Int,
 )
 
@@ -59,6 +64,7 @@ internal fun keyPackagesState(
     loading: Boolean,
     working: Boolean,
     packageCount: Int,
+    refreshFailed: Boolean = false,
 ): KeyPackagesState =
     KeyPackagesState(
         sections =
@@ -71,6 +77,7 @@ internal fun keyPackagesState(
         actionsEnabled = hasActiveAccount && !loading && !working,
         packageActionsEnabled = !working,
         showLoadingIndicator = loading,
+        showRefreshError = refreshFailed,
         packageCount = packageCount,
     )
 
@@ -93,7 +100,8 @@ internal const val KEY_PACKAGES_CONTENT_TAG = "key-packages-content"
 internal fun KeyPackagesScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
-    loadKeyPackages: suspend (refreshFromNetwork: Boolean) -> List<AccountKeyPackageFfi> = appState::fetchKeyPackages,
+    loadKeyPackages: suspend (refreshFromNetwork: Boolean) -> List<AccountKeyPackageInventoryEntryFfi> =
+        appState::fetchKeyPackageInventory,
     deleteKeyPackage: suspend (accountRef: String, eventIdHex: String, sourceRelays: List<String>) -> Boolean =
         appState::deleteKeyPackage,
     loadRelayEvents: suspend (refreshFromNetwork: Boolean) -> List<AccountKeyPackageRelayEventFfi> =
@@ -120,24 +128,32 @@ private fun KeyPackagesScreenForAccount(
     appState: WhiteNoiseAppState,
     accountRef: String?,
     onBack: () -> Unit,
-    loadKeyPackages: suspend (refreshFromNetwork: Boolean) -> List<AccountKeyPackageFfi>,
+    loadKeyPackages: suspend (refreshFromNetwork: Boolean) -> List<AccountKeyPackageInventoryEntryFfi>,
     deleteKeyPackage: suspend (accountRef: String, eventIdHex: String, sourceRelays: List<String>) -> Boolean,
     loadRelayEvents: suspend (refreshFromNetwork: Boolean) -> List<AccountKeyPackageRelayEventFfi>,
 ) {
     val scope = rememberCoroutineScope()
-    var packages by remember { mutableStateOf<List<AccountKeyPackageFfi>>(emptyList()) }
+    var inventory by remember { mutableStateOf<List<AccountKeyPackageInventoryEntryFfi>>(emptyList()) }
     var relayEvents by remember { mutableStateOf<List<AccountKeyPackageRelayEventFfi>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
     var working by remember { mutableStateOf(false) }
     var loaded by remember { mutableStateOf(false) }
+    var refreshFailed by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<AccountKeyPackageFfi?>(null) }
 
     suspend fun reload(refreshFromNetwork: Boolean = false) {
         loading = true
         try {
-            packages = loadKeyPackages(refreshFromNetwork)
-            relayEvents = loadRelayEvents(refreshFromNetwork)
+            val refreshedInventory = loadKeyPackages(refreshFromNetwork)
+            val refreshedRelayEvents = loadRelayEvents(refreshFromNetwork)
+            inventory = refreshedInventory
+            relayEvents = refreshedRelayEvents
             loaded = true
+            refreshFailed = false
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Throwable) {
+            refreshFailed = true
         } finally {
             loading = false
         }
@@ -154,9 +170,11 @@ private fun KeyPackagesScreenForAccount(
                 loaded = loaded,
                 loading = loading,
                 working = working,
-                packageCount = packages.relayBacked().size,
+                packageCount = inventory.map { it.record }.relayBacked().size,
+                refreshFailed = refreshFailed,
             ),
-        packages = packages,
+        packages = inventory.map { it.record },
+        inventory = inventory,
         relayEvents = relayEvents,
         onBack = onBack,
         onRefresh = { scope.launch { reload(refreshFromNetwork = true) } },
@@ -237,9 +255,21 @@ internal fun KeyPackagesContent(
     onPublishNew: () -> Unit,
     onDelete: (AccountKeyPackageFfi) -> Unit,
     relayEvents: List<AccountKeyPackageRelayEventFfi> = emptyList(),
+    inventory: List<AccountKeyPackageInventoryEntryFfi> =
+        packages.map { record ->
+            AccountKeyPackageInventoryEntryFfi(
+                record = record,
+                localState =
+                    if (record.local) {
+                        AccountKeyPackageLocalStateFfi.OTHER_OWNED
+                    } else {
+                        AccountKeyPackageLocalStateFfi.NOT_LOCAL
+                    },
+            )
+        },
 ) {
-    val published = packages.relayBacked()
-    val retained = packages.filter { it.local && !it.relay }
+    val published = inventory.filter { it.record.relay }
+    val retained = inventory.filter { it.localState != AccountKeyPackageLocalStateFfi.NOT_LOCAL && !it.record.relay }
     SettingsScaffold(
         title = stringResource(R.string.key_packages),
         onBack = onBack,
@@ -269,6 +299,9 @@ internal fun KeyPackagesContent(
                     }
                 }
             }
+            if (state.showRefreshError) {
+                item { SettingsExplainer(stringResource(R.string.key_packages_refresh_failed_preserved)) }
+            }
             item { SettingsSection(stringResource(R.string.published)) }
             if (KeyPackagesSection.Empty in state.sections) {
                 item {
@@ -283,8 +316,13 @@ internal fun KeyPackagesContent(
                     )
                 }
             }
-            itemsIndexed(published, key = { index, kp -> "published-${kp.eventIdHex}:$index" }) { _, kp ->
-                PublishedKeyPackage(kp, state.packageActionsEnabled, onDelete = { onDelete(kp) })
+            itemsIndexed(published, key = { index, entry -> "published-${entry.record.eventIdHex}:$index" }) { _, entry ->
+                PublishedKeyPackage(
+                    entry.record,
+                    state.packageActionsEnabled,
+                    localState = entry.localState,
+                    onDelete = { onDelete(entry.record) },
+                )
             }
             item { KeyPackageRelayHistory(relayEvents) }
             item { SettingsSection(stringResource(R.string.developer_retained)) }
@@ -294,8 +332,8 @@ internal fun KeyPackagesContent(
             if (retained.isEmpty() && !state.showLoadingIndicator && packagesResolved) {
                 item { SettingsExplainer(stringResource(R.string.developer_no_retained)) }
             }
-            itemsIndexed(retained, key = { index, kp -> "local-${kp.keyPackageId}:$index" }) { _, kp ->
-                RetainedKeyPackage(kp)
+            itemsIndexed(retained, key = { index, entry -> "local-${entry.record.keyPackageId}:$index" }) { _, entry ->
+                RetainedKeyPackage(entry.record, entry.localState)
             }
             item { SettingsExplainer(stringResource(R.string.developer_retained_help)) }
         }

@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -14,6 +15,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import dev.ipf.marmotkit.AccountKeyPackageFfi
+import dev.ipf.marmotkit.AccountKeyPackageLocalStateFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import java.time.Instant
@@ -27,6 +29,8 @@ import java.util.Locale
 internal fun PublishedKeyPackage(
     kp: AccountKeyPackageFfi,
     actionsEnabled: Boolean,
+    localState: AccountKeyPackageLocalStateFfi =
+        if (kp.local) AccountKeyPackageLocalStateFfi.OTHER_OWNED else AccountKeyPackageLocalStateFfi.NOT_LOCAL,
     onDelete: () -> Unit,
 ) {
     val sources =
@@ -53,6 +57,13 @@ internal fun PublishedKeyPackage(
         }
         row("source") { context ->
             SettingsValue(context, stringResource(R.string.developer_package_source), sources.joinToString(" · "))
+        }
+        row("local-state") { context ->
+            SettingsValue(
+                context,
+                stringResource(R.string.key_package_local_state),
+                stringResource(localState.labelResource()),
+            )
         }
         row("relays") { context ->
             SettingsValue(
@@ -89,13 +100,23 @@ internal fun PublishedKeyPackage(
 /** Local material stays explicitly separate from relay publication and offers no deletion action. */
 @Composable
 @Suppress("FunctionNaming")
-internal fun RetainedKeyPackage(kp: AccountKeyPackageFfi) {
+internal fun RetainedKeyPackage(
+    kp: AccountKeyPackageFfi,
+    localState: AccountKeyPackageLocalStateFfi = AccountKeyPackageLocalStateFfi.RETAINED_PRIVATE_MATERIAL,
+) {
     SettingsGroup(modifier = Modifier.testTag("key_packages.retained.${kp.keyPackageRefHex}")) {
         row("id") { context ->
             KeyPackageCopyValue(context, stringResource(R.string.developer_package_id), kp.keyPackageId)
         }
         row("source") { context ->
             SettingsValue(context, stringResource(R.string.developer_package_source), stringResource(R.string.local))
+        }
+        row("local-state") { context ->
+            SettingsValue(
+                context,
+                stringResource(R.string.key_package_local_state),
+                stringResource(localState.labelResource()),
+            )
         }
         row("size") { context ->
             SettingsValue(
@@ -106,6 +127,17 @@ internal fun RetainedKeyPackage(kp: AccountKeyPackageFfi) {
         }
     }
 }
+
+/** Localized diagnostic label for MarmotKit's durable ownership state. */
+@StringRes
+private fun AccountKeyPackageLocalStateFfi.labelResource(): Int =
+    when (this) {
+        AccountKeyPackageLocalStateFfi.NOT_LOCAL -> R.string.key_package_local_state_not_local
+        AccountKeyPackageLocalStateFfi.CURRENT -> R.string.key_package_local_state_current
+        AccountKeyPackageLocalStateFfi.PENDING_REPLACEMENT -> R.string.key_package_local_state_pending_replacement
+        AccountKeyPackageLocalStateFfi.RETAINED_PRIVATE_MATERIAL -> R.string.key_package_local_state_retained
+        AccountKeyPackageLocalStateFfi.OTHER_OWNED -> R.string.key_package_local_state_other_owned
+    }
 
 /** Short diagnostic identifiers retain their complete clipboard value when tapped. */
 @Composable

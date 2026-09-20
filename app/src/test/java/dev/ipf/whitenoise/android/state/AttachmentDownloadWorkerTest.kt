@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import androidx.work.WorkInfo
+import androidx.work.workDataOf
 import dev.ipf.marmotkit.MarmotKitException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -25,6 +26,7 @@ class AttachmentDownloadWorkerTest {
                 groupIdHex = "ab".repeat(16),
                 messageIdHex = "cd".repeat(32),
                 attachmentIndex = 3,
+                sourceMessageIdHex = "ef".repeat(32),
             )
 
         val encoded = AttachmentDownloadWorkData.encode(request)
@@ -34,6 +36,24 @@ class AttachmentDownloadWorkerTest {
         assertFalse(serialized.contains("https://"))
         assertFalse(serialized.contains("ciphertext"))
         assertFalse(serialized.contains("nonce"))
+    }
+
+    @Test
+    fun legacyWorkDataWithoutASourceMessageIdStillDecodes() {
+        val decoded =
+            AttachmentDownloadWorkData.decode(
+                workDataOf(
+                    "account_ref" to "account-a",
+                    "group_id_hex" to "ab".repeat(16),
+                    "message_id_hex" to "cd".repeat(32),
+                    "attachment_index" to 3,
+                ),
+            )
+
+        assertEquals(
+            AttachmentTransferRequest("account-a", "ab".repeat(16), "cd".repeat(32), 3),
+            decoded,
+        )
     }
 
     @Test

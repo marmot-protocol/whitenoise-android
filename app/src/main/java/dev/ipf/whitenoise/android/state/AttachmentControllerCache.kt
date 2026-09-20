@@ -44,7 +44,14 @@ internal suspend fun ConversationController.downloadAttachmentSource(
     priority: AttachmentDownloadPriority,
 ): AttachmentPlaintext {
     val account = boundAccountRef ?: error("no active account")
-    val request = AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex)
+    val request =
+        AttachmentTransferRequest(
+            account,
+            group.groupIdHex,
+            messageIdHex,
+            attachmentIndex,
+            sourceMessageIdHex = nativeAttachmentSourceId(messageIdHex),
+        )
     return appState.downloadAttachmentPlaintextSource(
         request = request,
         reference = reference,
@@ -59,3 +66,7 @@ internal suspend fun ConversationController.downloadAttachmentSource(
         },
     )
 }
+
+/** Returns the authoritative source id for a loaded projection, never the display id as a fallback. */
+internal fun ConversationController.nativeAttachmentSourceId(messageIdHex: String): String? =
+    timeline.firstOrNull { it.record.messageIdHex == messageIdHex }?.projected?.sourceMessageIdHex

@@ -26,6 +26,13 @@ internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
     persistInteractiveIntent: Boolean = true,
     onCacheMiss: (suspend () -> ByteArray)? = null,
 ): AttachmentPlaintext {
+    openNativeAttachment(request)?.let { native ->
+        if (priority == AttachmentDownloadPriority.Interactive && persistInteractiveIntent) {
+            clearInteractiveAttachmentDownloadIntent(request)
+        }
+        return native
+    }
+    acquireNativeAttachment(request, priority)?.let { return it }
     val cacheKey = request.run { mediaCacheKey(accountRef, groupIdHex, messageIdHex, attachmentIndex) }
     return resolveAttachmentPlaintext(
         loadMemory = { withContext(Dispatchers.Main.immediate) { cachedMediaPlaintext(cacheKey) } },

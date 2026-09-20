@@ -50,6 +50,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import dev.ipf.marmotkit.ChatListAttachmentKindFfi
+import dev.ipf.marmotkit.SelectedChatPreviewFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MessageBodyMatch
@@ -340,9 +341,14 @@ internal fun ChatRow(
         },
         supportingContent = supportingContent@{
             val draft =
-                appState
-                    .chatRowDraftFor(accountRef, item.group.groupIdHex)
-                    ?.takeIf { it.isNotBlank() }
+                chatRowDraftPreviewText(
+                    item = item,
+                    legacyDraft = appState.chatRowDraftFor(accountRef, item.group.groupIdHex),
+                )
+            val invitation =
+                item.selectedPreview == SelectedChatPreviewFfi.Invitation ||
+                    (item.selectedPreview == null && item.group.pendingConfirmation)
+            val empty = item.selectedPreview == SelectedChatPreviewFfi.Empty
             // Tokens only ever describe the last message's body, so they're
             // ignored whenever the line shows something else (invite copy,
             // draft). When the controller hasn't parsed yet (or the parse
@@ -350,7 +356,13 @@ internal fun ChatRow(
             // parsing happens here — composition stays parse-free.
             val markdownPreview =
                 item.previewTokens
-                    ?.takeIf { !item.group.pendingConfirmation && draft == null && it.blocks.isNotEmpty() }
+                    ?.takeIf {
+                        !invitation &&
+                            !empty &&
+                            draft == null &&
+                            it.blocks.isNotEmpty() &&
+                            (item.selectedPreview == null || item.selectedPreview == SelectedChatPreviewFfi.Message)
+                    }
             val preview =
                 if (markdownPreview != null) {
                     rememberMarkdownPreviewText(
@@ -363,13 +375,14 @@ internal fun ChatRow(
                 } else {
                     AnnotatedString(
                         when {
-                            item.group.pendingConfirmation ->
+                            invitation ->
                                 stringResource(
                                     R.string.invited_to_chat_by,
                                     avatarAccount?.let { appState.chatMemberTitle(it) }
                                         ?: stringResource(R.string.someone),
                                 )
                             draft != null -> stringResource(R.string.chat_row_draft_prefix) + draft
+                            empty -> stringResource(R.string.no_messages_yet)
                             else ->
                                 item.projectedPreviewText(
                                     copy = messageTextCopy,
@@ -407,7 +420,9 @@ internal fun ChatRow(
                             ?.lastMessage
                             ?.takeIf {
                                 draft == null &&
-                                    !item.group.pendingConfirmation &&
+                                    !invitation &&
+                                    !empty &&
+                                    (item.selectedPreview == null || item.selectedPreview == SelectedChatPreviewFfi.Message) &&
                                     !it.deleted &&
                                     (
                                         it.kind == LEGACY_NOTE_KIND ||
@@ -437,6 +452,17 @@ internal fun ChatRow(
             },
     )
 }
+
+/** Prefers MarmotKit's atomic row preview while retaining old-row compatibility. */
+internal fun chatRowDraftPreviewText(
+    item: ChatListItem,
+    legacyDraft: String?,
+): String? =
+    when (val selected = item.selectedPreview) {
+        is SelectedChatPreviewFfi.Draft -> selected.draft.text
+        null -> legacyDraft
+        else -> null
+    }?.takeIf { it.isNotBlank() }
 
 /** Quiet title-adjacent native status marker; descriptions distinguish muted, timed and ended membership. */
 @Suppress("FunctionNaming")

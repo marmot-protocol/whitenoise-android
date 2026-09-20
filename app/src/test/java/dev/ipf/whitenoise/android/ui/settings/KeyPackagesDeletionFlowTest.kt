@@ -9,6 +9,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountKeyPackageFfi
+import dev.ipf.marmotkit.AccountKeyPackageInventoryEntryFfi
+import dev.ipf.marmotkit.AccountKeyPackageLocalStateFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
@@ -86,6 +88,28 @@ class KeyPackagesDeletionFlowTest {
         assertEquals(1, loads.get())
     }
 
+    /** An explicit network failure leaves the already rendered local inventory intact. */
+    @Test
+    fun refreshFailurePreservesLocalInventoryAndShowsAnErrorState() {
+        val target = relayPackage()
+        val loads = AtomicInteger()
+
+        render(
+            load = { refresh ->
+                loads.incrementAndGet()
+                if (refresh) error("relay unavailable") else listOf(target)
+            },
+            delete = { _, _, _ -> false },
+        )
+        waitForLoads(1, loads)
+
+        composeRule.onNodeWithText(context.getString(R.string.refresh)).performClick()
+        waitForLoads(2, loads)
+
+        composeRule.onNodeWithText(IdentityFormatter.short(target.keyPackageId)).assertExists()
+        composeRule.onNodeWithText(context.getString(R.string.key_packages_refresh_failed_preserved)).assertExists()
+    }
+
     /** Renders the production account-scoped screen with controllable MDK load and delete boundaries. */
     private fun render(
         load: suspend (Boolean) -> List<AccountKeyPackageFfi>,
@@ -105,7 +129,14 @@ class KeyPackagesDeletionFlowTest {
                     KeyPackagesScreen(
                         appState = appState,
                         onBack = {},
-                        loadKeyPackages = load,
+                        loadKeyPackages = { refresh ->
+                            load(refresh).map { record ->
+                                AccountKeyPackageInventoryEntryFfi(
+                                    record,
+                                    AccountKeyPackageLocalStateFfi.CURRENT,
+                                )
+                            }
+                        },
                         deleteKeyPackage = delete,
                     )
                 }

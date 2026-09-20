@@ -1362,6 +1362,7 @@ internal fun ChatsScreen(
                                 val ownsMenu = actionSheetChatId == rowId && rowId in visibleChatIds
                                 ownsMenu && actionMenuOwner.isCurrent(menuToken) && menuActionsCurrent()
                             },
+                            actions = item.actions,
                         )
                     }
                 }
