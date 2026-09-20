@@ -6116,7 +6116,8 @@ class WhiteNoiseAppState private constructor(
     suspend fun refreshSecurityPrivacySettings() {
         diagnostics.refresh(marmot())
         auditLogSettingsMutex.withLock {
-            auditLogSettings = runCatchingCancellable { marmotIo { auditLogSettings() } }.getOrNull()
+            // A failed re-read keeps what is on screen rather than presenting a settled choice as off.
+            runCatchingCancellable { marmotIo { auditLogSettings() } }.getOrNull()?.let { auditLogSettings = it }
         }
     }
 
