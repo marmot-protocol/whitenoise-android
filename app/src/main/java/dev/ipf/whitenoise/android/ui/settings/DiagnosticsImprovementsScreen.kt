@@ -286,19 +286,7 @@ private fun AuditLogExportFlow(
                 if (inFlight) return@AuditLogExportConsentDialog
                 onConfirmOpenChange(false)
                 onInFlightChange(true)
-                runAuditMutation {
-                    // Preparation rethrows cancellation, so release the flag in a finally: leaving
-                    // it set would disable the export row for the life of the retained screen
-                    // state with no way for the reader to retry.
-                    var staged = false
-                    try {
-                        val archive = appState.prepareAuditLogArchiveForExport()
-                        onStagedArchivePathChange(archive?.absolutePath)
-                        staged = archive != null
-                    } finally {
-                        if (!staged) onInFlightChange(false)
-                    }
-                }
+                runAuditMutation { appState.stageAuditLogArchive(onStagedArchivePathChange, onInFlightChange) }
             },
         )
     }
@@ -324,6 +312,28 @@ private fun AuditLogExportFlow(
                 }.onFailure { appState.present(R.string.toast_couldnt_export_audit_logs) }
             },
         )
+    }
+}
+
+/**
+ * Stages one archive for the acknowledged export, releasing the export guard unless a destination
+ * was established.
+ *
+ * Preparation rethrows cancellation, so the guard is released in a `finally`: leaving it set would
+ * disable the export row for the life of the retained screen state with no way for the reader to
+ * retry.
+ */
+private suspend fun WhiteNoiseAppState.stageAuditLogArchive(
+    onStagedArchivePathChange: (String?) -> Unit,
+    onInFlightChange: (Boolean) -> Unit,
+) {
+    var staged = false
+    try {
+        val archive = prepareAuditLogArchiveForExport()
+        onStagedArchivePathChange(archive?.absolutePath)
+        staged = archive != null
+    } finally {
+        if (!staged) onInFlightChange(false)
     }
 }
 
