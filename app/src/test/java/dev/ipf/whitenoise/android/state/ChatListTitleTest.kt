@@ -352,6 +352,8 @@ class ChatListTitleTest {
         avatar = null,
         lastMessage =
             ChatListMessagePreviewFfi(
+                retentionSeconds = null,
+                retentionExpiresAt = null,
                 messageIdHex = "last-message",
                 sender = "peer-acc",
                 senderDisplayName = null,

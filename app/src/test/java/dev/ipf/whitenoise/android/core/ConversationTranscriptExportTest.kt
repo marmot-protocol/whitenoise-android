@@ -424,6 +424,7 @@ class ConversationTranscriptExportTest {
         reactions: TimelineReactionSummaryFfi = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
         groupSystem: GroupSystemEventFfi? = null,
     ) = TimelineMessageRecordFfi(
+        clientToken = null,
         messageIdHex = messageIdHex,
         sourceMessageIdHex = null,
         direction = direction,

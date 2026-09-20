@@ -176,6 +176,7 @@ class ConvergenceRetryMediaMatchTest {
         groupIdHex: String,
     ): TimelineMessageRecordFfi =
         TimelineMessageRecordFfi(
+            clientToken = null,
             messageIdHex = messageIdHex,
             sourceMessageIdHex = null,
             direction = "sent",

@@ -105,6 +105,7 @@ class GroupSystemPreparedIdentityTest {
 
     private fun systemRecord() =
         TimelineMessageRecordFfi(
+            clientToken = null,
             messageIdHex = "11".repeat(32),
             sourceMessageIdHex = null,
             direction = "system",

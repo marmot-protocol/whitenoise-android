@@ -288,11 +288,7 @@ internal class AttachmentDownloadGate(
  * failures fail immediately instead of repeating a potentially minute-long request.
  */
 internal fun isTransientAttachmentDownloadFailure(throwable: Throwable): Boolean {
-    val explicitlyTerminal =
-        throwable is CancellationException ||
-            throwable is MarmotKitException.InvalidMediaReference ||
-            throwable is MarmotKitException.MediaAttachmentRejected ||
-            throwable is MarmotKitException.MediaUnfetchable
+    val explicitlyTerminal = isTerminalAttachmentDownloadFailure(throwable)
     val typedTransient = throwable is MarmotKitException.StorageBusy || throwable is IOException
     val text =
         generateSequence(throwable) { it.cause }
@@ -314,3 +310,17 @@ internal fun isTransientAttachmentDownloadFailure(throwable: Throwable): Boolean
                 "temporary failure in name resolution" in text
     }
 }
+
+/** Typed contract failures and native terminal states cannot be repaired by a host transport retry. */
+private fun isTerminalAttachmentDownloadFailure(failure: Throwable): Boolean =
+    when (failure) {
+        is CancellationException,
+        is MarmotKitException.InvalidMediaReference,
+        is MarmotKitException.MediaAttachmentRejected,
+        is MarmotKitException.MediaUnfetchable,
+        is MarmotKitException.AttachmentModeRequired,
+        is MarmotKitException.AttachmentAccountSignedOut,
+        is NativeAttachmentTerminalException,
+        -> true
+        else -> false
+    }

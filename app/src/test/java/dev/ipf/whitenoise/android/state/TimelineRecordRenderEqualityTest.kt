@@ -15,6 +15,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TimelineRecordRenderEqualityTest {
+    /** Correlation arriving after the body must trigger exact optimistic reconciliation. */
+    @Test
+    fun callerTokenChangeInvalidatesRenderedRecord() {
+        assertFalse(timelineRecordsRenderEqual(record(), record().copy(clientToken = "logical-send")))
+    }
+
     @Test
     fun typedMediaChangeInvalidatesRenderedRecord() {
         val withoutMedia = record()
@@ -66,6 +72,7 @@ class TimelineRecordRenderEqualityTest {
 
     private fun record() =
         TimelineMessageRecordFfi(
+            clientToken = null,
             messageIdHex = "message",
             sourceMessageIdHex = "source",
             direction = "received",

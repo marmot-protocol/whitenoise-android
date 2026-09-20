@@ -653,6 +653,8 @@ class ChatsControllerDmMemberHydrationTest {
         avatar = null,
         lastMessage =
             ChatListMessagePreviewFfi(
+                retentionSeconds = null,
+                retentionExpiresAt = null,
                 messageIdHex = "msg-1",
                 sender = PEER,
                 senderDisplayName = null,

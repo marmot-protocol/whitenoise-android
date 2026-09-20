@@ -698,6 +698,7 @@ class NotificationFirstPostIntegrationTest {
         tags: List<MessageTagFfi> = emptyList(),
     ): TimelineMessageRecordFfi =
         TimelineMessageRecordFfi(
+            clientToken = null,
             messageIdHex = "message-a",
             sourceMessageIdHex = null,
             direction = direction,

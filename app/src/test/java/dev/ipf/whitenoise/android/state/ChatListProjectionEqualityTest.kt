@@ -122,6 +122,8 @@ class ChatListProjectionEqualityTest {
 
     private fun preview() =
         ChatListMessagePreviewFfi(
+            retentionSeconds = null,
+            retentionExpiresAt = null,
             messageIdHex = "b".repeat(64),
             sender = PEER_ACCOUNT,
             senderDisplayName = null,

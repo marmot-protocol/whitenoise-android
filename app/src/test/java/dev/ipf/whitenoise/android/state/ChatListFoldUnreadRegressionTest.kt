@@ -592,6 +592,8 @@ class ChatListFoldUnreadRegressionTest {
         lastMessage =
             if (includeLastMessage) {
                 ChatListMessagePreviewFfi(
+                    retentionSeconds = null,
+                    retentionExpiresAt = null,
                     messageIdHex = messageId,
                     sender = "sender",
                     senderDisplayName = "Sender",

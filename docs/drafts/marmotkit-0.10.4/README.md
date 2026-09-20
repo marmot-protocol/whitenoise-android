@@ -5,7 +5,7 @@ runtime pin. This is an execution assessment, not a second product backlog.
 
 ## Status and publication boundary
 
-- Local preparation only. No upgrade PR has been opened or branch pushed.
+- Local implementation draft only. No upgrade PR has been opened or branch pushed.
 - Worktree: `/Users/user/Workspace/marmot-protocol/wn-marmotkit-0.10.4`.
 - Branch: `build/marmotkit-0.10.4`.
 - Preparation base: `cf4d1a147855829182221297cf68d5093f153f2a`, the committed local
@@ -13,8 +13,9 @@ runtime pin. This is an execution assessment, not a second product backlog.
   reviewed or merged head. Published #2691 was `f1fc27041` during this assessment.
 - The #2691 worktree has active uncommitted review fixes. None were copied or
   changed. This draft must inherit their final merged result before publication.
-- The production lock remains 0.10.3. `MARMOT_VERSION.candidate` is an inert,
-  independently verifiable 0.10.4 candidate, not the active Gradle input.
+- The isolated branch now activates the verified 0.10.4 lock. Implementation is
+  underway; see `IMPLEMENTATION-STATUS.md` for exact coverage and pending gates.
+  The candidate file remains a reproducible copy of the same artifact cohort.
 - User instruction: keep the next PR unpublished until the user merges #2691.
   This document does not establish a background merge watcher.
 
@@ -55,8 +56,9 @@ candidate lock, local archive and an isolated temporary cache. This includes
 manifest/layout checks, ABI/ELF export checks and generated API signature checks.
 Generated binding SHA-256:
 `ac4c4daed9991998f3bd5fc2a6b6efd2231b7eaf0f633b39eb48c3b1e7427d12`.
-No Android consumer build, unit suite, device install or database migration was
-run for 0.10.4. Artifact validation is not application qualification.
+The initial Android compatibility compile passed. Behavioral adoption and
+qualification are tracked separately in `IMPLEMENTATION-STATUS.md`; artifact
+validation alone is not application qualification.
 
 To reproduce from this worktree (temporary artifacts may be cleaned by the OS):
 
@@ -102,12 +104,13 @@ comments before changing fakes; nullable does not mean optional constructor inpu
 
 ## Proposed single-PR scope
 
-Default recommendation pending the user's scope reply: one cohesive upgrade PR
-with compatibility, host-managed downloads, and required preview expiry. Use
-reviewable commits rather than additional PRs. Durable-send adoption is optional
-upstream and can remain on the supported old APIs for faster shipment; do not
-silently claim those five methods are consumed. If the user selects full send
-adoption, include the send checkpoint below in the same PR and its acceptance gate.
+The user selected binding consumption now, held locally until #2691 merges:
+one cohesive upgrade PR with compatibility, host-managed downloads, required
+preview expiry, and durable-send adoption. All eight new methods now have
+production call sites. Use reviewable commits rather than additional PRs.
+Call sites do not establish full product qualification: the send checkpoint below
+still applies, and non-draft/mismatched media retains the supported legacy
+publication fallback described in `IMPLEMENTATION-STATUS.md`.
 
 This release removes the missing host-permission prerequisite from #2691. It does
 not automatically complete #2691's native history UI, retry/remove UI, or leave
@@ -202,7 +205,7 @@ unread state. Unknown duration, zero duration, finite expiry and overflow/no fin
 expiry are distinct. Ensure equality/memoization sees retention changes. Add a
 localized empty/expired presentation consistent with current UI and tracked snapshots.
 
-### 4. Optional durable-send checkpoint (scope decision pending)
+### 4. Durable-send checkpoint (included by user instruction)
 
 Use one opaque 1–128 UTF-8-byte token per logical submission. Insert optimistic UI
 before draft persistence/FFI, reconcile only the exact echoed `clientToken`, and let
@@ -245,7 +248,7 @@ all of #2493's online attention budget, durable timing, or user recovery require
    `ChatRowRetentionExpiryTest` for exact deadline, no list event, resume, disabled,
    unknown, overflow and draft/invitation independence. Add deterministic Roborazzi
    before/at-expiry baselines, including relevant RTL/dark states.
-6. If checkpoint 4 is selected, test text/reply/revisioned-draft/media, interruption,
+6. For checkpoint 4, test text/reply/revisioned-draft/media, interruption,
    same-token retry, rejection, three identical rapid sends, restart, account/group
    removal and exact optimistic settlement. Measure optimistic display and local
    acceptance separately from transport completion.
@@ -273,8 +276,8 @@ traffic evidence. Engine budgets are limits, not measurements or proof of that c
    after fetching master and committing
    intended local changes). Do not replay all pre-squash #2691 commits onto master.
 3. Re-read changed ownership/constructor/policy code and rerun the API consumer scan.
-   Update this draft's decisions/evidence and resolve the optional-send scope reply.
-4. Implement and verify the selected checkpoints as one PR. Recheck the Project 7
+   Start from `IMPLEMENTATION-STATUS.md`; update evidence against the rebased code.
+4. Finish the remaining qualification checkpoints as one PR. Recheck the Project 7
    issues and exact-head review threads; close only outcomes actually delivered.
 5. Only then push/open the PR, attach it to the task and Project 7 as In Progress,
    publish exact-head visual evidence and verify rendered image links. Do not mark
@@ -282,7 +285,7 @@ traffic evidence. Engine budgets are limits, not measurements or proof of that c
 
 See [PR body draft](PR-DRAFT.md). For a new implementation agent:
 
-> Read this README and PR-DRAFT.md, then verify the live #2691 state. Work only in
+> Read IMPLEMENTATION-STATUS.md, this README and PR-DRAFT.md, then verify the live #2691 state. Work only in
 > wn-marmotkit-0.10.4, preserve other worktrees, and keep the PR unpublished until
 > #2691 is merged. Use the Android CLI and applicable skills. Adopt exact native
 > contracts, preserve user data, and report verification and remaining scope honestly.

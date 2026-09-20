@@ -43,6 +43,7 @@ internal fun timelineAppMessage(
 
 private fun projectedRecordFor(record: AppMessageRecordFfi): TimelineMessageRecordFfi =
     TimelineMessageRecordFfi(
+        clientToken = null,
         messageIdHex = record.messageIdHex,
         sourceMessageIdHex = record.messageIdHex,
         direction = record.direction,

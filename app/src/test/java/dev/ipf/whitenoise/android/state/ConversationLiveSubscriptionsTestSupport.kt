@@ -169,6 +169,7 @@ internal fun timelineRecord(
     plaintext: String = "body-$messageId",
 ): TimelineMessageRecordFfi =
     TimelineMessageRecordFfi(
+        clientToken = null,
         messageIdHex = messageId,
         sourceMessageIdHex = messageId,
         direction = "received",
@@ -305,6 +306,8 @@ internal fun conversationTimelineGroupRoster(): GroupRosterFfi =
 
 internal fun notifiedMessagePreview(): ChatListMessagePreviewFfi =
     ChatListMessagePreviewFfi(
+        retentionSeconds = null,
+        retentionExpiresAt = null,
         messageIdHex = ConversationTimelineTestIds.MESSAGE_B,
         sender = ConversationTimelineTestIds.SENDER_ID,
         senderDisplayName = "Peer",

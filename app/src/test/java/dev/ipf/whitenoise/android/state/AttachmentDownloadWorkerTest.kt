@@ -9,6 +9,22 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AttachmentDownloadWorkerTest {
+    /** Runtime mode and signed-out failures cannot be repaired by repeating attachment network work. */
+    @Test
+    fun nativePermissionErrorsAreTerminalForTheWorker() {
+        assertFalse(shouldRetryAttachmentDownloadWork(0, MarmotKitException.AttachmentModeRequired()))
+        assertFalse(shouldRetryAttachmentDownloadWork(0, MarmotKitException.AttachmentAccountSignedOut()))
+    }
+
+    /** Recovering native source identity must not strand pre-upgrade work or cancellation markers. */
+    @Test
+    fun recoveredSourceDoesNotChangeDurableWorkIdentity() {
+        val legacy = AttachmentTransferRequest("account", "ab".repeat(16), "cd".repeat(32), 3)
+        val resolved = legacy.copy(sourceMessageIdHex = "ef".repeat(32))
+        assertEquals(attachmentDownloadWorkName(legacy), attachmentDownloadWorkName(resolved))
+        assertEquals(attachmentIdentityTag(legacy), attachmentIdentityTag(resolved))
+    }
+
     /** Backlog stop removes only queued automatic work without interactive intent. */
     @Test
     fun backlogStopCancelsOnlyQueuedAutomaticWork() {

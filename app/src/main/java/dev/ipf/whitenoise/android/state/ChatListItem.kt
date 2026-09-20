@@ -83,8 +83,8 @@ internal fun chatListItemFromProjection(
                     kind = preview.kind,
                     tags = emptyList(),
                     sourceEpoch = null,
-                    retentionSeconds = null,
-                    retentionExpiresAt = null,
+                    retentionSeconds = preview.retentionSeconds,
+                    retentionExpiresAt = preview.retentionExpiresAt,
                     recordedAt = preview.timelineAt,
                     receivedAt = preview.timelineAt,
                 )

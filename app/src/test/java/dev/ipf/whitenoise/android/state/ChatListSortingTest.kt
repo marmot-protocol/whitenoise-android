@@ -457,6 +457,8 @@ class ChatListSortingTest {
         avatar = null,
         lastMessage =
             ChatListMessagePreviewFfi(
+                retentionSeconds = null,
+                retentionExpiresAt = null,
                 messageIdHex = "message-$groupId",
                 sender = "sender",
                 senderDisplayName = "Sender",
@@ -502,6 +504,8 @@ class ChatListSortingTest {
         plaintext: String,
         latestAt: ULong,
     ) = ChatListMessagePreviewFfi(
+        retentionSeconds = null,
+        retentionExpiresAt = null,
         messageIdHex = messageId,
         sender = "sender",
         senderDisplayName = "Sender",

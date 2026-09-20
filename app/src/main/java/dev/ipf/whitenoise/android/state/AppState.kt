@@ -1355,6 +1355,28 @@ class WhiteNoiseAppState private constructor(
 
     @Volatile
     private var marmotRuntime: AppMarmotRuntime? = initialMarmotRuntime
+    private val nativeAttachmentPermissions = NativeAttachmentPermissions()
+
+    /** Refreshes runtime-scoped permissions after network, preference, or account changes. */
+    internal fun refreshNativeAttachmentPermissions() {
+        val revision = nativeAttachmentPermissions.invalidate()
+        val engine = marmotRuntime?.marmot ?: return
+        val accountRefs = accounts.filterNot { it.signedOut }.map { it.label }
+        mutationsScope.launch(Dispatchers.IO) {
+            runCatchingCancellable {
+                nativeAttachmentPermissions.update(revision, engine, accountRefs) { account ->
+                    withContext(Dispatchers.Main.immediate) {
+                        loadMediaAutoDownloadMatrix(account).nativePermission(
+                            activeNetworkTypes(),
+                            hasValidatedInternet(),
+                            attachmentDownloadIntents.isAutomaticPaused(account),
+                        )
+                    }
+                }
+            }.onSuccess { withContext(Dispatchers.Main.immediate) { attachmentDownloadPolicyRevision += 1 } }
+                .onFailure { Log.w("AttachmentPermissions", "permission_update_failed") }
+        }
+    }
 
     private val bootstrapAttempts = BootstrapAttemptCoordinator()
     private val bootstrapRuntime = BootstrapRuntimeCoordinator<AppMarmotRuntime>()
@@ -3946,6 +3968,7 @@ class WhiteNoiseAppState private constructor(
         inFlightAttachmentAcquisitions.cancel(request.cacheKey(), AttachmentTransferCancelledByUserException())
         mutationsScope.launch { cancelNativeAttachmentBounded(request) }
         attachmentDownloadPolicyRevision += 1
+        mutationsScope.launch { runCatchingCancellable { cancelNativeAttachment(request) } }
     }
 
     /** True while the user's cancel of this exact attachment still blocks automatic work. */
@@ -3962,6 +3985,7 @@ class WhiteNoiseAppState private constructor(
     fun stopAutomaticAttachmentDownloads() {
         val accountRef = activeAccountRef ?: return
         attachmentDownloadIntents.pauseAutomatic(accountRef)
+        refreshNativeAttachmentPermissions()
         attachmentDownloadPolicyRevision += 1
         attachmentDownloadGate.cancelQueuedAutomatic(accountRef)
         mutationsScope.launch {
@@ -3972,6 +3996,7 @@ class WhiteNoiseAppState private constructor(
     fun restartAutomaticAttachmentDownloads() {
         val accountRef = activeAccountRef ?: return
         attachmentDownloadIntents.restartAutomatic(accountRef)
+        refreshNativeAttachmentPermissions()
         // Resuming the backlog is a resume-everything signal, and it is the one
         // point where per-file cancel records can be dropped in bulk instead of
         // accumulating for attachments the user never opens again.
@@ -3988,112 +4013,22 @@ class WhiteNoiseAppState private constructor(
         ) ||
             hasNativeAttachment(request)
 
-    /** Legacy fallback used only after Android and MarmotKit retained stores both miss. */
-    internal suspend fun downloadLegacyAttachmentPlaintext(
-        request: AttachmentTransferRequest,
-        reference: MediaAttachmentReferenceFfi,
-        priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Interactive,
-        persistInteractiveIntent: Boolean = true,
-    ): ByteArray {
-        val tracksInteractiveIntent =
-            priority == AttachmentDownloadPriority.Interactive && persistInteractiveIntent
-        val cacheKey =
-            mediaCacheKey(
-                request.accountRef,
-                request.groupIdHex,
-                request.messageIdHex,
-                request.attachmentIndex,
-            )
-        val cached =
-            withContext(Dispatchers.Main.immediate) { cachedMediaPlaintext(cacheKey) }
-                ?: withContext(Dispatchers.IO) { diskMediaCache.get(cacheKey) }
-                    ?.also { onDisk ->
-                        withContext(Dispatchers.Main.immediate) {
-                            cacheMediaPlaintext(cacheKey, onDisk)
-                        }
-                    }
-        if (cached != null) {
-            if (tracksInteractiveIntent) {
-                attachmentDownloadIntents.setInteractive(request, interactive = false)
-            }
-            return cached
-        }
-
-        if (priority == AttachmentDownloadPriority.Interactive) {
-            if (tracksInteractiveIntent) {
-                attachmentDownloadIntents.setInteractive(request, interactive = true)
-            }
-            attachmentDownloadGate.promote(cacheKey)
-        }
-
-        val deferred =
-            memoizedDownload(cacheKey, request, priority) {
-                downloadAndCacheAttachment(request, reference, cacheKey)
-            }
-        return deferred.await().also {
-            if (tracksInteractiveIntent) {
-                attachmentDownloadIntents.setInteractive(request, interactive = false)
-            }
-        }
-    }
-
-    /** Downloads through the legacy byte API and publishes non-empty plaintext into both cache tiers. */
-    private suspend fun downloadAndCacheAttachment(
-        request: AttachmentTransferRequest,
-        reference: MediaAttachmentReferenceFfi,
-        cacheKey: String,
-    ): ByteArray {
-        val publicationToken = diskMediaCache.capturePublicationToken()
-        val plaintext =
-            runCatchingCancellable {
-                marmotIo(MarmotTraceSection.MEDIA_DOWNLOAD) {
-                    downloadMedia(request.accountRef, request.groupIdHex, reference)
-                }.plaintext
-            }.onFailure { failure ->
-                logAttachmentDownloadFailure(request, failure)
-            }.getOrThrow()
-        if (plaintext.isNotEmpty()) {
-            cacheMediaPlaintext(cacheKey, plaintext)
-            withContext(Dispatchers.IO) {
-                diskMediaCache.put(
-                    cacheKey,
-                    plaintext,
-                    publicationToken,
-                    reference.ciphertextSha256,
-                )
-            }
-        }
-        return plaintext
-    }
-
-    /** Logs attachment failures without exposing full identifiers in release builds. */
-    private fun logAttachmentDownloadFailure(
-        request: AttachmentTransferRequest,
-        failure: Throwable,
-    ) {
-        if (BuildConfig.DEBUG) {
-            Log.w(
-                "DMAttachmentDownload",
-                "download failed group=${request.groupIdHex.take(8)} message=${request.messageIdHex.take(8)}",
-                failure,
-            )
-        } else {
-            Log.w("DMAttachmentDownload", "attachment_download_failed")
-        }
-    }
 
     /** Ensures durable work consumes large cache hits as leases instead of full heap copies. */
     internal suspend fun downloadAttachmentForDurableWork(
         request: AttachmentTransferRequest,
         priority: AttachmentDownloadPriority,
+        allowExplicitRetry: Boolean = true,
     ): Boolean {
-        val reference = resolveAttachmentReference(request) ?: throw AttachmentReferenceNotReadyException()
+        val match = findNativeAttachment(request) ?: throw AttachmentReferenceNotReadyException()
+        val resolved = request.copy(sourceMessageIdHex = match.target.sourceMessageIdHex)
         downloadAttachmentPlaintextSource(
-            request = request,
-            reference = reference,
+            request = resolved,
+            reference = match.reference,
             priority = priority,
+            allowExplicitRetry = allowExplicitRetry,
         ).use { }
-        return hasCachedAttachmentAfterHydration(request)
+        return hasCachedAttachmentAfterHydration(resolved)
     }
 
     /**
@@ -4693,6 +4628,7 @@ class WhiteNoiseAppState private constructor(
         accountListLifetime.runIfCurrent(requestToken) {
             accountSetup.acceptAccounts(setupAccounts)
             accounts = refreshedAccounts
+            refreshNativeAttachmentPermissions()
             releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
             publishedAccounts = refreshedAccounts
         }
@@ -6838,6 +6774,7 @@ class WhiteNoiseAppState private constructor(
         // a later toggle once the account resolves persists it to the right bucket.
         val key = mediaAutoDownloadPrefKeyOrNull(activeAccountRef) ?: return
         preferences.edit().putString(key, updated.toPreference()).apply()
+        refreshNativeAttachmentPermissions()
     }
 
     fun updateEnterKeyBehavior(behavior: EnterKeyBehavior) {
@@ -7162,6 +7099,7 @@ class WhiteNoiseAppState private constructor(
                 hasValidatedPhysicalNetwork = validatedInternetNetworks.hasValidatedInternet(),
             )
         updateConnectivitySignals(hasValidatedInternet = recovery.hasUsableInternet)
+        refreshNativeAttachmentPermissions()
         if (!recovery.restored) return
         AvatarLoadRecovery.onNetworkRestored()
         validatedConnectivityRecoveryGenerationMutable.update { generation -> generation + 1 }

@@ -474,6 +474,8 @@ class ConversationImeCollapseFocusTest {
 
     private fun cachedPreview() =
         ChatListMessagePreviewFfi(
+            retentionSeconds = null,
+            retentionExpiresAt = null,
             messageIdHex = CACHED_MESSAGE_ID,
             sender = "02" + "00".repeat(31),
             senderDisplayName = "Cached sender",

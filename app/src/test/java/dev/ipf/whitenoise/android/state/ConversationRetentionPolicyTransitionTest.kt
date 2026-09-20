@@ -137,6 +137,7 @@ class ConversationRetentionPolicyTransitionTest {
         retentionExpiresAt: ULong? = null,
     ): TimelineMessageRecordFfi =
         TimelineMessageRecordFfi(
+            clientToken = null,
             messageIdHex = id,
             sourceMessageIdHex = id,
             direction = "sent",

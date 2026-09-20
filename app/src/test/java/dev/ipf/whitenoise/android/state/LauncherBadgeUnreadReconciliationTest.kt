@@ -99,6 +99,8 @@ class LauncherBadgeUnreadReconciliationTest {
         avatar = null,
         lastMessage =
             ChatListMessagePreviewFfi(
+                retentionSeconds = null,
+                retentionExpiresAt = null,
                 messageIdHex = MESSAGE_ID,
                 sender = "sender",
                 senderDisplayName = "Sender",

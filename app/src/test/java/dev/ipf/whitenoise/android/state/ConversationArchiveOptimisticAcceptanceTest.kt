@@ -369,6 +369,8 @@ class ConversationArchiveOptimisticAcceptanceTest {
             avatar = null,
             lastMessage =
                 ChatListMessagePreviewFfi(
+                    retentionSeconds = null,
+                    retentionExpiresAt = null,
                     messageIdHex = "d4".repeat(32),
                     sender = ACCOUNT_ID,
                     senderDisplayName = null,

@@ -255,7 +255,11 @@ class AttachmentDownloadWorker : CoroutineWorker {
         withContext(Dispatchers.Main.immediate) {
             application.appState.ensureNotificationRuntimeStarted()
         }
-        return application.appState.downloadAttachmentForDurableWork(request, priority)
+        return application.appState.downloadAttachmentForDurableWork(
+            request = request,
+            priority = priority,
+            allowExplicitRetry = runAttemptCount == 0,
+        )
     }
 
     companion object {

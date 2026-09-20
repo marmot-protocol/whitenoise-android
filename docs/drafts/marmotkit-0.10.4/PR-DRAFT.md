@@ -5,11 +5,11 @@ Adopt MarmotKit 0.10.4 with host-managed attachment downloads
 ## Publication hold
 
 LOCAL DRAFT ONLY. Do not submit this body until #2691 is merged and the implementation
-has been rebased/transplanted onto that final master. The sections below describe
-planned scope, not implemented or verified behavior. Replace future tense and every
-pending verification with actual evidence before publication.
+has been rebased/transplanted onto that final master. The implementation is saved
+locally; see `IMPLEMENTATION-STATUS.md` for its exact scope and verification limits.
+Refresh every pending verification with final rebased-head evidence before publication.
 
-## Planned summary
+## Draft summary
 
 - Pin the immutable 0.10.4 Android cohort and update changed records, terminal
   states and typed errors.
@@ -21,8 +21,11 @@ pending verification with actual evidence before publication.
 - Hide expired selected-message chat previews at their native retention deadlines.
 - Keep #2691's final fixes and existing media pager behavior intact.
 
-Durable-send adoption: pending user scope decision. Existing APIs remain supported;
-do not claim token-aware composer adoption unless implemented and qualified.
+Durable-send adoption is included by user request: text/reply admission, matching
+revision-bound media sends, upload-only preparation, native status recovery, and
+exact timeline-token reconciliation. Non-draft media keeps the supported legacy
+publication fallback. Qualification is pending; do not claim all issue #2493
+acceptance criteria are satisfied.
 
 ## Provenance
 
@@ -35,7 +38,8 @@ do not claim token-aware composer adoption unless implemented and qualified.
 ## Verification to fill before publication
 
 - Final source head and merged #2691 base: pending.
-- Active lock, prepared artifact and generated signature agreement: pending implementation.
+- Active lock, prepared artifact and generated signature agreement: locally verified;
+  recheck after rebase.
 - Both-flavor consumer compilation and regression tests: pending.
 - Counted transfer/cache/upgrade tests: pending.
 - In-place emulator upgrade, restart and retained-local-media evidence: pending.

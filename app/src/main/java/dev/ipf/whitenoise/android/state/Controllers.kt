@@ -703,6 +703,7 @@ private fun timelineRecordEnvelopeEqual(
 ): Boolean =
     a.messageIdHex == b.messageIdHex &&
         a.sourceMessageIdHex == b.sourceMessageIdHex &&
+        a.clientToken == b.clientToken &&
         a.direction == b.direction &&
         a.groupIdHex == b.groupIdHex &&
         a.sender == b.sender &&
@@ -1286,6 +1287,7 @@ internal fun committedButUnpublishedProjectionForOptimistic(
         val projectedAction = TimelineProjector.toAppMessageRecord(projected)
         if (!MessageProjector.isMine(projectedAction, activeAccountIdHex)) return@firstOrNull false
         if (optimistic.groupIdHex != projectedAction.groupIdHex) return@firstOrNull false
+        projected.clientToken?.let { return@firstOrNull it == optimistic.messageIdHex }
         val projectedIsMedia = projectedAction.tags.any { it.values.firstOrNull() == "imeta" }
         if (optimisticIsMediaPending && projectedIsMedia) {
             timestampsAreNear(optimistic.recordedAt, projectedAction.recordedAt)
@@ -6200,31 +6202,14 @@ class ConversationController(
             groupRecoveryStatus(account, groupIdHex)
         }
     },
-    private val textPublisher: suspend (String?, String, String, String) -> SendSummaryFfi =
-        { replyTarget, account, groupIdHex, text ->
-            if (replyTarget != null) {
-                appState.marmotIo(MarmotTraceSection.TEXT_REPLY) {
-                    sendComposerText(account, groupIdHex, replyTarget, text)
-                }
-            } else {
-                appState.marmotIo(MarmotTraceSection.TEXT_SEND) {
-                    sendComposerText(account, groupIdHex, null, text)
-                }
-            }
-        },
-    private val mediaUploader: MediaUploader = { account, groupIdHex, request ->
-        appState.marmotIo(MarmotTraceSection.MEDIA_UPLOAD) { uploadMedia(account, groupIdHex, request) }
-    },
+    private val textPublisher: (suspend (String?, String, String, String) -> SendSummaryFfi)? = null,
+    private val mediaUploader: MediaUploader? = null,
     private val mediaImetaTagsBuilder: MediaImetaTagsBuilder = { account, groupIdHex, references ->
         appState.marmotIo {
             references.map { reference -> buildMediaImetaTag(account, groupIdHex, reference) }
         }
     },
-    private val mediaPublisher: MediaPublisher = { account, groupIdHex, references, caption ->
-        appState.marmotIo(MarmotTraceSection.MEDIA_SEND) {
-            sendComposerMedia(account, groupIdHex, references, caption)
-        }
-    },
+    private val mediaPublisher: MediaPublisher? = null,
     private val markdownParser: suspend (String) -> MarkdownDocumentFfi = { appState.parseMarkdownOrEmpty(it) },
     private val groupArchivedUpdater: suspend (String, String, Boolean) -> AppGroupRecordFfi =
         { account, groupIdHex, archived ->
@@ -7905,6 +7890,8 @@ class ConversationController(
                         conversationAccountRef,
                         group.groupIdHex,
                         ChatListMessagePreviewFfi(
+                            retentionSeconds = null,
+                            retentionExpiresAt = null,
                             messageIdHex = tempId,
                             sender = conversationAccountIdHex ?: "",
                             senderDisplayName = null,
@@ -7937,7 +7924,7 @@ class ConversationController(
             //
             // Each FFI attempt owns the conversation commit lock, but retry
             // backoff does not. Other mutations remain usable while offline.
-            val summary = publishTextWithRetry(replyTarget, account, trimmed, trace)
+            val summary = publishTextWithRetry(replyTarget, account, trimmed, trace, tempId)
             completeDurableAcceptance(optimisticKey)
             val reconciliation =
                 reconcileSuccessfulTextSend(
@@ -8047,25 +8034,18 @@ class ConversationController(
     }
 
     /**
-     * Publish a text/reply message, keeping it pending and re-sending only when
-     * the failure proves the event never reached a relay
-     * ([isTransientRelaySendError] — connect-phase failures). Because each
-     * attempt re-enters the high-level FFI send and the runtime builds a fresh
-     * inner app event per call, retrying any ambiguous post-send failure could
-     * duplicate a message; the classifier is narrowed to connect-phase reasons
-     * precisely so this re-send is idempotent. Terminal errors and ambiguous
-     * post-send failures rethrow immediately on the first attempt. Between
-     * attempts it uses capped exponential backoff to give the relay pool time
-     * to (re)connect, and logs the relay-health snapshot at the retry decision
-     * point — aggregate connection counts only, no relay URLs/account/group/
-     * message ids — so the intermittent failure window from #294 is diagnosable
-     * from logcat without leaking PII.
+     * Admits one logical text/reply token to native durable ownership. Proven
+     * pre-admission connectivity failures reuse the token; interrupted admission
+     * queries native status before another call. Acceptance stays pending until
+     * the authoritative projection reports publication. Native convergence owns
+     * accepted delivery; the host never invents another semantic send to retry it.
      */
     private suspend fun publishTextWithRetry(
         replyTarget: String?,
         account: String,
         trimmed: String,
         trace: PerformanceTrace?,
+        clientToken: String,
     ): dev.ipf.marmotkit.SendSummaryFfi =
         appState.withConversationTextSendOrder(account, group.groupIdHex) {
             retryPendingConversationSend(
@@ -8085,12 +8065,7 @@ class ConversationController(
                         durationMs = lockHeldAtMs?.minus(lockWaitStartMs ?: lockHeldAtMs) ?: 0L,
                         attempt = attempt,
                     )
-                    // Time the FFI hop itself (App → engine `send_message`: MLS
-                    // commit + encrypt + publish + relay ack round-trip, all
-                    // synchronous inside this call). This is the primary "long
-                    // pole" candidate the issue asks to measure — how long the
-                    // `sendText`/`replyToMessage` call blocks before returning
-                    // (issue #913).
+                    // Measure admission separately from transport publication.
                     val ffiStartMs = trace?.let { traceNowMs() }
                     sendTrace(
                         trace,
@@ -8100,7 +8075,9 @@ class ConversationController(
                         attempt = attempt,
                     )
                     try {
-                        val summary = textPublisher(replyTarget, account, group.groupIdHex, trimmed)
+                        val summary =
+                            textPublisher?.invoke(replyTarget, account, group.groupIdHex, trimmed)
+                                ?: publishDurableComposerText(account, replyTarget, trimmed, clientToken)
                         sendTrace(
                             trace,
                             PerformancePhase.FFI_RETURN,
@@ -8109,12 +8086,14 @@ class ConversationController(
                             attempt = attempt,
                             count = summary.messageIds.size,
                         )
-                        sendTrace(
-                            trace,
-                            PerformancePhase.TRANSPORT_COMPLETE,
-                            layer = PerformanceLayer.TRANSPORT,
-                            count = summary.messageIds.size,
-                        )
+                        if (summary.acceptDisposition == SendAcceptDispositionFfi.PUBLISHED) {
+                            sendTrace(
+                                trace,
+                                PerformancePhase.TRANSPORT_COMPLETE,
+                                layer = PerformanceLayer.TRANSPORT,
+                                count = summary.messageIds.size,
+                            )
+                        }
                         summary
                     } catch (throwable: Throwable) {
                         sendTrace(
@@ -8379,7 +8358,13 @@ class ConversationController(
                 // blobs (publish-only failure) — re-uploading would orphan
                 // duplicates on the Blossom server.
                 val references =
-                    retained.uploadedReferences ?: mediaUploader(
+                    retained.uploadedReferences ?: (
+                        mediaUploader ?: { uploadAccount, uploadGroup, request ->
+                            appState.marmotIo(MarmotTraceSection.MEDIA_UPLOAD) {
+                                uploadComposerMediaWithToken(uploadAccount, uploadGroup, request, tempId)
+                            }
+                        }
+                    )(
                         account,
                         group.groupIdHex,
                         MediaUploadRequestFfi(
@@ -8428,7 +8413,10 @@ class ConversationController(
                 val imetaTags = mediaImetaTagsBuilder(account, group.groupIdHex, references)
                 val summary =
                     appState.withGroupCommitLock(account, group.groupIdHex) {
-                        mediaPublisher(account, group.groupIdHex, references, retained.caption)
+                        mediaPublisher?.invoke(account, group.groupIdHex, references, retained.caption)
+                            ?: appState.marmotIo(MarmotTraceSection.MEDIA_SEND) {
+                                sendComposerMedia(account, group.groupIdHex, references, retained.caption, tempId)
+                            }
                     }
                 completeDurableAcceptance(key)
                 if (summary.acceptDisposition == SendAcceptDispositionFfi.ACCEPTED_PENDING) {
@@ -8975,6 +8963,8 @@ class ConversationController(
         timelineAt: ULong,
     ): ChatListMessagePreviewFfi =
         ChatListMessagePreviewFfi(
+            retentionSeconds = null,
+            retentionExpiresAt = null,
             messageIdHex = tempId,
             sender = conversationAccountIdHex ?: "",
             senderDisplayName = null,
@@ -9535,7 +9525,7 @@ class ConversationController(
                 elapsedMs = 0L,
                 result = PerformanceResult.PENDING,
             )
-            val summary = publishTextWithRetry(replyTarget, account, text, retryTrace)
+            val summary = publishTextWithRetry(replyTarget, account, text, retryTrace, tempId)
             completeDurableAcceptance(key)
             if (discardedDuringRetry.remove(key)) {
                 // User discarded mid-flight; drop the result entirely.
@@ -11464,12 +11454,14 @@ class ConversationController(
         val acceptedPendingMediaOptimisticId =
             acceptedPendingMediaOptimisticIdForProjection(record.messageIdHex).takeIf { reconcileOptimistic }
         val acceptedPendingOptimisticId =
-            acceptedPendingTextOptimisticId ?: acceptedPendingMediaOptimisticId
+            record.clientToken?.takeIf { reconcileOptimistic && "msg:$it" in optimisticMessages }
+                ?: acceptedPendingTextOptimisticId ?: acceptedPendingMediaOptimisticId
         val hasExactBridge =
             optimisticMessages.values.any { it.record.messageIdHex == record.messageIdHex } ||
                 hasAcceptedPendingTextBridge ||
                 acceptedPendingOptimisticId != null
-        if (projectedIsMediaUpsert && !hasExactBridge && reconcileOptimistic) {
+        val reconcileLegacyMedia = projectedIsMediaUpsert && record.clientToken == null && reconcileOptimistic
+        if (reconcileLegacyMedia && !hasExactBridge) {
             val pendingMediaCount =
                 optimisticMessages.values.count {
                     isSendableOptimisticStatus(it.status, allowDelayedProjection) &&
@@ -11483,6 +11475,7 @@ class ConversationController(
         pendingProjectionsAwaitingBridge.remove(record.messageIdHex)
         val actionRecord = draftAction
         if (
+            record.clientToken == null &&
             record.invalidationStatus != null &&
             failedOptimisticMessageIdForInvalidatedProjection(optimisticMessages.values, actionRecord) != null
         ) {
@@ -11496,8 +11489,9 @@ class ConversationController(
             }
             return actionRecord
         }
+        val unownedLegacyRecord = record.clientToken == null && record.sourceMessageIdHex == null
         if (
-            record.sourceMessageIdHex == null &&
+            unownedLegacyRecord &&
             record.invalidationStatus == null &&
             failedOptimisticMessageIdForInvalidatedProjection(optimisticMessages.values, actionRecord) != null
         ) {
@@ -11521,11 +11515,11 @@ class ConversationController(
         )
         val reconciledOptimisticId =
             acceptedPendingOptimisticId
-                ?: if (hasAcceptedPendingTextBridge) {
+                ?: if (hasAcceptedPendingTextBridge || record.clientToken != null) {
                     null
                 } else {
                     optimisticMessageIdForProjection(
-                        optimisticMessages.values,
+                        optimisticMessages.values.filter { projectedIsMediaUpsert || textPublisher != null },
                         actionRecord,
                         allowDelayedProjection = allowDelayedProjection,
                     ).takeIf { reconcileOptimistic }

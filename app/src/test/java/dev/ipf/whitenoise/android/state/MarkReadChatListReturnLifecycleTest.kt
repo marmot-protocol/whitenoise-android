@@ -132,6 +132,8 @@ class MarkReadChatListReturnLifecycleTest {
         avatar = null,
         lastMessage =
             ChatListMessagePreviewFfi(
+                retentionSeconds = null,
+                retentionExpiresAt = null,
                 messageIdHex = TAIL_ID,
                 sender = "sender",
                 senderDisplayName = "Sender",

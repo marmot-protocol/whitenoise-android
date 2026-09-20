@@ -120,6 +120,8 @@ class ConversationInitialTimelineTest {
         contentTokens: MarkdownDocumentFfi = markdown(),
         deliveryState: ChatListMessageDeliveryStateFfi = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
     ) = ChatListMessagePreviewFfi(
+        retentionSeconds = null,
+        retentionExpiresAt = null,
         messageIdHex = messageIdHex,
         sender = sender,
         senderDisplayName = "Sender",

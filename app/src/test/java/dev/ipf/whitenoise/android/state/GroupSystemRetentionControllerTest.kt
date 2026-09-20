@@ -149,6 +149,7 @@ class GroupSystemRetentionControllerTest {
 
     private fun groupSystemRecord() =
         TimelineMessageRecordFfi(
+            clientToken = null,
             messageIdHex = SYSTEM_MESSAGE_ID,
             sourceMessageIdHex = SOURCE_MESSAGE_ID,
             direction = "received",

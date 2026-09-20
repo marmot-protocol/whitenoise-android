@@ -37,13 +37,13 @@ internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintext(
     }
 
 /** Returns bounded memory or an owner-private file lease that the caller must close. */
-@Suppress("ReturnCount", "TooGenericExceptionCaught")
+@Suppress("UnusedParameter") // Existing consumers supply a reference; native source identity owns acquisition.
 internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
     request: AttachmentTransferRequest,
     reference: MediaAttachmentReferenceFfi,
     priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Interactive,
     persistInteractiveIntent: Boolean = true,
-    onCacheMiss: (suspend () -> ByteArray)? = null,
+    allowExplicitRetry: Boolean = true,
 ): AttachmentPlaintext {
     val cacheKey = request.run { mediaCacheKey(accountRef, groupIdHex, messageIdHex, attachmentIndex) }
     return resolveAttachmentPlaintext(
@@ -61,10 +61,9 @@ internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
             acquireAttachmentPlaintextSource(
                 cacheKey = cacheKey,
                 request = request,
-                reference = reference,
                 priority = priority,
                 persistInteractiveIntent = persistInteractiveIntent,
-                onCacheMiss = onCacheMiss,
+                allowExplicitRetry = allowExplicitRetry,
             )
         },
     )
@@ -101,36 +100,19 @@ private fun WhiteNoiseAppState.clearInteractiveAttachmentIntentAfterSuccess(
 private suspend fun WhiteNoiseAppState.acquireAttachmentPlaintextSource(
     cacheKey: String,
     request: AttachmentTransferRequest,
-    reference: MediaAttachmentReferenceFfi,
     priority: AttachmentDownloadPriority,
     persistInteractiveIntent: Boolean,
-    onCacheMiss: (suspend () -> ByteArray)?,
+    allowExplicitRetry: Boolean,
 ): AttachmentPlaintext {
     val resolved =
         memoizedAttachmentAcquisition(cacheKey, priority) {
-            val qualifiedRequest =
-                resolveNativeAttachmentTarget(request)?.let { target ->
-                    request.copy(sourceMessageIdHex = target.sourceMessageIdHex)
-                }
-            if (qualifiedRequest != null && hasNativeAttachment(qualifiedRequest)) {
-                AttachmentAcquisitionOutcome.NativeRetained(qualifiedRequest)
-            } else {
-                val native = qualifiedRequest?.let { acquireNativeAttachment(it, priority) }
-                if (native != null) {
-                    native.close()
-                    AttachmentAcquisitionOutcome.NativeRetained(checkNotNull(qualifiedRequest))
-                } else {
-                    AttachmentAcquisitionOutcome.LegacyBytes(
-                        onCacheMiss?.invoke()
-                            ?: downloadLegacyAttachmentPlaintext(
-                                request,
-                                reference,
-                                priority,
-                                persistInteractiveIntent,
-                            ),
-                    )
-                }
+            val target = resolveNativeAttachmentTarget(request) ?: throw AttachmentReferenceNotReadyException()
+            val qualifiedRequest = request.copy(sourceMessageIdHex = target.sourceMessageIdHex)
+            if (!hasNativeAttachment(qualifiedRequest)) {
+                acquireNativeAttachment(qualifiedRequest, priority, allowExplicitRetry)?.close()
+                    ?: throw AttachmentReferenceNotReadyException()
             }
+            AttachmentAcquisitionOutcome.NativeRetained(qualifiedRequest)
         }.await()
     return materializeAttachmentAcquisition(
         outcome = resolved,

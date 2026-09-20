@@ -97,6 +97,8 @@ class ChatRowPreviewMarkdownSourceTest {
         deleted: Boolean = false,
         lastMessage: ChatListMessagePreviewFfi? =
             ChatListMessagePreviewFfi(
+                retentionSeconds = null,
+                retentionExpiresAt = null,
                 messageIdHex = "message-1",
                 sender = "sender",
                 senderDisplayName = "Sender",

@@ -585,6 +585,8 @@ class ChatListProjectionReducerTest {
         deleted: Boolean = false,
         contentTokens: MarkdownDocumentFfi = markdown(),
     ) = ChatListMessagePreviewFfi(
+        retentionSeconds = null,
+        retentionExpiresAt = null,
         messageIdHex = messageId,
         sender = sender,
         senderDisplayName = null,

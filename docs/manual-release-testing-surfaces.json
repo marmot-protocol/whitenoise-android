@@ -3,6 +3,24 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "Pinned selected-message preview expiry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatPreviewExpiry.kt",
+        "anchor": "fun rememberChatPreviewExpired(",
+        "test_ids": ["MSG-018"]
+      },
+      {
+        "surface": "Native host-managed permission fencing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentPermissions.kt",
+        "anchor": "internal class NativeAttachmentPermissions",
+        "test_ids": ["MED-019", "MED-020"]
+      },
+      {
+        "surface": "Durable caller-correlated composer admission",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/DurableLocalSends.kt",
+        "anchor": "sendComposerTextWithToken(",
+        "test_ids": ["MSG-017"]
+      },
+      {
         "surface": "Key package inventory load failure toast",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateKeyPackageInventory.kt",
         "anchor": "R.string.toast_couldnt_load_key_packages",

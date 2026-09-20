@@ -55,18 +55,29 @@ internal suspend fun WhiteNoiseAppState.sendDetachedDictationText(request: Conve
 }
 
 /** Media variant of [sendComposerText]: the draft must describe every uploaded reference in order. */
+@Suppress("ReturnCount") // Recovered ownership, matching draft admission, and legacy fallback are distinct outcomes.
 internal suspend fun MarmotInterface.sendComposerMedia(
     accountRef: String,
     groupIdHex: String,
     references: List<MediaAttachmentReferenceFfi>,
     caption: String?,
+    clientToken: String? = null,
 ): SendSummaryFfi {
+    if (clientToken != null) recoveredLocalSend(accountRef, groupIdHex, clientToken)?.let { return it }
     val selected = selectedDraftOrNull(accountRef, groupIdHex)
     val content = selected?.draft
     if (selected != null && content != null && draftDescribes(content, references)) {
         val submitted =
             saveDraftForSend(accountRef, selected, caption.orEmpty(), content.replyToMessageIdHex)
-                ?.let { revision -> sendDraftOrNull(accountRef, revision, references) }
+                ?.let { revision ->
+                    if (clientToken == null) {
+                        sendDraftOrNull(accountRef, revision, references)
+                    } else {
+                        admitLocalSend(accountRef, groupIdHex, clientToken) {
+                            sendMessageDraftWithClientToken(accountRef, revision, references, clientToken)
+                        }
+                    }
+                }
         if (submitted != null) return submitted
     }
     return sendMediaAttachments(accountRef, groupIdHex, references, caption)

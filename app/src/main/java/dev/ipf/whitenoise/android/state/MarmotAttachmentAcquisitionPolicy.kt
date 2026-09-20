@@ -6,9 +6,9 @@ import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.whitenoise.android.core.MarmotClient
 
 /**
- * Leaves automatic attachment acquisition under White Noise's network matrix, durable queue, and stop controls.
- * MarmotKit 0.10.3 enables a second automatic downloader by default, so only that flag is disabled while native
- * retention, reserve, and transfer limits remain unchanged for future canonical-transfer adoption.
+ * Enables the native worker in a HOST_MANAGED runtime, which starts denied and never discovers attachments
+ * automatically. Android supplies demand and per-account network permissions; Marmot owns bytes and retries.
+ * Migrates the 0.10.3 containment flag without changing retention, reserve, or transfer limits.
  */
 internal suspend fun enforceAppOwnedAttachmentAcquisitionPolicy(
     accountRefs: Iterable<String>,
@@ -17,11 +17,11 @@ internal suspend fun enforceAppOwnedAttachmentAcquisitionPolicy(
 ) {
     accountRefs.distinct().forEach { accountRef ->
         val current = readPolicy(accountRef)
-        if (current.automatic) writePolicy(accountRef, current.copy(automatic = false))
+        if (!current.automatic) writePolicy(accountRef, current.copy(automatic = true))
     }
 }
 
-/** Disables MarmotKit's parallel automatic downloader without changing its native numeric limits. */
+/** Enables host-managed native demand without changing native numeric limits. */
 internal suspend fun MarmotInterface.enforceAppOwnedAttachmentAcquisitionPolicy(accountRefs: Iterable<String>) {
     enforceAppOwnedAttachmentAcquisitionPolicy(
         accountRefs = accountRefs,
@@ -30,12 +30,12 @@ internal suspend fun MarmotInterface.enforceAppOwnedAttachmentAcquisitionPolicy(
     )
 }
 
-/** Applies containment to every existing account while local policy storage is available. */
+/** Migrates existing accounts before runtime start, while host permission is still denied. */
 internal suspend fun MarmotInterface.enforceAppOwnedAttachmentAcquisitionForKnownAccounts() {
     enforceAppOwnedAttachmentAcquisitionPolicy(listAccounts().map(AccountSummaryFfi::label))
 }
 
-/** Returns an account snapshot only after every discovered account has the containment policy. */
+/** Returns accounts after enabling host-managed demand for newly discovered identities. */
 internal suspend fun MarmotInterface.listAccountsWithAppAttachmentPolicy(): List<AccountSummaryFfi> {
     val accounts = listAccounts()
     enforceAppOwnedAttachmentAcquisitionPolicy(accounts.map(AccountSummaryFfi::label))

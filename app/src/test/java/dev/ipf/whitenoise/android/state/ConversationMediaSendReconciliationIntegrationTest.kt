@@ -183,6 +183,7 @@ class ConversationMediaSendReconciliationIntegrationTest {
         recordedAt: ULong,
         reference: MediaAttachmentReferenceFfi,
     ) = TimelineMessageRecordFfi(
+        clientToken = null,
         messageIdHex = CONFIRMED_MESSAGE_ID,
         sourceMessageIdHex = "d4".repeat(32),
         direction = "sent",
@@ -325,6 +326,8 @@ class ConversationMediaSendReconciliationIntegrationTest {
             avatar = null,
             lastMessage =
                 ChatListMessagePreviewFfi(
+                    retentionSeconds = null,
+                    retentionExpiresAt = null,
                     messageIdHex = "d4".repeat(32),
                     sender = ACCOUNT_ID,
                     senderDisplayName = null,

@@ -298,6 +298,7 @@ class AgentStreamPreviewTest {
         tags: List<MessageTagFfi> = emptyList(),
     ): TimelineMessageRecordFfi =
         TimelineMessageRecordFfi(
+            clientToken = null,
             messageIdHex = id,
             sourceMessageIdHex = null,
             direction = "received",

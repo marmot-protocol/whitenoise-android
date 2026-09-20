@@ -49,6 +49,7 @@ class TimelineRecordProfileSendersTest {
         reactionSenders: List<String> = emptyList(),
         timelineAt: ULong = 0uL,
     ) = TimelineMessageRecordFfi(
+        clientToken = null,
         messageIdHex = id,
         sourceMessageIdHex = id,
         direction = "received",

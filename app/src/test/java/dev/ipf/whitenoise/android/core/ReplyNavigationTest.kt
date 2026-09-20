@@ -243,6 +243,7 @@ class ReplyNavigationTest {
         replyPreviewMessageId: String?,
         replyToMessageIdHex: String? = replyPreviewMessageId,
     ) = TimelineMessageRecordFfi(
+        clientToken = null,
         messageIdHex = "reply",
         sourceMessageIdHex = null,
         direction = "received",
