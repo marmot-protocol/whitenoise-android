@@ -349,7 +349,9 @@ private suspend fun WhiteNoiseAppState.saveAuditLogArchiveToDocument(
             openOutput = { resolver.openOutputStream(uri, "wt") },
             discardOutput = { discardAuditLogArchiveDocument(resolver, uri) },
         )
-    }.onSuccess { present(R.string.toast_audit_logs_saved) }
+        // Success is transient: it auto-dismisses after a couple of seconds, where a failure stays
+        // until the reader acknowledges it.
+    }.onSuccess { presentTransient(R.string.toast_audit_logs_saved) }
         .onFailure { present(R.string.toast_couldnt_save_audit_logs) }
 }
 
