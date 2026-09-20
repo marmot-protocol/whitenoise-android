@@ -7,6 +7,10 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Locale
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.thread
 
 @Suppress("LargeClass") // Controller lifecycle, focus, and seek cases share one fake engine/focus harness.
 class TtsControllerTest {
@@ -538,6 +542,53 @@ class TtsControllerTest {
             speakingTts(1, 2, 0, 1, "First sentence. Second sentence.", sentenceIndex = 1, sentenceCount = 2),
             controller.state.value,
         )
+    }
+
+    @Test
+    fun remainingTimeEstimateUsesTheControllerLockAndReflectsProgressAndRate() {
+        val engine = FakeTtsSpeechEngine()
+        var rate = 1f
+        val controller =
+            TtsController(
+                audioFocus = FakeTtsAudioFocus(),
+                maxChunkLength = 4_000,
+                speechRate = { rate },
+            )
+        controller.attachEngine(engine)
+        val text = List(80) { "word" }.joinToString(" ") + "."
+        assertTrue(controller.speak(text, Locale.US))
+        val initial = requireNotNull(controller.estimatedMessageRemainingSeconds())
+
+        val entered = CountDownLatch(1)
+        val returned = CountDownLatch(1)
+        val concurrentEstimate = AtomicReference<Int?>()
+        lateinit var reader: Thread
+        synchronized(controller) {
+            reader =
+                thread(start = true, name = "tts-remaining-time-reader") {
+                    entered.countDown()
+                    concurrentEstimate.set(controller.estimatedMessageRemainingSeconds())
+                    returned.countDown()
+                }
+            assertTrue(entered.await(1, TimeUnit.SECONDS))
+            assertFalse(
+                "estimate must share the controller's synchronized state boundary",
+                returned.await(100, TimeUnit.MILLISECONDS),
+            )
+        }
+        assertTrue(returned.await(1, TimeUnit.SECONDS))
+        reader.join()
+        assertEquals(initial, concurrentEstimate.get())
+
+        val halfway = text.length / 2
+        engine.range(0, halfway, halfway + 4)
+        val progressed = requireNotNull(controller.estimatedMessageRemainingSeconds())
+        assertTrue("progress must reduce the rendered remaining time", progressed < initial)
+
+        rate = 2f
+        controller.onSpeechRateChanged()
+        val accelerated = requireNotNull(controller.estimatedMessageRemainingSeconds())
+        assertTrue("a faster rate must reduce the rendered remaining time", accelerated < progressed)
     }
 
     @Test

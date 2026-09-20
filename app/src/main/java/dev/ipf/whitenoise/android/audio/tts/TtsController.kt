@@ -175,6 +175,7 @@ class TtsController internal constructor(
         )
 
     /** Approximate seconds until the active message finishes at the current voice pace and rate. */
+    @Synchronized
     fun estimatedMessageRemainingSeconds(): Int? =
         queue.estimatedMessageRemainingSeconds(
             pace.msPerUnitAt1x,
