@@ -3899,6 +3899,7 @@ class WhiteNoiseAppState private constructor(
         attachmentDownloadIntents.suppressAutomatic(request)
         attachmentDownloadIntents.setInteractive(request, interactive = false)
         AttachmentDownloadWorker.cancelForRequest(appContext, request)
+        mutationsScope.launch { cancelNativeAttachmentBounded(request) }
         attachmentDownloadPolicyRevision += 1
     }
 
@@ -3942,8 +3943,8 @@ class WhiteNoiseAppState private constructor(
         ) ||
             hasNativeAttachment(request)
 
-    /** Downloads through MDK and publishes plaintext into bounded L1 and encrypted L2 caches. */
-    internal suspend fun downloadAttachmentPlaintext(
+    /** Legacy fallback used only after Android and MarmotKit retained stores both miss. */
+    internal suspend fun downloadLegacyAttachmentPlaintext(
         request: AttachmentTransferRequest,
         reference: MediaAttachmentReferenceFfi,
         priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Interactive,

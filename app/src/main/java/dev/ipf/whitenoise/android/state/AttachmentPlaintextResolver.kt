@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
+import dev.ipf.whitenoise.android.media.toByteArray
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -17,6 +18,22 @@ internal suspend fun resolveAttachmentCacheAvailability(
     withContext(Dispatchers.Main.immediate) { memoryContains(cacheKey) } ||
         withContext(Dispatchers.IO) { diskContains(cacheKey) } ||
         withContext(Dispatchers.Main.immediate) { memoryContains(cacheKey) }
+
+/** Resolves every byte-returning consumer through the same native-aware retained-media owner. */
+internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintext(
+    request: AttachmentTransferRequest,
+    reference: MediaAttachmentReferenceFfi,
+    priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Interactive,
+    persistInteractiveIntent: Boolean = true,
+): ByteArray =
+    downloadAttachmentPlaintextSource(
+        request = request,
+        reference = reference,
+        priority = priority,
+        persistInteractiveIntent = persistInteractiveIntent,
+    ).use { source ->
+        withContext(Dispatchers.IO) { source.toByteArray() }
+    }
 
 /** Returns bounded memory or an owner-private file lease that the caller must close. */
 @Suppress("ReturnCount", "TooGenericExceptionCaught")
@@ -68,7 +85,7 @@ internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
             } else {
                 AttachmentPlaintext.Bytes(
                     onCacheMiss?.invoke()
-                        ?: downloadAttachmentPlaintext(request, reference, priority, persistInteractiveIntent),
+                        ?: downloadLegacyAttachmentPlaintext(request, reference, priority, persistInteractiveIntent),
                 )
             }
         },

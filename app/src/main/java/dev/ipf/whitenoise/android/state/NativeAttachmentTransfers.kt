@@ -6,7 +6,6 @@ import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.AttachmentTransferStatusFfi
 import dev.ipf.marmotkit.AttachmentTransferSubscription
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -23,6 +22,11 @@ private val NATIVE_TRANSFER_TERMINAL_FAILURES =
         AttachmentTransferStateFfi.REMOVED,
         AttachmentTransferStateFfi.POLICY_BLOCKED,
     )
+
+/** A native terminal state that must wait for another explicit user request instead of worker retry. */
+internal class NativeAttachmentTerminalException(
+    val state: AttachmentTransferStateFfi,
+) : IllegalStateException("native attachment transfer ended as $state")
 
 /** True only for explicit user demand with the complete native attachment identity. */
 internal fun shouldUseNativeExplicitDemand(
@@ -99,32 +103,32 @@ internal suspend fun WhiteNoiseAppState.acquireNativeAttachment(
                 subscribeAttachmentTransfers(request.accountRef, request.groupIdHex, listOf(ffiTarget))
             },
         )
-    return try {
-        feed.use { updates ->
-            marmotIo { downloadAttachmentAgain(request.accountRef, request.groupIdHex, ffiTarget) }
-                ?: throw IOException("native attachment demand was rejected")
-            var ready = false
-            while (!ready) {
-                val status =
-                    updates.next()?.items?.singleOrNull()
-                        ?: throw IOException("native attachment transfer closed")
-                if (status.state == AttachmentTransferStateFfi.READY) {
-                    ready = true
-                }
-                if (status.state in NATIVE_TRANSFER_TERMINAL_FAILURES) {
-                    throw IOException("native attachment transfer ended as ${status.state}")
-                }
+    feed.use { updates ->
+        marmotIo { downloadAttachmentAgain(request.accountRef, request.groupIdHex, ffiTarget) }
+            ?: throw IOException("native attachment demand was rejected")
+        var ready = false
+        while (!ready) {
+            val status =
+                updates.next()?.items?.singleOrNull()
+                    ?: throw IOException("native attachment transfer closed")
+            if (status.state == AttachmentTransferStateFfi.READY) {
+                ready = true
+            }
+            if (status.state in NATIVE_TRANSFER_TERMINAL_FAILURES) {
+                throw NativeAttachmentTerminalException(status.state)
             }
         }
-        openNativeAttachment(qualifiedRequest)
-            ?: throw IOException("native attachment was ready without readable bytes")
-    } catch (cancelled: CancellationException) {
-        withContext(NonCancellable) {
-            withTimeoutOrNull(NATIVE_ATTACHMENT_CANCEL_TIMEOUT_MILLIS) {
-                runCatching { cancelNativeAttachment(request, target) }
-            }
+    }
+    return openNativeAttachment(qualifiedRequest)
+        ?: throw IOException("native attachment was ready without readable bytes")
+}
+
+/** Sends native cancellation only for an explicit user action, bounded independently of caller cancellation. */
+internal suspend fun WhiteNoiseAppState.cancelNativeAttachmentBounded(request: AttachmentTransferRequest) {
+    withContext(NonCancellable) {
+        withTimeoutOrNull(NATIVE_ATTACHMENT_CANCEL_TIMEOUT_MILLIS) {
+            runCatching { cancelNativeAttachment(request) }
         }
-        throw cancelled
     }
 }
 

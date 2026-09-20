@@ -45,15 +45,27 @@ class NativeAttachmentTransfersTest {
         )
     }
 
-    /** Acquisition is owned by the subscription scope and cancellation gets a bounded non-cancellable cleanup. */
+    /** Observer disposal closes only its feed; explicit cancellation owns native cancellation. */
     @Test
-    fun `native acquisition closes its feed and sends cancellation during coroutine cancellation`() {
-        val body = source().readText().functionBody("WhiteNoiseAppState.acquireNativeAttachment")
+    fun `native acquisition teardown does not cancel shared durable work`() {
+        val source = source().readText()
+        val acquisition = source.functionBody("WhiteNoiseAppState.acquireNativeAttachment")
+        val explicitCancellation = appStateSource().readText().functionBody("cancelAttachmentDownload")
 
-        assertTrue(body.indexOf("feed.use") < body.indexOf("downloadAttachmentAgain"))
-        assertTrue("withContext(NonCancellable)" in body)
-        assertTrue("withTimeoutOrNull(NATIVE_ATTACHMENT_CANCEL_TIMEOUT_MILLIS)" in body)
-        assertTrue("cancelNativeAttachment(request, target)" in body)
+        assertTrue(acquisition.indexOf("feed.use") < acquisition.indexOf("downloadAttachmentAgain"))
+        assertFalse("cancelNativeAttachment(" in acquisition)
+        assertTrue("cancelNativeAttachmentBounded(request)" in explicitCancellation)
+        assertTrue("withContext(NonCancellable)" in source)
+        assertTrue("withTimeoutOrNull(NATIVE_ATTACHMENT_CANCEL_TIMEOUT_MILLIS)" in source)
+    }
+
+    /** Integrity/policy terminal states must never enter WorkManager's transient retry bucket. */
+    @Test
+    fun `native terminal failures are non retryable`() {
+        val failure = NativeAttachmentTerminalException(AttachmentTransferStateFfi.FAILED)
+
+        assertFalse(isTransientAttachmentDownloadFailure(failure))
+        assertFalse(shouldRetryAttachmentDownloadWork(runAttemptCount = 0, failure = failure))
     }
 
     /** Builds one transfer status fixture for presentation mapping. */
@@ -73,4 +85,11 @@ class NativeAttachmentTransfersTest {
             File("src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentTransfers.kt"),
             File("app/src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentTransfers.kt"),
         ).firstOrNull(File::exists) ?: error("Missing NativeAttachmentTransfers.kt")
+
+    /** Locates the production app-state owner in root- and module-scoped test layouts. */
+    private fun appStateSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
+        ).firstOrNull(File::exists) ?: error("Missing AppState.kt")
 }

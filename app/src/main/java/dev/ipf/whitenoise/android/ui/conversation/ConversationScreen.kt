@@ -209,7 +209,7 @@ import dev.ipf.whitenoise.android.ui.conversation.share.readSharedContact
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsScreen
 import dev.ipf.whitenoise.android.ui.medialibrary.rememberSharedMediaTiles
-import dev.ipf.whitenoise.android.ui.medialibrary.toViewerPages
+import dev.ipf.whitenoise.android.ui.medialibrary.toConversationViewerPages
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
@@ -975,7 +975,8 @@ internal fun ConversationScreen(
             appState = appState,
             myAccountId = conversationSelfAccountIdHex,
         )
-    val conversationVisualPages = remember(conversationMedia.visuals) { conversationMedia.visuals.toViewerPages() }
+    val conversationVisualPages =
+        remember(conversationMedia.visuals) { conversationMedia.visuals.toConversationViewerPages() }
     val renderedTimelineAnchorKeys =
         remember(renderedTimeline) {
             renderedTimeline.map { it.id to it.record.messageIdHex }
@@ -3078,7 +3079,17 @@ internal fun ConversationScreen(
             controller = controller,
             chatId = chat.id,
             mediaSlots = pendingMediaSlots,
+            documentUris = pendingDocumentUris,
         )
+
+    LaunchedEffect(mediaDraftState, controller.boundAccountRef, chat.id) {
+        if (pendingMediaSlots.isNotEmpty() || pendingDocumentUris.isNotEmpty()) return@LaunchedEffect
+        val restored = mediaDraftState.restorePersistedAttachments() ?: return@LaunchedEffect
+        if (pendingMediaSlots.isEmpty() && pendingDocumentUris.isEmpty()) {
+            pendingMediaSlots = restored.mediaSlots
+            pendingDocumentUris = restored.documentUris
+        }
+    }
 
     var mediaPreviewIndex by rememberSaveable(controller.boundAccountRef, chat.id) { mutableStateOf<Int?>(null) }
     var attachmentSendPending by remember(controller, chat.id) { mutableStateOf(false) }
@@ -3456,7 +3467,7 @@ internal fun ConversationScreen(
                 composerTextState = composerTextState,
                 composerAttachmentSheet = composerAttachmentSheet,
                 hasPendingAttachments = pendingMediaSlots.isNotEmpty() || pendingDocumentUris.isNotEmpty(),
-                attachmentsPreparing = mediaDraftState.preparingSlotIds.isNotEmpty(),
+                attachmentsPreparing = mediaDraftState.isPreparing,
                 attachmentContent =
                     if (pendingMediaSlots.isNotEmpty() || pendingDocumentUris.isNotEmpty()) {
                         {
@@ -3474,6 +3485,7 @@ internal fun ConversationScreen(
                                 },
                                 onRemoveDocument = { index ->
                                     if (!attachmentSendPending) {
+                                        pendingDocumentUris.getOrNull(index)?.let(mediaDraftState::releasePreparedDocument)
                                         pendingDocumentUris = pendingDocumentUris.filterIndexed { i, _ -> i != index }
                                     }
                                 },
@@ -3493,9 +3505,13 @@ internal fun ConversationScreen(
                             sendingDocuments,
                             caption,
                             preparedImageAttachments = mediaDraftState.preparedAttachments(),
+                            preparedDocumentAttachments = mediaDraftState.preparedDocumentAttachments(),
                             onAccepted = {
                                 val acceptedIds = sendingMedia.map { it.id }.toSet()
-                                acceptedIds.forEach(mediaDraftState::releasePreparedPhoto)
+                                mediaDraftState.forgetAcceptedAttachments(
+                                    acceptedIds,
+                                    sendingDocuments.toSet(),
+                                )
                                 pendingMediaSlots = pendingMediaSlots.filterNot { it.id in acceptedIds }
                                 pendingDocumentUris =
                                     removeAcceptedDocumentOccurrences(pendingDocumentUris, sendingDocuments)

@@ -19,9 +19,13 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.core.content.FileProvider
+import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.editor.DraftBackedPhoto
 import dev.ipf.whitenoise.android.media.editor.DraftPreparedPhoto
+import dev.ipf.whitenoise.android.media.editor.MessageDraftMutationResult
 import dev.ipf.whitenoise.android.media.editor.PhotoDraftStageResult
 import dev.ipf.whitenoise.android.media.editor.PhotoDraftStager
 import dev.ipf.whitenoise.android.media.editor.PhotoEditRecipe
@@ -33,6 +37,7 @@ import dev.ipf.whitenoise.android.media.editor.editorDigest
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaQuality
+import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerAcceptanceToken
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaPreviewScreen
@@ -51,7 +56,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.nio.charset.StandardCharsets
+import java.util.UUID
 
 internal data class PhotoEditorMessages(
     val animationNotEditable: String,
@@ -65,6 +75,11 @@ internal data class ActivePhotoEditor(
     val photo: DraftBackedPhoto,
     val previewBitmap: Bitmap,
     val stateHolder: PhotoEditorStateHolder,
+)
+
+internal data class RestoredConversationAttachments(
+    val mediaSlots: List<PendingMediaSlot>,
+    val documentUris: List<Uri>,
 )
 
 /**
@@ -98,13 +113,19 @@ internal class ConversationMediaDraftState(
             renderer = renderer,
             drafts = appState.messageDraftRepository,
         )
+    private val attachmentReader = ConversationAttachmentReader(appState, context)
 
     private var currentSlots: List<PendingMediaSlot> = emptyList()
+    private var currentDocumentUris: List<Uri> = emptyList()
     private var currentAccountRef: String? = null
+    private var restoreAttempted = false
+    private val preparationMutex = Mutex()
 
     var backedPhotos by mutableStateOf<Map<String, DraftBackedPhoto>>(emptyMap())
         private set
     var preparedPhotos by mutableStateOf<Map<String, DraftPreparedPhoto>>(emptyMap())
+        private set
+    var preparedDocuments by mutableStateOf<Map<Uri, DraftPreparedPhoto>>(emptyMap())
         private set
     var preparingSlotIds by mutableStateOf<Set<String>>(emptySet())
         private set
@@ -114,21 +135,39 @@ internal class ConversationMediaDraftState(
         private set
     private var requestedEditorSlotId: String? = null
 
+    /** Refreshes the latest shelf projection without making it the byte owner. */
     fun updateInputs(
         slots: List<PendingMediaSlot>,
+        documentUris: List<Uri>,
         accountRef: String?,
     ) {
         currentSlots = slots
+        currentDocumentUris = documentUris
         currentAccountRef = accountRef
     }
 
-    suspend fun prepareMissingPhotos() {
+    /** Stages picks on the process lifetime so navigation cannot cancel native-draft persistence. */
+    fun prepareMissingAttachments() {
+        appState.launchMutation {
+            preparationMutex.withLock { prepareMissingAttachmentsNow() }
+        }
+    }
+
+    /** Serializes draft insertion so native attachment order matches the composer shelf. */
+    private suspend fun prepareMissingAttachmentsNow() {
         val trackedSlotIds =
             backedPhotos.keys + preparedPhotos.keys + preparingSlotIds + nonEditableDescriptions.keys
         currentSlots.forEach { slot ->
             if (slot.id !in trackedSlotIds) preparePhoto(slot)
         }
+        currentDocumentUris.forEach { uri ->
+            val documentId = stagedDocumentAttachmentId(currentAccountRef ?: return, controller.group.groupIdHex, uri)
+            if (uri !in preparedDocuments && documentId !in preparingSlotIds) prepareDocument(uri, documentId)
+        }
     }
+
+    val isPreparing: Boolean
+        get() = preparingSlotIds.isNotEmpty()
 
     fun openEditor(slot: PendingMediaSlot) {
         if (slot.id in nonEditableDescriptions) return
@@ -279,18 +318,81 @@ internal class ConversationMediaDraftState(
         backedPhotos.mapValues { (_, photo) -> photo.pendingAttachment() } +
             preparedPhotos.mapValues { (_, photo) -> photo.pendingAttachment() }
 
-    fun dispose() {
-        activeEditor?.previewBitmap?.recycle()
-        val accountRef = currentAccountRef
-        val stagedPhotos = backedPhotos.values.toList()
-        val readyPhotos = preparedPhotos.values.toList()
-        if (accountRef != null && (stagedPhotos.isNotEmpty() || readyPhotos.isNotEmpty())) {
-            appState.launchMutation {
-                stagedPhotos.forEach { stager.remove(accountRef, controller.group.groupIdHex, it) }
-                readyPhotos.forEach { stager.removePrepared(accountRef, controller.group.groupIdHex, it) }
+    /** Returns native-owned document bytes in the URI order used by the shelf. */
+    fun preparedDocumentAttachments(): Map<Uri, PendingAttachment> = preparedDocuments.mapValues { (_, document) -> document.pendingAttachment() }
+
+    /** Removes a document only after an explicit shelf action, never because the screen was disposed. */
+    fun releasePreparedDocument(uri: Uri) {
+        val document = preparedDocuments[uri] ?: return
+        preparedDocuments -= uri
+        val accountRef = currentAccountRef ?: return
+        appState.launchMutation {
+            stager.removePrepared(accountRef, controller.group.groupIdHex, document)
+        }
+    }
+
+    /** Drops screen projections after optimistic acceptance while MDK owns bytes until durable send cleanup. */
+    fun forgetAcceptedAttachments(
+        mediaSlotIds: Set<String>,
+        documentUris: Set<Uri>,
+    ) {
+        backedPhotos = backedPhotos.filterKeys { it !in mediaSlotIds }
+        preparedPhotos = preparedPhotos.filterKeys { it !in mediaSlotIds }
+        nonEditableDescriptions = nonEditableDescriptions.filterKeys { it !in mediaSlotIds }
+        preparedDocuments = preparedDocuments.filterKeys { it !in documentUris }
+    }
+
+    /** Rehydrates the composer shelf from authoritative native bytes after navigation or process recreation. */
+    suspend fun restorePersistedAttachments(): RestoredConversationAttachments? {
+        if (restoreAttempted) return null
+        restoreAttempted = true
+        val accountRef = currentAccountRef ?: return null
+        val attachments =
+            appState.messageDraftRepository
+                .draft(accountRef, controller.group.groupIdHex)
+                .getOrNull()
+                ?.mediaAttachments
+                .orEmpty()
+        if (attachments.isEmpty()) return null
+
+        val restored =
+            withContext(Dispatchers.IO) {
+                attachments.mapNotNull { attachment ->
+                    materializeDraftAttachment(context, attachment)?.let { attachment to it }
+                }
+            }
+        if (restored.isEmpty()) return null
+
+        val media = mutableListOf<PendingMediaSlot>()
+        val documents = mutableListOf<Uri>()
+        val restoredPhotos = linkedMapOf<String, DraftPreparedPhoto>()
+        val restoredDocuments = linkedMapOf<Uri, DraftPreparedPhoto>()
+        restored.forEach { (attachment, uri) ->
+            val prepared = DraftPreparedPhoto(attachment, attachment.editorDigest())
+            if (attachment.isComposerVisual()) {
+                media += PendingMediaSlot(attachment.id, uri)
+                restoredPhotos[attachment.id] = prepared
+                if (attachment.mediaType.startsWith("image/", ignoreCase = true)) {
+                    nonEditableDescriptions += attachment.id to messages.sourceUnavailable
+                }
+            } else {
+                documents += uri
+                restoredDocuments[uri] = prepared
             }
         }
-        clearMediaTempFiles(context)
+        preparedPhotos += restoredPhotos
+        preparedDocuments += restoredDocuments
+        return RestoredConversationAttachments(media, documents)
+    }
+
+    /** Releases presentation resources without deleting the native attachment draft. */
+    fun dispose() {
+        activeEditor?.previewBitmap?.recycle()
+        if (currentSlots.isEmpty() && currentDocumentUris.isEmpty()) {
+            clearMediaTempFiles(context)
+        } else {
+            runCatching { File(context.cacheDir, "composer_paste/native_drafts").deleteRecursively() }
+        }
         controller.clearRetainedUploads()
     }
 
@@ -305,6 +407,7 @@ internal class ConversationMediaDraftState(
             if (existing == null) {
                 val mime = withContext(Dispatchers.IO) { safeGetType(context.contentResolver, slot.uri) }
                 if (mime.startsWith("video/", ignoreCase = true)) {
+                    stageVisualAttachment(slot, accountRef)
                     clearRequestedEditor(slotId)
                     return
                 }
@@ -332,12 +435,85 @@ internal class ConversationMediaDraftState(
     ) {
         when (result) {
             is PhotoDraftStageResult.Success -> handleStagedPhoto(slot, accountRef, result.photo)
-            is PhotoDraftStageResult.NotEditable -> markNotEditable(slot.id, result)
+            is PhotoDraftStageResult.NotEditable -> {
+                markNotEditable(slot.id, result)
+                stageVisualAttachment(slot, accountRef)
+            }
             is PhotoDraftStageResult.PreparedOnly -> markPreparedOnly(slot.id, result.photo)
             PhotoDraftStageResult.DraftUnavailable,
             PhotoDraftStageResult.SourceUnavailable,
-            -> showUnavailableIfRequested(slot.id)
+            -> {
+                stageVisualAttachment(slot, accountRef)
+                showUnavailableIfRequested(slot.id)
+            }
         }
+    }
+
+    /** Persists video and non-editable image bytes using the send-time media pipeline. */
+    private suspend fun stageVisualAttachment(
+        slot: PendingMediaSlot,
+        accountRef: String,
+    ) {
+        val pending = attachmentReader.readVisualDraft(slot.uri) ?: return
+        val attachmentId =
+            dev.ipf.whitenoise.android.media.editor.stagedPhotoAttachmentId(
+                accountRef,
+                controller.group.groupIdHex,
+                slot.id,
+            )
+        val prepared = stageGenericAttachment(accountRef, attachmentId, pending) ?: return
+        if (currentSlots.any { it.id == slot.id }) {
+            preparedPhotos += slot.id to prepared
+        } else {
+            stager.removePrepared(accountRef, controller.group.groupIdHex, prepared)
+        }
+    }
+
+    /** Persists one document before its picker grant can be revoked. */
+    private suspend fun prepareDocument(
+        uri: Uri,
+        attachmentId: String,
+    ) {
+        val accountRef = currentAccountRef ?: return
+        preparingSlotIds += attachmentId
+        try {
+            val pending = attachmentReader.readDocumentDraft(uri) ?: return
+            val prepared = stageGenericAttachment(accountRef, attachmentId, pending) ?: return
+            if (uri in currentDocumentUris) {
+                preparedDocuments += uri to prepared
+            } else {
+                stager.removePrepared(accountRef, controller.group.groupIdHex, prepared)
+            }
+        } finally {
+            preparingSlotIds -= attachmentId
+        }
+    }
+
+    /** Adds generic video/document bytes idempotently and recovers the authoritative duplicate. */
+    private suspend fun stageGenericAttachment(
+        accountRef: String,
+        attachmentId: String,
+        pending: PendingAttachment,
+    ): DraftPreparedPhoto? {
+        val attachment = pending.toMessageDraftAttachment(attachmentId)
+        val committed =
+            when (
+                appState.messageDraftRepository.addAttachment(
+                    accountRef,
+                    controller.group.groupIdHex,
+                    attachment,
+                )
+            ) {
+                is MessageDraftMutationResult.Success -> attachment
+                MessageDraftMutationResult.DuplicateAttachment ->
+                    appState.messageDraftRepository
+                        .draft(accountRef, controller.group.groupIdHex)
+                        .getOrNull()
+                        ?.mediaAttachments
+                        ?.firstOrNull { it.id == attachmentId }
+                else -> null
+            } ?: return null
+        return DraftPreparedPhoto(committed, committed.editorDigest())
     }
 
     private suspend fun handleStagedPhoto(
@@ -436,6 +612,7 @@ internal fun rememberConversationMediaDraftState(
     controller: ConversationController,
     chatId: String,
     mediaSlots: List<PendingMediaSlot>,
+    documentUris: List<Uri>,
 ): ConversationMediaDraftState {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -451,17 +628,43 @@ internal fun rememberConversationMediaDraftState(
             ConversationMediaDraftState(appState, controller, context, scope, messages)
         }
     SideEffect {
-        state.updateInputs(mediaSlots, controller.boundAccountRef)
+        state.updateInputs(mediaSlots, documentUris, controller.boundAccountRef)
     }
 
-    LaunchedEffect(state, mediaSlots, controller.boundAccountRef) {
-        state.prepareMissingPhotos()
+    LaunchedEffect(state, mediaSlots, documentUris, controller.boundAccountRef) {
+        state.prepareMissingAttachments()
     }
     DisposableEffect(state, chatId) {
         onDispose(state::dispose)
     }
     return state
 }
+
+/** Materializes native draft bytes only while their composer is visible. */
+private fun materializeDraftAttachment(
+    context: Context,
+    attachment: MessageDraftAttachmentFfi,
+): Uri? =
+    runCatching {
+        val directory = File(context.cacheDir, "composer_paste/native_drafts").apply { mkdirs() }
+        val safeExtension =
+            attachment.fileName
+                .substringAfterLast('.', "")
+                .lowercase()
+                .takeIf { it.length in 1..8 && it.all(Char::isLetterOrDigit) }
+                ?.let { ".$it" }
+                .orEmpty()
+        val stableName =
+            UUID.nameUUIDFromBytes(attachment.id.toByteArray(StandardCharsets.UTF_8)).toString()
+        val file = File(directory, "$stableName$safeExtension")
+        file.writeBytes(attachment.plaintext)
+        FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            file,
+            MediaPipeline.safeDisplayName(attachment.fileName),
+        )
+    }.getOrNull()
 
 /** Retains one caption acceptance generation across preview recompositions and staged-media edits. */
 @Composable
@@ -521,6 +724,7 @@ internal fun ConversationMediaDraftContent(
                         onClosePreview()
                     } else {
                         (state.backedPhotos.keys + state.preparedPhotos.keys).forEach(state::releasePreparedPhoto)
+                        documentUris.forEach(state::releasePreparedDocument)
                         onMediaSlotsChange(emptyList())
                         onDocumentUrisChange(emptyList())
                     }
@@ -531,9 +735,12 @@ internal fun ConversationMediaDraftContent(
                         documentUris,
                         caption,
                         preparedImageAttachments = state.preparedAttachments(),
+                        preparedDocumentAttachments = state.preparedDocumentAttachments(),
                         onAccepted = {
-                            (state.backedPhotos.keys + state.preparedPhotos.keys)
-                                .forEach(state::releasePreparedPhoto)
+                            state.forgetAcceptedAttachments(
+                                mediaSlots.mapTo(linkedSetOf()) { it.id },
+                                documentUris.toSet(),
+                            )
                             onMediaSlotsChange(emptyList())
                             onDocumentUrisChange(emptyList())
                             onCaptionAccepted(seededCaption)
@@ -548,6 +755,7 @@ internal fun ConversationMediaDraftContent(
                     onMediaSlotsChange(mediaSlots.toMutableList().apply { if (index in indices) removeAt(index) })
                 },
                 onRemoveDocumentAt = { index ->
+                    documentUris.getOrNull(index)?.let(state::releasePreparedDocument)
                     onDocumentUrisChange(
                         documentUris.toMutableList().apply { if (index in indices) removeAt(index) },
                     )

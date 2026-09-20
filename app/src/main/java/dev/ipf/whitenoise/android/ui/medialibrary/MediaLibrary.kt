@@ -419,11 +419,31 @@ internal fun SharedMediaSection(
     SharedContentCategories(tiles, onOpenCategory, modifier)
 }
 
-/** Viewer pages follow the newest-first gallery while preserving authored album slots. */
-internal fun List<SharedMediaTile>.toViewerPages(): List<MediaViewerPage> =
+/** Gallery viewer pages follow its newest-first grid while preserving authored album slots. */
+internal fun List<SharedMediaTile>.toGalleryViewerPages(): List<MediaViewerPage> =
     map {
         MediaViewerPage(it.messageIdHex, it.attachmentIndex, it.reference, it.mine, it.sender, it.recordedAt)
     }
+
+/** Conversation pages use chronological message traversal while preserving authored album slots. */
+internal fun List<SharedMediaTile>.toConversationViewerPages(): List<MediaViewerPage> =
+    newestFirstMessageGroupsToChronological().map {
+        MediaViewerPage(it.messageIdHex, it.attachmentIndex, it.reference, it.mine, it.sender, it.recordedAt)
+    }
+
+/** Reverses contiguous newest-first message groups without reversing slots within a message. */
+private fun List<SharedMediaTile>.newestFirstMessageGroupsToChronological(): List<SharedMediaTile> {
+    if (isEmpty()) return emptyList()
+    val groups = ArrayList<List<SharedMediaTile>>()
+    var start = 0
+    for (index in 1..size) {
+        if (index == size || this[index].messageIdHex != this[start].messageIdHex) {
+            groups += subList(start, index)
+            start = index
+        }
+    }
+    return groups.asReversed().flatten()
+}
 
 /** Opens one native per-chat category, with state isolated to its controller/account/runtime owner. */
 @Suppress("FunctionNaming", "LongParameterList")
@@ -457,7 +477,7 @@ private fun MediaLibraryContent(
     val forwardActions = rememberMediaViewerForwardActions(controller, appState)
     val viewerStart = viewerSelection.source
     val visualTiles = tiles.visualsFor(filter)
-    val viewerPages = remember(visualTiles) { visualTiles.toViewerPages() }
+    val viewerPages = remember(visualTiles) { visualTiles.toGalleryViewerPages() }
     val viewerIndex =
         viewerStart?.let { (messageId, attachmentIndex) ->
             viewerPages.indexOfFirst { it.messageIdHex == messageId && it.attachmentIndex == attachmentIndex }
