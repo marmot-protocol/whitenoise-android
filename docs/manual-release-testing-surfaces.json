@@ -25337,6 +25337,14 @@
           "ONB-017",
           "ONB-020"
         ]
+      },
+      {
+        "surface": "The crop rectangle moves when dragged inside it and slides along the image edge",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/editor/PhotoEditRecipe.kt",
+        "anchor": "fun translated(",
+        "test_ids": [
+          "MED-006"
+        ]
       }
     ],
     "notification_content_contracts": [

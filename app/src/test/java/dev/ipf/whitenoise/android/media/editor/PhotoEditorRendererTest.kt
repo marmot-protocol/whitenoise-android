@@ -283,4 +283,52 @@ class PhotoEditorRendererTest {
             bitmap.recycle()
         }
     }
+
+    /**
+     * An off-centre crop keeps its own corner under rotation, not a mirrored one.
+     *
+     * #2608 adds dragging the crop rectangle around, which is the first way to produce a rect that
+     * is not centred on the image. A symmetric crop cannot tell a left/right or top/bottom mix-up
+     * from correct mapping, so this drives the geometry with one whose every edge is distinct.
+     */
+    @Test
+    fun anOffCentreCropMapsItsOwnCornerThroughRotation() {
+        val renderer = renderer()
+        val source =
+            PhotoEditorSourceInfo(
+                encodedSize = EditorPixelSize(4000, 3000),
+                orientedSize = EditorPixelSize(4000, 3000),
+                exifOrientation = PhotoEditGeometry.EXIF_NORMAL,
+                mediaType = "image/jpeg",
+                mayHaveAlpha = false,
+            )
+        val crop = NormalizedRect(0.05f, 0.1f, 0.45f, 0.7f)
+        val upright = requireNotNull(renderer.outputPlan(source, PhotoEditRecipe(crop = crop), MediaQuality.Standard))
+        val turned =
+            requireNotNull(
+                renderer.outputPlan(
+                    source,
+                    PhotoEditRecipe(crop = crop, quarterTurnsClockwise = 1),
+                    MediaQuality.Standard,
+                ),
+            )
+
+        // The crop's own top-left lands at the output's origin however the image is turned.
+        val uprightCorner = upright.geometry.orientedToOutput(NormalizedPoint(crop.left, crop.top))
+        val turnedCorner = turned.geometry.orientedToOutput(NormalizedPoint(crop.left, crop.top))
+
+        assertEquals(0f, uprightCorner.x, 1f)
+        assertEquals(0f, uprightCorner.y, 1f)
+        assertEquals(
+            "a quarter turn swaps the output's sides",
+            upright.geometry.outputSize.width,
+            turned.geometry.outputSize.height,
+        )
+        assertEquals(
+            "and the crop's corner still maps onto an output edge",
+            0f,
+            minOf(turnedCorner.x, turnedCorner.y),
+            1f,
+        )
+    }
 }
