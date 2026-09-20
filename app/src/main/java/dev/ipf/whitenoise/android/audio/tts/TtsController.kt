@@ -174,6 +174,9 @@ class TtsController internal constructor(
             onTerminal = ::releaseTerminalAudioFocus,
         )
 
+    /** Approximate seconds until the active message finishes at the current voice pace and rate. */
+    fun estimatedMessageRemainingSeconds(): Int? = queue.estimatedMessageRemainingSeconds(pace.msPerUnitAt1x, speechRate())
+
     private val preparationRequests =
         dev.ipf.whitenoise.android.state
             .StalenessGuard()

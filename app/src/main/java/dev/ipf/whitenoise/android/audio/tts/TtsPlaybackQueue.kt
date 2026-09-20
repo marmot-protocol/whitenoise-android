@@ -189,6 +189,24 @@ internal class TtsPlaybackQueue(
     private var targetSeekGeneration: Long? = null
     private val progress = TtsPlaybackProgress()
 
+    /** Best-effort remaining time for the active message using the calibrated voice pace. */
+    internal fun estimatedMessageRemainingSeconds(
+        msPerUnitAt1x: Double,
+        rate: Float,
+    ): Int? {
+        val active = _state.value
+        if (active !is TtsState.Speaking && active !is TtsState.Paused) return null
+        val message = messages.getOrNull(active.messageIndex) ?: return null
+        val units = message.chunks.sumOf { TtsWordTimingEstimate.weightedLengthOf(it.text) }
+        if (units <= 0) return null
+        val remainingUnits =
+            units *
+                (1.0 - active.messageProgressFraction.coerceIn(0f, 1f))
+        val millis = remainingUnits * msPerUnitAt1x / rate.coerceIn(0.1f, 10f)
+        val seconds = kotlin.math.ceil(millis / 1_000.0).toInt()
+        return seconds.coerceAtLeast(0)
+    }
+
     /** How a repositioned target treats its message's sender announcement. */
     private enum class SenderAnnouncement {
         // The target crossed into another message: announce its sender once.

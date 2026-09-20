@@ -2370,9 +2370,9 @@
         ]
       },
       {
-        "surface": "TTS transport progress label",
+        "surface": "TTS transport remaining-time label",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
-        "anchor": "R.string.tts_bar_progress",
+        "anchor": "R.string.tts_bar_seconds_remaining",
         "test_ids": [
           "TTS-001",
           "TTS-004"
@@ -2399,15 +2399,6 @@
         "surface": "TtsTransportBarContent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
         "anchor": "fun TtsTransportBarContent(",
-        "test_ids": [
-          "TTS-001",
-          "TTS-004"
-        ]
-      },
-      {
-        "surface": "TtsTransportPreview",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
-        "anchor": "fun TtsTransportPreview(",
         "test_ids": [
           "TTS-001",
           "TTS-004"

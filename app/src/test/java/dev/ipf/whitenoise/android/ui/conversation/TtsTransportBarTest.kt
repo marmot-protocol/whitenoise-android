@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -16,6 +17,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -27,6 +29,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
@@ -75,10 +78,10 @@ class TtsTransportBarTest {
             onNextMessage = { clicks += "nextMessage" },
         )
 
-        composeRule.onNodeWithText(label(R.string.tts_bar_previous_message)).performClick()
+        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_previous_message)).performClick()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_skip_previous)).performClick()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_skip_next)).performClick()
-        composeRule.onNodeWithText(label(R.string.tts_bar_next_message)).performClick()
+        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_next_message)).performClick()
 
         assertEquals(
             listOf("previousMessage", "previousSentence", "nextSentence", "nextMessage"),
@@ -98,7 +101,9 @@ class TtsTransportBarTest {
             onStop = { stopTaps += 1 },
         )
 
-        composeRule.onNodeWithTag(TTS_TRANSPORT_BODY_TAG).performClick()
+        composeRule.onNodeWithTag(TTS_TRANSPORT_BODY_TAG).performTouchInput {
+            click(Offset(width / 2f, height - 2f))
+        }
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_pause)).performClick()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_stop)).performClick()
 
@@ -108,12 +113,12 @@ class TtsTransportBarTest {
     }
 
     @Test
-    fun progressIdentifiesBothTheSentenceAndTheMessage() {
+    fun compactProgressShowsRemainingTimeWithoutMessageDetails() {
         renderBar(state = speakingTts(4, 20, 1, 12, "Preview", sentenceIndex = 2, sentenceCount = 8))
 
-        composeRule
-            .onNodeWithText(app.getString(R.string.tts_bar_progress, 3, 8, 2, 12))
-            .assertIsDisplayed()
+        composeRule.onNodeWithText("Preview").assertDoesNotExist()
+        composeRule.onNodeWithText(app.getString(R.string.tts_bar_progress, 3, 8, 2, 12)).assertDoesNotExist()
+        composeRule.onNodeWithText(app.getString(R.string.tts_bar_seconds_remaining, 12)).assertIsDisplayed()
     }
 
     @Test
@@ -135,9 +140,7 @@ class TtsTransportBarTest {
         composeRule
             .onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo))
             .assertCountEquals(0)
-        composeRule
-            .onNodeWithText(app.getString(R.string.tts_bar_progress, 3, 8, 2, 12))
-            .assertIsDisplayed()
+        composeRule.onNodeWithText(app.getString(R.string.tts_bar_seconds_remaining, 12)).assertIsDisplayed()
     }
 
     /** Paused state offers play without losing navigation. */
@@ -149,10 +152,10 @@ class TtsTransportBarTest {
             onResume = { resumed = true },
         )
 
-        composeRule.onNodeWithText(label(R.string.tts_bar_previous_message)).assertIsEnabled()
+        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_previous_message)).assertIsEnabled()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_skip_previous)).assertIsEnabled()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_skip_next)).assertIsEnabled()
-        composeRule.onNodeWithText(label(R.string.tts_bar_next_message)).assertIsEnabled()
+        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_next_message)).assertIsEnabled()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_play)).performClick()
         assertEquals(true, resumed)
     }
@@ -166,10 +169,10 @@ class TtsTransportBarTest {
             onStop = { stopped = true },
         )
 
-        composeRule.onNodeWithText(label(R.string.tts_bar_previous_message)).assertIsNotEnabled()
+        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_previous_message)).assertIsNotEnabled()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_skip_previous)).assertIsNotEnabled()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_skip_next)).assertIsNotEnabled()
-        composeRule.onNodeWithText(label(R.string.tts_bar_next_message)).assertIsNotEnabled()
+        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_next_message)).assertIsNotEnabled()
         // Error clears the queue, so no play or pause control may exist —
         // a permanently disabled resume slot would lie to accessibility focus.
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_play)).assertDoesNotExist()
@@ -284,12 +287,7 @@ class TtsTransportBarTest {
             R.string.tts_bar_next_message,
             R.string.tts_bar_stop,
         ).forEach { resId ->
-            val action =
-                if (resId == R.string.tts_bar_previous_message || resId == R.string.tts_bar_next_message) {
-                    composeRule.onNodeWithText(label(resId))
-                } else {
-                    composeRule.onNodeWithContentDescription(label(resId))
-                }
+            val action = composeRule.onNodeWithContentDescription(label(resId))
             action.performScrollTo().assertIsDisplayed()
             // Unclipped bounds inside the bar prove the action is fully
             // visible — assertIsDisplayed alone passes on partial clipping.
@@ -312,10 +310,10 @@ class TtsTransportBarTest {
             historyEdge = TtsHistoryEdgeState.Loading(TtsHistoryDirection.Older),
         )
 
-        composeRule.onNodeWithText(label(R.string.tts_bar_previous_message)).assertIsNotEnabled()
+        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_previous_message)).assertIsNotEnabled()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_skip_previous)).assertIsNotEnabled()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_skip_next)).assertIsNotEnabled()
-        composeRule.onNodeWithText(label(R.string.tts_bar_next_message)).assertIsNotEnabled()
+        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_next_message)).assertIsNotEnabled()
         composeRule.onNodeWithText(label(R.string.tts_bar_history_loading)).assertIsDisplayed()
         // The status text must be a polite live region, or TalkBack never
         // narrates the state change to a listener who cannot see the bar.
@@ -363,8 +361,8 @@ class TtsTransportBarTest {
         composeRule.onNodeWithTag(BAR_TAG).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_pause)).assertDoesNotExist()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_play)).assertDoesNotExist()
-        composeRule.onNodeWithText(label(R.string.tts_bar_previous_message)).assertIsNotEnabled()
-        composeRule.onNodeWithText(label(R.string.tts_bar_next_message)).assertIsNotEnabled()
+        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_previous_message)).assertIsNotEnabled()
+        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_next_message)).assertIsNotEnabled()
 
         composeRule.mainClock.advanceTimeBy(201)
         composeRule.waitForIdle()
@@ -392,12 +390,12 @@ class TtsTransportBarTest {
         val bar = composeRule.onNodeWithTag(BAR_TAG).getUnclippedBoundsInRoot()
         assertTrue("Transport must reserve at least 55% of the short window", bar.bottom - bar.top <= 108.dp)
         composeRule
-            .onNodeWithText(label(R.string.tts_bar_previous_message))
+            .onNodeWithContentDescription(label(R.string.tts_bar_previous_message))
             .performScrollTo()
             .assertIsDisplayed()
             .performClick()
         composeRule
-            .onNodeWithText(label(R.string.tts_bar_next_message))
+            .onNodeWithContentDescription(label(R.string.tts_bar_next_message))
             .performScrollTo()
             .assertIsDisplayed()
             .performClick()
@@ -452,8 +450,8 @@ class TtsTransportBarTest {
         )
 
         composeRule.onNodeWithText(label(R.string.tts_bar_history_error)).assertIsDisplayed()
-        composeRule.onNodeWithText(label(R.string.tts_bar_previous_message)).assertIsEnabled()
-        composeRule.onNodeWithText(label(R.string.tts_bar_previous_message)).performClick()
+        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_previous_message)).assertIsEnabled()
+        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_previous_message)).performClick()
         assertEquals(1, previousTaps)
     }
 
@@ -488,6 +486,7 @@ class TtsTransportBarTest {
                     onNextMessage = onNextMessage,
                     onRateSelected = onRateSelected,
                     onStop = onStop,
+                    remainingSeconds = 12,
                     modifier = Modifier.width(barWidth.dp).testTag(BAR_TAG),
                     historyEdge = historyEdge,
                     onBodyClick = onBodyClick,

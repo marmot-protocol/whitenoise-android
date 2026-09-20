@@ -30,8 +30,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * Pixel baselines for the read-aloud transport's separated sentence and
- * message controls across playback states and themes.
+ * Pixel baselines for the compact read-aloud transport across playback states and themes.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -178,7 +177,7 @@ class TtsTransportBarScreenshotTest {
         capture("tts_resume_follow_amoled")
     }
 
-    /** Tts transport bar large font rtl keeps labeled message actions. */
+    /** Tts transport bar large font RTL keeps every icon action reachable. */
     @Test
     fun ttsTransportBarLargeFontRtlKeepsLabeledMessageActions() {
         render(
@@ -296,6 +295,7 @@ class TtsTransportBarScreenshotTest {
                         onNextMessage = {},
                         onRateSelected = {},
                         onStop = {},
+                        remainingSeconds = 12,
                         modifier = Modifier.width(360.dp).testTag(TAG),
                         historyEdge = historyEdge,
                     )
