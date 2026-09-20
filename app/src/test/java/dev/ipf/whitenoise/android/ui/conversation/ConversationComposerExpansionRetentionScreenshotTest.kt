@@ -460,9 +460,11 @@ class ConversationComposerExpansionRetentionScreenshotTest {
     /**
      * Models the dictation-to-input handoff by growing the bottom input only
      * after the optimistic row is published, then captures the settled result.
+     *
+     * One paused-clock lifecycle keeps publish, delayed growth, capture, and completion ordered.
      */
     @Test
-    @Suppress("LongMethod") // One paused-clock lifecycle keeps publish, delayed growth, capture, and completion ordered.
+    @Suppress("LongMethod")
     fun acceptedSendStaysVisibleWhenBottomInputGrowsNextFrame() {
         val publisherStarted = CompletableDeferred<Unit>()
         val releaseSuccess = CompletableDeferred<Unit>()
