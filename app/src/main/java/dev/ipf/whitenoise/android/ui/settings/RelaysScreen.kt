@@ -468,7 +468,7 @@ private fun RelayDetailsScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming", "LongMethod")
 @Composable
-private fun AddRelaySheet(
+internal fun AddRelaySheet(
     existing: List<AccountRelay>,
     busy: Boolean,
     rejectedUrl: String?,
@@ -523,6 +523,7 @@ private fun AddRelaySheet(
                     modifier = Modifier.fillMaxWidth().testTag("relay.add.submit"),
                     enabled = canAdd,
                     loading = busy,
+                    loadingLabel = stringResource(R.string.relay_list_publishing),
                 ) { Text(stringResource(R.string.add_relay)) }
             }
         }

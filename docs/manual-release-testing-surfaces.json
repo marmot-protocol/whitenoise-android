@@ -20255,6 +20255,14 @@
         ]
       },
       {
+        "surface": "string:relay_list_publishing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.relay_list_publishing",
+        "test_ids": [
+          "SYS-003"
+        ]
+      },
+      {
         "surface": "string:relay_list_refresh",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
         "anchor": "R.string.relay_list_refresh",
