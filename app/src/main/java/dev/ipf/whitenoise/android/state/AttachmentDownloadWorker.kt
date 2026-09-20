@@ -154,6 +154,9 @@ internal fun attachmentDownloadWorkState(
 
 internal class AttachmentReferenceNotReadyException : IllegalStateException("attachment reference is not projected yet")
 
+/** A completed body was not retained; local absence is not evidence of a transient transport failure. */
+internal class AttachmentNotRetainedException : IllegalStateException("attachment did not reach encrypted cache")
+
 internal typealias PerformDurableAttachmentDownload = suspend (
     WhiteNoiseApplication,
     AttachmentTransferRequest,
@@ -209,7 +212,11 @@ class AttachmentDownloadWorker : CoroutineWorker {
     ): Result =
         try {
             if (!durableDownload(application, request, priority)) {
-                throw java.io.IOException("attachment did not reach encrypted cache")
+                // A cache publication failure (or eviction before this probe)
+                // is not a transport failure. Do not spend the bounded network
+                // retry downloading an already completed body again. Durable
+                // suppression across new work generations belongs to MDK.
+                throw AttachmentNotRetainedException()
             }
             intentStore.setInteractive(request, interactive = false)
             Result.success()

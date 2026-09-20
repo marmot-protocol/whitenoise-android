@@ -12,6 +12,7 @@ import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -92,13 +93,69 @@ class AttachmentDownloadWorkerClassTest {
     @Test
     fun doWorkRetriesTransientDownloadFailuresOnce() =
         runTest {
-            val worker =
-                buildWorkerWithDownloadOverride(
-                    downloadOverride = { _, _, _ -> false },
-                    runAttemptCount = 0,
-                )
+            var attempts = 0
+            val download: DownloadOverride = { _, _, _ ->
+                attempts += 1
+                throw java.io.IOException("synthetic transport interruption")
+            }
 
-            assertEquals(Result.retry(), worker.doWork())
+            assertEquals(Result.retry(), buildWorkerWithDownloadOverride(download, runAttemptCount = 0).doWork())
+            assertEquals(Result.failure(), buildWorkerWithDownloadOverride(download, runAttemptCount = 1).doWork())
+            assertEquals(2, attempts)
+        }
+
+    @Test
+    fun completedBodyWithoutRetentionIsTerminalForAutomaticAndInteractiveWork() =
+        runTest {
+            val request = testRequest()
+            val intents =
+                AttachmentDownloadIntentStore(appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE))
+            for (interactive in listOf(false, true)) {
+                intents.setInteractive(request, interactive)
+                val expectedPriority =
+                    if (interactive) AttachmentDownloadPriority.Interactive else AttachmentDownloadPriority.Automatic
+                var completedBodies = 0
+                val worker =
+                    buildWorkerWithDownloadOverride(
+                        downloadOverride = { _, _, priority ->
+                            assertEquals(expectedPriority, priority)
+                            completedBodies += 1
+                            false
+                        },
+                        runAttemptCount = 0,
+                    )
+
+                assertEquals(Result.failure(), worker.doWork())
+                assertEquals(1, completedBodies)
+                assertFalse(intents.isInteractive(request))
+                // A failed retention result must not be stored as acquired,
+                // nor impersonate the user's durable cancellation intent.
+                assertFalse(intents.isAutomaticSuppressed(request))
+            }
+        }
+
+    @Test
+    fun explicitRequestCanRetryAfterBodyWasNotRetained() =
+        runTest {
+            assertEquals(Result.failure(), buildWorkerWithDownloadOverride({ _, _, _ -> false }).doWork())
+            AttachmentDownloadWorker.enqueue(appContext, testRequest(), AttachmentDownloadPriority.Interactive)
+            val retry =
+                buildWorkerWithDownloadOverride(
+                    downloadOverride = { _, _, priority ->
+                        assertEquals(AttachmentDownloadPriority.Interactive, priority)
+                        true
+                    },
+                )
+            assertEquals(Result.success(), retry.doWork())
+        }
+
+    @Test
+    fun interruptedDownloadPropagatesCancellationWithoutClaimingSuccess() =
+        runTest {
+            val cancellation = CancellationException("synthetic cancellation")
+            val worker = buildWorkerWithDownloadOverride(downloadOverride = { _, _, _ -> throw cancellation })
+            val result = runCatching { worker.doWork() }
+            assertTrue(result.exceptionOrNull() === cancellation)
         }
 
     @Test
