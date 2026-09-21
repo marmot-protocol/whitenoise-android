@@ -1,7 +1,7 @@
 # Android push recovery qualification — 2026-09-20
 
 Implementation source: isolated branch `fix/fcm-durable-recovery`, based on refreshed
-master `6a9f2434c02d55c358c23ee99b1ff4e0f09b9f7d`. The original checkout and native
+master `fc1da1900c00825864d15c7694f43e39ad496bcb`. The original checkout and native
 dependency pin are unchanged. This report covers the Android implementation and does
 not establish a fix for the reported 2026.9.17 open-chat symptom.
 
@@ -94,6 +94,8 @@ not establish a fix for the reported 2026.9.17 open-chat symptom.
     attempt budget now use one durable transaction. A successful generation write can no longer be
     followed by a failed admission write that returns without an owner or durable dispatch. Tests
     prove both the single-commit success path and the shared commit-failure result.
+14. **Qualification provenance.** The report now records the full exact refreshed base revision,
+    and the source/test patch hash is recomputed from that revision after the final rebase.
 
 Repository regressions cover the external review reproductions directly. They hold the
 completion and acknowledgement dispatches, advance the real network generation, and prove
@@ -115,11 +117,13 @@ Final settled-source results:
 
 | Check | Result |
 | --- | --- |
-| Change-aware completion gate, `--visual changed` | PASS; final review follow-up run 2m 22s |
+| Change-aware completion gate, `--visual changed` | PASS; final post-rebase run 2m 27s |
 | Both debug variants and instrumentation compilation | PASS |
 | Formatting, static analysis, alternate-variant Android lint | PASS |
 | Primary-variant focused tests | 244 passed, 0 failures/errors/skips; 24 suites |
 | Alternate-variant focused tests | 241 recovery-focused tests plus the 21-test affected ordering class passed separately; 0 failures/errors/skips |
+| Post-rebase CI regression set | PASS; 45 tests in each debug variant, 0 failures/errors/skips |
+| Full alternate variant plus Kover XML | PASS with one documented exclusion; 9,164 tests, 0 failures/errors, 1 skipped |
 | Locale resource parity | PASS; every translated resource set matches the default key set |
 | Visual baseline verification | PASS |
 | Manual inventory | 267 active IDs, 0 retired IDs |
@@ -132,6 +136,22 @@ owner acceptance and loss, scheduling database states, marker reopening, retry e
 generation coalescing, native-lane serialization, worker cancellation, completion and
 acknowledgement races, delivery-mode cutover and rollback, battery-policy projection,
 diagnostic correlation/privacy, and updated settings behavior.
+
+After the final 2026-09-21 rebase, the exact CI regression set covers recovery tracing,
+suspend-then-publish ownership guards, the state-source growth ratchet, denied-permission
+delivery preservation, and all 29 delivery-mode recovery cases. It passed all 45 tests in
+both debug variants. A full primary-variant run executed 9,122 tests and exposed one test-only
+ordering race: the assertion observed the native setting before the later registration callback.
+The maintained test now awaits both ordered effects and its full class passes in both variants.
+The full primary suite was not repeated after that test-only correction.
+
+Two unfiltered local alternate-variant coverage attempts each executed 9,165 tests and timed
+out only in `MediaDownloadHostRegressionTest.explicitCancellationStopsSharedNativeAcquisition`.
+That unrelated class passes all 9 tests on the exact head in 13 seconds. To retain a coverage
+receipt without hiding the exception, the final Kover run excluded only that method: 9,164 tests
+passed with 1 existing skip. Overall line coverage is 85,063/106,355 (79.98%); `WhiteNoiseAppState`
+line coverage is 3,111/4,211 (73.88%). The Kover XML SHA-256 is
+`d9971b90a9f2f1e9b855d31cfa976f73b18c4a7bb034bccd3bf6911fd4880f61`.
 
 An earlier hosted run exposed three stale source-ordering assertions after the recovery helper
 boundaries changed. Their maintained contracts now locate the final helper bodies. The next
@@ -178,11 +198,11 @@ was performed.
 
 The first package ID was already present on both devices under a different local signing key,
 so Android rejected the in-place update. Both existing packages were retained. Qualification
-then moved to the fresh isolated package ID above. The rebased settled revision was installed
+then moved to the fresh isolated package ID above. The 2026-09-20 candidate was installed
 in place on the API-30 emulator and physical handset. Notification permission was granted only
 to the qualification package for its synthetic alert test.
 
-The rebased settled-source candidate passed the same three device tests on each target. The
+The 2026-09-20 settled-source candidate passed the same three device tests on each target. The
 emulator completed the two recovery/scheduler checks in 0.151 seconds and the synthetic
 notification-cohort check in 3.427 seconds. The physical handset completed them in 0.754 and
 4.018 seconds:
@@ -198,11 +218,14 @@ job start/stop. Each qualification UID retained identical recorded job, wake-loc
 available CPU/running-time totals. No statistics were reset. This supports the no-pending-work
 fast exit only; it does not measure energy impact.
 
-The final review-follow-up Dev APK was built for arm64 with SHA-256
-`8c4d88c7e38a92178ac2df44729b298255ba3bde97ebf2d236873c8f323ae50b`. It reports the
-expected Dev package/version and signing certificate. The physical Pixel disconnected before the
-required fresh backup and in-place update could begin, so this exact candidate is not yet claimed
-installed. No device data was touched during the failed connection check.
+Those observations apply to the recorded 2026-09-20 candidate. Device and battery qualification
+was not repeated after the final 2026-09-21 master rebase, so it is not current-head evidence.
+
+The final post-rebase Dev APK was built for arm64 with SHA-256
+`af5e4da8d64ec5faaf7174a319db00ee0bd029b06f7f81e29abb660818349eb3`. It reports package
+`dev.ipf.whitenoise.android.dev`, version `2026.9.21-dev-debug`, version code 17, and arm64-v8a.
+This exact candidate was not installed on the physical handset. No physical-device app data was
+touched during the final rebase and validation.
 
 ## Unperformed and deferred checks
 
@@ -222,7 +245,7 @@ installed. No device data was touched during the failed connection check.
 ## Source and artifacts
 
 The source/test patch relative to the base revision is SHA-256
-`858b09083eb4d80ad8492bb4e14d5340d32909f59ca7738cc02834869bf470e6`.
+`d59ce189c2bdb5b8b93cb0b0031492c3f968d81a06f56165a7dee4a6f5320be5`.
 This hashes `git diff origin/master --binary -- app/src`. The native dependency remains unchanged.
 
 Final qualification APK hashes:
