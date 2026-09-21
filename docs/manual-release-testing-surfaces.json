@@ -109,6 +109,14 @@
         ]
       },
       {
+        "surface": "Dictation voice-send command phrase wiring",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.dictation_voice_send_command_phrase",
+        "test_ids": [
+          "DIC-007"
+        ]
+      },
+      {
         "surface": "Key package relay history load failure toast",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateKeyPackages.kt",
         "anchor": "R.string.toast_couldnt_load_key_packages",
@@ -18918,6 +18926,22 @@
         "surface": "setting:dictation_voice_send_command",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
         "anchor": "R.string.dictation_voice_send_command_title",
+        "test_ids": [
+          "DIC-007"
+        ]
+      },
+      {
+        "surface": "setting:dictation_voice_send_command_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "R.string.dictation_voice_send_command_description",
+        "test_ids": [
+          "DIC-007"
+        ]
+      },
+      {
+        "surface": "setting:dictation_voice_send_command_phrase",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "R.string.dictation_voice_send_command_phrase",
         "test_ids": [
           "DIC-007"
         ]
