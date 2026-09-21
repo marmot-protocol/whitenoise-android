@@ -7,6 +7,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
@@ -36,11 +37,13 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
 import dev.ipf.whitenoise.android.audio.VoiceRecordingController
+import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.TimelineReplyDisplay
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_GESTURE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerPill
 import dev.ipf.whitenoise.android.ui.conversation.composer.RecordingStripLeading
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CoroutineScope
@@ -97,6 +100,49 @@ class ComposerBarScreenshotTest {
     fun composerBarDraftRtl() {
         render(darkTheme = false, amoled = false, draft = "Draft message text", rtl = true)
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_bar_draft_rtl.png")
+    }
+
+    @Test
+    fun composerMentionActiveCompositionUsesCanonicalText() {
+        val npub = "npub1" + "q".repeat(58)
+        val draft = "@$npub "
+        val focusRequester = FocusRequester()
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                Surface(Modifier.width(360.dp).testTag(MENTION_COMPOSITION_TAG)) {
+                    ComposerPill(
+                        textFieldValue =
+                            TextFieldValue(
+                                text = draft,
+                                selection = TextRange(3),
+                                composition = TextRange(2, 3),
+                            ),
+                        composerFocus = focusRequester,
+                        emojiPickerOpen = false,
+                        onValueChange = {},
+                        onEmojiPickerToggle = {},
+                        onAttachmentsToggle = {},
+                        attachmentSheetOpen = false,
+                        onPickFromGallery = null,
+                        onPickDocument = null,
+                        highlightMentionChips = true,
+                        mentionCandidates =
+                            listOf(
+                                MentionComposer.Candidate(
+                                    accountIdHex = "aa".repeat(32),
+                                    npub = npub,
+                                    displayName = "Alice",
+                                ),
+                            ),
+                    )
+                }
+            }
+        }
+        composeRule.runOnIdle { focusRequester.requestFocus() }
+        composeRule.waitForIdle()
+        composeRule
+            .onNodeWithTag(MENTION_COMPOSITION_TAG)
+            .captureRoboImage("src/test/snapshots/composer_mention_active_composition.png")
     }
 
     @Test
@@ -665,6 +711,7 @@ class ComposerBarScreenshotTest {
         /** Sampled past the height animation's former 160ms clock, before the 220ms editing row lands. */
         const val BULK_PASTE_MID_TRANSITION_MILLIS = 182L
         const val TAG = "composer-bar"
+        const val MENTION_COMPOSITION_TAG = "composer-mention-active-composition"
         const val LONG_TAG = "long-composer-bar"
         const val BULK_PASTE_TAG = "bulk-paste-composer"
         const val RECORDING_STRIP_TAG = "composer-voice-recording-strip"
