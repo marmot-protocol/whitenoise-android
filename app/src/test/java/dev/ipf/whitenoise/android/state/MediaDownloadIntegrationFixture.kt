@@ -75,6 +75,7 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
         val reference: MediaAttachmentReferenceFfi,
     ) {
         val result = CompletableDeferred<ByteArray>()
+        internal val observed = CompletableDeferred<Unit>()
 
         @Volatile var bytes: ByteArray? = null
 
@@ -260,7 +261,9 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
                     initial = false
                     initialSnapshot
                 } else {
-                    checkNotNull(jobs[key]).result.await()
+                    val call = checkNotNull(jobs[key])
+                    call.observed.complete(Unit)
+                    call.result.await()
                     AttachmentTransferSnapshotFfi(listOf(status(key)))
                 }
             }

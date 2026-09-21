@@ -256,15 +256,16 @@ repro_verify_record_build_environment() {
     cat -- "$configured_jvm_report"
     printf '\n[tree1 build jvm]\n'
     cat -- "$jvm_report1"
-    printf '\n[tree2 build jvm]\n'
-    cat -- "$jvm_report2"
-    sha256sum -- "$source_tree/gradle/wrapper/gradle-wrapper.jar" \
-      "$source_tree/gradle/wrapper/gradle-wrapper.properties"
+    if [[ -n "$jvm_report2" ]]; then
+      printf '\n[tree2 build jvm]\n'
+      cat -- "$jvm_report2"
+    fi
+    (cd "$source_tree" && sha256sum gradle/wrapper/gradle-wrapper.{jar,properties})
     if [[ -n "$android_sdk" && -d "$android_sdk" ]]; then
       find "$android_sdk/platforms" "$android_sdk/build-tools" \
-        -maxdepth 2 -type f -name source.properties -print -exec sha256sum '{}' ';'
+        -maxdepth 2 -type f -name source.properties -print -exec sha256sum '{}' ';' | LC_ALL=C sort
       find "$android_sdk/platforms" \
-        -maxdepth 2 -type f -name android.jar -print -exec sha256sum '{}' ';'
+        -maxdepth 2 -type f -name android.jar -print -exec sha256sum '{}' ';' | LC_ALL=C sort
     fi
     if apksigner="$(repro_verify_locate_apksigner)"; then
       printf 'apksigner=%s\n' "$apksigner"
@@ -391,9 +392,10 @@ repro_verify_build() {
     "${clean_env[@]}" ./gradlew :app:assembleProductionZapstoreRelease \
       -Pandroid.injected.build.abi=arm64-v8a \
       -Pandroid.injected.testOnly=false \
+      -x :app:lintVitalProductionZapstoreRelease \
       --init-script "$init_script" \
       -Drepro.verify.jvm.report="$jvm_report" \
-      --no-daemon -q
+      --no-build-cache --no-configuration-cache --no-daemon --profile -q
   )
   repro_verify_assert_build_jvm "$jvm_report" "$configured_jvm_report" "$(basename -- "$tree")"
 }

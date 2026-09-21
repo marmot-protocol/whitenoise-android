@@ -20,9 +20,18 @@ permissions:
 
 jobs:
   analyze:
-    name: Analyze Java and Kotlin
+    name: Analyze Java and Kotlin (${{ matrix.flavor }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Retain the existing analysis history for the Zapstore source set.
+          - flavor: Zapstore
+            category: /language:java-kotlin
+          - flavor: Play
+            category: /language:java-kotlin/flavor:play
 
     steps:
       - name: Checkout
@@ -46,19 +55,28 @@ jobs:
           build-mode: manual
           queries: security-extended
 
-      # Compile both distribution flavors so CodeQL extracts their small
-      # flavor-specific self-update implementations as well as the shared
-      # production source set. The :benchmark module contains test-only
-      # Macrobenchmark and Baseline Profile drivers, so it is intentionally
-      # excluded from this production-code scan.
+      # Each scan extracts shared production code and its flavor-specific code.
+      # Compilation must execute under the extractor, even with warm caches.
+      # The :benchmark module remains excluded because it contains test drivers.
       - name: Build Java and Kotlin for analysis
         run: >-
           ./gradlew
-          :app:compileDevZapstoreDebugKotlin
-          :app:compileDevPlayDebugKotlin
-          --no-daemon --stacktrace
+          :app:compileDev${{ matrix.flavor }}DebugKotlin
+          --no-build-cache --no-daemon --stacktrace
 
       - name: Analyze
         uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
         with:
-          category: /language:java-kotlin
+          category: ${{ matrix.category }}
+
+  verify:
+    name: Analyze Java and Kotlin
+    needs: analyze
+    if: always()
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Require both distribution scans
+        env:
+          SCAN_RESULT: ${{ needs.analyze.result }}
+        run: test "$SCAN_RESULT" = success

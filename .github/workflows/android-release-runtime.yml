@@ -3,6 +3,7 @@ name: Android Release Runtime Verify
 # R8 can successfully package bytecode that ART later rejects. These pre-merge
 # checks build the optimized production/API-36 and staging/API-37 paths, sign
 # them with disposable CI-only keys, and ask ART to verify every DEX class.
+# On PRs, release lint runs once per variant in android-repro-verify.yml's gate.
 
 on:
   pull_request:
@@ -42,6 +43,8 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
 
       - name: Read MarmotKit artifact pin
         id: marmotkit
@@ -86,7 +89,8 @@ jobs:
           -Pwhitenoise.allowUnconfiguredProductionFirebaseForReleaseRuntimeTest=true
           -Pandroid.injected.build.abi=x86_64
           -Pandroid.injected.testOnly=false
-          --no-daemon --stacktrace
+          ${{ github.event_name == 'pull_request' && '-x :app:lintVitalProductionZapstoreRelease' || '' }}
+          --build-cache --no-daemon --stacktrace
 
       - name: Locate release APK
         id: apk
@@ -119,6 +123,7 @@ jobs:
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
           api-level: 36
+          cores: 4
           target: google_apis
           arch: x86_64
           force-avd-creation: false
@@ -158,6 +163,8 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
 
       - name: Read MarmotKit artifact pin
         id: marmotkit
@@ -198,7 +205,8 @@ jobs:
         run: >-
           ./gradlew :app:assembleStagingZapstoreRelease
           -Pandroid.injected.testOnly=false
-          --no-daemon --stacktrace
+          ${{ github.event_name == 'pull_request' && '-x :app:lintVitalStagingZapstoreRelease' || '' }}
+          --build-cache --no-daemon --stacktrace
 
       - name: Locate ARM64 and x86_64 staging APKs
         id: apks
@@ -314,6 +322,7 @@ jobs:
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
           api-level: '37.0'
+          cores: 4
           target: google_apis_ps16k
           arch: x86_64
           # Keep this to a profile shipped by both the runner image's bundled

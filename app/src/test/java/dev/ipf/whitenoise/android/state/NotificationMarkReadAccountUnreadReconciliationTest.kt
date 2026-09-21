@@ -136,16 +136,18 @@ class NotificationMarkReadAccountUnreadReconciliationTest {
     @Test
     fun markReadOnOneAccountNeverTouchesAnotherAccountsDot() =
         runTest {
+            // Keep authoritative rows consistent with the manual-attention assertion,
+            // including refreshes still running when the background action completes.
+            activeRows = listOf(readRow().copy(manuallyMarkedUnread = true))
             withFixture { fixture ->
                 val appState = fixture.appState
                 fixture.bootstrapAndRefresh()
                 awaitCondition("background dot lights from its own unread") {
                     appState.accountShowsUnreadDot(BACKGROUND_ACCOUNT)
                 }
-                // Manually flag the active account so it holds observable dot state
-                // that a background-account action must not clear.
-                appState.updateAccountManualUnread(ACTIVE_ACCOUNT, hasManualUnread = true)
-                assertTrue(appState.accountShowsUnreadDot(ACTIVE_ACCOUNT))
+                awaitCondition("active dot reflects its authoritative manual attention") {
+                    appState.accountShowsUnreadDot(ACTIVE_ACCOUNT)
+                }
 
                 backgroundRows = listOf(readRow())
                 pumpingMainLooper {

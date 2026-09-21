@@ -71,17 +71,18 @@ frozen in `config/detekt/detekt-baseline.xml`. The workflow runs both the
 `zapstore` and `play` dev debug variants and requires no signing secrets or
 `google-services.json`.
 
-Validation runs concurrently on separate runners: build/release/tooling contracts,
+Validation runs concurrently on separate runners: tooling and packaging contracts,
 Compose compiler reports, one static-analysis job per distribution, one full unit
 and coverage job per distribution, and one curated screenshot job per distribution.
-Each static-analysis job runs its Android lint variant; the Play job also owns
+Each static-analysis job runs its Android lint variant; the tooling job owns
 the flavor-independent ktlint and detekt checks. Unit jobs run the complete suite
 once, and the Zapstore job also enforces all Kover ratchets. Screenshot jobs keep
 the established committed-baseline allowlist and run beside the full suite instead
-of extending its critical path. The Play static-analysis job and both test jobs
+of extending its critical path. Both test jobs
 reuse one runner-local Gradle daemon across sequential invocations, avoiding
-repeated JVM startup and warm-up while retaining the existing test-worker heap and
-parallelism limits. Coverage reports run only after a successful unit step, so a
+repeated JVM startup and warm-up. Unit suites use three isolated 1 GiB workers;
+local tests stay serial unless `-PciTestForks=3` is set. Coverage reports run only
+after a successful unit step, so a
 failed suite cannot trigger a second full test execution. The existing
 `Compile, test, ktlint, detekt, Android lint` check aggregates every job, including
 the offline ZSP contract, and fails if any dependency fails, is cancelled, or skips.
@@ -89,24 +90,24 @@ the offline ZSP contract, and fails if any dependency fails, is cancelled, or sk
 Coverage artifacts are `kover-coverage-report-Zapstore` and
 `kover-coverage-report-Play`. Failure reports and Gradle timing profiles use
 `android-ci-reports-<job>` and `android-ci-gradle-profiles-<job>`, where `<job>` is
-`build-contracts`, `compose-compiler`, `static-analysis-Zapstore`,
+`build-contracts-<phase>`, `compose-compiler`, `static-analysis-Zapstore`,
 `static-analysis-Play`, `screenshots-Zapstore`, `screenshots-Play`, `Zapstore`, or
 `Play`. Separate runners
 reduce the serial critical path but repeat some setup/compilation; compare both
-wall time and summed job durations when measuring CI performance. Only the Play
-test job writes Gradle cache state on master pushes and same-repository PRs;
-build contracts, Compose reports, static analysis, screenshots, Zapstore tests,
-and all fork PR jobs restore caches read-only. The separate MarmotKit cache uses
-the same single-writer policy. This avoids publishing a separate cache state from
-every parallel job. GitHub's ephemeral runner bounds read-only daemon lifetime;
+wall time and summed job durations when measuring CI performance. Each Gradle job
+retains its own task outputs on master pushes and same-repository PRs; fork PRs
+restore caches read-only. Assertions execute on every fresh runner. The separate
+MarmotKit cache retains one writer: Play unit tests. GitHub's ephemeral runner
+bounds read-only daemon lifetime;
 the pinned Gradle setup action stops writable-job daemons before cache cleanup.
 
 Two security workflows run separately from the main Gradle validation so their
 permissions and results stay explicit:
 
 - `.github/workflows/codeql.yml` compiles the credential-free dev Zapstore and
-  Play debug variants and scans their Java and Kotlin with CodeQL's extended
-  security query suite.
+  Play debug variants on separate runners and scans each with CodeQL's extended
+  security query suite. The existing `Analyze Java and Kotlin` gate requires both
+  scans. Zapstore keeps the existing SARIF category; Play has its own category.
   It runs for pull requests, `master` pushes, a weekly full scan, and manual
   dispatch. Only its SARIF upload receives `security-events: write`.
 - `.github/workflows/dependency-submission.yml` supplies GitHub's dependency
@@ -116,7 +117,7 @@ permissions and results stay explicit:
 
 Both security workflows pin every third-party action to a full commit SHA,
 cancel superseded work, and have bounded job timeouts. CodeQL's Gradle setup
-reuses the normal dependency and build caches; the dependency-submission action
+reuses dependencies but always compiles under the extractor; the dependency-submission action
 manages its own Gradle execution. Dependency submission runs only from trusted
 `master` pushes because it is the sole workflow with `contents: write`.
 

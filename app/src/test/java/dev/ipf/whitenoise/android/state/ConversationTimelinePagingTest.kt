@@ -218,15 +218,10 @@ class ConversationTimelinePagingTest {
                 startOnConstruction = true,
             )
         try {
-            // Apply the opening window here rather than waiting on subscription startup: under the
-            // full suite that race leaves hasMoreBefore false and every page reports no progress.
-            settle()
-            controller.applyTimelinePage(
-                page(listOf(record(SEED_ID, timelineAt = 200uL)), hasMoreBefore = true),
-                replaceWindow = true,
-                updatePagination = true,
-            )
-            check(controller.hasMoreBefore) { "the seeded window must still have older history" }
+            // Paging needs both the opening window and its active subscription.
+            awaitConversationCondition {
+                controller.timelineSubscription === subscription && controller.hasMoreBefore
+            }
             block(controller)
         } finally {
             controller.onCleared()

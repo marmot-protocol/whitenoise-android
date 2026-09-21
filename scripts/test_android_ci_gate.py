@@ -88,6 +88,7 @@ class AndroidCiGateTest(unittest.TestCase):
         )
         self.assertIn(':app:compileStagingZapstoreReleaseKotlin', compile_step)
         self.assertIn('-Pwhitenoise.enableComposeCompilerReports=true', compile_step)
+        self.assertIn(' --no-build-cache ', compile_step)
         self.assertIn(' --no-daemon ', compile_step)
         self.assertNotIn(':app:compileStagingZapstoreReleaseKotlin', self.build_contracts)
         self.assertIn('name: compose-compiler-reports', self.compose_compiler)
@@ -117,22 +118,21 @@ class AndroidCiGateTest(unittest.TestCase):
 
     def test_static_analysis_isolated_by_flavor_without_duplicating_singletons(self):
         """Both lint variants run concurrently while ktlint and detekt run once."""
-        self.assertIn("name: ktlint, detekt, and Android lint (${{ matrix.flavor }})", self.static_analysis)
+        self.assertIn("name: Android lint (${{ matrix.flavor }})", self.static_analysis)
         self.assertIn('      fail-fast: false\n', self.static_analysis)
         self.assertIn('        flavor: [Zapstore, Play]\n', self.static_analysis)
-        ktlint = self.named_step(self.static_analysis, 'ktlint')
-        detekt = self.named_step(self.static_analysis, 'detekt')
+        style = self.named_step(self.build_contracts, 'ktlint and detekt')
         lint = self.named_step(self.static_analysis, 'Android lint')
-        self.assertIn("        if: matrix.flavor == 'Play'\n", ktlint)
-        self.assertIn("        if: matrix.flavor == 'Play'\n", detekt)
+        self.assertIn("        if: matrix.phase == 'tooling'\n", style)
         self.assertNotIn('\n        if:', lint)
-        self.assertIn(':app:ktlintCheck :benchmark:ktlintCheck', ktlint)
-        self.assertIn(':app:detekt', detekt)
+        self.assertIn(':app:ktlintCheck :benchmark:ktlintCheck :app:detekt', style)
+        self.assertNotIn(':app:ktlintCheck', self.static_analysis)
+        self.assertNotIn(':app:detekt', self.static_analysis)
         self.assertIn(':app:lintDev${{ matrix.flavor }}Debug', lint)
         self.assertNotIn(':app:lintDevZapstoreDebug :app:lintDevPlayDebug', self.static_analysis)
         self.assertIn('android-ci-reports-static-analysis-${{ matrix.flavor }}', self.static_analysis)
         self.assertIn('android-ci-gradle-profiles-static-analysis-${{ matrix.flavor }}', self.static_analysis)
-        self.assertIn('cache-read-only: true', self.static_analysis)
+        self.assertIn('cache-read-only:', self.static_analysis)
 
     def test_full_unit_suite_is_reused_by_coverage_without_verify_mode(self):
         """Coverage reuses the full suite without widening screenshot ownership."""
@@ -193,26 +193,23 @@ class AndroidCiGateTest(unittest.TestCase):
             self.assertIn(f"--tests '{test_filter}'", step)
         self.assertEqual(step.count("--tests '"), len(expected_filters))
         self.assertIn(' --no-daemon ', step)
-        self.assertIn('cache-read-only: true', self.screenshots)
+        self.assertIn('cache-read-only:', self.screenshots)
         self.assertIn('android-ci-reports-screenshots-${{ matrix.flavor }}', self.screenshots)
         self.assertIn('android-ci-gradle-profiles-screenshots-${{ matrix.flavor }}', self.screenshots)
 
-    def test_only_play_tests_publish_gradle_cache_state(self):
-        """Parallel analysis and fork runs cannot create competing cache writers."""
-        setup_gradle = self.named_step(self.tests_job, 'Set up Gradle')
-        expected_policy = """          cache-read-only: >-
-            ${{ matrix.flavor != 'Play' ||
-                (github.event_name == 'pull_request' &&
-                 github.event.pull_request.head.repo.full_name != github.repository) }}
-"""
-        self.assertIn(expected_policy, setup_gradle)
+    def test_job_caches(self):
+        """Every workload retains its own task cache; forks remain read-only."""
         gradle_setup_steps = re.findall(
             r'(?ms)^      - name: Set up Gradle\n.*?(?=^      - |^  [a-z]|\Z)',
             self.workflow,
         )
         self.assertEqual(len(gradle_setup_steps), 5)
         for step in gradle_setup_steps:
-            self.assertIn('cache-read-only:', step)
+            self.assertIn(
+                "cache-read-only: ${{ github.event_name == 'pull_request' && "
+                "github.event.pull_request.head.repo.full_name != github.repository }}",
+                step,
+            )
         self.assertNotIn('uses: actions/cache@', self.workflow)
         self.assertEqual(self.workflow.count('uses: actions/cache/restore@'), 5)
         self.assertEqual(self.workflow.count('uses: actions/cache/save@'), 1)
@@ -225,17 +222,33 @@ class AndroidCiGateTest(unittest.TestCase):
         )
         self.assertIn("steps.marmotkit-cache.outputs.cache-hit != 'true'", save_step)
 
+    def test_build_phases(self):
+        """Packaging runs independently, with phase-specific diagnostics."""
+        self.assertIn('phase: [tooling, baseline]', self.build_contracts)
+        self.assertIn('fail-fast: false', self.build_contracts)
+        for name, phase in (
+            ('Compile (Kotlin)', 'tooling'),
+            ('Assemble app for Baseline Profile verification', 'baseline'),
+            ('Verify packaged Baseline Profile assets', 'baseline'),
+        ):
+            step = self.named_step(self.build_contracts, name)
+            self.assertIn(f"if: matrix.phase == '{phase}'", step)
+        self.assertIn('android-ci-reports-build-contracts-${{ matrix.phase }}', self.build_contracts)
+        self.assertIn('android-ci-gradle-profiles-build-contracts-${{ matrix.phase }}', self.build_contracts)
+
+    def test_parallel_test_workers(self):
+        """Parallelism changes execution, never the full-suite scope or caching."""
+        self.assertIn("ORG_GRADLE_PROJECT_ciTestForks: '3'", self.tests_job)
+        root_build = (WORKFLOW.parents[2] / 'build.gradle.kts').read_text()
+        self.assertIn('providers.gradleProperty("ciTestForks").map(String::toInt).getOrElse(1)', root_build)
+        self.assertIn('outputs.doNotCacheIf("CI test assertions must execute")', root_build)
+
     def test_sequential_analysis_and_test_builds_reuse_the_gradle_daemon(self):
         """Multi-invocation jobs avoid a fresh Gradle JVM for every phase."""
-        for job_name, job in (
-            ('static-analysis', self.static_analysis),
-            ('tests', self.tests_job),
-        ):
-            with self.subTest(job=job_name):
-                invocations = self.gradle_steps(job)
-                self.assertGreaterEqual(len(invocations), 3)
-                self.assertTrue(all(' --daemon ' in step for step in invocations))
-                self.assertTrue(all(' --no-daemon ' not in step for step in invocations))
+        invocations = self.gradle_steps(self.tests_job)
+        self.assertGreaterEqual(len(invocations), 3)
+        self.assertTrue(all(' --daemon ' in step for step in invocations))
+        self.assertTrue(all(' --no-daemon ' not in step for step in invocations))
 
     def test_all_successful_jobs_pass(self):
         """A complete green matrix permits the existing required check to pass."""
@@ -243,6 +256,24 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         for job in self.dependencies:
             self.assertIn(f'{job}: success', result.stdout)
+
+    def test_release_lint_remains_required(self):
+        """Hoisting lint out of APK builds must preserve both release checks."""
+        workflow = WORKFLOW.with_name('android-repro-verify.yml').read_text()
+        self.assertIn('variant: [Production, Staging]', workflow)
+        self.assertIn(':app:lintVital${{ matrix.variant }}ZapstoreRelease', workflow)
+        gate = self.job_block(workflow, 'verify')
+        self.assertIn('needs: [build, lint]', gate)
+        self.assertIn('if: always()', gate)
+        script = re.search(r'^        run: (test .*success)$', gate, re.MULTILINE).group(1)
+        for build in ('success', 'failure', 'cancelled', 'skipped'):
+            for lint in ('success', 'failure', 'cancelled', 'skipped'):
+                result = subprocess.run(
+                    ['bash', '-c', script],
+                    env={**os.environ, 'BUILD_RESULT': build, 'LINT_RESULT': lint},
+                    check=False,
+                )
+                self.assertEqual(result.returncode == 0, build == lint == 'success')
 
     def test_any_non_successful_job_blocks(self):
         """Failure, cancellation, and skipped matrix jobs all block the gate."""

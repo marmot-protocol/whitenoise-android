@@ -34,6 +34,9 @@ plugins {
 
 subprojects {
     tasks.withType<Test>().configureEach {
+        // CI uses three isolated workers; local and other workflow runs stay serial.
+        maxParallelForks = providers.gradleProperty("ciTestForks").map(String::toInt).getOrElse(1)
+
         // Reuse compilation/analysis outputs, but execute assertions in each
         // fresh CI job, including screenshot comparisons against the baselines.
         outputs.doNotCacheIf("CI test assertions must execute") {
