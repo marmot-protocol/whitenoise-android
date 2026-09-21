@@ -51,9 +51,13 @@ jobs:
           retention-days: 14
 
   build-contracts:
-    name: Build, release, and tooling contracts
+    name: Build contracts (${{ matrix.phase }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        phase: [tooling, baseline]
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -61,9 +65,11 @@ jobs:
           fetch-depth: 0
 
       - name: Test manual release guide validator
+        if: matrix.phase == 'tooling'
         run: python3 -m unittest scripts/test_check_manual_test_guide.py
 
       - name: Validate manual release guide
+        if: matrix.phase == 'tooling'
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
@@ -73,40 +79,51 @@ jobs:
           fi
 
       - name: Test PR screenshot renderer
+        if: matrix.phase == 'tooling'
         run: node --test .github/scripts/update-pr-screenshots.test.js .github/scripts/update-pr-preview-links.test.js
 
       - name: Test GitHub triage reconciliation
+        if: matrix.phase == 'tooling'
         run: python3 -m unittest scripts/test_check_github_triage.py
 
       - name: Test stale-result recurrence classifier
+        if: matrix.phase == 'tooling'
         run: python3 -m unittest scripts/test_stale_result_recurrence.py
 
       - name: Test package-replacement startup reporter
+        if: matrix.phase == 'tooling'
         run: bash .github/scripts/test-package-replacement-startup-report.sh
 
       - name: Test PR preview publisher
+        if: matrix.phase == 'tooling'
         run: bash .github/scripts/test-upload-pr-apk-to-blossom.sh
 
       - name: Test release and staging transport tooling
+        if: matrix.phase == 'tooling'
         run: |
           ./scripts/release_test.sh
           .github/scripts/test-staging-apk-transport.sh
 
       - name: Test production release safety gates
+        if: matrix.phase == 'tooling'
         run: python3 -m unittest scripts/test_release_pipeline.py
 
       - name: Verify Android release metadata and store assets
+        if: matrix.phase == 'tooling'
         run: ./scripts/check-release-metadata.py
 
       - name: Test MarmotKit artifact preparation
+        if: matrix.phase == 'tooling'
         run: ./scripts/test-prepare-marmotkit-artifact.sh
 
       - name: Verify generated performance profiles
+        if: matrix.phase == 'tooling'
         run: |
           bash .github/scripts/test-verify-generated-profiles.sh
           bash scripts/verify-generated-profiles.sh
 
       - name: Test Android CI aggregate gate
+        if: matrix.phase == 'tooling'
         run: python3 -m unittest scripts/test_android_ci_gate.py
 
       - name: Configure MarmotKit cache directory
@@ -120,12 +137,11 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # Reuse cached dependencies and task outputs without publishing another
-      # job-specific Gradle home. The Play test leg is the sole cache writer.
+      # Retain this job's task outputs instead of relying on the Play test cache.
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
         with:
-          cache-read-only: true
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
 
       - name: Read MarmotKit artifact pin
         id: marmotkit
@@ -142,9 +158,11 @@ jobs:
           key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
 
       - name: Prepare MarmotKit API signature
+        if: matrix.phase == 'tooling'
         run: ./gradlew :app:stageMarmotKitApiSignature --build-cache --profile --no-daemon --stacktrace
 
       - name: Upload MarmotKit API signature
+        if: matrix.phase == 'tooling'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: marmotkit-api-signature
@@ -153,20 +171,24 @@ jobs:
           retention-days: 14
 
       - name: Verify packaged system labels for every app variant
+        if: matrix.phase == 'tooling'
         run: ./scripts/test-system-labels.sh
 
       - name: Verify production signing and bundle task isolation
+        if: matrix.phase == 'tooling'
         run: python3 scripts/test-release-gradle.py
 
       - name: Compile (Kotlin)
+        if: matrix.phase == 'tooling'
         run: ./gradlew :app:compileDevZapstoreDebugAndroidTestKotlin :benchmark:assembleDevZapstoreBenchmarkRelease --build-cache --profile --no-daemon --stacktrace
 
-      # Keep release compilation in a fresh process after androidTest and the
-      # benchmark harness so their compiler heaps do not compete on this runner.
+      # Package on a separate runner so release compilation overlaps tooling checks.
       - name: Assemble app for Baseline Profile verification
+        if: matrix.phase == 'baseline'
         run: ./gradlew :app:assembleDevZapstoreBenchmarkRelease --build-cache --profile --no-daemon --stacktrace
 
       - name: Verify packaged Baseline Profile assets
+        if: matrix.phase == 'baseline'
         shell: bash
         run: |
           set -euo pipefail
@@ -187,7 +209,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: android-ci-reports-build-contracts
+          name: android-ci-reports-build-contracts-${{ matrix.phase }}
           path: |
             app/build/reports/
             app/build/test-results/
@@ -201,7 +223,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: android-ci-gradle-profiles-build-contracts
+          name: android-ci-gradle-profiles-build-contracts-${{ matrix.phase }}
           path: build/reports/profile/
           if-no-files-found: ignore
           retention-days: 7
@@ -227,7 +249,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
         with:
-          cache-read-only: true
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
 
       - name: Read MarmotKit artifact pin
         id: marmotkit
@@ -303,12 +325,11 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # Reuse cached dependencies and task outputs without publishing another
-      # job-specific Gradle home. The Play test leg is the sole cache writer.
+      # Retain this job's task outputs instead of relying on the Play test cache.
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
         with:
-          cache-read-only: true
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
 
       - name: Read MarmotKit artifact pin
         id: marmotkit
@@ -384,7 +405,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
         with:
-          cache-read-only: true
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
 
       - name: Read MarmotKit artifact pin
         id: marmotkit
@@ -448,9 +469,10 @@ jobs:
     name: Unit tests and coverage (${{ matrix.flavor }})
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    env:
+      ORG_GRADLE_PROJECT_ciTestForks: '4'
     strategy:
-      # Keep both variants' diagnostics when one fails. Each runner retains the
-      # existing single test worker and heap limits.
+      # Keep both variants' diagnostics; four isolated 1 GiB workers per runner.
       fail-fast: false
       matrix:
         flavor: [Zapstore, Play]
@@ -469,16 +491,11 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # Share cached dependencies and task outputs, but publish Gradle state
-      # from only the Play leg to avoid multiplying job/matrix cache entries.
-      # Fork PRs remain read-only, including their Play leg.
+      # Retain both flavors' compilation outputs; fork PRs remain read-only.
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
         with:
-          cache-read-only: >-
-            ${{ matrix.flavor != 'Play' ||
-                (github.event_name == 'pull_request' &&
-                 github.event.pull_request.head.repo.full_name != github.repository) }}
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
 
       - name: Read MarmotKit artifact pin
         id: marmotkit

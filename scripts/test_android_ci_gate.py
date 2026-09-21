@@ -132,7 +132,7 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertNotIn(':app:lintDevZapstoreDebug :app:lintDevPlayDebug', self.static_analysis)
         self.assertIn('android-ci-reports-static-analysis-${{ matrix.flavor }}', self.static_analysis)
         self.assertIn('android-ci-gradle-profiles-static-analysis-${{ matrix.flavor }}', self.static_analysis)
-        self.assertIn('cache-read-only: true', self.static_analysis)
+        self.assertIn('cache-read-only:', self.static_analysis)
 
     def test_full_unit_suite_is_reused_by_coverage_without_verify_mode(self):
         """Coverage reuses the full suite without widening screenshot ownership."""
@@ -193,26 +193,23 @@ class AndroidCiGateTest(unittest.TestCase):
             self.assertIn(f"--tests '{test_filter}'", step)
         self.assertEqual(step.count("--tests '"), len(expected_filters))
         self.assertIn(' --no-daemon ', step)
-        self.assertIn('cache-read-only: true', self.screenshots)
+        self.assertIn('cache-read-only:', self.screenshots)
         self.assertIn('android-ci-reports-screenshots-${{ matrix.flavor }}', self.screenshots)
         self.assertIn('android-ci-gradle-profiles-screenshots-${{ matrix.flavor }}', self.screenshots)
 
-    def test_only_play_tests_publish_gradle_cache_state(self):
-        """Parallel analysis and fork runs cannot create competing cache writers."""
-        setup_gradle = self.named_step(self.tests_job, 'Set up Gradle')
-        expected_policy = """          cache-read-only: >-
-            ${{ matrix.flavor != 'Play' ||
-                (github.event_name == 'pull_request' &&
-                 github.event.pull_request.head.repo.full_name != github.repository) }}
-"""
-        self.assertIn(expected_policy, setup_gradle)
+    def test_job_caches(self):
+        """Every workload retains its own task cache; forks remain read-only."""
         gradle_setup_steps = re.findall(
             r'(?ms)^      - name: Set up Gradle\n.*?(?=^      - |^  [a-z]|\Z)',
             self.workflow,
         )
         self.assertEqual(len(gradle_setup_steps), 5)
         for step in gradle_setup_steps:
-            self.assertIn('cache-read-only:', step)
+            self.assertIn(
+                "cache-read-only: ${{ github.event_name == 'pull_request' && "
+                "github.event.pull_request.head.repo.full_name != github.repository }}",
+                step,
+            )
         self.assertNotIn('uses: actions/cache@', self.workflow)
         self.assertEqual(self.workflow.count('uses: actions/cache/restore@'), 5)
         self.assertEqual(self.workflow.count('uses: actions/cache/save@'), 1)
@@ -224,6 +221,27 @@ class AndroidCiGateTest(unittest.TestCase):
             save_step,
         )
         self.assertIn("steps.marmotkit-cache.outputs.cache-hit != 'true'", save_step)
+
+    def test_build_phases(self):
+        """Packaging runs independently, with phase-specific diagnostics."""
+        self.assertIn('phase: [tooling, baseline]', self.build_contracts)
+        self.assertIn('fail-fast: false', self.build_contracts)
+        for name, phase in (
+            ('Compile (Kotlin)', 'tooling'),
+            ('Assemble app for Baseline Profile verification', 'baseline'),
+            ('Verify packaged Baseline Profile assets', 'baseline'),
+        ):
+            step = self.named_step(self.build_contracts, name)
+            self.assertIn(f"if: matrix.phase == '{phase}'", step)
+        self.assertIn('android-ci-reports-build-contracts-${{ matrix.phase }}', self.build_contracts)
+        self.assertIn('android-ci-gradle-profiles-build-contracts-${{ matrix.phase }}', self.build_contracts)
+
+    def test_parallel_test_workers(self):
+        """Parallelism changes execution, never the full-suite scope or caching."""
+        self.assertIn("ORG_GRADLE_PROJECT_ciTestForks: '4'", self.tests_job)
+        root_build = (WORKFLOW.parents[2] / 'build.gradle.kts').read_text()
+        self.assertIn('providers.gradleProperty("ciTestForks").map(String::toInt).getOrElse(1)', root_build)
+        self.assertIn('outputs.doNotCacheIf("CI test assertions must execute")', root_build)
 
     def test_sequential_analysis_and_test_builds_reuse_the_gradle_daemon(self):
         """Multi-invocation jobs avoid a fresh Gradle JVM for every phase."""
