@@ -11,6 +11,7 @@ internal object WhiteNoiseUrls {
     const val BUG_REPORT = "https://github.com/marmot-protocol/whitenoise-android/issues/new/choose"
 
     const val PRIVACY_POLICY = "https://www.whitenoise.chat/privacy"
+    const val DOWNLOAD = "https://www.whitenoise.chat/download"
 
     // Follow the latest reviewed connector guidance without requiring an Android release.
     const val AGENT_CONNECTOR_DOCS =

@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import android.content.Intent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -16,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,12 +44,21 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.ProfileLink
+import dev.ipf.whitenoise.android.share.QrShareCardRenderer
+import dev.ipf.whitenoise.android.share.QrShareCardSpec
+import dev.ipf.whitenoise.android.share.launchOutboundShare
+import dev.ipf.whitenoise.android.share.outboundShareIntent
+import dev.ipf.whitenoise.android.share.presentOutboundShareFailure
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
@@ -113,6 +122,8 @@ internal fun ShareConnectScreen(
     var scannerSession by remember(accountIdHex, runtime) { mutableStateOf<Long?>(null) }
     var nextScannerSession by remember(accountIdHex, runtime) { mutableStateOf(0L) }
     var scanInvalid by rememberSaveable(accountIdHex) { mutableStateOf(false) }
+    var pictureShareInProgress by remember(accountIdHex, runtime) { mutableStateOf(false) }
+    val profileCardHeadline = stringResource(R.string.profile_share_card_headline)
 
     LaunchedEffect(copied) {
         if (copied) {
@@ -126,17 +137,48 @@ internal fun ShareConnectScreen(
         qrContent = link?.qrUri ?: npub,
         copied = copied,
         scanInvalid = scanInvalid,
+        pictureShareInProgress = pictureShareInProgress,
         onBack = {
             if (ownsScreen()) {
                 routeActive = false
                 onBack()
             }
         },
-        onShare = share@{
+        onShareUrl = share@{
             if (!ownsScreen()) return@share
-            val sendIntent =
-                Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, link?.uri ?: npub)
-            context.startActivity(Intent.createChooser(sendIntent, shareProfileTitle))
+            launchOutboundShare(
+                context,
+                outboundShareIntent(link?.uri ?: npub, emptyList()),
+                shareProfileTitle,
+            ).onFailure { appState.presentOutboundShareFailure("PROFILE_URL_SHARE", it) }
+        },
+        onSharePicture = picture@{
+            if (!ownsScreen() || pictureShareInProgress || link == null) return@picture
+            pictureShareInProgress = true
+            appState.launchMutation {
+                runCatchingCancellable {
+                    val staged =
+                        QrShareCardRenderer.stage(
+                            context,
+                            QrShareCardSpec(
+                                headline = profileCardHeadline,
+                                qrPayload = link.qrUri,
+                                displayName = profile.name,
+                                avatar = AvatarImageLoader.peekBitmap(profile.pictureUrl),
+                            ),
+                        )
+                    if (ownsScreen()) {
+                        launchOutboundShare(
+                            context,
+                            outboundShareIntent(link.uri, listOf(staged.stream)),
+                            shareProfileTitle,
+                        ).getOrThrow()
+                    }
+                }.onFailure {
+                    if (ownsScreen()) appState.presentOutboundShareFailure("PROFILE_PICTURE_SHARE", it)
+                }
+                if (ownsScreen()) pictureShareInProgress = false
+            }
         },
         onCopy = copy@{
             if (!ownsScreen()) return@copy
@@ -191,18 +233,21 @@ internal data class ShareConnectProfile(
 
 /** Share & Connect as the prototype lays it out: centered top bar with share, identity column, pinned scan button. */
 @OptIn(ExperimentalMaterial3Api::class)
-@Suppress("FunctionNaming", "LongParameterList")
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList") // Single visual surface with one anchored share menu.
 @Composable
 internal fun ShareConnectContent(
     profile: ShareConnectProfile,
     qrContent: String,
     copied: Boolean,
     scanInvalid: Boolean,
+    pictureShareInProgress: Boolean = false,
     onBack: () -> Unit,
-    onShare: () -> Unit,
+    onShareUrl: () -> Unit,
+    onSharePicture: () -> Unit,
     onCopy: () -> Unit,
     onOpenScanner: () -> Unit,
 ) {
+    var shareMenuExpanded by remember { mutableStateOf(false) }
     WhiteNoiseScaffold(
         modifier = Modifier.fillMaxSize().testTag("share_connect.screen"),
         contentWindowInsets = WindowInsets.safeDrawing,
@@ -219,10 +264,40 @@ internal fun ShareConnectContent(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onShare, modifier = Modifier.testTag("share_connect.share")) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_share),
-                            contentDescription = stringResource(R.string.share_profile),
+                    Box {
+                        IconButton(
+                            onClick = { shareMenuExpanded = true },
+                            enabled = !pictureShareInProgress,
+                            modifier = Modifier.testTag("share_connect.share"),
+                        ) {
+                            if (pictureShareInProgress) {
+                                CircularProgressIndicator(
+                                    Modifier.size(ShareConnectDefaults.IconSize),
+                                    strokeWidth = 2.dp,
+                                )
+                            } else {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_share),
+                                    contentDescription = stringResource(R.string.share_profile),
+                                )
+                            }
+                        }
+                        WhiteNoiseDropdownMenu(
+                            expanded = shareMenuExpanded,
+                            onDismissRequest = { shareMenuExpanded = false },
+                            items =
+                                listOf(
+                                    WhiteNoiseMenuItem(
+                                        stringResource(R.string.share_profile_url),
+                                        onShareUrl,
+                                        R.drawable.ic_link,
+                                    ),
+                                    WhiteNoiseMenuItem(
+                                        stringResource(R.string.share_profile_picture),
+                                        onSharePicture,
+                                        R.drawable.ic_image,
+                                    ),
+                                ),
                         )
                     }
                 },

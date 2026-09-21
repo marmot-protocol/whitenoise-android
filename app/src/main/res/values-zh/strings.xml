@@ -485,6 +485,9 @@
     <string name="active">活跃</string>
     <string name="copied">已复制</string>
     <string name="share_profile">分享与连接</string>
+    <string name="share_profile_url">分享个人资料链接</string>
+    <string name="share_profile_picture">分享个人资料图片</string>
+    <string name="profile_share_card_headline">你在用 White Noise 吗？在这里给我发消息。</string>
     <string name="share">分享</string>
     <string name="scan">扫描</string>
     <string name="couldnt_read_profile_code">无法读取此个人资料码。</string>

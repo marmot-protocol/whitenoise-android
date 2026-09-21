@@ -1224,7 +1224,8 @@
           "NCH-001",
           "NCH-002",
           "ACC-003",
-          "ACC-017"
+          "ACC-017",
+          "ACC-019"
         ]
       },
       {
@@ -6246,7 +6247,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileQrSheet.kt",
         "anchor": "fun ProfileQrSheet(",
         "test_ids": [
-          "PRO-001"
+          "PRO-001",
+          "ACC-019"
         ]
       },
       {
@@ -7852,7 +7854,8 @@
         "anchor": "fun ShareConnectContent(",
         "test_ids": [
           "SET-001",
-          "NAV-004"
+          "NAV-004",
+          "ACC-019"
         ]
       },
       {
@@ -7861,7 +7864,8 @@
         "anchor": "fun ShareConnectScreen(",
         "test_ids": [
           "SET-001",
-          "NAV-004"
+          "NAV-004",
+          "ACC-019"
         ]
       },
       {

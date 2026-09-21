@@ -701,6 +701,9 @@
     <string name="active">Active</string>
     <string name="copied">Copied</string>
     <string name="share_profile">Share profile</string>
+    <string name="share_profile_url">Share profile URL</string>
+    <string name="share_profile_picture">Share profile picture</string>
+    <string name="profile_share_card_headline">On White Noise? Message me here.</string>
     <string name="share">Share</string>
     <string name="scan">Scan</string>
     <string name="couldnt_read_profile_code">Couldn\'t read this profile code.</string>

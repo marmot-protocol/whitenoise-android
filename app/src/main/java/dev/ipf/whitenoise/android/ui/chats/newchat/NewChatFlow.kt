@@ -40,7 +40,12 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.core.WhiteNoiseUrls
+import dev.ipf.whitenoise.android.share.QrShareCardRenderer
+import dev.ipf.whitenoise.android.share.QrShareCardSpec
 import dev.ipf.whitenoise.android.share.launchInviteShare
+import dev.ipf.whitenoise.android.share.launchOutboundShare
+import dev.ipf.whitenoise.android.share.outboundShareIntent
 import dev.ipf.whitenoise.android.share.presentOutboundShareFailure
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatCreateOpenTiming
@@ -370,6 +375,7 @@ private fun NewMessageAccountScreen(
     var scannerSession by remember { mutableStateOf<Long?>(null) }
     var nextScannerSession by remember { mutableStateOf(0L) }
     var creatingHex by remember { mutableStateOf<String?>(null) }
+    var inviteShareInProgress by remember { mutableStateOf(false) }
     var startChatError by remember { mutableStateOf<StartChatErrorUiState?>(null) }
     DisposableEffect(session) {
         onDispose {
@@ -386,11 +392,36 @@ private fun NewMessageAccountScreen(
     val inviteTitle = stringResource(R.string.invite_to_white_noise)
     val inviteMessage = stringResource(R.string.invite_message)
 
-    /** Shares the invite text unless the flow is busy or superseded. */
+    /** Shares a branded download QR card, retaining the existing localized text-only fallback. */
     fun shareInvite() {
-        if (!session.isCurrent() || creatingHex != null || scannerSession != null) return
-        launchInviteShare(context, inviteMessage, inviteTitle)
-            .onFailure { appState.presentOutboundShareFailure("INVITE_SHARE", it) }
+        val flowBusy = creatingHex != null || scannerSession != null || inviteShareInProgress
+        if (!session.isCurrent() || flowBusy) return
+        inviteShareInProgress = true
+        appState.launchMutation {
+            val pictureResult =
+                runCatchingCancellable {
+                    val staged =
+                        QrShareCardRenderer.stage(
+                            context,
+                            QrShareCardSpec(
+                                headline = inviteTitle,
+                                qrPayload = WhiteNoiseUrls.DOWNLOAD,
+                            ),
+                        )
+                    if (session.isCurrent()) {
+                        launchOutboundShare(
+                            context,
+                            outboundShareIntent(inviteMessage, listOf(staged.stream)),
+                            inviteTitle,
+                        ).getOrThrow()
+                    }
+                }
+            if (pictureResult.isFailure && session.isCurrent()) {
+                launchInviteShare(context, inviteMessage, inviteTitle)
+                    .onFailure { appState.presentOutboundShareFailure("INVITE_SHARE", it) }
+            }
+            if (session.isCurrent()) inviteShareInProgress = false
+        }
     }
 
     /** Leaves the screen through [action] after closing the scanner, unless the flow is busy. */

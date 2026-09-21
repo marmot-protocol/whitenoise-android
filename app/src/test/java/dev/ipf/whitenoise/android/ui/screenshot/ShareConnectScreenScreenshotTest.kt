@@ -3,11 +3,14 @@ package dev.ipf.whitenoise.android.ui.screenshot
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.github.takahirom.roborazzi.captureScreenRoboImage
 import dev.ipf.whitenoise.android.ui.settings.ShareConnectContent
 import dev.ipf.whitenoise.android.ui.settings.shareConnectFixture
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -61,6 +64,15 @@ class ShareConnectScreenScreenshotTest {
         capture("copied_invalid_scan")
     }
 
+    /** The share menu makes the URL and picture paths explicit. */
+    @Test
+    fun shareConnectMenu() {
+        render(darkTheme = false)
+        composeRule.onNodeWithTag("share_connect.share").performClick()
+        composeRule.onNode(isPopup()).assertExists()
+        captureScreenRoboImage("src/test/snapshots/share_connect_menu_light.png")
+    }
+
     /** Composes the surface under test with the given fixture. */
     private fun render(
         darkTheme: Boolean,
@@ -83,7 +95,8 @@ class ShareConnectScreenScreenshotTest {
                         copied = copied,
                         scanInvalid = scanInvalid,
                         onBack = {},
-                        onShare = {},
+                        onShareUrl = {},
+                        onSharePicture = {},
                         onCopy = {},
                         onOpenScanner = {},
                     )
