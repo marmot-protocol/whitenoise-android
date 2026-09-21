@@ -578,15 +578,16 @@ private fun PerformanceDiagnosticsGroup(
                     },
             )
         }
-        row("performance-copy") { context ->
-            SettingsAction(
-                context = context,
-                title = stringResource(R.string.copy_performance_logs),
-                subtitle = stringResource(R.string.copy_performance_logs_detail),
-                onClick = onCopy,
-                enabled = status.emittedCount > 0,
-                modifier = Modifier.testTag("diagnostics.performance.copy"),
-            )
+        if (status.emittedCount > 0) {
+            row("performance-copy") { context ->
+                SettingsAction(
+                    context = context,
+                    title = stringResource(R.string.copy_performance_logs),
+                    subtitle = stringResource(R.string.copy_performance_logs_detail),
+                    onClick = onCopy,
+                    modifier = Modifier.testTag("diagnostics.performance.copy"),
+                )
+            }
         }
     }
     SettingsExplainer(stringResource(R.string.performance_logs_description))

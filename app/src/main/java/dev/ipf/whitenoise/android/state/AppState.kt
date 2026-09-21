@@ -118,6 +118,7 @@ import dev.ipf.whitenoise.android.notifications.ConversationVibrationPreferences
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
 import dev.ipf.whitenoise.android.notifications.NativePushCapability
+import dev.ipf.whitenoise.android.notifications.NotificationBatteryPolicy
 import dev.ipf.whitenoise.android.notifications.NotificationChannels
 import dev.ipf.whitenoise.android.notifications.NotificationReactionSendOutcome
 import dev.ipf.whitenoise.android.notifications.NotificationReplyCommitProbe
@@ -212,7 +213,6 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.resume
 import dev.ipf.whitenoise.android.audio.ConversationDictationTargetValidation as TargetValidation
 import dev.ipf.whitenoise.android.notifications.notificationReplyCommitProbe as probeNotificationReplyCommit
-import dev.ipf.whitenoise.android.notifications.openNotificationBatterySettings as openSystemNotificationBatterySettings
 
 private const val NATIVE_ATTACHMENT_PERMISSION_RETRY_LIMIT = 3
 private const val NATIVE_ATTACHMENT_PERMISSION_RETRY_DELAY_MILLIS = 500L
@@ -2032,9 +2032,8 @@ class WhiteNoiseAppState private constructor(
     var notificationDeliveryModeBusy by mutableStateOf(false)
         private set
 
-    internal var notificationBatteryPolicy by mutableStateOf(readNotificationBatteryPolicy(appContext))
+    internal var notificationBatteryPolicy by mutableStateOf(NotificationBatteryPolicy.Unknown)
         private set
-
     private var defaultNotificationsEnableAttempted by mutableStateOf(
         preferences.getBoolean(DEFAULT_NOTIFICATIONS_ENABLE_ATTEMPTED_KEY, false),
     )
@@ -3931,8 +3930,8 @@ class WhiteNoiseAppState private constructor(
                         } else {
                             pushTokenStore.deferPushWakeRetry(pushWakeNowMs())
                         }
-                    check(persisted)
-                    currentSuccess
+                    if (!persisted) PushWakeDiagnostics.event(PushWakeEvent.PersistenceFailed)
+                    currentSuccess && persisted
                 }
         }
         val succeeded = settlementSucceeded && isCatchUpKeyCurrent(key)
@@ -4611,8 +4610,10 @@ class WhiteNoiseAppState private constructor(
                 if (notificationRuntimeRecoveryAllowed(generation)) {
                     withContext(pushWakeStorageDispatcher) {
                         if (pushTokenStore.pushWakeAttempts() == attempts) {
-                            checkNotNull(pushTokenStore.claimPushWakeAttempt(pushWakeNowMs()))
-                            check(pushTokenStore.deferPushWakeRetry(pushWakeNowMs()))
+                            val reclaimed = pushTokenStore.claimPushWakeAttempt(pushWakeNowMs())
+                            if (reclaimed == null || !pushTokenStore.deferPushWakeRetry(pushWakeNowMs())) {
+                                PushWakeDiagnostics.event(PushWakeEvent.PersistenceFailed)
+                            }
                         }
                     }
                 }
@@ -4707,7 +4708,7 @@ class WhiteNoiseAppState private constructor(
                             withContext(pushWakeStorageDispatcher) {
                                 pushTokenStore.recordPendingPushWakeCatchUp()
                             }
-                        check(restored) { "Unable to restore a push wake after its recovery identity became stale" }
+                        if (!restored) PushWakeDiagnostics.event(PushWakeEvent.PersistenceFailed)
                     }
                     false
                 } else {
@@ -8385,11 +8386,6 @@ class WhiteNoiseAppState private constructor(
         notificationBatteryPolicy = readNotificationBatteryPolicy(appContext)
     }
 
-    /** Opens the user-requested Android battery policy surface without requesting an exemption. */
-    fun openNotificationBatterySettings(context: Context = appContext) {
-        openSystemNotificationBatterySettings(context)
-    }
-
     /**
      * Applies one latest-wins delivery choice. Replacement delivery is confirmed before the prior
      * path is disabled, and the existing native/global settings remain the only durable truth.
@@ -11221,6 +11217,10 @@ class WhiteNoiseAppState private constructor(
     // fields declared later in this class before their initializers have run.
     init {
         if (startPlatformServices) {
+            mutationsScope.launch {
+                val policy = withContext(Dispatchers.IO) { readNotificationBatteryPolicy(appContext) }
+                notificationBatteryPolicy = policy
+            }
             if (BuildConfig.SELF_UPDATE_ENABLED) {
                 // Off-main: sweeping stale APKs touches the cache dir (listFiles + deletes).
                 mutationsScope.launch(Dispatchers.IO) { appSelfUpdateFlow.sweepStaleApks() }

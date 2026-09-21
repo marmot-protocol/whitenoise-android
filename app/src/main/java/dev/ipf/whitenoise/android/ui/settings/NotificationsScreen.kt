@@ -30,6 +30,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.NotificationBatteryPolicy
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
+import dev.ipf.whitenoise.android.notifications.openNotificationBatterySettings
 import dev.ipf.whitenoise.android.notifications.openNotificationChannelSettings
 import dev.ipf.whitenoise.android.state.NotificationDeliveryMode
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -114,7 +115,11 @@ internal fun NotificationsScreen(
                     permissionGranted = permissionGranted,
                     batteryPolicy = appState.notificationBatteryPolicy,
                     onOpenNotificationSettings = { openAppNotificationSettings(context) },
-                    onOpenBatterySettings = { appState.openNotificationBatterySettings(context) },
+                    onOpenBatterySettings = {
+                        if (!openNotificationBatterySettings(context)) {
+                            appState.present(R.string.toast_notification_settings_unavailable)
+                        }
+                    },
                 )
             }
             item { SettingsExplainer(stringResource(R.string.notification_device_policy_detail)) }

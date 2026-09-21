@@ -26643,8 +26643,8 @@
       },
       {
         "surface": "Single notification delivery mode and safe cutover",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NativePushDelivery.kt",
-        "anchor": "internal suspend fun configureNotificationDeliveryMode(",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "internal suspend fun setNotificationDeliveryMode(",
         "test_ids": [
           "NTF-002",
           "NTF-003",
@@ -26659,6 +26659,14 @@
           "NTF-001",
           "NTF-002",
           "NTF-022"
+        ]
+      },
+      {
+        "surface": "Battery-policy settings launch failure feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.toast_notification_settings_unavailable",
+        "test_ids": [
+          "NTF-004"
         ]
       },
       {

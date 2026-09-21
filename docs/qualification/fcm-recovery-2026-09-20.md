@@ -1,7 +1,7 @@
 # Android push recovery qualification — 2026-09-20
 
 Implementation source: isolated branch `fix/fcm-durable-recovery`, based on refreshed
-master `fc1da1900c00825864d15c7694f43e39ad496bcb`. The original checkout and native
+master `51d4733b90ff5e5d59091d4ddf2bda74a689eed9`. The original checkout and native
 dependency pin are unchanged. This report covers the Android implementation and does
 not establish a fix for the reported 2026.9.17 open-chat symptom.
 
@@ -117,16 +117,16 @@ Final settled-source results:
 
 | Check | Result |
 | --- | --- |
-| Change-aware completion gate, `--visual changed` | PASS; final post-rebase run 2m 27s |
+| Change-aware completion gate, `--visual changed` | PASS; final post-rebase run 2m 41s |
 | Both debug variants and instrumentation compilation | PASS |
 | Formatting, static analysis, alternate-variant Android lint | PASS |
-| Primary-variant focused tests | 244 passed, 0 failures/errors/skips; 24 suites |
+| Final review-focused primary-variant tests | 87 passed, 0 failures/errors/skips; 9 suites |
 | Alternate-variant focused tests | 241 recovery-focused tests plus the 21-test affected ordering class passed separately; 0 failures/errors/skips |
 | Post-rebase CI regression set | PASS; 45 tests in each debug variant, 0 failures/errors/skips |
-| Full alternate variant plus Kover XML | PASS with one documented exclusion; 9,164 tests, 0 failures/errors, 1 skipped |
+| Full alternate variant | PASS; 9,169 tests, 0 failures/errors, 1 skipped; 5m 41s |
 | Locale resource parity | PASS; every translated resource set matches the default key set |
 | Visual baseline verification | PASS |
-| Manual inventory | 267 active IDs, 0 retired IDs |
+| Manual inventory | 271 active IDs, 0 retired IDs |
 | Manual-guide validator tests | 33 passed |
 | Diff whitespace integrity | PASS |
 | Local touched-function documentation audit | 273/316, 86.4% |
@@ -145,13 +145,12 @@ ordering race: the assertion observed the native setting before the later regist
 The maintained test now awaits both ordered effects and its full class passes in both variants.
 The full primary suite was not repeated after that test-only correction.
 
-Two unfiltered local alternate-variant coverage attempts each executed 9,165 tests and timed
-out only in `MediaDownloadHostRegressionTest.explicitCancellationStopsSharedNativeAcquisition`.
-That unrelated class passes all 9 tests on the exact head in 13 seconds. To retain a coverage
-receipt without hiding the exception, the final Kover run excluded only that method: 9,164 tests
-passed with 1 existing skip. Overall line coverage is 85,063/106,355 (79.98%); `WhiteNoiseAppState`
-line coverage is 3,111/4,211 (73.88%). The Kover XML SHA-256 is
-`d9971b90a9f2f1e9b855d31cfa976f73b18c4a7bb034bccd3bf6911fd4880f61`.
+Earlier unfiltered alternate-variant attempts exposed an indefinite test wait for best-effort
+native cleanup. The maintained regression now pumps its test Main dispatcher while real IO
+completes, under a finite timeout, instead of advancing virtual time past the native cleanup
+window. The final unfiltered alternate suite passes all 9,169 tests with one existing skip. Kover
+XML was not regenerated after these review fixes, so the earlier coverage receipt is not
+current-source evidence.
 
 An earlier hosted run exposed three stale source-ordering assertions after the recovery helper
 boundaries changed. Their maintained contracts now locate the final helper bodies. The next
@@ -221,9 +220,9 @@ fast exit only; it does not measure energy impact.
 Those observations apply to the recorded 2026-09-20 candidate. Device and battery qualification
 was not repeated after the final 2026-09-21 master rebase, so it is not current-head evidence.
 
-The final post-rebase Dev APK was built for arm64 with SHA-256
-`af5e4da8d64ec5faaf7174a319db00ee0bd029b06f7f81e29abb660818349eb3`. It reports package
-`dev.ipf.whitenoise.android.dev`, version `2026.9.21-dev-debug`, version code 17, and arm64-v8a.
+The final post-review Dev APK was built for arm64 with SHA-256
+`151580fe69508a796e868cde588f6d30f207a202d7d5d67b62dfc049674c7bcb`. It reports package
+`dev.ipf.whitenoise.android.dev`, version `2026.9.21-dev-debug`, version code 18, and arm64-v8a.
 This exact candidate was not installed on the physical handset. No physical-device app data was
 touched during the final rebase and validation.
 
@@ -239,13 +238,13 @@ touched during the final rebase and validation.
   this candidate under the original open-chat reproduction, so that issue is not claimed fixed.
 - Authoritative already-read notification suppression remains deferred with its native
   dependency. Existing eligibility and cancellation behavior remains unchanged.
-- Issue and pull-request ownership and Project 7 `In Progress` state were verified. No merge or
-  release was created.
+- Live Project 7 item data verified on 2026-09-21 that issue #2676 and pull request #2712 are each
+  present once with `In Progress` status. No merge or release was created.
 
 ## Source and artifacts
 
 The source/test patch relative to the base revision is SHA-256
-`d59ce189c2bdb5b8b93cb0b0031492c3f968d81a06f56165a7dee4a6f5320be5`.
+`3ffa5b2207d2cfc6cf7b2d154ccff4ff212d47f40dd914e552a2374f6311a1ad`.
 This hashes `git diff origin/master --binary -- app/src`. The native dependency remains unchanged.
 
 Final qualification APK hashes:

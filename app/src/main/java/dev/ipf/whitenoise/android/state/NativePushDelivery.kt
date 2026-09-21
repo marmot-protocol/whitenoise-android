@@ -68,38 +68,6 @@ internal fun notificationDeliveryMode(
         NotificationDeliveryMode.Local
     }
 
-/** Orders mode cutover so the working path is disabled only after its replacement is confirmed. */
-internal suspend fun configureNotificationDeliveryMode(
-    mode: NotificationDeliveryMode,
-    enableRendering: suspend () -> Boolean,
-    enableNativePush: suspend () -> Boolean,
-    disableNativePush: suspend () -> Boolean,
-    enablePersistentDelivery: suspend () -> Boolean,
-    disablePersistentDelivery: suspend () -> Boolean,
-): Boolean {
-    if (!enableRendering()) return false
-    return when (mode) {
-        NotificationDeliveryMode.Fcm -> {
-            if (!enableNativePush()) {
-                false
-            } else if (disablePersistentDelivery()) {
-                true
-            } else {
-                val nativeDisabled = disableNativePush()
-                val persistentRestored = enablePersistentDelivery()
-                nativeDisabled && persistentRestored
-            }
-        }
-        NotificationDeliveryMode.Local -> {
-            if (!enablePersistentDelivery()) {
-                false
-            } else {
-                disableNativePush()
-            }
-        }
-    }
-}
-
 /** Resolves the first unavailable build or device prerequisite without reaching later SDKs. */
 internal fun nativePushCapabilityForContext(
     context: Context,

@@ -39,20 +39,32 @@ internal fun readNotificationBatteryPolicy(context: Context): NotificationBatter
 }
 
 /** Opens a user-initiated app battery settings surface, falling back to app details. */
-internal fun openNotificationBatterySettings(context: Context) {
+internal fun openNotificationBatterySettings(context: Context): Boolean {
     val packageUri = Uri.parse("package:${context.packageName}")
     val appBatteryIntent =
         Intent(ACTION_APP_BATTERY_SETTINGS, packageUri)
             .putExtra(Intent.EXTRA_PACKAGE_NAME, context.packageName)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    try {
-        context.startActivity(appBatteryIntent)
-    } catch (_: ActivityNotFoundException) {
-        context.startActivity(
-            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, packageUri)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
-    }
+    if (startSettingsActivity(context, appBatteryIntent)) return true
+    return startSettingsActivity(
+        context,
+        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, packageUri)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+    )
 }
+
+/** Returns false when Android cannot resolve or permit the requested settings surface. */
+private fun startSettingsActivity(
+    context: Context,
+    intent: Intent,
+): Boolean =
+    try {
+        context.startActivity(intent)
+        true
+    } catch (_: ActivityNotFoundException) {
+        false
+    } catch (_: SecurityException) {
+        false
+    }
 
 private const val ACTION_APP_BATTERY_SETTINGS = "android.settings.APP_BATTERY_SETTINGS"

@@ -213,10 +213,7 @@ class NotificationPushWakeDrainCoverageTest {
     fun pendingPushWakeDrainUsesSingleFlightAndGenerationClear() {
         val appState = appStateSource().readText()
         val drain = appStateFunctionBody("drainPendingPushWakeCatchUpIfNeeded")
-        val acknowledgeObserved =
-            appState
-                .substringAfter("private suspend fun acknowledgePendingPushWakeCatchUp(")
-                .substringBefore("\n\n    private ")
+        val acknowledgeObserved = appStateFunctionBody("acknowledgePendingPushWakeCatchUp")
         val reconnect = notificationNetworkRecoverySource().readText().kotlinFunctionBody("schedule")
         val schedule = appStateFunctionBody("schedulePendingPushWakeCatchUpDrain")
         val expectedPushWakeCatchUp =
@@ -273,11 +270,6 @@ class NotificationPushWakeDrainCoverageTest {
 
     private fun appStateFunctionBody(functionName: String): String = appStateSource().readText().kotlinFunctionBody(functionName)
 
-    private fun firebaseServiceFunctionBody(functionName: String): String {
-        val source = firebaseServiceSource().readText()
-        return source.kotlinFunctionBody(functionName)
-    }
-
     private fun serviceSource(): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/notifications/NotificationStreamForegroundService.kt"),
@@ -299,13 +291,6 @@ class NotificationPushWakeDrainCoverageTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/state/NotificationNetworkRecovery.kt"),
         ).firstOrNull { it.exists() }
             ?: error("Missing NotificationNetworkRecovery.kt source file")
-
-    private fun firebaseServiceSource(): File =
-        listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/notifications/MarmotFirebaseMessagingService.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/notifications/MarmotFirebaseMessagingService.kt"),
-        ).firstOrNull { it.exists() }
-            ?: error("Missing MarmotFirebaseMessagingService.kt source file")
 
     private fun String.kotlinFunctionBody(functionName: String): String {
         val start =

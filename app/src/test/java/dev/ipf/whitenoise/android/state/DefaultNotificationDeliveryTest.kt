@@ -36,60 +36,6 @@ class DefaultNotificationDeliveryTest {
         )
     }
 
-    /** Push cutover confirms rendering and registration before stopping persistent delivery. */
-    @Test
-    fun pushModeUsesSafeCutoverOrdering() =
-        runTest {
-            val calls = mutableListOf<String>()
-            assertTrue(
-                configureNotificationDeliveryMode(
-                    mode = NotificationDeliveryMode.Fcm,
-                    enableRendering = { true.also { calls += "render:on" } },
-                    enableNativePush = { true.also { calls += "push:confirmed" } },
-                    disableNativePush = { true.also { calls += "push:off" } },
-                    enablePersistentDelivery = { true.also { calls += "persistent:ready" } },
-                    disablePersistentDelivery = { true.also { calls += "persistent:off" } },
-                ),
-            )
-            assertEquals(listOf("render:on", "push:confirmed", "persistent:off"), calls)
-        }
-
-    /** Local cutover requires acknowledged persistent delivery before disabling push. */
-    @Test
-    fun localModeWaitsForPersistentReadiness() =
-        runTest {
-            val calls = mutableListOf<String>()
-            assertTrue(
-                configureNotificationDeliveryMode(
-                    mode = NotificationDeliveryMode.Local,
-                    enableRendering = { true.also { calls += "render:on" } },
-                    enableNativePush = { true.also { calls += "push:on" } },
-                    disableNativePush = { true.also { calls += "push:off" } },
-                    enablePersistentDelivery = { true.also { calls += "persistent:ready" } },
-                    disablePersistentDelivery = { true.also { calls += "persistent:off" } },
-                ),
-            )
-            assertEquals(listOf("render:on", "persistent:ready", "push:off"), calls)
-        }
-
-    /** A rejected persistent owner keeps push enabled and reports the transition incomplete. */
-    @Test
-    fun localModeRejectionLeavesPushUntouched() =
-        runTest {
-            var pushDisabled = false
-            assertFalse(
-                configureNotificationDeliveryMode(
-                    mode = NotificationDeliveryMode.Local,
-                    enableRendering = { true },
-                    enableNativePush = { true },
-                    disableNativePush = { true.also { pushDisabled = true } },
-                    enablePersistentDelivery = { false },
-                    disablePersistentDelivery = { true },
-                ),
-            )
-            assertFalse(pushDisabled)
-        }
-
     /** Requires both global registration success and an active-account fingerprint. */
     @Test
     fun nativePushEnablementRequiresAllAccountsAndActiveRegistration() {

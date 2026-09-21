@@ -132,6 +132,13 @@ class DiagnosticsContentTest {
         composeRule.runOnIdle { assertEquals(1, performanceCopies) }
     }
 
+    /** A supported diagnostics build exposes no copy action before it retains evidence. */
+    @Test fun performanceCopyIsHiddenWithoutRetainedEvidence() {
+        render(performanceAvailable = true)
+        health()
+        composeRule.onNodeWithTag("diagnostics.performance.copy").assertDoesNotExist()
+    }
+
     /** Release builds omit performance controls and closing Health preserves the screen's back navigation. */
     @Test fun unavailableLoggingIsHiddenAndCloseDoesNotNavigateBack() {
         render()

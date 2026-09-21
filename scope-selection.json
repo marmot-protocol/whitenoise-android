@@ -93,7 +93,7 @@
     {
       "capability": "Project 7 tracking and review checks",
       "selection": "included",
-      "status": "blocked: authenticated CLI project/search requests return HTTP 401; public issue read alone cannot verify project state"
+      "status": "verified 2026-09-21: issue #2676 and pull request #2712 are each present once and In Progress"
     }
   ],
   "optional": [

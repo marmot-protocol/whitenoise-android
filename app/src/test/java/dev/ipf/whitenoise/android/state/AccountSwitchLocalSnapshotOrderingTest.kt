@@ -372,6 +372,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val refresh = body.indexOf("refreshActivatedAccount(", startIndex = activated)
         val refreshBody = source.kotlinFunctionBody("refreshActivatedAccount")
         val currentGuard = refreshBody.indexOf("if (!isCurrent()) return")
+        assertTrue("the refresh boundary must contain its stale-owner guard", currentGuard >= 0)
         val profile = refreshBody.indexOf("warmProfile(it)", startIndex = currentGuard)
         val privacy = refreshBody.indexOf("configurePrivacyRuntime()", startIndex = profile)
         val notifications = refreshBody.indexOf("refreshLocalNotificationSettings()", startIndex = privacy)

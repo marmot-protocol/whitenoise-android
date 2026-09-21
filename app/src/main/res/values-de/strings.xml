@@ -848,7 +848,7 @@
     <string name="notification_permission_status">Benachrichtigungsberechtigung</string>
     <string name="notification_permission_allowed">Erlaubt</string>
     <string name="notification_permission_blocked">Blockiert</string>
-    <string name="notification_battery_policy">Akkunutzung</string>
+    <string name="notification_battery_policy">Akkuoptimierung</string>
     <string name="notification_battery_optimized">Optimiert</string>
     <string name="notification_battery_unrestricted">Uneingeschränkt</string>
     <string name="notification_battery_restricted">Eingeschränkt</string>
