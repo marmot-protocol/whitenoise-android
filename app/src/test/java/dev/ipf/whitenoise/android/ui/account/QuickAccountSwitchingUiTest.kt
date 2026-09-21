@@ -21,6 +21,7 @@ import dev.ipf.whitenoise.android.ui.chats.ChatListTopBar
 import dev.ipf.whitenoise.android.ui.settings.AppearanceScreen
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -39,15 +40,15 @@ class QuickAccountSwitchingUiTest {
     @get:Rule val composeRule = createComposeRule()
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
-    /** The whole-row Appearance control defaults off and writes only the app-wide preference. */
-    @Test fun appearanceOptInDoesNotChangeTheActiveAccount() {
+    /** The whole-row Appearance control defaults on and can opt out without changing the active account. */
+    @Test fun appearanceOptOutDoesNotChangeTheActiveAccount() {
         val app = state(listOf(A, B))
         composeRule.setContent {
             WhiteNoiseTheme { AppearanceScreen(app, {}, {}, {}, {}) }
         }
         composeRule.onNodeWithText(context.getString(R.string.quick_account_switching)).performClick()
         composeRule.runOnIdle {
-            assertTrue(app.quickAccountSwitching)
+            assertFalse(app.quickAccountSwitching)
             assertEquals(A.label, app.activeAccountRef)
         }
     }
@@ -67,6 +68,7 @@ class QuickAccountSwitchingUiTest {
     /** Off leaves the row absent while the active avatar still opens the native account selector. */
     @Test fun offWithSeveralAccountsRetainsTheNormalSelector() {
         val app = state(listOf(A, B))
+        app.updateQuickAccountSwitching(false)
         render(app, onSettings = { error("Multiple profiles open selector") })
         composeRule.onNodeWithTag(OTHER_ACCOUNT_STACK_TAG).assertDoesNotExist()
         composeRule.onNodeWithTag("chats.switchProfile").performClick()

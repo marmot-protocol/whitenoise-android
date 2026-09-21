@@ -57,10 +57,10 @@ class QuickAccountSwitchingScreenshotTest {
     /** Off: the active avatar stands alone with no other accounts beside it. */
     @Test fun off() = capture("quick_account_switching_off", enabled = false)
 
-    /** The Appearance opt-in row that reveals the other accounts. */
+    /** The Appearance row after the user turns off quick switching. */
     @Test fun appearance() = capture("quick_account_switching_appearance_light", settings = true, enabled = false)
 
-    /** The Appearance opt-in in AMOLED right-to-left. */
+    /** The default-on Appearance preference in AMOLED right-to-left. */
     @Test
     fun appearanceAmoledRtl() {
         capture(
@@ -80,9 +80,13 @@ class QuickAccountSwitchingScreenshotTest {
         amoled: Boolean = false,
         rtl: Boolean = false,
         settings: Boolean = false,
-        enabled: Boolean = true,
+        enabled: Boolean? = null,
     ) {
         val context = ApplicationProvider.getApplicationContext<Context>()
+        val preferences =
+            context.getSharedPreferences("quick-account-switching-screenshot-$name", Context.MODE_PRIVATE).also {
+                it.edit().clear().commit()
+            }
         val app =
             WhiteNoiseAppState(
                 context,
@@ -93,10 +97,11 @@ class QuickAccountSwitchingScreenshotTest {
                     AccountSummaryFfi("b", "bb".repeat(32), true, false, false, true),
                 ),
                 "a",
+                preferences = preferences,
                 profileReader = { null },
                 profileRefreshRequest = {},
             )
-        app.updateQuickAccountSwitching(enabled)
+        enabled?.let(app::updateQuickAccountSwitching)
         app.updateAccountUnreadCount("b", 3uL)
         composeRule.setContent {
             CompositionLocalProvider(

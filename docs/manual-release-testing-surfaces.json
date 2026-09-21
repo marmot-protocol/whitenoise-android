@@ -15,6 +15,12 @@
         "test_ids": ["MED-019", "MED-020"]
       },
       {
+        "surface": "Quick account switching preference",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/QuickAccountSwitchingPreference.kt",
+        "anchor": "internal class QuickAccountSwitchingPreference",
+        "test_ids": ["NAV-005", "ACC-017", "SET-001"]
+      },
+      {
         "surface": "Native attachment transfer observation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentTransfers.kt",
         "anchor": "private suspend fun NativeTransferFeed.nextState()",

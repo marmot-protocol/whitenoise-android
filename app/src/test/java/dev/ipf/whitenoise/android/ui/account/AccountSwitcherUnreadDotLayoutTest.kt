@@ -34,6 +34,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.updateQuickAccountSwitching
 import dev.ipf.whitenoise.android.ui.chats.ChatListTopBar
 import dev.ipf.whitenoise.android.ui.chats.ConnectivityBannerState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -172,10 +173,15 @@ class AccountSwitcherUnreadDotLayoutTest {
         assertUnreadBadgeOwnedByRow("account-3", neighbor = "account-2")
     }
 
-    /** Active account unread announces unread on the profile selector action. */
+    /** With quick switching off, active account unread announces unread on the profile selector action. */
     @Test
     fun activeAccountUnreadAnnouncesUnreadOnTheProfileSelectorAction() {
-        renderTopBar(testAppState(accountCount = 2).also { it.updateAccountUnreadCount("personal", 2uL) })
+        renderTopBar(
+            testAppState(accountCount = 2).also {
+                it.updateQuickAccountSwitching(false)
+                it.updateAccountUnreadCount("personal", 2uL)
+            },
+        )
         composeRule
             .onNode(
                 hasContentDescription(context.getString(R.string.switch_profile), substring = true) and
@@ -198,10 +204,15 @@ class AccountSwitcherUnreadDotLayoutTest {
         assertActiveAccountUnreadMarkerInsideButtonClip(rtl = true)
     }
 
-    /** Other account unread announces its count on the actual selector row. */
+    /** With quick switching off, other account unread announces its count on the actual selector row. */
     @Test
     fun otherAccountUnreadAnnouncesItsCountOnTheActualSelectorRow() {
-        renderTopBar(testAppState(accountCount = 2).also { it.updateAccountUnreadCount("account-2", 1uL) })
+        renderTopBar(
+            testAppState(accountCount = 2).also {
+                it.updateQuickAccountSwitching(false)
+                it.updateAccountUnreadCount("account-2", 1uL)
+            },
+        )
         composeRule.onNodeWithContentDescription(unreadDescription, substring = true).assertDoesNotExist()
         composeRule.onNodeWithTag("chats.switchProfile").performClick()
         val countDescription = context.resources.getQuantityString(R.plurals.unread_messages_count, 1, 1)
@@ -229,13 +240,16 @@ class AccountSwitcherUnreadDotLayoutTest {
             .assertDoesNotExist()
     }
 
-    /** Switching active account moves unread ownership from selector row to active avatar. */
+    /** With quick switching off, active-account changes move unread ownership within the selector path. */
     @Suppress("LongMethod")
     @Test
     fun switchingActiveAccountMovesUnreadOwnershipFromSelectorRowToActiveAvatar() {
         val appStateHolder =
             mutableStateOf(
-                testAppState(accountCount = 3).also { it.updateAccountUnreadCount("account-2", 1uL) },
+                testAppState(accountCount = 3).also {
+                    it.updateQuickAccountSwitching(false)
+                    it.updateAccountUnreadCount("account-2", 1uL)
+                },
             )
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -263,6 +277,7 @@ class AccountSwitcherUnreadDotLayoutTest {
         composeRule.runOnIdle {
             appStateHolder.value =
                 testAppState(accountCount = 3, activeAccountRef = "account-2").also {
+                    it.updateQuickAccountSwitching(false)
                     it.updateAccountUnreadCount("account-2", 1uL)
                 }
         }
