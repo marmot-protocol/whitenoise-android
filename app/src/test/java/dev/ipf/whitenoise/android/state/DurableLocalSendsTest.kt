@@ -4,6 +4,10 @@ import dev.ipf.marmotkit.LocalSendAcceptanceFfi
 import dev.ipf.marmotkit.LocalSendStatusFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -94,5 +98,64 @@ class DurableLocalSendsTest {
             assertTrue(thrown === admissionFailure)
             val diagnostic = admissionFailure.suppressed.single()
             assertTrue(diagnostic === recoveryFailure || diagnostic.cause === recoveryFailure)
+        }
+
+    /** An interrupted call that already transferred ownership must never be admitted again. */
+    @Test
+    fun transportClosureRecoversOwnershipWithoutReadmission() =
+        runTest {
+            var statusReads = 0
+            var admissions = 0
+            val engine =
+                nativeBoundary { method, _ ->
+                    check(method == "localSendStatus")
+                    statusReads += 1
+                    if (statusReads == 1) null else LocalSendStatusFfi.EngineOwned
+                }
+
+            val result =
+                engine.admitLocalSend("account", "group", "same-token") {
+                    admissions += 1
+                    throw MarmotKitException.TransportClosed()
+                }
+
+            assertEquals(SendAcceptDispositionFfi.ACCEPTED_PENDING, result.acceptDisposition)
+            assertEquals(1, admissions)
+            assertEquals(2, statusReads)
+        }
+
+    /** A pre-ownership transport closure retries one logical submission with its original token. */
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun transportClosureWithoutOwnershipRetriesTheSameToken() =
+        runTest {
+            val admittedTokens = mutableListOf<String>()
+            val engine =
+                nativeBoundary { method, _ ->
+                    check(method == "localSendStatus")
+                    null
+                }
+            val send =
+                async {
+                    retryPendingConversationSend(
+                        retryableFailure = { failure ->
+                            isTransientRelaySendError(failure) || isTransientRuntimeWorkerError(failure)
+                        },
+                    ) {
+                        engine.admitLocalSend("account", "group", "same-token") {
+                            admittedTokens += "same-token"
+                            if (admittedTokens.size == 1) throw MarmotKitException.TransportClosed()
+                            LocalSendAcceptanceFfi("same-token", "22".repeat(32))
+                        }
+                    }
+                }
+
+            runCurrent()
+            assertEquals(listOf("same-token"), admittedTokens)
+            advanceTimeBy(SEND_RETRY_BACKOFF_MS)
+            runCurrent()
+
+            assertEquals(SendAcceptDispositionFfi.ACCEPTED_PENDING, send.await().acceptDisposition)
+            assertEquals(listOf("same-token", "same-token"), admittedTokens)
         }
 }

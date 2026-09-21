@@ -8036,6 +8036,15 @@ class ConversationController(
     }
 
     /**
+     * Token-aware admission may safely repeat a closed-runtime call because MDK
+     * deduplicates the original client token. The injected legacy publisher
+     * still retries only failures proven to occur before relay publication.
+     */
+    private fun isRetryableTextAdmissionError(throwable: Throwable): Boolean =
+        isTransientRelaySendError(throwable) ||
+            (textPublisher == null && isTransientRuntimeWorkerError(throwable))
+
+    /**
      * Admits one logical text/reply token to native durable ownership. Proven
      * pre-admission connectivity failures reuse the token; interrupted admission
      * queries native status before another call. Acceptance stays pending until
@@ -8052,6 +8061,7 @@ class ConversationController(
         appState.withConversationTextSendOrder(account, group.groupIdHex) {
             retryPendingConversationSend(
                 connectivityRecoveryGeneration = appState.validatedConnectivityRecoveryGeneration,
+                retryableFailure = ::isRetryableTextAdmissionError,
                 onTransientFailure = { attempt, _ -> logSendRetry(trace, attempt) },
             ) { attempt ->
                 // Serialize only this commit-producing FFI attempt. Releasing the
