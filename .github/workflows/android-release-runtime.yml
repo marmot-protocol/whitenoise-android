@@ -204,7 +204,6 @@ jobs:
       - name: Build optimized staging APKs
         run: >-
           ./gradlew :app:assembleStagingZapstoreRelease
-          -Pandroid.injected.build.abi=arm64-v8a,x86_64
           -Pandroid.injected.testOnly=false
           ${{ github.event_name == 'pull_request' && '-x :app:lintVitalStagingZapstoreRelease' || '' }}
           --build-cache --no-daemon --stacktrace

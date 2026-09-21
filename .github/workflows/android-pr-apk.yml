@@ -144,8 +144,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          apk=$(find app/build/outputs/apk -type f -name '*arm64-v8a*.apk' -print -quit)
-          test -n "$apk"
+          shopt -s nullglob
+          apks=(app/build/{outputs,intermediates}/apk/previewPlay/release/*arm64-v8a*.apk)
+          [[ ${#apks[@]} -eq 1 ]]
+          apk=${apks[0]}
           mapping=app/build/outputs/mapping/previewPlayRelease/mapping.txt
           test -s "$mapping"
           apk_sha256=$(sha256sum "$apk" | cut -d' ' -f1)

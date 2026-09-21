@@ -87,3 +87,25 @@ grep -Fq -- '--tag "server=$server_host"' "$uploader"
 grep -Fq -- '--header "Content-Type: $expected_mime"' "$uploader"
 grep -Fq -- '--header "X-SHA-256: $apk_sha256"' "$uploader"
 reject 'blossom upload --server' "$uploader"
+
+# ABI-targeted unsigned builds use intermediates; reject missing or ambiguous APKs.
+selector=$(sed -n '/^          shopt -s nullglob$/,/^          apk=${apks\[0\]}$/p' "$build")
+test -n "$selector"
+fixture=$(mktemp -d)
+trap 'rm -rf "$fixture"' EXIT
+for location in outputs intermediates; do
+  directory="$fixture/app/build/$location/apk/previewPlay/release"
+  mkdir -p "$directory"
+  touch "$directory/app-arm64-v8a-release.apk"
+  (cd "$fixture" && bash -ec "$selector")
+  rm "$directory/app-arm64-v8a-release.apk"
+done
+if (cd "$fixture" && bash -ec "$selector"); then
+  echo 'Missing APK unexpectedly accepted' >&2
+  exit 1
+fi
+touch "$fixture"/app/build/{outputs,intermediates}/apk/previewPlay/release/app-arm64-v8a-release.apk
+if (cd "$fixture" && bash -ec "$selector"); then
+  echo 'Ambiguous APKs unexpectedly accepted' >&2
+  exit 1
+fi
