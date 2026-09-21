@@ -16,6 +16,7 @@ GitHub/artifact work in #2126, Play in #2127, Zapstore in #2128, qualification i
 | **Android Production Build** | Build and verify an ARM64 direct APK and four-ABI Play AAB; retain a candidate bundle for 30 days. No GitHub release or store upload. | `android-release-signing` environment |
 | **Android Release - GitHub Draft or Play Internal** | Distribute an existing, reviewed bundle. Default destination is a GitHub **draft**. The other destination releases to Play **internal testing only**. | Explicit dispatch; Play also requires `google-play-internal` approval |
 | **Android Zapstore - PUBLIC Publication** | Publish the reviewed APK and listing publicly. This has no private/internal track. | Separate dispatch, version-specific typed confirmation, and `zapstore-production` approval |
+| **Android Zapstore - PUBLIC Legacy App Deletion** | One-time NIP-09 deletion of the retired `org.parres.whitenoise` listing and its two releases/assets. It cannot target the current app. | Exact app-specific typed confirmation and `zapstore-production` approval |
 
 All workflows run from `master`. Keep required reviewers and the `master` branch
 restriction enabled on all three environments. Never give an automatic build or
@@ -370,3 +371,19 @@ A failed online command may have partially published. Inspect relay and Blossom
 state before retrying. There is no automatic retry, overwrite-release flag,
 withdrawal, or legacy-listing removal. `org.parres.whitenoise` is a different
 application and cannot migrate installed data by publishing this new package.
+
+### Retire the legacy package
+
+`Android Zapstore - PUBLIC Legacy App Deletion` is a one-time, hard-scoped
+workflow for removing the obsolete `org.parres.whitenoise` catalog entry. It
+requires the exact confirmation `DELETE ZAPSTORE org.parres.whitenoise`, uses the
+protected `zapstore-production` signer, and refuses any target other than the
+five reviewed legacy app, release, and asset events embedded in
+`scripts/delete-legacy-zapstore-app.go`.
+
+The workflow publishes a signed NIP-09 kind-5 deletion request containing both
+address coordinates and exact event IDs, then reads the relay back. It verifies
+that those legacy records are no longer returned and that the current
+`dev.ipf.whitenoise.android` app event is unchanged. The deletion request is
+public and cannot be undone. CDN blobs and copies retained by other relays or
+clients may remain even after Zapstore removes the catalog records.

@@ -1,0 +1,62 @@
+name: Android Zapstore - PUBLIC Legacy App Deletion
+
+# This irreversible workflow is hard-scoped in code to org.parres.whitenoise
+# and cannot target the current dev.ipf.whitenoise.android listing.
+on:
+  workflow_dispatch:
+    inputs:
+      app_id:
+        description: 'Exact retired Zapstore application ID'
+        required: true
+        type: string
+      confirmation:
+        description: 'Type DELETE ZAPSTORE org.parres.whitenoise'
+        required: true
+        type: string
+
+concurrency:
+  group: android-zapstore-publication
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  confirm-deletion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require exact legacy deletion intent
+        env:
+          EXPECTED_APP_ID: ${{ inputs.app_id }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          [[ "$GITHUB_REF" == refs/heads/master ]] || { echo 'Only master may delete'; exit 1; }
+          [[ "$EXPECTED_APP_ID" == org.parres.whitenoise ]] || { echo 'Only the retired app may be deleted'; exit 1; }
+          [[ "$CONFIRMATION" == 'DELETE ZAPSTORE org.parres.whitenoise' ]] || {
+            echo 'Confirmation does not match the retired app'; exit 1;
+          }
+          echo 'Deletion of org.parres.whitenoise requires zapstore-production approval.' >> "$GITHUB_STEP_SUMMARY"
+
+  delete-legacy-app:
+    needs: confirm-deletion
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: zapstore-production
+    steps:
+      - name: Checkout trusted deletion tool
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.24.11'
+          cache: false
+      - name: Delete only the retired Zapstore app
+        env:
+          SIGN_WITH: ${{ secrets.ZAPSTORE_SIGN_WITH }}
+          BUNKER_CLIENT_KEY: ${{ secrets.ZAPSTORE_BUNKER_CLIENT_KEY }}
+          EXPECTED_APP_ID: ${{ inputs.app_id }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: bash scripts/delete-legacy-zapstore-app.sh
