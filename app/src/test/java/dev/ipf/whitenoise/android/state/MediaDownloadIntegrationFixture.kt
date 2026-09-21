@@ -251,14 +251,21 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
     }
 
     /** Emits an initial snapshot; later observation awaits native work without owning or cancelling it. */
-    private fun subscription(key: String): AttachmentTransferSubscription =
-        nativeStub(FixtureTransferFeed::class.java).also {
+    private fun subscription(key: String): AttachmentTransferSubscription {
+        val initialSnapshot = AttachmentTransferSnapshotFfi(listOf(status(key)))
+        return nativeStub(FixtureTransferFeed::class.java).also {
             var initial = true
             it.nextSnapshot = {
-                if (initial) initial = false else checkNotNull(jobs[key]).result.await()
-                AttachmentTransferSnapshotFfi(listOf(status(key)))
+                if (initial) {
+                    initial = false
+                    initialSnapshot
+                } else {
+                    checkNotNull(jobs[key]).result.await()
+                    AttachmentTransferSnapshotFfi(listOf(status(key)))
+                }
             }
         }
+    }
 
     /** Scripted feed allocated without running UniFFI's Android native-cleaner constructor. */
     private class FixtureTransferFeed : AttachmentTransferSubscription(NoPointer) {

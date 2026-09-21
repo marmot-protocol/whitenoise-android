@@ -126,6 +126,12 @@ internal class AttachmentDownloadGate(
             true
         }
 
+    /** True only while this attachment currently owns one of the bounded native-work permits. */
+    fun isAdmitted(key: String): Boolean =
+        synchronized(lock) {
+            keyedWaiters.forKey(key).orEmpty().any(Waiter::ownsPermit)
+        }
+
     /** Cancels only automatic requests that have not acquired a permit. */
     fun cancelQueuedAutomatic(accountRef: String): Int {
         val cancelled =

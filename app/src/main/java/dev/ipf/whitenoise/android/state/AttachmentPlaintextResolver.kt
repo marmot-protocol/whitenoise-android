@@ -46,6 +46,7 @@ internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
     allowExplicitRetry: Boolean = true,
 ): AttachmentPlaintext {
     val cacheKey = request.run { mediaCacheKey(accountRef, groupIdHex, messageIdHex, attachmentIndex) }
+    promoteQueuedAttachmentAcquisition(cacheKey, priority, allowExplicitRetry)
     return resolveAttachmentPlaintext(
         loadMemory = { withContext(Dispatchers.Main.immediate) { cachedMediaPlaintext(cacheKey) } },
         loadDisk = { cancellationCheck, onAcquired ->
@@ -67,6 +68,21 @@ internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
             )
         },
     )
+}
+
+/** Moves an already-shared automatic owner before cache probes can let another queued transfer win. */
+private fun WhiteNoiseAppState.promoteQueuedAttachmentAcquisition(
+    cacheKey: String,
+    priority: AttachmentDownloadPriority,
+    allowExplicitRetry: Boolean,
+) {
+    if (
+        priority == AttachmentDownloadPriority.Interactive &&
+        allowExplicitRetry &&
+        hasActiveAttachmentAcquisition(cacheKey)
+    ) {
+        promoteAdmittedAttachmentAcquisition(cacheKey)
+    }
 }
 
 /** Loads one Android-retained cache entry while exposing lease acquisition to cancellation cleanup. */
@@ -135,11 +151,17 @@ private suspend fun WhiteNoiseAppState.promoteActiveAttachmentAcquisition(
             allowExplicitRetry &&
             hasActiveAttachmentAcquisition(cacheKey)
     if (!shouldPromote) return
-    val target = resolveNativeAttachmentTarget(request) ?: return
-    // Promotion is advisory. The joined automatic owner remains authoritative
-    // even when native priority escalation is temporarily unavailable.
-    runCatchingCancellable {
-        marmotIo { downloadAttachmentAgain(request.accountRef, request.groupIdHex, target.toFfi()) }
+    val admitted = promoteAdmittedAttachmentAcquisition(cacheKey)
+    // A registered owner can still be waiting behind the bounded host gate.
+    // Promoting that waiter is sufficient; native has no acquisition to
+    // escalate until the waiter owns a permit and begins its demand call.
+    if (!admitted) return
+    resolveNativeAttachmentTarget(request)?.let { target ->
+        // Promotion is advisory. The joined automatic owner remains authoritative
+        // even when native priority escalation is temporarily unavailable.
+        runCatchingCancellable {
+            marmotIo { downloadAttachmentAgain(request.accountRef, request.groupIdHex, target.toFfi()) }
+        }
     }
 }
 

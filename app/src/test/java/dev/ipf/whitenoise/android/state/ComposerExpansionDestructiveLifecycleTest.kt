@@ -572,6 +572,10 @@ class ComposerExpansionDestructiveLifecycleTest {
                         messageIdHex = summary.messageIds.single(),
                     )
                 }
+                "sendText" -> {
+                    calls.send.incrementAndGet()
+                    sendResult()
+                }
                 "groupMembers" -> members()
                 "listMedia" -> emptyList<Any>()
                 "leaveGroup" -> {

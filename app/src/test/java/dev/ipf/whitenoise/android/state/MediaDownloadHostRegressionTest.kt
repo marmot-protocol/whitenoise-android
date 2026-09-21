@@ -63,6 +63,7 @@ class MediaDownloadHostRegressionTest {
             val tappedIndex = (0 until 16).last { index -> first.none { it.reference == reference(index) } }
             val tapped =
                 async { download(tappedIndex, AttachmentDownloadPriority.Interactive) }
+            runCurrent()
             first.first().succeed(bytes(first.first().reference.fileName))
             val next = fixture.entered.receive()
             assertEquals(reference(tappedIndex), next.reference)

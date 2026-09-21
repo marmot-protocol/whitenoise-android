@@ -3953,6 +3953,12 @@ class WhiteNoiseAppState private constructor(
     @Suppress("MaxLineLength") // Kept as an expression body by ktlint's formatter.
     internal fun hasActiveAttachmentAcquisition(cacheKey: String): Boolean = inFlightAttachmentAcquisitions.isActive(cacheKey)
 
+    /** Promotes a queued owner and reports whether native work is already admitted for that identity. */
+    internal fun promoteAdmittedAttachmentAcquisition(cacheKey: String): Boolean {
+        attachmentDownloadGate.promote(cacheKey)
+        return attachmentDownloadGate.isAdmitted(cacheKey)
+    }
+
     /**
      * Cancels one account-scoped memoized source attempt after its forwarding
      * owner times out or is cancelled. The identity-safe completion hook leaves
