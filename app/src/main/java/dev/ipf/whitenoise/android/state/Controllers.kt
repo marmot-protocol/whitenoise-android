@@ -2224,6 +2224,9 @@ internal sealed interface OwnReactionRetractionPlan {
     data object Unavailable : OwnReactionRetractionPlan
 }
 
+private const val MARMOT_DELETE_EVENT_KIND = 5uL
+private const val MARMOT_REACTION_EVENT_KIND = 7uL
+
 /**
  * Selects the narrowest safe removal for an own reaction. A projected reaction-event id removes
  * only the tapped emoji; when projection details have not arrived yet, target-wide unreact is safe
@@ -2240,6 +2243,35 @@ internal fun planOwnReactionRetraction(
         ownEmojisBeforeMutation == setOf(emoji) -> OwnReactionRetractionPlan.UnreactTarget
         else -> OwnReactionRetractionPlan.Unavailable
     }
+}
+
+/**
+ * Finds the newest active reaction event for [emoji] in Marmot's raw local history. Same-author
+ * delete events suppress older reactions so a stale event id is never retried after an unreact.
+ */
+internal fun activeOwnReactionEventId(
+    records: List<AppMessageRecordFfi>,
+    activeAccountIdHex: String,
+    targetMessageIdHex: String,
+    emoji: String,
+): String? {
+    val deletedOwnEventIds =
+        records
+            .asSequence()
+            .filter { record ->
+                MessageProjector.isDelete(record) && record.sender.equals(activeAccountIdHex, ignoreCase = true)
+            }.flatMap { MessageProjector.deletedTargetMessageIds(it).asSequence() }
+            .map(String::lowercase)
+            .toSet()
+    return records
+        .asSequence()
+        .filter(MessageProjector::isReaction)
+        .filter { it.sender.equals(activeAccountIdHex, ignoreCase = true) }
+        .filter { it.plaintext == emoji }
+        .filter { MessageProjector.reactedToMessageId(it)?.equals(targetMessageIdHex, ignoreCase = true) == true }
+        .filter { it.messageIdHex.lowercase() !in deletedOwnEventIds }
+        .maxWithOrNull(compareBy<AppMessageRecordFfi>({ it.recordedAt }, { it.receivedAt }, { it.messageIdHex }))
+        ?.messageIdHex
 }
 
 internal fun confirmedOptimisticReactionKeys(
@@ -6639,6 +6671,7 @@ class ConversationController(
     internal val pendingProjectionsAwaitingBridge =
         appState.pendingProjectionsAwaitingBridge(conversationAccountRef, initialGroup.groupIdHex)
     private val optimisticReactionChanges = linkedMapOf<String, OptimisticReactionChange>()
+    private val unprojectedOwnReactionEventIds = linkedMapOf<Pair<String, String>, String>()
 
     // DEBUG-only send-latency trace bookkeeping (issue #913): maps a pending
     // optimistic text message's temp id to (traceSequence, monotonicStartMs) so
@@ -8718,13 +8751,38 @@ class ConversationController(
             if (alreadyMine) {
                 retractOwnReaction(account, target, emoji, ownEmojisBeforeMutation)
             } else {
-                appState.marmotIo(MarmotTraceSection.MESSAGE_REACT) {
-                    reactToMessage(account, group.groupIdHex, target, emoji)
+                val summary =
+                    appState.marmotIo(MarmotTraceSection.MESSAGE_REACT) {
+                        reactToMessage(account, group.groupIdHex, target, emoji)
+                    }
+                summary.messageIds.firstOrNull()?.takeIf(String::isNotBlank)?.let { messageIdHex ->
+                    unprojectedOwnReactionEventIds[target to emoji] = messageIdHex
                 }
             }
         }
         return !alreadyMine
     }
+
+    /** Resolves a missing projected reaction id from Marmot's authoritative local event history. */
+    private suspend fun resolveOwnReactionEventId(
+        account: String,
+        target: String,
+        emoji: String,
+        activeAccountIdHex: String,
+    ): String? =
+        runCatchingCancellable {
+            appState.marmotIo {
+                messages(
+                    account,
+                    group.groupIdHex,
+                    null,
+                    listOf(MARMOT_DELETE_EVENT_KIND, MARMOT_REACTION_EVENT_KIND),
+                )
+            }
+        }.onFailure {
+            if (BuildConfig.DEBUG) Log.w("DMConversation", "reaction event lookup failed", it)
+        }.getOrNull()
+            ?.let { records -> activeOwnReactionEventId(records, activeAccountIdHex, target, emoji) }
 
     /** Removes the tapped own reaction without clearing a different emoji when several are active. */
     private suspend fun retractOwnReaction(
@@ -8747,11 +8805,28 @@ class ConversationController(
             ownReactions
                 .filter { it.reactionMessageIdHex.isNotBlank() }
                 .associate { it.emoji to it.reactionMessageIdHex }
-        when (val plan = planOwnReactionRetraction(emoji, knownEventIdByEmoji, ownEmojisBeforeMutation)) {
-            is OwnReactionRetractionPlan.DeleteReactionMessage ->
+                .toMutableMap()
+                .apply {
+                    unprojectedOwnReactionEventIds[target to emoji]?.let { put(emoji, it) }
+                }
+        val initialPlan = planOwnReactionRetraction(emoji, knownEventIdByEmoji, ownEmojisBeforeMutation)
+        val plan =
+            if (initialPlan == OwnReactionRetractionPlan.Unavailable) {
+                resolveOwnReactionEventId(account, target, emoji, me)
+                    ?.let { OwnReactionRetractionPlan.DeleteReactionMessage(it) }
+                    ?: initialPlan
+            } else {
+                initialPlan
+            }
+        when (plan) {
+            is OwnReactionRetractionPlan.DeleteReactionMessage -> {
                 appState.marmotIo { deleteMessage(account, group.groupIdHex, plan.messageIdHex) }
-            OwnReactionRetractionPlan.UnreactTarget ->
+                unprojectedOwnReactionEventIds.remove(target to emoji)
+            }
+            OwnReactionRetractionPlan.UnreactTarget -> {
                 appState.marmotIo { unreactFromMessage(account, group.groupIdHex, target) }
+                unprojectedOwnReactionEventIds.keys.removeAll { (messageId, _) -> messageId == target }
+            }
             OwnReactionRetractionPlan.Unavailable -> error("no reaction event to retract for $emoji")
         }
     }

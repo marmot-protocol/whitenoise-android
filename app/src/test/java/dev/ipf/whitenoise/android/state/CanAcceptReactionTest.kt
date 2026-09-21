@@ -1,5 +1,8 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.core.ReactionTally
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
@@ -167,6 +170,55 @@ class CanAcceptReactionTest {
         )
     }
 
+    /** Raw history chooses the newest matching reaction while projection catches up. */
+    @Test
+    fun rawHistoryFindsNewestActiveOwnReaction() {
+        val records =
+            listOf(
+                rawRecord(id = "older-reaction", kind = 7uL, plaintext = "👍", target = TARGET, recordedAt = 1uL),
+                rawRecord(id = "other-emoji", kind = 7uL, plaintext = "🔥", target = TARGET, recordedAt = 2uL),
+                rawRecord(id = "newer-reaction", kind = 7uL, plaintext = "👍", target = TARGET, recordedAt = 3uL),
+            )
+
+        assertEquals(
+            "newer-reaction",
+            activeOwnReactionEventId(records, ACCOUNT, TARGET, "👍"),
+        )
+    }
+
+    /** An own delete suppresses its reaction event so stale ids are never retried. */
+    @Test
+    fun rawHistoryIgnoresDeletedOwnReaction() {
+        val records =
+            listOf(
+                rawRecord(id = "reaction-event", kind = 7uL, plaintext = "👍", target = TARGET, recordedAt = 1uL),
+                rawRecord(id = "delete-event", kind = 5uL, target = "reaction-event", recordedAt = 2uL),
+            )
+
+        assertEquals(null, activeOwnReactionEventId(records, ACCOUNT, TARGET, "👍"))
+    }
+
+    /** A different sender cannot forge deletion of the active account's reaction. */
+    @Test
+    fun rawHistoryIgnoresForgedReactionDelete() {
+        val records =
+            listOf(
+                rawRecord(id = "reaction-event", kind = 7uL, plaintext = "👍", target = TARGET, recordedAt = 1uL),
+                rawRecord(
+                    id = "forged-delete",
+                    sender = "another-account",
+                    kind = 5uL,
+                    target = "reaction-event",
+                    recordedAt = 2uL,
+                ),
+            )
+
+        assertEquals(
+            "reaction-event",
+            activeOwnReactionEventId(records, ACCOUNT, TARGET, "👍"),
+        )
+    }
+
     @Test
     fun confirmedEchoPrunesOnlyItsMatchingOptimisticOverlay() {
         val optimistic =
@@ -231,6 +283,30 @@ class CanAcceptReactionTest {
             confirmedSendersByEmoji = emptyMap(),
             optimisticChanges = optimistic.values,
         )
+
+    /** Builds a minimal raw Marmot record for reaction-resolution tests. */
+    private fun rawRecord(
+        id: String,
+        sender: String = ACCOUNT,
+        kind: ULong,
+        plaintext: String = "",
+        target: String,
+        recordedAt: ULong,
+    ) = AppMessageRecordFfi(
+        messageIdHex = id,
+        direction = "sent",
+        groupIdHex = "group",
+        sender = sender,
+        plaintext = plaintext,
+        contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList(), blankLinesBefore = ByteArray(0)),
+        kind = kind,
+        tags = listOf(MessageTagFfi(listOf("e", target))),
+        sourceEpoch = null,
+        retentionSeconds = null,
+        retentionExpiresAt = null,
+        recordedAt = recordedAt,
+        receivedAt = recordedAt,
+    )
 
     private companion object {
         const val ACCOUNT = "abcdef"
