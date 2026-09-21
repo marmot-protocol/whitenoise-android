@@ -1672,6 +1672,10 @@
     <string name="tts_bar_previous_message">Previous message</string>
     <string name="tts_bar_next_message">Next message</string>
     <string name="tts_bar_progress">Sentence %1$d of %2$d, message %3$d of %4$d</string>
+    <plurals name="tts_bar_seconds_remaining">
+        <item quantity="one">~%1$ds left</item>
+        <item quantity="other">~%1$ds left</item>
+    </plurals>
     <string name="tts_bar_stop">Stop reading</string>
     <string name="tts_bar_return_to_source">Return to spoken message</string>
     <string name="tts_source_unavailable">The spoken message is no longer available</string>

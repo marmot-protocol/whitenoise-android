@@ -1517,6 +1517,12 @@
     <string name="tts_bar_previous_message">Предыдущее сообщение</string>
     <string name="tts_bar_next_message">Следующее сообщение</string>
     <string name="tts_bar_progress">Предложение %1$d из %2$d, сообщение %3$d из %4$d</string>
+    <plurals name="tts_bar_seconds_remaining">
+        <item quantity="one">Осталось ~%1$d с</item>
+        <item quantity="few">Осталось ~%1$d с</item>
+        <item quantity="many">Осталось ~%1$d с</item>
+        <item quantity="other">Осталось ~%1$d с</item>
+    </plurals>
     <string name="tts_bar_stop">Остановить чтение</string>
     <string name="tts_bar_return_to_source">Вернуться к озвученному сообщению</string>
     <string name="tts_source_unavailable">Озвученное сообщение больше недоступно</string>

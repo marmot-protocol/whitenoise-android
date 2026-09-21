@@ -3,11 +3,30 @@ package dev.ipf.whitenoise.android.audio.tts
 import android.speech.tts.TextToSpeech
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TtsPlaybackQueueTest {
+    /** Remaining seconds fall as the active message advances and halve when the rate doubles. */
+    @Test
+    fun remainingTimeEstimateTracksTheActiveMessageProgressAndRate() {
+        val harness = TtsQueueHarness()
+        val message = mappedMessage("m1", "", "Hello world.")
+        harness.queue.start(listOf(message))
+        val units = message.chunks.sumOf { TtsWordTimingEstimate.weightedLengthOf(it.text) }
+
+        assertEquals(units, harness.queue.estimatedMessageRemainingSeconds(msPerUnitAt1x = 1_000.0, rate = 1f))
+        assertEquals(
+            kotlin.math.ceil(units / 2.0).toInt(),
+            harness.queue.estimatedMessageRemainingSeconds(msPerUnitAt1x = 1_000.0, rate = 2f),
+        )
+
+        harness.queue.stop()
+        assertNull(harness.queue.estimatedMessageRemainingSeconds(msPerUnitAt1x = 1_000.0, rate = 1f))
+    }
+
     @Test
     fun restartingTheSamePassagePublishesANewSessionAndRetainsItsTimelinePosition() {
         val harness = TtsQueueHarness()

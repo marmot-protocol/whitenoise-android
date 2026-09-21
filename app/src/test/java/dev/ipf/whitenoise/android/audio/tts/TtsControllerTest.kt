@@ -1,12 +1,18 @@
 package dev.ipf.whitenoise.android.audio.tts
 
 import android.speech.tts.TextToSpeech
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Locale
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.thread
 
 @Suppress("LargeClass") // Controller lifecycle, focus, and seek cases share one fake engine/focus harness.
 class TtsControllerTest {
@@ -537,6 +543,136 @@ class TtsControllerTest {
         assertEquals(
             speakingTts(1, 2, 0, 1, "First sentence. Second sentence.", sentenceIndex = 1, sentenceCount = 2),
             controller.state.value,
+        )
+    }
+
+    @Test
+    fun remainingTimeEstimateAdoptsTheRequeuedRateAtTheSentenceBoundary() {
+        var requestedRate = 1f
+        var now = 0L
+        val acceleratedEngine = FakeTtsSpeechEngine()
+        val acceleratedController =
+            TtsController(
+                audioFocus = FakeTtsAudioFocus(),
+                maxChunkLength = 500,
+                speechRate = { requestedRate },
+                wordTicker =
+                    TtsEstimatedWordTicker(
+                        dispatcher = StandardTestDispatcher(TestCoroutineScheduler()),
+                        clock = { now },
+                    ),
+                clock = { now },
+            )
+        acceleratedController.attachEngine(acceleratedEngine)
+
+        val sentence = List(80) { "word" }.joinToString(" ") + "."
+        val text = "$sentence $sentence"
+        assertTrue(acceleratedController.speak(text, Locale.US))
+        acceleratedEngine.start(0)
+        val beforeRateChange = requireNotNull(acceleratedController.estimatedMessageRemainingSeconds())
+
+        requestedRate = 2f
+        acceleratedController.onSpeechRateChanged()
+        assertEquals(
+            "the audible sentence must retain its original rate until the boundary",
+            beforeRateChange,
+            acceleratedController.estimatedMessageRemainingSeconds(),
+        )
+
+        acceleratedEngine.complete(0)
+        assertEquals(2f, acceleratedEngine.appliedRates.last())
+        acceleratedEngine.start(acceleratedEngine.spoken.lastIndex)
+        val acceleratedBoundaryEstimate =
+            requireNotNull(acceleratedController.estimatedMessageRemainingSeconds())
+
+        val controlEngine = FakeTtsSpeechEngine()
+        val controlController =
+            TtsController(
+                audioFocus = FakeTtsAudioFocus(),
+                maxChunkLength = 500,
+                speechRate = { 1f },
+                wordTicker =
+                    TtsEstimatedWordTicker(
+                        dispatcher = StandardTestDispatcher(TestCoroutineScheduler()),
+                        clock = { now },
+                    ),
+                clock = { now },
+            )
+        controlController.attachEngine(controlEngine)
+        assertTrue(controlController.speak(text, Locale.US))
+        controlEngine.start(0)
+        controlEngine.complete(0)
+        controlEngine.start(controlEngine.spoken.lastIndex)
+        val controlBoundaryEstimate = requireNotNull(controlController.estimatedMessageRemainingSeconds())
+
+        assertTrue(
+            "the estimate must adopt the faster rate applied to the requeued sentence",
+            acceleratedBoundaryEstimate < controlBoundaryEstimate,
+        )
+    }
+
+    /** Remaining time stays readable under concurrent access and follows the audible utterance's rate. */
+    @Test
+    fun remainingTimeEstimateUsesTheControllerLockAndHoldsTheAudibleRate() {
+        val engine = FakeTtsSpeechEngine()
+        var rate = 1f
+        var now = 0L
+        val controller =
+            TtsController(
+                audioFocus = FakeTtsAudioFocus(),
+                maxChunkLength = 4_000,
+                speechRate = { rate },
+                // A parked scheduler keeps the estimated-word ticker from advancing
+                // progress between the two reads this test compares.
+                wordTicker =
+                    TtsEstimatedWordTicker(
+                        dispatcher = StandardTestDispatcher(TestCoroutineScheduler()),
+                        clock = { now },
+                    ),
+                clock = { now },
+            )
+        controller.attachEngine(engine)
+        val text = List(80) { "word" }.joinToString(" ") + "."
+        assertTrue(controller.speak(text, Locale.US))
+        engine.start(0)
+        now += 1_000L
+        val initial = requireNotNull(controller.estimatedMessageRemainingSeconds())
+
+        val entered = CountDownLatch(1)
+        val returned = CountDownLatch(1)
+        val concurrentEstimate = AtomicReference<Int?>()
+        lateinit var reader: Thread
+        synchronized(controller) {
+            reader =
+                thread(start = true, name = "tts-remaining-time-reader") {
+                    entered.countDown()
+                    concurrentEstimate.set(controller.estimatedMessageRemainingSeconds())
+                    returned.countDown()
+                }
+            assertTrue(entered.await(1, TimeUnit.SECONDS))
+            assertFalse(
+                "estimate must share the controller's synchronized state boundary",
+                returned.await(100, TimeUnit.MILLISECONDS),
+            )
+        }
+        assertTrue(returned.await(1, TimeUnit.SECONDS))
+        reader.join()
+        assertEquals(initial, concurrentEstimate.get())
+
+        val halfway = text.length / 2
+        engine.range(0, halfway, halfway + 4)
+        val progressed = requireNotNull(controller.estimatedMessageRemainingSeconds())
+        assertTrue("progress must reduce the rendered remaining time", progressed < initial)
+
+        // A rate change only re-queues pending chunks at the next boundary, so the
+        // sentence already being spoken keeps the rate it was enqueued with.
+        rate = 2f
+        controller.onSpeechRateChanged()
+        val afterRateChange = requireNotNull(controller.estimatedMessageRemainingSeconds())
+        assertEquals(
+            "a rate change must not shorten the estimate while the audible sentence keeps its rate",
+            progressed,
+            afterRateChange,
         )
     }
 

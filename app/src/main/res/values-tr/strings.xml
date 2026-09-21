@@ -1463,6 +1463,10 @@
     <string name="tts_bar_previous_message">Önceki mesaj</string>
     <string name="tts_bar_next_message">Sonraki mesaj</string>
     <string name="tts_bar_progress">Cümle %1$d/%2$d, mesaj %3$d/%4$d</string>
+    <plurals name="tts_bar_seconds_remaining">
+        <item quantity="one">~%1$d sn kaldı</item>
+        <item quantity="other">~%1$d sn kaldı</item>
+    </plurals>
     <string name="tts_bar_stop">Okumayı durdur</string>
     <string name="tts_bar_return_to_source">Okunan mesaja dön</string>
     <string name="tts_source_unavailable">Okunan mesaj artık kullanılamıyor</string>

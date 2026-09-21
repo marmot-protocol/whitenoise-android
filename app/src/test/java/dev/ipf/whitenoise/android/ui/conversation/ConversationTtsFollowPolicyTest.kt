@@ -420,8 +420,9 @@ class ConversationTtsFollowPolicyTest {
         )
     }
 
+    /** A drag suspends follow for the current sentence only; the next spoken sentence resumes it. */
     @Test
-    fun directDragSuspendsFollowingUntilExplicitResumeOrANewSession() {
+    fun directDragSuspendsCurrentSentenceAndNextSentenceResumesFollowing() {
         val policy = ConversationTtsFollowPolicy()
         policy.observe(speaking(sessionId = 1, sentenceIndex = 0), ownsSession = true)
         policy.claimPendingTarget()
@@ -429,12 +430,8 @@ class ConversationTtsFollowPolicyTest {
         policy.onUserDrag()
         policy.observe(speaking(sessionId = 1, sentenceIndex = 1), ownsSession = true)
 
-        assertFalse(policy.isFollowEnabled)
-        assertTrue(policy.showResumeAction)
-        assertNull(policy.claimPendingTarget())
-
-        policy.resumeFollow()
         assertTrue(policy.isFollowEnabled)
+        assertFalse(policy.showResumeAction)
         assertEquals(1, policy.claimPendingTarget()?.sentenceIndex)
 
         policy.onUserDrag()
