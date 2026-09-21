@@ -546,6 +546,58 @@ class TtsControllerTest {
         )
     }
 
+    @Test
+    fun remainingTimeEstimateAdoptsTheRequeuedRateAtTheSentenceBoundary() {
+        var requestedRate = 1f
+        val acceleratedEngine = FakeTtsSpeechEngine()
+        val acceleratedController =
+            TtsController(
+                audioFocus = FakeTtsAudioFocus(),
+                maxChunkLength = 4_000,
+                speechRate = { requestedRate },
+            )
+        acceleratedController.attachEngine(acceleratedEngine)
+
+        val sentence = List(80) { "word" }.joinToString(" ") + "."
+        val text = "$sentence $sentence"
+        assertTrue(acceleratedController.speak(text, Locale.US))
+        acceleratedEngine.start(0)
+        val beforeRateChange = requireNotNull(acceleratedController.estimatedMessageRemainingSeconds())
+
+        requestedRate = 2f
+        acceleratedController.onSpeechRateChanged()
+        assertEquals(
+            "the audible sentence must retain its original rate until the boundary",
+            beforeRateChange,
+            acceleratedController.estimatedMessageRemainingSeconds(),
+        )
+
+        acceleratedEngine.complete(0)
+        assertEquals(2f, acceleratedEngine.appliedRates.last())
+        acceleratedEngine.start(acceleratedEngine.spoken.lastIndex)
+        val acceleratedBoundaryEstimate =
+            requireNotNull(acceleratedController.estimatedMessageRemainingSeconds())
+
+        val controlEngine = FakeTtsSpeechEngine()
+        val controlController =
+            TtsController(
+                audioFocus = FakeTtsAudioFocus(),
+                maxChunkLength = 4_000,
+                speechRate = { 1f },
+            )
+        controlController.attachEngine(controlEngine)
+        assertTrue(controlController.speak(text, Locale.US))
+        controlEngine.start(0)
+        controlEngine.complete(0)
+        controlEngine.start(controlEngine.spoken.lastIndex)
+        val controlBoundaryEstimate = requireNotNull(controlController.estimatedMessageRemainingSeconds())
+
+        assertTrue(
+            "the estimate must adopt the faster rate applied to the requeued sentence",
+            acceleratedBoundaryEstimate < controlBoundaryEstimate,
+        )
+    }
+
     /** Remaining time stays readable under concurrent access and follows the audible utterance's rate. */
     @Test
     fun remainingTimeEstimateUsesTheControllerLockAndHoldsTheAudibleRate() {
