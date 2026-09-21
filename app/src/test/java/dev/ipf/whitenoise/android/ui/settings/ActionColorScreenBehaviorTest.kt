@@ -152,9 +152,9 @@ class ActionColorScreenBehaviorTest {
         composeRule.onNodeWithTag("action_color.save").assertIsEnabled()
     }
 
-    /** AMOLED shows the fixed-colours notice instead of the editor. */
+    /** AMOLED explains its fixed action colour and directs bubble-outline customization elsewhere. */
     @Test
-    fun amoledShowsTheFixedColoursNotice() {
+    fun amoledShowsTheFixedActionColourNotice() {
         appState.updateThemeMode(AppThemeMode.Amoled)
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true, amoled = true) {
@@ -162,8 +162,10 @@ class ActionColorScreenBehaviorTest {
             }
         }
         composeRule
-            .onNodeWithText("AMOLED uses fixed white action and bubble colors. Switch themes to customize colors.")
-            .assertExists()
+            .onNodeWithText(
+                "AMOLED action buttons use fixed white. " +
+                    "Message bubble outlines can be customized under Chat bubble colors.",
+            ).assertExists()
         composeRule.onNodeWithTag("action_color.save").assertDoesNotExist()
     }
 
