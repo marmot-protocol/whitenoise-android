@@ -112,6 +112,7 @@ class TtsTransportBarTest {
         assertEquals(1, stopTaps)
     }
 
+    /** The compact progress row reports remaining time and omits the removed message detail rows. */
     @Test
     fun compactProgressShowsRemainingTimeWithoutMessageDetails() {
         renderBar(state = speakingTts(4, 20, 1, 12, "Preview", sentenceIndex = 2, sentenceCount = 8))

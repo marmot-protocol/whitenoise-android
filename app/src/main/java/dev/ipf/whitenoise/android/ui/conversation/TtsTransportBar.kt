@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -66,6 +67,14 @@ internal fun TtsTransportBar(
     val rateOverride by appState.ttsRatePreferences.rateOverride.collectAsState()
     val historyEdge by appState.ttsHistorySession.edgeState.collectAsState()
     val activeRate = rateOverride ?: appState.ttsRatePreferences.resolvedRate()
+    // The estimate takes the controller lock, which the speech callback thread
+    // also holds during playback, so it must not run on every recomposition.
+    // Its only inputs are the playback state and the active rate — recompute
+    // when one of those changes and reuse the result otherwise.
+    val remainingSeconds =
+        remember(state, activeRate) {
+            appState.ttsController.estimatedMessageRemainingSeconds()
+        }
 
     TtsTransportBarContent(
         state = displayState,
@@ -81,7 +90,7 @@ internal fun TtsTransportBar(
         onNextMessage = { appState.ttsHistorySession.nextMessage() },
         onRateSelected = appState::setTtsRateOverride,
         onStop = { appState.stopSpeaking() },
-        remainingSeconds = appState.ttsController.estimatedMessageRemainingSeconds(),
+        remainingSeconds = remainingSeconds,
         modifier = modifier,
         historyEdge = historyEdge,
         onBodyClick = onBodyClick,

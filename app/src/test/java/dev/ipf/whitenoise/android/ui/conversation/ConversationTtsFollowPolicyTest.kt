@@ -420,6 +420,7 @@ class ConversationTtsFollowPolicyTest {
         )
     }
 
+    /** A drag suspends follow for the current sentence only; the next spoken sentence resumes it. */
     @Test
     fun directDragSuspendsCurrentSentenceAndNextSentenceResumesFollowing() {
         val policy = ConversationTtsFollowPolicy()

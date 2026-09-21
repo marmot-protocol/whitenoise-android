@@ -544,6 +544,7 @@ class TtsControllerTest {
         )
     }
 
+    /** Remaining time stays readable under concurrent access and rescales with progress and rate. */
     @Test
     fun remainingTimeEstimateUsesTheControllerLockAndReflectsProgressAndRate() {
         val engine = FakeTtsSpeechEngine()

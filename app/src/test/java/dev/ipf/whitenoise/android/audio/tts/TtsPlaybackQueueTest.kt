@@ -9,6 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TtsPlaybackQueueTest {
+    /** Remaining seconds fall as the active message advances and halve when the rate doubles. */
     @Test
     fun remainingTimeEstimateTracksTheActiveMessageProgressAndRate() {
         val harness = TtsQueueHarness()
