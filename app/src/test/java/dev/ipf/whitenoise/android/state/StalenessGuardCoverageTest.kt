@@ -94,11 +94,25 @@ class StalenessGuardCoverageTest {
                 "AppState.kt:reconcileUnavailableNativePushFallback" to
                     listOf(
                         "captureNativePushFallbackOwner",
-                        "ownerIsCurrent = ::ownsNativePushFallback",
+                        "ownsNativePushFallback(owner)",
                         "nativePushFallback.reconcile",
                     ),
                 "AppState.kt:clearPushRegistrationForOwnerLocked" to
                     listOf("ownsNativePushFallback(owner)", "clearPending(owner.accountRef)"),
+                "AppState.kt:acknowledgePendingPushWakeCatchUp" to
+                    listOf("isCatchUpKeyCurrent(key)", "recordPendingPushWakeCatchUp"),
+                "AppState.kt:ensureNotificationRenderingEnabled" to
+                    listOf("ownsNotificationDeliveryMode(owner)", "localNotificationSettings = it"),
+                "AppState.kt:selectFcmDelivery" to
+                    listOf("ownsNotificationDeliveryMode(owner)", "settleFailedFcmDelivery"),
+                "AppState.kt:configureNativeDeliveryForAccount" to
+                    listOf("ownsNotificationDeliveryMode(owner)", "localNotificationSettings = updated"),
+                "AppState.kt:disableNativePushForPersistentDelivery" to
+                    listOf("ownsNotificationDeliveryMode(modeOwner)", "nativePushFallback.isReady(fallbackOwner)"),
+                "AppState.kt:rollbackNativePushMode" to
+                    listOf("ownsNotificationDeliveryMode(owner)", "localNotificationSettings = restored"),
+                "AppState.kt:restorePersistentPreference" to
+                    listOf("ownsNotificationDeliveryMode(owner)", "backgroundConnectionEnabled = enabled"),
                 "NativePushFallbackRuntime.kt:reconcile" to
                     listOf("readNativePushFallbackSettings", "ownerIsCurrent", "ensurePersistentFallback"),
                 "NativePushFallbackRuntime.kt:ensurePersistentFallback" to

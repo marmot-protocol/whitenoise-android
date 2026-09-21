@@ -3,26 +3,22 @@ package dev.ipf.whitenoise.android.ui.settings
 import android.Manifest
 import android.app.Application
 import android.content.Context
-import android.os.Looper
-import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.assertIsOff
-import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.NotificationSettingsFfi
-import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.BackgroundConnectionPreferences
+import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.state.NotificationBootstrapTestFixture
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.After
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -57,85 +53,52 @@ class NotificationRevocationTest {
         fixture?.close()
     }
 
-    /** Local notification revocation reaches MDK and also stops the saved background policy. */
+    /** Permission loss preserves an existing local-delivery choice without issuing native writes. */
     @Test
-    fun deniedPermissionStillAllowsLocalNotificationsOff() {
+    fun deniedPermissionPreservesLocalDelivery() {
         val owner = show(local = true, push = false, background = true)
-        composeRule
-            .onNodeWithText(app.getString(R.string.local_notifications))
-            .performScrollTo()
-            .assertIsOn()
-            .assertIsEnabled()
-            .performClick()
-        awaitMutation { owner.appState.localNotificationSettings?.localNotificationsEnabled == false }
+
+        composeRule.onNodeWithTag("notification-delivery.local").assertIsSelected().assertIsNotEnabled()
+        assertTrue(owner.notificationSettings(ACCOUNT).localNotificationsEnabled)
+        assertTrue(owner.appState.backgroundConnectionEnabled)
+        assertTrue(BackgroundConnectionPreferences.isEnabled(app))
+        assertTrue(owner.nativePushSettingWrites.isEmpty())
+        assertFalse(owner.appState.localNotificationPermissionGranted)
+    }
+
+    /** Permission loss preserves an existing native-push choice and its registration. */
+    @Test
+    fun deniedPermissionPreservesNativePushDelivery() {
+        val owner = show(local = true, push = true, background = false)
+
+        composeRule.onNodeWithTag("notification-delivery.fcm").assertIsSelected().assertIsNotEnabled()
+        composeRule.onNodeWithTag("notification-delivery.local").assertIsNotSelected().assertIsNotEnabled()
+        assertTrue(owner.notificationSettings(ACCOUNT).nativePushEnabled)
+        assertTrue(owner.clearedPushRegistrations.isEmpty())
+        assertTrue(owner.nativePushSettingWrites.isEmpty())
+        assertFalse(owner.appState.localNotificationPermissionGranted)
+    }
+
+    /** A legacy all-off state stays unchanged while the permission gate prevents choosing a mode. */
+    @Test
+    fun deniedPermissionDoesNotRepairLegacyAllOffState() {
+        val owner = show(local = false, push = false, background = false)
+
+        composeRule.onNodeWithTag("notification-delivery.local").assertIsSelected().assertIsNotEnabled()
         assertFalse(owner.notificationSettings(ACCOUNT).localNotificationsEnabled)
-        assertFalse(owner.appState.backgroundConnectionEnabled)
-        assertFalse(BackgroundConnectionPreferences.isEnabled(app))
-        composeRule.onNodeWithText(app.getString(R.string.local_notifications)).assertIsOff().assertIsNotEnabled()
-        assertFalse(owner.appState.localNotificationPermissionGranted)
-    }
-
-    /** Stopping an enabled persistent connection requires no new notification grant. */
-    @Test
-    fun deniedPermissionStillAllowsKeepConnectedOff() {
-        val owner = show(local = true, push = false, background = true)
-        composeRule
-            .onNodeWithText(app.getString(R.string.keep_connected_in_background))
-            .performScrollTo()
-            .assertIsOn()
-            .assertIsEnabled()
-            .performClick()
-        awaitMutation { !owner.appState.backgroundConnectionEnabled }
-        assertFalse(BackgroundConnectionPreferences.isEnabled(app))
-        composeRule
-            .onNodeWithText(app.getString(R.string.keep_connected_in_background))
-            .assertIsOff()
-            .assertIsNotEnabled()
-        assertFalse(owner.appState.localNotificationPermissionGranted)
-    }
-
-    /** A previously enabled push policy can be disabled after local delivery and permission are both off. */
-    @Test
-    fun deniedPermissionAndLocalOffStillAllowNativePushRevocation() {
-        val owner = show(local = false, push = true, background = false)
-        composeRule
-            .onNodeWithText(app.getString(R.string.native_push_title))
-            .performScrollTo()
-            .assertIsOn()
-            .assertIsEnabled()
-            .performClick()
-        awaitMutation { owner.clearedPushRegistrations.contains(ACCOUNT) }
         assertFalse(owner.notificationSettings(ACCOUNT).nativePushEnabled)
-        assertEquals(listOf(ACCOUNT to false), owner.nativePushSettingWrites.toList())
-        composeRule.onNodeWithText(app.getString(R.string.native_push_title)).assertIsOff().assertIsNotEnabled()
+        assertFalse(BackgroundConnectionPreferences.isEnabled(app))
+        assertTrue(owner.nativePushSettingWrites.isEmpty())
         assertFalse(owner.appState.localNotificationPermissionGranted)
     }
 
-    /** Off policies retain the prototype permission gate and cannot be enabled through their disabled rows. */
+    /** Both delivery choices remain disabled until Android permission is available. */
     @Test
-    fun deniedPermissionDoesNotEnableOffPolicies() {
-        show(local = false, push = false, background = false)
-        val policies =
-            listOf(
-                R.string.local_notifications,
-                R.string.keep_connected_in_background,
-                R.string.native_push_title,
-            )
-        policies.forEach { id ->
-            composeRule
-                .onNodeWithText(app.getString(id))
-                .performScrollTo()
-                .assertIsOff()
-                .assertIsNotEnabled()
-        }
-    }
+    fun deniedPermissionDisablesEveryAvailableDeliveryChoice() {
+        show(local = true, push = false, background = true)
 
-    /** Process-owned Main mutations resume outside the Compose test scheduler after native IO returns. */
-    private fun awaitMutation(condition: () -> Boolean) {
-        composeRule.waitUntil(5_000) {
-            shadowOf(Looper.getMainLooper()).idle()
-            condition()
-        }
+        composeRule.onNodeWithTag("notification-delivery.fcm").assertIsNotSelected().assertIsNotEnabled()
+        composeRule.onNodeWithTag("notification-delivery.local").assertIsSelected().assertIsNotEnabled()
     }
 
     /** Persisted fixture state enters the real owner through notificationSettings, not direct UI assignment. */
@@ -151,6 +114,7 @@ class NotificationRevocationTest {
                 accounts = listOf(AccountSummaryFfi(ACCOUNT, "a".repeat(64), true, false, false, true)),
                 initialNotificationSettings = NotificationSettingsFfi(ACCOUNT, "a".repeat(64), local, push),
                 emitStartupNotification = false,
+                nativePushCapabilityResolver = { NativePushCapability.Available },
             )
         fixture = owner
         runBlocking { owner.bootstrap() }

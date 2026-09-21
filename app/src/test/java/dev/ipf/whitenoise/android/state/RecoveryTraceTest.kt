@@ -77,7 +77,7 @@ class RecoveryTraceTest {
         ).forEach { trigger -> assertTrue("Missing $trigger", trigger in appState) }
         assertTrue(
             Regex(
-                """private fun launchAccountCatchUp\(\s*mustStartAfter: Long\?,\s*trigger: PerformanceTrigger,\s*\)""",
+                """private fun launchAccountCatchUp\(\s*mustStartAfter: Long\?,\s*trigger: PerformanceTrigger,\s*publishReadiness: Boolean = true,\s*\)""",
             ).containsMatchIn(appState),
         )
         assertTrue("actual native work owns the catch-up slice", "RecoveryTrace.catchUp(trigger)" in appState)
