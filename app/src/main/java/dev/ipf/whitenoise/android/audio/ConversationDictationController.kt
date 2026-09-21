@@ -520,6 +520,7 @@ internal class ConversationDictationController internal constructor(
     private var generationHasSpeech = false
     private var consecutiveNoSpeechRestarts = 0
     private var retainedCallerAudioRetries = 0
+    private var retainedCallerAudioCapacityRetries = 0
     private var rejectedCallerAudioChunkId: Long? = null
     private var rejectedCallerAudioRetries = 0
     private var generationReadyAtElapsedMillis: Long? = null
@@ -1065,8 +1066,17 @@ internal class ConversationDictationController internal constructor(
         if (failed.reason == ConversationDictationFailure.DeliveryUnknown) return
         if (finishRequested && runCatching(platform::callerAudioHasPending).getOrDefault(false)) {
             retainedCallerAudioRetries = 0
-            conversationDictationDiagnostic("event=caller_audio_retry_requested source=failure")
-            startRecognition(failed.sessionId, failed.target)
+            retainedCallerAudioCapacityRetries = if (failed.reason.hasProviderCapacityBackoff) 1 else 0
+            val delayMillis =
+                failed.reason.retainedCallerAudioRetryDelayMillis(retainedCallerAudioCapacityRetries)
+            conversationDictationDiagnostic(
+                "event=caller_audio_retry_requested source=failure delay_ms=$delayMillis",
+            )
+            if (delayMillis == 0L) {
+                startRecognition(failed.sessionId, failed.target)
+            } else {
+                scheduleRetainedCallerAudioRetry(failed.sessionId, failed.target, delayMillis)
+            }
             return
         }
         failed.retainedTranscript?.takeIf(String::isNotBlank)?.let { transcript ->
@@ -1798,12 +1808,45 @@ internal class ConversationDictationController internal constructor(
             )
             failWithRetainedCallerAudio(sessionId, target, failure)
         } else {
+            if (failure.hasProviderCapacityBackoff) retainedCallerAudioCapacityRetries += 1
+            val delayMillis = failure.retainedCallerAudioRetryDelayMillis(retainedCallerAudioCapacityRetries)
             conversationDictationDiagnostic(
                 "event=caller_audio_retry_scheduled failure=${failure.name} " +
-                    "retry=$retainedCallerAudioRetries",
+                    "retry=$retainedCallerAudioRetries delay_ms=$delayMillis",
             )
-            startRecognition(sessionId, target)
+            if (delayMillis == 0L) {
+                startRecognition(sessionId, target)
+            } else {
+                scheduleRetainedCallerAudioRetry(sessionId, target, delayMillis)
+            }
         }
+    }
+
+    /** Lets a disconnected or still-busy provider release capacity without dropping sealed PCM. */
+    private fun scheduleRetainedCallerAudioRetry(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+        delayMillis: Long,
+    ) {
+        if (state.sessionId != sessionId || !finishRequested) {
+            conversationDictationDiagnostic("event=caller_audio_retry_skipped reason=state")
+            return
+        }
+        cancelPendingRestart()
+        state = ConversationDictationState.Starting(sessionId, target)
+        val scheduledRestartId = ++restartId
+        restartTimeoutHandle =
+            scheduleTimeout(delayMillis) {
+                restartTimeoutHandle = null
+                if (
+                    state.sessionId == sessionId &&
+                    state is ConversationDictationState.Starting &&
+                    finishRequested &&
+                    restartId == scheduledRestartId
+                ) {
+                    startRecognition(sessionId, target)
+                }
+            }
     }
 
     /** Keeps sealed PCM and durable ownership for Retry instead of reporting a partial success. */
@@ -1836,6 +1879,7 @@ internal class ConversationDictationController internal constructor(
         // Reaching this helper means the previous chunk was resolved or there was no owned chunk.
         // Keep the recovery budget local to the next pending chunk instead of leaking it across the drain.
         retainedCallerAudioRetries = 0
+        retainedCallerAudioCapacityRetries = 0
         clearRejectedCallerAudioRetries()
         if (runCatching(platform::callerAudioHasPending).getOrDefault(false)) {
             startRecognition(sessionId, target)
@@ -2086,6 +2130,7 @@ internal class ConversationDictationController internal constructor(
         accumulatedTranscript = appendConversationDictationSegment(accumulatedTranscript, normalized)
         consecutiveNoSpeechRestarts = 0
         retainedCallerAudioRetries = 0
+        retainedCallerAudioCapacityRetries = 0
         clearRejectedCallerAudioRetries()
         silenceDeadlineElapsedMillis = null
     }
@@ -2666,6 +2711,7 @@ internal class ConversationDictationController internal constructor(
         generationHasSpeech = false
         consecutiveNoSpeechRestarts = 0
         retainedCallerAudioRetries = 0
+        retainedCallerAudioCapacityRetries = 0
         clearRejectedCallerAudioRetries()
         generationReadyAtElapsedMillis = null
         providerDisconnectRetries = 0
@@ -2681,6 +2727,21 @@ internal class ConversationDictationController internal constructor(
                 this == ConversationDictationFailure.Network ||
                 this == ConversationDictationFailure.RecognizerBusy ||
                 this == ConversationDictationFailure.Unknown
+
+    private val ConversationDictationFailure.hasProviderCapacityBackoff: Boolean
+        get() =
+            this == ConversationDictationFailure.ProviderDisconnected ||
+                this == ConversationDictationFailure.RecognizerBusy
+
+    /** Uses the provider-disconnect backoff for failures that otherwise form a capacity hot loop. */
+    private fun ConversationDictationFailure.retainedCallerAudioRetryDelayMillis(attempt: Int): Long =
+        if (hasProviderCapacityBackoff) {
+            PROVIDER_DISCONNECT_RETRY_DELAYS_MILLIS[
+                (attempt - 1).coerceIn(0, PROVIDER_DISCONNECT_RETRY_DELAYS_MILLIS.lastIndex),
+            ]
+        } else {
+            0L
+        }
 
     private companion object {
         const val PREFERENCES_NAME = CONVERSATION_DICTATION_PREFERENCES_NAME
