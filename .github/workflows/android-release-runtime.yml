@@ -123,6 +123,7 @@ jobs:
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
           api-level: 36
+          cores: 4
           target: google_apis
           arch: x86_64
           force-avd-creation: false
@@ -203,6 +204,7 @@ jobs:
       - name: Build optimized staging APKs
         run: >-
           ./gradlew :app:assembleStagingZapstoreRelease
+          -Pandroid.injected.build.abi=arm64-v8a,x86_64
           -Pandroid.injected.testOnly=false
           ${{ github.event_name == 'pull_request' && '-x :app:lintVitalStagingZapstoreRelease' || '' }}
           --build-cache --no-daemon --stacktrace
@@ -321,6 +323,7 @@ jobs:
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
           api-level: '37.0'
+          cores: 4
           target: google_apis_ps16k
           arch: x86_64
           # Keep this to a profile shipped by both the runner image's bundled

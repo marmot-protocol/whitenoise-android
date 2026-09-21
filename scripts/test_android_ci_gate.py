@@ -118,17 +118,16 @@ class AndroidCiGateTest(unittest.TestCase):
 
     def test_static_analysis_isolated_by_flavor_without_duplicating_singletons(self):
         """Both lint variants run concurrently while ktlint and detekt run once."""
-        self.assertIn("name: ktlint, detekt, and Android lint (${{ matrix.flavor }})", self.static_analysis)
+        self.assertIn("name: Android lint (${{ matrix.flavor }})", self.static_analysis)
         self.assertIn('      fail-fast: false\n', self.static_analysis)
         self.assertIn('        flavor: [Zapstore, Play]\n', self.static_analysis)
-        ktlint = self.named_step(self.static_analysis, 'ktlint')
-        detekt = self.named_step(self.static_analysis, 'detekt')
+        style = self.named_step(self.build_contracts, 'ktlint and detekt')
         lint = self.named_step(self.static_analysis, 'Android lint')
-        self.assertIn("        if: matrix.flavor == 'Play'\n", ktlint)
-        self.assertIn("        if: matrix.flavor == 'Play'\n", detekt)
+        self.assertIn("        if: matrix.phase == 'tooling'\n", style)
         self.assertNotIn('\n        if:', lint)
-        self.assertIn(':app:ktlintCheck :benchmark:ktlintCheck', ktlint)
-        self.assertIn(':app:detekt', detekt)
+        self.assertIn(':app:ktlintCheck :benchmark:ktlintCheck :app:detekt', style)
+        self.assertNotIn(':app:ktlintCheck', self.static_analysis)
+        self.assertNotIn(':app:detekt', self.static_analysis)
         self.assertIn(':app:lintDev${{ matrix.flavor }}Debug', lint)
         self.assertNotIn(':app:lintDevZapstoreDebug :app:lintDevPlayDebug', self.static_analysis)
         self.assertIn('android-ci-reports-static-analysis-${{ matrix.flavor }}', self.static_analysis)
@@ -239,22 +238,17 @@ class AndroidCiGateTest(unittest.TestCase):
 
     def test_parallel_test_workers(self):
         """Parallelism changes execution, never the full-suite scope or caching."""
-        self.assertIn("ORG_GRADLE_PROJECT_ciTestForks: '2'", self.tests_job)
+        self.assertIn("ORG_GRADLE_PROJECT_ciTestForks: '3'", self.tests_job)
         root_build = (WORKFLOW.parents[2] / 'build.gradle.kts').read_text()
         self.assertIn('providers.gradleProperty("ciTestForks").map(String::toInt).getOrElse(1)', root_build)
         self.assertIn('outputs.doNotCacheIf("CI test assertions must execute")', root_build)
 
     def test_sequential_analysis_and_test_builds_reuse_the_gradle_daemon(self):
         """Multi-invocation jobs avoid a fresh Gradle JVM for every phase."""
-        for job_name, job in (
-            ('static-analysis', self.static_analysis),
-            ('tests', self.tests_job),
-        ):
-            with self.subTest(job=job_name):
-                invocations = self.gradle_steps(job)
-                self.assertGreaterEqual(len(invocations), 3)
-                self.assertTrue(all(' --daemon ' in step for step in invocations))
-                self.assertTrue(all(' --no-daemon ' not in step for step in invocations))
+        invocations = self.gradle_steps(self.tests_job)
+        self.assertGreaterEqual(len(invocations), 3)
+        self.assertTrue(all(' --daemon ' in step for step in invocations))
+        self.assertTrue(all(' --no-daemon ' not in step for step in invocations))
 
     def test_all_successful_jobs_pass(self):
         """A complete green matrix permits the existing required check to pass."""

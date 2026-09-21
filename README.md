@@ -74,14 +74,14 @@ frozen in `config/detekt/detekt-baseline.xml`. The workflow runs both the
 Validation runs concurrently on separate runners: tooling and packaging contracts,
 Compose compiler reports, one static-analysis job per distribution, one full unit
 and coverage job per distribution, and one curated screenshot job per distribution.
-Each static-analysis job runs its Android lint variant; the Play job also owns
+Each static-analysis job runs its Android lint variant; the tooling job owns
 the flavor-independent ktlint and detekt checks. Unit jobs run the complete suite
 once, and the Zapstore job also enforces all Kover ratchets. Screenshot jobs keep
 the established committed-baseline allowlist and run beside the full suite instead
-of extending its critical path. The Play static-analysis job and both test jobs
+of extending its critical path. Both test jobs
 reuse one runner-local Gradle daemon across sequential invocations, avoiding
-repeated JVM startup and warm-up. Unit suites use two isolated 1 GiB workers;
-local tests stay serial unless `-PciTestForks=2` is set. Coverage reports run only
+repeated JVM startup and warm-up. Unit suites use three isolated 1 GiB workers;
+local tests stay serial unless `-PciTestForks=3` is set. Coverage reports run only
 after a successful unit step, so a
 failed suite cannot trigger a second full test execution. The existing
 `Compile, test, ktlint, detekt, Android lint` check aggregates every job, including

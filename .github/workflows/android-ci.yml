@@ -182,6 +182,10 @@ jobs:
         if: matrix.phase == 'tooling'
         run: ./gradlew :app:compileDevZapstoreDebugAndroidTestKotlin :benchmark:assembleDevZapstoreBenchmarkRelease --build-cache --profile --no-daemon --stacktrace
 
+      - name: ktlint and detekt
+        if: matrix.phase == 'tooling'
+        run: ./gradlew :app:ktlintCheck :benchmark:ktlintCheck :app:detekt --build-cache --profile --no-daemon --stacktrace
+
       # Package on a separate runner so release compilation overlaps tooling checks.
       - name: Assemble app for Baseline Profile verification
         if: matrix.phase == 'baseline'
@@ -302,12 +306,11 @@ jobs:
           retention-days: 7
 
   static-analysis:
-    name: ktlint, detekt, and Android lint (${{ matrix.flavor }})
+    name: Android lint (${{ matrix.flavor }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
-      # Lint each distribution on its own runner. Play also owns the
-      # flavor-independent Kotlin style and static-analysis checks.
+      # Lint each distribution while build-contracts runs the shared style checks.
       fail-fast: false
       matrix:
         flavor: [Zapstore, Play]
@@ -346,16 +349,8 @@ jobs:
           path: ${{ runner.temp }}/marmotkit-cache
           key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
 
-      - name: ktlint
-        if: matrix.flavor == 'Play'
-        run: ./gradlew :app:ktlintCheck :benchmark:ktlintCheck --build-cache --profile --daemon --stacktrace
-
-      - name: detekt
-        if: matrix.flavor == 'Play'
-        run: ./gradlew :app:detekt --build-cache --profile --daemon --stacktrace
-
       - name: Android lint
-        run: ./gradlew :app:lintDev${{ matrix.flavor }}Debug --build-cache --profile --daemon --stacktrace
+        run: ./gradlew :app:lintDev${{ matrix.flavor }}Debug --build-cache --profile --no-daemon --stacktrace
 
       # Preserve failure diagnostics with a unique artifact name per job.
       - name: Upload reports
@@ -471,7 +466,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
-      ORG_GRADLE_PROJECT_ciTestForks: '2'
+      ORG_GRADLE_PROJECT_ciTestForks: '3'
     strategy:
       # Keep both variants' diagnostics; two isolated 1 GiB workers per runner.
       fail-fast: false
