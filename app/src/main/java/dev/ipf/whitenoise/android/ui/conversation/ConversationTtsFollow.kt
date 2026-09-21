@@ -269,7 +269,12 @@ internal class ConversationTtsFollowPolicy private constructor(
             evaluatedTarget = null
             retriedTarget = null
             explicitRevealTarget = null
-        } else if (newSentence && isFollowEnabled) {
+        } else if (newSentence) {
+            // A direct drag may inspect elsewhere during the current sentence,
+            // but the next spoken sentence resumes follow automatically. This
+            // prevents one incidental gesture from disabling follow-along for
+            // the rest of the session.
+            isFollowEnabled = true
             evaluatedTarget = null
             retriedTarget = null
             explicitRevealTarget = null
