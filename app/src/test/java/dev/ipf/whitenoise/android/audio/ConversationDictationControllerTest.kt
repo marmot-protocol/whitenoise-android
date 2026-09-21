@@ -1886,7 +1886,11 @@ class ConversationDictationControllerTest {
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         command = null
 
-        assertEquals("White Noise send message", fixture.controller.state.target?.voiceSendCommand)
+        assertEquals(
+            "White Noise send message",
+            fixture.controller.state.target
+                ?.voiceSendCommand,
+        )
         assertTrue(platform.voiceSendCommandConfigured)
     }
 
@@ -2602,10 +2606,11 @@ class ConversationDictationControllerTest {
     fun voiceCommandCancellationWindowPreventsDispatch() =
         runTest {
             var sendCalls = 0
-            val platform = FakePlatform().apply {
-                pendingCallerAudio = true
-                deferVoiceCommandFinish = true
-            }
+            val platform =
+                FakePlatform().apply {
+                    pendingCallerAudio = true
+                    deferVoiceCommandFinish = true
+                }
             val fixture =
                 fixture(
                     draft = TextFieldValue(""),
@@ -2662,10 +2667,11 @@ class ConversationDictationControllerTest {
     @Test
     fun voiceCommandBoundaryFailureRetainsTranscriptWithoutSending() {
         var sendCalls = 0
-        val platform = FakePlatform().apply {
-            pendingCallerAudio = true
-            voiceCommandBoundaryAccepted = false
-        }
+        val platform =
+            FakePlatform().apply {
+                pendingCallerAudio = true
+                voiceCommandBoundaryAccepted = false
+            }
         val fixture =
             fixture(
                 draft = TextFieldValue(""),
