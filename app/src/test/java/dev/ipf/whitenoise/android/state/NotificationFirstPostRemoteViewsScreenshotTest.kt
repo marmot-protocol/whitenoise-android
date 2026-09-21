@@ -171,9 +171,11 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
         fixture.appState.parseMarkdownOrEmpty("**parser warm-up**")
         beforeDispatch()
         fixture.releaseNotificationDispatch()
-        // Use a controlled Android clock for deterministic rendering;
-        // this fixture does not measure wall-clock or device latency.
-        fixture.awaitNotificationPosted(advanceMainClock = false)
+        // Advance Robolectric's paused clock so the production notification
+        // pacer can refill after earlier captures in this class. Rendering is
+        // still deterministic because assertAlignedHeaderClock resets the
+        // framework clock to the actual post time before capture.
+        fixture.awaitNotificationPosted()
         withTimeout(WRITE_AWAIT_TIMEOUT_MS) {
             while (writes.get() < 1) delay(1L)
         }
