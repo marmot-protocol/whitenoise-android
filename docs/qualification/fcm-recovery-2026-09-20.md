@@ -1,7 +1,8 @@
 # Android push recovery qualification — 2026-09-20
 
 Implementation source: isolated branch `fix/fcm-durable-recovery`, based on refreshed
-master `51d4733b90ff5e5d59091d4ddf2bda74a689eed9`. The original checkout and native
+master `b3bf1acc3ec681fea1459cf392656208187cc3dd`. `scope-selection.json` records this
+same final qualification base. The original checkout and native
 dependency pin are unchanged. This report covers the Android implementation and does
 not establish a fix for the reported 2026.9.17 open-chat symptom.
 
@@ -117,17 +118,17 @@ Final settled-source results:
 
 | Check | Result |
 | --- | --- |
-| Change-aware completion gate, `--visual changed` | PASS; final post-rebase run 2m 41s |
+| Change-aware completion gate, `--visual none` for the final non-visual review fixes | PASS; final post-rebase run 2m 16s |
 | Both debug variants and instrumentation compilation | PASS |
 | Formatting, static analysis, alternate-variant Android lint | PASS |
-| Final review-focused primary-variant tests | 87 passed, 0 failures/errors/skips; 9 suites |
+| Final review-focused primary-variant tests | 114 passed, 0 failures/errors/skips; 11 suites |
 | Alternate-variant focused tests | 241 recovery-focused tests plus the 21-test affected ordering class passed separately; 0 failures/errors/skips |
 | Post-rebase CI regression set | PASS; 45 tests in each debug variant, 0 failures/errors/skips |
 | Full alternate variant | PASS; 9,169 tests, 0 failures/errors, 1 skipped; 5m 41s |
 | Locale resource parity | PASS; every translated resource set matches the default key set |
 | Visual baseline verification | PASS |
-| Manual inventory | 271 active IDs, 0 retired IDs |
-| Manual-guide validator tests | 33 passed |
+| Manual inventory | 273 active IDs, 0 retired IDs |
+| Manual-guide validator | PASS |
 | Diff whitespace integrity | PASS |
 | Local touched-function documentation audit | 273/316, 86.4% |
 
@@ -221,10 +222,19 @@ Those observations apply to the recorded 2026-09-20 candidate. Device and batter
 was not repeated after the final 2026-09-21 master rebase, so it is not current-head evidence.
 
 The final post-review Dev APK was built for arm64 with SHA-256
-`151580fe69508a796e868cde588f6d30f207a202d7d5d67b62dfc049674c7bcb`. It reports package
-`dev.ipf.whitenoise.android.dev`, version `2026.9.21-dev-debug`, version code 18, and arm64-v8a.
-This exact candidate was not installed on the physical handset. No physical-device app data was
-touched during the final rebase and validation.
+`b9844f73af4e3e3eb5a5fbbe96b49f446ddb623d316c3a93f7ced15e4cb5503f`. It reports package
+`dev.ipf.whitenoise.android.dev`, version `2026.9.21-dev-debug`, version code 19, and arm64-v8a.
+This exact candidate was installed in place on Pixel `46131FDAS003CG` with `adb install -r -t`.
+The installed APK hash matches the candidate, the signing certificate and native library match
+the prior installation, the original first-install timestamp and three account records remain,
+and a cold launch resumed `MainActivity` without a fatal, migration, database, or startup error
+in the privacy-filtered log check. No app was uninstalled and no app data was cleared.
+
+A fresh private pre-install archive is retained at
+`/Users/mubarak/Workspace/marmot-protocol/pixel-fcm-recovery-20260921.X7NSnz`. The data archive
+SHA-256 is `57b346e10e80a2164dd20ece8e59c0dc866e20c60acbd62142116a7d234484cb`;
+the preserved pre-install APK SHA-256 is
+`b40bf86cb4638968c7979408c83e1104f1e803b36b18cd69822ccabb54b26488`.
 
 ## Unperformed and deferred checks
 
@@ -244,7 +254,7 @@ touched during the final rebase and validation.
 ## Source and artifacts
 
 The source/test patch relative to the base revision is SHA-256
-`3ffa5b2207d2cfc6cf7b2d154ccff4ff212d47f40dd914e552a2374f6311a1ad`.
+`7a7338dd95767c16882970c75a0574427cfd120b5ef8dfe8af0e230753036281`.
 This hashes `git diff origin/master --binary -- app/src`. The native dependency remains unchanged.
 
 Final qualification APK hashes:

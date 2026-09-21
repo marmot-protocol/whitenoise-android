@@ -133,6 +133,8 @@ import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundServ
 import dev.ipf.whitenoise.android.notifications.PUSH_WAKE_MAX_ATTEMPTS
 import dev.ipf.whitenoise.android.notifications.PushServerConfig
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
+import dev.ipf.whitenoise.android.notifications.PushWakeAdmission
+import dev.ipf.whitenoise.android.notifications.PushWakeAttemptBudget
 import dev.ipf.whitenoise.android.notifications.PushWakeAttemptClaim
 import dev.ipf.whitenoise.android.notifications.PushWakeDiagnostics
 import dev.ipf.whitenoise.android.notifications.PushWakeEvent
@@ -1039,14 +1041,6 @@ private data class AccountUnreadFoldResult(
     val value: AccountUnreadValue,
 )
 
-private sealed interface PushWakeAdmission {
-    data object Rejected : PushWakeAdmission
-
-    data class Admitted(
-        val claim: PushWakeAttemptClaim?,
-    ) : PushWakeAdmission
-}
-
 class WhiteNoiseAppState private constructor(
     context: Context,
     val draftStore: DraftStore,
@@ -1778,6 +1772,14 @@ class WhiteNoiseAppState private constructor(
     val ttsHasUsableEngine: Boolean
         get() = ttsResolution?.hasUsableEngine == true
     private val pushTokenStore = PushTokenStore.create(appContext)
+
+    private fun pushWakeAttemptBudget() =
+        PushWakeAttemptBudget(
+            store = pushTokenStore,
+            storageDispatcher = pushWakeStorageDispatcher,
+            nowMs = pushWakeNowMs,
+        )
+
     private val amberSigner = AmberSignerController(appContext)
 
     // Per-account (platform, token, server-pubkey, relay-hint) fingerprint
@@ -3879,38 +3881,18 @@ class WhiteNoiseAppState private constructor(
         if (!isCatchUpKeyCurrent(key)) {
             false
         } else {
-            when (val admission = reservePushWakeAttempt()) {
+            when (val admission = pushWakeAttemptBudget().reserve()) {
                 PushWakeAdmission.Rejected -> false
                 is PushWakeAdmission.Admitted -> {
                     if (isCatchUpKeyCurrent(key)) {
                         performAdmittedAccountCatchUp(key, trigger, admission.claim)
                     } else {
-                        admission.claim?.let { reserved -> releasePushWakeAttempt(reserved) }
+                        admission.claim?.let { reserved -> pushWakeAttemptBudget().release(reserved) }
                         false
                     }
                 }
             }
         }
-
-    /** Reads and reserves the durable budget together on storage IO. */
-    private suspend fun reservePushWakeAttempt(): PushWakeAdmission =
-        withContext(pushWakeStorageDispatcher) {
-            if (!pushTokenStore.pushWakeCatchUpPending()) {
-                PushWakeAdmission.Admitted(claim = null)
-            } else {
-                val claim = pushTokenStore.claimPushWakeAttempt(pushWakeNowMs())
-                claim?.let(PushWakeAdmission::Admitted) ?: PushWakeAdmission.Rejected
-            }
-        }
-
-    /** Restores a reservation when a lifecycle fence changes while durable IO is suspended. */
-    private suspend fun releasePushWakeAttempt(claim: PushWakeAttemptClaim) {
-        withContext(pushWakeStorageDispatcher) {
-            if (!pushTokenStore.releasePushWakeAttempt(claim)) {
-                PushWakeDiagnostics.event(PushWakeEvent.PersistenceFailed)
-            }
-        }
-    }
 
     /** Runs native catch-up only after admission and settles the same durable reservation. */
     private suspend fun performAdmittedAccountCatchUp(
@@ -3921,18 +3903,7 @@ class WhiteNoiseAppState private constructor(
         val nativeSucceeded = instrumentedCatchUpAccounts(trigger)
         var settlementSucceeded = nativeSucceeded && isCatchUpKeyCurrent(key)
         if (claim != null) {
-            settlementSucceeded =
-                withContext(pushWakeStorageDispatcher) {
-                    val currentSuccess = nativeSucceeded && isCatchUpKeyCurrent(key)
-                    val persisted =
-                        if (currentSuccess) {
-                            pushTokenStore.completePushWakeAttempt()
-                        } else {
-                            pushTokenStore.deferPushWakeRetry(pushWakeNowMs())
-                        }
-                    if (!persisted) PushWakeDiagnostics.event(PushWakeEvent.PersistenceFailed)
-                    currentSuccess && persisted
-                }
+            settlementSucceeded = pushWakeAttemptBudget().settle(nativeSucceeded) { isCatchUpKeyCurrent(key) }
         }
         val succeeded = settlementSucceeded && isCatchUpKeyCurrent(key)
         if (claim != null) {
@@ -8596,26 +8567,30 @@ class WhiteNoiseAppState private constructor(
         fallbackOwner: NativePushFallbackOwner,
         nativeDisableCommitted: AtomicBoolean,
     ): Boolean {
-        for (account in modeOwner.accountRefs) {
-            if (!ownsNotificationDeliveryMode(modeOwner) || !nativePushFallback.isReady(fallbackOwner)) return false
-            val cleanupQueued =
-                withContext(Dispatchers.IO) {
-                    nativePushFallbackPlatform.recordPendingRegistrationClear(account)
+        return nativePushSyncMutex.withLock {
+            for (account in modeOwner.accountRefs) {
+                if (!ownsNotificationDeliveryMode(modeOwner) || !nativePushFallback.isReady(fallbackOwner)) {
+                    return@withLock false
                 }
-            if (!cleanupQueued || !ownsNotificationDeliveryMode(modeOwner)) return false
-            perAccountSyncedFingerprints.remove(account)
-            val settings =
-                withContext(Dispatchers.IO) {
-                    modeOwner.runtime.marmot.setNativePushEnabled(account, false).also { updated ->
-                        if (!updated.nativePushEnabled) nativeDisableCommitted.set(true)
+                val cleanupQueued =
+                    withContext(Dispatchers.IO) {
+                        nativePushFallbackPlatform.recordPendingRegistrationClear(account)
                     }
-                }
-            if (!ownsNotificationDeliveryMode(modeOwner) || settings.nativePushEnabled) return false
-            if (account == modeOwner.activeAccountRef) localNotificationSettings = settings
-            clearPushRegistrationForNotificationDeliveryOwner(modeOwner, account)
-            if (!ownsNotificationDeliveryMode(modeOwner)) return false
+                if (!cleanupQueued || !ownsNotificationDeliveryMode(modeOwner)) return@withLock false
+                perAccountSyncedFingerprints.remove(account)
+                val settings =
+                    withContext(Dispatchers.IO) {
+                        modeOwner.runtime.marmot.setNativePushEnabled(account, false).also { updated ->
+                            if (!updated.nativePushEnabled) nativeDisableCommitted.set(true)
+                        }
+                    }
+                if (!ownsNotificationDeliveryMode(modeOwner) || settings.nativePushEnabled) return@withLock false
+                if (account == modeOwner.activeAccountRef) localNotificationSettings = settings
+                clearPushRegistrationForNotificationDeliveryOwnerLocked(modeOwner, account)
+                if (!ownsNotificationDeliveryMode(modeOwner)) return@withLock false
+            }
+            true
         }
-        return true
     }
 
     /**
@@ -8837,8 +8812,8 @@ class WhiteNoiseAppState private constructor(
         return true
     }
 
-    /** Clears one registration while retaining durable cleanup when ownership or sharing fails. */
-    private suspend fun clearPushRegistrationForNotificationDeliveryOwner(
+    /** Clears one registration while the caller holds [nativePushSyncMutex]. */
+    private suspend fun clearPushRegistrationForNotificationDeliveryOwnerLocked(
         owner: NotificationDeliveryModeOwner,
         account: String,
     ) {
@@ -8864,22 +8839,24 @@ class WhiteNoiseAppState private constructor(
         owner: NotificationDeliveryModeOwner,
         previous: Map<String, NotificationSettingsFfi>,
     ) {
-        if (!ownsNotificationDeliveryMode(owner)) return
-        previous.forEach { (account, settings) ->
-            if (!ownsNotificationDeliveryMode(owner)) return
-            val restored =
-                runCatchingCancellable {
-                    withContext(Dispatchers.IO) {
-                        owner.runtime.marmot.setNativePushEnabled(account, settings.nativePushEnabled)
-                    }
-                }.getOrNull() ?: return@forEach
-            if (account == owner.activeAccountRef && ownsNotificationDeliveryMode(owner)) {
-                localNotificationSettings = restored
-            }
-            if (!settings.nativePushEnabled) {
-                perAccountSyncedFingerprints.remove(account)
-                withContext(Dispatchers.IO) { pushTokenStore.recordPendingClear(account) }
-                clearPushRegistrationForNotificationDeliveryOwner(owner, account)
+        nativePushSyncMutex.withLock {
+            if (!ownsNotificationDeliveryMode(owner)) return@withLock
+            previous.forEach { (account, settings) ->
+                if (!ownsNotificationDeliveryMode(owner)) return@withLock
+                val restored =
+                    runCatchingCancellable {
+                        withContext(Dispatchers.IO) {
+                            owner.runtime.marmot.setNativePushEnabled(account, settings.nativePushEnabled)
+                        }
+                    }.getOrNull() ?: return@forEach
+                if (account == owner.activeAccountRef && ownsNotificationDeliveryMode(owner)) {
+                    localNotificationSettings = restored
+                }
+                if (!settings.nativePushEnabled) {
+                    perAccountSyncedFingerprints.remove(account)
+                    withContext(Dispatchers.IO) { pushTokenStore.recordPendingClear(account) }
+                    clearPushRegistrationForNotificationDeliveryOwnerLocked(owner, account)
+                }
             }
         }
     }
@@ -9017,7 +8994,14 @@ class WhiteNoiseAppState private constructor(
      */
     fun onPushTokenRotated(token: String) {
         pushTokenStore.setToken(token)
-        notificationScope.launch { syncNativePushRegistrationIfEnabled() }
+        notificationScope.launch {
+            withContext(pushWakeStorageDispatcher) {
+                pushTokenStore.recordPendingNativePushRegistrationSync()
+            }
+            notificationDeliveryModeMutex.withLock {
+                if (!notificationDeliveryModeBusy) syncNativePushRegistrationIfEnabled()
+            }
+        }
     }
 
     /**
