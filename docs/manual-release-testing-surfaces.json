@@ -25832,6 +25832,35 @@
         ]
       },
       {
+        "surface": "User-facing copy audit: strings rewritten for plain, non-protocol wording across onboarding, profile, groups, media, dictation and diagnostics",
+        "source": "app/src/main/res/values/strings.xml",
+        "anchor": "name=\"dictation_send_safety_note\"",
+        "test_ids": [
+          "ONB-003",
+          "ONB-008",
+          "ONB-024",
+          "FLD-002",
+          "SET-009",
+          "ACC-007",
+          "ACC-013",
+          "ACC-014",
+          "PRO-001",
+          "GRP-009",
+          "GRP-017",
+          "GRP-021",
+          "MED-005",
+          "MED-006",
+          "DIC-001",
+          "DIC-002",
+          "SET-016",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
         "surface": "The crop rectangle moves when dragged inside it and slides along the image edge",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/media/editor/PhotoEditRecipe.kt",
         "anchor": "fun translated(",

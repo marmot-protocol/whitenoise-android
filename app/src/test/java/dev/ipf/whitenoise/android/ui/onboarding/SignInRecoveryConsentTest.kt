@@ -99,8 +99,8 @@ class SignInRecoveryConsentTest {
         composeRule.onNodeWithText(string(R.string.sign_in_recovery_title)).assertExists()
         composeRule.onNodeWithText(string(R.string.sign_in_recovery_message)).assertExists()
         assertTrue(
-            "the prompt must name the orphaned-KeyPackage risk",
-            string(R.string.sign_in_recovery_message).contains("orphaned"),
+            "the prompt must name the published invitation-key risk",
+            string(R.string.sign_in_recovery_message).contains("invitation keys", ignoreCase = true),
         )
         assertEquals("the prompt alone must reach no recovery", emptyList<RecoveryCall>(), engine.recoveries)
         assertEquals(1, engine.logins.size)
