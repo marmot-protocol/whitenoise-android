@@ -549,12 +549,19 @@ class TtsControllerTest {
     @Test
     fun remainingTimeEstimateAdoptsTheRequeuedRateAtTheSentenceBoundary() {
         var requestedRate = 1f
+        var now = 0L
         val acceleratedEngine = FakeTtsSpeechEngine()
         val acceleratedController =
             TtsController(
                 audioFocus = FakeTtsAudioFocus(),
                 maxChunkLength = 4_000,
                 speechRate = { requestedRate },
+                wordTicker =
+                    TtsEstimatedWordTicker(
+                        dispatcher = StandardTestDispatcher(TestCoroutineScheduler()),
+                        clock = { now },
+                    ),
+                clock = { now },
             )
         acceleratedController.attachEngine(acceleratedEngine)
 
@@ -584,6 +591,12 @@ class TtsControllerTest {
                 audioFocus = FakeTtsAudioFocus(),
                 maxChunkLength = 4_000,
                 speechRate = { 1f },
+                wordTicker =
+                    TtsEstimatedWordTicker(
+                        dispatcher = StandardTestDispatcher(TestCoroutineScheduler()),
+                        clock = { now },
+                    ),
+                clock = { now },
             )
         controlController.attachEngine(controlEngine)
         assertTrue(controlController.speak(text, Locale.US))
