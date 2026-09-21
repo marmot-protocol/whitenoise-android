@@ -2170,6 +2170,30 @@ class ConversationDictationControllerTest {
         assertEquals("", fixture.drafts.getValue(key()).text)
     }
 
+    /** A drained tail finalizes instead of reopening a recognizer when its backoff expires. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun retainedTailBackoffRechecksPendingAudioBeforeStarting() =
+        runTest {
+            val fixture = fixture(draft = TextFieldValue(""), targetValidationScope = this)
+            fixture.platform.pendingCallerAudio = true
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.platform.listener.onResult("recognized body")
+            fixture.scheduler.runDelay(250L)
+            fixture.controller.paste()
+            fixture.platform.listener.onError(ConversationDictationFailure.ProviderDisconnected)
+            assertEquals(2, fixture.platform.sessions.size)
+
+            fixture.platform.pendingCallerAudio = false
+            fixture.scheduler.advanceBy(500L)
+            advanceUntilIdle()
+
+            assertEquals(2, fixture.platform.sessions.size)
+            assertEquals("recognized body", fixture.drafts.getValue(key()).text)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+            assertFalse(fixture.controller.hasDurableSession)
+        }
+
     /** Retry exhaustion never sends partial text and a later retry sends the complete transcript. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test

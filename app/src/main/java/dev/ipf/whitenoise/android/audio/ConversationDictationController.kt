@@ -1808,7 +1808,11 @@ internal class ConversationDictationController internal constructor(
             )
             failWithRetainedCallerAudio(sessionId, target, failure)
         } else {
-            if (failure.hasProviderCapacityBackoff) retainedCallerAudioCapacityRetries += 1
+            if (failure.hasProviderCapacityBackoff) {
+                retainedCallerAudioCapacityRetries += 1
+            } else {
+                retainedCallerAudioCapacityRetries = 0
+            }
             val delayMillis = failure.retainedCallerAudioRetryDelayMillis(retainedCallerAudioCapacityRetries)
             conversationDictationDiagnostic(
                 "event=caller_audio_retry_scheduled failure=${failure.name} " +
@@ -1844,7 +1848,11 @@ internal class ConversationDictationController internal constructor(
                     finishRequested &&
                     restartId == scheduledRestartId
                 ) {
-                    startRecognition(sessionId, target)
+                    if (runCatching(platform::callerAudioHasPending).getOrDefault(false)) {
+                        startRecognition(sessionId, target)
+                    } else {
+                        finalizeAccumulatedTranscript(sessionId, target)
+                    }
                 }
             }
     }
