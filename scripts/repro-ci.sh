@@ -5,11 +5,10 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/repro-verify.sh"
 
 repro_ci_build() {
-  local ref="$1" work_dir="$2" evidence_dir="$3"
-  local commit_sha tree gradle_home configured jvm_report init_script apk
+  local ref="$1" work_dir="$2" gradle_home="$3" evidence_dir="$4"
+  local commit_sha tree configured jvm_report init_script apk
   commit_sha="$(git -C "$REPO_ROOT" rev-parse --verify "$ref^{commit}")"
   tree="$work_dir/tree"
-  gradle_home="$work_dir/gradle-user-home"
   configured="$work_dir/configured-jvm.properties"
   jvm_report="$work_dir/build-jvm.properties"
   init_script="$work_dir/repro-jvm-report.init.gradle"
@@ -49,8 +48,8 @@ repro_ci_compare() {
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   case "${1:-}" in
-    build) shift; [[ $# == 3 ]]; repro_ci_build "$@" ;;
+    build) shift; [[ $# == 4 ]]; repro_ci_build "$@" ;;
     compare) shift; [[ $# == 4 ]]; repro_ci_compare "$@" ;;
-    *) echo 'Usage: repro-ci.sh build REF WORK_DIR EVIDENCE_DIR | compare SHA FIRST SECOND EVIDENCE_DIR' >&2; exit 2 ;;
+    *) echo 'Usage: repro-ci.sh build REF WORK_DIR GRADLE_HOME EVIDENCE_DIR | compare SHA FIRST SECOND EVIDENCE_DIR' >&2; exit 2 ;;
   esac
 fi

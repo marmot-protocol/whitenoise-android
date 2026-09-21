@@ -16,6 +16,7 @@ reproducibility and what remains out of scope.
   Maven dependencies, the Gradle wrapper distribution, and pinned MarmotKit inputs
   from earlier runs. Task outputs, transforms, and configuration caches are never
   restored; both builds explicitly disable Gradle build/configuration caching.
+  Both runners restore the same input cache; only the first runner saves it.
 - No `local.properties`, no `app/google-services.json`, and no release signing
   environment variables (defaults / empty runtime config only).
 - The exact MarmotKit Android archive is pinned by immutable URL, source SHA,
