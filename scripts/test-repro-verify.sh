@@ -134,6 +134,7 @@ grep -Fxq ':app:assembleProductionZapstoreRelease' "$fake_tree/captured-args" ||
 }
 grep -Fxq -- '--no-build-cache' "$fake_tree/captured-args"
 grep -Fxq -- '--no-configuration-cache' "$fake_tree/captured-args"
+grep -Fxq ':app:lintVitalProductionZapstoreRelease' "$fake_tree/captured-args"
 grep -Fxq -- "--init-script" "$fake_tree/captured-args" || {
   echo 'error: verifier did not pass a JVM report init script' >&2
   exit 1

@@ -263,6 +263,24 @@ class AndroidCiGateTest(unittest.TestCase):
         for job in self.dependencies:
             self.assertIn(f'{job}: success', result.stdout)
 
+    def test_release_lint_remains_required(self):
+        """Hoisting lint out of APK builds must preserve both release checks."""
+        workflow = WORKFLOW.with_name('android-repro-verify.yml').read_text()
+        self.assertIn('variant: [Production, Staging]', workflow)
+        self.assertIn(':app:lintVital${{ matrix.variant }}ZapstoreRelease', workflow)
+        gate = self.job_block(workflow, 'verify')
+        self.assertIn('needs: [build, lint]', gate)
+        self.assertIn('if: always()', gate)
+        script = re.search(r'^        run: (test .*success)$', gate, re.MULTILINE).group(1)
+        for build in ('success', 'failure', 'cancelled', 'skipped'):
+            for lint in ('success', 'failure', 'cancelled', 'skipped'):
+                result = subprocess.run(
+                    ['bash', '-c', script],
+                    env={**os.environ, 'BUILD_RESULT': build, 'LINT_RESULT': lint},
+                    check=False,
+                )
+                self.assertEqual(result.returncode == 0, build == lint == 'success')
+
     def test_any_non_successful_job_blocks(self):
         """Failure, cancellation, and skipped matrix jobs all block the gate."""
         for job in self.dependencies:

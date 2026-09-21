@@ -392,6 +392,7 @@ repro_verify_build() {
     "${clean_env[@]}" ./gradlew :app:assembleProductionZapstoreRelease \
       -Pandroid.injected.build.abi=arm64-v8a \
       -Pandroid.injected.testOnly=false \
+      -x :app:lintVitalProductionZapstoreRelease \
       --init-script "$init_script" \
       -Drepro.verify.jvm.report="$jvm_report" \
       --no-build-cache --no-configuration-cache --no-daemon -q

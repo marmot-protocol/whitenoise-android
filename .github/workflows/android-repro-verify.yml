@@ -21,6 +21,50 @@ permissions:
   contents: read
 
 jobs:
+  lint:
+    name: Release lint (${{ matrix.variant }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [Production, Staging]
+    env:
+      WHITENOISE_ALLOW_UNSIGNED_RELEASE: 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+
+      # Run each release assertion once, without competing with R8 or emulator work.
+      - name: Check release lint
+        run: >-
+          ./gradlew :app:lintVital${{ matrix.variant }}ZapstoreRelease
+          -Pandroid.injected.testOnly=false --build-cache --no-daemon --stacktrace
+
+      - name: Upload lint reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-lint-${{ matrix.variant }}
+          path: |
+            app/build/reports/lint-results-*
+            app/build/intermediates/lint_vital_intermediate_text_report/
+          if-no-files-found: ignore
+          retention-days: 7
+
   build:
     name: Independent unsigned build (${{ matrix.tree }})
     runs-on: ubuntu-24.04
@@ -83,15 +127,16 @@ jobs:
 
   verify:
     name: Verify unsigned production APK reproducibility
-    needs: build
+    needs: [build, lint]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - name: Require both independent builds
+      - name: Require independent builds and release lint
         env:
           BUILD_RESULT: ${{ needs.build.result }}
-        run: test "$BUILD_RESULT" = success
+          LINT_RESULT: ${{ needs.lint.result }}
+        run: test "$BUILD_RESULT" = success && test "$LINT_RESULT" = success
 
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
