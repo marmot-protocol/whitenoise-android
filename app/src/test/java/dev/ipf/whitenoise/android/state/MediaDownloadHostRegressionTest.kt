@@ -243,7 +243,9 @@ class MediaDownloadHostRegressionTest {
                 MarmotKitException.InvalidMediaReference("synthetic integrity failure"),
             ).forEachIndexed { index, failure ->
                 val failed = async { runCatching { download(index) } }
-                fixture.entered.receive().fail(failure)
+                val call = fixture.entered.receive()
+                call.observed.await()
+                call.fail(failure)
                 assertEquals(failure, failed.await().exceptionOrNull())
                 runCurrent()
                 assertEquals(index + 1, fixture.calls.size)
@@ -277,7 +279,9 @@ class MediaDownloadHostRegressionTest {
             fixture.onDownload = {}
             val externalFailure = MarmotKitException.InvalidMediaReference("external synthetic failure")
             val externallyCompleted = async { runCatching { download(21) } }
-            fixture.entered.receive().fail(externalFailure)
+            val externalCall = fixture.entered.receive()
+            externalCall.observed.await()
+            externalCall.fail(externalFailure)
             assertSame(externalFailure, externallyCompleted.await().exceptionOrNull())
             assertEquals(0, fixture.active.get())
         }
