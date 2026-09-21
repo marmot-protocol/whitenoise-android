@@ -86,6 +86,7 @@ class MarkdownAutolinkIntegrationTest {
         text: String,
         document: dev.ipf.marmotkit.MarkdownDocumentFfi,
     ) = TimelineMessageRecordFfi(
+        clientToken = null,
         messageIdHex = "confirmed",
         sourceMessageIdHex = "source",
         sourceEpoch = null,

@@ -291,6 +291,7 @@ class AgentStreamPreviewTest {
             timelineOrder = timelineOrder,
         )
 
+    /** Builds one streamed timeline projection without borrowing production storage or transport. */
     private fun timelineRecord(
         id: String,
         recordedAt: ULong,
@@ -298,6 +299,7 @@ class AgentStreamPreviewTest {
         tags: List<MessageTagFfi> = emptyList(),
     ): TimelineMessageRecordFfi =
         TimelineMessageRecordFfi(
+            clientToken = null,
             messageIdHex = id,
             sourceMessageIdHex = null,
             direction = "received",

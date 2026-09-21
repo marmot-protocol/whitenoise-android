@@ -147,8 +147,10 @@ class GroupSystemRetentionControllerTest {
             hasMoreAfter = false,
         )
 
+    /** Builds a retained group-system record with an explicit non-message preview surface. */
     private fun groupSystemRecord() =
         TimelineMessageRecordFfi(
+            clientToken = null,
             messageIdHex = SYSTEM_MESSAGE_ID,
             sourceMessageIdHex = SOURCE_MESSAGE_ID,
             direction = "received",

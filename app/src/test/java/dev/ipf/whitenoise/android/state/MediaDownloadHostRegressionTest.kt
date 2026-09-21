@@ -1,7 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.MarmotKitException
-import dev.ipf.whitenoise.android.media.AttachmentPlaintext
+import dev.ipf.whitenoise.android.media.toByteArray
 import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.qualifiedRequest
 import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.reference
 import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.request
@@ -62,13 +62,8 @@ class MediaDownloadHostRegressionTest {
             assertTrue(fixture.entered.tryReceive().isFailure)
             val tappedIndex = (0 until 16).last { index -> first.none { it.reference == reference(index) } }
             val tapped =
-                fixture.state.memoizedDownload(
-                    request(tappedIndex).cacheKey(),
-                    request(tappedIndex),
-                    AttachmentDownloadPriority.Interactive,
-                ) {
-                    error("The automatic owner must already be registered")
-                }
+                async { download(tappedIndex, AttachmentDownloadPriority.Interactive) }
+            runCurrent()
             first.first().succeed(bytes(first.first().reference.fileName))
             val next = fixture.entered.receive()
             assertEquals(reference(tappedIndex), next.reference)
@@ -133,14 +128,14 @@ class MediaDownloadHostRegressionTest {
             val expected = bytes(reference(0).fileName)
             call.succeed(expected)
             assertArrayEquals(expected, returning.await())
-            sourceConsumer.await().use { assertArrayEquals(expected, (it as AttachmentPlaintext.Bytes).bytes) }
+            sourceConsumer.await().use { assertArrayEquals(expected, it.toByteArray()) }
             assertArrayEquals(expected, download(0))
             assertEquals(1, fixture.calls.size)
         }
 
-    /** An explicit tap joins an automatic legacy owner before native-path selection can duplicate it. */
+    /** A deliberate tap upgrades native demand while retaining the one shared acquisition owner. */
     @Test
-    fun interactiveTapJoinsSuspendedAutomaticLegacyAcquisition() =
+    fun interactiveTapJoinsSuspendedAutomaticNativeAcquisition() =
         runTest(dispatcher) {
             val request = qualifiedRequest()
             val automatic =
@@ -152,7 +147,7 @@ class MediaDownloadHostRegressionTest {
                         persistInteractiveIntent = false,
                     )
                 }
-            val legacyCall = fixture.entered.receive()
+            val nativeCall = fixture.entered.receive()
 
             val interactive =
                 async {
@@ -163,19 +158,56 @@ class MediaDownloadHostRegressionTest {
                         persistInteractiveIntent = false,
                     )
                 }
-            runCurrent()
+            fixture.awaitExplicitDemands(1)
             assertFalse(interactive.isCompleted)
 
             val expected = bytes(reference(0).fileName)
-            legacyCall.succeed(expected)
+            nativeCall.succeed(expected)
+            assertArrayEquals(expected, automatic.await())
+            assertArrayEquals(expected, interactive.await())
+            assertEquals(1, fixture.calls.size)
+            assertEquals(1, fixture.automaticDemands.get())
+            assertEquals(1, fixture.explicitDemands.get())
+        }
+
+    /** Failed priority escalation still joins the healthy automatic owner instead of failing the tap. */
+    @Test
+    fun failedPromotionDoesNotOverrideSharedAutomaticAcquisition() =
+        runTest(dispatcher) {
+            val request = qualifiedRequest()
+            val automatic =
+                async {
+                    fixture.state.downloadAttachmentPlaintext(
+                        request,
+                        reference(0),
+                        AttachmentDownloadPriority.Automatic,
+                        persistInteractiveIntent = false,
+                    )
+                }
+            val nativeCall = fixture.entered.receive()
+            fixture.explicitDemandFailure = java.io.IOException("synthetic promotion failure")
+            val interactive =
+                async {
+                    fixture.state.downloadAttachmentPlaintext(
+                        request,
+                        reference(0),
+                        AttachmentDownloadPriority.Interactive,
+                        persistInteractiveIntent = false,
+                    )
+                }
+            fixture.awaitExplicitDemands(1)
+
+            val expected = bytes(reference(0).fileName)
+            nativeCall.succeed(expected)
+
             assertArrayEquals(expected, automatic.await())
             assertArrayEquals(expected, interactive.await())
             assertEquals(1, fixture.calls.size)
         }
 
-    /** An explicit stop reaches both shared Android owners instead of caching after cancellation. */
+    /** An explicit stop cancels the Android waiter and separately persists native cancellation. */
     @Test
-    fun explicitCancellationStopsSharedLegacyAcquisition() =
+    fun explicitCancellationStopsSharedNativeAcquisition() =
         runTest(dispatcher) {
             val request = request(0)
             val download = async { runCatching { download(0, AttachmentDownloadPriority.Interactive) } }
@@ -185,6 +217,7 @@ class MediaDownloadHostRegressionTest {
             runCurrent()
 
             assertTrue(download.await().exceptionOrNull() is kotlinx.coroutines.CancellationException)
+            fixture.cancellationObserved.await()
             assertEquals(0, fixture.active.get())
             assertNull(fixture.state.cachedMediaPlaintext(request.cacheKey()))
             assertNull(withContext(Dispatchers.IO) { fixture.disk.get(request.cacheKey()) })
@@ -205,6 +238,9 @@ class MediaDownloadHostRegressionTest {
                 assertEquals(index + 1, fixture.calls.size)
                 assertNull(fixture.state.cachedMediaPlaintext(request(index).cacheKey()))
                 assertNull(withContext(Dispatchers.IO) { fixture.disk.get(request(index).cacheKey()) })
+                val repeated = runCatching { download(index) }.exceptionOrNull()
+                assertTrue(repeated is NativeAttachmentTerminalException)
+                assertEquals(index + 1, fixture.calls.size)
             }
             val retry = async { download(0, AttachmentDownloadPriority.Interactive) }
             val expected = bytes(reference(0).fileName)
@@ -213,7 +249,7 @@ class MediaDownloadHostRegressionTest {
             assertEquals(3, fixture.calls.size)
         }
 
-    /** Immediate and externally completed failures both retain the precise throwable across the proxy boundary. */
+    /** Immediate terminal snapshots and later observation errors remain distinct native outcomes. */
     @Test
     fun immediateAndExternallyCompletedNativeFailuresUseContinuationDelivery() =
         runTest(dispatcher) {
@@ -222,7 +258,10 @@ class MediaDownloadHostRegressionTest {
             val immediate = async { runCatching { download(20) } }
             val immediateCall = fixture.entered.receive()
             assertEquals(reference(20), immediateCall.reference)
-            assertSame(immediateFailure, immediate.await().exceptionOrNull())
+            assertEquals(
+                dev.ipf.marmotkit.AttachmentTransferStateFfi.FAILED,
+                (immediate.await().exceptionOrNull() as NativeAttachmentTerminalException).state,
+            )
 
             fixture.onDownload = {}
             val externalFailure = MarmotKitException.InvalidMediaReference("external synthetic failure")

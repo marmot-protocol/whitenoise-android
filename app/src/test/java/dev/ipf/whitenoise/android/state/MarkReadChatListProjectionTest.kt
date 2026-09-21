@@ -214,6 +214,8 @@ class MarkReadChatListProjectionTest {
         avatar = null,
         lastMessage =
             ChatListMessagePreviewFfi(
+                retentionSeconds = null,
+                retentionExpiresAt = null,
                 messageIdHex = lastMessageId,
                 sender = "sender",
                 senderDisplayName = "Sender",

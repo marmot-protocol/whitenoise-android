@@ -675,12 +675,14 @@ class GroupSystemEventsTest {
         receivedAt = 1uL,
     )
 
+    /** Wraps a group-system event in the complete timeline projection consumed by rendering. */
     private fun timelineRecord(
         plaintext: String,
         direction: String = "system",
         sourceMessageIdHex: String? = null,
         groupSystem: GroupSystemEventFfi? = null,
     ) = TimelineMessageRecordFfi(
+        clientToken = null,
         messageIdHex = "message",
         sourceMessageIdHex = sourceMessageIdHex,
         direction = direction,

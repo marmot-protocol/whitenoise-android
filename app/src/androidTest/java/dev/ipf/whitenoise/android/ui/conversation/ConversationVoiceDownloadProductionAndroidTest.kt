@@ -1161,6 +1161,7 @@ private fun instrumentedTimelineRecord(
 ): TimelineMessageRecordFfi {
     val messageId = instrumentedMessageId(index, idOffset)
     return TimelineMessageRecordFfi(
+        clientToken = null,
         messageIdHex = messageId,
         sourceMessageIdHex = messageId,
         direction = "received",

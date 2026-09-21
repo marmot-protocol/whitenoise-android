@@ -3,11 +3,18 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.AttachmentTransferStatusFfi
 import dev.ipf.whitenoise.android.functionBody
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 
 class NativeAttachmentTransfersTest {
     /** Only an explicit request with complete native identity can demand transfer. */
@@ -52,12 +59,41 @@ class NativeAttachmentTransfersTest {
         val acquisition = source.functionBody("WhiteNoiseAppState.acquireNativeAttachment")
         val explicitCancellation = appStateSource().readText().functionBody("cancelAttachmentDownload")
 
-        assertTrue(acquisition.indexOf("feed.use") < acquisition.indexOf("downloadAttachmentAgain"))
+        assertTrue(acquisition.indexOf("awaitNativeAttachment(") < acquisition.indexOf("downloadAttachmentAgain"))
+        assertTrue("owned?.close()" in source.functionBody("awaitNativeAttachment"))
         assertFalse("cancelNativeAttachment(" in acquisition)
         assertTrue("cancelNativeAttachmentBounded(request)" in explicitCancellation)
         assertTrue("withContext(NonCancellable)" in source)
         assertTrue("withTimeoutOrNull(NATIVE_ATTACHMENT_CANCEL_TIMEOUT_MILLIS)" in source)
     }
+
+    /** Cancellation after native subscribe returns still closes the newly owned feed. */
+    @Test
+    fun `cancelled subscription handoff closes native feed`() =
+        runBlocking {
+            val closed = AtomicBoolean()
+            val owner =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    val callerJob = currentCoroutineContext().job
+                    awaitNativeAttachment(
+                        open = {
+                            callerJob.cancel()
+                            object : NativeTransferFeed {
+                                override suspend fun next() = yield().let { null }
+
+                                override fun close() {
+                                    closed.set(true)
+                                }
+                            }
+                        },
+                    ) { null }
+                }
+
+            owner.join()
+
+            assertTrue(owner.isCancelled)
+            assertTrue("cancellation stranded the native transfer subscription", closed.get())
+        }
 
     /** Integrity/policy terminal states must never enter WorkManager's transient retry bucket. */
     @Test

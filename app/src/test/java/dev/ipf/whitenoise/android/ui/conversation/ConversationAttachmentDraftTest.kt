@@ -2,13 +2,38 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.whitenoise.android.media.editor.stagedPhotoAttachmentId
+import dev.ipf.whitenoise.android.state.DraftAttachmentRemovalTombstones
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConversationAttachmentDraftTest {
+    /** Removed saved documents are neither rebound nor materialized as unmatched native drafts. */
+    @Test
+    fun removalDuringRestoreExcludesNativeDocumentBeforeAndAfterShelfUpdate() {
+        val uri = "content://picker/document/removed"
+        val id = stagedDocumentAttachmentId("alice", "group", uri)
+        val native = attachment("application/pdf", id)
+        val fence = DraftDocumentRemovalFence()
+        fence.recordRemoval(uri)
+        for (selected in listOf(listOf(uri), emptyList())) {
+            val restored =
+                reconcilePersistedDraftAttachments(
+                    accountRef = "alice",
+                    groupIdHex = "group",
+                    mediaSlotIds = emptyList(),
+                    documentUriStrings = selected,
+                    attachments = listOf(native),
+                    removedAttachmentIds = fence.removedAttachmentIds("alice", "group"),
+                )
+            assertTrue(restored.documentsByUriString.isEmpty())
+            assertTrue(restored.unmatched.isEmpty())
+        }
+    }
+
     /** Native staging preserves every send-relevant field and the stable shelf identity. */
     @Test
     fun pendingAttachmentRoundTripsThroughNativeDraft() {
@@ -124,19 +149,100 @@ class ConversationAttachmentDraftTest {
         assertTrue(imageDocument.isComposerDocument())
     }
 
-    /** A removal fence rejects a late prepare result until the URI is explicitly selected again. */
+    /** Same-URI reselection stays blocked until cleanup for the previous lifetime completes. */
     @Test
-    fun documentRemovalFenceRejectsLatePreparationAndAllowsReselection() {
+    fun documentRemovalFenceSerializesCleanupBeforeReselection() {
         val uri = "content://picker/document/late"
         val fence = DraftDocumentRemovalFence()
 
         fence.updateInputs(emptyList(), listOf(uri))
-        fence.recordRemoval(uri)
+        val queuedCleanup = fence.recordRemoval(uri)
 
         assertFalse(fence.canPublish(uri, listOf(uri)))
         fence.updateInputs(listOf(uri), emptyList())
         fence.updateInputs(emptyList(), listOf(uri))
+        assertFalse(fence.canPublish(uri, listOf(uri)))
+
+        fence.completeRemoval(queuedCleanup)
+
         assertTrue(fence.canPublish(uri, listOf(uri)))
+    }
+
+    /** A missing account cannot create a cleanup ticket that no owner can ever complete. */
+    @Test
+    fun documentRemovalRequiresAnAccountOwner() {
+        val uri = "content://picker/document/no-owner"
+        val removals = DraftDocumentRemovalFence()
+        val owners = DraftDocumentOwnerFence()
+        removals.updateInputs(emptyList(), listOf(uri))
+
+        assertNull(owners.recordRemoval(uri, removals))
+        assertTrue(removals.canPublish(uri, listOf(uri)))
+    }
+
+    /** Returning to the same account does not revive work queued by its previous lifetime. */
+    @Test
+    fun documentOwnerGenerationRejectsQueuedWorkAcrossAccountChanges() {
+        val uri = "content://picker/document/account-switch"
+        val removals = DraftDocumentRemovalFence()
+        val owners = DraftDocumentOwnerFence()
+        owners.update("alice")
+        removals.updateInputs(emptyList(), listOf(uri))
+        val oldRemoval = requireNotNull(owners.recordRemoval(uri, removals))
+
+        assertTrue(owners.isCurrent(oldRemoval.owner))
+        owners.update("bob")
+        assertFalse(owners.isCurrent(oldRemoval.owner))
+        owners.update("alice")
+        assertFalse(owners.isCurrent(oldRemoval.owner))
+    }
+
+    /** A replacement composer excludes pending cleanup until the native removal completes. */
+    @Test
+    fun processRemovalTombstoneSurvivesComposerReplacement() {
+        val account = "alice"
+        val group = "group"
+        val uri = "content://picker/document/replaced-composer"
+        val attachment = attachment(id = stagedDocumentAttachmentId(account, group, uri), mediaType = "text/plain")
+        val tombstones = DraftAttachmentRemovalTombstones()
+        val removal = tombstones.begin(account, group, attachment.id)
+
+        val whilePending =
+            reconcilePersistedDraftAttachments(
+                account,
+                group,
+                mediaSlotIds = emptyList(),
+                documentUriStrings = listOf(uri),
+                attachments = listOf(attachment),
+                removedAttachmentIds = tombstones.attachmentIds(account, group),
+            )
+        assertTrue(whilePending.documentsByUriString.isEmpty())
+
+        tombstones.complete(removal)
+        val afterCleanup =
+            reconcilePersistedDraftAttachments(
+                account,
+                group,
+                mediaSlotIds = emptyList(),
+                documentUriStrings = listOf(uri),
+                attachments = listOf(attachment),
+                removedAttachmentIds = tombstones.attachmentIds(account, group),
+            )
+        assertEquals(attachment, afterCleanup.documentsByUriString[uri])
+    }
+
+    /** One completed cleanup cannot clear an overlapping removal for the same native attachment. */
+    @Test
+    fun processRemovalTombstoneCountsOverlappingCleanup() {
+        val tombstones = DraftAttachmentRemovalTombstones()
+        val first = tombstones.begin("alice", "group", "attachment")
+        val second = tombstones.begin("alice", "group", "attachment")
+
+        tombstones.complete(first)
+        assertEquals(setOf("attachment"), tombstones.attachmentIds("alice", "group"))
+
+        tombstones.complete(second)
+        assertTrue(tombstones.attachmentIds("alice", "group").isEmpty())
     }
 
     /** Builds a minimal native draft descriptor for classification tests. */

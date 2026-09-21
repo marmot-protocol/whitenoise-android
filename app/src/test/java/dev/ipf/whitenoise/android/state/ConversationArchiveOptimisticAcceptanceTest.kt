@@ -355,6 +355,7 @@ class ConversationArchiveOptimisticAcceptanceTest {
             viaWelcomeMessageIdHex = null,
         )
 
+    /** Returns an active row with explicit capabilities for optimistic archive assertions. */
     private fun row() =
         ChatListRowFfi(
             selfMembership = SelfMembershipFfi.MEMBER,
@@ -369,6 +370,8 @@ class ConversationArchiveOptimisticAcceptanceTest {
             avatar = null,
             lastMessage =
                 ChatListMessagePreviewFfi(
+                    retentionSeconds = null,
+                    retentionExpiresAt = null,
                     messageIdHex = "d4".repeat(32),
                     sender = ACCOUNT_ID,
                     senderDisplayName = null,

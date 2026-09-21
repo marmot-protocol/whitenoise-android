@@ -637,6 +637,7 @@ class ChatsControllerDmMemberHydrationTest {
             disbandRequest = null,
         )
 
+    /** Supplies a direct-message row whose member hydration is the only changing input. */
     private fun dmRow(
         selfMembership: SelfMembershipFfi,
         conversationKind: ChatConversationKindFfi,
@@ -653,6 +654,8 @@ class ChatsControllerDmMemberHydrationTest {
         avatar = null,
         lastMessage =
             ChatListMessagePreviewFfi(
+                retentionSeconds = null,
+                retentionExpiresAt = null,
                 messageIdHex = "msg-1",
                 sender = PEER,
                 senderDisplayName = null,

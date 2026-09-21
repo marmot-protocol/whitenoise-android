@@ -597,6 +597,7 @@ class OptimisticMessageReconciliationTest {
         sender: String = "alice",
     ): TimelineMessageRecordFfi =
         TimelineMessageRecordFfi(
+            clientToken = null,
             messageIdHex = messageIdHex,
             sourceMessageIdHex = sourceMessageIdHex,
             direction = "sent",

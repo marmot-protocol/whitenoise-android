@@ -498,6 +498,7 @@ class MessageBubbleLongPressDragTest {
             )
         val projected =
             TimelineMessageRecordFfi(
+                clientToken = null,
                 messageIdHex = record.messageIdHex,
                 sourceMessageIdHex = record.messageIdHex,
                 direction = record.direction,

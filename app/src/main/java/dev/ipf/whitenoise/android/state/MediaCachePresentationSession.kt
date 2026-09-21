@@ -38,7 +38,13 @@ internal suspend fun ConversationController.refreshAttachmentTransferState(
     attachmentTransfers.refresh(attachmentTransferKey(messageIdHex, attachmentIndex)) {
         val account = boundAccountRef ?: return@refresh false
         appState.isAttachmentCachedForPresentation(
-            AttachmentTransferRequest(account, group.groupIdHex, messageIdHex, attachmentIndex),
+            AttachmentTransferRequest(
+                account,
+                group.groupIdHex,
+                messageIdHex,
+                attachmentIndex,
+                sourceMessageIdHex = nativeAttachmentSourceId(messageIdHex),
+            ),
         )
     }
 }

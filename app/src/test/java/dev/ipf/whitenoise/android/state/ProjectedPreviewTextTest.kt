@@ -263,6 +263,8 @@ class ProjectedPreviewTextTest {
         attachmentCount: UInt = 0u,
         deliveryState: ChatListMessageDeliveryStateFfi = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
     ) = ChatListMessagePreviewFfi(
+        retentionSeconds = null,
+        retentionExpiresAt = null,
         messageIdHex = "preview-message",
         sender = "sender",
         senderDisplayName = "Sender",

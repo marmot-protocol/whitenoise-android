@@ -91,12 +91,15 @@ class ChatRowPreviewMarkdownSourceTest {
         assertNull(chatRowPreviewMarkdownSource(rowWith(lastMessage = null)))
     }
 
+    /** Creates a row with one selected preview source for Markdown precedence checks. */
     private fun rowWith(
         kind: ULong = 9uL,
         plaintext: String = "body",
         deleted: Boolean = false,
         lastMessage: ChatListMessagePreviewFfi? =
             ChatListMessagePreviewFfi(
+                retentionSeconds = null,
+                retentionExpiresAt = null,
                 messageIdHex = "message-1",
                 sender = "sender",
                 senderDisplayName = "Sender",

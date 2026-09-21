@@ -567,6 +567,7 @@ class ChatListFoldUnreadRegressionTest {
     private val idA = "d".repeat(64)
     private val idB = "e".repeat(64)
 
+    /** Creates a complete row projection for unread-fold ordering and preview assertions. */
     private fun row(
         messageId: String,
         lastMessageAt: ULong,
@@ -592,6 +593,8 @@ class ChatListFoldUnreadRegressionTest {
         lastMessage =
             if (includeLastMessage) {
                 ChatListMessagePreviewFfi(
+                    retentionSeconds = null,
+                    retentionExpiresAt = null,
                     messageIdHex = messageId,
                     sender = "sender",
                     senderDisplayName = "Sender",

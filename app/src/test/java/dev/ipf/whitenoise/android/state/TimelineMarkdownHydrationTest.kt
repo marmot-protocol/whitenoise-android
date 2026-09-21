@@ -82,6 +82,7 @@ class TimelineMarkdownHydrationTest {
         plaintext: String,
     ): TimelineMessageRecordFfi =
         TimelineMessageRecordFfi(
+            clientToken = null,
             messageIdHex = messageIdHex,
             sourceMessageIdHex = null,
             direction = "sent",

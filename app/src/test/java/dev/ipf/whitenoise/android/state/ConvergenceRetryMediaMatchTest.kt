@@ -168,6 +168,7 @@ class ConvergenceRetryMediaMatchTest {
             groupIdHex = "group",
         )
 
+    /** Creates a projected media message for exact retry-to-timeline convergence matching. */
     private fun projection(
         messageIdHex: String,
         plaintext: String,
@@ -176,6 +177,7 @@ class ConvergenceRetryMediaMatchTest {
         groupIdHex: String,
     ): TimelineMessageRecordFfi =
         TimelineMessageRecordFfi(
+            clientToken = null,
             messageIdHex = messageIdHex,
             sourceMessageIdHex = null,
             direction = "sent",

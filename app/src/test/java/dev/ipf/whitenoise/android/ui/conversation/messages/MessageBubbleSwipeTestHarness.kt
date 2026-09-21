@@ -145,6 +145,7 @@ internal fun swipeTestProjectedRecord(
             thumbhash = null,
         )
     return TimelineMessageRecordFfi(
+        clientToken = null,
         messageIdHex = SWIPE_TEST_MESSAGE_ID,
         sourceMessageIdHex = SWIPE_TEST_MESSAGE_ID,
         direction = if (mine) "sent" else "received",

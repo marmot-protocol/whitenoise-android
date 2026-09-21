@@ -1395,6 +1395,8 @@ private fun preview(
     deliveryState: ChatListMessageDeliveryStateFfi = ChatListMessageDeliveryStateFfi.PENDING,
 ): ChatListMessagePreviewFfi =
     ChatListMessagePreviewFfi(
+        retentionSeconds = null,
+        retentionExpiresAt = null,
         messageIdHex = messageId,
         sender = ACCOUNT_ID,
         senderDisplayName = null,

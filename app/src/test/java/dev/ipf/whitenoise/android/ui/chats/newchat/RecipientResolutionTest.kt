@@ -840,6 +840,8 @@ private fun dmChatRow(
 
 private fun dmLatestMessage(sender: String) =
     ChatListMessagePreviewFfi(
+        retentionSeconds = null,
+        retentionExpiresAt = null,
         messageIdHex = "msg",
         sender = sender,
         senderDisplayName = null,

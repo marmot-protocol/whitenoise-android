@@ -109,6 +109,7 @@ class ConversationInitialTimelineTest {
         assertFalse(shouldDiscardInitialTimelineSeedForFailure(published = true))
     }
 
+    /** Builds a selected-message preview for initial timeline seed acceptance decisions. */
     private fun preview(
         messageIdHex: String = MESSAGE_ID,
         sender: String = SENDER_ID,
@@ -120,6 +121,8 @@ class ConversationInitialTimelineTest {
         contentTokens: MarkdownDocumentFfi = markdown(),
         deliveryState: ChatListMessageDeliveryStateFfi = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
     ) = ChatListMessagePreviewFfi(
+        retentionSeconds = null,
+        retentionExpiresAt = null,
         messageIdHex = messageIdHex,
         sender = sender,
         senderDisplayName = "Sender",

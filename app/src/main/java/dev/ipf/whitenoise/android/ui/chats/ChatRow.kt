@@ -58,6 +58,7 @@ import dev.ipf.whitenoise.android.core.SnippetHighlight
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.messagePreviewForRetention
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
@@ -348,7 +349,10 @@ internal fun ChatRow(
             val invitation =
                 item.selectedPreview == SelectedChatPreviewFfi.Invitation ||
                     (item.selectedPreview == null && item.group.pendingConfirmation)
-            val empty = item.selectedPreview == SelectedChatPreviewFfi.Empty
+            val expired by rememberChatPreviewExpired(item.messagePreviewForRetention())
+            val empty =
+                item.selectedPreview == SelectedChatPreviewFfi.Empty ||
+                    (expired && !invitation && draft == null)
             // Tokens only ever describe the last message's body, so they're
             // ignored whenever the line shows something else (invite copy,
             // draft). When the controller hasn't parsed yet (or the parse

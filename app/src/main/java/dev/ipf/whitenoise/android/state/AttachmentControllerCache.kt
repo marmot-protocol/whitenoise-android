@@ -56,14 +56,6 @@ internal suspend fun ConversationController.downloadAttachmentSource(
         request = request,
         reference = reference,
         priority = priority,
-        onCacheMiss = {
-            requestAttachmentTransfer(
-                messageIdHex = messageIdHex,
-                attachmentIndex = attachmentIndex,
-                reference = reference,
-                priority = priority,
-            ).await()
-        },
     )
 }
 

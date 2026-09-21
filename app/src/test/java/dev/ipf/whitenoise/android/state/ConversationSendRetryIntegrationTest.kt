@@ -54,6 +54,46 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36], qualifiers = "en")
 @Suppress("LargeClass") // Send, retry, projection, preview, and durable-draft scenarios share one controller fixture.
 class ConversationSendRetryIntegrationTest {
+    /** Exact caller identity settles only its bubble even when text and timestamps are identical. */
+    @Test
+    fun callerTokenReconcilesIdenticalOptimisticMessagesWithoutHeuristics() =
+        runTest {
+            val controller =
+                ConversationController(
+                    appState = appState(),
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ -> pendingLocalSend() },
+                    clockMillis = { 20_000L },
+                )
+            controller.send("hello")
+            val first =
+                controller.timeline
+                    .single()
+                    .record.messageIdHex
+            controller.send("hello")
+            val second =
+                controller.timeline
+                    .first { it.record.messageIdHex != first }
+                    .record.messageIdHex
+            val projection = projectedMessage(20uL, null, null).copy(clientToken = second)
+            applyProjection(controller, projection)
+            assertEquals(2, controller.timeline.size)
+            assertTrue(
+                controller.timeline.any {
+                    it.record.messageIdHex == first && it.status == MessageStatus.Pending
+                },
+            )
+            assertFalse(controller.timeline.any { it.record.messageIdHex == second })
+            // An unrelated caller token with identical visible content must not consume the remaining bubble.
+            applyProjection(controller, projection.copy(messageIdHex = "ee".repeat(32), clientToken = "another-caller"))
+            assertTrue(
+                controller.timeline.any {
+                    it.record.messageIdHex == first && it.status == MessageStatus.Pending
+                },
+            )
+        }
+
     /** Hands dictation back to Idle at optimistic publication, before transport settles. */
     @Test
     fun dictationPendingCallbackPrecedesDurableAcceptance() =
@@ -1374,6 +1414,8 @@ class ConversationSendRetryIntegrationTest {
             avatar = null,
             lastMessage =
                 ChatListMessagePreviewFfi(
+                    retentionSeconds = null,
+                    retentionExpiresAt = null,
                     messageIdHex = "d4".repeat(32),
                     sender = ACCOUNT_ID,
                     senderDisplayName = null,
@@ -1420,6 +1462,7 @@ class ConversationSendRetryIntegrationTest {
         retentionExpiresAt: ULong?,
         sourceMessageIdHex: String? = "d4".repeat(32),
     ) = TimelineMessageRecordFfi(
+        clientToken = null,
         messageIdHex = CONFIRMED_MESSAGE_ID,
         sourceMessageIdHex = sourceMessageIdHex,
         direction = "sent",

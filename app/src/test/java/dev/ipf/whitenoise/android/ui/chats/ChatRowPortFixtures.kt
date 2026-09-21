@@ -62,6 +62,8 @@ internal object ChatRowPortFixtures {
                 conversationKind = ChatConversationKindFfi.GROUP,
                 lastMessage =
                     ChatListMessagePreviewFfi(
+                        retentionSeconds = null,
+                        retentionExpiresAt = null,
                         messageIdHex = "message-row-fixture",
                         sender = "b".repeat(64),
                         senderDisplayName = "Test peer",

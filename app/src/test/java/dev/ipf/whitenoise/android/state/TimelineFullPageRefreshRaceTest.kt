@@ -215,6 +215,7 @@ class TimelineFullPageRefreshRaceTest {
         tags: List<MessageTagFfi> = emptyList(),
     ): TimelineMessageRecordFfi =
         TimelineMessageRecordFfi(
+            clientToken = null,
             messageIdHex = messageId,
             sourceMessageIdHex = messageId,
             direction = "received",

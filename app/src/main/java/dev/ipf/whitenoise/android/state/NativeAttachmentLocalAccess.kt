@@ -51,15 +51,24 @@ internal class NativeAttachmentLocalAccess(
     private val readAsset: suspend (String, ULong, UInt) -> AttachmentLocalBytesFfi,
 ) {
     /** Returns one result for every target, preserving target order and duplicates. */
-    suspend fun open(targets: List<NativeAttachmentTarget>): List<AttachmentPlaintext?> =
-        withContext(Dispatchers.IO) {
-            require(targets.size <= NATIVE_ATTACHMENT_TARGET_LIMIT) { "native attachment target batch exceeds 64" }
-            if (targets.isEmpty()) return@withContext emptyList()
-            prepareLeaseDirectory()
-            val assets = queryAssets(targets.map(NativeAttachmentTarget::toFfi))
-            check(assets.size == targets.size) { "native local asset response changed target cardinality" }
-            assets.map { asset -> materialize(asset) }
+    @Suppress("TooGenericExceptionCaught") // Dispatcher cancellation must also release acquired leases.
+    suspend fun open(targets: List<NativeAttachmentTarget>): List<AttachmentPlaintext?> {
+        require(targets.size <= NATIVE_ATTACHMENT_TARGET_LIMIT) { "native attachment target batch exceeds 64" }
+        if (targets.isEmpty()) return emptyList()
+        val acquired = mutableListOf<AttachmentPlaintext?>()
+        try {
+            return withContext(Dispatchers.IO) {
+                prepareLeaseDirectory()
+                val assets = queryAssets(targets.map(NativeAttachmentTarget::toFfi))
+                check(assets.size == targets.size) { "native local asset response changed target cardinality" }
+                assets.forEach { asset -> acquired += materialize(asset) }
+                acquired.toList()
+            }
+        } catch (failure: Throwable) {
+            acquired.forEach { it?.close() }
+            throw failure
         }
+    }
 
     /** Removes process-orphaned plaintext once before creating the first new lease. */
     private fun prepareLeaseDirectory() {

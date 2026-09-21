@@ -9,9 +9,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class StartupCoordinatorTest {
-    /** Existing-account automatic requests are rejected before native workers can admit them. */
+    /** Existing-account requests remain blocked until the host grants native automatic permission. */
     @Test
-    fun attachmentContainmentPreventsStartupRequestAdmission() =
+    fun hostPermissionContainmentPreventsStartupRequestAdmission() =
         runTest {
             val coordinator = BootstrapRuntimeCoordinator<FakeAttachmentRuntime>()
             val runtime = FakeAttachmentRuntime()
@@ -30,7 +30,7 @@ class StartupCoordinatorTest {
             )
 
             assertEquals(0, runtime.admittedAutomaticRequests)
-            assertEquals(false, runtime.policy.automatic)
+            assertEquals(true, runtime.policy.automatic)
         }
 
     @Test
@@ -199,14 +199,15 @@ class StartupCoordinatorTest {
             assertEquals(1, closes)
         }
 
-    /** Minimal native-worker model: startup admits one pending request only while automatic policy is enabled. */
+    /** Minimal native-worker model with separate account policy and host permission containment. */
     private class FakeAttachmentRuntime {
         val accounts = listOf("existing")
         var policy = dev.ipf.marmotkit.AttachmentDownloadPolicyFfi(true, 2_000uL, 300uL, 40uL)
+        var automaticPermissionGranted = false
         var admittedAutomaticRequests = 0
 
         fun start() {
-            if (policy.automatic) admittedAutomaticRequests += 1
+            if (policy.automatic && automaticPermissionGranted) admittedAutomaticRequests += 1
         }
     }
 }

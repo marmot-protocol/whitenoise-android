@@ -83,6 +83,7 @@ class LauncherBadgeUnreadReconciliationTest {
             projection = row,
         )
 
+    /** Creates an account-scoped row for launcher badge reconciliation without network state. */
     private fun chatRow(
         unreadCount: ULong,
         lastReadMessageIdHex: String?,
@@ -99,6 +100,8 @@ class LauncherBadgeUnreadReconciliationTest {
         avatar = null,
         lastMessage =
             ChatListMessagePreviewFfi(
+                retentionSeconds = null,
+                retentionExpiresAt = null,
                 messageIdHex = MESSAGE_ID,
                 sender = "sender",
                 senderDisplayName = "Sender",

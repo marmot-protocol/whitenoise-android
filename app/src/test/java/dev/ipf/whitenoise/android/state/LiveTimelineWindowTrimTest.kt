@@ -108,6 +108,7 @@ class LiveTimelineWindowTrimTest {
         id: String,
         recordedAt: ULong,
     ) = TimelineMessageRecordFfi(
+        clientToken = null,
         messageIdHex = id,
         sourceMessageIdHex = null,
         direction = "received",

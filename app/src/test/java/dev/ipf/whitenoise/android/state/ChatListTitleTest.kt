@@ -336,6 +336,7 @@ class ChatListTitleTest {
             members = members,
         )
 
+    /** Builds a row whose member and preview fields can vary independently of title selection. */
     private fun row(
         groupId: String,
         rawTitle: String,
@@ -352,6 +353,8 @@ class ChatListTitleTest {
         avatar = null,
         lastMessage =
             ChatListMessagePreviewFfi(
+                retentionSeconds = null,
+                retentionExpiresAt = null,
                 messageIdHex = "last-message",
                 sender = "peer-acc",
                 senderDisplayName = null,

@@ -239,10 +239,12 @@ class ReplyNavigationTest {
         receivedAt = 1uL,
     )
 
+    /** Creates a reply-navigation record with all native projection fields populated explicitly. */
     private fun timelineRecord(
         replyPreviewMessageId: String?,
         replyToMessageIdHex: String? = replyPreviewMessageId,
     ) = TimelineMessageRecordFfi(
+        clientToken = null,
         messageIdHex = "reply",
         sourceMessageIdHex = null,
         direction = "received",

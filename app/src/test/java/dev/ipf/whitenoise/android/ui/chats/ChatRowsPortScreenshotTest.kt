@@ -9,6 +9,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
@@ -33,6 +34,37 @@ import org.robolectric.annotation.GraphicsMode
 class ChatRowsPortScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
     private val context = ApplicationProvider.getApplicationContext<Context>()
+
+    /** Expiry hides the selected message while preserving the chat, unread badge, and native row selection. */
+    @Test
+    fun expiredSelectedMessagePreview() {
+        val state = ChatRowPortFixtures.state(context)
+        val original = ChatRowPortFixtures.item(unread = true)
+        val projection = checkNotNull(original.projection)
+        val row =
+            original.copy(
+                selectedPreview = SelectedChatPreviewFfi.Message,
+                projection =
+                    projection.copy(
+                        lastMessage =
+                            checkNotNull(projection.lastMessage).copy(
+                                retentionSeconds = 30uL,
+                                retentionExpiresAt = 1uL,
+                            ),
+                    ),
+            )
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                Surface(Modifier.fillMaxSize()) {
+                    Column {
+                        ChatRow(item = row, appState = state, onClick = {}, onOpenProfile = {})
+                    }
+                }
+            }
+        }
+        composeRule.onNodeWithText(ChatRowPortFixtures.PREVIEW).assertDoesNotExist()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/chat_row_expired_selected_preview.png")
+    }
 
     /** Rows light. */
     @Test fun rowsLight() = capture("chat_rows_port_light")

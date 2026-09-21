@@ -71,13 +71,13 @@ class AttachmentPolicyStartupOrderingTest {
         assertTrue(refresh.contains("listAccountsWithAppAttachmentPolicy()"))
     }
 
-    /** Disabling automatic acquisition preserves every native numeric storage limit. */
+    /** Enabling host-managed demand preserves every native numeric storage limit. */
     @Test
     fun containmentChangesOnlyAutomatic() =
         runTest {
             val original =
                 AttachmentDownloadPolicyFfi(
-                    automatic = true,
+                    automatic = false,
                     retainedBytes = 2_000uL,
                     diskReserve = 300uL,
                     transferLimit = 40uL,
@@ -90,12 +90,12 @@ class AttachmentPolicyStartupOrderingTest {
                 writePolicy = { accountRef, policy -> writes += accountRef to policy },
             )
 
-            assertEquals(listOf("personal" to original.copy(automatic = false)), writes)
+            assertEquals(listOf("personal" to original.copy(automatic = true)), writes)
         }
 
-    /** An already-contained account is not rewritten during startup or refresh. */
+    /** An already-enabled account is not rewritten during startup or refresh. */
     @Test
-    fun disabledPolicyDoesNotCauseAWrite() =
+    fun enabledPolicyDoesNotCauseAWrite() =
         runTest {
             var writes = 0
 
@@ -103,7 +103,7 @@ class AttachmentPolicyStartupOrderingTest {
                 accountRefs = listOf("personal"),
                 readPolicy = {
                     AttachmentDownloadPolicyFfi(
-                        automatic = false,
+                        automatic = true,
                         retainedBytes = 2_000uL,
                         diskReserve = 300uL,
                         transferLimit = 40uL,
@@ -128,7 +128,7 @@ class AttachmentPolicyStartupOrderingTest {
                         accountRefs = listOf("personal", "work"),
                         readPolicy = { accountRef ->
                             reads += accountRef
-                            AttachmentDownloadPolicyFfi(true, 2_000uL, 300uL, 40uL)
+                            AttachmentDownloadPolicyFfi(false, 2_000uL, 300uL, 40uL)
                         },
                         writePolicy = { _, _ -> throw failure },
                     )

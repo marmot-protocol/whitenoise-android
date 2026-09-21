@@ -103,8 +103,10 @@ class GroupSystemPreparedIdentityTest {
             newRetentionSeconds = null,
         )
 
+    /** Supplies a deterministic system record whose presentation identity can be asserted. */
     private fun systemRecord() =
         TimelineMessageRecordFfi(
+            clientToken = null,
             messageIdHex = "11".repeat(32),
             sourceMessageIdHex = null,
             direction = "system",

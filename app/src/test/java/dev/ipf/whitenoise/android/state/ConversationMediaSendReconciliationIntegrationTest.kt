@@ -16,12 +16,17 @@ import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.GroupMemberDetailsFfi
 import dev.ipf.marmotkit.GroupRosterFfi
+import dev.ipf.marmotkit.LocalSendAcceptanceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentResultFfi
+import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
+import dev.ipf.marmotkit.MediaUploadSubmissionFfi
 import dev.ipf.marmotkit.MessageTagFfi
+import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
@@ -38,10 +43,27 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.lang.reflect.Proxy
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class ConversationMediaSendReconciliationIntegrationTest {
+    /** Exercises the production voice-note path without an injected publisher or uploader. */
+    @Test
+    fun draftlessVoiceNoteUsesTokenBoundNativeAdmission() =
+        assertDraftlessMediaUsesTokenBoundNativeAdmission(
+            mediaType = "audio/ogg",
+            fileName = "voice-note.ogg",
+        )
+
+    /** Exercises the production contact-share path without an injected publisher or uploader. */
+    @Test
+    fun draftlessContactShareUsesTokenBoundNativeAdmission() =
+        assertDraftlessMediaUsesTokenBoundNativeAdmission(
+            mediaType = "text/vcard",
+            fileName = "contact.vcf",
+        )
+
     @Test
     fun acceptedPendingReturnSettlesAProjectionThatArrivedFirstAndReleasesUploadState() =
         runTest {
@@ -105,6 +127,72 @@ class ConversationMediaSendReconciliationIntegrationTest {
             assertEquals(CONFIRMED_MESSAGE_ID, confirmedPreview?.messageIdHex)
             assertEquals(ChatListMessageDeliveryStateFfi.DELIVERED, confirmedPreview?.deliveryState)
         }
+
+    /** Exercises the default production path: no injected uploader or publisher test seam. */
+    private fun assertDraftlessMediaUsesTokenBoundNativeAdmission(
+        mediaType: String,
+        fileName: String,
+    ) = runTest {
+        val calls = mutableListOf<String>()
+        var uploadedRequest: MediaUploadRequestFfi? = null
+        val reference = mediaReference().copy(fileName = fileName, mediaType = mediaType)
+        val marmot =
+            Proxy.newProxyInstance(
+                MarmotInterface::class.java.classLoader,
+                arrayOf(MarmotInterface::class.java),
+            ) { proxy, method, args ->
+                val name = method.name.substringBefore('-')
+                calls += name
+                when (name) {
+                    "toString" -> "draftless-media-boundary"
+                    "hashCode" -> System.identityHashCode(proxy)
+                    "equals" -> proxy === args?.firstOrNull()
+                    "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
+                    "localSendStatus" -> null
+                    "selectedMessageDraft" -> null
+                    "uploadMediaWithClientToken" -> {
+                        val request = args!![2] as MediaUploadRequestFfi
+                        val token = args[3] as String
+                        uploadedRequest = request
+                        MediaUploadSubmissionFfi(
+                            upload = MediaUploadResultFfi(listOf(MediaUploadAttachmentResultFfi(reference, 4uL)), null),
+                            acceptance = LocalSendAcceptanceFfi(token, CONFIRMED_MESSAGE_ID),
+                        )
+                    }
+                    else -> error("Unexpected Marmot call: $name")
+                }
+            } as MarmotInterface
+        val appState =
+            appState().also { state ->
+                WhiteNoiseAppState::class.java
+                    .getDeclaredField("marmotRuntime")
+                    .apply { isAccessible = true }
+                    .set(state, AppMarmotRuntime("test", marmot))
+            }
+        val controller =
+            ConversationController(
+                appState = appState,
+                initialGroup = group(),
+                initialMemberSnapshot = memberSnapshot(),
+                groupRosterReader = { _, _ -> authoritativeRoster() },
+                mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
+                markdownParser = { emptyMarkdownDocument() },
+            )
+
+        controller.retryMembers()
+        assertEquals(true, controller.canSendMessages)
+        controller.sendAttachments(
+            listOf(PendingAttachment(byteArrayOf(1, 2, 3, 4), mediaType, fileName)),
+            caption = null,
+        )
+
+        assertEquals(1, calls.count { it == "uploadMediaWithClientToken" })
+        assertFalse(calls.contains("sendMediaAttachments"))
+        assertFalse(calls.contains("sendMessageDraftWithClientToken"))
+        assertEquals(true, uploadedRequest?.send)
+        assertEquals(mediaType, uploadedRequest?.attachments?.single()?.mediaType)
+        assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+    }
 
     private fun attachedChatsController(appState: WhiteNoiseAppState): ChatsController =
         ChatsController(
@@ -179,10 +267,12 @@ class ConversationMediaSendReconciliationIntegrationTest {
 
     private fun mediaImetaTag() = MessageTagFfi(listOf("imeta", "m image/jpeg"))
 
+    /** Creates the authoritative media projection used to reconcile one optimistic send token. */
     private fun projectedMediaMessage(
         recordedAt: ULong,
         reference: MediaAttachmentReferenceFfi,
     ) = TimelineMessageRecordFfi(
+        clientToken = null,
         messageIdHex = CONFIRMED_MESSAGE_ID,
         sourceMessageIdHex = "d4".repeat(32),
         direction = "sent",
@@ -325,6 +415,8 @@ class ConversationMediaSendReconciliationIntegrationTest {
             avatar = null,
             lastMessage =
                 ChatListMessagePreviewFfi(
+                    retentionSeconds = null,
+                    retentionExpiresAt = null,
                     messageIdHex = "d4".repeat(32),
                     sender = ACCOUNT_ID,
                     senderDisplayName = null,

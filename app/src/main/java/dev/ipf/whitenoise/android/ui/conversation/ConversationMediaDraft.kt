@@ -121,7 +121,8 @@ internal class ConversationMediaDraftState(
     private var currentAccountRef: String? = null
     private var restoreAttempted = false
     private val preparationMutex = Mutex()
-    private val documentRemovalFence = DraftDocumentRemovalFence()
+    private val documentOwnerFence = DraftDocumentOwnerFence()
+    private var documentRemovalFence = DraftDocumentRemovalFence()
 
     var backedPhotos by mutableStateOf<Map<String, DraftBackedPhoto>>(emptyMap())
         private set
@@ -143,8 +144,10 @@ internal class ConversationMediaDraftState(
         documentUris: List<Uri>,
         accountRef: String?,
     ) {
+        val ownerChanged = documentOwnerFence.update(accountRef)
+        if (ownerChanged) documentRemovalFence = DraftDocumentRemovalFence()
         documentRemovalFence.updateInputs(
-            previousUris = currentDocumentUris.map(Uri::toString),
+            previousUris = if (ownerChanged) emptyList() else currentDocumentUris.map(Uri::toString),
             currentUris = documentUris.map(Uri::toString),
         )
         currentSlots = slots
@@ -161,6 +164,8 @@ internal class ConversationMediaDraftState(
 
     /** Serializes draft insertion so native attachment order matches the composer shelf. */
     private suspend fun prepareMissingAttachmentsNow() {
+        val owner = documentOwnerFence.current() ?: return
+        val removalFence = documentRemovalFence
         val trackedSlotIds =
             backedPhotos.keys + preparedPhotos.keys + preparingSlotIds + nonEditableDescriptions.keys
         currentSlots.forEach { slot ->
@@ -169,16 +174,16 @@ internal class ConversationMediaDraftState(
         currentDocumentUris.forEach { uri ->
             val documentId =
                 stagedDocumentAttachmentId(
-                    currentAccountRef ?: return,
+                    owner.accountRef,
                     controller.group.groupIdHex,
                     uri.toString(),
                 )
             if (
                 uri !in preparedDocuments &&
                 documentId !in preparingSlotIds &&
-                documentRemovalFence.canPublish(uri.toString(), currentDocumentUris.map(Uri::toString))
+                removalFence.canPublish(uri.toString(), currentDocumentUris.map(Uri::toString))
             ) {
-                prepareDocument(uri, documentId)
+                prepareDocument(uri, documentId, owner, removalFence)
             }
         }
     }
@@ -343,12 +348,43 @@ internal class ConversationMediaDraftState(
 
     /** Removes a document only after an explicit shelf action, never because the screen was disposed. */
     fun releasePreparedDocument(uri: Uri) {
-        documentRemovalFence.recordRemoval(uri.toString())
-        val document = preparedDocuments[uri] ?: return
+        val uriString = uri.toString()
+        val removalFence = documentRemovalFence
+        val ownedRemoval = documentOwnerFence.recordRemoval(uriString, removalFence) ?: return
+        val document = preparedDocuments[uri]
         preparedDocuments -= uri
-        val accountRef = currentAccountRef ?: return
+        val owner = ownedRemoval.owner
+        val accountRef = owner.accountRef
+        val groupId = controller.group.groupIdHex
+        val attachmentId =
+            document?.attachment?.id
+                ?: stagedDocumentAttachmentId(accountRef, groupId, uriString)
+        val sharedRemoval =
+            appState.draftAttachmentRemovalTombstones.begin(
+                accountRef,
+                groupId,
+                attachmentId,
+            )
         appState.launchMutation {
-            stager.removePrepared(accountRef, controller.group.groupIdHex, document)
+            preparationMutex.withLock {
+                val removed =
+                    document ?: appState.messageDraftRepository
+                        .draft(accountRef, groupId)
+                        .getOrNull()
+                        ?.mediaAttachments
+                        ?.firstOrNull { it.id == attachmentId }
+                        ?.let { DraftPreparedPhoto(it, it.editorDigest()) }
+                if (removed != null) stager.removePrepared(accountRef, groupId, removed)
+                appState.draftAttachmentRemovalTombstones.complete(sharedRemoval)
+                removalFence.completeRemoval(ownedRemoval.removal)
+                val currentUris = currentDocumentUris.map(Uri::toString)
+                if (
+                    uri !in preparedDocuments &&
+                    canPublishDocument(uriString, currentUris, owner, removalFence)
+                ) {
+                    prepareDocument(uri, attachmentId, owner, removalFence)
+                }
+            }
         }
     }
 
@@ -364,7 +400,7 @@ internal class ConversationMediaDraftState(
     }
 
     /** Rehydrates the composer shelf from authoritative native bytes after navigation or process recreation. */
-    @Suppress("ReturnCount") // Guard returns avoid materializing incomplete or unowned native drafts.
+    @Suppress("LongMethod", "ReturnCount") // One locked pass reconnects, materializes, and publishes one snapshot.
     suspend fun restorePersistedAttachments(): RestoredConversationAttachments? =
         preparationMutex.withLock {
             if (restoreAttempted) return@withLock null
@@ -385,6 +421,8 @@ internal class ConversationMediaDraftState(
                     mediaSlotIds = currentSlots.map(PendingMediaSlot::id),
                     documentUriStrings = currentDocumentUris.map(Uri::toString),
                     attachments = attachments,
+                    removedAttachmentIds =
+                        removedDraftAttachmentIds(accountRef),
                 )
             val restoredPhotos =
                 reconciliation.mediaBySlotId.mapValues { (_, attachment) ->
@@ -413,6 +451,11 @@ internal class ConversationMediaDraftState(
             val media = currentSlots.toMutableList()
             val documents = currentDocumentUris.toMutableList()
             materialized.forEach { (attachment, uri) ->
+                val removedAttachmentIds =
+                    removedDraftAttachmentIds(accountRef)
+                if (attachment.id in removedAttachmentIds) {
+                    return@forEach
+                }
                 val prepared = DraftPreparedPhoto(attachment, attachment.editorDigest())
                 if (attachment.isComposerVisual() && !attachment.isComposerDocument()) {
                     media += PendingMediaSlot(attachment.id, uri)
@@ -427,6 +470,11 @@ internal class ConversationMediaDraftState(
             }
             RestoredConversationAttachments(media, documents)
         }
+
+    /** Combines this composer's fences with process-owned cleanup still running for the account. */
+    private fun removedDraftAttachmentIds(accountRef: String): Set<String> =
+        documentRemovalFence.removedAttachmentIds(accountRef, controller.group.groupIdHex) +
+            appState.draftAttachmentRemovalTombstones.attachmentIds(accountRef, controller.group.groupIdHex)
 
     /** Releases presentation resources without deleting the native attachment draft. */
     fun dispose() {
@@ -517,13 +565,17 @@ internal class ConversationMediaDraftState(
     private suspend fun prepareDocument(
         uri: Uri,
         attachmentId: String,
+        owner: DraftDocumentOwner,
+        removalFence: DraftDocumentRemovalFence,
     ) {
-        val accountRef = currentAccountRef ?: return
+        if (!documentOwnerFence.isCurrent(owner) || removalFence !== documentRemovalFence) return
+        val accountRef = owner.accountRef
         preparingSlotIds += attachmentId
         try {
             val pending = attachmentReader.readDocumentDraft(uri) ?: return
             val prepared = stageGenericAttachment(accountRef, attachmentId, pending) ?: return
-            if (documentRemovalFence.canPublish(uri.toString(), currentDocumentUris.map(Uri::toString))) {
+            val currentUris = currentDocumentUris.map(Uri::toString)
+            if (canPublishDocument(uri.toString(), currentUris, owner, removalFence)) {
                 preparedDocuments += uri to prepared
             } else {
                 stager.removePrepared(accountRef, controller.group.groupIdHex, prepared)
@@ -532,6 +584,17 @@ internal class ConversationMediaDraftState(
             preparingSlotIds -= attachmentId
         }
     }
+
+    /** Rejects results from an old account lifetime or its detached removal fence. */
+    private fun canPublishDocument(
+        uri: String,
+        currentUris: List<String>,
+        owner: DraftDocumentOwner,
+        removalFence: DraftDocumentRemovalFence,
+    ): Boolean =
+        documentOwnerFence.isCurrent(owner) &&
+            removalFence === documentRemovalFence &&
+            removalFence.canPublish(uri, currentUris)
 
     /** Adds generic video/document bytes idempotently and recovers the authoritative duplicate. */
     private suspend fun stageGenericAttachment(
@@ -668,7 +731,7 @@ internal fun rememberConversationMediaDraftState(
             saveFailed = stringResource(R.string.photo_editor_save_failed),
         )
     val state =
-        remember(appState, controller, chatId, context, scope, messages) {
+        remember(appState, controller, chatId, controller.boundAccountRef, context, scope, messages) {
             ConversationMediaDraftState(appState, controller, context, scope, messages)
         }
     SideEffect {

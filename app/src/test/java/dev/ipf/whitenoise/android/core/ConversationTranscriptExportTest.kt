@@ -413,6 +413,7 @@ class ConversationTranscriptExportTest {
         disbandRequest = null,
     )
 
+    /** Builds an exportable projection with explicit deletion provenance and attachment state. */
     private fun timelineRecord(
         messageIdHex: String,
         direction: String = "received",
@@ -424,6 +425,7 @@ class ConversationTranscriptExportTest {
         reactions: TimelineReactionSummaryFfi = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
         groupSystem: GroupSystemEventFfi? = null,
     ) = TimelineMessageRecordFfi(
+        clientToken = null,
         messageIdHex = messageIdHex,
         sourceMessageIdHex = null,
         direction = direction,

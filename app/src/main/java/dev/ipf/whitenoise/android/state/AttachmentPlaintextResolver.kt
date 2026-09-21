@@ -37,15 +37,16 @@ internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintext(
     }
 
 /** Returns bounded memory or an owner-private file lease that the caller must close. */
-@Suppress("ReturnCount", "TooGenericExceptionCaught")
+@Suppress("UnusedParameter") // Existing consumers supply a reference; native source identity owns acquisition.
 internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
     request: AttachmentTransferRequest,
     reference: MediaAttachmentReferenceFfi,
     priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Interactive,
     persistInteractiveIntent: Boolean = true,
-    onCacheMiss: (suspend () -> ByteArray)? = null,
+    allowExplicitRetry: Boolean = true,
 ): AttachmentPlaintext {
     val cacheKey = request.run { mediaCacheKey(accountRef, groupIdHex, messageIdHex, attachmentIndex) }
+    promoteQueuedAttachmentAcquisition(cacheKey, priority, allowExplicitRetry)
     return resolveAttachmentPlaintext(
         loadMemory = { withContext(Dispatchers.Main.immediate) { cachedMediaPlaintext(cacheKey) } },
         loadDisk = { cancellationCheck, onAcquired ->
@@ -61,13 +62,27 @@ internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
             acquireAttachmentPlaintextSource(
                 cacheKey = cacheKey,
                 request = request,
-                reference = reference,
                 priority = priority,
                 persistInteractiveIntent = persistInteractiveIntent,
-                onCacheMiss = onCacheMiss,
+                allowExplicitRetry = allowExplicitRetry,
             )
         },
     )
+}
+
+/** Moves an already-shared automatic owner before cache probes can let another queued transfer win. */
+private fun WhiteNoiseAppState.promoteQueuedAttachmentAcquisition(
+    cacheKey: String,
+    priority: AttachmentDownloadPriority,
+    allowExplicitRetry: Boolean,
+) {
+    if (
+        priority == AttachmentDownloadPriority.Interactive &&
+        allowExplicitRetry &&
+        hasActiveAttachmentAcquisition(cacheKey)
+    ) {
+        promoteAdmittedAttachmentAcquisition(cacheKey)
+    }
 }
 
 /** Loads one Android-retained cache entry while exposing lease acquisition to cancellation cleanup. */
@@ -101,36 +116,19 @@ private fun WhiteNoiseAppState.clearInteractiveAttachmentIntentAfterSuccess(
 private suspend fun WhiteNoiseAppState.acquireAttachmentPlaintextSource(
     cacheKey: String,
     request: AttachmentTransferRequest,
-    reference: MediaAttachmentReferenceFfi,
     priority: AttachmentDownloadPriority,
     persistInteractiveIntent: Boolean,
-    onCacheMiss: (suspend () -> ByteArray)?,
+    allowExplicitRetry: Boolean,
 ): AttachmentPlaintext {
+    promoteActiveAttachmentAcquisition(cacheKey, request, priority, allowExplicitRetry)
     val resolved =
-        memoizedAttachmentAcquisition(cacheKey, priority) {
-            val qualifiedRequest =
-                resolveNativeAttachmentTarget(request)?.let { target ->
-                    request.copy(sourceMessageIdHex = target.sourceMessageIdHex)
-                }
-            if (qualifiedRequest != null && hasNativeAttachment(qualifiedRequest)) {
-                AttachmentAcquisitionOutcome.NativeRetained(qualifiedRequest)
-            } else {
-                val native = qualifiedRequest?.let { acquireNativeAttachment(it, priority) }
-                if (native != null) {
-                    native.close()
-                    AttachmentAcquisitionOutcome.NativeRetained(checkNotNull(qualifiedRequest))
-                } else {
-                    AttachmentAcquisitionOutcome.LegacyBytes(
-                        onCacheMiss?.invoke()
-                            ?: downloadLegacyAttachmentPlaintext(
-                                request,
-                                reference,
-                                priority,
-                                persistInteractiveIntent,
-                            ),
-                    )
-                }
+        memoizedAttachmentAcquisition(cacheKey, request, priority) {
+            val target = resolveNativeAttachmentTarget(request) ?: throw AttachmentReferenceNotReadyException()
+            val qualifiedRequest = request.copy(sourceMessageIdHex = target.sourceMessageIdHex)
+            if (!hasNativeAttachment(qualifiedRequest)) {
+                acquireNativeAttachment(qualifiedRequest, priority, allowExplicitRetry)
             }
+            AttachmentAcquisitionOutcome.NativeRetained(qualifiedRequest)
         }.await()
     return materializeAttachmentAcquisition(
         outcome = resolved,
@@ -139,6 +137,32 @@ private suspend fun WhiteNoiseAppState.acquireAttachmentPlaintextSource(
             clearInteractiveAttachmentIntentAfterSuccess(request, priority, persistInteractiveIntent)
         },
     )
+}
+
+/** Promotes an existing automatic native job when an explicit caller joins it. */
+private suspend fun WhiteNoiseAppState.promoteActiveAttachmentAcquisition(
+    cacheKey: String,
+    request: AttachmentTransferRequest,
+    priority: AttachmentDownloadPriority,
+    allowExplicitRetry: Boolean,
+) {
+    val shouldPromote =
+        priority == AttachmentDownloadPriority.Interactive &&
+            allowExplicitRetry &&
+            hasActiveAttachmentAcquisition(cacheKey)
+    if (!shouldPromote) return
+    val admitted = promoteAdmittedAttachmentAcquisition(cacheKey)
+    // A registered owner can still be waiting behind the bounded host gate.
+    // Promoting that waiter is sufficient; native has no acquisition to
+    // escalate until the waiter owns a permit and begins its demand call.
+    if (!admitted) return
+    resolveNativeAttachmentTarget(request)?.let { target ->
+        // Promotion is advisory. The joined automatic owner remains authoritative
+        // even when native priority escalation is temporarily unavailable.
+        runCatchingCancellable {
+            marmotIo { downloadAttachmentAgain(request.accountRef, request.groupIdHex, target.toFfi()) }
+        }
+    }
 }
 
 /** Clears durable demand only after the selected retained source is open and caller-owned. */

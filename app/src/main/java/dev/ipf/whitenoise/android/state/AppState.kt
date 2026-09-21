@@ -207,6 +207,9 @@ import kotlin.coroutines.resume
 import dev.ipf.whitenoise.android.audio.ConversationDictationTargetValidation as TargetValidation
 import dev.ipf.whitenoise.android.notifications.notificationReplyCommitProbe as probeNotificationReplyCommit
 
+private const val NATIVE_ATTACHMENT_PERMISSION_RETRY_LIMIT = 3
+private const val NATIVE_ATTACHMENT_PERMISSION_RETRY_DELAY_MILLIS = 500L
+
 internal data class ProfileGroupInviteOutcome(
     val attempted: Int,
     val failures: Int,
@@ -1233,6 +1236,7 @@ class WhiteNoiseAppState private constructor(
                 gateway = MarmotMessageDraftGateway(::marmot),
                 editorSessions = editorSessionStore,
             )
+    internal val draftAttachmentRemovalTombstones = DraftAttachmentRemovalTombstones()
     private val chatMuteRepository = ChatMuteRepository(MarmotChatMuteGateway(::marmot))
 
     // Which of the two sequential signer round-trips the Amber sign-in is
@@ -1355,6 +1359,57 @@ class WhiteNoiseAppState private constructor(
 
     @Volatile
     private var marmotRuntime: AppMarmotRuntime? = initialMarmotRuntime
+    private val nativeAttachmentPermissions = NativeAttachmentPermissions()
+
+    /** Refreshes runtime-scoped permissions after network, preference, or account changes. */
+    internal fun refreshNativeAttachmentPermissions() {
+        val runtime = marmotRuntime
+        val revision = nativeAttachmentPermissions.invalidate(runtime)
+        val engine = runtime?.marmot ?: return
+        val accountRefs = accounts.filterNot { it.signedOut }.map { it.label }
+        // Marmot binding calls remain on the mutations scope's Main.immediate dispatcher.
+        mutationsScope.launch {
+            var pending = accountRefs.toSet()
+            var attempt = 0
+            while (pending.isNotEmpty() && nativeAttachmentPermissions.isCurrent(revision, runtime)) {
+                pending =
+                    nativeAttachmentPermissions.update(revision, runtime, engine, pending.toList()) { account ->
+                        loadMediaAutoDownloadMatrix(account).nativePermission(
+                            activeNetworkTypes(),
+                            hasValidatedInternet(),
+                            attachmentDownloadIntents.isAutomaticPaused(account),
+                        )
+                    }
+                if (!nativeAttachmentPermissions.isCurrent(revision, runtime)) return@launch
+                if (pending.isEmpty()) {
+                    attachmentDownloadPolicyRevision += 1
+                    return@launch
+                }
+                attempt += 1
+                if (attempt >= NATIVE_ATTACHMENT_PERMISSION_RETRY_LIMIT) break
+                delay(NATIVE_ATTACHMENT_PERMISSION_RETRY_DELAY_MILLIS * attempt)
+            }
+            if (pending.isNotEmpty() && nativeAttachmentPermissions.isCurrent(revision, runtime)) {
+                Log.w("AttachmentPermissions", "permission_update_failed accounts=${pending.size}")
+            }
+        }
+    }
+
+    /** Publishes a runtime, invalidates obsolete permission work, and seeds synchronization for retained accounts. */
+    private fun publishMarmotRuntime(runtime: AppMarmotRuntime) {
+        marmotRuntime = runtime
+        nativeAttachmentPermissions.invalidate(runtime)
+        mutationsScope.launch {
+            if (marmotRuntime === runtime) refreshNativeAttachmentPermissions()
+        }
+    }
+
+    /** Clears only the runtime that failed and immediately fences its permission callbacks. */
+    private fun clearMarmotRuntime(runtime: AppMarmotRuntime) {
+        if (marmotRuntime !== runtime) return
+        marmotRuntime = null
+        nativeAttachmentPermissions.invalidate(null)
+    }
 
     private val bootstrapAttempts = BootstrapAttemptCoordinator()
     private val bootstrapRuntime = BootstrapRuntimeCoordinator<AppMarmotRuntime>()
@@ -3879,9 +3934,30 @@ class WhiteNoiseAppState private constructor(
      */
     internal fun memoizedAttachmentAcquisition(
         cacheKey: String,
+        request: AttachmentTransferRequest,
         priority: AttachmentDownloadPriority,
         block: suspend CoroutineScope.() -> AttachmentAcquisitionOutcome,
-    ): Deferred<AttachmentAcquisitionOutcome> = inFlightAttachmentAcquisitions.acquire(cacheKey, priority, block)
+    ): Deferred<AttachmentAcquisitionOutcome> =
+        inFlightAttachmentAcquisitions.acquire(cacheKey, priority) {
+            val owner = this
+            attachmentDownloadGate.withPermit(cacheKey, request.accountRef, priority) {
+                val cached =
+                    cachedMediaPlaintext(cacheKey)
+                        ?: withContext(Dispatchers.IO) { diskMediaCache.getIfSmall(cacheKey) }
+                        ?: cachedMediaPlaintext(cacheKey)
+                cached?.let(AttachmentAcquisitionOutcome::LegacyBytes) ?: owner.block()
+            }
+        }
+
+    /** Exposes only active owner lifetime, never a second retained attachment record. */
+    @Suppress("MaxLineLength") // Kept as an expression body by ktlint's formatter.
+    internal fun hasActiveAttachmentAcquisition(cacheKey: String): Boolean = inFlightAttachmentAcquisitions.isActive(cacheKey)
+
+    /** Promotes a queued owner and reports whether native work is already admitted for that identity. */
+    internal fun promoteAdmittedAttachmentAcquisition(cacheKey: String): Boolean {
+        attachmentDownloadGate.promote(cacheKey)
+        return attachmentDownloadGate.isAdmitted(cacheKey)
+    }
 
     /**
      * Cancels one account-scoped memoized source attempt after its forwarding
@@ -3962,6 +4038,7 @@ class WhiteNoiseAppState private constructor(
     fun stopAutomaticAttachmentDownloads() {
         val accountRef = activeAccountRef ?: return
         attachmentDownloadIntents.pauseAutomatic(accountRef)
+        refreshNativeAttachmentPermissions()
         attachmentDownloadPolicyRevision += 1
         attachmentDownloadGate.cancelQueuedAutomatic(accountRef)
         mutationsScope.launch {
@@ -3972,6 +4049,7 @@ class WhiteNoiseAppState private constructor(
     fun restartAutomaticAttachmentDownloads() {
         val accountRef = activeAccountRef ?: return
         attachmentDownloadIntents.restartAutomatic(accountRef)
+        refreshNativeAttachmentPermissions()
         // Resuming the backlog is a resume-everything signal, and it is the one
         // point where per-file cancel records can be dropped in bulk instead of
         // accumulating for attachments the user never opens again.
@@ -3988,112 +4066,21 @@ class WhiteNoiseAppState private constructor(
         ) ||
             hasNativeAttachment(request)
 
-    /** Legacy fallback used only after Android and MarmotKit retained stores both miss. */
-    internal suspend fun downloadLegacyAttachmentPlaintext(
-        request: AttachmentTransferRequest,
-        reference: MediaAttachmentReferenceFfi,
-        priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Interactive,
-        persistInteractiveIntent: Boolean = true,
-    ): ByteArray {
-        val tracksInteractiveIntent =
-            priority == AttachmentDownloadPriority.Interactive && persistInteractiveIntent
-        val cacheKey =
-            mediaCacheKey(
-                request.accountRef,
-                request.groupIdHex,
-                request.messageIdHex,
-                request.attachmentIndex,
-            )
-        val cached =
-            withContext(Dispatchers.Main.immediate) { cachedMediaPlaintext(cacheKey) }
-                ?: withContext(Dispatchers.IO) { diskMediaCache.get(cacheKey) }
-                    ?.also { onDisk ->
-                        withContext(Dispatchers.Main.immediate) {
-                            cacheMediaPlaintext(cacheKey, onDisk)
-                        }
-                    }
-        if (cached != null) {
-            if (tracksInteractiveIntent) {
-                attachmentDownloadIntents.setInteractive(request, interactive = false)
-            }
-            return cached
-        }
-
-        if (priority == AttachmentDownloadPriority.Interactive) {
-            if (tracksInteractiveIntent) {
-                attachmentDownloadIntents.setInteractive(request, interactive = true)
-            }
-            attachmentDownloadGate.promote(cacheKey)
-        }
-
-        val deferred =
-            memoizedDownload(cacheKey, request, priority) {
-                downloadAndCacheAttachment(request, reference, cacheKey)
-            }
-        return deferred.await().also {
-            if (tracksInteractiveIntent) {
-                attachmentDownloadIntents.setInteractive(request, interactive = false)
-            }
-        }
-    }
-
-    /** Downloads through the legacy byte API and publishes non-empty plaintext into both cache tiers. */
-    private suspend fun downloadAndCacheAttachment(
-        request: AttachmentTransferRequest,
-        reference: MediaAttachmentReferenceFfi,
-        cacheKey: String,
-    ): ByteArray {
-        val publicationToken = diskMediaCache.capturePublicationToken()
-        val plaintext =
-            runCatchingCancellable {
-                marmotIo(MarmotTraceSection.MEDIA_DOWNLOAD) {
-                    downloadMedia(request.accountRef, request.groupIdHex, reference)
-                }.plaintext
-            }.onFailure { failure ->
-                logAttachmentDownloadFailure(request, failure)
-            }.getOrThrow()
-        if (plaintext.isNotEmpty()) {
-            cacheMediaPlaintext(cacheKey, plaintext)
-            withContext(Dispatchers.IO) {
-                diskMediaCache.put(
-                    cacheKey,
-                    plaintext,
-                    publicationToken,
-                    reference.ciphertextSha256,
-                )
-            }
-        }
-        return plaintext
-    }
-
-    /** Logs attachment failures without exposing full identifiers in release builds. */
-    private fun logAttachmentDownloadFailure(
-        request: AttachmentTransferRequest,
-        failure: Throwable,
-    ) {
-        if (BuildConfig.DEBUG) {
-            Log.w(
-                "DMAttachmentDownload",
-                "download failed group=${request.groupIdHex.take(8)} message=${request.messageIdHex.take(8)}",
-                failure,
-            )
-        } else {
-            Log.w("DMAttachmentDownload", "attachment_download_failed")
-        }
-    }
-
     /** Ensures durable work consumes large cache hits as leases instead of full heap copies. */
     internal suspend fun downloadAttachmentForDurableWork(
         request: AttachmentTransferRequest,
         priority: AttachmentDownloadPriority,
+        allowExplicitRetry: Boolean = true,
     ): Boolean {
-        val reference = resolveAttachmentReference(request) ?: throw AttachmentReferenceNotReadyException()
+        val match = findNativeAttachment(request) ?: throw AttachmentReferenceNotReadyException()
+        val resolved = request.copy(sourceMessageIdHex = match.target.sourceMessageIdHex)
         downloadAttachmentPlaintextSource(
-            request = request,
-            reference = reference,
+            request = resolved,
+            reference = match.reference,
             priority = priority,
+            allowExplicitRetry = allowExplicitRetry,
         ).use { }
-        return hasCachedAttachmentAfterHydration(request)
+        return hasCachedAttachmentAfterHydration(resolved)
     }
 
     /**
@@ -4238,7 +4225,7 @@ class WhiteNoiseAppState private constructor(
                             marmotRuntimeFactory(appContext).also { runtime ->
                                 // Publish before start so lifecycle consumers
                                 // and later listener retries can resolve Marmot.
-                                marmotRuntime = runtime
+                                publishMarmotRuntime(runtime)
                                 diagnostics.bind(runtime.marmot)
                                 AvatarImageLoader.attachProfileImageFetcher { url, maxBytes ->
                                     runtime.marmot.downloadProfileImage(url, maxBytes)
@@ -4264,10 +4251,10 @@ class WhiteNoiseAppState private constructor(
                     startupPerformance.stage(PerformancePhase.FAILED_RUNTIME_CLOSE) {
                         withContext(Dispatchers.IO) { runtime.marmot.shutdownAndClose() }
                     }
-                    if (marmotRuntime === runtime) marmotRuntime = null
+                    clearMarmotRuntime(runtime)
                 },
             )
-        marmotRuntime = opened
+        publishMarmotRuntime(opened)
         return opened
     }
 
@@ -4693,6 +4680,7 @@ class WhiteNoiseAppState private constructor(
         accountListLifetime.runIfCurrent(requestToken) {
             accountSetup.acceptAccounts(setupAccounts)
             accounts = refreshedAccounts
+            refreshNativeAttachmentPermissions()
             releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
             publishedAccounts = refreshedAccounts
         }
@@ -6838,6 +6826,7 @@ class WhiteNoiseAppState private constructor(
         // a later toggle once the account resolves persists it to the right bucket.
         val key = mediaAutoDownloadPrefKeyOrNull(activeAccountRef) ?: return
         preferences.edit().putString(key, updated.toPreference()).apply()
+        refreshNativeAttachmentPermissions()
     }
 
     fun updateEnterKeyBehavior(behavior: EnterKeyBehavior) {
@@ -7162,6 +7151,7 @@ class WhiteNoiseAppState private constructor(
                 hasValidatedPhysicalNetwork = validatedInternetNetworks.hasValidatedInternet(),
             )
         updateConnectivitySignals(hasValidatedInternet = recovery.hasUsableInternet)
+        refreshNativeAttachmentPermissions()
         if (!recovery.restored) return
         AvatarLoadRecovery.onNetworkRestored()
         validatedConnectivityRecoveryGenerationMutable.update { generation -> generation + 1 }
