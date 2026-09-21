@@ -1,0 +1,1 @@
+Faster, steadier conversations with improved message rendering, dictation delivery, attachment downloads, and unread handling. Adds diagnostic-log archive export, polishes media and chat UI, and fixes an attachment-download crash.
