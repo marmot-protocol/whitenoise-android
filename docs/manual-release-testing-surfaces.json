@@ -24423,6 +24423,30 @@
         ]
       },
       {
+        "surface": "R.string.person_add_to_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "R.string.person_add_to_group",
+        "test_ids": [
+          "ACC-008"
+        ]
+      },
+      {
+        "surface": "R.string.person_start_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "R.string.person_start_group",
+        "test_ids": [
+          "ACC-008"
+        ]
+      },
+      {
+        "surface": "R.string.profile_actions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "R.string.profile_actions",
+        "test_ids": [
+          "ACC-008"
+        ]
+      },
+      {
         "surface": "R.string.quick_action_search",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.quick_action_search",
