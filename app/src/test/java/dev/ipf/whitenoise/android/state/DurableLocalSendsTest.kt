@@ -14,7 +14,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DurableLocalSendsTest {
-    /** Native local acceptance must remain pending and preserve the exact optimistic token. */
+    /** Fresh local acceptance skips recovery I/O, remains pending, and preserves the optimistic token. */
     @Test
     fun textAndReplyUseStableTokenWithoutClaimingDelivery() =
         runTest {
@@ -24,7 +24,6 @@ class DurableLocalSendsTest {
                     nativeBoundary { method, args ->
                         calls += method
                         when (method) {
-                            "localSendStatus" -> null
                             "sendTextWithClientToken", "replyToMessageWithClientToken" -> {
                                 assertEquals("logical-token", args[args.size - 2])
                                 LocalSendAcceptanceFfi("logical-token", "11".repeat(32))
@@ -32,12 +31,20 @@ class DurableLocalSendsTest {
                             else -> error(method)
                         }
                     }
-                val result = engine.sendComposerTextWithToken("account", "group", reply, "hello", "logical-token")
+                val result =
+                    engine.sendComposerTextWithToken(
+                        "account",
+                        "group",
+                        reply,
+                        "hello",
+                        "logical-token",
+                        probeExistingAdmission = false,
+                    )
                 assertEquals(SendAcceptDispositionFfi.ACCEPTED_PENDING, result.acceptDisposition)
                 assertEquals(0u, result.published)
                 assertEquals(listOf("11".repeat(32)), result.messageIds)
                 val expectedMethod = if (reply == null) "sendTextWithClientToken" else "replyToMessageWithClientToken"
-                assertEquals(expectedMethod, calls.last())
+                assertEquals(listOf(expectedMethod), calls)
             }
         }
 
@@ -110,18 +117,23 @@ class DurableLocalSendsTest {
                 nativeBoundary { method, _ ->
                     check(method == "localSendStatus")
                     statusReads += 1
-                    if (statusReads == 1) null else LocalSendStatusFfi.EngineOwned
+                    LocalSendStatusFfi.EngineOwned
                 }
 
             val result =
-                engine.admitLocalSend("account", "group", "same-token") {
+                engine.admitLocalSend(
+                    "account",
+                    "group",
+                    "same-token",
+                    probeExistingAdmission = false,
+                ) {
                     admissions += 1
                     throw MarmotKitException.TransportClosed()
                 }
 
             assertEquals(SendAcceptDispositionFfi.ACCEPTED_PENDING, result.acceptDisposition)
             assertEquals(1, admissions)
-            assertEquals(2, statusReads)
+            assertEquals(1, statusReads)
         }
 
     /** A pre-ownership transport closure retries one logical submission with its original token. */

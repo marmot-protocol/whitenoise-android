@@ -8089,7 +8089,7 @@ class ConversationController(
                     try {
                         val summary =
                             textPublisher?.invoke(replyTarget, account, group.groupIdHex, trimmed)
-                                ?: publishDurableComposerText(account, replyTarget, trimmed, clientToken)
+                                ?: publishDurableComposerText(account, replyTarget, trimmed, clientToken, attempt > 1)
                         sendTrace(
                             trace,
                             PerformancePhase.FFI_RETURN,

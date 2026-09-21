@@ -10,15 +10,23 @@ import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 
-/** Runs synchronous status reads and local text admission off the UI thread for this bound conversation. */
+/** Runs local text admission off the UI thread, probing existing ownership only for retained tokens. */
 internal suspend fun ConversationController.publishDurableComposerText(
     account: String,
     replyTarget: String?,
     text: String,
     token: String,
+    probeExistingAdmission: Boolean = true,
 ): SendSummaryFfi =
     appState.marmotIo(MarmotTraceSection.TEXT_SEND) {
-        sendComposerTextWithToken(account, group.groupIdHex, replyTarget, text, token)
+        sendComposerTextWithToken(
+            account,
+            group.groupIdHex,
+            replyTarget,
+            text,
+            token,
+            probeExistingAdmission,
+        )
     }
 
 /** Adapts local ownership to the existing pending UI without claiming relay delivery. */
@@ -52,15 +60,16 @@ private fun MarmotInterface.recoverLocalSendResult(
         Result.failure(failure)
     }
 
-/** Keeps the same logical token across interrupted admissions and connect-phase retries. */
+/** Keeps one logical token across interrupted admissions and optionally probes ownership before retrying. */
 internal suspend fun MarmotInterface.sendComposerTextWithToken(
     account: String,
     group: String,
     replyTarget: String?,
     text: String,
     token: String,
+    probeExistingAdmission: Boolean = true,
 ): SendSummaryFfi =
-    admitLocalSend(account, group, token) {
+    admitLocalSend(account, group, token, probeExistingAdmission) {
         if (replyTarget == null) {
             sendTextWithClientToken(account, group, text, token)
         } else {
@@ -68,14 +77,15 @@ internal suspend fun MarmotInterface.sendComposerTextWithToken(
         }
     }
 
-/** Recovers an ambiguous admission without creating another semantic send or clearing a newer draft. */
+/** Optionally recovers retained ownership, then resolves ambiguous admission without duplicating a send. */
 internal suspend fun MarmotInterface.admitLocalSend(
     account: String,
     group: String,
     token: String,
+    probeExistingAdmission: Boolean = true,
     admit: suspend () -> LocalSendAcceptanceFfi,
 ): SendSummaryFfi {
-    recoveredLocalSend(account, group, token)?.let { return it }
+    if (probeExistingAdmission) recoveredLocalSend(account, group, token)?.let { return it }
     return try {
         val acceptance = admit()
         check(acceptance.clientToken == token) { "local acceptance changed the caller token" }
