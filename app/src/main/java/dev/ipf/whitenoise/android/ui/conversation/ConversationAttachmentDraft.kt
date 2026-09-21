@@ -104,6 +104,51 @@ internal data class DraftDocumentRemoval(
     val sequence: Long,
 )
 
+/** Captures the account lifetime that owns one document preparation or removal. */
+internal data class DraftDocumentOwner(
+    val accountRef: String,
+    val generation: Long,
+)
+
+/** Couples a removal ticket to the account lifetime that created it. */
+internal data class OwnedDraftDocumentRemoval(
+    val owner: DraftDocumentOwner,
+    val removal: DraftDocumentRemoval,
+)
+
+/** Invalidates queued document work whenever the composer changes account ownership. */
+internal class DraftDocumentOwnerFence {
+    private var accountRef: String? = null
+    private var generation = 0L
+
+    /** Publishes the latest owner and reports whether its lifetime changed. */
+    @Synchronized
+    fun update(accountRef: String?): Boolean {
+        if (this.accountRef == accountRef) return false
+        this.accountRef = accountRef
+        generation += 1L
+        return true
+    }
+
+    /** Returns the current non-null account lifetime, or null while no account owns the composer. */
+    @Synchronized
+    fun current(): DraftDocumentOwner? = accountRef?.let { DraftDocumentOwner(it, generation) }
+
+    /** Records no cleanup until an account lifetime can own and later complete it. */
+    @Synchronized
+    fun recordRemoval(
+        uri: String,
+        removals: DraftDocumentRemovalFence,
+    ): OwnedDraftDocumentRemoval? {
+        val owner = current() ?: return null
+        return OwnedDraftDocumentRemoval(owner, removals.recordRemoval(uri))
+    }
+
+    /** Accepts queued work only for the still-current account lifetime. */
+    @Synchronized
+    fun isCurrent(owner: DraftDocumentOwner): Boolean = accountRef == owner.accountRef && generation == owner.generation
+}
+
 /** Fences preparation results and reselections until older native cleanup completes. */
 internal class DraftDocumentRemovalFence {
     private val generationByUri = mutableMapOf<String, Long>()

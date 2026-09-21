@@ -5,6 +5,7 @@ import dev.ipf.whitenoise.android.media.editor.stagedPhotoAttachmentId
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -164,6 +165,35 @@ class ConversationAttachmentDraftTest {
         fence.completeRemoval(queuedCleanup)
 
         assertTrue(fence.canPublish(uri, listOf(uri)))
+    }
+
+    /** A missing account cannot create a cleanup ticket that no owner can ever complete. */
+    @Test
+    fun documentRemovalRequiresAnAccountOwner() {
+        val uri = "content://picker/document/no-owner"
+        val removals = DraftDocumentRemovalFence()
+        val owners = DraftDocumentOwnerFence()
+        removals.updateInputs(emptyList(), listOf(uri))
+
+        assertNull(owners.recordRemoval(uri, removals))
+        assertTrue(removals.canPublish(uri, listOf(uri)))
+    }
+
+    /** Returning to the same account does not revive work queued by its previous lifetime. */
+    @Test
+    fun documentOwnerGenerationRejectsQueuedWorkAcrossAccountChanges() {
+        val uri = "content://picker/document/account-switch"
+        val removals = DraftDocumentRemovalFence()
+        val owners = DraftDocumentOwnerFence()
+        owners.update("alice")
+        removals.updateInputs(emptyList(), listOf(uri))
+        val oldRemoval = requireNotNull(owners.recordRemoval(uri, removals))
+
+        assertTrue(owners.isCurrent(oldRemoval.owner))
+        owners.update("bob")
+        assertFalse(owners.isCurrent(oldRemoval.owner))
+        owners.update("alice")
+        assertFalse(owners.isCurrent(oldRemoval.owner))
     }
 
     /** Builds a minimal native draft descriptor for classification tests. */

@@ -1362,6 +1362,7 @@ class WhiteNoiseAppState private constructor(
         val revision = nativeAttachmentPermissions.invalidate()
         val engine = marmotRuntime?.marmot ?: return
         val accountRefs = accounts.filterNot { it.signedOut }.map { it.label }
+        // Marmot binding calls stay off Main; only Android permission evaluation returns to Main below.
         mutationsScope.launch(Dispatchers.IO) {
             runCatchingCancellable {
                 nativeAttachmentPermissions.update(revision, engine, accountRefs) { account ->
