@@ -76,7 +76,7 @@ func TestLoopbackRelayReplaysResponsePublishedBeforeSubscription(t *testing.T) {
 	}
 }
 
-func TestReconnectOmitsConsumedInvitation(t *testing.T) {
+func TestReconnectMatchesPublisherAndRetainsOriginalURI(t *testing.T) {
 	key, clientKey := nostr.GeneratePrivateKey(), nostr.GeneratePrivateKey()
 	pub, _ := nostr.GetPublicKey(key)
 	clientPub, _ := nostr.GetPublicKey(clientKey)
@@ -133,7 +133,7 @@ func TestReconnectOmitsConsumedInvitation(t *testing.T) {
 					invitation = req.Params[1]
 				}
 				seen <- invitation
-				if invitation != "" {
+				if invitation != "original-invitation" {
 					return
 				}
 			}
@@ -166,8 +166,8 @@ func TestReconnectOmitsConsumedInvitation(t *testing.T) {
 	if err := testSigner(); err != nil {
 		t.Fatal(err)
 	}
-	if <-seen != "" {
-		t.Fatal("reconnect reused consumed invitation")
+	if <-seen != "original-invitation" {
+		t.Fatal("reconnect did not retain the publisher's original bunker URI")
 	}
 }
 
