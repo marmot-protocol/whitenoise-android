@@ -23,10 +23,10 @@ internal data class ReactionMutationCoordination(
 )
 
 /**
- * Applies a reaction overlay before waiting for the engine, rolling it back only when the
- * authoritative mutation fails.
+ * Applies a reaction overlay before waiting for the engine, rolling it back when the authoritative
+ * mutation fails or its caller is cancelled.
  */
-@Suppress("TooGenericExceptionCaught") // The FFI boundary can raise unchecked failures; cancellation is rethrown first.
+@Suppress("TooGenericExceptionCaught")
 internal suspend fun runOptimisticReactionMutation(
     applyOptimistic: () -> Unit,
     commit: suspend () -> Boolean,
@@ -36,6 +36,7 @@ internal suspend fun runOptimisticReactionMutation(
     return try {
         Result.success(commit())
     } catch (cancel: CancellationException) {
+        rollback()
         throw cancel
     } catch (throwable: Throwable) {
         rollback()
@@ -57,13 +58,13 @@ internal sealed interface OwnReactionRetractionPlan {
 /**
  * Selects the safest removal for an own reaction. [preferredEventId] is used only when an immediate
  * removal is paired with the exact event returned by its still-unprojected add. Otherwise,
- * target-wide unreact is preferred for a sole projected reaction, while multiple own reactions
- * require an event-scoped delete so another emoji is not cleared.
+ * target-wide unreact requires authoritative confirmation that [emoji] is the account's only
+ * active reaction; an event-scoped delete is used whenever the tapped event is known.
  */
 internal fun planOwnReactionRetraction(
     emoji: String,
     knownEventIdByEmoji: Map<String, String>,
-    ownEmojisBeforeMutation: Set<String>,
+    authoritativeOwnEmojis: Set<String>?,
     preferredEventId: String? = null,
 ): OwnReactionRetractionPlan {
     val preferredReactionMessageId = preferredEventId?.takeIf(String::isNotBlank)
@@ -71,7 +72,7 @@ internal fun planOwnReactionRetraction(
     return when {
         preferredReactionMessageId != null ->
             OwnReactionRetractionPlan.DeleteReactionMessage(preferredReactionMessageId)
-        ownEmojisBeforeMutation == setOf(emoji) -> OwnReactionRetractionPlan.UnreactTarget
+        authoritativeOwnEmojis == setOf(emoji) -> OwnReactionRetractionPlan.UnreactTarget
         reactionMessageId != null -> OwnReactionRetractionPlan.DeleteReactionMessage(reactionMessageId)
         else -> OwnReactionRetractionPlan.Unavailable
     }
@@ -84,15 +85,14 @@ internal suspend fun awaitImmediateReactionEventId(
 ): String? = if (precedingAdd != null) precedingAdd.await() else cachedEventId()
 
 /**
- * Finds the newest active reaction event for [emoji] in Marmot's raw local history. Same-author
- * delete events suppress older reactions so a stale event id is never retried after an unreact.
+ * Finds the newest active own event for each emoji in Marmot's raw local history. Same-author
+ * delete events suppress older reactions so stale event ids are never retried after an unreact.
  */
-internal fun activeOwnReactionEventId(
+internal fun activeOwnReactionEventIdsByEmoji(
     records: List<AppMessageRecordFfi>,
     activeAccountIdHex: String,
     targetMessageIdHex: String,
-    emoji: String,
-): String? {
+): Map<String, String> {
     val deletedOwnEventIds =
         records
             .asSequence()
@@ -101,16 +101,29 @@ internal fun activeOwnReactionEventId(
             }.flatMap { MessageProjector.deletedTargetMessageIds(it).asSequence() }
             .map(String::lowercase)
             .toSet()
+    val newestFirst =
+        compareByDescending<AppMessageRecordFfi> { it.recordedAt }
+            .thenByDescending { it.receivedAt }
+            .thenByDescending { it.messageIdHex }
     return records
         .asSequence()
         .filter(MessageProjector::isReaction)
         .filter { it.sender.equals(activeAccountIdHex, ignoreCase = true) }
-        .filter { it.plaintext == emoji }
+        .filter { it.plaintext.isNotBlank() }
         .filter { MessageProjector.reactedToMessageId(it)?.equals(targetMessageIdHex, ignoreCase = true) == true }
         .filter { it.messageIdHex.lowercase() !in deletedOwnEventIds }
-        .maxWithOrNull(compareBy<AppMessageRecordFfi>({ it.recordedAt }, { it.receivedAt }, { it.messageIdHex }))
-        ?.messageIdHex
+        .sortedWith(newestFirst)
+        .distinctBy { it.plaintext }
+        .associate { it.plaintext to it.messageIdHex }
 }
+
+/** Returns the newest active own reaction event for one [emoji] from authoritative history. */
+internal fun activeOwnReactionEventId(
+    records: List<AppMessageRecordFfi>,
+    activeAccountIdHex: String,
+    targetMessageIdHex: String,
+    emoji: String,
+): String? = activeOwnReactionEventIdsByEmoji(records, activeAccountIdHex, targetMessageIdHex)[emoji]
 
 /** Returns optimistic overlays whose intended state now matches the authoritative sender sets. */
 internal fun confirmedOptimisticReactionKeys(

@@ -7,6 +7,8 @@ import dev.ipf.whitenoise.android.core.ReactionTally
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -131,6 +133,33 @@ class CanAcceptReactionTest {
             assertEquals(1, rollbackCount)
         }
 
+    /** Cancelling an in-flight add removes the optimistic chip instead of leaving removal latched. */
+    @Test
+    fun cancelledCommitRollsBackOptimisticReaction() =
+        runTest {
+            val optimistic = linkedMapOf<String, OptimisticReactionChange>()
+            var rollbackCount = 0
+            val mutation =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    runOptimisticReactionMutation(
+                        applyOptimistic = {
+                            optimistic["pending"] = OptimisticReactionChange(TARGET, "👍", add = true)
+                        },
+                        commit = { awaitCancellation() },
+                        rollback = {
+                            optimistic.remove("pending")
+                            rollbackCount += 1
+                        },
+                    )
+                }
+
+            assertEquals(setOf("pending"), optimistic.keys)
+            mutation.cancelAndJoin()
+
+            assertTrue(optimistic.isEmpty())
+            assertEquals(1, rollbackCount)
+        }
+
     /** An immediate removal remains suspended only until the preceding add returns its event id. */
     @Test
     fun immediateRemovalWaitsForReactionAddResult() =
@@ -175,20 +204,20 @@ class CanAcceptReactionTest {
             planOwnReactionRetraction(
                 emoji = "👍",
                 knownEventIdByEmoji = mapOf("👍" to "reaction-event"),
-                ownEmojisBeforeMutation = setOf("👍", "🔥"),
+                authoritativeOwnEmojis = setOf("👍", "🔥"),
             ),
         )
     }
 
-    /** A sole own reaction can use target-wide unreact while its event id is still missing. */
+    /** An authoritatively sole own reaction can use target-wide unreact while its event id is missing. */
     @Test
-    fun soleOwnReactionFallsBackToTargetUnreactBeforeProjectionEcho() {
+    fun authoritativelySoleOwnReactionFallsBackToTargetUnreactBeforeProjectionEcho() {
         assertEquals(
             OwnReactionRetractionPlan.UnreactTarget,
             planOwnReactionRetraction(
                 emoji = "👍",
                 knownEventIdByEmoji = emptyMap(),
-                ownEmojisBeforeMutation = setOf("👍"),
+                authoritativeOwnEmojis = setOf("👍"),
             ),
         )
     }
@@ -201,7 +230,33 @@ class CanAcceptReactionTest {
             planOwnReactionRetraction(
                 emoji = "👍",
                 knownEventIdByEmoji = mapOf("👍" to "reaction-event"),
-                ownEmojisBeforeMutation = setOf("👍"),
+                authoritativeOwnEmojis = setOf("👍"),
+            ),
+        )
+    }
+
+    /** A stale sole projection deletes only the tapped event when history contains another emoji. */
+    @Test
+    fun authoritativeSecondEmojiPreventsTargetWideUnreact() {
+        assertEquals(
+            OwnReactionRetractionPlan.DeleteReactionMessage("thumb-event"),
+            planOwnReactionRetraction(
+                emoji = "👍",
+                knownEventIdByEmoji = mapOf("👍" to "thumb-event", "🔥" to "fire-event"),
+                authoritativeOwnEmojis = setOf("👍", "🔥"),
+            ),
+        )
+    }
+
+    /** Failed authoritative lookup still prefers a known tapped event over target-wide unreact. */
+    @Test
+    fun unknownAuthoritativeStateDeletesKnownTappedEvent() {
+        assertEquals(
+            OwnReactionRetractionPlan.DeleteReactionMessage("thumb-event"),
+            planOwnReactionRetraction(
+                emoji = "👍",
+                knownEventIdByEmoji = mapOf("👍" to "thumb-event"),
+                authoritativeOwnEmojis = null,
             ),
         )
     }
@@ -214,7 +269,7 @@ class CanAcceptReactionTest {
             planOwnReactionRetraction(
                 emoji = "👍",
                 knownEventIdByEmoji = emptyMap(),
-                ownEmojisBeforeMutation = setOf("👍"),
+                authoritativeOwnEmojis = null,
                 preferredEventId = "new-reaction-event",
             ),
         )
@@ -228,8 +283,23 @@ class CanAcceptReactionTest {
             planOwnReactionRetraction(
                 emoji = "👍",
                 knownEventIdByEmoji = emptyMap(),
-                ownEmojisBeforeMutation = setOf("👍", "🔥"),
+                authoritativeOwnEmojis = setOf("👍", "🔥"),
             ),
+        )
+    }
+
+    /** Raw history exposes every active own emoji so sole-ness never relies on projection alone. */
+    @Test
+    fun rawHistoryFindsAllActiveOwnReactions() {
+        val records =
+            listOf(
+                rawRecord(id = "thumb-event", kind = 7uL, plaintext = "👍", target = TARGET, recordedAt = 1uL),
+                rawRecord(id = "fire-event", kind = 7uL, plaintext = "🔥", target = TARGET, recordedAt = 2uL),
+            )
+
+        assertEquals(
+            mapOf("🔥" to "fire-event", "👍" to "thumb-event"),
+            activeOwnReactionEventIdsByEmoji(records, ACCOUNT, TARGET),
         )
     }
 

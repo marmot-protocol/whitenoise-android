@@ -20,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -43,6 +44,26 @@ import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+
+/** Keeps a reactor-sheet filter while its emoji remains present in the live participant list. */
+internal fun retainedReactionFilter(
+    selectedEmoji: String?,
+    participants: List<ReactionParticipant>,
+): String? = selectedEmoji?.takeIf { emoji -> participants.any { it.emoji == emoji } }
+
+/** Returns every reactor or only those matching the selected emoji. */
+internal fun filteredReactionParticipants(
+    participants: List<ReactionParticipant>,
+    selectedEmoji: String?,
+): List<ReactionParticipant> = selectedEmoji?.let { emoji -> participants.filter { it.emoji == emoji } } ?: participants
+
+/** Counts reactors per emoji and orders the filters by popularity, then emoji. */
+internal fun reactionEmojiCounts(participants: List<ReactionParticipant>): List<Pair<String, Int>> =
+    participants
+        .groupingBy { it.emoji }
+        .eachCount()
+        .toList()
+        .sortedWith(compareByDescending<Pair<String, Int>> { it.second }.thenBy { it.first })
 
 /** Attaches the reaction summary to the bubble's outer edge. */
 internal fun Modifier.reactionSummaryAttachment(outgoing: Boolean): Modifier =
@@ -70,77 +91,106 @@ internal fun ReactionDetailsSheet(
     onRemoveOwnReaction: ((String) -> Unit)?,
     onDismissRequest: () -> Unit,
 ) {
-    var selectedEmoji by
-        remember(participants, initialEmoji) {
-            mutableStateOf(initialEmoji?.takeIf { emoji -> participants.any { it.emoji == emoji } })
-        }
-    val activeAccountId = appState.activeAccount?.accountIdHex
-    val emojiCounts =
-        remember(participants) {
-            participants
-                .groupingBy { it.emoji }
-                .eachCount()
-                .toList()
-                .sortedWith(compareByDescending<Pair<String, Int>> { it.second }.thenBy { it.first })
-        }
-    val visibleParticipants =
-        remember(participants, selectedEmoji) {
-            selectedEmoji?.let { emoji -> participants.filter { it.emoji == emoji } } ?: participants
-        }
-
     KeyboardSafePopup(
         expanded = true,
         onDismissRequest = onDismissRequest,
         popupPositionProvider = BottomAnchoredPopupPositionProvider,
     ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = amoledSheetContainerColor(),
-            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        ReactionDetailsContent(
+            participants = participants,
+            appState = appState,
+            initialEmoji = initialEmoji,
+            onRemoveOwnReaction = onRemoveOwnReaction,
+        )
+    }
+}
+
+/** Renders the stateful reactor filters and rows independently of the popup window that owns them. */
+@Composable
+@Suppress("FunctionNaming")
+internal fun ReactionDetailsContent(
+    participants: List<ReactionParticipant>,
+    appState: WhiteNoiseAppState,
+    initialEmoji: String? = null,
+    onRemoveOwnReaction: ((String) -> Unit)?,
+) {
+    var selectedEmoji by
+        remember(initialEmoji) {
+            mutableStateOf(initialEmoji)
+        }
+    LaunchedEffect(participants, selectedEmoji) {
+        val retainedFilter = retainedReactionFilter(selectedEmoji, participants)
+        if (retainedFilter != selectedEmoji) selectedEmoji = retainedFilter
+    }
+    val activeAccountId = appState.activeAccount?.accountIdHex
+    val emojiCounts = remember(participants) { reactionEmojiCounts(participants) }
+    val visibleParticipants =
+        remember(participants, selectedEmoji) { filteredReactionParticipants(participants, selectedEmoji) }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = amoledSheetContainerColor(),
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(horizontal = 20.dp)
-                    .padding(bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ReactionFilterChips(
+                selectedEmoji = selectedEmoji,
+                emojiCounts = emojiCounts,
+                participantCount = participants.size,
+                onSelectedEmoji = { selectedEmoji = it },
+            )
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    FilterChip(
-                        selected = selectedEmoji == null,
-                        onClick = { selectedEmoji = null },
-                        label = { Text("${stringResource(R.string.reaction_filter_all)} · ${participants.size}") },
+                itemsIndexed(
+                    visibleParticipants,
+                    key = { _, participant -> "${participant.sender}:${participant.emoji}:${participant.reactedAt}" },
+                ) { _, participant ->
+                    val isMine = activeAccountId != null && participant.sender.equals(activeAccountId, ignoreCase = true)
+                    ReactionParticipantRow(
+                        participant = participant,
+                        appState = appState,
+                        mine = isMine,
+                        onRemove = if (isMine && onRemoveOwnReaction != null) ({ onRemoveOwnReaction(participant.emoji) }) else null,
                     )
-                    emojiCounts.forEach { (emoji, count) ->
-                        FilterChip(
-                            selected = selectedEmoji == emoji,
-                            onClick = { selectedEmoji = emoji },
-                            label = { Text("$emoji $count") },
-                        )
-                    }
-                }
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    itemsIndexed(
-                        visibleParticipants,
-                        key = { _, participant -> "${participant.sender}:${participant.emoji}:${participant.reactedAt}" },
-                    ) { _, participant ->
-                        val isMine = activeAccountId != null && participant.sender.equals(activeAccountId, ignoreCase = true)
-                        ReactionParticipantRow(
-                            participant = participant,
-                            appState = appState,
-                            mine = isMine,
-                            onRemove = if (isMine && onRemoveOwnReaction != null) ({ onRemoveOwnReaction(participant.emoji) }) else null,
-                        )
-                    }
                 }
             }
+        }
+    }
+}
+
+/** Renders the All and per-emoji filters while reporting the user's current selection. */
+@Composable
+@Suppress("FunctionNaming")
+private fun ReactionFilterChips(
+    selectedEmoji: String?,
+    emojiCounts: List<Pair<String, Int>>,
+    participantCount: Int,
+    onSelectedEmoji: (String?) -> Unit,
+) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        FilterChip(
+            selected = selectedEmoji == null,
+            onClick = { onSelectedEmoji(null) },
+            label = { Text("${stringResource(R.string.reaction_filter_all)} · $participantCount") },
+        )
+        emojiCounts.forEach { (emoji, count) ->
+            FilterChip(
+                selected = selectedEmoji == emoji,
+                onClick = { onSelectedEmoji(emoji) },
+                label = { Text("$emoji $count") },
+            )
         }
     }
 }
