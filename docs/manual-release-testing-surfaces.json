@@ -22202,7 +22202,7 @@
         ]
       },
       {
-        "surface": "Dictation completed-transcript target validation and retention",
+        "surface": "Dictation completed-transcript Send validation and local-only Paste delivery",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
         "anchor": "internal enum class ConversationDictationTargetValidation",
         "test_ids": [
@@ -22438,6 +22438,14 @@
         ]
       },
       {
+        "surface": "Completed non-reply dictation delivery after the conversation screen detaches",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "internal suspend fun sendDictationTranscriptIfOriginUnchanged(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
         "surface": "host timing configuration and consent boundary",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "anchor": "setProductAnalyticsRuntimeConfig(",
@@ -22484,6 +22492,14 @@
         "surface": "Dictation playback handoff",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationDictationPlaybackHandoff.kt",
         "anchor": "internal class ConversationDictationPlaybackHandoff(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "Detached, mismatched, and mounted dictation reply-target resolution",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationDictationReplyTargetResolution.kt",
+        "anchor": "internal fun resolveConversationDictationReplyTarget(",
         "test_ids": [
           "DIC-002"
         ]
@@ -22536,6 +22552,14 @@
           "CON-005",
           "CON-008",
           "CON-012"
+        ]
+      },
+      {
+        "surface": "A detached completed dictation sends through the process-owned transport order",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/DraftSend.kt",
+        "anchor": "internal suspend fun WhiteNoiseAppState.sendDetachedDictationText(",
+        "test_ids": [
+          "DIC-002"
         ]
       },
       {

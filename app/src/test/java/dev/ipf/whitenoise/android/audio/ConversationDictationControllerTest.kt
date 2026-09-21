@@ -73,7 +73,53 @@ class ConversationDictationControllerTest {
         )
         replyAvailable = false
 
+        fixture.controller.paste()
         fixture.platform.listener.onResult("must remain a reply")
+
+        assertEquals("Keep", fixture.drafts.getValue(key()).text)
+        assertEquals(0, fixture.writes)
+    }
+
+    @Test
+    fun detachedReplyPasteRetainsItsTranscriptWithoutWriting() {
+        var replyAvailable: Boolean? = true
+        val fixture =
+            fixture(
+                draft = TextFieldValue("Keep", TextRange(4)),
+                targetReplyAvailable = { replyAvailable },
+            )
+        fixture.controller.requestStart(
+            ACCOUNT,
+            GROUP,
+            fixture.drafts.getValue(key()),
+            replyToMessageIdHex = REPLY_MESSAGE_ID,
+        )
+        replyAvailable = null
+
+        fixture.controller.paste()
+        fixture.platform.listener.onResult("must remain a reply")
+
+        assertEquals("Keep", fixture.drafts.getValue(key()).text)
+        assertEquals(0, fixture.writes)
+        assertEquals(
+            "must remain a reply",
+            (fixture.controller.state as ConversationDictationState.Failed).retainedTranscript,
+        )
+    }
+
+    @Test
+    fun nonReplyPasteDoesNotRetargetIntoAMountedReplyComposer() {
+        var replyMatches = true
+        val fixture =
+            fixture(
+                draft = TextFieldValue("Keep", TextRange(4)),
+                targetReplyAvailable = { replyMatches },
+            )
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        replyMatches = false
+
+        fixture.controller.paste()
+        fixture.platform.listener.onResult("must remain standalone")
 
         assertEquals("Keep", fixture.drafts.getValue(key()).text)
         assertEquals(0, fixture.writes)
@@ -418,34 +464,172 @@ class ConversationDictationControllerTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun authoritativeRemovalAndIndeterminateValidationRetainPasteAndSendResults() =
+    fun nonReplyPasteSurvivesOriginControllerDetachment() =
+        runTest {
+            var originControllerAttached = true
+            val fixture =
+                fixture(
+                    draft = TextFieldValue("Keep", TextRange(4)),
+                    targetReplyAvailable = { originControllerAttached.takeIf { it } },
+                    targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
+                    targetValidationScope = this,
+                )
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.platform.listener.onReady()
+
+            originControllerAttached = false
+            fixture.controller.paste()
+            fixture.platform.listener.onResult("all of it")
+            advanceUntilIdle()
+
+            assertEquals("Keep all of it", fixture.drafts.getValue(key()).text)
+            assertEquals(1, fixture.writes)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun pasteIntoEmptyComposerDoesNotStartRemoteTargetValidation() =
+        runTest {
+            var validationCalls = 0
+            val fixture =
+                fixture(
+                    draft = TextFieldValue(""),
+                    targetValidator = { _, _ ->
+                        validationCalls += 1
+                        ConversationDictationTargetValidation.Indeterminate
+                    },
+                    targetValidationScope = this,
+                )
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.platform.listener.onReady()
+
+            fixture.controller.paste()
+            fixture.platform.listener.onResult("complete words")
+            advanceUntilIdle()
+
+            assertEquals("complete words", fixture.drafts.getValue(key()).text)
+            assertEquals(1, fixture.writes)
+            assertEquals(0, validationCalls)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun preTransportSendRejectionRestoresDraftAndPreservesTranscript() =
+        runTest {
+            val fixture =
+                fixture(
+                    draft = TextFieldValue("Keep", TextRange(4)),
+                    deliveryMode = { ConversationDictationDeliveryMode.SendOnFinish },
+                    targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        assertTrue(request.beginDispatch())
+                        request.onDispatchRejectedBeforeTransport()
+                        false
+                    },
+                )
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.platform.listener.onReady()
+
+            fixture.controller.send()
+            fixture.platform.listener.onResult("all of it")
+            advanceUntilIdle()
+
+            assertEquals("Keep all of it", fixture.drafts.getValue(key()).text)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun detachedNonReplyPasteBypassesRemoteValidationWhileSendStillFailsClosed() =
         runTest {
             listOf(
                 ConversationDictationTargetValidation.DefinitelyRemoved,
                 ConversationDictationTargetValidation.Indeterminate,
             ).forEach { validation ->
-                listOf<(ConversationDictationController) -> Unit>(
-                    { it.paste() },
-                    { it.send() },
-                ).forEach { finish ->
-                    val fixture =
-                        fixture(
-                            draft = TextFieldValue("Keep", TextRange(4)),
-                            targetValidator = { _, _ -> validation },
-                            targetValidationScope = this,
-                        )
-                    fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
-                    fixture.platform.listener.onReady()
+                val pasted =
+                    fixture(
+                        draft = TextFieldValue("Keep", TextRange(4)),
+                        targetReplyAvailable = { null },
+                        targetValidator = { _, _ -> validation },
+                        targetValidationScope = this,
+                    )
+                pasted.controller.requestStart(ACCOUNT, GROUP, pasted.drafts.getValue(key()))
+                pasted.platform.listener.onReady()
+                pasted.controller.paste()
+                pasted.platform.listener.onResult("recover me")
+                advanceUntilIdle()
 
-                    finish(fixture.controller)
-                    fixture.platform.listener.onResult("recover me")
-                    advanceUntilIdle()
+                assertEquals("Keep recover me", pasted.drafts.getValue(key()).text)
+                assertEquals(1, pasted.writes)
+                assertTrue(pasted.controller.state is ConversationDictationState.Idle)
 
-                    assertEquals("Keep", fixture.drafts.getValue(key()).text)
-                    assertEquals(0, fixture.writes)
-                    val failure = fixture.controller.state as ConversationDictationState.Failed
-                    assertEquals("recover me", failure.retainedTranscript)
-                }
+                val sent =
+                    fixture(
+                        draft = TextFieldValue("Keep", TextRange(4)),
+                        targetReplyAvailable = { null },
+                        targetValidator = { _, _ -> validation },
+                        targetValidationScope = this,
+                    )
+                sent.controller.requestStart(ACCOUNT, GROUP, sent.drafts.getValue(key()))
+                sent.platform.listener.onReady()
+                sent.controller.send()
+                sent.platform.listener.onResult("recover me")
+                advanceUntilIdle()
+
+                assertEquals("Keep", sent.drafts.getValue(key()).text)
+                assertEquals(0, sent.writes)
+                assertEquals(
+                    "recover me",
+                    (sent.controller.state as ConversationDictationState.Failed).retainedTranscript,
+                )
+            }
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun attachedNonReplyPasteBypassesRemoteValidationWhileSendStillFailsClosed() =
+        runTest {
+            listOf(
+                ConversationDictationTargetValidation.DefinitelyRemoved,
+                ConversationDictationTargetValidation.Indeterminate,
+            ).forEach { validation ->
+                val pasted =
+                    fixture(
+                        draft = TextFieldValue("Keep", TextRange(4)),
+                        targetValidator = { _, _ -> validation },
+                        targetValidationScope = this,
+                    )
+                pasted.controller.requestStart(ACCOUNT, GROUP, pasted.drafts.getValue(key()))
+                pasted.platform.listener.onReady()
+                pasted.controller.paste()
+                pasted.platform.listener.onResult("recover me")
+                advanceUntilIdle()
+
+                assertEquals("Keep recover me", pasted.drafts.getValue(key()).text)
+                assertEquals(1, pasted.writes)
+                assertTrue(pasted.controller.state is ConversationDictationState.Idle)
+
+                val sent =
+                    fixture(
+                        draft = TextFieldValue("Keep", TextRange(4)),
+                        targetValidator = { _, _ -> validation },
+                        targetValidationScope = this,
+                    )
+                sent.controller.requestStart(ACCOUNT, GROUP, sent.drafts.getValue(key()))
+                sent.platform.listener.onReady()
+                sent.controller.send()
+                sent.platform.listener.onResult("recover me")
+                advanceUntilIdle()
+
+                assertEquals("Keep", sent.drafts.getValue(key()).text)
+                assertEquals(0, sent.writes)
+                assertEquals(
+                    "recover me",
+                    (sent.controller.state as ConversationDictationState.Failed).retainedTranscript,
+                )
             }
         }
 
@@ -3771,7 +3955,7 @@ class ConversationDictationControllerTest {
     private fun fixture(
         draft: TextFieldValue,
         targetAvailable: () -> Boolean = { true },
-        targetReplyAvailable: (String?) -> Boolean = { true },
+        targetReplyAvailable: (String?) -> Boolean? = { true },
         targetValidator: (suspend (String, String) -> ConversationDictationTargetValidation)? = null,
         targetValidationScope: CoroutineScope? = null,
         onBeforeRecognition: () -> Unit = {},

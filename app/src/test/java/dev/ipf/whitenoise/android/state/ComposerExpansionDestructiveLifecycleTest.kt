@@ -71,6 +71,177 @@ class ComposerExpansionDestructiveLifecycleTest {
         }
 
     @Test
+    fun detachedNonReplyDictationSendUsesTheProcessTransport() =
+        runBlocking {
+            val fixture = fixture(attachConversationController = false)
+            fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("typed"))
+            var pendingCallbacks = 0
+            val request =
+                dictationRequest(fixture.appState, "typed").copy(
+                    onPendingShown = { pendingCallbacks += 1 },
+                )
+            retainExpansion(fixture.appState, draftGeneration = request.expectedDraftRevision)
+
+            assertTrue(fixture.appState.sendDictationTranscriptIfOriginUnchanged(request))
+
+            assertEquals(1, fixture.calls.send.get())
+            assertEquals(1, pendingCallbacks)
+            assertTrue(fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID).isNullOrEmpty())
+            assertNull(fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+        }
+
+    @Test
+    fun detachedNonReplyEmptySummaryRetainsDraftAndGeometry() =
+        runBlocking {
+            val fixture = fixture(sendResult = ::emptySendSummary, attachConversationController = false)
+            fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("typed"))
+            var pendingCallbacks = 0
+            val request =
+                dictationRequest(fixture.appState, "typed").copy(
+                    onPendingShown = { pendingCallbacks += 1 },
+                )
+            val retained = retainExpansion(fixture.appState, draftGeneration = request.expectedDraftRevision)
+
+            assertFalse(fixture.appState.sendDictationTranscriptIfOriginUnchanged(request))
+
+            assertEquals(1, fixture.calls.send.get())
+            assertEquals(0, pendingCallbacks)
+            assertEquals("typed", fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID))
+            assertEquals(
+                retained,
+                fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID),
+            )
+        }
+
+    @Test
+    fun detachedNonReplyStaleDraftNeverClaimsOrSends() =
+        runBlocking {
+            val fixture = fixture(attachConversationController = false)
+            val request = dictationRequest(fixture.appState)
+            fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("newer"))
+            var dispatchClaims = 0
+            val staleRequest =
+                request.copy(
+                    beginDispatch = {
+                        dispatchClaims += 1
+                        true
+                    },
+                )
+
+            assertFalse(fixture.appState.sendDictationTranscriptIfOriginUnchanged(staleRequest))
+
+            assertEquals(0, dispatchClaims)
+            assertEquals(0, fixture.calls.send.get())
+            assertEquals("newer", fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID))
+        }
+
+    @Test
+    fun detachedReplyDictationDoesNotSendWithoutItsComposerContext() =
+        runBlocking {
+            val fixture = fixture(attachConversationController = false)
+            fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("typed"))
+            var dispatchClaims = 0
+            val request =
+                dictationRequest(fixture.appState, "typed").copy(
+                    replyToMessageIdHex = REPLY_MESSAGE_ID,
+                    beginDispatch = {
+                        dispatchClaims += 1
+                        true
+                    },
+                )
+
+            assertFalse(fixture.appState.sendDictationTranscriptIfOriginUnchanged(request))
+
+            assertEquals(0, dispatchClaims)
+            assertEquals(0, fixture.calls.send.get())
+            assertEquals("typed", fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID))
+        }
+
+    @Test
+    fun nonReplyDetachAfterDispatchClaimUsesTheProcessTransport() =
+        runBlocking {
+            val fixture = fixture()
+            fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("typed"))
+            val request =
+                dictationRequest(fixture.appState, "typed").copy(
+                    beginDispatch = {
+                        fixture.appState.detachConversationController(fixture.conversationController)
+                        true
+                    },
+                )
+
+            assertTrue(fixture.appState.sendDictationTranscriptIfOriginUnchanged(request))
+
+            assertEquals(1, fixture.calls.send.get())
+        }
+
+    @Test
+    fun replyDetachAfterDispatchClaimRejectsStandaloneDelivery() =
+        runBlocking {
+            val fixture = fixture()
+            fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("typed"))
+            fixture.conversationController.replyingTo = timelineAppMessage(REPLY_MESSAGE_ID)
+            var dispatchClaims = 0
+            var preTransportRejections = 0
+            val request =
+                dictationRequest(fixture.appState, "typed").copy(
+                    replyToMessageIdHex = REPLY_MESSAGE_ID,
+                    beginDispatch = {
+                        dispatchClaims += 1
+                        fixture.appState.detachConversationController(fixture.conversationController)
+                        true
+                    },
+                    onDispatchRejectedBeforeTransport = { preTransportRejections += 1 },
+                )
+            val retained = retainExpansion(fixture.appState, draftGeneration = request.expectedDraftRevision)
+
+            assertFalse(fixture.appState.sendDictationTranscriptIfOriginUnchanged(request))
+
+            assertEquals(1, dispatchClaims)
+            assertEquals(1, preTransportRejections)
+            assertEquals(0, fixture.calls.send.get())
+            assertEquals("typed", fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID))
+            assertEquals(
+                retained,
+                fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID),
+            )
+        }
+
+    @Test
+    fun replyComposerMountedAfterDispatchClaimRejectsTheNonReplySend() =
+        runBlocking {
+            val fixture = fixture(attachConversationController = false)
+            fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("typed"))
+            fixture.conversationController.replyingTo = timelineAppMessage(REPLY_MESSAGE_ID)
+            var dispatchClaims = 0
+            var preTransportRejections = 0
+            val request =
+                dictationRequest(fixture.appState, "typed").copy(
+                    beginDispatch = {
+                        dispatchClaims += 1
+                        fixture.appState.attachConversationController(fixture.conversationController)
+                        true
+                    },
+                    onDispatchRejectedBeforeTransport = { preTransportRejections += 1 },
+                )
+            val retained = retainExpansion(fixture.appState, draftGeneration = request.expectedDraftRevision)
+            try {
+                assertFalse(fixture.appState.sendDictationTranscriptIfOriginUnchanged(request))
+
+                assertEquals(1, dispatchClaims)
+                assertEquals(1, preTransportRejections)
+                assertEquals(0, fixture.calls.send.get())
+                assertEquals("typed", fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID))
+                assertEquals(
+                    retained,
+                    fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID),
+                )
+            } finally {
+                fixture.appState.detachConversationController(fixture.conversationController)
+            }
+        }
+
+    @Test
     fun terminallyRejectedDictationSendRestoresDraftAndGeometry() =
         runBlocking {
             val fixture = fixture(sendResult = { throw MarmotKitException.Publish("relay rejected event") })
@@ -228,6 +399,14 @@ class ComposerExpansionDestructiveLifecycleTest {
             maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
         )
 
+    private fun emptySendSummary() =
+        SendSummaryFfi(
+            published = 0u,
+            messageIds = emptyList(),
+            acceptDisposition = SendAcceptDispositionFfi.ACCEPTED_PENDING,
+            maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+        )
+
     @Test
     fun successfulChatListLeaveClearsOnlyTheRemovedConversationGeometry() =
         runBlocking {
@@ -321,6 +500,7 @@ class ComposerExpansionDestructiveLifecycleTest {
         failLeave: Boolean = false,
         failDelete: Boolean = false,
         sendResult: () -> SendSummaryFfi = ::successfulSendSummary,
+        attachConversationController: Boolean = true,
     ): LifecycleFixture {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val appState =
@@ -338,8 +518,9 @@ class ComposerExpansionDestructiveLifecycleTest {
             .getDeclaredField("marmotRuntime")
             .apply { isAccessible = true }
             .set(appState, AppMarmotRuntime(rootPath = "test", marmot = marmot))
-        appState.attachConversationController(ConversationController(appState = appState, initialGroup = group()))
-        return LifecycleFixture(appState, calls)
+        val conversationController = ConversationController(appState = appState, initialGroup = group())
+        if (attachConversationController) appState.attachConversationController(conversationController)
+        return LifecycleFixture(appState, calls, conversationController)
     }
 
     /** Retains one manual expansion and returns the exact value expected after a failed commit. */
@@ -445,6 +626,7 @@ class ComposerExpansionDestructiveLifecycleTest {
     private class LifecycleFixture(
         val appState: WhiteNoiseAppState,
         val calls: LifecycleCalls,
+        val conversationController: ConversationController,
     ) {
         /** Seeds the actual chat-list projection required by its leave and delete actions. */
         fun seededChatsController(): ChatsController =
@@ -473,6 +655,7 @@ class ComposerExpansionDestructiveLifecycleTest {
         val PEER_ID = "b2".repeat(32)
         const val GROUP_ID = "group-a"
         const val OTHER_GROUP = "group-b"
+        const val REPLY_MESSAGE_ID = "reply-message"
 
         /** Builds the one stable group used by both leave and delete controller routes. */
         fun group() =
