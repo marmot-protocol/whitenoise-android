@@ -83,6 +83,7 @@ class FreshSweepCoverageTest {
         assertTrue("copy text must derive from cached action items", "batchCopyText(actionItems)" in actionItemsBlock)
     }
 
+    /** Every unread-derived state must invalidate when its visible controller or projection inputs change. */
     @Test
     fun conversationUnreadDerivationsRebindToTheVisibleController() {
         val source =
@@ -90,7 +91,20 @@ class FreshSweepCoverageTest {
                 .section("val unreadIncomingCount by", "// Reading the raw IME inset")
                 .replace(Regex("\\s+"), " ")
 
-        assertTrue(source.contains("val unreadIncomingCount by remember(controller, chat.id)"))
+        val unreadRememberInputs =
+            source
+                .substringAfter("val unreadIncomingCount by remember(")
+                .substringBefore(") { derivedStateOf")
+        assertTrue("unread derivation must follow the visible controller", "controller" in unreadRememberInputs)
+        assertTrue("unread derivation must follow the visible chat", "chat.id" in unreadRememberInputs)
+        assertTrue(
+            "projected unread changes must invalidate the derivation",
+            "projectedUnreadCount" in unreadRememberInputs,
+        )
+        assertTrue(
+            "projection availability changes must invalidate the derivation",
+            "entryProjectionAvailable" in unreadRememberInputs,
+        )
         assertTrue(
             source.contains(
                 "val mentionDetectionCache = remember(controller, chat.id, selfAccountIdHex) { MentionDetectionCache() }",
