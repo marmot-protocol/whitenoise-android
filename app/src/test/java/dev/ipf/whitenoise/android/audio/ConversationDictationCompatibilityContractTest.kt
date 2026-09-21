@@ -87,6 +87,7 @@ class ConversationDictationCompatibilityContractTest {
 
         assertTrue("android.speech.action.RECOGNIZE_SPEECH" in manifest)
         assertTrue("android.speech.RecognitionService" in manifest)
+        assertTrue("<package android:name=\"app.offlinespeechtotext\" />" in manifest)
         assertTrue("SpeechRecognizer" in matrix)
         assertTrue("RecognitionService" in matrix)
         assertTrue("Voice IME" in matrix)

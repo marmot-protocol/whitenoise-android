@@ -41,6 +41,9 @@
          queryIntentActivities and the nostrsigner: intents/content providers
          need the signer app to be visible to this package. -->
     <queries>
+        <!-- The dictation settings recommend Offline Speech to Text only when
+             its production package is not already installed. -->
+        <package android:name="app.offlinespeechtotext" />
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="nostrsigner" />

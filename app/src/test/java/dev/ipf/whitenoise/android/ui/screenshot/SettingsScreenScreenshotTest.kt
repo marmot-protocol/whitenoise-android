@@ -8,6 +8,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasScrollToNodeAction
@@ -138,6 +140,63 @@ class SettingsScreenScreenshotTest {
         }
 
         composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_settings_default_light.png")
+    }
+
+    /** Installed Offline Speech to Text needs no recommendation or marketplace detour. */
+    @Test
+    fun dictationSettingsHidesRecommendationWhenOsttIsInstalled() {
+        val appState = dictationAppState()
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    DictationSettingsScreen(
+                        appState = appState,
+                        onBack = {},
+                        isOfflineSpeechToTextInstalled = { true },
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Get Offline Speech to Text").assertDoesNotExist()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_settings_ostt_installed_light.png")
+    }
+
+    /** The missing-app recommendation opens the same canonical Zapstore page in every build flavor. */
+    @Test
+    fun dictationSettingsMissingOsttOpensCanonicalZapstoreListing() {
+        val openedUris = mutableListOf<String>()
+        val appState = dictationAppState()
+        composeRule.setContent {
+            CompositionLocalProvider(
+                LocalUriHandler provides
+                    object : UriHandler {
+                        override fun openUri(uri: String) {
+                            openedUris += uri
+                        }
+                    },
+            ) {
+                WhiteNoiseTheme {
+                    DictationSettingsScreen(
+                        appState = appState,
+                        onBack = {},
+                        isOfflineSpeechToTextInstalled = { false },
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Get Offline Speech to Text").performClick()
+        composeRule.runOnIdle {
+            assertEquals(
+                listOf(
+                    "https://zapstore.dev/apps/" +
+                        "naddr1qqtkzurs9ehkvenvd9hx2umsv4jkx6r5da6x27r5qyv8wumn8ghj7un9d3shjtn6v9c8xar0wfjjuer9wcp" +
+                        "zpys5pkhzxd9dqp4ger8du6p5f6y43tcnzqktjzmwvahq5vumtay4qvzqqqr7pv8t57pf",
+                ),
+                openedUris,
+            )
+        }
     }
 
     /** Verifies settings sheets persist explicit silence completion and send-on-finish choices. */

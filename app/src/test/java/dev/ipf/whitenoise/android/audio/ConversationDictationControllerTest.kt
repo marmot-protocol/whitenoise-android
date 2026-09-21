@@ -1786,6 +1786,185 @@ class ConversationDictationControllerTest {
         }
     }
 
+    /** A short caller-audio utterance must endpoint before any provider-final text exists. */
+    @Test
+    fun configuredSilenceFinishesShortCallerAudioAndPastesItsFinalTail() {
+        val platform =
+            FakePlatform().apply {
+                pendingCallerAudio = true
+                capturedSilenceMillis = 0L
+            }
+        val fixture =
+            fixture(
+                draft = TextFieldValue(""),
+                platform = platform,
+                finishAfterSilenceMillis = { 3_000L },
+            )
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        fixture.scheduler.advanceBy(2_999L)
+        assertFalse(platform.session.stopped)
+        platform.capturedSilenceMillis = 3_000L
+        fixture.scheduler.advanceBy(1L)
+
+        assertTrue(platform.session.stopped)
+        assertTrue(fixture.controller.state is ConversationDictationState.Processing)
+        assertEquals(0, fixture.writes)
+        platform.pendingCallerAudio = false
+        platform.listener.onResult("complete short tail")
+
+        assertEquals("complete short tail", fixture.drafts.getValue(key()).text)
+        assertEquals(1, fixture.writes)
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+    }
+
+    /** Automatic endpointing waits for real PCM speech instead of timing out from capture startup. */
+    @Test
+    fun configuredSilenceDoesNotFinishCallerAudioBeforeSpeech() {
+        val platform =
+            FakePlatform().apply {
+                pendingCallerAudio = true
+                capturedSilenceMillis = null
+            }
+        val fixture =
+            fixture(
+                draft = TextFieldValue(""),
+                platform = platform,
+                finishAfterSilenceMillis = { 3_000L },
+            )
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        fixture.scheduler.advanceBy(9_000L)
+
+        assertFalse(platform.session.stopped)
+        assertTrue(fixture.controller.state is ConversationDictationState.Starting)
+        assertEquals(0, fixture.writes)
+    }
+
+    /** Capture-side speech resets the configured interval even when provider callbacks lag. */
+    @Test
+    fun configuredSilenceRearmsFromResumedCallerAudioSpeech() {
+        val platform =
+            FakePlatform().apply {
+                pendingCallerAudio = true
+                capturedSilenceMillis = 0L
+            }
+        val fixture =
+            fixture(
+                draft = TextFieldValue(""),
+                platform = platform,
+                finishAfterSilenceMillis = { 3_000L },
+            )
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.scheduler.advanceBy(2_500L)
+        platform.capturedSilenceMillis = 0L
+
+        fixture.scheduler.advanceBy(500L)
+        assertFalse(platform.session.stopped)
+        fixture.scheduler.advanceBy(2_999L)
+        assertFalse(platform.session.stopped)
+        platform.capturedSilenceMillis = 3_000L
+        fixture.scheduler.advanceBy(1L)
+
+        assertTrue(platform.session.stopped)
+    }
+
+    /** A delayed provider speech callback must keep using the current capture clock and cannot rearm after stop. */
+    @Test
+    fun configuredSilenceFencesLaggingProviderSpeechCallbacks() {
+        val platform =
+            FakePlatform().apply {
+                pendingCallerAudio = true
+                capturedSilenceMillis = 0L
+            }
+        val fixture =
+            fixture(
+                draft = TextFieldValue(""),
+                platform = platform,
+                finishAfterSilenceMillis = { 3_000L },
+            )
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.scheduler.advanceBy(2_500L)
+        platform.capturedSilenceMillis = 0L
+        platform.listener.onBeginningOfSpeech()
+
+        fixture.scheduler.advanceBy(2_999L)
+        assertFalse(platform.session.stopped)
+        platform.capturedSilenceMillis = 3_000L
+        fixture.scheduler.advanceBy(1L)
+
+        assertTrue(platform.session.stopped)
+        val pendingAfterStop = fixture.scheduler.liveTaskCount()
+        platform.listener.onBeginningOfSpeech()
+        assertEquals(pendingAfterStop, fixture.scheduler.liveTaskCount())
+    }
+
+    /** The capture clock is logical-session state even when a replacement generation has no stream. */
+    @Test
+    fun configuredSilenceRetainsCallerAudioClockAcrossRecognizerGenerations() {
+        val platform =
+            FakePlatform().apply {
+                pendingCallerAudio = true
+                capturedSilenceMillis = 0L
+            }
+        val fixture =
+            fixture(
+                draft = TextFieldValue(""),
+                platform = platform,
+                finishAfterSilenceMillis = { 3_000L },
+            )
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        platform.sessionCallerAudioOwnedOverride = false
+        platform.listener.onResult("first chunk")
+        fixture.scheduler.runDelay(250L)
+        assertEquals(2, platform.sessions.size)
+
+        platform.capturedSilenceMillis = 3_000L
+        fixture.scheduler.advanceBy(2_750L)
+
+        assertTrue(platform.sessions.last().stopped)
+        platform.pendingCallerAudio = false
+        platform.listener.onResult("final tail")
+        assertEquals("first chunk final tail", fixture.drafts.getValue(key()).text)
+        assertEquals(1, fixture.writes)
+    }
+
+    /** Send-on-finish shares the same short-tail endpoint and immutable delivery pipeline as Paste. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun configuredSilenceFinishesShortCallerAudioAndSendsItsFinalTail() =
+        runTest {
+            val sent = mutableListOf<String>()
+            val platform =
+                FakePlatform().apply {
+                    pendingCallerAudio = true
+                    capturedSilenceMillis = 0L
+                }
+            val fixture =
+                fixture(
+                    draft = TextFieldValue("Draft", TextRange(5)),
+                    platform = platform,
+                    finishAfterSilenceMillis = { 3_000L },
+                    deliveryMode = { ConversationDictationDeliveryMode.SendOnFinish },
+                    targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        sent += request.payload
+                        true
+                    },
+                )
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            platform.capturedSilenceMillis = 3_000L
+            fixture.scheduler.advanceBy(3_000L)
+            platform.pendingCallerAudio = false
+            platform.listener.onResult("complete short tail")
+            advanceUntilIdle()
+
+            assertEquals(listOf("Draft complete short tail"), sent)
+            assertEquals("", fixture.drafts.getValue(key()).text)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        }
+
     /** Buffered live speech must not be mistaken for provider silence between 30-second chunks. */
     @Test
     fun bufferedSpeechDefersAutomaticFinishUntilCaptureIsQuietAndTailIsRecognized() {
@@ -4084,6 +4263,7 @@ class ConversationDictationControllerTest {
         lateinit var callerAudioProbeCallback: (ConversationDictationCallerAudioRequirement) -> Unit
             private set
         var pendingCallerAudio = false
+        var sessionCallerAudioOwnedOverride: Boolean? = null
         var currentCallerAudioChunkId = 1L
         var capturedSilenceMillis: Long? = null
         var deferCallerAudioFinish = false
@@ -4162,7 +4342,7 @@ class ConversationDictationControllerTest {
                     listener,
                     completePreparationOnStop,
                     deferCaptureCompletion,
-                    callerAudioOwned = pendingCallerAudio,
+                    callerAudioOwned = sessionCallerAudioOwnedOverride ?: pendingCallerAudio,
                     callerAudioChunkId = currentCallerAudioChunkId,
                     onCallerAudioAcknowledged = { currentCallerAudioChunkId += 1L },
                 )
@@ -4287,6 +4467,9 @@ class ConversationDictationControllerTest {
             retriedCallerAudioWithFollowingAudio += 1
             return retryCallerAudio()
         }
+
+        /** Mirrors whether this fake generation successfully owns White Noise-captured audio. */
+        override fun usesCallerAudioCapture(): Boolean = callerAudioOwned
     }
 
     private class FakeTimeoutScheduler {
@@ -4341,6 +4524,9 @@ class ConversationDictationControllerTest {
             }
             error("virtual timeout scheduler exceeded its iteration bound")
         }
+
+        /** Counts live callbacks so late provider events cannot silently schedule another completion. */
+        fun liveTaskCount(): Int = tasks.count { !it.cancelled && !it.ran }
 
         private data class Task(
             val delayMillis: Long,

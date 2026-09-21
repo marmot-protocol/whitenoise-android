@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.provider.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
@@ -16,6 +17,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -42,14 +44,21 @@ private enum class DictationSetting { Finish, Result }
 internal fun DictationSettingsScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
+    isOfflineSpeechToTextInstalled: (Context) -> Boolean = ::offlineSpeechToTextInstalled,
 ) {
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
     val preferences by appState.conversationDictationPreferences.state.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
     var refreshToken by remember { mutableIntStateOf(0) }
     var picker by rememberSaveable { mutableStateOf<DictationSetting?>(null) }
     var providerSheetOpen by remember { mutableStateOf(false) }
     var settingsFailed by remember { mutableStateOf(false) }
+    var osttOpenFailed by remember { mutableStateOf(false) }
+    val osttInstalled =
+        remember(context, refreshToken, isOfflineSpeechToTextInstalled) {
+            isOfflineSpeechToTextInstalled(context)
+        }
 
     DisposableEffect(lifecycleOwner) {
         val observer =
@@ -64,6 +73,35 @@ internal fun DictationSettingsScreen(
     SettingsScaffold(title = stringResource(R.string.dictation_settings_title), onBack = onBack) {
         SettingsList {
             item { SettingsExplainer(stringResource(R.string.dictation_settings_explainer)) }
+            if (!osttInstalled) {
+                item {
+                    SettingsGroup(modifier = Modifier.testTag("dictation.ostt_recommendation.group")) {
+                        row("open") { rowContext ->
+                            SettingsAction(
+                                context = rowContext,
+                                title = stringResource(R.string.dictation_ostt_recommendation_title),
+                                subtitle = stringResource(R.string.dictation_ostt_recommendation_summary),
+                                onClick = {
+                                    osttOpenFailed =
+                                        runCatching { uriHandler.openUri(OSTT_ZAPSTORE_URL) }.isFailure
+                                },
+                                leading = {
+                                    Icon(painterResource(R.drawable.ic_download), contentDescription = null)
+                                },
+                            )
+                        }
+                    }
+                }
+                if (osttOpenFailed) {
+                    item {
+                        SettingsCallout(
+                            text = stringResource(R.string.dictation_ostt_recommendation_open_failed),
+                            modifier = Modifier.testTag("dictation.ostt_recommendation.open_failed"),
+                            isError = true,
+                        )
+                    }
+                }
+            }
             item {
                 SettingsGroup(modifier = Modifier.testTag("dictation.preferences.group")) {
                     row("provider") { context ->
@@ -202,4 +240,20 @@ private fun openVoiceInputSettings(context: Context): Boolean =
         .recoverCatching { context.startActivity(Intent(Settings.ACTION_SETTINGS)) }
         .isSuccess
 
+/** Package visibility is declared in the manifest so this is deterministic on Android 11+. */
+@Suppress("DEPRECATION")
+internal fun offlineSpeechToTextInstalled(context: Context): Boolean =
+    try {
+        context.packageManager.getApplicationInfo(
+            OFFLINE_SPEECH_TO_TEXT_PACKAGE,
+            PackageManager.MATCH_DISABLED_COMPONENTS,
+        )
+        true
+    } catch (_: PackageManager.NameNotFoundException) {
+        false
+    }
+
 private const val MILLIS_PER_SECOND = 1_000L
+internal const val OFFLINE_SPEECH_TO_TEXT_PACKAGE = "app.offlinespeechtotext"
+internal const val OSTT_ZAPSTORE_URL =
+    "https://zapstore.dev/apps/naddr1qqtkzurs9ehkvenvd9hx2umsv4jkx6r5da6x27r5qyv8wumn8ghj7un9d3shjtn6v9c8xar0wfjjuer9wcpzpys5pkhzxd9dqp4ger8du6p5f6y43tcnzqktjzmwvahq5vumtay4qvzqqqr7pv8t57pf"

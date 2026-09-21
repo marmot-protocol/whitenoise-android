@@ -272,6 +272,9 @@ internal interface ConversationDictationRecognitionSession {
 
     /** Requeues a no-speech chunk with following audio so it cannot block later captured speech. */
     fun retryCallerAudioWithFollowingAudio(): Boolean = retryCallerAudio()
+
+    /** Whether this generation successfully started White Noise-owned microphone capture. */
+    fun usesCallerAudioCapture(): Boolean = false
 }
 
 internal class ConversationDictationProviderUnavailableException : IllegalStateException()
@@ -518,6 +521,7 @@ internal class ConversationDictationController internal constructor(
     private var sendJob: Job? = null
     private var requestedDeliveryMode: ConversationDictationDeliveryMode? = null
     private var generationHasSpeech = false
+    private var callerAudioEndpointingActive = false
     private var consecutiveNoSpeechRestarts = 0
     private var retainedCallerAudioRetries = 0
     private var rejectedCallerAudioChunkId: Long? = null
@@ -1552,9 +1556,15 @@ internal class ConversationDictationController internal constructor(
                     if (!owns(sessionId, generationId)) return
                     generationHasSpeech = true
                     unresolvedRecognitionFailure = null
-                    silenceTimeoutHandle?.cancel()
-                    silenceTimeoutHandle = null
-                    silenceDeadlineElapsedMillis = null
+                    if (callerAudioEndpointingActive) {
+                        // Provider callbacks can lag White Noise-owned capture by an entire chunk.
+                        // Keep endpointing tied to current PCM activity instead of disarming it here.
+                        armSilenceDeadline(sessionId, target)
+                    } else {
+                        silenceTimeoutHandle?.cancel()
+                        silenceTimeoutHandle = null
+                        silenceDeadlineElapsedMillis = null
+                    }
                 }
 
                 /** Moves the owned generation into bounded final-result processing. */
@@ -1729,7 +1739,12 @@ internal class ConversationDictationController internal constructor(
                 }
             }
         runCatching {
-            platform.createSession(listener).also { recognitionSession = it }.start()
+            val session = platform.createSession(listener).also { recognitionSession = it }
+            session.start()
+            if (owns(sessionId, generationId) && session.usesCallerAudioCapture()) {
+                callerAudioEndpointingActive = true
+                armSilenceDeadline(sessionId, target)
+            }
         }.onFailure { error ->
             conversationDictationDiagnostic("event=recognizer_start_exception type=${error.javaClass.simpleName}")
             if (accumulatedTranscript.isNotBlank()) {
@@ -2041,27 +2056,71 @@ internal class ConversationDictationController internal constructor(
         sessionId: Long,
         target: ConversationDictationTarget,
     ) {
+        if (state.sessionId != sessionId || finishRequested) return
         val silenceMillis = target.finishAfterSilenceMillis ?: return
-        if (accumulatedTranscript.isBlank()) return
         val now = elapsedRealtime()
-        val deadline = silenceDeadlineElapsedMillis ?: (now + silenceMillis).also { silenceDeadlineElapsedMillis = it }
+        val capturedSilence =
+            if (callerAudioEndpointingActive) {
+                platform.callerAudioSilenceMillis()
+            } else {
+                if (accumulatedTranscript.isBlank()) return
+                null
+            }
+        val deadline =
+            if (callerAudioEndpointingActive) {
+                now + (silenceMillis - (capturedSilence ?: 0L)).coerceAtLeast(0L)
+            } else {
+                silenceDeadlineElapsedMillis ?: (now + silenceMillis)
+            }
+        silenceDeadlineElapsedMillis = deadline
         val remainingMillis = (deadline - now).coerceAtLeast(0L)
         silenceTimeoutHandle?.cancel()
+        conversationDictationDiagnostic(
+            "event=silence_check_armed delay_ms=$remainingMillis " +
+                "caller_audio=$callerAudioEndpointingActive speech_seen=${capturedSilence != null}",
+        )
         silenceTimeoutHandle =
             scheduleTimeout(remainingMillis) {
-                val capturedSilence = platform.callerAudioSilenceMillis()
-                if (state.sessionId == sessionId && capturedSilence != null) {
-                    finishAfterCallerAudioSilence(sessionId, target, silenceMillis, capturedSilence)
-                } else if (state.sessionId == sessionId && !generationHasSpeech && accumulatedTranscript.isNotBlank()) {
-                    finishRequested = true
-                    cancelPendingRestart()
-                    clearRecognitionGeneration(
-                        cancel = true,
-                        onAudioCaptureFinished = ::finishPlaybackInterruption,
-                    )
-                    finalizeAccumulatedTranscript(sessionId, target)
-                }
+                checkSilenceDeadline(sessionId, target, silenceMillis)
             }
+    }
+
+    /** Evaluates one deadline against the current capture rather than its originally scheduled state. */
+    private fun checkSilenceDeadline(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+        silenceMillis: Long,
+    ) {
+        if (state.sessionId != sessionId || finishRequested) return
+        val currentCapturedSilence =
+            if (callerAudioEndpointingActive) {
+                platform.callerAudioSilenceMillis()
+            } else {
+                null
+            }
+        when {
+            callerAudioEndpointingActive && currentCapturedSilence == null -> {
+                conversationDictationDiagnostic("event=silence_check_rearmed reason=no_speech")
+                silenceDeadlineElapsedMillis = null
+                armSilenceDeadline(sessionId, target)
+            }
+            callerAudioEndpointingActive ->
+                finishAfterCallerAudioSilence(
+                    sessionId,
+                    target,
+                    silenceMillis,
+                    requireNotNull(currentCapturedSilence),
+                )
+            !generationHasSpeech && accumulatedTranscript.isNotBlank() -> {
+                finishRequested = true
+                cancelPendingRestart()
+                clearRecognitionGeneration(
+                    cancel = true,
+                    onAudioCaptureFinished = ::finishPlaybackInterruption,
+                )
+                finalizeAccumulatedTranscript(sessionId, target)
+            }
+        }
     }
 
     /** Rechecks actual microphone activity and drains the tail before automatic completion. */
@@ -2072,9 +2131,17 @@ internal class ConversationDictationController internal constructor(
         capturedSilenceMillis: Long,
     ) {
         if (capturedSilenceMillis < thresholdMillis) {
-            silenceDeadlineElapsedMillis = elapsedRealtime() + thresholdMillis - capturedSilenceMillis
+            conversationDictationDiagnostic(
+                "event=silence_check_rearmed reason=speech silence_ms=$capturedSilenceMillis",
+            )
             armSilenceDeadline(sessionId, target)
         } else {
+            conversationDictationDiagnostic(
+                "event=silence_check_complete silence_ms=$capturedSilenceMillis",
+            )
+            silenceTimeoutHandle?.cancel()
+            silenceTimeoutHandle = null
+            silenceDeadlineElapsedMillis = null
             stop()
         }
     }
@@ -2664,6 +2731,7 @@ internal class ConversationDictationController internal constructor(
         dispatchedSessionId = null
         requestedDeliveryMode = null
         generationHasSpeech = false
+        callerAudioEndpointingActive = false
         consecutiveNoSpeechRestarts = 0
         retainedCallerAudioRetries = 0
         clearRejectedCallerAudioRetries()
@@ -3584,6 +3652,9 @@ private class AndroidConversationDictationRecognitionSession(
 
     /** Coalesces a provider-rejected short chunk with following PCM before the next generation. */
     override fun retryCallerAudioWithFollowingAudio(): Boolean = callerAudio?.retryWithFollowingAudio() == true
+
+    /** Reports the actual capture mode after start; a failed caller-audio start falls back safely. */
+    override fun usesCallerAudioCapture(): Boolean = callerAudioCapturing
 
     /** Releases the recognizer when no capture acknowledgement is required. */
     override fun destroy() = destroy {}

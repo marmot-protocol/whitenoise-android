@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.audio
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -343,6 +344,43 @@ class ConversationDictationCallerAudioTest {
         }
     }
 
+    /** Startup quiet is unknown until PCM speech is observed, then silence follows the capture clock. */
+    @Test
+    fun silenceMillisStartsOnlyAfterActualCallerAudioSpeech() {
+        val clock = FakeElapsedRealtime()
+        val device = SpeechTrackingCaptureDevice()
+        val capture =
+            callerAudio(
+                device = device,
+                buffer =
+                    ConversationDictationAudioChunkBuffer(
+                        sessionId = 9L,
+                        chunkBytes = 6_400,
+                        maxBufferedBytes = 12_800,
+                    ),
+                elapsedRealtime = clock::now,
+            )
+        val stream = checkNotNull(capture.openProviderStream())
+        try {
+            assertTrue(stream.start())
+            assertTrue(device.waitingForSpeech.await(2, TimeUnit.SECONDS))
+            assertNull(capture.silenceMillis())
+
+            device.allowSpeech.countDown()
+            assertTrue(device.speechRecorded.await(2, TimeUnit.SECONDS))
+            assertEquals(0L, capture.silenceMillis())
+
+            clock.advance(3_000L)
+            assertEquals(3_000L, capture.silenceMillis())
+        } finally {
+            device.allowSpeech.countDown()
+            device.allowEnd.countDown()
+            stream.cancel()
+            stream.closeProviderEnd()
+            capture.discard {}
+        }
+    }
+
     /** Builds a real capture with small bounded PCM storage and an injectable device and writer. */
     private fun callerAudio(
         device: ConversationDictationAudioCaptureDevice = FakeCaptureDevice(),
@@ -409,6 +447,45 @@ class ConversationDictationCallerAudioTest {
 
         fun advance(millis: Long) {
             this.millis.addAndGet(millis)
+        }
+    }
+
+    /** Holds before its first speech read and again after that read is fully observed by capture. */
+    private class SpeechTrackingCaptureDevice : ConversationDictationAudioCaptureDevice {
+        val waitingForSpeech = CountDownLatch(1)
+        val allowSpeech = CountDownLatch(1)
+        val speechRecorded = CountDownLatch(1)
+        val allowEnd = CountDownLatch(1)
+        private var reads = 0
+
+        override val initialized: Boolean = true
+
+        override val recording: Boolean = true
+
+        override fun start() = Unit
+
+        override fun read(target: ShortArray): Int =
+            when (reads++) {
+                0 -> {
+                    waitingForSpeech.countDown()
+                    check(allowSpeech.await(2, TimeUnit.SECONDS))
+                    target.fill(1_000)
+                    target.size
+                }
+                else -> {
+                    speechRecorded.countDown()
+                    check(allowEnd.await(2, TimeUnit.SECONDS))
+                    0
+                }
+            }
+
+        override fun stop() {
+            allowEnd.countDown()
+        }
+
+        override fun release() {
+            allowSpeech.countDown()
+            allowEnd.countDown()
         }
     }
 
