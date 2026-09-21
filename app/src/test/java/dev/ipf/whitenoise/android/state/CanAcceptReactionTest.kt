@@ -157,6 +157,19 @@ class CanAcceptReactionTest {
         )
     }
 
+    /** A sole own reaction uses the dedicated unreact API even after its event id projects. */
+    @Test
+    fun soleOwnReactionPrefersTargetUnreactWithKnownEventId() {
+        assertEquals(
+            OwnReactionRetractionPlan.UnreactTarget,
+            planOwnReactionRetraction(
+                emoji = "👍",
+                knownEventIdByEmoji = mapOf("👍" to "reaction-event"),
+                ownEmojisBeforeMutation = setOf("👍"),
+            ),
+        )
+    }
+
     /** Multiple own reactions never use target-wide unreact without the tapped event id. */
     @Test
     fun multipleOwnReactionsWithoutEventIdRemainUnavailable() {

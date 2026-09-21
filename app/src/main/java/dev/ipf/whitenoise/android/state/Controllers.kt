@@ -2228,9 +2228,9 @@ private const val MARMOT_DELETE_EVENT_KIND = 5uL
 private const val MARMOT_REACTION_EVENT_KIND = 7uL
 
 /**
- * Selects the narrowest safe removal for an own reaction. A projected reaction-event id removes
- * only the tapped emoji; when projection details have not arrived yet, target-wide unreact is safe
- * only if the pre-mutation UI showed that emoji as the account's sole reaction.
+ * Selects the safest removal for an own reaction. Target-wide unreact is preferred when the tapped
+ * emoji is the account's sole reaction; otherwise a projected reaction-event id keeps removal
+ * scoped to that emoji without clearing another own reaction.
  */
 internal fun planOwnReactionRetraction(
     emoji: String,
@@ -2239,8 +2239,8 @@ internal fun planOwnReactionRetraction(
 ): OwnReactionRetractionPlan {
     val reactionMessageId = knownEventIdByEmoji[emoji]?.takeIf(String::isNotBlank)
     return when {
-        reactionMessageId != null -> OwnReactionRetractionPlan.DeleteReactionMessage(reactionMessageId)
         ownEmojisBeforeMutation == setOf(emoji) -> OwnReactionRetractionPlan.UnreactTarget
+        reactionMessageId != null -> OwnReactionRetractionPlan.DeleteReactionMessage(reactionMessageId)
         else -> OwnReactionRetractionPlan.Unavailable
     }
 }
