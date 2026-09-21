@@ -597,6 +597,7 @@ internal fun ConversationScreen(
     onTtsTransportBodyClick: (() -> Unit)? = null,
     surfaceState: ConversationSurfaceState? = null,
     dictationControlsVisible: Boolean = true,
+    onStartGroupWithPeer: (RecipientSearch.Candidate) -> Unit = {},
 ) {
     androidx.compose.runtime.LaunchedEffect(
         controller,
@@ -3141,6 +3142,7 @@ internal fun ConversationScreen(
                 showDetails = false
                 navigationState.searchOpen = true
             },
+            onStartGroupWithPeer = onStartGroupWithPeer,
         )
         return
     }

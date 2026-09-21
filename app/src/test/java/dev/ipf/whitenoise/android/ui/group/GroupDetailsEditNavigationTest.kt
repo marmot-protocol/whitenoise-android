@@ -36,6 +36,7 @@ import dev.ipf.marmotkit.GroupMemberDetailsFfi
 import dev.ipf.marmotkit.GroupRosterFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
@@ -44,6 +45,7 @@ import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
 import dev.ipf.whitenoise.android.state.GroupRosterLoadState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.profile.PROFILE_ADD_TO_GROUPS_CONTENT_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -145,22 +147,30 @@ class GroupDetailsEditNavigationTest {
         assertTrue(sectionTops.zipWithNext().all { (first, second) -> first < second })
     }
 
-    /** Direct-message details retain their existing order and do not gain group-only sections. */
+    /** Direct-message details put the two peer group actions together before shared content. */
     @Test
-    fun directMessageOverviewKeepsItsExistingSectionOrder() {
+    fun directMessageOverviewKeepsPeerGroupActionsTogether() {
+        var startedPeerId: String? = null
         render(
             controller(
                 group(name = ""),
                 verifiedRoster = true,
                 membersOverride = listOf(member(SELF_HEX, local = true), member("member-b")),
             ),
+            onStartGroupWithPeer = { startedPeerId = it.accountIdHex },
         )
 
         composeRule.onNodeWithTag("chat_info.members").assertDoesNotExist()
         composeRule.onNodeWithTag("chat_info.management").assertDoesNotExist()
         composeRule.onNodeWithTag("chat_info.developer").assertDoesNotExist()
+        composeRule.onNodeWithTag("chat_info.start_group").assertIsDisplayed().performClick()
+        assertEquals("member-b", startedPeerId)
+        composeRule.onNodeWithTag("chat_info.add_to_group").assertIsDisplayed().performClick()
+        composeRule.onNodeWithTag(PROFILE_ADD_TO_GROUPS_CONTENT_TAG).assertExists()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
         val sectionTops =
             listOf(
+                "chat_info.group_actions",
                 "chat_info.shared_media",
                 "chat_info.actions",
                 "chat_info.technical",
@@ -423,6 +433,7 @@ class GroupDetailsEditNavigationTest {
     private fun render(
         testController: TestController,
         onOpenSearch: (() -> Unit)? = null,
+        onStartGroupWithPeer: (RecipientSearch.Candidate) -> Unit = {},
     ) {
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -432,6 +443,7 @@ class GroupDetailsEditNavigationTest {
                     onBack = {},
                     onLeft = {},
                     onOpenSearch = onOpenSearch,
+                    onStartGroupWithPeer = onStartGroupWithPeer,
                 )
             }
         }
