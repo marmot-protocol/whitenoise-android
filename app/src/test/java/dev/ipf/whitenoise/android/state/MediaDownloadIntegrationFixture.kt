@@ -55,6 +55,7 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
     val active = AtomicInteger()
     val peak = AtomicInteger()
     var onDownload: (Call) -> Unit = {}
+    var explicitDemandFailure: Throwable? = null
     val state =
         WhiteNoiseAppState(
             context = ApplicationProvider.getApplicationContext<Context>(),
@@ -162,6 +163,7 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
                     val key = key(args!![0] as String, args[1] as String, args[2] as AttachmentLocalTargetFfi)
                     val automatic = method.name.substringBefore('-') == "requestAutomaticAttachment"
                     if (automatic) automaticDemands.incrementAndGet() else explicitDemands.incrementAndGet()
+                    if (!automatic && jobs[key] != null) explicitDemandFailure?.let { throw it }
                     admit(args, key, explicit = !automatic)
                     if (automatic) {
                         AutomaticAttachmentRequestFfi(status(key), true)

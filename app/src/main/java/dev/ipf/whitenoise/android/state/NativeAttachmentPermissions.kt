@@ -15,40 +15,42 @@ internal class NativeAttachmentPermissions {
     /** Invalidates pending evaluations synchronously, before their coroutine can resume. */
     fun invalidate(): Long = revision.incrementAndGet()
 
+    /** Whether a retry still belongs to the latest host permission inputs. */
+    fun isCurrent(expectedRevision: Long): Boolean = revision.get() == expectedRevision
+
     /**
      * Revokes before evaluating. Each native generation is consumed at most once;
      * a stale response is never retried with a freshly minted generation.
      */
-    @Suppress("TooGenericExceptionCaught") // Finish revoking other accounts before surfacing a per-account failure.
+    @Suppress("TooGenericExceptionCaught") // Isolate failures so one account cannot strand every other account revoked.
     suspend fun update(
         expectedRevision: Long,
         engine: MarmotInterface,
         accounts: List<String>,
         evaluate: suspend (String) -> AttachmentAutomaticPermissionFfi,
-    ) = updates.withLock {
-        val generations = mutableMapOf<String, String>()
-        var failure: Exception? = null
-        for (account in accounts.distinct()) {
-            if (revision.get() != expectedRevision) break
-            try {
-                generations[account] = engine.beginAttachmentPermissionUpdate(account)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (error: Exception) {
-                failure = failure ?: error
+    ): Set<String> =
+        updates.withLock {
+            val failed = mutableSetOf<String>()
+            for (account in accounts.distinct()) {
+                if (revision.get() != expectedRevision) break
+                try {
+                    val generation = engine.beginAttachmentPermissionUpdate(account)
+                    val permission = evaluate(account)
+                    if (revision.get() == expectedRevision &&
+                        !engine.setAttachmentAutomaticPermission(account, generation, permission)
+                    ) {
+                        failed += account
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (
+                    @Suppress("SwallowedException") error: Exception,
+                ) {
+                    failed += account
+                }
             }
+            failed
         }
-        // A single unavailable account must not leave other accounts on stale Wi-Fi approval.
-        // Revoke all reachable accounts before failing closed or evaluating any grants.
-        failure?.let { throw it }
-        for ((account, generation) in generations) {
-            if (revision.get() != expectedRevision) break
-            val permission = evaluate(account)
-            if (revision.get() == expectedRevision) {
-                engine.setAttachmentAutomaticPermission(account, generation, permission)
-            }
-        }
-    }
 }
 
 /** Denies unvalidated connections and user-paused accounts before applying the restrictive network matrix. */

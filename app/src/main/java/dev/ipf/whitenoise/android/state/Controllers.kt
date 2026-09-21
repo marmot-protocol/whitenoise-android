@@ -2418,6 +2418,8 @@ internal class RetainedMediaUpload(
     val attachments: List<PendingAttachment>,
     val caption: String?,
     var uploadedReferences: List<MediaAttachmentReferenceFfi>? = null,
+    var localAcceptance: SendSummaryFfi? = null,
+    var recoveredWithoutUpload: Boolean = false,
     var acceptedPending: Boolean = false,
     var acceptedPendingMessageIdHex: String? = null,
 )
@@ -8357,35 +8359,38 @@ class ConversationController(
                 // Reuse the references if a prior attempt already uploaded the
                 // blobs (publish-only failure) — re-uploading would orphan
                 // duplicates on the Blossom server.
+                val request =
+                    MediaUploadRequestFfi(
+                        attachments =
+                            retained.attachments.map { attachment ->
+                                MediaUploadAttachmentRequestFfi(
+                                    fileName = attachment.fileName,
+                                    mediaType = attachment.mediaType,
+                                    plaintext = attachment.plaintextBytes,
+                                    dim = attachment.dim,
+                                    thumbhash = attachment.thumbhash,
+                                )
+                            },
+                        caption = retained.caption,
+                        send = false,
+                        blossomServer = null,
+                    )
                 val references =
                     retained.uploadedReferences ?: (
-                        mediaUploader ?: { uploadAccount, uploadGroup, request ->
-                            appState.marmotIo(MarmotTraceSection.MEDIA_UPLOAD) {
-                                uploadComposerMediaWithToken(uploadAccount, uploadGroup, request, tempId)
-                            }
-                        }
-                    )(
-                        account,
-                        group.groupIdHex,
-                        MediaUploadRequestFfi(
-                            attachments =
-                                retained.attachments.map { attachment ->
-                                    MediaUploadAttachmentRequestFfi(
-                                        fileName = attachment.fileName,
-                                        mediaType = attachment.mediaType,
-                                        plaintext = attachment.plaintextBytes,
-                                        dim = attachment.dim,
-                                        thumbhash = attachment.thumbhash,
-                                    )
-                                },
-                            caption = retained.caption,
-                            send = false,
-                            blossomServer = null,
-                        ),
+                        mediaUploader?.invoke(account, group.groupIdHex, request)
+                            ?: appState
+                                .withGroupCommitLock(account, group.groupIdHex) {
+                                    appState.marmotIo(MarmotTraceSection.MEDIA_UPLOAD) {
+                                        uploadOrAdmitComposerMediaWithToken(account, group.groupIdHex, request, tempId)
+                                    }
+                                }.also { outcome ->
+                                    retained.localAcceptance = outcome.acceptance
+                                    retained.recoveredWithoutUpload = outcome.recoveredWithoutUpload
+                                }.upload
                     ).attachments
                         .map { it.reference }
                         .also { uploaded ->
-                            if (uploaded.size != retained.attachments.size) {
+                            if (!retained.recoveredWithoutUpload && uploaded.size != retained.attachments.size) {
                                 error(
                                     "media upload returned ${uploaded.size} references " +
                                         "for ${retained.attachments.size} attachments",
@@ -8407,17 +8412,14 @@ class ConversationController(
                     publishTimelineFromIndexes()
                     return
                 }
-                // MarmotKit owns the encrypted-media wire format. Build the
-                // optimistic bridge tags through the same native API that
-                // validates and publishes the projected attachments.
-                val imetaTags = mediaImetaTagsBuilder(account, group.groupIdHex, references)
                 val summary =
-                    appState.withGroupCommitLock(account, group.groupIdHex) {
-                        mediaPublisher?.invoke(account, group.groupIdHex, references, retained.caption)
-                            ?: appState.marmotIo(MarmotTraceSection.MEDIA_SEND) {
-                                sendComposerMedia(account, group.groupIdHex, references, retained.caption, tempId)
-                            }
-                    }
+                    retained.localAcceptance
+                        ?: appState.withGroupCommitLock(account, group.groupIdHex) {
+                            mediaPublisher?.invoke(account, group.groupIdHex, references, retained.caption)
+                                ?: appState.marmotIo(MarmotTraceSection.MEDIA_SEND) {
+                                    sendComposerMedia(account, group.groupIdHex, references, retained.caption, tempId)
+                                }
+                        }
                 completeDurableAcceptance(key)
                 if (summary.acceptDisposition == SendAcceptDispositionFfi.ACCEPTED_PENDING) {
                     // MDK now owns a durable, unpublished media intent. It still
@@ -8480,6 +8482,10 @@ class ConversationController(
                     publishTimelineFromIndexes()
                     return
                 }
+                // MarmotKit owns the encrypted-media wire format. Build the
+                // optimistic bridge tags through the same native API that
+                // validates and publishes the projected attachments.
+                val imetaTags = mediaImetaTagsBuilder(account, group.groupIdHex, references)
                 val confirmedId = summary.messageIds.firstOrNull() ?: tempId
                 transferRetentionAtSend(tempId, confirmedId)
                 appState.commitOptimisticSentPreview(
@@ -11519,7 +11525,7 @@ class ConversationController(
                     null
                 } else {
                     optimisticMessageIdForProjection(
-                        optimisticMessages.values.filter { projectedIsMediaUpsert || textPublisher != null },
+                        optimisticMessages.values,
                         actionRecord,
                         allowDelayedProjection = allowDelayedProjection,
                     ).takeIf { reconcileOptimistic }

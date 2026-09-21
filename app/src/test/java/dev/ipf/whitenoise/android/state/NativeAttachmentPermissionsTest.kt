@@ -75,6 +75,46 @@ class NativeAttachmentPermissionsTest {
             }
             assertEquals(listOf("beginAttachmentPermissionUpdate", "setAttachmentAutomaticPermission"), calls)
         }
+
+    /** One unavailable account neither strands healthy accounts revoked nor suppresses a retry. */
+    @Test
+    fun accountFailureIsIsolatedAndReturnedForRetry() =
+        runTest {
+            val owner = NativeAttachmentPermissions()
+            val calls = mutableListOf<String>()
+            var firstFailure = true
+            val engine =
+                nativeBoundary { method, args ->
+                    val account = args.firstOrNull() as? String
+                    calls += "$method:$account"
+                    when (method) {
+                        "beginAttachmentPermissionUpdate" -> {
+                            if (account == "broken" && firstFailure) {
+                                firstFailure = false
+                                throw IllegalStateException("temporarily unavailable")
+                            }
+                            "generation-$account"
+                        }
+                        "setAttachmentAutomaticPermission" -> true
+                        else -> error(method)
+                    }
+                }
+            val revision = owner.invalidate()
+
+            val failed =
+                owner.update(revision, engine, listOf("broken", "healthy")) {
+                    AttachmentAutomaticPermissionFfi(true, false, false, false)
+                }
+            assertEquals(setOf("broken"), failed)
+            assertTrue("setAttachmentAutomaticPermission:healthy" in calls)
+
+            val retryFailed =
+                owner.update(revision, engine, failed.toList()) {
+                    AttachmentAutomaticPermissionFfi(true, false, false, false)
+                }
+            assertTrue(retryFailed.isEmpty())
+            assertTrue("setAttachmentAutomaticPermission:broken" in calls)
+        }
 }
 
 /** Dispatches only explicitly scripted binding calls, with no native runtime or unsafe fake constructor. */

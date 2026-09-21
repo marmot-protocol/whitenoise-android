@@ -99,13 +99,15 @@ internal suspend fun WhiteNoiseAppState.acquireNativeAttachment(
         if (hasNativeAttachment(resolved)) return resolved
     }
 
-    val feed =
-        MarmotNativeTransferFeed(
-            marmotIo {
-                subscribeAttachmentTransfers(request.accountRef, request.groupIdHex, listOf(ffiTarget))
-            },
-        )
-    awaitNativeAttachment(feed) {
+    awaitNativeAttachment(
+        open = {
+            MarmotNativeTransferFeed(
+                marmotIo {
+                    subscribeAttachmentTransfers(request.accountRef, request.groupIdHex, listOf(ffiTarget))
+                },
+            )
+        },
+    ) {
         marmotIo {
             if (priority == AttachmentDownloadPriority.Automatic) {
                 requestAutomaticAttachment(request.accountRef, request.groupIdHex, ffiTarget).status.state
@@ -125,22 +127,42 @@ internal suspend fun WhiteNoiseAppState.acquireNativeAttachment(
     return resolved
 }
 
+/** Installs native subscription ownership before caller cancellation can resume, then always releases it. */
+internal suspend fun awaitNativeAttachment(
+    open: suspend () -> NativeTransferFeed,
+    demand: suspend () -> AttachmentTransferStateFfi?,
+) {
+    var owned: NativeTransferFeed? = null
+    try {
+        withContext(NonCancellable) { owned = open() }
+        observeNativeAttachment(checkNotNull(owned), demand)
+    } finally {
+        owned?.close()
+    }
+}
+
 /** Lexically owns observation even if demand fails or its caller stops waiting. */
 internal suspend fun awaitNativeAttachment(
     feed: NativeTransferFeed,
     demand: suspend () -> AttachmentTransferStateFfi?,
 ) {
-    feed.use { updates ->
-        // The subscription starts with a pre-demand snapshot; it must not be
-        // mistaken for the terminal outcome of the acquisition we are starting.
-        updates.nextState()
-        var state = demand()
-        while (state != AttachmentTransferStateFfi.READY) {
-            if (state in NATIVE_TRANSFER_TERMINAL_FAILURES) {
-                throw NativeAttachmentTerminalException(requireNotNull(state))
-            }
-            state = updates.nextState()
+    feed.use { observeNativeAttachment(it, demand) }
+}
+
+/** Waits for one demanded acquisition after ownership has already been made cancellation-safe. */
+private suspend fun observeNativeAttachment(
+    updates: NativeTransferFeed,
+    demand: suspend () -> AttachmentTransferStateFfi?,
+) {
+    // The subscription starts with a pre-demand snapshot; it must not be
+    // mistaken for the terminal outcome of the acquisition we are starting.
+    updates.nextState()
+    var state = demand()
+    while (state != AttachmentTransferStateFfi.READY) {
+        if (state in NATIVE_TRANSFER_TERMINAL_FAILURES) {
+            throw NativeAttachmentTerminalException(requireNotNull(state))
         }
+        state = updates.nextState()
     }
 }
 

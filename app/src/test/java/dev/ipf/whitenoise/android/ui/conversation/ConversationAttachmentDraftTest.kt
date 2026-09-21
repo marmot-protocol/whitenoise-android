@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.whitenoise.android.media.editor.stagedPhotoAttachmentId
+import dev.ipf.whitenoise.android.state.DraftAttachmentRemovalTombstones
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -194,6 +195,40 @@ class ConversationAttachmentDraftTest {
         assertFalse(owners.isCurrent(oldRemoval.owner))
         owners.update("alice")
         assertFalse(owners.isCurrent(oldRemoval.owner))
+    }
+
+    /** A replacement composer excludes pending cleanup until the native removal completes. */
+    @Test
+    fun processRemovalTombstoneSurvivesComposerReplacement() {
+        val account = "alice"
+        val group = "group"
+        val uri = "content://picker/document/replaced-composer"
+        val attachment = attachment(id = stagedDocumentAttachmentId(account, group, uri), mediaType = "text/plain")
+        val tombstones = DraftAttachmentRemovalTombstones()
+        val removal = tombstones.begin(account, group, attachment.id)
+
+        val whilePending =
+            reconcilePersistedDraftAttachments(
+                account,
+                group,
+                mediaSlotIds = emptyList(),
+                documentUriStrings = listOf(uri),
+                attachments = listOf(attachment),
+                removedAttachmentIds = tombstones.attachmentIds(account, group),
+            )
+        assertTrue(whilePending.documentsByUriString.isEmpty())
+
+        tombstones.complete(removal)
+        val afterCleanup =
+            reconcilePersistedDraftAttachments(
+                account,
+                group,
+                mediaSlotIds = emptyList(),
+                documentUriStrings = listOf(uri),
+                attachments = listOf(attachment),
+                removedAttachmentIds = tombstones.attachmentIds(account, group),
+            )
+        assertEquals(attachment, afterCleanup.documentsByUriString[uri])
     }
 
     /** Builds a minimal native draft descriptor for classification tests. */

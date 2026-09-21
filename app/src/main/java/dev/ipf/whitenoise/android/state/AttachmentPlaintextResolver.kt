@@ -135,9 +135,12 @@ private suspend fun WhiteNoiseAppState.promoteActiveAttachmentAcquisition(
             allowExplicitRetry &&
             hasActiveAttachmentAcquisition(cacheKey)
     if (!shouldPromote) return
-    val target = resolveNativeAttachmentTarget(request) ?: throw AttachmentReferenceNotReadyException()
-    marmotIo { downloadAttachmentAgain(request.accountRef, request.groupIdHex, target.toFfi()) }
-        ?: throw IOException("native attachment promotion was rejected")
+    val target = resolveNativeAttachmentTarget(request) ?: return
+    // Promotion is advisory. The joined automatic owner remains authoritative
+    // even when native priority escalation is temporarily unavailable.
+    runCatchingCancellable {
+        marmotIo { downloadAttachmentAgain(request.accountRef, request.groupIdHex, target.toFfi()) }
+    }
 }
 
 /** Clears durable demand only after the selected retained source is open and caller-owned. */

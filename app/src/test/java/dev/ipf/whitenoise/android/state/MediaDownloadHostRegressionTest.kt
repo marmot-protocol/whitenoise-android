@@ -169,6 +169,41 @@ class MediaDownloadHostRegressionTest {
             assertEquals(1, fixture.explicitDemands.get())
         }
 
+    /** Failed priority escalation still joins the healthy automatic owner instead of failing the tap. */
+    @Test
+    fun failedPromotionDoesNotOverrideSharedAutomaticAcquisition() =
+        runTest(dispatcher) {
+            val request = qualifiedRequest()
+            val automatic =
+                async {
+                    fixture.state.downloadAttachmentPlaintext(
+                        request,
+                        reference(0),
+                        AttachmentDownloadPriority.Automatic,
+                        persistInteractiveIntent = false,
+                    )
+                }
+            val nativeCall = fixture.entered.receive()
+            fixture.explicitDemandFailure = java.io.IOException("synthetic promotion failure")
+            val interactive =
+                async {
+                    fixture.state.downloadAttachmentPlaintext(
+                        request,
+                        reference(0),
+                        AttachmentDownloadPriority.Interactive,
+                        persistInteractiveIntent = false,
+                    )
+                }
+            fixture.awaitExplicitDemands(1)
+
+            val expected = bytes(reference(0).fileName)
+            nativeCall.succeed(expected)
+
+            assertArrayEquals(expected, automatic.await())
+            assertArrayEquals(expected, interactive.await())
+            assertEquals(1, fixture.calls.size)
+        }
+
     /** An explicit stop cancels the Android waiter and separately persists native cancellation. */
     @Test
     fun explicitCancellationStopsSharedNativeAcquisition() =

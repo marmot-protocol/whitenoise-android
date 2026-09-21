@@ -74,6 +74,7 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.CoroutineContext
 
 /** Typed-update fixture that preserves AppState startup, local MDK, and platform posting paths. */
+@Suppress("LargeClass") // Bootstrap scenarios share one process-wide Marmot and notification fixture.
 internal class NotificationBootstrapTestFixture(
     context: Context,
     initiallyFailSubscriptions: Boolean = false,
@@ -362,6 +363,9 @@ internal class NotificationBootstrapTestFixture(
                 }
                 "listAccounts" -> accounts
                 "attachmentDownloadPolicy" -> AttachmentDownloadPolicyFfi(false, 2_000uL, 300uL, 40uL)
+                "setAttachmentDownloadPolicy" -> Unit
+                "beginAttachmentPermissionUpdate" -> "fixture-permission-generation"
+                "setAttachmentAutomaticPermission" -> true
                 "openChatListWindow" -> {
                     val view = arguments?.get(1) as ChatListViewFfi
                     if (view == ChatListViewFfi.CHATS) localSnapshotSubscriptionCalls.incrementAndGet()

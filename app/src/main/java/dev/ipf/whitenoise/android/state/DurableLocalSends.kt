@@ -38,6 +38,20 @@ internal fun MarmotInterface.recoveredLocalSend(
         null -> null
     }
 
+/** Captures a status-probe failure without intercepting VM errors or replacing the admission failure. */
+private fun MarmotInterface.recoverLocalSendResult(
+    account: String,
+    group: String,
+    token: String,
+): Result<SendSummaryFfi?> =
+    try {
+        Result.success(recoveredLocalSend(account, group, token))
+    } catch (
+        @Suppress("TooGenericExceptionCaught") failure: Exception,
+    ) {
+        Result.failure(failure)
+    }
+
 /** Keeps the same logical token across interrupted admissions and connect-phase retries. */
 internal suspend fun MarmotInterface.sendComposerTextWithToken(
     account: String,
@@ -67,8 +81,59 @@ internal suspend fun MarmotInterface.admitLocalSend(
         check(acceptance.clientToken == token) { "local acceptance changed the caller token" }
         pendingLocalSend(listOf(acceptance.messageIdHex))
     } catch (failure: MarmotKitException) {
-        recoveredLocalSend(account, group, token) ?: throw failure
+        val recovery = recoverLocalSendResult(account, group, token)
+        recovery.getOrNull()
+            ?: run {
+                recovery.exceptionOrNull()?.takeIf { it !== failure }?.let(failure::addSuppressed)
+                throw failure
+            }
     }
+}
+
+/** Upload outcome plus any token-bound admission completed by the same native call. */
+internal data class DurableComposerMediaUpload(
+    val upload: MediaUploadResultFfi,
+    val acceptance: SendSummaryFfi?,
+    val recoveredWithoutUpload: Boolean,
+)
+
+/**
+ * Uses draft admission when MDK owns matching staged bytes, otherwise asks the
+ * token-aware upload call to admit draft-less voice notes and contact cards.
+ */
+internal suspend fun MarmotInterface.uploadOrAdmitComposerMediaWithToken(
+    account: String,
+    group: String,
+    request: MediaUploadRequestFfi,
+    token: String,
+): DurableComposerMediaUpload {
+    require(!request.send) { "controller request must begin as upload-only" }
+    recoveredLocalSend(account, group, token)?.let { recovered ->
+        return DurableComposerMediaUpload(
+            upload = MediaUploadResultFfi(emptyList(), null),
+            // The completed native send owns its projection, but an interrupted
+            // upload return did not give Android the references needed to build
+            // a truthful sent bridge. Keep the bubble pending until that echo.
+            acceptance = pendingLocalSend(recovered.messageIds),
+            recoveredWithoutUpload = true,
+        )
+    }
+    val draftBacked =
+        selectedDraftOrNull(account, group)
+            ?.draft
+            ?.let { draftDescribesUpload(it, request.attachments) } == true
+    val submission = uploadMediaWithClientToken(account, group, request.copy(send = !draftBacked), token)
+    val acceptance =
+        submission.acceptance?.also {
+            check(it.clientToken == token) { "media acceptance changed the caller token" }
+        }
+    check(draftBacked || acceptance != null) { "draft-less media upload was not admitted" }
+    check(!draftBacked || acceptance == null) { "upload-only draft preparation unexpectedly admitted a message" }
+    return DurableComposerMediaUpload(
+        upload = submission.upload,
+        acceptance = acceptance?.let { pendingLocalSend(listOf(it.messageIdHex)) },
+        recoveredWithoutUpload = false,
+    )
 }
 
 /** Upload-only preparation does not claim acceptance; publication still uses the captured draft revision. */

@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.LocalSendAcceptanceFfi
 import dev.ipf.marmotkit.LocalSendStatusFfi
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -65,5 +66,33 @@ class DurableLocalSendsTest {
                     engine.sendComposerTextWithToken("account", "group", null, "hello", "rejected")
                 }.exceptionOrNull()
             assertTrue(failure is IllegalStateException)
+        }
+
+    /** A failed status probe is diagnostic context, not a replacement for the admission failure. */
+    @Test
+    fun recoveryProbeCannotMaskAdmissionFailure() =
+        runTest {
+            val admissionFailure = MarmotKitException.Publish("primary admission failure")
+            val recoveryFailure = MarmotKitException.Runtime("secondary status failure")
+            var statusReads = 0
+            val engine =
+                nativeBoundary { method, _ ->
+                    when (method) {
+                        "localSendStatus" -> {
+                            statusReads += 1
+                            if (statusReads == 1) null else throw recoveryFailure
+                        }
+                        else -> error(method)
+                    }
+                }
+
+            val thrown =
+                runCatching {
+                    engine.admitLocalSend("account", "group", "token") { throw admissionFailure }
+                }.exceptionOrNull()
+
+            assertTrue(thrown === admissionFailure)
+            val diagnostic = admissionFailure.suppressed.single()
+            assertTrue(diagnostic === recoveryFailure || diagnostic.cause === recoveryFailure)
         }
 }

@@ -13,6 +13,7 @@ import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
+import dev.ipf.marmotkit.LocalSendAcceptanceFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
@@ -562,9 +563,14 @@ class ComposerExpansionDestructiveLifecycleTest {
             when (method.name.substringBefore('-')) {
                 "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
                 "selectedMessageDraft" -> SelectedMessageDraftFfi(emptyDraftRevision, null)
-                "sendText" -> {
+                "localSendStatus" -> null
+                "sendTextWithClientToken" -> {
                     calls.send.incrementAndGet()
-                    sendResult()
+                    val summary = sendResult()
+                    LocalSendAcceptanceFfi(
+                        clientToken = arguments!![3] as String,
+                        messageIdHex = summary.messageIds.single(),
+                    )
                 }
                 "groupMembers" -> members()
                 "listMedia" -> emptyList<Any>()

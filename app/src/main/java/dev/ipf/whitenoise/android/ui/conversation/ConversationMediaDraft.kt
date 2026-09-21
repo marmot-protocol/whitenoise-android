@@ -355,12 +355,18 @@ internal class ConversationMediaDraftState(
         preparedDocuments -= uri
         val owner = ownedRemoval.owner
         val accountRef = owner.accountRef
+        val groupId = controller.group.groupIdHex
+        val attachmentId =
+            document?.attachment?.id
+                ?: stagedDocumentAttachmentId(accountRef, groupId, uriString)
+        val sharedRemoval =
+            appState.draftAttachmentRemovalTombstones.begin(
+                accountRef,
+                groupId,
+                attachmentId,
+            )
         appState.launchMutation {
             preparationMutex.withLock {
-                val groupId = controller.group.groupIdHex
-                val attachmentId =
-                    document?.attachment?.id
-                        ?: stagedDocumentAttachmentId(accountRef, groupId, uriString)
                 val removed =
                     document ?: appState.messageDraftRepository
                         .draft(accountRef, groupId)
@@ -369,6 +375,7 @@ internal class ConversationMediaDraftState(
                         ?.firstOrNull { it.id == attachmentId }
                         ?.let { DraftPreparedPhoto(it, it.editorDigest()) }
                 if (removed != null) stager.removePrepared(accountRef, groupId, removed)
+                appState.draftAttachmentRemovalTombstones.complete(sharedRemoval)
                 removalFence.completeRemoval(ownedRemoval.removal)
                 val currentUris = currentDocumentUris.map(Uri::toString)
                 if (
@@ -415,10 +422,7 @@ internal class ConversationMediaDraftState(
                     documentUriStrings = currentDocumentUris.map(Uri::toString),
                     attachments = attachments,
                     removedAttachmentIds =
-                        documentRemovalFence.removedAttachmentIds(
-                            accountRef,
-                            controller.group.groupIdHex,
-                        ),
+                        removedDraftAttachmentIds(accountRef),
                 )
             val restoredPhotos =
                 reconciliation.mediaBySlotId.mapValues { (_, attachment) ->
@@ -448,10 +452,7 @@ internal class ConversationMediaDraftState(
             val documents = currentDocumentUris.toMutableList()
             materialized.forEach { (attachment, uri) ->
                 val removedAttachmentIds =
-                    documentRemovalFence.removedAttachmentIds(
-                        accountRef,
-                        controller.group.groupIdHex,
-                    )
+                    removedDraftAttachmentIds(accountRef)
                 if (attachment.id in removedAttachmentIds) {
                     return@forEach
                 }
@@ -469,6 +470,11 @@ internal class ConversationMediaDraftState(
             }
             RestoredConversationAttachments(media, documents)
         }
+
+    /** Combines this composer's fences with process-owned cleanup still running for the account. */
+    private fun removedDraftAttachmentIds(accountRef: String): Set<String> =
+        documentRemovalFence.removedAttachmentIds(accountRef, controller.group.groupIdHex) +
+            appState.draftAttachmentRemovalTombstones.attachmentIds(accountRef, controller.group.groupIdHex)
 
     /** Releases presentation resources without deleting the native attachment draft. */
     fun dispose() {

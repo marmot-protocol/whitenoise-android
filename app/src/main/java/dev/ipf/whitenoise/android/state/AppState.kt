@@ -207,6 +207,9 @@ import kotlin.coroutines.resume
 import dev.ipf.whitenoise.android.audio.ConversationDictationTargetValidation as TargetValidation
 import dev.ipf.whitenoise.android.notifications.notificationReplyCommitProbe as probeNotificationReplyCommit
 
+private const val NATIVE_ATTACHMENT_PERMISSION_RETRY_LIMIT = 3
+private const val NATIVE_ATTACHMENT_PERMISSION_RETRY_DELAY_MILLIS = 500L
+
 internal data class ProfileGroupInviteOutcome(
     val attempted: Int,
     val failures: Int,
@@ -1233,6 +1236,7 @@ class WhiteNoiseAppState private constructor(
                 gateway = MarmotMessageDraftGateway(::marmot),
                 editorSessions = editorSessionStore,
             )
+    internal val draftAttachmentRemovalTombstones = DraftAttachmentRemovalTombstones()
     private val chatMuteRepository = ChatMuteRepository(MarmotChatMuteGateway(::marmot))
 
     // Which of the two sequential signer round-trips the Amber sign-in is
@@ -1362,20 +1366,31 @@ class WhiteNoiseAppState private constructor(
         val revision = nativeAttachmentPermissions.invalidate()
         val engine = marmotRuntime?.marmot ?: return
         val accountRefs = accounts.filterNot { it.signedOut }.map { it.label }
-        // Marmot binding calls stay off Main; only Android permission evaluation returns to Main below.
-        mutationsScope.launch(Dispatchers.IO) {
-            runCatchingCancellable {
-                nativeAttachmentPermissions.update(revision, engine, accountRefs) { account ->
-                    withContext(Dispatchers.Main.immediate) {
+        // Marmot binding calls remain on the mutations scope's Main.immediate dispatcher.
+        mutationsScope.launch {
+            var pending = accountRefs.toSet()
+            var attempt = 0
+            while (pending.isNotEmpty() && nativeAttachmentPermissions.isCurrent(revision)) {
+                pending =
+                    nativeAttachmentPermissions.update(revision, engine, pending.toList()) { account ->
                         loadMediaAutoDownloadMatrix(account).nativePermission(
                             activeNetworkTypes(),
                             hasValidatedInternet(),
                             attachmentDownloadIntents.isAutomaticPaused(account),
                         )
                     }
+                if (!nativeAttachmentPermissions.isCurrent(revision)) return@launch
+                if (pending.isEmpty()) {
+                    attachmentDownloadPolicyRevision += 1
+                    return@launch
                 }
-            }.onSuccess { withContext(Dispatchers.Main.immediate) { attachmentDownloadPolicyRevision += 1 } }
-                .onFailure { Log.w("AttachmentPermissions", "permission_update_failed") }
+                attempt += 1
+                if (attempt >= NATIVE_ATTACHMENT_PERMISSION_RETRY_LIMIT) break
+                delay(NATIVE_ATTACHMENT_PERMISSION_RETRY_DELAY_MILLIS * attempt)
+            }
+            if (pending.isNotEmpty() && nativeAttachmentPermissions.isCurrent(revision)) {
+                Log.w("AttachmentPermissions", "permission_update_failed accounts=${pending.size}")
+            }
         }
     }
 
@@ -3911,7 +3926,7 @@ class WhiteNoiseAppState private constructor(
             attachmentDownloadGate.withPermit(cacheKey, request.accountRef, priority) {
                 val cached =
                     cachedMediaPlaintext(cacheKey)
-                        ?: withContext(Dispatchers.IO) { diskMediaCache.get(cacheKey) }
+                        ?: withContext(Dispatchers.IO) { diskMediaCache.getIfSmall(cacheKey) }
                         ?: cachedMediaPlaintext(cacheKey)
                 cached?.let(AttachmentAcquisitionOutcome::LegacyBytes) ?: owner.block()
             }

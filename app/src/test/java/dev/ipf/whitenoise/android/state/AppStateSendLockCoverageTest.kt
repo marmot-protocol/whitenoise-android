@@ -13,6 +13,7 @@ import java.io.File
  * so this JVM test verifies the structural invariant: each commit-producing send
  * calls sendText only from inside the existing per-group commit lock.
  */
+@Suppress("LargeClass") // Structural send-path assertions share source parsers and lock invariants.
 class AppStateSendLockCoverageTest {
     @Test
     fun dictationSendRecordsTiming() {
@@ -27,7 +28,9 @@ class AppStateSendLockCoverageTest {
         assertTrue(
             "The ordinary text publisher must record its marmotIo timing section",
             "marmotIo(MarmotTraceSection.TEXT_SEND)" in controllerFunctionBody("send") ||
-                "marmotIo(MarmotTraceSection.TEXT_SEND)" in controllersSource().readText(),
+                "marmotIo(MarmotTraceSection.TEXT_SEND)" in controllersSource().readText() ||
+                "marmotIo(MarmotTraceSection.TEXT_SEND)" in
+                controllersSource().resolveSibling("DurableLocalSends.kt").readText(),
         )
     }
 
