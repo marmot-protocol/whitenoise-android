@@ -138,7 +138,7 @@ jobs:
       # The Play distribution deliberately omits Zapstore's production-style
       # self-updater. Preview APKs are replaced only from the PR install link.
       - name: Assemble preview candidate
-        run: ./gradlew :app:assemblePreviewPlayRelease --no-daemon --stacktrace -I "$PR_PREVIEW_INIT_SCRIPT"
+        run: ./gradlew :app:assemblePreviewPlayRelease --build-cache --no-daemon --stacktrace -I "$PR_PREVIEW_INIT_SCRIPT"
 
       - name: Stage candidate and provenance
         shell: bash

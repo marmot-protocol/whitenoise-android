@@ -105,8 +105,9 @@ Two security workflows run separately from the main Gradle validation so their
 permissions and results stay explicit:
 
 - `.github/workflows/codeql.yml` compiles the credential-free dev Zapstore and
-  Play debug variants and scans their Java and Kotlin with CodeQL's extended
-  security query suite.
+  Play debug variants on separate runners and scans each with CodeQL's extended
+  security query suite. The existing `Analyze Java and Kotlin` gate requires both
+  scans. Zapstore keeps the existing SARIF category; Play has its own category.
   It runs for pull requests, `master` pushes, a weekly full scan, and manual
   dispatch. Only its SARIF upload receives `security-events: write`.
 - `.github/workflows/dependency-submission.yml` supplies GitHub's dependency
@@ -116,7 +117,7 @@ permissions and results stay explicit:
 
 Both security workflows pin every third-party action to a full commit SHA,
 cancel superseded work, and have bounded job timeouts. CodeQL's Gradle setup
-reuses the normal dependency and build caches; the dependency-submission action
+reuses dependencies but always compiles under the extractor; the dependency-submission action
 manages its own Gradle execution. Dependency submission runs only from trusted
 `master` pushes because it is the sole workflow with `contents: write`.
 
