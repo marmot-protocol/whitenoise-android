@@ -195,10 +195,12 @@ internal suspend fun WhiteNoiseAppState.cancelNativeAttachment(
     resolvedTarget: NativeAttachmentTarget? = null,
 ): Boolean {
     val target = resolvedTarget ?: resolveNativeAttachmentTarget(request) ?: return false
-    val status =
-        marmotIo {
+    return marmotIo {
+        val status =
             attachmentTransferSnapshot(request.accountRef, request.groupIdHex, listOf(target.toFfi()))
-        }.items.singleOrNull()
-    val reference = status?.reference ?: return false
-    return marmotIo { controlAttachment(request.accountRef, reference, AttachmentControlFfi.CANCEL) }
+                .items
+                .singleOrNull()
+        val reference = status?.reference ?: return@marmotIo false
+        controlAttachment(request.accountRef, reference, AttachmentControlFfi.CANCEL)
+    }
 }

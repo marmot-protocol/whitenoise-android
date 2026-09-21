@@ -89,16 +89,20 @@ internal fun pendingSendRetryBackoffMs(failedAttempt: Int): Long {
 }
 
 /**
- * Keep a foreground send pending across proven pre-publish connectivity
- * failures. Coroutine cancellation is the lifecycle boundary. [sendAttempt]
- * must acquire and release any shared commit lock within one invocation; the
- * retry loop deliberately owns no lock while it waits between attempts. A
- * newer [connectivityRecoveryGeneration] interrupts that wait and resets the
- * backoff so Android does not sleep through restored validated internet.
+ * Keeps a foreground send pending across failures that [retryableFailure]
+ * certifies are safe to repeat. The default accepts only proven pre-publish
+ * connectivity failures; token-aware callers may admit a broader class when
+ * their native boundary deduplicates retries. Coroutine cancellation is the
+ * lifecycle boundary. [sendAttempt] must acquire and release any shared commit
+ * lock within one invocation; the retry loop deliberately owns no lock while
+ * it waits between attempts. A newer [connectivityRecoveryGeneration]
+ * interrupts that wait and resets the backoff so Android does not sleep through
+ * restored validated internet.
  */
 @Suppress("TooGenericExceptionCaught") // Every non-cancellation gateway failure must be classified before retry.
 internal suspend fun <T> retryPendingConversationSend(
     connectivityRecoveryGeneration: StateFlow<Long>? = null,
+    retryableFailure: (Throwable) -> Boolean = ::isTransientRelaySendError,
     onTransientFailure: suspend (attempt: Int, throwable: Throwable) -> Unit = { _, _ -> },
     sendAttempt: suspend (attempt: Int) -> T,
 ): T {
@@ -110,7 +114,7 @@ internal suspend fun <T> retryPendingConversationSend(
             return sendAttempt(attempt)
         } catch (throwable: Throwable) {
             rethrowIfCancellation(throwable)
-            if (!isTransientRelaySendError(throwable)) throw throwable
+            if (!retryableFailure(throwable)) throw throwable
             onTransientFailure(attempt, throwable)
             val wokeForConnectivity =
                 awaitPendingSendRetryWindow(

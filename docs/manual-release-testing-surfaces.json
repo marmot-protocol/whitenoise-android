@@ -22168,6 +22168,24 @@
     ],
     "source_coverage": [
       {
+        "surface": "Token-aware text admission safely retries an interrupted runtime call",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "private fun isRetryableTextAdmissionError(",
+        "test_ids": ["MSG-017"]
+      },
+      {
+        "surface": "Pending-send retries use a caller-owned safety classifier",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationRetryPolicy.kt",
+        "anchor": "retryableFailure: (Throwable) -> Boolean",
+        "test_ids": ["MSG-017"]
+      },
+      {
+        "surface": "Native attachment status and cancellation share one IO bridge turn",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentTransfers.kt",
+        "anchor": "internal suspend fun WhiteNoiseAppState.cancelNativeAttachment(",
+        "test_ids": ["MED-020"]
+      },
+      {
         "surface": "Attachment worker completed-body retention failure",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt",
         "anchor": "durable_attachment_download_not_retained",
