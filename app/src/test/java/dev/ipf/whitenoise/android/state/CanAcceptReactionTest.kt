@@ -128,6 +128,45 @@ class CanAcceptReactionTest {
             assertEquals(1, rollbackCount)
         }
 
+    /** A projected reaction event keeps removal scoped to the tapped emoji. */
+    @Test
+    fun ownReactionRetractionDeletesKnownReactionEvent() {
+        assertEquals(
+            OwnReactionRetractionPlan.DeleteReactionMessage("reaction-event"),
+            planOwnReactionRetraction(
+                emoji = "👍",
+                knownEventIdByEmoji = mapOf("👍" to "reaction-event"),
+                ownEmojisBeforeMutation = setOf("👍", "🔥"),
+            ),
+        )
+    }
+
+    /** A sole own reaction can use target-wide unreact while its event id is still missing. */
+    @Test
+    fun soleOwnReactionFallsBackToTargetUnreactBeforeProjectionEcho() {
+        assertEquals(
+            OwnReactionRetractionPlan.UnreactTarget,
+            planOwnReactionRetraction(
+                emoji = "👍",
+                knownEventIdByEmoji = emptyMap(),
+                ownEmojisBeforeMutation = setOf("👍"),
+            ),
+        )
+    }
+
+    /** Multiple own reactions never use target-wide unreact without the tapped event id. */
+    @Test
+    fun multipleOwnReactionsWithoutEventIdRemainUnavailable() {
+        assertEquals(
+            OwnReactionRetractionPlan.Unavailable,
+            planOwnReactionRetraction(
+                emoji = "👍",
+                knownEventIdByEmoji = emptyMap(),
+                ownEmojisBeforeMutation = setOf("👍", "🔥"),
+            ),
+        )
+    }
+
     @Test
     fun confirmedEchoPrunesOnlyItsMatchingOptimisticOverlay() {
         val optimistic =

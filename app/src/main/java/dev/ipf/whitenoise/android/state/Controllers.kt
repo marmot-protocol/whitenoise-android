@@ -2213,6 +2213,35 @@ internal suspend fun runOptimisticReactionMutation(
     }
 }
 
+/** Engine mutation chosen to remove an own reaction without affecting unrelated emoji. */
+internal sealed interface OwnReactionRetractionPlan {
+    data class DeleteReactionMessage(
+        val messageIdHex: String,
+    ) : OwnReactionRetractionPlan
+
+    data object UnreactTarget : OwnReactionRetractionPlan
+
+    data object Unavailable : OwnReactionRetractionPlan
+}
+
+/**
+ * Selects the narrowest safe removal for an own reaction. A projected reaction-event id removes
+ * only the tapped emoji; when projection details have not arrived yet, target-wide unreact is safe
+ * only if the pre-mutation UI showed that emoji as the account's sole reaction.
+ */
+internal fun planOwnReactionRetraction(
+    emoji: String,
+    knownEventIdByEmoji: Map<String, String>,
+    ownEmojisBeforeMutation: Set<String>,
+): OwnReactionRetractionPlan {
+    val reactionMessageId = knownEventIdByEmoji[emoji]?.takeIf(String::isNotBlank)
+    return when {
+        reactionMessageId != null -> OwnReactionRetractionPlan.DeleteReactionMessage(reactionMessageId)
+        ownEmojisBeforeMutation == setOf(emoji) -> OwnReactionRetractionPlan.UnreactTarget
+        else -> OwnReactionRetractionPlan.Unavailable
+    }
+}
+
 internal fun confirmedOptimisticReactionKeys(
     activeAccountIdHex: String?,
     optimisticChanges: Map<String, OptimisticReactionChange>,
@@ -8677,15 +8706,17 @@ class ConversationController(
         return accountRef
     }
 
+    /** Commits the optimistic reaction change while preserving the pre-mutation own-reaction set. */
     private suspend fun commitReactionMutation(
         account: String,
         target: String,
         emoji: String,
         alreadyMine: Boolean,
+        ownEmojisBeforeMutation: Set<String>,
     ): Boolean {
         appState.withGroupCommitLock(account, group.groupIdHex) {
             if (alreadyMine) {
-                retractOwnReaction(account, target, emoji)
+                retractOwnReaction(account, target, emoji, ownEmojisBeforeMutation)
             } else {
                 appState.marmotIo(MarmotTraceSection.MESSAGE_REACT) {
                     reactToMessage(account, group.groupIdHex, target, emoji)
@@ -8695,10 +8726,12 @@ class ConversationController(
         return !alreadyMine
     }
 
+    /** Removes the tapped own reaction without clearing a different emoji when several are active. */
     private suspend fun retractOwnReaction(
         account: String,
         target: String,
         emoji: String,
+        ownEmojisBeforeMutation: Set<String>,
     ) {
         // Retract just the tapped emoji by deleting its own reaction event; the
         // FFI target-only unreact would drop the wrong emoji when the user holds
@@ -8710,19 +8743,20 @@ class ConversationController(
                 ?.userReactions
                 .orEmpty()
                 .filter { it.sender.equals(me, ignoreCase = true) }
-        val reactionEventId =
+        val knownEventIdByEmoji =
             ownReactions
-                .firstOrNull { it.emoji == emoji && it.reactionMessageIdHex.isNotBlank() }
-                ?.reactionMessageIdHex
-        when {
-            reactionEventId != null ->
-                appState.marmotIo { deleteMessage(account, group.groupIdHex, reactionEventId) }
-            ownReactions.size == 1 && ownReactions.first().emoji == emoji ->
+                .filter { it.reactionMessageIdHex.isNotBlank() }
+                .associate { it.emoji to it.reactionMessageIdHex }
+        when (val plan = planOwnReactionRetraction(emoji, knownEventIdByEmoji, ownEmojisBeforeMutation)) {
+            is OwnReactionRetractionPlan.DeleteReactionMessage ->
+                appState.marmotIo { deleteMessage(account, group.groupIdHex, plan.messageIdHex) }
+            OwnReactionRetractionPlan.UnreactTarget ->
                 appState.marmotIo { unreactFromMessage(account, group.groupIdHex, target) }
-            else -> error("no reaction event to retract for $emoji")
+            OwnReactionRetractionPlan.Unavailable -> error("no reaction event to retract for $emoji")
         }
     }
 
+    /** Optimistically adds or removes [emoji], then reconciles the authoritative Marmot mutation. */
     suspend fun toggleReaction(
         emoji: String,
         message: AppMessageRecordFfi,
@@ -8734,7 +8768,8 @@ class ConversationController(
                     appState.present(R.string.toast_reaction_failed)
                     return
                 }
-        val alreadyMine = reactions[target]?.any { it.emoji == emoji && it.mine } == true
+        val ownEmojisBeforeMutation = reactions[target].orEmpty().filter { it.mine }.mapTo(linkedSetOf()) { it.emoji }
+        val alreadyMine = emoji in ownEmojisBeforeMutation
         val optimisticId = UUID.randomUUID().toString()
         val optimisticChange =
             OptimisticReactionChange(
@@ -8748,7 +8783,9 @@ class ConversationController(
                     optimisticReactionChanges[optimisticId] = optimisticChange
                     recomputeReactions()
                 },
-                commit = { commitReactionMutation(account, target, emoji, alreadyMine) },
+                commit = {
+                    commitReactionMutation(account, target, emoji, alreadyMine, ownEmojisBeforeMutation)
+                },
                 rollback = {
                     optimisticReactionChanges.remove(optimisticId)
                     recomputeReactions()
