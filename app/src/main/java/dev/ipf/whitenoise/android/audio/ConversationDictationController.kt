@@ -1842,12 +1842,11 @@ internal class ConversationDictationController internal constructor(
         restartTimeoutHandle =
             scheduleTimeout(delayMillis) {
                 restartTimeoutHandle = null
-                if (
+                val ownsScheduledRestart =
                     state.sessionId == sessionId &&
-                    state is ConversationDictationState.Starting &&
-                    finishRequested &&
-                    restartId == scheduledRestartId
-                ) {
+                        state is ConversationDictationState.Starting &&
+                        restartId == scheduledRestartId
+                if (ownsScheduledRestart && finishRequested) {
                     if (runCatching(platform::callerAudioHasPending).getOrDefault(false)) {
                         startRecognition(sessionId, target)
                     } else {
