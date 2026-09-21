@@ -22630,6 +22630,15 @@
         ]
       },
       {
+        "surface": "An accepted-pending text send settles its chat-list delivery indicator after navigation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "private suspend fun convergeAcceptedPendingTextSend(",
+        "test_ids": [
+          "CON-004",
+          "CHL-002"
+        ]
+      },
+      {
         "surface": "Conversation replacements deduplicate profile requests and retain completed stream state",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "suspend fun applyTimelinePage(",
