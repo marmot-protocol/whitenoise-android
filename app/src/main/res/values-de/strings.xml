@@ -1424,6 +1424,8 @@
     <string name="action_color_detail">Wähle die Aktionsfarbe für das Design „%1$s“. Hintergründe und neutrale Flächen bleiben unverändert.</string>
     <string name="chat_bubble_colors_global_detail">Wähle die Standard-Nachrichtenfarben für das Design „%1$s“.</string>
     <string name="chat_bubble_colors_chat_detail">Überschreibt diesen Chat in jedem Design. Setze zurück, um die Standardwerte des aktuellen Designs „%1$s“ zu verwenden.</string>
+    <string name="chat_bubble_colors_global_amoled_detail">Wähle die standardmäßigen Umrissfarben für Nachrichten im AMOLED-Design. Das Innere der Sprechblasen bleibt rein schwarz.</string>
+    <string name="chat_bubble_colors_chat_amoled_detail">Überschreibt diesen Chat in jedem Design. AMOLED verwendet diese Farben für Umrisse, Hell und Dunkel für Füllungen. Setze zurück, um die AMOLED-Kontostandardwerte zu verwenden.</string>
     <string name="more_options">Weitere Optionen</string>
     <string name="reset_to_global_colors">Auf globale Farben zurücksetzen</string>
 
@@ -1591,7 +1593,7 @@
     <string name="external_open_failed_detail">Dieses Ziel ist gerade nicht verfügbar. Versuche es erneut oder kehre zu „Über und Lizenzen“ zurück.</string>
     <string name="developer_tools_unlocked">Entwicklertools freigeschaltet</string>
     <string name="developer_tools_already_enabled">Entwicklertools sind bereits aktiviert</string>
-    <string name="appearance_outline_colors_fixed">AMOLED verwendet feste weiße Farben für Aktionen und Sprechblasen. Wechsle das Design, um Farben anzupassen.</string>
+    <string name="appearance_outline_colors_fixed">AMOLED verwendet festes Weiß für Aktionsschaltflächen. Die Umrissfarben von Sprechblasen lassen sich unter „Sprechblasenfarben“ anpassen.</string>
     <string name="appearance_theme">Design</string>
     <string name="appearance_theme_help">Systemstandard folgt deinem Gerät. Hell und Dunkel behalten das gewählte Erscheinungsbild. AMOLED verwendet einen schwarzen Hintergrund mit weißen Konturen.</string>
     <string name="appearance_amoled_detail">Reines Schwarz mit klaren weißen Konturen.</string>

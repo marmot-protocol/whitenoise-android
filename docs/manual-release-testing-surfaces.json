@@ -4144,6 +4144,7 @@
         "test_ids": [
           "MED-009",
           "MSG-001",
+          "MSG-005",
           "MSG-013",
           "MSG-015",
           "CON-017"
@@ -4180,7 +4181,9 @@
         "anchor": "fun MediaCaptionFrame(",
         "test_ids": [
           "MED-003",
-          "MED-007"
+          "MED-007",
+          "CON-011",
+          "SET-005"
         ]
       },
       {
@@ -4198,7 +4201,9 @@
         "anchor": "fun MessageBubbleFrame(",
         "test_ids": [
           "MSG-001",
-          "MSG-002"
+          "MSG-002",
+          "CON-011",
+          "SET-005"
         ]
       },
       {
@@ -4701,7 +4706,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ReactionPills.kt",
         "anchor": "fun ReactionPillItem(",
         "test_ids": [
-          "MSG-001"
+          "MSG-005"
         ]
       },
       {
@@ -4709,7 +4714,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ReactionPills.kt",
         "anchor": "fun ReactionPillRow(",
         "test_ids": [
-          "MSG-001"
+          "MSG-005"
         ]
       },
       {
@@ -4717,7 +4722,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ReactionPills.kt",
         "anchor": "fun ReactionPillSurface(",
         "test_ids": [
-          "MSG-001"
+          "MSG-005"
         ]
       },
       {
@@ -4725,7 +4730,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
         "anchor": "fun ReactionDetailsSheet(",
         "test_ids": [
-          "MSG-001"
+          "MSG-005"
         ]
       },
       {
@@ -4733,7 +4738,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
         "anchor": "fun ReactionParticipantRow(",
         "test_ids": [
-          "MSG-001"
+          "MSG-005"
         ]
       },
       {
@@ -4741,7 +4746,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/replies/ReplyPreviewCard.kt",
         "anchor": "fun ReplyPreviewCard(",
         "test_ids": [
-          "MSG-006"
+          "MSG-006",
+          "CON-012"
         ]
       },
       {
@@ -16988,9 +16994,25 @@
         ]
       },
       {
+        "surface": "string:chat_bubble_colors_chat_amoled_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "R.string.chat_bubble_colors_chat_amoled_detail",
+        "test_ids": [
+          "SET-005"
+        ]
+      },
+      {
         "surface": "string:chat_bubble_colors_global_detail",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
         "anchor": "R.string.chat_bubble_colors_global_detail",
+        "test_ids": [
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "string:chat_bubble_colors_global_amoled_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "R.string.chat_bubble_colors_global_amoled_detail",
         "test_ids": [
           "SET-005"
         ]

@@ -13,23 +13,22 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubblePresentation
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** Stored account and chat colours survive AMOLED even though the rendered surfaces ignore them. */
+/** Stored account and chat colours survive AMOLED and provide its custom bubble outlines. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class AccountColorThemeRestorationTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    /** Theme transitions suppress legacy AMOLED accents and restore the saved light-theme account/chat colours. */
+    /** AMOLED uses a saved bubble colour as its outline while light mode restores it as the fill. */
     @Test
-    fun amoledSuppressesStoredColorsAndLightRestoresThem() {
+    fun amoledUsesStoredBubbleColorAsBorderAndLightRestoresFill() {
         val appState = stateWithSavedColors()
         var renderedAction = Color.Unspecified
         var renderedBubble = 0L
@@ -64,7 +63,7 @@ class AccountColorThemeRestorationTest {
         composeRule.runOnIdle {
             assertEquals(Color.White, renderedAction)
             assertEquals(0xFF000000L, renderedBubble)
-            assertNull(renderedBorder)
+            assertEquals(CHAT_COLOR, renderedBorder)
             assertEquals(AMOLED_ACCENT, appState.actionColorArgb(BubbleTheme.Amoled))
             assertEquals(AMOLED_ACCENT, appState.globalBubbleColorArgb(BubbleTheme.Amoled, BubbleSide.Mine))
             assertEquals(CHAT_COLOR, appState.chatBubbleColorArgb("chat", BubbleSide.Mine))

@@ -1426,6 +1426,8 @@
     <string name="action_color_detail">Scegli l’accento delle azioni per il tema %1$s. Sfondi e superfici neutre restano invariati.</string>
     <string name="chat_bubble_colors_global_detail">Scegli i colori predefiniti dei messaggi per il tema %1$s.</string>
     <string name="chat_bubble_colors_chat_detail">Sostituisce i colori di questa chat in ogni tema. Ripristina per usare i valori predefiniti del tema %1$s attuale.</string>
+    <string name="chat_bubble_colors_global_amoled_detail">Scegli i colori predefiniti dei contorni dei messaggi per il tema AMOLED. L’interno dei fumetti rimane nero puro.</string>
+    <string name="chat_bubble_colors_chat_amoled_detail">Sostituisce i colori di questa chat in ogni tema. AMOLED usa questi colori per i contorni; Chiaro e Scuro li usano per i riempimenti. Ripristina per usare i valori predefiniti AMOLED dell’account.</string>
     <string name="more_options">Altre opzioni</string>
     <string name="reset_to_global_colors">Ripristina i colori globali</string>
 
@@ -1593,7 +1595,7 @@
     <string name="external_open_failed_detail">Questa destinazione non è disponibile al momento. Riprova o torna a Informazioni e licenze.</string>
     <string name="developer_tools_unlocked">Strumenti sviluppatore sbloccati</string>
     <string name="developer_tools_already_enabled">Gli strumenti sviluppatore sono già attivi</string>
-    <string name="appearance_outline_colors_fixed">AMOLED usa colori bianchi fissi per azioni e fumetti. Cambia tema per personalizzare i colori.</string>
+    <string name="appearance_outline_colors_fixed">AMOLED usa il bianco fisso per i pulsanti di azione. I contorni dei fumetti si possono personalizzare in Colori fumetti.</string>
     <string name="appearance_theme">Tema</string>
     <string name="appearance_theme_help">L\'impostazione di sistema segue il dispositivo. Chiaro e Scuro mantengono l\'aspetto selezionato. AMOLED usa uno sfondo nero con contorni bianchi.</string>
     <string name="appearance_amoled_detail">Nero puro con contorni bianchi netti.</string>

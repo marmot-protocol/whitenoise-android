@@ -246,9 +246,7 @@ private fun RichMentionBubble() {
             ReactionPillRow(
                 tallies = listOf(ReactionTally("👍", 12, mine = true), ReactionTally("🎉", 3, mine = false)),
                 enabled = true,
-                onToggle = {},
-                onOverflow = {},
-                onLongPress = null,
+                onOpenDetails = {},
             )
         }
     }

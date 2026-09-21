@@ -90,8 +90,7 @@ internal fun ColumnScope.MessageReactionSummary(
     mine: Boolean,
     visibilityState: MutableTransitionState<Boolean>? = null,
     enabled: Boolean = true,
-    onToggle: (String) -> Unit = {},
-    onClick: () -> Unit,
+    onClick: (String?) -> Unit,
 ) {
     val reactionChipPadding = reactionChipPadding(mine)
     val targetVisible = tallies.isNotEmpty()
@@ -144,9 +143,7 @@ internal fun ColumnScope.MessageReactionSummary(
             ReactionPillRow(
                 tallies = displayTallies,
                 enabled = enabled,
-                onToggle = onToggle,
-                onOverflow = onClick,
-                onLongPress = onClick,
+                onOpenDetails = onClick,
                 modifier = hostGraphicsModifier,
             )
         }

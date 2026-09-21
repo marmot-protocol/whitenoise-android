@@ -87,7 +87,7 @@ internal fun messageBodyTextToRender(
         else -> displayedBody
     }
 
-/** Keeps failure/tombstone semantics fixed and suppresses saved bubble colours on AMOLED. */
+/** Keeps failure/tombstone semantics fixed and maps saved colours to fills or AMOLED outlines. */
 internal fun resolveBubblePresentationArgb(
     deleted: Boolean,
     amoled: Boolean,
@@ -111,6 +111,7 @@ internal fun resolveBubblePresentationArgb(
                 backgroundArgb = OPAQUE_BLACK_ARGB,
                 contentArgb = tokens.surfaceContentArgb,
                 mentionAccentArgb = tokens.mentionAccentArgb,
+                borderOverrideArgb = customArgb,
             )
         customArgb != null ->
             BubblePresentation(

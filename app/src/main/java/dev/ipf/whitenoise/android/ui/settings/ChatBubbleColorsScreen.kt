@@ -22,6 +22,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -33,10 +34,11 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
+import dev.ipf.whitenoise.android.ui.conversation.messages.BubblePresentation
 import dev.ipf.whitenoise.android.ui.conversation.messages.BubblePresentationTokens
 import dev.ipf.whitenoise.android.ui.conversation.messages.colorFromArgb
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleBorder
 import dev.ipf.whitenoise.android.ui.conversation.messages.resolveBubblePresentationArgb
-import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
 /**
  * Chat bubble colour editor for the account's theme defaults or, with [groupIdHex], one conversation's override.
@@ -50,10 +52,6 @@ internal fun ChatBubbleColorsScreen(
     groupIdHex: String? = null,
 ) {
     val bubbleTheme = BubbleTheme.resolve(appState.themeMode, isSystemInDarkTheme())
-    if (bubbleTheme == BubbleTheme.Amoled) {
-        OutlineColorNotice(stringResource(R.string.chat_bubble_colors), onBack)
-        return
-    }
     val accountScope = appState.activeAccountRef?.trim()?.takeIf(String::isNotEmpty) ?: "none"
     val global =
         BubbleColorPair(
@@ -112,7 +110,7 @@ private fun ChatBubbleColorEditor(
     val otherSelected = (if (reset) null else initial.other) ?: inherited.other
     val canReset = mine != null || other != null || !mineValid || !otherValid
     val changed = mine != initial.mine || other != initial.other
-    val defaults = defaultBubbleColors()
+    val defaults = defaultBubbleColors(theme)
     SettingsScaffold(
         title = stringResource(R.string.chat_bubble_colors),
         onBack = onBack,
@@ -167,6 +165,7 @@ private fun ChatBubbleColorEditor(
                         row("preview") { context ->
                             SettingsGroupPanel(context) {
                                 BubblePreview(
+                                    theme = theme,
                                     mineArgb = mine ?: inherited.mine,
                                     otherArgb = other ?: inherited.other,
                                     modifier = Modifier.padding(16.dp),
@@ -214,14 +213,24 @@ private fun ChatBubbleColorEditor(
             }
             item {
                 SettingsExplainer(
-                    stringResource(
-                        if (perChat) {
-                            R.string.chat_bubble_colors_chat_detail
-                        } else {
-                            R.string.chat_bubble_colors_global_detail
-                        },
-                        stringResource(theme.labelRes),
-                    ),
+                    if (theme == BubbleTheme.Amoled) {
+                        stringResource(
+                            if (perChat) {
+                                R.string.chat_bubble_colors_chat_amoled_detail
+                            } else {
+                                R.string.chat_bubble_colors_global_amoled_detail
+                            },
+                        )
+                    } else {
+                        stringResource(
+                            if (perChat) {
+                                R.string.chat_bubble_colors_chat_detail
+                            } else {
+                                R.string.chat_bubble_colors_global_detail
+                            },
+                            stringResource(theme.labelRes),
+                        )
+                    },
                 )
             }
         }
@@ -232,24 +241,26 @@ private fun ChatBubbleColorEditor(
 @Suppress("FunctionNaming")
 @Composable
 private fun BubblePreview(
+    theme: BubbleTheme,
     mineArgb: Long?,
     otherArgb: Long?,
     modifier: Modifier = Modifier,
 ) {
     val tokens = previewBubbleTokens()
-    val other = resolveBubblePresentationArgb(deleted = false, amoled = false, mine = false, otherArgb, tokens)
-    val mine = resolveBubblePresentationArgb(deleted = false, amoled = false, mine = true, mineArgb, tokens)
+    val amoled = theme == BubbleTheme.Amoled
+    val other = resolveBubblePresentationArgb(deleted = false, amoled = amoled, mine = false, otherArgb, tokens)
+    val mine = resolveBubblePresentationArgb(deleted = false, amoled = amoled, mine = true, mineArgb, tokens)
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         PreviewBubble(
             text = stringResource(R.string.bubble_preview_other),
-            container = colorFromArgb(other.backgroundArgb),
-            content = colorFromArgb(other.contentArgb),
+            presentation = other,
+            mine = false,
             modifier = Modifier.align(Alignment.Start).testTag("bubble_colors.other.preview"),
         )
         PreviewBubble(
             text = stringResource(R.string.bubble_preview_mine),
-            container = colorFromArgb(mine.backgroundArgb),
-            content = colorFromArgb(mine.contentArgb),
+            presentation = mine,
+            mine = true,
             modifier = Modifier.align(Alignment.End).testTag("bubble_colors.mine.preview"),
         )
     }
@@ -260,15 +271,20 @@ private fun BubblePreview(
 @Composable
 private fun PreviewBubble(
     text: String,
-    container: Color,
-    content: Color,
+    presentation: BubblePresentation,
+    mine: Boolean,
     modifier: Modifier,
 ) {
     Surface(
         modifier = modifier,
-        color = container,
-        contentColor = content,
-        border = amoledOutlineBorder(),
+        color = colorFromArgb(presentation.backgroundArgb),
+        contentColor = colorFromArgb(presentation.contentArgb),
+        border =
+            messageBubbleBorder(
+                highlighted = false,
+                mine = mine,
+                customBorderArgb = presentation.borderOverrideArgb,
+            ),
         shape = MaterialTheme.shapes.large,
     ) {
         Text(text, Modifier.padding(horizontal = 16.dp, vertical = 10.dp))
@@ -290,13 +306,26 @@ private fun previewBubbleTokens(): BubblePresentationTokens {
     )
 }
 
-/** Where each picker starts when no colour is saved: the theme's own bubble fills. */
+/** Where each picker starts when no colour is saved: theme fills or AMOLED directional outlines. */
 @Composable
-private fun defaultBubbleColors(): BubbleColorDefaults {
+private fun defaultBubbleColors(theme: BubbleTheme): BubbleColorDefaults {
     val scheme = MaterialTheme.colorScheme
     return BubbleColorDefaults(
-        mine = scheme.primaryContainer.toOpaqueArgb(),
-        other = scheme.surfaceVariant.toOpaqueArgb(),
+        mine =
+            if (theme == BubbleTheme.Amoled) {
+                scheme.primary.toOpaqueArgb()
+            } else {
+                scheme.primaryContainer.toOpaqueArgb()
+            },
+        other =
+            if (theme == BubbleTheme.Amoled) {
+                scheme.onSurface
+                    .copy(alpha = 0.7f)
+                    .compositeOver(Color.Black)
+                    .toOpaqueArgb()
+            } else {
+                scheme.surfaceVariant.toOpaqueArgb()
+            },
     )
 }
 

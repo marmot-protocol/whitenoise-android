@@ -1424,6 +1424,8 @@
     <string name="action_color_detail">%1$s teması için eylem vurgusunu seçin. Arka planlar ve nötr yüzeyler değişmeden kalır.</string>
     <string name="chat_bubble_colors_global_detail">%1$s teması için varsayılan mesaj renklerini seçin.</string>
     <string name="chat_bubble_colors_chat_detail">Bu sohbeti her temada geçersiz kılın. Geçerli %1$s tema varsayılanlarını kullanmak için sıfırlayın.</string>
+    <string name="chat_bubble_colors_global_amoled_detail">AMOLED teması için varsayılan mesaj dış çizgi renklerini seçin. Balonların içi saf siyah kalır.</string>
+    <string name="chat_bubble_colors_chat_amoled_detail">Bu sohbeti her temada geçersiz kılar. AMOLED bu renkleri dış çizgilerde, Açık ve Koyu ise dolgularda kullanır. AMOLED hesap varsayılanlarını kullanmak için sıfırlayın.</string>
     <string name="more_options">Daha fazla seçenek</string>
     <string name="reset_to_global_colors">Genel renklere sıfırla</string>
 
@@ -1591,7 +1593,7 @@
     <string name="external_open_failed_detail">Bu hedef şu anda kullanılamıyor. Tekrar deneyin veya Hakkında ve lisanslar’a dönün.</string>
     <string name="developer_tools_unlocked">Geliştirici araçları kilidi açıldı</string>
     <string name="developer_tools_already_enabled">Geliştirici araçları zaten açık</string>
-    <string name="appearance_outline_colors_fixed">AMOLED, eylemler ve mesaj balonları için sabit beyaz renk kullanır. Renkleri özelleştirmek için temayı değiştirin.</string>
+    <string name="appearance_outline_colors_fixed">AMOLED, eylem düğmeleri için sabit beyaz kullanır. Mesaj balonu dış çizgileri Balon renkleri bölümünden özelleştirilebilir.</string>
     <string name="appearance_theme">Tema</string>
     <string name="appearance_theme_help">Sistem varsayılanı cihazınızı takip eder. Açık ve Koyu, seçilen görünümü korur. AMOLED, beyaz çizgili siyah bir arka plan kullanır.</string>
     <string name="appearance_amoled_detail">Keskin beyaz çizgilerle saf siyah.</string>

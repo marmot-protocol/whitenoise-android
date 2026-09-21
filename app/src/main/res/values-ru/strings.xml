@@ -1478,6 +1478,8 @@
     <string name="action_color_detail">Выберите акцент действия для темы %1$s. Фон и нейтральные поверхности остаются неизменными.</string>
     <string name="chat_bubble_colors_global_detail">Выберите цвета сообщений по умолчанию для темы %1$s.</string>
     <string name="chat_bubble_colors_chat_detail">Переопределить этот чат в каждой теме. Выполните сброс, чтобы использовать текущие настройки темы %1$s по умолчанию.</string>
+    <string name="chat_bubble_colors_global_amoled_detail">Выберите стандартные цвета контуров сообщений для темы AMOLED. Внутренняя часть сообщений останется полностью чёрной.</string>
+    <string name="chat_bubble_colors_chat_amoled_detail">Переопределяет этот чат во всех темах. AMOLED использует эти цвета для контуров, а светлая и тёмная темы — для заливки. Выполните сброс, чтобы использовать стандартные настройки аккаунта AMOLED.</string>
     <string name="more_options">Больше возможностей</string>
     <string name="reset_to_global_colors">Сброс к глобальным цветам</string>
 
@@ -1647,7 +1649,7 @@
     <string name="external_open_failed_detail">Это направление сейчас недоступно. Попробуйте еще раз или вернитесь в раздел «О приложении и лицензиях».</string>
     <string name="developer_tools_unlocked">Инструменты разработчика разблокированы</string>
     <string name="developer_tools_already_enabled">Инструменты разработчика уже включены</string>
-    <string name="appearance_outline_colors_fixed">В теме AMOLED цвета кнопок действий и сообщений всегда белые. Чтобы настроить цвета, выберите другую тему.</string>
+    <string name="appearance_outline_colors_fixed">В теме AMOLED кнопки действий всегда белые. Цвета контуров сообщений можно настроить в разделе «Цвета сообщений».</string>
     <string name="appearance_theme">Тема</string>
     <string name="appearance_theme_help">Системные настройки по умолчанию соответствуют вашему устройству. Светлый и Темный сохраняют выбранный вид. AMOLED использует черный фон с белыми контурами.</string>
     <string name="appearance_amoled_detail">Чистый чёрный фон с чёткими белыми контурами.</string>

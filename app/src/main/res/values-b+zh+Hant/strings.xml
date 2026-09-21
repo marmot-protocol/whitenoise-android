@@ -1402,6 +1402,8 @@
     <string name="action_color_detail">為%1$s主題選擇操作強調色。背景和中性表面保持不變。</string>
     <string name="chat_bubble_colors_global_detail">為%1$s主題選擇預設訊息顏色。</string>
     <string name="chat_bubble_colors_chat_detail">在所有主題中覆寫此聊天。重設以使用目前%1$s主題的預設值。</string>
+    <string name="chat_bubble_colors_global_amoled_detail">為 AMOLED 主題選擇預設訊息輪廓顏色。氣泡內部維持純黑。</string>
+    <string name="chat_bubble_colors_chat_amoled_detail">在所有主題中覆寫此聊天。AMOLED 將這些顏色用於輪廓，淺色和深色主題則用於填滿。重設以使用 AMOLED 帳戶預設值。</string>
     <string name="more_options">更多選項</string>
     <string name="reset_to_global_colors">重設為全域顏色</string>
 
@@ -1568,7 +1570,7 @@
     <string name="external_open_failed_detail">該目標暫時無法使用。請重試或返回「關於與授權」。</string>
     <string name="developer_tools_unlocked">開發者工具已解鎖</string>
     <string name="developer_tools_already_enabled">開發者工具已開啟</string>
-    <string name="appearance_outline_colors_fixed">AMOLED 的操作按鈕和訊息氣泡使用固定的白色。如需自訂顏色，請切換主題。</string>
+    <string name="appearance_outline_colors_fixed">AMOLED 操作按鈕使用固定白色。訊息氣泡輪廓可在「氣泡顏色」中自訂。</string>
     <string name="appearance_theme">主題</string>
     <string name="appearance_theme_help">系統預設跟蹤您的裝置 。 光和暗保持選定的外觀.AMOLED使用帶有白色輪廓的黑色背景。</string>
     <string name="appearance_amoled_detail">純黑背景，搭配清晰的白色輪廓。</string>

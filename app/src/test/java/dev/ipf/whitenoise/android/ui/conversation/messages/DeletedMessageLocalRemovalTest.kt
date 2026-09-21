@@ -14,6 +14,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
@@ -157,18 +158,19 @@ class DeletedMessageLocalRemovalTest {
         placeholder().assertIsDisplayed()
     }
 
-    /** Remote deletion makes retained reaction summary inert and closes details sheet. */
+    /** A reaction tap opens its filtered reactor list, which remote deletion then closes. */
     @Test
-    fun remoteDeletionMakesRetainedReactionSummaryInertAndClosesDetailsSheet() {
+    fun reactionTapOpensFilteredDetailsAndRemoteDeletionClosesThem() {
         val surface = renderLive(reactions = reactedSummary())
         val viewReactorsAction =
             SemanticsMatcher("has view reactors action") {
-                it.config.contains(SemanticsActions.OnLongClick) &&
-                    it.config[SemanticsActions.OnLongClick].label == string(R.string.view_reactors)
+                it.config.contains(SemanticsActions.OnClick) &&
+                    it.config[SemanticsActions.OnClick].label == string(R.string.view_reactors)
             }
-        composeRule.onNode(viewReactorsAction, useUnmergedTree = true).performTouchInput { longClick() }
+        composeRule.onNode(viewReactorsAction, useUnmergedTree = true).performClick()
         val reactionFilterAll = "${string(R.string.reaction_filter_all)} · 1"
         composeRule.onNodeWithText(reactionFilterAll, substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText("👍 1", substring = false).assertIsSelected()
 
         composeRule.mainClock.autoAdvance = false
         surface.markDeleted()

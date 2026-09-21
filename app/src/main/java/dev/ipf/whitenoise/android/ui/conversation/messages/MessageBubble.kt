@@ -169,17 +169,21 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-/** Draws semantic highlight or monochrome directional borders; saved colours only affect non-AMOLED fills. */
+/** Draws semantic, saved-colour, or directional AMOLED borders in that precedence order. */
 @Composable
 internal fun messageBubbleBorder(
     highlighted: Boolean,
     mine: Boolean,
     persistedFailure: Boolean = false,
+    customBorderArgb: Long? = null,
+    mentionAccentArgb: Long? = null,
 ): BorderStroke? {
     val amoledAccent = amoledDirectionalAccentColor(mine)
     return when {
         persistedFailure -> null
         highlighted -> BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary)
+        mentionAccentArgb != null && amoledAccent != null -> BorderStroke(2.dp, colorFromArgb(mentionAccentArgb))
+        customBorderArgb != null && amoledAccent != null -> BorderStroke(2.dp, colorFromArgb(customBorderArgb))
         amoledAccent != null -> BorderStroke(2.dp, amoledAccent)
         else -> null
     }
@@ -896,6 +900,7 @@ internal fun MessageBubble(
     var forwardSheetOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var editHistoryOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var reactionSheetOpen by remember(record.messageIdHex) { mutableStateOf(false) }
+    var reactionSheetInitialEmoji by remember(record.messageIdHex) { mutableStateOf<String?>(null) }
     var customizeReactionsOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var configureReactionsDraft by remember(record.messageIdHex) { mutableStateOf<List<String>>(emptyList()) }
     var configureReactionSlot by remember(record.messageIdHex) { mutableStateOf<Int?>(null) }
@@ -955,6 +960,7 @@ internal fun MessageBubble(
             forwardSheetOpen = false
             editHistoryOpen = false
             reactionSheetOpen = false
+            reactionSheetInitialEmoji = null
             customizeReactionsOpen = false
             configureReactionSlot = null
             deleteDialogOpen = false
@@ -2928,10 +2934,12 @@ internal fun MessageBubble(
                     mine = mine,
                     visibilityState = reactionVisibilityState,
                     enabled = !deleted,
-                    onToggle = { emoji ->
-                        if (!deleted) appState.launchMutation { controller.toggleReaction(emoji, record) }
+                    onClick = { emoji ->
+                        if (!deleted) {
+                            reactionSheetInitialEmoji = emoji
+                            reactionSheetOpen = true
+                        }
                     },
-                    onClick = { if (!deleted) reactionSheetOpen = true },
                 )
                 if (reactionSheetOpen && !deleted) {
                     val participants =
@@ -2940,19 +2948,26 @@ internal fun MessageBubble(
                         }
                     // Close when the participant list drains, without re-firing for every list update.
                     LaunchedEffect(participants.isEmpty()) {
-                        if (participants.isEmpty()) reactionSheetOpen = false
+                        if (participants.isEmpty()) {
+                            reactionSheetOpen = false
+                            reactionSheetInitialEmoji = null
+                        }
                     }
                     if (participants.isNotEmpty()) {
                         ReactionDetailsSheet(
                             participants = participants,
                             appState = appState,
+                            initialEmoji = reactionSheetInitialEmoji,
                             onRemoveOwnReaction =
                                 if (readOnly || deleted) {
                                     null
                                 } else {
                                     { emoji -> appState.launchMutation { controller.toggleReaction(emoji, record) } }
                                 },
-                            onDismissRequest = { reactionSheetOpen = false },
+                            onDismissRequest = {
+                                reactionSheetOpen = false
+                                reactionSheetInitialEmoji = null
+                            },
                         )
                     }
                 }

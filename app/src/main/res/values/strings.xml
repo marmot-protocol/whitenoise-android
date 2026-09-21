@@ -1153,7 +1153,7 @@
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
     <string name="theme_amoled">AMOLED</string>
-    <string name="appearance_outline_colors_fixed">AMOLED uses fixed white action and bubble colors. Switch themes to customize colors.</string>
+    <string name="appearance_outline_colors_fixed">AMOLED action buttons use fixed white. Message bubble outlines can be customized under Chat bubble colors.</string>
     <string name="appearance_theme">Theme</string>
     <string name="appearance_theme_help">System default follows your device. Light and Dark keep the selected appearance. AMOLED uses a black background with white outlines.</string>
     <string name="appearance_amoled" translatable="false">AMOLED</string>
@@ -1639,6 +1639,8 @@
     <string name="action_color_detail">Choose the action accent for the %1$s theme. Backgrounds and neutral surfaces stay unchanged.</string>
     <string name="chat_bubble_colors_global_detail">Choose default message colors for the %1$s theme.</string>
     <string name="chat_bubble_colors_chat_detail">Override this chat in every theme. Reset to use the current %1$s theme defaults.</string>
+    <string name="chat_bubble_colors_global_amoled_detail">Choose default message outline colors for the AMOLED theme. Bubble interiors stay pure black.</string>
+    <string name="chat_bubble_colors_chat_amoled_detail">Override this chat in every theme. AMOLED uses these colors for outlines; Light and Dark use them for fills. Reset to use the AMOLED account defaults.</string>
     <string name="more_options">More options</string>
     <string name="reset_to_global_colors">Reset to global colors</string>
 

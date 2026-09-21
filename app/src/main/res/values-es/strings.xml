@@ -1426,6 +1426,8 @@
     <string name="action_color_detail">Elige el acento de acción para el tema %1$s. Los fondos y las superficies neutras no cambian.</string>
     <string name="chat_bubble_colors_global_detail">Elige los colores de mensaje predeterminados para el tema %1$s.</string>
     <string name="chat_bubble_colors_chat_detail">Anula este chat en todos los temas. Restablece para usar los valores predeterminados del tema %1$s actual.</string>
+    <string name="chat_bubble_colors_global_amoled_detail">Elige los colores de contorno predeterminados de los mensajes para el tema AMOLED. El interior de los globos permanece negro puro.</string>
+    <string name="chat_bubble_colors_chat_amoled_detail">Anula este chat en todos los temas. AMOLED usa estos colores para los contornos; Claro y Oscuro los usan para el relleno. Restablece para usar los valores predeterminados de la cuenta AMOLED.</string>
     <string name="more_options">Más opciones</string>
     <string name="reset_to_global_colors">Restablecer a los colores globales</string>
 
@@ -1593,7 +1595,7 @@
     <string name="external_open_failed_detail">Este destino no está disponible ahora mismo. Vuelve a intentarlo o regresa a Acerca de y licencias.</string>
     <string name="developer_tools_unlocked">Herramientas de desarrollador desbloqueadas</string>
     <string name="developer_tools_already_enabled">Las herramientas de desarrollador ya están activadas</string>
-    <string name="appearance_outline_colors_fixed">AMOLED usa colores blancos fijos para acciones y burbujas. Cambia de tema para personalizar los colores.</string>
+    <string name="appearance_outline_colors_fixed">AMOLED usa blanco fijo para los botones de acción. Los contornos de los globos se pueden personalizar en Colores de globos.</string>
     <string name="appearance_theme">Tema</string>
     <string name="appearance_theme_help">El valor predeterminado del sistema sigue tu dispositivo. Claro y Oscuro mantienen la apariencia seleccionada. AMOLED usa un fondo negro con contornos blancos.</string>
     <string name="appearance_amoled_detail">Negro puro con contornos blancos nítidos.</string>
