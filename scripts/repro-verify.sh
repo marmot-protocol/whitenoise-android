@@ -395,7 +395,7 @@ repro_verify_build() {
       -x :app:lintVitalProductionZapstoreRelease \
       --init-script "$init_script" \
       -Drepro.verify.jvm.report="$jvm_report" \
-      --no-build-cache --no-configuration-cache --no-daemon -q
+      --no-build-cache --no-configuration-cache --no-daemon --profile -q
   )
   repro_verify_assert_build_jvm "$jvm_report" "$configured_jvm_report" "$(basename -- "$tree")"
 }

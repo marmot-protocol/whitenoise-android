@@ -141,6 +141,15 @@ jobs:
           compression-level: 0
           retention-days: 1
 
+      - name: Upload build timing profile
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: build-profile-${{ matrix.tree }}
+          path: ${{ runner.temp }}/repro-${{ matrix.tree }}/tree/build/reports/profile/
+          if-no-files-found: ignore
+          retention-days: 7
+
   verify:
     name: Verify unsigned production APK reproducibility
     needs: [build, lint]
