@@ -816,7 +816,12 @@ class NotificationDeliveryModeRecoveryTest {
                 assertTrue(fixture.runOnMainLooperPumping { fixture.appState.setActiveAccount(ACCOUNT_B) })
                 fixture.runWithMainLooperPumping {
                     withTimeout(5_000L) {
-                        while (!fixture.notificationSettings(ACCOUNT_B).nativePushEnabled) yield()
+                        while (
+                            !fixture.notificationSettings(ACCOUNT_B).nativePushEnabled ||
+                            !fixture.upsertedPushRegistrations.containsAll(listOf(ACCOUNT_A, ACCOUNT_B))
+                        ) {
+                            yield()
+                        }
                     }
                 }
 
