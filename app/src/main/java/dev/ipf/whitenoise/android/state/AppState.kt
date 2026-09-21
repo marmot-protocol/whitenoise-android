@@ -2803,6 +2803,17 @@ class WhiteNoiseAppState private constructor(
             acceptedPendingTextOptimisticIdsByConversation.getOrPut(key) { mutableMapOf() }
         }
 
+    /** Resolves a delivered chat-list projection to the exact accepted-pending optimistic send. */
+    internal fun acceptedPendingTextOptimisticId(
+        accountRef: String?,
+        groupIdHex: String,
+        confirmedMessageIdHex: String,
+    ): String? =
+        synchronized(conversationStateLock) {
+            acceptedPendingTextOptimisticIdsByConversation[conversationKey(accountRef, groupIdHex)]
+                ?.get(confirmedMessageIdHex)
+        }
+
     internal fun retainedMediaUploads(
         accountRef: String?,
         groupIdHex: String,

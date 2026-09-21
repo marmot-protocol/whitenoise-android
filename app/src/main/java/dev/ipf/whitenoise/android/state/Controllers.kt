@@ -1304,124 +1304,6 @@ private fun timestampsAreNear(
     right: ULong,
 ): Boolean = if (left >= right) left - right <= 1uL else right - left <= 1uL
 
-internal fun shouldInsertSentOptimisticMessage(
-    confirmedId: String,
-    projectedMessageIds: Set<String>,
-): Boolean = confirmedId !in projectedMessageIds
-
-/** Publish succeeded without an id and its temp bubble still awaits the engine echo (#1315). */
-internal fun textSendAwaitingEchoConfirmation(
-    summaryMessageIds: List<String>,
-    optimisticStillPresent: Boolean,
-): Boolean = summaryMessageIds.isEmpty() && optimisticStillPresent
-
-internal fun acceptedPendingTextAwaitingProjection(
-    acceptDisposition: SendAcceptDispositionFfi,
-    confirmedId: String,
-    projectedMessageIds: Set<String>,
-): Boolean =
-    acceptDisposition == SendAcceptDispositionFfi.ACCEPTED_PENDING &&
-        confirmedId !in projectedMessageIds
-
-data class SuccessfulTextSendReconciliation(
-    val confirmedId: String,
-    val confirmed: AppMessageRecordFfi,
-    val awaitingEcho: Boolean,
-    /** MDK durably accepted the intent but has not assigned a published event id. */
-    val acceptedPending: Boolean,
-    val insertedSent: Boolean,
-) {
-    /** Keep the optimistic bubble until MDK's durable projection settles it. */
-    val awaitingProjection: Boolean
-        get() = awaitingEcho || acceptedPending
-}
-
-/**
- * Shared optimistic-state transition after a successful text/reply publish.
- * Used by the initial send path and [ConversationController.retryFailedSend] so
- * empty-summary late-echo semantics stay identical (#1315).
- */
-internal fun reconcileSuccessfulTextSend(
-    summaryMessageIds: List<String>,
-    acceptDisposition: SendAcceptDispositionFfi,
-    optimisticKey: String,
-    tempId: String,
-    optimisticRecord: AppMessageRecordFfi,
-    optimisticMessages: MutableMap<String, TimelineMessage>,
-    messageById: MutableMap<String, AppMessageRecordFfi>,
-    projectedMessageIds: Set<String>,
-    timelineOrder: ULong,
-    acceptedPendingTextOptimisticIdsByMessageId: MutableMap<String, String>? = null,
-): SuccessfulTextSendReconciliation {
-    val retentionAtSendSeconds = optimisticMessages[optimisticKey]?.retentionAtSendSeconds
-    val hasConfirmedId = summaryMessageIds.isNotEmpty()
-    val confirmedId = summaryMessageIds.firstOrNull() ?: tempId
-    // The authoritative projection can beat the accepted-pending FFI return.
-    // In that ordering there is nothing left to await or bridge: settle through
-    // the normal confirmed path using the exact canonical id already projected.
-    val acceptedPending =
-        acceptedPendingTextAwaitingProjection(
-            acceptDisposition = acceptDisposition,
-            confirmedId = confirmedId,
-            projectedMessageIds = projectedMessageIds,
-        )
-    val awaitingEcho =
-        !acceptedPending &&
-            textSendAwaitingEchoConfirmation(
-                summaryMessageIds,
-                optimisticStillPresent = optimisticKey in optimisticMessages,
-            )
-    val confirmed = optimisticRecord.copy(messageIdHex = confirmedId)
-    if ((hasConfirmedId || awaitingEcho) && confirmedId.isNotEmpty()) {
-        messageById[confirmedId] = confirmed
-    }
-    rememberAcceptedPendingTextOptimisticId(
-        acceptedPending = acceptedPending,
-        confirmedId = confirmedId,
-        tempId = tempId,
-        acceptedPendingTextOptimisticIdsByMessageId = acceptedPendingTextOptimisticIdsByMessageId,
-    )
-    if (!awaitingEcho && !acceptedPending) {
-        optimisticMessages.remove(optimisticKey)
-        if (confirmedId != tempId) messageById.remove(tempId)
-    }
-    val insertedSent =
-        !acceptedPending &&
-            (
-                awaitingEcho ||
-                    (hasConfirmedId && shouldInsertSentOptimisticMessage(confirmedId, projectedMessageIds))
-            )
-    if (insertedSent) {
-        val sentKey = if (awaitingEcho) optimisticKey else "msg:$confirmedId"
-        optimisticMessages[sentKey] =
-            TimelineMessage(
-                sentKey,
-                confirmed,
-                MessageStatus.Sent,
-                timelineOrder = timelineOrder,
-                retentionAtSendSeconds = retentionAtSendSeconds,
-            )
-    }
-    return SuccessfulTextSendReconciliation(
-        confirmedId = confirmedId,
-        confirmed = confirmed,
-        awaitingEcho = awaitingEcho,
-        acceptedPending = acceptedPending,
-        insertedSent = insertedSent,
-    )
-}
-
-private fun rememberAcceptedPendingTextOptimisticId(
-    acceptedPending: Boolean,
-    confirmedId: String,
-    tempId: String,
-    acceptedPendingTextOptimisticIdsByMessageId: MutableMap<String, String>?,
-) {
-    if (acceptedPending && confirmedId.isNotEmpty()) {
-        acceptedPendingTextOptimisticIdsByMessageId?.set(confirmedId, tempId)
-    }
-}
-
 /**
  * An optimistic-send position override (#1256) is a transient bridge: it pins a
  * confirmed row to where its optimistic bubble sat so the row doesn't jump on the
@@ -2782,6 +2664,30 @@ class ChatsController private constructor(
             }
     }
 
+    /** Uses the canonical accepted-pending ID before falling back to render-shape matching. */
+    private fun authoritativeOptimisticPreviewMatch(
+        state: OptimisticChatListPreviewState,
+        row: ChatListRowFfi,
+    ): OptimisticChatListPreviewMatch? {
+        val acceptedPendingEntryKey =
+            row.lastMessage
+                ?.takeIf { it.deliveryState == ChatListMessageDeliveryStateFfi.DELIVERED }
+                ?.messageIdHex
+                ?.let { confirmedMessageIdHex ->
+                    appState.acceptedPendingTextOptimisticId(
+                        accountRef = accountRef,
+                        groupIdHex = row.groupIdHex,
+                        confirmedMessageIdHex = confirmedMessageIdHex,
+                    )
+                }
+        return acceptedPendingEntryKey
+            ?.let { entryKey ->
+                state.entries[entryKey]?.let { entry ->
+                    OptimisticChatListPreviewMatch(entryKey, entry.activitySequence)
+                }
+            } ?: matchingOptimisticPreview(state, row)
+    }
+
     private fun optimisticMatchIsStale(
         match: OptimisticChatListPreviewMatch,
         baselineRow: ChatListRowFfi,
@@ -2851,8 +2757,9 @@ class ChatsController private constructor(
     ): ChatListRowFfi {
         val activityCompare = compareChatListActivity(state.baselineRow, row)
         val match =
-            matchingOptimisticPreview(state, row)
+            authoritativeOptimisticPreviewMatch(state, row)
                 ?.takeUnless { acceptBackwardActivity && activityCompare < 0 }
+        acceptDeliveredOptimisticPreview(state, row)
         // A failed send is terminal: its callback will never report a confirmed
         // id, so parking an authoritative row against it would strand the row
         // on FAILED and discard every later update for that message.
@@ -2908,6 +2815,44 @@ class ChatsController private constructor(
         }
         if (acceptRow) state.baselineRow = row
         return if (acceptRow) row else state.baselineRow
+    }
+
+    /**
+     * Treats a delivered authoritative row as the exact optimistic ID handoff that an open conversation
+     * normally performs. This keeps the chat-list subscription sufficient after navigation disposes the route.
+     */
+    private fun acceptDeliveredOptimisticPreview(
+        state: OptimisticChatListPreviewState,
+        row: ChatListRowFfi,
+    ) {
+        val delivered =
+            row.lastMessage?.takeIf {
+                it.deliveryState == ChatListMessageDeliveryStateFfi.DELIVERED
+            } ?: return
+        val entryKey =
+            delivered.messageIdHex.let { confirmedMessageIdHex ->
+                appState.acceptedPendingTextOptimisticId(
+                    accountRef = accountRef,
+                    groupIdHex = row.groupIdHex,
+                    confirmedMessageIdHex = confirmedMessageIdHex,
+                )
+            }
+        entryKey?.let { acceptedEntryKey ->
+            state.entries[acceptedEntryKey]
+                ?.takeIf { it.confirmedMessageIdHex == null }
+                ?.let { entry ->
+                    state.confirmedActivitySequenceById[delivered.messageIdHex] = entry.activitySequence
+                    while (state.confirmedActivitySequenceById.size > MAX_CHAT_LIST_ACTIVITY_SEQUENCE_HISTORY) {
+                        state.confirmedActivitySequenceById.remove(state.confirmedActivitySequenceById.keys.first())
+                    }
+                    state.entries[acceptedEntryKey] =
+                        entry.copy(
+                            preview = delivered,
+                            confirmedMessageIdHex = delivered.messageIdHex,
+                            pendingAuthoritativeRow = null,
+                        )
+                }
+        }
     }
 
     /**
@@ -4029,10 +3974,14 @@ class ChatsController private constructor(
         val rowKey = chatRowKey(groupIdHex)
         val state = optimisticChatListPreviewByGroup[rowKey].takeIf { accountRef != null } ?: return
         val removedReservation = state.reservedActivitySequenceById.remove(optimisticMessageIdHex) != null
-        val removedEntry = state.entries.remove(optimisticMessageIdHex) != null
+        val removedEntry = state.entries.remove(optimisticMessageIdHex)
         val removedFallback = state.failedFallbackEntry?.preview?.messageIdHex == optimisticMessageIdHex
         if (removedFallback) state.failedFallbackEntry = null
-        if (!removedReservation && !removedEntry && !removedFallback) return
+        if (!removedReservation && removedEntry == null && !removedFallback) return
+        removedEntry
+            ?.pendingAuthoritativeRow
+            ?.takeIf { row -> row.lastMessage?.deliveryState == ChatListMessageDeliveryStateFfi.DELIVERED }
+            ?.let { row -> foldOptimisticChatListBaseline(state, row) }
         materializeOptimisticChatListPreview(rowKey, state)
         scheduleRecompute()
     }
@@ -7948,6 +7897,7 @@ class ConversationController(
                     timelineOrder = optimisticOrder,
                     acceptedPendingTextOptimisticIdsByMessageId = acceptedPendingTextOptimisticIds,
                 )
+            convergeAcceptedPendingTextSend(account, reconciliation)
             if (!reconciliation.acceptedPending) {
                 transferRetentionAtSend(tempId, reconciliation.confirmedId)
                 appState.commitOptimisticSentPreview(
@@ -8050,6 +8000,28 @@ class ConversationController(
     private fun isRetryableTextAdmissionError(throwable: Throwable): Boolean =
         isTransientRelaySendError(throwable) ||
             (textPublisher == null && isTransientRuntimeWorkerError(throwable))
+
+    /** Keeps accepted-pending settlement alive when navigation disposes this conversation's visible route. */
+    private suspend fun convergeAcceptedPendingTextSend(
+        account: String,
+        reconciliation: SuccessfulTextSendReconciliation,
+    ) {
+        runAcceptedPendingTextConvergence(
+            acceptedPending = reconciliation.acceptedPending,
+            converge = {
+                appState.withGroupCommitLock(account, group.groupIdHex) {
+                    appState.marmotIo { retryGroupConvergence(account, group.groupIdHex) }
+                }
+            },
+            onFailure = { throwable ->
+                Log.w(
+                    "ConversationController",
+                    "accepted-pending convergence deferred; keeping preview pending",
+                    throwable,
+                )
+            },
+        )
+    }
 
     /**
      * Admits one logical text/reply token to native durable ownership. Proven
@@ -9572,6 +9544,7 @@ class ConversationController(
                     timelineOrder = order,
                     acceptedPendingTextOptimisticIdsByMessageId = acceptedPendingTextOptimisticIds,
                 )
+            convergeAcceptedPendingTextSend(account, reconciliation)
             if (!reconciliation.acceptedPending) {
                 transferRetentionAtSend(tempId, reconciliation.confirmedId)
                 appState.commitOptimisticSentPreview(
