@@ -2579,6 +2579,7 @@
         "anchor": "fun ComposerBar(",
         "test_ids": [
           "CON-001",
+          "CON-005",
           "CON-017",
           "DIC-001",
           "DIC-002",
@@ -2599,6 +2600,7 @@
         "anchor": "fun ComposerPill(",
         "test_ids": [
           "CON-001",
+          "CON-005",
           "CON-007"
         ]
       },
