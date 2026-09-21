@@ -2011,6 +2011,7 @@ class ConversationDictationControllerTest {
             null,
             ConversationDictationFailure.NoSpeech,
             ConversationDictationFailure.ProviderDisconnected,
+            ConversationDictationFailure.RecognizerBusy,
         ).forEach { failureCallback ->
             val fixture = fixture(draft = TextFieldValue(""))
             fixture.platform.pendingCallerAudio = true
@@ -2019,13 +2020,19 @@ class ConversationDictationControllerTest {
             fixture.scheduler.runDelay(250L)
             fixture.controller.paste()
 
-            repeat(2) {
+            repeat(2) { retry ->
                 if (failureCallback != null) {
                     fixture.platform.listener.onError(failureCallback)
                 } else {
                     fixture.platform.listener.onResult(null)
                 }
                 assertTrue(fixture.controller.state is ConversationDictationState.Starting)
+                if (
+                    failureCallback == ConversationDictationFailure.ProviderDisconnected ||
+                    failureCallback == ConversationDictationFailure.RecognizerBusy
+                ) {
+                    fixture.scheduler.runDelay(if (retry == 0) 500L else 1_000L)
+                }
             }
             if (failureCallback != null) {
                 fixture.platform.listener.onError(failureCallback)
@@ -2046,6 +2053,12 @@ class ConversationDictationControllerTest {
 
             fixture.controller.retry()
             assertTrue(fixture.controller.state is ConversationDictationState.Starting)
+            if (
+                failureCallback == ConversationDictationFailure.ProviderDisconnected ||
+                failureCallback == ConversationDictationFailure.RecognizerBusy
+            ) {
+                fixture.scheduler.runDelay(500L)
+            }
             fixture.platform.pendingCallerAudio = false
             fixture.platform.listener.onResult("recovered tail")
             assertEquals("first recovered tail", fixture.drafts.getValue(key()).text)
@@ -2074,6 +2087,7 @@ class ConversationDictationControllerTest {
                 fixture.platform.listener.onResult(null)
             } else {
                 fixture.platform.listener.onError(stalledProviderCallback)
+                fixture.scheduler.runDelay(500L)
             }
             fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
             assertEquals("", fixture.drafts.getValue(key()).text)
@@ -2085,6 +2099,100 @@ class ConversationDictationControllerTest {
             assertFalse(fixture.controller.hasDurableSession)
         }
     }
+
+    /** A finishing tail gives the provider time to release capacity before retrying retained PCM. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun sendBacksOffDisconnectedAndBusyTailWithoutRenderingRetryControls() =
+        runTest {
+            val sent = mutableListOf<String>()
+            val fixture =
+                fixture(
+                    draft = TextFieldValue(""),
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        sent += request.payload
+                        true
+                    },
+                )
+            fixture.platform.pendingCallerAudio = true
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.platform.listener.onResult("recognized body")
+            fixture.scheduler.runDelay(250L)
+            fixture.controller.send()
+
+            val disconnectedGeneration = fixture.platform.listener
+            disconnectedGeneration.onError(ConversationDictationFailure.ProviderDisconnected)
+            assertEquals(2, fixture.platform.sessions.size)
+            assertTrue(fixture.controller.state is ConversationDictationState.Starting)
+            assertEquals("", fixture.drafts.getValue(key()).text)
+            disconnectedGeneration.onError(ConversationDictationFailure.ProviderDisconnected)
+            fixture.scheduler.advanceBy(499L)
+            assertEquals(2, fixture.platform.sessions.size)
+            fixture.scheduler.advanceBy(1L)
+            assertEquals(3, fixture.platform.sessions.size)
+
+            fixture.platform.listener.onError(ConversationDictationFailure.RecognizerBusy)
+            assertTrue(fixture.controller.state is ConversationDictationState.Starting)
+            fixture.scheduler.advanceBy(999L)
+            assertEquals(3, fixture.platform.sessions.size)
+            assertTrue(fixture.controller.state is ConversationDictationState.Starting)
+            fixture.scheduler.advanceBy(1L)
+            assertEquals(4, fixture.platform.sessions.size)
+
+            fixture.platform.pendingCallerAudio = false
+            fixture.platform.listener.onResult("recovered tail")
+            advanceUntilIdle()
+
+            assertEquals(listOf("recognized body recovered tail"), sent)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+            assertFalse(fixture.controller.hasDurableSession)
+        }
+
+    /** Cancel during retained-tail backoff fences the timeout and discards audio ownership once. */
+    @Test
+    fun cancelDuringRetainedTailBackoffPreventsAReplacementGeneration() {
+        val fixture = fixture(draft = TextFieldValue(""))
+        fixture.platform.pendingCallerAudio = true
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onResult("recognized body")
+        fixture.scheduler.runDelay(250L)
+        fixture.controller.paste()
+        fixture.platform.listener.onError(ConversationDictationFailure.ProviderDisconnected)
+        assertEquals(2, fixture.platform.sessions.size)
+
+        fixture.controller.cancel()
+        fixture.scheduler.advanceBy(500L)
+
+        assertEquals(2, fixture.platform.sessions.size)
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        assertFalse(fixture.controller.hasDurableSession)
+        assertEquals("", fixture.drafts.getValue(key()).text)
+    }
+
+    /** A drained tail finalizes instead of reopening a recognizer when its backoff expires. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun retainedTailBackoffRechecksPendingAudioBeforeStarting() =
+        runTest {
+            val fixture = fixture(draft = TextFieldValue(""), targetValidationScope = this)
+            fixture.platform.pendingCallerAudio = true
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.platform.listener.onResult("recognized body")
+            fixture.scheduler.runDelay(250L)
+            fixture.controller.paste()
+            fixture.platform.listener.onError(ConversationDictationFailure.ProviderDisconnected)
+            assertEquals(2, fixture.platform.sessions.size)
+
+            fixture.platform.pendingCallerAudio = false
+            fixture.scheduler.advanceBy(500L)
+            advanceUntilIdle()
+
+            assertEquals(2, fixture.platform.sessions.size)
+            assertEquals("recognized body", fixture.drafts.getValue(key()).text)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+            assertFalse(fixture.controller.hasDurableSession)
+        }
 
     /** Retry exhaustion never sends partial text and a later retry sends the complete transcript. */
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -2220,6 +2328,7 @@ class ConversationDictationControllerTest {
         assertTrue(fixture.controller.state is ConversationDictationState.Starting)
         assertEquals("", fixture.drafts.getValue(key()).text)
 
+        fixture.scheduler.runDelay(500L)
         fixture.platform.pendingCallerAudio = false
         fixture.platform.listener.onResult("recovered tail")
 
