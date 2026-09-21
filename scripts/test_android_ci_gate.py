@@ -239,7 +239,7 @@ class AndroidCiGateTest(unittest.TestCase):
 
     def test_parallel_test_workers(self):
         """Parallelism changes execution, never the full-suite scope or caching."""
-        self.assertIn("ORG_GRADLE_PROJECT_ciTestForks: '4'", self.tests_job)
+        self.assertIn("ORG_GRADLE_PROJECT_ciTestForks: '2'", self.tests_job)
         root_build = (WORKFLOW.parents[2] / 'build.gradle.kts').read_text()
         self.assertIn('providers.gradleProperty("ciTestForks").map(String::toInt).getOrElse(1)', root_build)
         self.assertIn('outputs.doNotCacheIf("CI test assertions must execute")', root_build)
