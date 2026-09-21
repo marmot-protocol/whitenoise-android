@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import android.os.Looper
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.LaunchedEffect
@@ -28,8 +29,10 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.time.Duration
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -94,6 +97,90 @@ class OptimisticSentPreviewOrderingTest {
         assertEquals(ChatListMessageDeliveryStateFfi.PENDING, optimistic?.lastMessage?.deliveryState)
         assertEquals(20uL, optimistic?.activitySortAt)
         assertEquals(20uL, controller.items.first().latestAt)
+    }
+
+    /** A delivered projection must refresh a list that became visible before native settlement completed. */
+    @Test
+    fun deliveredProjectionRefreshesPendingPreviewWhileChatListIsAlreadyVisible() {
+        val appState = appState()
+        val controller = controllerWithRows(appState, row("chat-a", "Alpha", 20uL), row("chat-b", "Zulu", 10uL))
+
+        controller.setChatListVisible(false)
+        controller.applyOptimisticSentPreview("chat-b", preview("temp-b", "pending B", 20uL))
+        appState.acceptedPendingTextOptimisticIds(ACCOUNT_REF, "chat-b")["confirmed-b"] = "temp-b"
+        controller.setChatListVisible(true)
+        assertEquals(
+            ChatListMessageDeliveryStateFfi.PENDING,
+            controller.items
+                .first()
+                .projection
+                ?.lastMessage
+                ?.deliveryState,
+        )
+
+        applySubscriptionChatListRow(
+            controller,
+            row("chat-b", "Zulu", 20uL).copy(
+                lastMessage =
+                    preview(
+                        "confirmed-b",
+                        "pending B",
+                        20uL,
+                        ChatListMessageDeliveryStateFfi.DELIVERED,
+                    ),
+            ),
+            ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE,
+        )
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(20))
+
+        val delivered =
+            controller.items
+                .first()
+                .projection
+                ?.lastMessage
+        assertEquals("confirmed-b", delivered?.messageIdHex)
+        assertEquals(ChatListMessageDeliveryStateFfi.DELIVERED, delivered?.deliveryState)
+    }
+
+    /** A shape-only delivered row cannot settle a pending send without its canonical accepted ID. */
+    @Test
+    fun deliveredProjectionWithoutAcceptedPendingIdentityRemainsProvisional() {
+        val controller = controllerWithRows(row("chat-b", "Zulu", 10uL))
+
+        controller.setChatListVisible(false)
+        controller.applyOptimisticSentPreview("chat-b", preview("temp-b", "same text", 20uL))
+        applySubscriptionChatListRow(
+            controller,
+            row("chat-b", "Zulu", 20uL).copy(
+                lastMessage =
+                    preview(
+                        "unrelated-confirmed-b",
+                        "same text",
+                        20uL,
+                        ChatListMessageDeliveryStateFfi.DELIVERED,
+                    ),
+            ),
+            ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE,
+        )
+        controller.setChatListVisible(true)
+
+        val visible =
+            controller.items
+                .single()
+                .projection
+                ?.lastMessage
+        assertEquals("temp-b", visible?.messageIdHex)
+        assertEquals(ChatListMessageDeliveryStateFfi.PENDING, visible?.deliveryState)
+        controller.rollbackOptimisticSentPreview("chat-b", "temp-b")
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(20))
+        assertEquals(
+            "message-chat-b",
+            controller.items
+                .single()
+                .projection
+                ?.lastMessage
+                ?.messageIdHex,
+        )
     }
 
     @Test
@@ -1254,8 +1341,15 @@ class LocalDeletedGroupProjectionTest {
     }
 }
 
-private fun controllerWithRows(vararg rows: ChatListRowFfi): ChatsController {
-    val controller = ChatsController(appState())
+/** Builds the default-account chat-list fixture with the supplied authoritative rows. */
+private fun controllerWithRows(vararg rows: ChatListRowFfi): ChatsController = controllerWithRows(appState(), *rows)
+
+/** Builds a chat-list fixture sharing [appState] so retained conversation state can be asserted. */
+private fun controllerWithRows(
+    appState: WhiteNoiseAppState,
+    vararg rows: ChatListRowFfi,
+): ChatsController {
+    val controller = ChatsController(appState)
     ChatsController::class.java
         .getDeclaredField("accountRef")
         .apply { isAccessible = true }

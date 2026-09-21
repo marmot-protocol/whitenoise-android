@@ -1323,6 +1323,25 @@ internal fun acceptedPendingTextAwaitingProjection(
     acceptDisposition == SendAcceptDispositionFfi.ACCEPTED_PENDING &&
         confirmedId !in projectedMessageIds
 
+/**
+ * Drives native settlement for an already-durable text intent without issuing another semantic send.
+ * A convergence failure leaves the optimistic row pending for a later authoritative projection; cancellation
+ * still escapes so account and process lifetimes retain ownership of the suspended work.
+ */
+internal suspend fun runAcceptedPendingTextConvergence(
+    acceptedPending: Boolean,
+    converge: suspend () -> Unit,
+    onFailure: (Throwable) -> Unit = {},
+) {
+    if (!acceptedPending) return
+    try {
+        converge()
+    } catch (throwable: Throwable) {
+        rethrowIfCancellation(throwable)
+        onFailure(throwable)
+    }
+}
+
 data class SuccessfulTextSendReconciliation(
     val confirmedId: String,
     val confirmed: AppMessageRecordFfi,
@@ -2782,6 +2801,30 @@ class ChatsController private constructor(
             }
     }
 
+    /** Uses the canonical accepted-pending ID before falling back to render-shape matching. */
+    private fun authoritativeOptimisticPreviewMatch(
+        state: OptimisticChatListPreviewState,
+        row: ChatListRowFfi,
+    ): OptimisticChatListPreviewMatch? {
+        val acceptedPendingEntryKey =
+            row.lastMessage
+                ?.takeIf { it.deliveryState == ChatListMessageDeliveryStateFfi.DELIVERED }
+                ?.messageIdHex
+                ?.let { confirmedMessageIdHex ->
+                    appState.acceptedPendingTextOptimisticId(
+                        accountRef = accountRef,
+                        groupIdHex = row.groupIdHex,
+                        confirmedMessageIdHex = confirmedMessageIdHex,
+                    )
+                }
+        return acceptedPendingEntryKey
+            ?.let { entryKey ->
+                state.entries[entryKey]?.let { entry ->
+                    OptimisticChatListPreviewMatch(entryKey, entry.activitySequence)
+                }
+            } ?: matchingOptimisticPreview(state, row)
+    }
+
     private fun optimisticMatchIsStale(
         match: OptimisticChatListPreviewMatch,
         baselineRow: ChatListRowFfi,
@@ -2851,8 +2894,9 @@ class ChatsController private constructor(
     ): ChatListRowFfi {
         val activityCompare = compareChatListActivity(state.baselineRow, row)
         val match =
-            matchingOptimisticPreview(state, row)
+            authoritativeOptimisticPreviewMatch(state, row)
                 ?.takeUnless { acceptBackwardActivity && activityCompare < 0 }
+        acceptDeliveredOptimisticPreview(state, row)
         // A failed send is terminal: its callback will never report a confirmed
         // id, so parking an authoritative row against it would strand the row
         // on FAILED and discard every later update for that message.
@@ -2908,6 +2952,44 @@ class ChatsController private constructor(
         }
         if (acceptRow) state.baselineRow = row
         return if (acceptRow) row else state.baselineRow
+    }
+
+    /**
+     * Treats a delivered authoritative row as the exact optimistic ID handoff that an open conversation
+     * normally performs. This keeps the chat-list subscription sufficient after navigation disposes the route.
+     */
+    private fun acceptDeliveredOptimisticPreview(
+        state: OptimisticChatListPreviewState,
+        row: ChatListRowFfi,
+    ) {
+        val delivered =
+            row.lastMessage?.takeIf {
+                it.deliveryState == ChatListMessageDeliveryStateFfi.DELIVERED
+            } ?: return
+        val entryKey =
+            delivered.messageIdHex.let { confirmedMessageIdHex ->
+                appState.acceptedPendingTextOptimisticId(
+                    accountRef = accountRef,
+                    groupIdHex = row.groupIdHex,
+                    confirmedMessageIdHex = confirmedMessageIdHex,
+                )
+            }
+        entryKey?.let { acceptedEntryKey ->
+            state.entries[acceptedEntryKey]
+                ?.takeIf { it.confirmedMessageIdHex == null }
+                ?.let { entry ->
+                    state.confirmedActivitySequenceById[delivered.messageIdHex] = entry.activitySequence
+                    while (state.confirmedActivitySequenceById.size > MAX_CHAT_LIST_ACTIVITY_SEQUENCE_HISTORY) {
+                        state.confirmedActivitySequenceById.remove(state.confirmedActivitySequenceById.keys.first())
+                    }
+                    state.entries[acceptedEntryKey] =
+                        entry.copy(
+                            preview = delivered,
+                            confirmedMessageIdHex = delivered.messageIdHex,
+                            pendingAuthoritativeRow = null,
+                        )
+                }
+        }
     }
 
     /**
@@ -7948,6 +8030,7 @@ class ConversationController(
                     timelineOrder = optimisticOrder,
                     acceptedPendingTextOptimisticIdsByMessageId = acceptedPendingTextOptimisticIds,
                 )
+            convergeAcceptedPendingTextSend(account, reconciliation)
             if (!reconciliation.acceptedPending) {
                 transferRetentionAtSend(tempId, reconciliation.confirmedId)
                 appState.commitOptimisticSentPreview(
@@ -8050,6 +8133,28 @@ class ConversationController(
     private fun isRetryableTextAdmissionError(throwable: Throwable): Boolean =
         isTransientRelaySendError(throwable) ||
             (textPublisher == null && isTransientRuntimeWorkerError(throwable))
+
+    /** Keeps accepted-pending settlement alive when navigation disposes this conversation's visible route. */
+    private suspend fun convergeAcceptedPendingTextSend(
+        account: String,
+        reconciliation: SuccessfulTextSendReconciliation,
+    ) {
+        runAcceptedPendingTextConvergence(
+            acceptedPending = reconciliation.acceptedPending,
+            converge = {
+                appState.withGroupCommitLock(account, group.groupIdHex) {
+                    appState.marmotIo { retryGroupConvergence(account, group.groupIdHex) }
+                }
+            },
+            onFailure = { throwable ->
+                Log.w(
+                    "ConversationController",
+                    "accepted-pending convergence deferred; keeping preview pending",
+                    throwable,
+                )
+            },
+        )
+    }
 
     /**
      * Admits one logical text/reply token to native durable ownership. Proven
@@ -9572,6 +9677,7 @@ class ConversationController(
                     timelineOrder = order,
                     acceptedPendingTextOptimisticIdsByMessageId = acceptedPendingTextOptimisticIds,
                 )
+            convergeAcceptedPendingTextSend(account, reconciliation)
             if (!reconciliation.acceptedPending) {
                 transferRetentionAtSend(tempId, reconciliation.confirmedId)
                 appState.commitOptimisticSentPreview(
