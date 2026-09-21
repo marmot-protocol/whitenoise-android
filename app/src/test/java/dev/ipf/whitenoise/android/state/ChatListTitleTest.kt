@@ -336,6 +336,7 @@ class ChatListTitleTest {
             members = members,
         )
 
+    /** Builds a row whose member and preview fields can vary independently of title selection. */
     private fun row(
         groupId: String,
         rawTitle: String,

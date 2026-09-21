@@ -147,18 +147,22 @@ class ConversationAttachmentDraftTest {
         assertTrue(imageDocument.isComposerDocument())
     }
 
-    /** A removal fence rejects a late prepare result until the URI is explicitly selected again. */
+    /** Same-URI reselection stays blocked until cleanup for the previous lifetime completes. */
     @Test
-    fun documentRemovalFenceRejectsLatePreparationAndAllowsReselection() {
+    fun documentRemovalFenceSerializesCleanupBeforeReselection() {
         val uri = "content://picker/document/late"
         val fence = DraftDocumentRemovalFence()
 
         fence.updateInputs(emptyList(), listOf(uri))
-        fence.recordRemoval(uri)
+        val queuedCleanup = fence.recordRemoval(uri)
 
         assertFalse(fence.canPublish(uri, listOf(uri)))
         fence.updateInputs(listOf(uri), emptyList())
         fence.updateInputs(emptyList(), listOf(uri))
+        assertFalse(fence.canPublish(uri, listOf(uri)))
+
+        fence.completeRemoval(queuedCleanup)
+
         assertTrue(fence.canPublish(uri, listOf(uri)))
     }
 

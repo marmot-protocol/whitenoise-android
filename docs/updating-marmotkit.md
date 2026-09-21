@@ -2,7 +2,8 @@
 
 Local preparation for the next release is recorded in the
 [0.10.4 waiting upgrade draft](drafts/marmotkit-0.10.4/README.md). It is not an
-active pin or a claim of completed adoption; publication waits for PR #2691.
+active pin or a claim of completed adoption; publication remains gated on final
+validation and release-readiness checks.
 
 White Noise Android consumes one immutable MarmotKit Android release archive.
 Normal builds never regenerate bindings from a local MDK checkout. Maintainers

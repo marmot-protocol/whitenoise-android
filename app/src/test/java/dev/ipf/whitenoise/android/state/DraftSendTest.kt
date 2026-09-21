@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
+import dev.ipf.marmotkit.LocalSendStatusFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
@@ -73,6 +74,33 @@ class DraftSendTest {
             assertEquals(listOf("selectedMessageDraft", "sendMediaAttachments"), mismatched.calls)
         }
 
+    /** Tokenized retries fail closed when their draft is missing instead of publishing a duplicate. */
+    @Test
+    fun tokenizedMediaRetryNeverFallsBackToUnkeyedSend() =
+        runBlocking {
+            for (engine in listOf(
+                ScriptedEngine(draft = content("cap", attachments = listOf(jpeg("b.jpg")))),
+                ScriptedEngine(
+                    draft = content("cap", attachments = listOf(jpeg("a.jpg"))),
+                    conflictOnSave = true,
+                ),
+            )) {
+                val failure =
+                    runCatching {
+                        engine.marmot.sendComposerMedia(
+                            "acct",
+                            "group",
+                            listOf(reference("a.jpg", "image/jpeg")),
+                            "changed caption",
+                            clientToken = "stable-token",
+                        )
+                    }.exceptionOrNull()
+
+                assertTrue(failure is IllegalStateException)
+                assertFalse("sendMediaAttachments" in engine.calls)
+            }
+        }
+
     /** The descriptor match is positional and covers name and media type. */
     @Test
     fun draftDescribesChecksOrderNameAndType() {
@@ -95,6 +123,16 @@ private class ScriptedEngine private constructor() : Marmot(NoPointer) {
     private lateinit var revision: MessageDraftRevisionFfi
 
     val marmot: MarmotInterface get() = this
+
+    /** Reports no prior native ownership so tokenized tests exercise admission routing. */
+    override fun localSendStatus(
+        accountRef: String,
+        groupIdHex: String,
+        clientToken: String,
+    ): LocalSendStatusFfi? {
+        calls += "localSendStatus"
+        return null
+    }
 
     /** Records the read so a send's full engine-call sequence, not just its writes, is assertable. */
     override fun selectedMessageDraft(

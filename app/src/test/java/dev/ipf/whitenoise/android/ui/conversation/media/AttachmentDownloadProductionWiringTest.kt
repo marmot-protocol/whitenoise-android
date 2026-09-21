@@ -137,7 +137,8 @@ class AttachmentDownloadProductionWiringTest {
             )
         assertTrue(
             "File-backed consumers share the native-aware acquisition owner",
-            "appState.downloadAttachmentPlaintextSource(" in sourceDownload && "memoizedAttachmentAcquisition(" in resolver,
+            "appState.downloadAttachmentPlaintextSource(" in sourceDownload &&
+                "memoizedAttachmentAcquisition(" in resolver,
         )
         val durableDownload =
             appState

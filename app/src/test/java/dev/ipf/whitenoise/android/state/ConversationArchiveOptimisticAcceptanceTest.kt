@@ -355,6 +355,7 @@ class ConversationArchiveOptimisticAcceptanceTest {
             viaWelcomeMessageIdHex = null,
         )
 
+    /** Returns an active row with explicit capabilities for optimistic archive assertions. */
     private fun row() =
         ChatListRowFfi(
             selfMembership = SelfMembershipFfi.MEMBER,

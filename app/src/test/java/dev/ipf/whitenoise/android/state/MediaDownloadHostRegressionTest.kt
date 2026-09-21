@@ -157,7 +157,7 @@ class MediaDownloadHostRegressionTest {
                         persistInteractiveIntent = false,
                     )
                 }
-            runCurrent()
+            fixture.awaitExplicitDemands(1)
             assertFalse(interactive.isCompleted)
 
             val expected = bytes(reference(0).fileName)

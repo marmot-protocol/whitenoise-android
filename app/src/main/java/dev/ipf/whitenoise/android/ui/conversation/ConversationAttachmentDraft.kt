@@ -97,32 +97,68 @@ internal fun reconcilePersistedDraftAttachments(
     return PersistedDraftAttachmentReconciliation(mediaBySlotId, documentsByUriString, unmatched)
 }
 
-/** Fences preparation results that complete after their document was explicitly removed. */
-internal class DraftDocumentRemovalFence {
-    private val removedUris = mutableSetOf<String>()
+/** Identifies one removal from a specific selection lifetime of a document URI. */
+internal data class DraftDocumentRemoval(
+    val uri: String,
+    val generation: Long,
+    val sequence: Long,
+)
 
-    /** A newly selected URI starts a fresh lifetime; unchanged projections keep their tombstone. */
+/** Fences preparation results and reselections until older native cleanup completes. */
+internal class DraftDocumentRemovalFence {
+    private val generationByUri = mutableMapOf<String, Long>()
+    private val removedGenerationsByUri = mutableMapOf<String, MutableSet<Long>>()
+    private val pendingCleanups = mutableSetOf<DraftDocumentRemoval>()
+    private var nextRemovalSequence = 0L
+
+    /** A newly selected URI starts a fresh lifetime without releasing older cleanup fences. */
+    @Synchronized
     fun updateInputs(
         previousUris: List<String>,
         currentUris: List<String>,
     ) {
-        removedUris.removeAll(currentUris.toSet() - previousUris.toSet())
+        (currentUris.toSet() - previousUris.toSet()).forEach { uri ->
+            generationByUri[uri] = generationByUri.getOrDefault(uri, 0L) + 1L
+        }
     }
 
-    /** Records intent before any prepared value lookup can return early. */
-    fun recordRemoval(uri: String) {
-        removedUris += uri
+    /** Records intent before lookup and returns the exact cleanup lifetime to acknowledge. */
+    @Synchronized
+    fun recordRemoval(uri: String): DraftDocumentRemoval {
+        val generation = generationByUri.getOrPut(uri) { 1L }
+        val removal = DraftDocumentRemoval(uri, generation, ++nextRemovalSequence)
+        removedGenerationsByUri.getOrPut(uri, ::mutableSetOf) += generation
+        pendingCleanups += removal
+        return removal
     }
 
-    /** Maps removal intent to native identity even before prepared bytes have been restored. */
+    /** Releases only the completed cleanup while retaining the removed lifetime's tombstone. */
+    @Synchronized
+    fun completeRemoval(removal: DraftDocumentRemoval) {
+        pendingCleanups -= removal
+    }
+
+    /** Maps every blocked lifetime to native identity before stale restoration can publish it. */
+    @Synchronized
     fun removedAttachmentIds(
         accountRef: String,
         groupIdHex: String,
-    ): Set<String> = removedUris.mapTo(mutableSetOf()) { stagedDocumentAttachmentId(accountRef, groupIdHex, it) }
+    ): Set<String> =
+        generationByUri
+            .filter { (uri, generation) ->
+                generation in removedGenerationsByUri[uri].orEmpty() || pendingCleanups.any { it.uri == uri }
+            }.keys
+            .mapTo(mutableSetOf()) { stagedDocumentAttachmentId(accountRef, groupIdHex, it) }
 
-    /** Allows publication only while the URI is selected in its current lifetime. */
+    /** Allows the selected lifetime only after every older cleanup for its URI has completed. */
+    @Synchronized
     fun canPublish(
         uri: String,
         currentUris: List<String>,
-    ): Boolean = uri in currentUris && uri !in removedUris
+    ): Boolean {
+        val generation = generationByUri[uri] ?: return false
+        return uri in currentUris &&
+            generation !in removedGenerationsByUri[uri].orEmpty() &&
+            pendingCleanups.none { it.uri == uri }
+    }
 }

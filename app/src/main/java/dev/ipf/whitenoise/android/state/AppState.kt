@@ -3917,6 +3917,7 @@ class WhiteNoiseAppState private constructor(
         }
 
     /** Exposes only active owner lifetime, never a second retained attachment record. */
+    @Suppress("MaxLineLength") // Kept as an expression body by ktlint's formatter.
     internal fun hasActiveAttachmentAcquisition(cacheKey: String): Boolean = inFlightAttachmentAcquisitions.isActive(cacheKey)
 
     /**
@@ -3982,7 +3983,6 @@ class WhiteNoiseAppState private constructor(
         inFlightAttachmentAcquisitions.cancel(request.cacheKey(), AttachmentTransferCancelledByUserException())
         mutationsScope.launch { cancelNativeAttachmentBounded(request) }
         attachmentDownloadPolicyRevision += 1
-        mutationsScope.launch { runCatchingCancellable { cancelNativeAttachment(request) } }
     }
 
     /** True while the user's cancel of this exact attachment still blocks automatic work. */

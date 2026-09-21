@@ -179,6 +179,7 @@ class ConversationMediaSendReconciliationIntegrationTest {
 
     private fun mediaImetaTag() = MessageTagFfi(listOf("imeta", "m image/jpeg"))
 
+    /** Creates the authoritative media projection used to reconcile one optimistic send token. */
     private fun projectedMediaMessage(
         recordedAt: ULong,
         reference: MediaAttachmentReferenceFfi,

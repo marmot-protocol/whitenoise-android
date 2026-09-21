@@ -91,6 +91,7 @@ class ChatRowPreviewMarkdownSourceTest {
         assertNull(chatRowPreviewMarkdownSource(rowWith(lastMessage = null)))
     }
 
+    /** Creates a row with one selected preview source for Markdown precedence checks. */
     private fun rowWith(
         kind: ULong = 9uL,
         plaintext: String = "body",

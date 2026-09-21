@@ -80,6 +80,7 @@ internal suspend fun MarmotInterface.sendComposerMedia(
                 }
         if (submitted != null) return submitted
     }
+    check(clientToken == null) { "client-token media send requires a matching draft revision" }
     return sendMediaAttachments(accountRef, groupIdHex, references, caption)
 }
 

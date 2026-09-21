@@ -93,6 +93,10 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
     }
 
     /** Replaces only the existing runtime handle; no bootstrap, worker, or socket is started. */
+    @Suppress(
+        "CyclomaticComplexMethod",
+        "LongMethod",
+    ) // One exhaustive proxy dispatch keeps unexpected native calls fatal.
     private fun nativeBoundary(): MarmotInterface =
         Proxy.newProxyInstance(
             MarmotInterface::class.java.classLoader,
@@ -135,7 +139,13 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
                     if (bytes == null) {
                         AttachmentLocalBytesFfi(false, byteArrayOf())
                     } else {
-                        AttachmentLocalBytesFfi(true, bytes.copyOfRange(offset.toInt(), minOf(bytes.size, offset.toInt() + limit.toInt())))
+                        AttachmentLocalBytesFfi(
+                            true,
+                            bytes.copyOfRange(
+                                offset.toInt(),
+                                minOf(bytes.size, offset.toInt() + limit.toInt()),
+                            ),
+                        )
                     }
                 }
                 "attachmentTransferSnapshot" ->
@@ -144,7 +154,10 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
                             status(key(args[0] as String, args[1] as String, it))
                         },
                     )
-                "subscribeAttachmentTransfers" -> subscription(key(args!![0] as String, args[1] as String, targets(args).single()))
+                "subscribeAttachmentTransfers" ->
+                    subscription(
+                        key(args!![0] as String, args[1] as String, targets(args).single()),
+                    )
                 "requestAutomaticAttachment", "downloadAttachmentAgain" -> {
                     val key = key(args!![0] as String, args[1] as String, args[2] as AttachmentLocalTargetFfi)
                     val automatic = method.name.substringBefore('-') == "requestAutomaticAttachment"
@@ -172,8 +185,10 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
         } as MarmotInterface
 
     /** Extracts ordered targets without silently replacing source identity. */
-    @Suppress("UNCHECKED_CAST")
-    private fun targets(args: Array<out Any?>): List<AttachmentLocalTargetFfi> = args[2] as List<AttachmentLocalTargetFfi>
+    private fun targets(args: Array<out Any?>): List<AttachmentLocalTargetFfi> {
+        @Suppress("UNCHECKED_CAST")
+        return args[2] as List<AttachmentLocalTargetFfi>
+    }
 
     /** This fixture has one immutable history generation, including across final-page checks. */
     private fun historyVersion(): AttachmentHistoryVersion = nativeStub(FixedHistoryVersion::class.java)
@@ -308,6 +323,14 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
                 while (synchronized(lock) { (entriesField.get(owners) as Map<*, *>).size } != count) {
                     delay(1)
                 }
+            }
+        }
+
+    /** Waits for an explicit promotion to cross the real IO cache probe before completing native work. */
+    suspend fun awaitExplicitDemands(count: Int) =
+        withContext(Dispatchers.IO) {
+            withTimeout(10_000) {
+                while (explicitDemands.get() != count) delay(1)
             }
         }
 

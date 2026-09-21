@@ -437,6 +437,7 @@ class ChatListSortingTest {
             activitySequence = activitySequence,
         )
 
+    /** Constructs a sortable row while keeping preview and action capabilities deterministic. */
     private fun row(
         groupId: String,
         title: String,

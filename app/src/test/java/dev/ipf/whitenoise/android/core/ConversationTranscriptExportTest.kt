@@ -413,6 +413,7 @@ class ConversationTranscriptExportTest {
         disbandRequest = null,
     )
 
+    /** Builds an exportable projection with explicit deletion provenance and attachment state. */
     private fun timelineRecord(
         messageIdHex: String,
         direction: String = "received",

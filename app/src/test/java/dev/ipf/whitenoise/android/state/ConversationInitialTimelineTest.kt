@@ -109,6 +109,7 @@ class ConversationInitialTimelineTest {
         assertFalse(shouldDiscardInitialTimelineSeedForFailure(published = true))
     }
 
+    /** Builds a selected-message preview for initial timeline seed acceptance decisions. */
     private fun preview(
         messageIdHex: String = MESSAGE_ID,
         sender: String = SENDER_ID,

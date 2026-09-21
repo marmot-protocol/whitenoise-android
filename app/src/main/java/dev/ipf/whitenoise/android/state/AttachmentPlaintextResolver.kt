@@ -104,11 +104,7 @@ private suspend fun WhiteNoiseAppState.acquireAttachmentPlaintextSource(
     persistInteractiveIntent: Boolean,
     allowExplicitRetry: Boolean,
 ): AttachmentPlaintext {
-    if (priority == AttachmentDownloadPriority.Interactive && allowExplicitRetry && hasActiveAttachmentAcquisition(cacheKey)) {
-        val target = resolveNativeAttachmentTarget(request) ?: throw AttachmentReferenceNotReadyException()
-        marmotIo { downloadAttachmentAgain(request.accountRef, request.groupIdHex, target.toFfi()) }
-            ?: throw IOException("native attachment promotion was rejected")
-    }
+    promoteActiveAttachmentAcquisition(cacheKey, request, priority, allowExplicitRetry)
     val resolved =
         memoizedAttachmentAcquisition(cacheKey, request, priority) {
             val target = resolveNativeAttachmentTarget(request) ?: throw AttachmentReferenceNotReadyException()
@@ -125,6 +121,23 @@ private suspend fun WhiteNoiseAppState.acquireAttachmentPlaintextSource(
             clearInteractiveAttachmentIntentAfterSuccess(request, priority, persistInteractiveIntent)
         },
     )
+}
+
+/** Promotes an existing automatic native job when an explicit caller joins it. */
+private suspend fun WhiteNoiseAppState.promoteActiveAttachmentAcquisition(
+    cacheKey: String,
+    request: AttachmentTransferRequest,
+    priority: AttachmentDownloadPriority,
+    allowExplicitRetry: Boolean,
+) {
+    val shouldPromote =
+        priority == AttachmentDownloadPriority.Interactive &&
+            allowExplicitRetry &&
+            hasActiveAttachmentAcquisition(cacheKey)
+    if (!shouldPromote) return
+    val target = resolveNativeAttachmentTarget(request) ?: throw AttachmentReferenceNotReadyException()
+    marmotIo { downloadAttachmentAgain(request.accountRef, request.groupIdHex, target.toFfi()) }
+        ?: throw IOException("native attachment promotion was rejected")
 }
 
 /** Clears durable demand only after the selected retained source is open and caller-owned. */

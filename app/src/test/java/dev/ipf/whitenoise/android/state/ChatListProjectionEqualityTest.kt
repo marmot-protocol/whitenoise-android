@@ -120,6 +120,7 @@ class ChatListProjectionEqualityTest {
             AppGroupMemberRecordFfi(memberIdHex = PEER_ACCOUNT, account = null, local = false),
         )
 
+    /** Returns an immutable preview that isolates row equality from message-content changes. */
     private fun preview() =
         ChatListMessagePreviewFfi(
             retentionSeconds = null,

@@ -30,18 +30,22 @@ observation, terminal-state preservation, explicit cancellation, and retained
 ranged reads. It fails on any legacy network call. Generated native test handles
 use the repository's constructor-free stub convention, not real JNI cleaners.
 
-The user requested an immediate review checkpoint push before the remaining
-validation completes. Keep the PR draft: the latest offline fast gate failed
-detekt with 16 findings (line length, throw count, method length and test-fixture
-complexity). Both-flavor production compilation completed; the gate did not
-complete its remaining test/lint tasks. An earlier focused run passed the two
-lease regressions and real composer-removal regression but had two transfer
-fixture failures; those fixtures were corrected and still need a successful
-rerun. The 30 artifact-preparation tests and 33 manual-guide validator tests
-passed; the guide has 265 active IDs. No passing final-head gate is claimed.
+Review remediation is complete locally. Duplicate native cancellation was
+removed; tokenized media retries now fail closed instead of falling through to
+an unkeyed send; document removals carry a selection generation so same-URI
+reselections wait for older cleanup; and the expiry baseline is tracked. The
+touched projection-fixture builders now have meaningful KDoc sufficient to
+raise the review's 66.04% touched-function coverage above its 80% threshold.
 
-The emulator showed a System UI ANR before candidate
-installation and was stopped without wiping app data. No candidate-device,
+The final offline fast gate passed in 14m 6s. It covered both-flavor production
+compilation, ktlint, detekt, Zapstore Android lint, Android-test compilation,
+157 focused Play tests, and Play Roborazzi verification. A separate focused
+Zapstore Roborazzi verification passed in 3m 35s. The 30 artifact-preparation
+tests and 33 manual-guide validator tests passed; the guide has 265 active IDs.
+GitHub CI and the incremental review remain authoritative for the pushed head.
+
+The emulator showed a System UI ANR before candidate installation and was
+stopped without wiping app data. No candidate-device,
 in-place schema migration, real transport-byte, or durable-send interruption
 qualification is claimed. Project 7 still lists this PR and #2493 In Progress.
 

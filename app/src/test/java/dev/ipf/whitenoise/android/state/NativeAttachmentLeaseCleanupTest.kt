@@ -38,7 +38,10 @@ class NativeAttachmentLeaseCleanupTest {
                         sources.forEach { it?.close() }
                     }
                 owner.join()
-                assertTrue("Caller must observe cancellation instead of a returned lease", owner.isCancelled && !returned)
+                assertTrue(
+                    "Caller must observe cancellation instead of a returned lease",
+                    owner.isCancelled && !returned,
+                )
                 assertEquals("Cancelled dispatcher handoff orphaned a plaintext lease", 0, leases(root).size)
             } finally {
                 root.deleteRecursively()
@@ -54,7 +57,12 @@ class NativeAttachmentLeaseCleanupTest {
                 val reader =
                     NativeAttachmentLocalAccess(
                         cacheRoot = root,
-                        queryAssets = { listOf(AttachmentLocalAssetFfi("first", 3u), AttachmentLocalAssetFfi("second", 3u)) },
+                        queryAssets = {
+                            listOf(
+                                AttachmentLocalAssetFfi("first", 3u),
+                                AttachmentLocalAssetFfi("second", 3u),
+                            )
+                        },
                         readAsset = { reference, _, _ ->
                             if (reference == "second") throw IOException("second asset unavailable")
                             AttachmentLocalBytesFfi(true, byteArrayOf(1, 2, 3))

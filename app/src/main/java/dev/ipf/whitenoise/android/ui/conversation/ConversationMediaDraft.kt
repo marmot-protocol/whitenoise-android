@@ -343,15 +343,17 @@ internal class ConversationMediaDraftState(
 
     /** Removes a document only after an explicit shelf action, never because the screen was disposed. */
     fun releasePreparedDocument(uri: Uri) {
-        documentRemovalFence.recordRemoval(uri.toString())
+        val uriString = uri.toString()
+        val removal = documentRemovalFence.recordRemoval(uriString)
         val document = preparedDocuments[uri]
         preparedDocuments -= uri
         val accountRef = currentAccountRef ?: return
         appState.launchMutation {
             preparationMutex.withLock {
                 val groupId = controller.group.groupIdHex
-                val attachmentId = document?.attachment?.id ?: stagedDocumentAttachmentId(accountRef, groupId, uri.toString())
-                if (documentRemovalFence.canPublish(uri.toString(), currentDocumentUris.map(Uri::toString))) return@withLock
+                val attachmentId =
+                    document?.attachment?.id
+                        ?: stagedDocumentAttachmentId(accountRef, groupId, uriString)
                 val removed =
                     document ?: appState.messageDraftRepository
                         .draft(accountRef, groupId)
@@ -360,6 +362,11 @@ internal class ConversationMediaDraftState(
                         ?.firstOrNull { it.id == attachmentId }
                         ?.let { DraftPreparedPhoto(it, it.editorDigest()) }
                 if (removed != null) stager.removePrepared(accountRef, groupId, removed)
+                documentRemovalFence.completeRemoval(removal)
+                val currentUris = currentDocumentUris.map(Uri::toString)
+                if (uri !in preparedDocuments && documentRemovalFence.canPublish(uriString, currentUris)) {
+                    prepareDocument(uri, attachmentId)
+                }
             }
         }
     }
@@ -376,7 +383,7 @@ internal class ConversationMediaDraftState(
     }
 
     /** Rehydrates the composer shelf from authoritative native bytes after navigation or process recreation. */
-    @Suppress("ReturnCount") // Guard returns avoid materializing incomplete or unowned native drafts.
+    @Suppress("LongMethod", "ReturnCount") // One locked pass reconnects, materializes, and publishes one snapshot.
     suspend fun restorePersistedAttachments(): RestoredConversationAttachments? =
         preparationMutex.withLock {
             if (restoreAttempted) return@withLock null
@@ -397,7 +404,11 @@ internal class ConversationMediaDraftState(
                     mediaSlotIds = currentSlots.map(PendingMediaSlot::id),
                     documentUriStrings = currentDocumentUris.map(Uri::toString),
                     attachments = attachments,
-                    removedAttachmentIds = documentRemovalFence.removedAttachmentIds(accountRef, controller.group.groupIdHex),
+                    removedAttachmentIds =
+                        documentRemovalFence.removedAttachmentIds(
+                            accountRef,
+                            controller.group.groupIdHex,
+                        ),
                 )
             val restoredPhotos =
                 reconciliation.mediaBySlotId.mapValues { (_, attachment) ->
@@ -426,7 +437,12 @@ internal class ConversationMediaDraftState(
             val media = currentSlots.toMutableList()
             val documents = currentDocumentUris.toMutableList()
             materialized.forEach { (attachment, uri) ->
-                if (attachment.id in documentRemovalFence.removedAttachmentIds(accountRef, controller.group.groupIdHex)) {
+                val removedAttachmentIds =
+                    documentRemovalFence.removedAttachmentIds(
+                        accountRef,
+                        controller.group.groupIdHex,
+                    )
+                if (attachment.id in removedAttachmentIds) {
                     return@forEach
                 }
                 val prepared = DraftPreparedPhoto(attachment, attachment.editorDigest())
