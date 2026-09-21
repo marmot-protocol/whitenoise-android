@@ -3,13 +3,64 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.AttachmentTransferSnapshotFfi
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.AttachmentTransferStatusFfi
+import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
 
 class NativeAttachmentObservationTest {
+    /** A native wake callback must return before polling can re-enter its scheduler lock. */
+    @Test(timeout = 10_000)
+    fun wakeDoesNotReenterCallback() =
+        runBlocking {
+            val scheduler = Any()
+            val wake = CompletableDeferred<CancellableContinuation<Unit>>()
+            val frames = Feed(listOf(AttachmentTransferStateFfi.NOT_REQUESTED, AttachmentTransferStateFfi.READY))
+            val feed =
+                object : NativeTransferFeed {
+                    private var reads = 0
+
+                    override suspend fun next(): AttachmentTransferSnapshotFfi {
+                        if (reads++ > 0) {
+                            suspendCancellableCoroutine<Unit> { wake.complete(it) }
+                            assertFalse("poll re-entered the callback's lock", Thread.holdsLock(scheduler))
+                        }
+
+                        return frames.next()
+                    }
+
+                    override fun close() {
+                        frames.close()
+                    }
+                }
+
+            // Unconfined exposes the same inline callback resumption as Main.immediate.
+            val observation = async(Dispatchers.Unconfined) { awaitNativeAttachment(open = { feed }) { null } }
+            val continuation = wake.await()
+            val nativeThread = Executors.newSingleThreadExecutor()
+            try {
+                nativeThread
+                    .submit {
+                        synchronized(scheduler) { continuation.resume(Unit) }
+                    }.get(5, TimeUnit.SECONDS)
+                observation.await()
+                assertEquals(1, frames.closes)
+            } finally {
+                nativeThread.shutdownNow()
+            }
+        }
+
     /** A demand exception still releases the subscription acquired before admission. */
     @Test
     fun demandFailureClosesObservation() =

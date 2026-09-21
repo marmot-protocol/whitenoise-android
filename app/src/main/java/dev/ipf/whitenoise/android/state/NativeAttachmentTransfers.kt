@@ -5,6 +5,7 @@ import dev.ipf.marmotkit.AttachmentTransferSnapshotFfi
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.AttachmentTransferStatusFfi
 import dev.ipf.marmotkit.AttachmentTransferSubscription
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -168,7 +169,10 @@ private suspend fun observeNativeAttachment(
 
 /** A complete one-target replacement is required before interpreting native progress. */
 private suspend fun NativeTransferFeed.nextState(): AttachmentTransferStateFfi =
-    next()?.items?.singleOrNull()?.state ?: throw IOException("native attachment transfer closed")
+    // UniFFI wakes under a scheduler lock; dispatch before a resumed read polls it again.
+    withContext(Dispatchers.IO) {
+        next()?.items?.singleOrNull()?.state ?: throw IOException("native attachment transfer closed")
+    }
 
 /** A terminal native acquisition must not be turned into a host transport retry. */
 internal class NativeAttachmentTerminalException(

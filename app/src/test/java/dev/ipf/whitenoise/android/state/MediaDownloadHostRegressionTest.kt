@@ -10,12 +10,15 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -214,7 +217,15 @@ class MediaDownloadHostRegressionTest {
             fixture.entered.receive()
 
             fixture.state.cancelAttachmentDownload(request)
-            runCurrent()
+            // Pump Main without skipping the cancellation deadline while real IO is pending.
+            runBlocking {
+                withTimeout(10_000) {
+                    while (!download.isCompleted || !fixture.cancellationObserved.isCompleted) {
+                        runCurrent()
+                        delay(1)
+                    }
+                }
+            }
 
             assertTrue(download.await().exceptionOrNull() is kotlinx.coroutines.CancellationException)
             fixture.cancellationObserved.await()
