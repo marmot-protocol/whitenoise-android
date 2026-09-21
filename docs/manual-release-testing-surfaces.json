@@ -15,6 +15,12 @@
         "test_ids": ["MED-019", "MED-020"]
       },
       {
+        "surface": "Native attachment transfer observation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentTransfers.kt",
+        "anchor": "private suspend fun NativeTransferFeed.nextState()",
+        "test_ids": ["MED-019", "MED-020"]
+      },
+      {
         "surface": "Durable caller-correlated composer admission",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/DurableLocalSends.kt",
         "anchor": "sendComposerTextWithToken(",
