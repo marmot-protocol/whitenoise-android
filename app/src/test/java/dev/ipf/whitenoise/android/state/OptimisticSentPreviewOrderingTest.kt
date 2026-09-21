@@ -199,36 +199,6 @@ class OptimisticSentPreviewOrderingTest {
         )
     }
 
-    /** A successful callback must beat an earlier locally committed pending echo on return to the list. */
-    @Test
-    fun pendingAuthoritativeEchoBeforeSuccessShowsDeliveredWithoutReopeningConversation() {
-        val controller = controllerWithRows(row("chat-a", "Alpha", 20uL), row("chat-b", "Zulu", 10uL))
-
-        controller.setChatListVisible(false)
-        controller.applyOptimisticSentPreview("chat-b", preview("temp-b", "pending B", 20uL))
-        controller.applyChatListRow(
-            row("chat-b", "Zulu", 20uL).copy(
-                lastMessage =
-                    preview(
-                        "confirmed-b",
-                        "pending B",
-                        20uL,
-                        ChatListMessageDeliveryStateFfi.PENDING,
-                    ),
-            ),
-        )
-        controller.commitOptimisticSentPreview("chat-b", "temp-b", "confirmed-b")
-        controller.setChatListVisible(true)
-
-        val confirmed =
-            controller.items
-                .first()
-                .projection
-                ?.lastMessage
-        assertEquals("confirmed-b", confirmed?.messageIdHex)
-        assertEquals(ChatListMessageDeliveryStateFfi.DELIVERED, confirmed?.deliveryState)
-    }
-
     @Test
     fun lateEchoCannotMoveTheSameChatBehindANewerAuthoritativeMessage() {
         val controller = controllerWithRows(row("chat-b", "Zulu", 10uL))

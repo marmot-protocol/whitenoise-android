@@ -2853,7 +2853,6 @@ class ChatsController private constructor(
         val match =
             matchingOptimisticPreview(state, row)
                 ?.takeUnless { acceptBackwardActivity && activityCompare < 0 }
-        val effectiveRow = deliveredRowForCommittedPreview(state, row, match)
         // A failed send is terminal: its callback will never report a confirmed
         // id, so parking an authoritative row against it would strand the row
         // on FAILED and discard every later update for that message.
@@ -2907,30 +2906,8 @@ class ChatsController private constructor(
                     observesNewActivity,
                 )
         }
-        if (acceptRow) state.baselineRow = effectiveRow
-        return if (acceptRow) effectiveRow else state.baselineRow
-    }
-
-    /**
-     * Keeps a successful send delivered when its locally committed PENDING row reached the list first.
-     * The echo remains authoritative for every other field, while the later successful callback supplies
-     * stronger delivery evidence so returning to the list does not require another refresh to show a tick.
-     */
-    private fun deliveredRowForCommittedPreview(
-        state: OptimisticChatListPreviewState,
-        row: ChatListRowFfi,
-        match: OptimisticChatListPreviewMatch?,
-    ): ChatListRowFfi {
-        val lastMessage = row.lastMessage
-        val entry = match?.entryKey?.let(state.entries::get)
-        val committedPendingEcho =
-            lastMessage?.takeIf {
-                entry?.confirmedMessageIdHex == it.messageIdHex &&
-                    it.deliveryState == ChatListMessageDeliveryStateFfi.PENDING
-            }
-        return committedPendingEcho
-            ?.let { row.copy(lastMessage = it.copy(deliveryState = ChatListMessageDeliveryStateFfi.DELIVERED)) }
-            ?: row
+        if (acceptRow) state.baselineRow = row
+        return if (acceptRow) row else state.baselineRow
     }
 
     /**
