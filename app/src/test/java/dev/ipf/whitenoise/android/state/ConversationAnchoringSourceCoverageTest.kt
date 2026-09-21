@@ -84,6 +84,23 @@ class ConversationAnchoringSourceCoverageTest {
     }
 
     @Test
+    fun pendingDictatedSendUsesTheAcceptedSendRevealPath() {
+        val source = conversationScreenSource().readText()
+
+        assertTrue(
+            "a real dictated pending row must reveal through the same measured tail transaction as typed sends",
+            source.containsAll(
+                "appState.conversationDictation.pendingSendRevision(",
+                "remember(controller, draftAccountRef) { mutableIntStateOf(dictatedPendingSendRevision) }",
+                "LaunchedEffect(controller, dictatedPendingSendRevision)",
+                "dictatedPendingSendRevision <= observedDictatedPendingSendRevision",
+                "acceptedSendRevealedTranscript = true",
+                "revealSentMessage()",
+            ),
+        )
+    }
+
+    @Test
     fun readAnchorFollowsTheUnobstructedViewport() {
         val source = conversationScreenSource().readText()
         val helperIndex = source.indexOf("private fun rememberConversationReadAnchor(")

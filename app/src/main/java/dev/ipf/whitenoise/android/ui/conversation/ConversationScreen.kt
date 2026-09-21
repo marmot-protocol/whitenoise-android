@@ -52,6 +52,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -3233,6 +3234,24 @@ internal fun ConversationScreen(
                 groupIdHex = controller.group.groupIdHex,
             )
         } ?: 0
+    val dictatedPendingSendRevision =
+        draftAccountRef?.let { accountRef ->
+            appState.conversationDictation.pendingSendRevision(
+                accountRef = accountRef,
+                groupIdHex = controller.group.groupIdHex,
+            )
+        } ?: 0
+    var observedDictatedPendingSendRevision by
+        remember(controller, draftAccountRef) { mutableIntStateOf(dictatedPendingSendRevision) }
+    LaunchedEffect(controller, dictatedPendingSendRevision) {
+        if (dictatedPendingSendRevision <= observedDictatedPendingSendRevision) {
+            observedDictatedPendingSendRevision = dictatedPendingSendRevision
+            return@LaunchedEffect
+        }
+        observedDictatedPendingSendRevision = dictatedPendingSendRevision
+        acceptedSendRevealedTranscript = true
+        revealSentMessage()
+    }
     // Capture the revision for this navigation entry. A later accepted
     // transcript must rehydrate text/selection without being mistaken for a
     // restored draft and reopening the IME. Re-entering the conversation gets

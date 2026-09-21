@@ -358,6 +358,7 @@ class ConversationDictationControllerTest {
         assertEquals(TextRange(12), fixture.drafts.getValue(key()).selection)
         assertEquals(1, fixture.writes)
         assertEquals(1, fixture.controller.completionRevision(ACCOUNT, GROUP))
+        assertEquals(0, fixture.controller.pendingSendRevision(ACCOUNT, GROUP))
         assertTrue(fixture.controller.state is ConversationDictationState.Idle)
     }
 
@@ -3112,12 +3113,14 @@ class ConversationDictationControllerTest {
             assertFalse(fixture.controller.ownsMicrophone)
             assertEquals(1, durableStops)
             assertEquals("", fixture.drafts.getValue(key()).text)
+            assertEquals(1, fixture.controller.pendingSendRevision(ACCOUNT, GROUP))
 
             finishSend.complete(true)
             advanceUntilIdle()
 
             assertFalse(fixture.controller.hasDurableSession)
             assertEquals(1, durableStops)
+            assertEquals(1, fixture.controller.pendingSendRevision(ACCOUNT, GROUP))
             assertTrue(fixture.controller.state is ConversationDictationState.Idle)
         }
 
