@@ -31,7 +31,7 @@ using the same build helpers as the local script, on tag pushes, every pull
 request to `master`, and manual dispatch. A required comparison job checks source
 identity, matching recorded toolchain inputs, unsignedness, and APK bytes.
 Production and staging release lint run once each in separate required jobs.
-APK assembly in this verifier and the runtime workflow excludes those duplicate
+APK assembly in this verifier and PR runtime builds excludes those duplicate
 lint tasks; the reproducibility gate also requires both lint jobs to succeed.
 The local script verifies packaging determinism without running release lint.
 Tag/manual runs publish the verified unsigned APK, `SHA256SUMS`, and a toolchain

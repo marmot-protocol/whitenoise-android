@@ -3,7 +3,7 @@ name: Android Release Runtime Verify
 # R8 can successfully package bytecode that ART later rejects. These pre-merge
 # checks build the optimized production/API-36 and staging/API-37 paths, sign
 # them with disposable CI-only keys, and ask ART to verify every DEX class.
-# Release lint runs once per variant in android-repro-verify.yml's required gate.
+# On PRs, release lint runs once per variant in android-repro-verify.yml's gate.
 
 on:
   pull_request:
@@ -89,7 +89,7 @@ jobs:
           -Pwhitenoise.allowUnconfiguredProductionFirebaseForReleaseRuntimeTest=true
           -Pandroid.injected.build.abi=x86_64
           -Pandroid.injected.testOnly=false
-          -x :app:lintVitalProductionZapstoreRelease
+          ${{ github.event_name == 'pull_request' && '-x :app:lintVitalProductionZapstoreRelease' || '' }}
           --build-cache --no-daemon --stacktrace
 
       - name: Locate release APK
@@ -204,7 +204,7 @@ jobs:
         run: >-
           ./gradlew :app:assembleStagingZapstoreRelease
           -Pandroid.injected.testOnly=false
-          -x :app:lintVitalStagingZapstoreRelease
+          ${{ github.event_name == 'pull_request' && '-x :app:lintVitalStagingZapstoreRelease' || '' }}
           --build-cache --no-daemon --stacktrace
 
       - name: Locate ARM64 and x86_64 staging APKs
