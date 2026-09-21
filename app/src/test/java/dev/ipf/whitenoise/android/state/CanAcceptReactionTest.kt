@@ -131,46 +131,40 @@ class CanAcceptReactionTest {
             assertEquals(1, rollbackCount)
         }
 
-    /** An immediate removal remains suspended until the preceding add projects. */
+    /** An immediate removal remains suspended only until the preceding add returns its event id. */
     @Test
-    fun immediateRemovalWaitsForReactionProjection() =
+    fun immediateRemovalWaitsForReactionAddResult() =
         runTest {
-            val awaiter = ReactionProjectionAwaiter(timeoutMillis = 1_000)
-            var projected = false
+            val addResult = CompletableDeferred<String?>()
             val removal =
                 async(start = CoroutineStart.UNDISPATCHED) {
-                    awaiter.await(TARGET, "👍") { projected }
+                    awaitImmediateReactionEventId(addResult) { null }
                 }
 
-            assertFalse("removal must not race the unprojected add", removal.isCompleted)
-            projected = true
-            awaiter.confirm(TARGET, "👍")
+            assertFalse("removal must not race the in-flight add", removal.isCompleted)
+            addResult.complete("reaction-event")
 
-            assertTrue(removal.await())
+            assertEquals("reaction-event", removal.await())
         }
 
-    /** A failed add releases its queued removal without allowing another native mutation. */
+    /** A completed add can hand off its cached id after leaving the in-flight registry. */
     @Test
-    fun failedReactionAddReleasesQueuedRemovalAsFailure() =
+    fun immediateRemovalUsesCachedReactionEventId() =
         runTest {
-            val awaiter = ReactionProjectionAwaiter(timeoutMillis = 1_000)
-            val removal =
-                async(start = CoroutineStart.UNDISPATCHED) {
-                    awaiter.await(TARGET, "👍") { false }
-                }
-
-            awaiter.fail(TARGET, "👍")
-
-            assertFalse(removal.await())
+            assertEquals(
+                "cached-reaction-event",
+                awaitImmediateReactionEventId(precedingAdd = null) { "cached-reaction-event" },
+            )
         }
 
-    /** A reaction already present in the authoritative projection never waits for another echo. */
+    /** A failed add hands null to the queued removal so no unrelated event can be deleted. */
     @Test
-    fun projectedReactionSkipsProjectionWait() =
+    fun failedReactionAddDoesNotProduceRetractionEventId() =
         runTest {
-            val awaiter = ReactionProjectionAwaiter(timeoutMillis = 1_000)
+            val addResult = CompletableDeferred<String?>()
+            addResult.complete(null)
 
-            assertTrue(awaiter.await(TARGET, "👍") { true })
+            assertEquals(null, awaitImmediateReactionEventId(addResult) { "stale-event" })
         }
 
     /** A projected reaction event keeps removal scoped to the tapped emoji. */
@@ -208,6 +202,20 @@ class CanAcceptReactionTest {
                 emoji = "👍",
                 knownEventIdByEmoji = mapOf("👍" to "reaction-event"),
                 ownEmojisBeforeMutation = setOf("👍"),
+            ),
+        )
+    }
+
+    /** An immediate removal deletes the exact just-created event without waiting for projection. */
+    @Test
+    fun immediateRemovalPrefersReturnedReactionEvent() {
+        assertEquals(
+            OwnReactionRetractionPlan.DeleteReactionMessage("new-reaction-event"),
+            planOwnReactionRetraction(
+                emoji = "👍",
+                knownEventIdByEmoji = emptyMap(),
+                ownEmojisBeforeMutation = setOf("👍"),
+                preferredEventId = "new-reaction-event",
             ),
         )
     }
