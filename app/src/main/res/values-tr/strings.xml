@@ -496,6 +496,9 @@
     <string name="active">Aktif</string>
     <string name="copied">Kopyalandı</string>
     <string name="share_profile">Paylaş ve bağlan</string>
+    <string name="share_profile_url">Profil URL’sini paylaş</string>
+    <string name="share_profile_picture">Profil resmini paylaş</string>
+    <string name="profile_share_card_headline">White Noise’da mısın? Bana buradan yaz.</string>
     <string name="share">Paylaş</string>
     <string name="scan">Tara</string>
     <string name="couldnt_read_profile_code">Bu profil kodu okunamadı.</string>

@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.share
 
+import android.content.ComponentName
 import android.content.Intent
 import android.provider.OpenableColumns
 import android.view.KeyEvent
@@ -25,6 +26,48 @@ import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class OutboundShareDeviceContractTest {
+    /** An external receiver reads and decodes only the generated stream explicitly granted to it. */
+    @Test
+    fun generatedQrCardIsReadableButItsCacheNeighborIsNot() =
+        runBlocking {
+            val instrumentation = InstrumentationRegistry.getInstrumentation()
+            val context = instrumentation.targetContext
+            val externalContext = instrumentation.context
+            val payload = "marmot://profile/npub1${"q".repeat(58)}?from=qr"
+            val directory = File(context.cacheDir, MediaCacheDirs.SHARED).apply { mkdirs() }
+            val neighbor = File(directory, "neighbor-account-secret.txt").apply { writeText("not shared") }
+            val staged =
+                QrShareCardRenderer.stage(
+                    context,
+                    QrShareCardSpec(
+                        headline = "On White Noise? Message me here.",
+                        qrPayload = payload,
+                        displayName = "Ada",
+                    ),
+                )
+            val neighborUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", neighbor)
+            val results = externalContext.getSharedPreferences(OutboundShareTestTargetActivity.RESULTS, 0)
+            results.edit().clear().commit()
+            try {
+                val share =
+                    outboundShareIntent("https://example.test/profile", listOf(staged.stream))
+                        .setComponent(ComponentName(externalContext, OutboundShareTestTargetActivity::class.java))
+                        .putExtra(OutboundShareTestTargetActivity.EXTRA_NEIGHBOR_URI, neighborUri.toString())
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+                context.startActivity(share)
+                instrumentation.waitForIdleSync()
+
+                assertTrue(results.getBoolean(OutboundShareTestTargetActivity.KEY_COMPLETE, false))
+                assertEquals(payload, results.getString(OutboundShareTestTargetActivity.KEY_DECODED_QR, null))
+                assertFalse(results.getBoolean(OutboundShareTestTargetActivity.KEY_NEIGHBOR_READABLE, true))
+            } finally {
+                staged.file.delete()
+                neighbor.delete()
+                results.edit().clear().commit()
+            }
+        }
+
     /** A receiving app reads each staged attachment by its own sanitized name, never by the cache file's. */
     @Test
     fun stagedStreamsExposeTheAttachmentsOwnDisplayNames() =

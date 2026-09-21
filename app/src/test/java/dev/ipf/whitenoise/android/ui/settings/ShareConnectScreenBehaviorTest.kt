@@ -24,19 +24,24 @@ class ShareConnectScreenBehaviorTest {
     val composeRule = createComposeRule()
 
     private var backCount = 0
-    private var shareCount = 0
+    private var urlShareCount = 0
+    private var pictureShareCount = 0
     private var copyCount = 0
     private var scannerCount = 0
 
-    /** Back and the top-bar share action invoke their callers once per tap. */
+    /** Back and both explicit top-bar share choices invoke their callers once per tap. */
     @Test
     fun backAndShareFireOncePerTap() {
         mount()
         composeRule.onNodeWithContentDescription("Back").performClick()
         composeRule.onNodeWithTag("share_connect.share").performClick()
+        composeRule.onNodeWithText("Share profile URL").assertIsDisplayed().performClick()
+        composeRule.onNodeWithTag("share_connect.share").performClick()
+        composeRule.onNodeWithText("Share profile picture").assertIsDisplayed().performClick()
         composeRule.runOnIdle {
             assertEquals(1, backCount)
-            assertEquals(1, shareCount)
+            assertEquals(1, urlShareCount)
+            assertEquals(1, pictureShareCount)
         }
     }
 
@@ -89,7 +94,8 @@ class ShareConnectScreenBehaviorTest {
                     copied = copied,
                     scanInvalid = scanInvalid,
                     onBack = { backCount++ },
-                    onShare = { shareCount++ },
+                    onShareUrl = { urlShareCount++ },
+                    onSharePicture = { pictureShareCount++ },
                     onCopy = { copyCount++ },
                     onOpenScanner = { scannerCount++ },
                 )

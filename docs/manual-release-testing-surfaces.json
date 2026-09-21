@@ -1230,7 +1230,8 @@
           "NCH-001",
           "NCH-002",
           "ACC-003",
-          "ACC-017"
+          "ACC-017",
+          "ACC-019"
         ]
       },
       {
@@ -6252,7 +6253,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileQrSheet.kt",
         "anchor": "fun ProfileQrSheet(",
         "test_ids": [
-          "PRO-001"
+          "PRO-001",
+          "ACC-019"
         ]
       },
       {
@@ -7858,7 +7860,8 @@
         "anchor": "fun ShareConnectContent(",
         "test_ids": [
           "SET-001",
-          "NAV-004"
+          "NAV-004",
+          "ACC-019"
         ]
       },
       {
@@ -7867,7 +7870,8 @@
         "anchor": "fun ShareConnectScreen(",
         "test_ids": [
           "SET-001",
-          "NAV-004"
+          "NAV-004",
+          "ACC-019"
         ]
       },
       {
@@ -15653,6 +15657,42 @@
         ]
       },
       {
+        "surface": "profile-qr:string:profile_share_card_headline",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileQrSheet.kt",
+        "anchor": "R.string.profile_share_card_headline",
+        "test_ids": [
+          "PRO-001",
+          "ACC-019"
+        ]
+      },
+      {
+        "surface": "profile-qr:string:share",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileQrSheet.kt",
+        "anchor": "R.string.share",
+        "test_ids": [
+          "PRO-001",
+          "ACC-019"
+        ]
+      },
+      {
+        "surface": "profile-qr:string:share_profile_picture",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileQrSheet.kt",
+        "anchor": "R.string.share_profile_picture",
+        "test_ids": [
+          "PRO-001",
+          "ACC-019"
+        ]
+      },
+      {
+        "surface": "profile-qr:string:share_profile_url",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileQrSheet.kt",
+        "anchor": "R.string.share_profile_url",
+        "test_ids": [
+          "PRO-001",
+          "ACC-019"
+        ]
+      },
+      {
         "surface": "string:group_actions",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
         "anchor": "R.string.group_actions",
@@ -20919,6 +20959,16 @@
         ]
       },
       {
+        "surface": "share-connect:string:profile_share_card_headline",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
+        "anchor": "R.string.profile_share_card_headline",
+        "test_ids": [
+          "SET-001",
+          "NAV-004",
+          "ACC-019"
+        ]
+      },
+      {
         "surface": "string:scan_qr_code",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
         "anchor": "R.string.scan_qr_code",
@@ -20952,6 +21002,26 @@
         "test_ids": [
           "SET-001",
           "NAV-004"
+        ]
+      },
+      {
+        "surface": "share-connect:string:share_profile_picture",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
+        "anchor": "R.string.share_profile_picture",
+        "test_ids": [
+          "SET-001",
+          "NAV-004",
+          "ACC-019"
+        ]
+      },
+      {
+        "surface": "share-connect:string:share_profile_url",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
+        "anchor": "R.string.share_profile_url",
+        "test_ids": [
+          "SET-001",
+          "NAV-004",
+          "ACC-019"
         ]
       },
       {

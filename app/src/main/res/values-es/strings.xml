@@ -496,6 +496,9 @@
     <string name="active">Activo</string>
     <string name="copied">Copiado</string>
     <string name="share_profile">Compartir y conectar</string>
+    <string name="share_profile_url">Compartir URL del perfil</string>
+    <string name="share_profile_picture">Compartir imagen del perfil</string>
+    <string name="profile_share_card_headline">¿Estás en White Noise? Escríbeme aquí.</string>
     <string name="share">Compartir</string>
     <string name="scan">Escanear</string>
     <string name="couldnt_read_profile_code">No se pudo leer este código de perfil.</string>

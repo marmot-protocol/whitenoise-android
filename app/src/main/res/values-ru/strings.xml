@@ -526,6 +526,9 @@
     <string name="active">Активный</string>
     <string name="copied">Скопировано</string>
     <string name="share_profile">Поделиться и подключиться</string>
+    <string name="share_profile_url">Поделиться ссылкой на профиль</string>
+    <string name="share_profile_picture">Поделиться изображением профиля</string>
+    <string name="profile_share_card_headline">Вы в White Noise? Напишите мне здесь.</string>
     <string name="share">Поделиться</string>
     <string name="scan">Сканировать</string>
     <string name="couldnt_read_profile_code">Не удалось прочитать этот код профиля.</string>
