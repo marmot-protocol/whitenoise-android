@@ -1,0 +1,1 @@
+Improves message delivery, voice dictation, text-to-speech, conversation navigation, account switching, and AMOLED appearance. Adds shareable profile and invite QR cards, plus group actions from profiles.
