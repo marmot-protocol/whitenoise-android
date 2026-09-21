@@ -18871,6 +18871,30 @@
         ]
       },
       {
+        "surface": "string:dictation_ostt_recommendation_open_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "R.string.dictation_ostt_recommendation_open_failed",
+        "test_ids": [
+          "SET-027"
+        ]
+      },
+      {
+        "surface": "string:dictation_ostt_recommendation_summary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "R.string.dictation_ostt_recommendation_summary",
+        "test_ids": [
+          "SET-027"
+        ]
+      },
+      {
+        "surface": "string:dictation_ostt_recommendation_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "R.string.dictation_ostt_recommendation_title",
+        "test_ids": [
+          "SET-027"
+        ]
+      },
+      {
         "surface": "setting:dictation_finish_manual",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
         "anchor": "R.string.dictation_finish_manual",
