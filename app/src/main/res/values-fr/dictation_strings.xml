@@ -7,6 +7,9 @@
     <string name="notification_channel_dictation_description">Contrôle une session de dictée active dans le champ de rédaction</string>
     <string name="dictation_settings_title">Dictée</string>
     <string name="dictation_settings_explainer">White Noise utilise un service de reconnaissance vocale installé. Ce service traite l’audio ; White Noise ne conserve en mémoire que le texte renvoyé, jusqu’à ce qu’il soit collé ou envoyé.</string>
+    <string name="dictation_ostt_recommendation_title">Obtenir Offline Speech to Text</string>
+    <string name="dictation_ostt_recommendation_summary">Application de transcription recommandée pour une dictée privée sur l’appareil. Disponible sur Zapstore, pas sur Google Play.</string>
+    <string name="dictation_ostt_recommendation_open_failed">Impossible d’ouvrir la page d’Offline Speech to Text sur Zapstore.</string>
     <string name="dictation_finish_title">Terminer la dictée</string>
     <string name="dictation_finish_manual">Lorsque je choisis Coller ou Envoyer</string>
     <string name="dictation_finish_after_silence">Après %1$d secondes de silence</string>

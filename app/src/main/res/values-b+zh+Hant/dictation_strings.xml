@@ -7,6 +7,9 @@
     <string name="notification_channel_dictation_description">控制訊息輸入框中的進行中聽寫工作階段</string>
     <string name="dictation_settings_title">聽寫</string>
     <string name="dictation_settings_explainer">White Noise 會使用已安裝的語音辨識服務。該服務負責處理音訊；White Noise 只會將傳回的文字保留在記憶體中，直到貼上或傳送為止。</string>
+    <string name="dictation_ostt_recommendation_title">取得 Offline Speech to Text</string>
+    <string name="dictation_ostt_recommendation_summary">推薦用於私密裝置端聽寫的轉寫應用程式。可從 Zapstore 取得，Google Play 不提供。</string>
+    <string name="dictation_ostt_recommendation_open_failed">無法開啟 Zapstore 上的 Offline Speech to Text 頁面。</string>
     <string name="dictation_finish_title">結束聽寫</string>
     <string name="dictation_finish_manual">當我選擇「貼上」或「傳送」時</string>
     <string name="dictation_finish_after_silence">靜音 %1$d 秒後</string>

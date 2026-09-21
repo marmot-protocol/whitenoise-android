@@ -7,6 +7,9 @@
     <string name="notification_channel_dictation_description">Управляет активной диктовкой в поле сообщения</string>
     <string name="dictation_settings_title">Диктовка</string>
     <string name="dictation_settings_explainer">White Noise использует установленную службу распознавания речи. Эта служба обрабатывает звук; White Noise хранит в памяти только полученный текст, пока он не будет вставлен или отправлен.</string>
+    <string name="dictation_ostt_recommendation_title">Установить Offline Speech to Text</string>
+    <string name="dictation_ostt_recommendation_summary">Рекомендуемое приложение для конфиденциальной локальной расшифровки диктовки. Доступно в Zapstore, но не в Google Play.</string>
+    <string name="dictation_ostt_recommendation_open_failed">Не удалось открыть страницу Offline Speech to Text в Zapstore.</string>
     <string name="dictation_finish_title">Завершение диктовки</string>
     <string name="dictation_finish_manual">Когда я выберу «Вставить» или «Отправить»</string>
     <string name="dictation_finish_after_silence">После %1$d секунд тишины</string>
