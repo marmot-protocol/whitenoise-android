@@ -15,6 +15,7 @@ import org.json.JSONObject
 internal data class ConversationDictationPreferenceState(
     val finishAfterSilenceMillis: Long?,
     val deliveryMode: ConversationDictationDeliveryMode,
+    val voiceSendCommandEnabled: Boolean = false,
     val recognitionServiceOverride: ComponentName? = null,
     val providerSelection: ConversationDictationProviderChoice? = null,
 )
@@ -52,6 +53,12 @@ internal class ConversationDictationPreferences(
         update(current().copy(deliveryMode = value))
     }
 
+    /** Persists the explicit opt-in for the distinctive terminal spoken send command. */
+    fun setVoiceSendCommandEnabled(value: Boolean) {
+        if (current().voiceSendCommandEnabled == value) return
+        update(current().copy(voiceSendCommandEnabled = value))
+    }
+
     /** Persists an explicit service identity, or clears it to follow Android's system default. */
     fun setRecognitionServiceOverride(value: ComponentName?) {
         val selection =
@@ -72,13 +79,14 @@ internal class ConversationDictationPreferences(
         setProviderSelection(selection)
     }
 
-    /** Publishes and persists both fields as one coherent preference snapshot. */
+    /** Publishes and persists the complete preference state as one coherent snapshot. */
     private fun update(value: ConversationDictationPreferenceState) {
         _state.value = value
         preferences
             .edit()
             .putLong(KEY_FINISH_AFTER_SILENCE, value.finishAfterSilenceMillis ?: MANUAL_FINISH)
             .putString(KEY_DELIVERY_MODE, value.deliveryMode.name)
+            .putBoolean(KEY_VOICE_SEND_COMMAND_ENABLED, value.voiceSendCommandEnabled)
             .remove(KEY_RECOGNITION_SERVICE_OVERRIDE)
             .putString(KEY_PROVIDER_SELECTION, value.providerSelection?.let(::encodeSelection))
             .apply()
@@ -95,8 +103,15 @@ internal class ConversationDictationPreferences(
                 .getString(KEY_DELIVERY_MODE, null)
                 ?.let { stored -> ConversationDictationDeliveryMode.entries.firstOrNull { it.name == stored } }
                 ?: ConversationDictationDeliveryMode.PasteIntoDraft
+        val voiceSendCommandEnabled = preferences.getBoolean(KEY_VOICE_SEND_COMMAND_ENABLED, false)
         val selection = decodeSelection(preferences.getString(KEY_PROVIDER_SELECTION, null))
-        return ConversationDictationPreferenceState(silence, delivery, selection?.service, selection)
+        return ConversationDictationPreferenceState(
+            finishAfterSilenceMillis = silence,
+            deliveryMode = delivery,
+            voiceSendCommandEnabled = voiceSendCommandEnabled,
+            recognitionServiceOverride = selection?.service,
+            providerSelection = selection,
+        )
     }
 
     private fun encodeSelection(value: ConversationDictationProviderChoice): String =
@@ -146,6 +161,7 @@ internal class ConversationDictationPreferences(
         private const val PREFERENCES_NAME = "whitenoise.composer_dictation"
         private const val KEY_FINISH_AFTER_SILENCE = "finishAfterSilenceMillis"
         private const val KEY_DELIVERY_MODE = "deliveryMode"
+        private const val KEY_VOICE_SEND_COMMAND_ENABLED = "voiceSendCommandEnabled"
         private const val KEY_PROVIDER_SELECTION = "providerSelection"
         private const val KEY_RECOGNITION_SERVICE_OVERRIDE = "recognitionServiceOverride"
         private const val MANUAL_FINISH = -1L

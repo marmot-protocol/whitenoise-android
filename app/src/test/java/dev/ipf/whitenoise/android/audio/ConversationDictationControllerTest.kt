@@ -1847,6 +1847,49 @@ class ConversationDictationControllerTest {
         assertEquals(1, fixture.writes)
     }
 
+    /** The explicit wake-prefixed command must be a complete terminal phrase despite provider punctuation. */
+    @Test
+    fun voiceCommandMatcherRequiresAWholeTerminalPhrase() {
+        val command = "White Noise send message"
+        assertEquals(
+            "Keep every word.",
+            stripTerminalConversationDictationVoiceCommand(
+                "Keep every word. WHITE NOISE, SEND MESSAGE!",
+                command,
+            ),
+        )
+        assertEquals("", stripTerminalConversationDictationVoiceCommand("White Noise send message", command))
+        assertEquals(
+            null,
+            stripTerminalConversationDictationVoiceCommand(
+                "White Noise send message but keep dictating",
+                command,
+            ),
+        )
+        assertEquals(
+            null,
+            stripTerminalConversationDictationVoiceCommand("prefixWhite Noise send message", command),
+        )
+        assertEquals(
+            null,
+            stripTerminalConversationDictationVoiceCommand("ordinary send message", command),
+        )
+    }
+
+    /** The preference is snapshotted at gesture start and configures low-latency caller-audio chunks. */
+    @Test
+    fun voiceCommandPreferenceIsCapturedForTheLogicalSession() {
+        var command: String? = "White Noise send message"
+        val platform = FakePlatform()
+        val fixture = fixture(TextFieldValue(""), platform = platform, voiceSendCommand = { command })
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        command = null
+
+        assertEquals("White Noise send message", fixture.controller.state.target?.voiceSendCommand)
+        assertTrue(platform.voiceSendCommandConfigured)
+    }
+
     /** A duplicate callback from a completed generation is stale and must not append twice. */
     @Test
     fun staleDuplicateFinalFromCompletedGenerationIsIgnored() {
@@ -2444,6 +2487,203 @@ class ConversationDictationControllerTest {
             assertEquals("", fixture.drafts.getValue(key()).text)
             assertTrue(fixture.controller.state is ConversationDictationState.Idle)
         }
+
+    /** A finalized wake-prefixed command strips itself and sends all earlier FIFO segments once. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun voiceCommandSendsAccumulatedCallerAudioAtItsAcknowledgedBoundary() =
+        runTest {
+            val sent = mutableListOf<String>()
+            val platform = FakePlatform().apply { pendingCallerAudio = true }
+            val fixture =
+                fixture(
+                    draft = TextFieldValue(""),
+                    platform = platform,
+                    targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
+                    targetValidationScope = this,
+                    voiceSendCommand = { "White Noise send message" },
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        sent += request.payload
+                        true
+                    },
+                )
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+            platform.listener.onResult("first sentence")
+            fixture.scheduler.runDelay(250L)
+            platform.listener.onResult("final words. White Noise, send message!")
+
+            assertEquals(2L, platform.voiceCommandFinishedChunkId)
+            assertTrue(fixture.controller.state is ConversationDictationState.Processing)
+            assertTrue(sent.isEmpty())
+            fixture.scheduler.runDelay(3_000L)
+            advanceUntilIdle()
+
+            assertEquals(listOf("first sentence final words."), sent)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        }
+
+    /** A provider-owned microphone can finish from a command-only final after earlier text. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun voiceCommandOnlySegmentSendsEarlierProviderOwnedTranscript() =
+        runTest {
+            val sent = mutableListOf<String>()
+            val fixture =
+                fixture(
+                    draft = TextFieldValue(""),
+                    targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
+                    targetValidationScope = this,
+                    voiceSendCommand = { "White Noise send message" },
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        sent += request.payload
+                        true
+                    },
+                )
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+            fixture.platform.listener.onResult("message body")
+            fixture.scheduler.runDelay(250L)
+            fixture.platform.listener.onResult("White Noise send message")
+            fixture.scheduler.runDelay(3_000L)
+            advanceUntilIdle()
+
+            assertEquals(listOf("message body"), sent)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        }
+
+    /** A bare command is retained as dictated text rather than sending an empty transcription. */
+    @Test
+    fun voiceCommandWithoutDictatedTextDoesNotSend() {
+        var sendCalls = 0
+        val fixture =
+            fixture(
+                draft = TextFieldValue(""),
+                voiceSendCommand = { "White Noise send message" },
+                sendTranscriptIfOriginUnchanged = {
+                    sendCalls += 1
+                    true
+                },
+            )
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        fixture.platform.listener.onResult("White Noise send message")
+        fixture.controller.stop()
+
+        assertEquals("White Noise send message", fixture.drafts.getValue(key()).text)
+        assertEquals(0, sendCalls)
+    }
+
+    /** A user's explicit action and an automatic command are serialized; the first completion claim wins. */
+    @Test
+    fun explicitPasteBeforeCommandResultKeepsTheCommandAsText() {
+        var sendCalls = 0
+        val fixture =
+            fixture(
+                draft = TextFieldValue(""),
+                voiceSendCommand = { "White Noise send message" },
+                sendTranscriptIfOriginUnchanged = {
+                    sendCalls += 1
+                    true
+                },
+            )
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        fixture.controller.paste()
+        fixture.platform.listener.onResult("keep this White Noise send message")
+
+        assertEquals("keep this White Noise send message", fixture.drafts.getValue(key()).text)
+        assertEquals(0, sendCalls)
+    }
+
+    /** Cancel remains available after command recognition and wins before guarded dispatch begins. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun voiceCommandCancellationWindowPreventsDispatch() =
+        runTest {
+            var sendCalls = 0
+            val platform = FakePlatform().apply {
+                pendingCallerAudio = true
+                deferVoiceCommandFinish = true
+            }
+            val fixture =
+                fixture(
+                    draft = TextFieldValue(""),
+                    platform = platform,
+                    targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
+                    targetValidationScope = this,
+                    voiceSendCommand = { "White Noise send message" },
+                    sendTranscriptIfOriginUnchanged = {
+                        sendCalls += 1
+                        true
+                    },
+                )
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            platform.listener.onResult("do not lose this White Noise send message")
+
+            fixture.controller.cancel()
+            checkNotNull(platform.voiceCommandFinishCallback).invoke(true)
+            fixture.scheduler.advanceBy(3_000L)
+            advanceUntilIdle()
+
+            assertEquals(0, sendCalls)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        }
+
+    /** Manual Send cannot claim a second dispatch after the voice command has entered its cancel window. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun explicitSendDuringVoiceCommandWindowCannotDoubleDispatch() =
+        runTest {
+            var sendCalls = 0
+            val fixture =
+                fixture(
+                    draft = TextFieldValue(""),
+                    targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
+                    targetValidationScope = this,
+                    voiceSendCommand = { "White Noise send message" },
+                    sendTranscriptIfOriginUnchanged = {
+                        sendCalls += 1
+                        true
+                    },
+                )
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.platform.listener.onResult("send this once White Noise send message")
+
+            fixture.controller.send()
+            fixture.scheduler.runDelay(3_000L)
+            advanceUntilIdle()
+
+            assertEquals(1, sendCalls)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        }
+
+    /** An unprovable FIFO boundary retains stripped text and never dispatches it. */
+    @Test
+    fun voiceCommandBoundaryFailureRetainsTranscriptWithoutSending() {
+        var sendCalls = 0
+        val platform = FakePlatform().apply {
+            pendingCallerAudio = true
+            voiceCommandBoundaryAccepted = false
+        }
+        val fixture =
+            fixture(
+                draft = TextFieldValue(""),
+                platform = platform,
+                voiceSendCommand = { "White Noise send message" },
+                sendTranscriptIfOriginUnchanged = {
+                    sendCalls += 1
+                    true
+                },
+            )
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        platform.listener.onResult("retain these words White Noise send message")
+
+        assertEquals(0, sendCalls)
+        assertEquals("retain these words", fixture.drafts.getValue(key()).text)
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+    }
 
     /** The composer empties in the frame the dispatch is claimed, never beside its own pending row. */
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -3972,6 +4212,7 @@ class ConversationDictationControllerTest {
         deliveryMode: () -> ConversationDictationDeliveryMode = {
             ConversationDictationDeliveryMode.PasteIntoDraft
         },
+        voiceSendCommand: () -> String? = { null },
         sendTranscriptIfOriginUnchanged: suspend (ConversationDictationSendRequest) -> Boolean = { false },
         onReadinessEvent: (ConversationDictationReadinessEvent) -> Unit = {},
     ): Fixture {
@@ -4015,6 +4256,7 @@ class ConversationDictationControllerTest {
                 scheduleTimeout = scheduler::schedule,
                 finishAfterSilenceMillis = finishAfterSilenceMillis,
                 deliveryMode = deliveryMode,
+                voiceSendCommand = voiceSendCommand,
                 sendTranscriptIfOriginUnchanged = sendTranscriptIfOriginUnchanged,
                 onReadinessEvent = onReadinessEvent,
             )
@@ -4088,6 +4330,15 @@ class ConversationDictationControllerTest {
         var capturedSilenceMillis: Long? = null
         var deferCallerAudioFinish = false
         var callerAudioFinishCallback: (() -> Unit)? = null
+        var deferVoiceCommandFinish = false
+        var voiceCommandBoundaryAccepted = true
+        var voiceCommandFinishedChunkId: Long? = null
+        var voiceCommandFinishCallback: ((Boolean) -> Unit)? = null
+        var voiceSendCommandConfigured = false
+
+        override fun configureVoiceSendCommand(enabled: Boolean) {
+            voiceSendCommandConfigured = enabled
+        }
 
         /** Simulates a platform that cannot even start the question, such as a recognizer refusal. */
         var callerAudioProbeFailure: RuntimeException? = null
@@ -4141,6 +4392,21 @@ class ConversationDictationControllerTest {
                 callerAudioFinishCallback = onClosed
             } else {
                 onClosed()
+            }
+            return true
+        }
+
+        override fun finishCallerAudioAtVoiceCommand(
+            acknowledgedChunkId: Long,
+            onClosed: (boundaryAccepted: Boolean) -> Unit,
+        ): Boolean {
+            if (!pendingCallerAudio) return false
+            voiceCommandFinishedChunkId = acknowledgedChunkId
+            pendingCallerAudio = false
+            if (deferVoiceCommandFinish) {
+                voiceCommandFinishCallback = onClosed
+            } else {
+                onClosed(voiceCommandBoundaryAccepted)
             }
             return true
         }

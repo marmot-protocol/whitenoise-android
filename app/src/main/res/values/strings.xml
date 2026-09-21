@@ -1434,6 +1434,9 @@
     <string name="dictation_result_paste_description">Review or edit the text before sending</string>
     <string name="dictation_result_send">Send message</string>
     <string name="dictation_result_send_description">Opt in to send only if the original chat and draft are unchanged</string>
+    <string name="dictation_voice_send_command_title">Send with a voice command</string>
+    <string name="dictation_voice_send_command_description">Say “%1$s” and pause. White Noise removes the command and sends after a short cancellation window.</string>
+    <string name="dictation_voice_send_command_phrase" translatable="false">White Noise send message</string>
     <string name="dictation_send_safety_note">Send message fails closed: if the original draft, membership, or session changes, White Noise keeps the transcript for review instead of sending it.</string>
     <string name="voice_message_play">Play voice message</string>
     <string name="voice_message_pause">Pause voice message</string>

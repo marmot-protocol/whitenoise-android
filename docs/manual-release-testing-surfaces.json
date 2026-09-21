@@ -104,7 +104,8 @@
         "anchor": "fun sendDictationTranscriptIfOriginUnchanged(",
         "test_ids": [
           "CON-017",
-          "DIC-002"
+          "DIC-002",
+          "DIC-007"
         ]
       },
       {
@@ -7168,7 +7169,8 @@
         "anchor": "fun DictationSettingsScreen(",
         "test_ids": [
           "DIC-002",
-          "DIC-004"
+          "DIC-004",
+          "DIC-007"
         ]
       },
       {
@@ -18913,6 +18915,14 @@
         ]
       },
       {
+        "surface": "setting:dictation_voice_send_command",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "R.string.dictation_voice_send_command_title",
+        "test_ids": [
+          "DIC-007"
+        ]
+      },
+      {
         "surface": "string:dictation_send_safety_note",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
         "anchor": "R.string.dictation_send_safety_note",
@@ -22223,6 +22233,30 @@
         "anchor": "fun chunkId(): Long? = chunk.get()?.chunkId",
         "test_ids": [
           "DIC-002"
+        ]
+      },
+      {
+        "surface": "Dictation voice command discards caller audio only after its proven FIFO boundary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationAudioChunkBuffer.kt",
+        "anchor": "fun discardAfterAcknowledged(chunkId: Long): Boolean",
+        "test_ids": [
+          "DIC-007"
+        ]
+      },
+      {
+        "surface": "Dictation voice command closes capture at the acknowledged command chunk",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationCallerAudio.kt",
+        "anchor": "fun finishAtVoiceCommand(",
+        "test_ids": [
+          "DIC-007"
+        ]
+      },
+      {
+        "surface": "Dictation terminal voice command matching and guarded send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "private fun finishFromVoiceCommand(",
+        "test_ids": [
+          "DIC-007"
         ]
       },
       {

@@ -1210,6 +1210,13 @@ class WhiteNoiseAppState private constructor(
             deliveryMode = {
                 conversationDictationPreferences.current().deliveryMode
             },
+            voiceSendCommand = {
+                conversationDictationPreferences
+                    .current()
+                    .voiceSendCommandEnabled
+                    .takeIf { it }
+                    ?.let { appContext.getString(R.string.dictation_voice_send_command_phrase) }
+            },
             sendTranscriptIfOriginUnchanged = ::sendDictationTranscriptIfOriginUnchanged,
         )
     }

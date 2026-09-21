@@ -36,6 +36,7 @@ import dev.ipf.whitenoise.android.ui.settings.settingsHomeState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import dev.ipf.whitenoise.android.updates.AppUpdateInfo
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -140,7 +141,7 @@ class SettingsScreenScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_settings_default_light.png")
     }
 
-    /** Verifies settings sheets persist explicit silence completion and send-on-finish choices. */
+    /** Verifies settings persist explicit completion, delivery, and hands-free send choices. */
     @Test
     fun dictationSettingsWriteExplicitFinishAndDeliverySelections() {
         val appState = dictationAppState()
@@ -154,12 +155,14 @@ class SettingsScreenScreenshotTest {
         composeRule.onNodeWithText("After 5 seconds of silence").performClick()
         composeRule.onNodeWithText("When finished").performClick()
         composeRule.onNodeWithText("Send message").performClick()
+        composeRule.onNodeWithText("Send with a voice command").performClick()
 
         assertEquals(5_000L, appState.conversationDictationPreferences.current().finishAfterSilenceMillis)
         assertEquals(
             ConversationDictationDeliveryMode.SendOnFinish,
             appState.conversationDictationPreferences.current().deliveryMode,
         )
+        assertTrue(appState.conversationDictationPreferences.current().voiceSendCommandEnabled)
     }
 
     /** The settings home with Alice signed in, a self-updating build and no-op callbacks. */

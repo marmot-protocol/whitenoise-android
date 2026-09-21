@@ -92,6 +92,20 @@ internal fun DictationSettingsScreen(
                             value = stringResource(dictationDeliveryLabel(preferences.deliveryMode)),
                         )
                     }
+                    row("voice_send_command") { context ->
+                        SettingsSwitch(
+                            context = context,
+                            title = stringResource(R.string.dictation_voice_send_command_title),
+                            checked = preferences.voiceSendCommandEnabled,
+                            onCheckedChange =
+                                appState.conversationDictationPreferences::setVoiceSendCommandEnabled,
+                            subtitle =
+                                stringResource(
+                                    R.string.dictation_voice_send_command_description,
+                                    stringResource(R.string.dictation_voice_send_command_phrase),
+                                ),
+                        )
+                    }
                 }
             }
             if (preferences.deliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {

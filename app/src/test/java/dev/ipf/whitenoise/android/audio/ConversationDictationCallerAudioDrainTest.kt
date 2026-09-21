@@ -72,6 +72,45 @@ class ConversationDictationCallerAudioDrainTest {
         }
     }
 
+    /** Voice-command completion closes capture only after proving its acknowledged FIFO boundary. */
+    @Test
+    fun voiceCommandClosesCaptureAtAcknowledgedChunkAndDropsOnlyItsTail() {
+        val buffer = ConversationDictationAudioChunkBuffer(2L, chunkBytes = 4, maxBufferedBytes = 12)
+        buffer.append(byteArrayOf(1, 2, 3, 4, 5, 6), 6, hasSpeech = true)
+        val commandChunk = checkNotNull(buffer.poll())
+        assertTrue(buffer.acknowledge(commandChunk.chunkId))
+        val capture = ConversationDictationCallerAudio(StoppedCaptureDevice, buffer)
+        var boundaryAccepted: Boolean? = null
+
+        assertTrue(capture.finishAtVoiceCommand(commandChunk.chunkId) { boundaryAccepted = it })
+
+        assertEquals(true, boundaryAccepted)
+        assertFalse(capture.hasPending())
+        assertFalse(capture.start())
+        assertNull(capture.openProviderStream())
+    }
+
+    /** Boundary rejection frees detached PCM immediately instead of retaining an orphaned audio queue. */
+    @Test
+    fun rejectedVoiceCommandBoundaryDiscardsDetachedAudio() {
+        val buffer = ConversationDictationAudioChunkBuffer(3L, chunkBytes = 4, maxBufferedBytes = 8)
+        buffer.append(byteArrayOf(1, 2, 3, 4), 4, hasSpeech = true)
+        val capture = ConversationDictationCallerAudio(StoppedCaptureDevice, buffer)
+        var boundaryAccepted: Boolean? = null
+
+        assertFalse(capture.finishAtVoiceCommand(1L) { boundaryAccepted = it })
+
+        assertEquals(false, boundaryAccepted)
+        assertFalse(capture.hasPending())
+    }
+
+    /** Voice-command latency bounds never alter ordinary dictation's provider-safe defaults. */
+    @Test
+    fun voiceCommandChunkBoundsAreSessionScoped() {
+        assertEquals(10..30, conversationDictationCallerAudioChunkSeconds(false))
+        assertEquals(5..15, conversationDictationCallerAudioChunkSeconds(true))
+    }
+
     /** Fails immediately if draining attempts to reopen the already stopped microphone. */
     private object StoppedCaptureDevice : ConversationDictationAudioCaptureDevice {
         override val initialized: Boolean = true

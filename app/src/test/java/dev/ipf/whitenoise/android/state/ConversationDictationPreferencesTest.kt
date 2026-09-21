@@ -4,7 +4,9 @@ import android.content.ComponentName
 import android.content.Context
 import dev.ipf.whitenoise.android.audio.ConversationDictationDeliveryMode
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -29,7 +31,20 @@ class ConversationDictationPreferencesTest {
 
         assertNull(state.finishAfterSilenceMillis)
         assertEquals(ConversationDictationDeliveryMode.PasteIntoDraft, state.deliveryMode)
+        assertFalse(state.voiceSendCommandEnabled)
         assertNull(state.recognitionServiceOverride)
+    }
+
+    /** Voice-command sending is a separate, explicit and durable opt-in. */
+    @Test
+    fun persistsVoiceSendCommandOptIn() {
+        val original = ConversationDictationPreferences(context, preferences())
+
+        original.setVoiceSendCommandEnabled(true)
+
+        assertTrue(ConversationDictationPreferences(context, preferences()).current().voiceSendCommandEnabled)
+        original.setVoiceSendCommandEnabled(false)
+        assertFalse(ConversationDictationPreferences(context, preferences()).current().voiceSendCommandEnabled)
     }
 
     /** Verifies only supported endpointing values persist and send mode requires explicit selection. */

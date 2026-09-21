@@ -62,6 +62,7 @@ internal data class ConversationDictationTarget(
     val replyToMessageIdHex: String? = null,
     val finishAfterSilenceMillis: Long? = null,
     val deliveryMode: ConversationDictationDeliveryMode = ConversationDictationDeliveryMode.PasteIntoDraft,
+    val voiceSendCommand: String? = null,
 ) {
     /** Compares the stable account and group identifiers without changing the captured target. */
     fun matchesConversation(
@@ -285,6 +286,9 @@ internal enum class ConversationDictationMicrophoneAccess {
 }
 
 internal interface ConversationDictationPlatform {
+    /** Captures whether this logical session needs low-latency sentence chunks for a voice command. */
+    fun configureVoiceSendCommand(enabled: Boolean) = Unit
+
     /** Resolves and pins a new gesture; false asks for a provider before microphone access. */
     fun prepareProviderSelection(): Boolean = true
 
@@ -358,6 +362,12 @@ internal interface ConversationDictationPlatform {
     /** Releases volatile caller audio at logical-session teardown. */
     fun discardCallerAudio(onClosed: () -> Unit): Boolean = false
 
+    /** Stops capture at an acknowledged command chunk and reports whether the FIFO boundary was proven. */
+    fun finishCallerAudioAtVoiceCommand(
+        acknowledgedChunkId: Long,
+        onClosed: (boundaryAccepted: Boolean) -> Unit,
+    ): Boolean = false
+
     /** Creates one recognition generation whose callbacks are owned by [listener]. */
     fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession
 }
@@ -420,6 +430,7 @@ internal class ConversationDictationController internal constructor(
     private val deliveryMode: () -> ConversationDictationDeliveryMode = {
         ConversationDictationDeliveryMode.PasteIntoDraft
     },
+    private val voiceSendCommand: () -> String? = { null },
     private val sendTranscriptIfOriginUnchanged: suspend (ConversationDictationSendRequest) -> Boolean = { false },
     private val disclosureAccepted: () -> Boolean,
     private val markDisclosureAccepted: () -> Unit,
@@ -451,6 +462,7 @@ internal class ConversationDictationController internal constructor(
         deliveryMode: () -> ConversationDictationDeliveryMode = {
             ConversationDictationDeliveryMode.PasteIntoDraft
         },
+        voiceSendCommand: () -> String? = { null },
         sendTranscriptIfOriginUnchanged: suspend (ConversationDictationSendRequest) -> Boolean = { false },
     ) : this(
         platform = AndroidConversationDictationPlatform(context.applicationContext),
@@ -470,6 +482,7 @@ internal class ConversationDictationController internal constructor(
         stopDurableSession = { ConversationDictationForegroundService.stop(context.applicationContext) },
         finishAfterSilenceMillis = finishAfterSilenceMillis,
         deliveryMode = deliveryMode,
+        voiceSendCommand = voiceSendCommand,
         sendTranscriptIfOriginUnchanged = sendTranscriptIfOriginUnchanged,
         disclosureAccepted = {
             context
@@ -688,7 +701,9 @@ internal class ConversationDictationController internal constructor(
                 mode = mode,
                 finishAfterSilenceMillis = finishAfterSilenceMillis()?.takeIf { it > 0L },
                 deliveryMode = deliveryMode(),
+                voiceSendCommand = voiceSendCommand()?.trim()?.takeIf(String::isNotBlank),
             )
+        platform.configureVoiceSendCommand(target.voiceSendCommand != null)
         if (!targetAvailable(target)) return false
         if (!runCatching(platform::prepareProviderSelection).getOrDefault(false)) {
             state = ConversationDictationState.ProviderSelectionRequired(sessionId, target)
@@ -1609,9 +1624,26 @@ internal class ConversationDictationController internal constructor(
                         }
                         return
                     }
+                    val commandPrefix =
+                        if (!finishRequested) {
+                            target.voiceSendCommand?.let { command ->
+                                stripTerminalConversationDictationVoiceCommand(recognized, command)
+                            }
+                        } else {
+                            null
+                        }
+                    val voiceCommandAccepted =
+                        commandPrefix != null &&
+                            (accumulatedTranscript.isNotBlank() || commandPrefix.isNotBlank())
+                    if (commandPrefix != null && !voiceCommandAccepted) {
+                        conversationDictationDiagnostic(
+                            "event=voice_send_command accepted=false reason=no_dictated_text",
+                        )
+                    }
+                    val callerAudioChunkId = recognitionSession?.callerAudioChunkId()
                     recognitionSession?.acknowledgeCallerAudio()
                     clearRecognitionGeneration(cancel = false)
-                    commitSegment(recognized)
+                    commitSegment(if (voiceCommandAccepted) requireNotNull(commandPrefix) else recognized)
                     val targetStillAvailable = runCatching { targetAvailable(target) }.getOrDefault(false)
                     if (!targetStillAvailable) {
                         fail(
@@ -1623,7 +1655,9 @@ internal class ConversationDictationController internal constructor(
                         )
                         return
                     }
-                    if (finishRequested) {
+                    if (voiceCommandAccepted) {
+                        finishFromVoiceCommand(sessionId, target, callerAudioChunkId)
+                    } else if (finishRequested) {
                         continueOrFinalizeCallerAudioDrain(sessionId, target)
                     } else {
                         scheduleRestart(sessionId, target, SUCCESS_RESULT_RESTART_DELAY_MILLIS, "result")
@@ -1745,6 +1779,61 @@ internal class ConversationDictationController internal constructor(
                     },
                 )
             }
+        }
+    }
+
+    /** Claims automatic Send, closes capture at the acknowledged command chunk, then reuses guarded delivery. */
+    private fun finishFromVoiceCommand(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+        acknowledgedChunkId: Long?,
+    ) {
+        if (finishRequested || state.sessionId != sessionId) return
+        finishRequested = true
+        requestedDeliveryMode = ConversationDictationDeliveryMode.SendOnFinish
+        cancelPendingRestart()
+        silenceTimeoutHandle?.cancel()
+        silenceTimeoutHandle = null
+        silenceDeadlineElapsedMillis = null
+        state = ConversationDictationState.Processing(sessionId, target)
+        conversationDictationDiagnostic("event=voice_send_command accepted=true")
+        armSessionTimeout(sessionId, PROCESSING_TIMEOUT_MILLIS) {
+            if (finishRequested && state.sessionId == sessionId) {
+                failOrRetainTranscript(sessionId, target, ConversationDictationFailure.TimedOut)
+            }
+        }
+
+        fun afterCaptureClosed(boundaryAccepted: Boolean) {
+            if (state !is ConversationDictationState.Processing || state.sessionId != sessionId) return
+            finishPlaybackInterruption()
+            if (!boundaryAccepted) {
+                conversationDictationDiagnostic("event=voice_send_command_boundary accepted=false")
+                failOrRetainTranscript(sessionId, target, ConversationDictationFailure.Unknown)
+                return
+            }
+            conversationDictationDiagnostic("event=voice_send_command_boundary accepted=true")
+            scheduleTimeout(VOICE_COMMAND_CANCEL_WINDOW_MILLIS) {
+                if (
+                    state is ConversationDictationState.Processing &&
+                    state.sessionId == sessionId &&
+                    finishRequested &&
+                    requestedDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish
+                ) {
+                    finalizeAccumulatedTranscript(sessionId, target)
+                }
+            }
+        }
+
+        val platformOwnsClosure =
+            acknowledgedChunkId?.let { chunkId ->
+                runCatching {
+                    platform.finishCallerAudioAtVoiceCommand(chunkId, ::afterCaptureClosed)
+                }.getOrDefault(false)
+            } ?: false
+        if (!platformOwnsClosure) {
+            val callerAudioUnexpectedlyPending =
+                runCatching(platform::callerAudioHasPending).getOrDefault(false)
+            afterCaptureClosed(boundaryAccepted = !callerAudioUnexpectedlyPending)
         }
     }
 
@@ -2697,6 +2786,7 @@ internal class ConversationDictationController internal constructor(
         const val MAX_SESSION_MILLIS = 65L * 60L * 1_000L
         const val CALLER_AUDIO_DRAIN_TIMEOUT_MILLIS = 90_000L
         const val PROCESSING_TIMEOUT_MILLIS = 20_000L
+        const val VOICE_COMMAND_CANCEL_WINDOW_MILLIS = 3_000L
         const val ORDINARY_SILENCE_MILLIS = 2_000L
         const val MAX_CONSECUTIVE_RAPID_EMPTY_GENERATIONS = 3
         const val MAX_RETAINED_CALLER_AUDIO_RETRIES = 2
@@ -2932,6 +3022,7 @@ internal class AndroidConversationDictationPlatform(
     private var sessionProvider: ConversationDictationProviderChoice? = null
     private var providerPrepared = false
     private var sessionProviderCanRecord = false
+    private var sessionVoiceSendCommandEnabled = false
     private val dictationPreferences by lazy { ConversationDictationPreferences(context) }
 
     /**
@@ -2980,6 +3071,10 @@ internal class AndroidConversationDictationPlatform(
             }
         conversationDictationDiagnostic("event=app_record_audio_access mode=$mode access=${access.name}")
         return access
+    }
+
+    override fun configureVoiceSendCommand(enabled: Boolean) {
+        sessionVoiceSendCommandEnabled = enabled
     }
 
     override fun prepareProviderSelection(): Boolean {
@@ -3117,9 +3212,29 @@ internal class AndroidConversationDictationPlatform(
 
     /** Allocates and retains one capture identity shared by all recognizer generations in the session. */
     private fun createCallerAudioCapture(): ConversationDictationCallerAudio? {
-        val capture = ConversationDictationCallerAudio.open(++nextCallerAudioSessionId)
+        val chunkSeconds = conversationDictationCallerAudioChunkSeconds(sessionVoiceSendCommandEnabled)
+        val capture =
+            ConversationDictationCallerAudio.open(
+                sessionId = ++nextCallerAudioSessionId,
+                minimumSentenceChunkSeconds = chunkSeconds.first,
+                maximumChunkSeconds = chunkSeconds.last,
+            )
         callerAudioCapture = capture
         return capture
+    }
+
+    /** Stops caller capture on the recognized FIFO command boundary and reports closure on main. */
+    override fun finishCallerAudioAtVoiceCommand(
+        acknowledgedChunkId: Long,
+        onClosed: (boundaryAccepted: Boolean) -> Unit,
+    ): Boolean {
+        val capture = callerAudioCapture ?: return false
+        callerAudioCapture = null
+        capture.finishAtVoiceCommand(acknowledgedChunkId) { boundaryAccepted ->
+            val notify = { onClosed(boundaryAccepted) }
+            if (Looper.myLooper() == Looper.getMainLooper()) notify() else Handler(Looper.getMainLooper()).post(notify)
+        }
+        return true
     }
 
     /** Detaches the logical capture before discarding PCM and notifying the caller of recorder closure. */

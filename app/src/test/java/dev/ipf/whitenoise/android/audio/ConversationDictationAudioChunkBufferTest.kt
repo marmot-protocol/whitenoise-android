@@ -185,6 +185,37 @@ class ConversationDictationAudioChunkBufferTest {
         assertArrayEquals(byteArrayOf(5, 6, 7, 8), checkNotNull(buffer.poll()).pcm)
     }
 
+    /** A recognized command may discard only audio captured strictly after its acknowledged chunk. */
+    @Test
+    fun acknowledgedCommandBoundaryDiscardsOnlyFollowingAudio() {
+        val buffer = ConversationDictationAudioChunkBuffer(sessionId = 6L, chunkBytes = 4, maxBufferedBytes = 12)
+        assertTrue(buffer.append(byteArrayOf(1, 2, 3, 4, 5, 6, 7, 8, 9, 10), 10, hasSpeech = true))
+        val commandChunk = checkNotNull(buffer.poll())
+        assertTrue(buffer.acknowledge(commandChunk.chunkId))
+
+        assertTrue(buffer.discardAfterAcknowledged(commandChunk.chunkId))
+
+        assertEquals(0, buffer.bufferedBytes)
+        assertFalse(buffer.hasPending)
+        assertNull(buffer.poll())
+        assertFalse(buffer.append(byteArrayOf(11, 12), 2, hasSpeech = true))
+    }
+
+    /** An unacknowledged or stale chunk ID can never authorize dropping later captured speech. */
+    @Test
+    fun commandBoundaryRequiresTheExactLatestAcknowledgement() {
+        val buffer = ConversationDictationAudioChunkBuffer(sessionId = 10L, chunkBytes = 4, maxBufferedBytes = 12)
+        assertTrue(buffer.append(byteArrayOf(1, 2, 3, 4, 5, 6, 7, 8), 8, hasSpeech = true))
+        val first = checkNotNull(buffer.poll())
+
+        assertFalse(buffer.discardAfterAcknowledged(first.chunkId))
+        assertTrue(buffer.acknowledge(first.chunkId))
+        val second = checkNotNull(buffer.poll())
+        assertTrue(buffer.acknowledge(second.chunkId))
+        assertFalse(buffer.discardAfterAcknowledged(first.chunkId))
+        assertFalse(buffer.hasPending)
+    }
+
     /** Cancellation must clear queued, partial, and in-flight PCM and prevent further appends. */
     @Test
     fun discardClearsCurrentQueuedAndInFlightAudio() {

@@ -33,6 +33,7 @@ internal class ConversationDictationAudioChunkBuffer(
     private var currentSize = 0
     private var currentHasSpeech = false
     private var nextChunkId = 0L
+    private var lastAcknowledgedChunkId = 0L
     private var nextSample = 0L
     private var finished = false
 
@@ -101,6 +102,7 @@ internal class ConversationDictationAudioChunkBuffer(
     fun acknowledge(chunkId: Long): Boolean {
         val chunk = inFlight.remove(chunkId) ?: return false
         bufferedBytes -= chunk.pcm.size
+        lastAcknowledgedChunkId = chunkId
         return true
     }
 
@@ -150,6 +152,24 @@ internal class ConversationDictationAudioChunkBuffer(
             }
         }
         queued.addFirst(merged)
+        return true
+    }
+
+    /**
+     * Discards only audio known to follow an acknowledged command chunk.
+     *
+     * Recognition is deliberately serial. Refusing a boundary with an older queued or in-flight chunk turns a
+     * future ordering regression into a retained transcript instead of silently truncating pre-command speech.
+     */
+    @Synchronized
+    fun discardAfterAcknowledged(chunkId: Long): Boolean {
+        if (chunkId <= 0L || lastAcknowledgedChunkId != chunkId) return false
+        if (inFlight.isNotEmpty() || queued.any { it.chunkId <= chunkId }) return false
+        queued.clear()
+        currentSize = 0
+        currentHasSpeech = false
+        bufferedBytes = 0
+        finished = true
         return true
     }
 

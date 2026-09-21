@@ -107,9 +107,9 @@ private class AndroidConversationDictationAudioCaptureDevice(
  * Owns one continuous microphone capture for a logical dictation session.
  *
  * Recognition generations attach one provider stream at a time. Capture is split into immutable
- * sentence-aware chunks bounded at 30 seconds. It remains active while the provider returns a
- * final and the next recognizer is created. Queued and in-flight PCM is bounded to 90 seconds;
- * overflow stops capture instead of silently dropping a read.
+ * sentence-aware chunks bounded at the session's configured maximum. It remains active while the
+ * provider returns a final and the next recognizer is created. Queued and in-flight PCM is bounded
+ * to 90 seconds; overflow stops capture instead of silently dropping a read.
  */
 @Suppress("TooManyFunctions")
 internal class ConversationDictationCallerAudio internal constructor(
@@ -120,6 +120,8 @@ internal class ConversationDictationCallerAudio internal constructor(
             Os.write(descriptor, source, offset, length)
         },
     private val elapsedRealtime: () -> Long = SystemClock::elapsedRealtime,
+    private val minimumSentenceChunkBytes: Int = DEFAULT_MIN_SENTENCE_CHUNK_BYTES,
+    private val maximumChunkBytes: Int = DEFAULT_MAX_CHUNK_BYTES,
 ) {
     private val lastSpeechAt = AtomicLong(elapsedRealtime())
     private val recording = AtomicBoolean(false)
@@ -153,7 +155,9 @@ internal class ConversationDictationCallerAudio internal constructor(
         }
         conversationDictationDiagnostic(
             "event=caller_audio_started sample_rate=$CALLER_AUDIO_SAMPLE_RATE_HZ " +
-                "channels=$CALLER_AUDIO_CHANNEL_COUNT encoding=pcm16 chunk_seconds=10-30 buffer_seconds=90",
+                "channels=$CALLER_AUDIO_CHANNEL_COUNT encoding=pcm16 " +
+                "chunk_seconds=${minimumSentenceChunkBytes / CALLER_AUDIO_BYTES_PER_SECOND}-" +
+                "${maximumChunkBytes / CALLER_AUDIO_BYTES_PER_SECOND} buffer_seconds=90",
         )
         thread(name = "dictation-caller-audio-capture", isDaemon = true, block = ::capture)
         return true
@@ -212,6 +216,30 @@ internal class ConversationDictationCallerAudio internal constructor(
         } else {
             releaseRecorder()
         }
+    }
+
+    /** Stops capture and discards only PCM proven to follow the acknowledged command chunk. */
+    @Synchronized
+    fun finishAtVoiceCommand(
+        acknowledgedChunkId: Long,
+        onClosed: (boundaryAccepted: Boolean) -> Unit,
+    ): Boolean {
+        discarded.set(true)
+        pendingFailure = null
+        val boundaryAccepted = buffer.discardAfterAcknowledged(acknowledgedChunkId)
+        if (!boundaryAccepted) buffer.discard()
+        onCaptureClosed { onClosed(boundaryAccepted) }
+        activeStream.getAndSet(null)?.cancel(requeue = false)
+        finishing.set(true)
+        postActionReadsRemaining.set(0)
+        postActionDrainDeadline.set(0L)
+        val wasRecording = recording.getAndSet(false)
+        if (wasRecording) {
+            runCatching(device::stop)
+        } else {
+            releaseRecorder()
+        }
+        return boundaryAccepted
     }
 
     /** Includes partial, queued, and in-flight audio until acknowledged or discarded. */
@@ -303,7 +331,7 @@ internal class ConversationDictationCallerAudio internal constructor(
         val sealed =
             chunkHasSpeech &&
                 quietMillis >= SENTENCE_BOUNDARY_SILENCE_MILLIS &&
-                buffer.sealCurrentIfAtLeast(MIN_SENTENCE_CHUNK_BYTES)
+                buffer.sealCurrentIfAtLeast(minimumSentenceChunkBytes)
         if (sealed) {
             conversationDictationDiagnostic("event=caller_audio_chunk_sealed reason=silence")
         }
@@ -329,11 +357,24 @@ internal class ConversationDictationCallerAudio internal constructor(
 
     companion object {
         /** Opens one logical capture without allocating a provider pipe yet. */
-        fun open(sessionId: Long): ConversationDictationCallerAudio? =
+        fun open(
+            sessionId: Long,
+            minimumSentenceChunkSeconds: Int = DEFAULT_MIN_SENTENCE_CHUNK_SECONDS,
+            maximumChunkSeconds: Int = DEFAULT_MAX_CHUNK_SECONDS,
+        ): ConversationDictationCallerAudio? =
             openRecorder()?.let { recorder ->
+                val maximumChunkBytes =
+                    CALLER_AUDIO_BYTES_PER_SECOND * maximumChunkSeconds.coerceAtLeast(minimumSentenceChunkSeconds)
                 ConversationDictationCallerAudio(
                     device = AndroidConversationDictationAudioCaptureDevice(recorder),
-                    buffer = ConversationDictationAudioChunkBuffer(sessionId = sessionId),
+                    buffer =
+                        ConversationDictationAudioChunkBuffer(
+                            sessionId = sessionId,
+                            chunkBytes = maximumChunkBytes,
+                        ),
+                    minimumSentenceChunkBytes =
+                        CALLER_AUDIO_BYTES_PER_SECOND * minimumSentenceChunkSeconds.coerceAtLeast(1),
+                    maximumChunkBytes = maximumChunkBytes,
                 )
             }
 
@@ -390,10 +431,23 @@ internal class ConversationDictationCallerAudio internal constructor(
     }
 }
 
-private const val MIN_SENTENCE_CHUNK_SECONDS = 10
-private const val MIN_SENTENCE_CHUNK_BYTES =
-    CALLER_AUDIO_SAMPLE_RATE_HZ * BYTES_PER_FRAME * MIN_SENTENCE_CHUNK_SECONDS
+private const val CALLER_AUDIO_BYTES_PER_SECOND = CALLER_AUDIO_SAMPLE_RATE_HZ * BYTES_PER_FRAME
+internal const val DEFAULT_MIN_SENTENCE_CHUNK_SECONDS = 10
+internal const val DEFAULT_MAX_CHUNK_SECONDS = 30
+internal const val VOICE_COMMAND_MIN_SENTENCE_CHUNK_SECONDS = 5
+internal const val VOICE_COMMAND_MAX_CHUNK_SECONDS = 15
+private const val DEFAULT_MIN_SENTENCE_CHUNK_BYTES =
+    CALLER_AUDIO_BYTES_PER_SECOND * DEFAULT_MIN_SENTENCE_CHUNK_SECONDS
+private const val DEFAULT_MAX_CHUNK_BYTES = CALLER_AUDIO_BYTES_PER_SECOND * DEFAULT_MAX_CHUNK_SECONDS
 private const val SENTENCE_BOUNDARY_SILENCE_MILLIS = 500L
+
+/** Keeps default provider-safe chunking unchanged and scopes lower latency to explicit command sessions. */
+internal fun conversationDictationCallerAudioChunkSeconds(voiceSendCommandEnabled: Boolean): IntRange =
+    if (voiceSendCommandEnabled) {
+        VOICE_COMMAND_MIN_SENTENCE_CHUNK_SECONDS..VOICE_COMMAND_MAX_CHUNK_SECONDS
+    } else {
+        DEFAULT_MIN_SENTENCE_CHUNK_SECONDS..DEFAULT_MAX_CHUNK_SECONDS
+    }
 
 /** One provider request backed by one exact, retryable caller-audio chunk. */
 @Suppress("TooManyFunctions")
