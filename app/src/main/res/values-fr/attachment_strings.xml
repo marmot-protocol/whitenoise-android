@@ -4,4 +4,5 @@
     <string name="attachment_photos_videos">Photos et vidéos</string>
     <string name="attachment_device_contact">Contact de l’appareil</string>
     <string name="attachment_recent_media">Médias récents</string>
+    <string name="recent_media_browse_all">Parcourir toutes les photos et vidéos</string>
 </resources>

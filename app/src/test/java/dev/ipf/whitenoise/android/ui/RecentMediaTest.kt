@@ -10,7 +10,7 @@ import org.junit.Test
 /**
  * Pins the recent-media strip's permission gate: full images, full video, OR
  * Android's partial "Select photos" grant each unlock the strip, and a full
- * denial keeps it closed (the permission-free Gallery tile still works).
+ * denial keeps it closed (the permission-free Browse all action still works).
  */
 class RecentMediaTest {
     private val images = "android.permission.READ_MEDIA_IMAGES"

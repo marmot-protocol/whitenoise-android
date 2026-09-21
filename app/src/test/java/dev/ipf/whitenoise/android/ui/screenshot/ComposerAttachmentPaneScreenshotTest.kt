@@ -51,6 +51,35 @@ class ComposerAttachmentPaneScreenshotTest {
         capture("composer_attachment_pane_corners_amoled.png")
     }
 
+    /** The permission-denied media pane still exposes its permission-free system-picker route. */
+    @Test
+    fun recentMediaPaneKeepsBrowseAllAvailable() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                Surface(color = MaterialTheme.colorScheme.background) {
+                    ComposerAttachmentSheetPane(
+                        alpha = 1f,
+                        minimumHeight = 0.dp,
+                        onPickRecentMedia = {},
+                        onPickFromGallery = {},
+                        onCaptureFromCamera = null,
+                        onPickDocument = null,
+                        onShareLocation = null,
+                        onShareUser = null,
+                        onShareContact = null,
+                        onComingSoon = {},
+                        recentMediaOnly = true,
+                        bottomCornersOverride = ComposerAttachmentPaneBottomCorners(0.dp, 0.dp),
+                        modifier = Modifier.testTag(RECENT_MEDIA_TAG),
+                    )
+                }
+            }
+        }
+        composeRule
+            .onNodeWithTag(RECENT_MEDIA_TAG)
+            .captureRoboImage("src/test/snapshots/composer_recent_media_pane_denied_dark.png")
+    }
+
     private fun render(
         darkTheme: Boolean,
         amoled: Boolean,
@@ -88,6 +117,7 @@ class ComposerAttachmentPaneScreenshotTest {
 
     private companion object {
         const val TAG = "composer-attachment-pane-corners"
+        const val RECENT_MEDIA_TAG = "composer-recent-media-pane"
     }
 }
 

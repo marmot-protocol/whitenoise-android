@@ -15,7 +15,6 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties.EditableText
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -23,7 +22,6 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -87,9 +85,7 @@ class ConversationComposerFullScreenRetentionScreenshotTest {
         assertEquals(2f, context.resources.displayMetrics.density, 0.01f)
         val automaticHeight = composerHeight()
 
-        composeRule
-            .onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG, useUnmergedTree = true)
-            .performTouchInput { click(center) }
+        performAccessibleResizeAction()
         composeRule.waitForIdle()
         assertFullScreenOwner(appState, draft)
         val fullScreenHeight = composerHeight()
@@ -160,8 +156,23 @@ class ConversationComposerFullScreenRetentionScreenshotTest {
         resizeHandle.assertIsDisplayed()
         assertEquals(
             context.getString(R.string.composer_collapse),
-            resizeHandle.fetchSemanticsNode().config[SemanticsActions.OnClick].label,
+            resizeHandle
+                .fetchSemanticsNode()
+                .config[SemanticsActions.CustomActions]
+                .single()
+                .label,
         )
+    }
+
+    /** Invokes the named non-drag resize path retained for accessibility services. */
+    private fun performAccessibleResizeAction() {
+        val action =
+            composeRule
+                .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
+                .fetchSemanticsNode()
+                .config[SemanticsActions.CustomActions]
+                .single()
+        composeRule.runOnUiThread { check(action.action()) }
     }
 
     /** Re-entry restores the accessible surface and border drag target without a visible handle. */

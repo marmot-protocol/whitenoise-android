@@ -4,4 +4,5 @@
     <string name="attachment_photos_videos">照片和视频</string>
     <string name="attachment_device_contact">设备联系人</string>
     <string name="attachment_recent_media">最近的媒体</string>
+    <string name="recent_media_browse_all">浏览所有照片和视频</string>
 </resources>

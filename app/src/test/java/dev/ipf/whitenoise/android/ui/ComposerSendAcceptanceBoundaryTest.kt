@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MessageTextCopy
-import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_GESTURE_TAG
+import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
@@ -72,7 +72,7 @@ class ComposerSendAcceptanceBoundaryTest {
             }
         }
 
-        resizeGesture().performClick()
+        performAccessibleResizeAction()
         composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()
         composeRule.waitForIdle()
 
@@ -102,7 +102,7 @@ class ComposerSendAcceptanceBoundaryTest {
             }
         }
 
-        resizeGesture().performClick()
+        performAccessibleResizeAction()
         composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()
         composeRule.waitForIdle()
 
@@ -133,7 +133,7 @@ class ComposerSendAcceptanceBoundaryTest {
             }
         }
 
-        resizeGesture().performClick()
+        performAccessibleResizeAction()
         composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()
         composeRule.onNodeWithText(sentText).performTextReplacement(newerText)
         composeRule.runOnIdle { checkNotNull(accepted).invoke() }
@@ -256,9 +256,6 @@ class ComposerSendAcceptanceBoundaryTest {
         composeRule.onNodeWithText("Account B draft").assertExists()
     }
 
-    /** Pointer input targets the border so taps never reposition the editor caret. */
-    private fun resizeGesture() = composeRule.onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG, useUnmergedTree = true)
-
     /** Returns the accessible resize action shared by the acceptance scenarios. */
     private fun resizeHandle() =
         context.getString(R.string.composer_resize).let { description ->
@@ -268,9 +265,25 @@ class ComposerSendAcceptanceBoundaryTest {
             composeRule.onNodeWithContentDescription(description)
         }
 
-    /** Verifies the localized tap action exposed by the visible resize handle. */
+    /** Invokes the named resize path retained for accessibility services. */
+    private fun performAccessibleResizeAction() {
+        val action =
+            composeRule
+                .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
+                .fetchSemanticsNode()
+                .config[SemanticsActions.CustomActions]
+                .single()
+        composeRule.runOnUiThread { check(action.action()) }
+    }
+
+    /** Verifies the localized custom action exposed by the visible resize handle. */
     private fun assertResizeHandleToggleLabel(labelRes: Int) {
-        val label = resizeHandle().fetchSemanticsNode().config[SemanticsActions.OnClick].label
+        val label =
+            resizeHandle()
+                .fetchSemanticsNode()
+                .config[SemanticsActions.CustomActions]
+                .single()
+                .label
         assertEquals(context.getString(labelRes), label)
     }
 

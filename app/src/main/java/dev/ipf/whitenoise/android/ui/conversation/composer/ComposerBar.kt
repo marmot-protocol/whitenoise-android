@@ -1404,12 +1404,16 @@ internal fun ComposerBar(
                                 expanded = attachmentSheetState.isOpen && !attachmentSheetState.recentMediaOpen,
                                 onDismiss = attachmentSheetState::dismiss,
                                 onCamera = onCaptureFromCamera,
-                                onGallery = onPickFromGallery,
+                                onGallery =
+                                    when {
+                                        onPickFromGallery == null -> null
+                                        onPickRecentMedia != null -> ::openRecentMediaPane
+                                        else -> onPickFromGallery
+                                    },
                                 onFiles = onPickDocument,
                                 onLocation = onShareLocation,
                                 onUser = onShareUser,
                                 onContact = onShareContact,
-                                onRecentMedia = onPickRecentMedia?.let { { openRecentMediaPane() } },
                             )
                         },
                         preImeBackEnabled = !composerEmojiPickerOpen && !attachmentSheetState.isOpen,

@@ -15,6 +15,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
@@ -186,11 +187,12 @@ private fun rememberRecentThumbnail(uri: Uri): ImageBitmap? {
  * A tap stages that item and opens the preview (where multi-select, removal,
  * caption, and send already live) — no extra send control on the sheet. If
  * access is denied it shows a one-tap opt-in rather than nagging on open; the
- * permission-free Gallery tile below always remains available.
+ * permission-free browse action always remains available.
  */
 @Composable
 internal fun RecentMediaStrip(
     onPick: (Uri) -> Unit,
+    onBrowseAll: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -224,34 +226,64 @@ internal fun RecentMediaStrip(
         items = if (granted) queryRecentVisualMedia(context, RECENT_MEDIA_LIMIT) else emptyList()
     }
 
-    when {
-        granted && items.isNotEmpty() ->
-            LazyRow(
-                modifier = modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                items(items, key = { it.uri }) { item ->
-                    RecentThumb(item = item, onClick = { onPick(item.uri) })
-                }
-                if (partialAccess) {
-                    item(key = "recent_media_manage") {
-                        TextButton(onClick = { permissionLauncher.launch(recentMediaReadPermissions()) }) {
-                            Text(stringResource(R.string.recent_media_manage))
+    RecentMediaContent(
+        granted = granted,
+        partialAccess = partialAccess,
+        items = items,
+        onRequestAccess = { permissionLauncher.launch(recentMediaReadPermissions()) },
+        onPick = onPick,
+        onBrowseAll = onBrowseAll,
+        modifier = modifier,
+    )
+}
+
+/** Renders recent, permission, empty, and permission-free browse states with one stable browse action. */
+@Composable
+@Suppress("FunctionNaming")
+internal fun RecentMediaContent(
+    granted: Boolean,
+    partialAccess: Boolean,
+    items: List<RecentMediaItem>,
+    onRequestAccess: () -> Unit,
+    onPick: (Uri) -> Unit,
+    onBrowseAll: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        when {
+            granted && items.isNotEmpty() ->
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    items(items, key = { it.uri }) { item ->
+                        RecentThumb(item = item, onClick = { onPick(item.uri) })
+                    }
+                    if (partialAccess) {
+                        item(key = "recent_media_manage") {
+                            TextButton(onClick = onRequestAccess) {
+                                Text(stringResource(R.string.recent_media_manage))
+                            }
                         }
                     }
                 }
-            }
-        !granted || partialAccess ->
-            Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = { permissionLauncher.launch(recentMediaReadPermissions()) }) {
-                    Text(
-                        stringResource(
-                            if (partialAccess) R.string.recent_media_manage else R.string.recent_media_enable,
-                        ),
-                    )
+            !granted || partialAccess ->
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = onRequestAccess) {
+                        Text(
+                            stringResource(
+                                if (partialAccess) R.string.recent_media_manage else R.string.recent_media_enable,
+                            ),
+                        )
+                    }
                 }
+            else -> Unit // granted but empty gallery — retain only the permission-free browse action
+        }
+        onBrowseAll?.let { browse ->
+            TextButton(onClick = browse) {
+                Text(stringResource(R.string.recent_media_browse_all))
             }
-        else -> Unit // granted but empty gallery — render nothing
+        }
     }
 }
 

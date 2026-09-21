@@ -48,7 +48,6 @@ class ComposerAttachmentMenuWidthTest {
                             onLocation = {},
                             onUser = {},
                             onContact = {},
-                            onRecentMedia = null,
                         )
                     }
                 }

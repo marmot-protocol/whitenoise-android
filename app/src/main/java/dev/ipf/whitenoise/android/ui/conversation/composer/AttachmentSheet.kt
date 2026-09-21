@@ -201,7 +201,7 @@ internal fun ComposerAttachmentSheetPane(
             // own opt-in permission and stays absent until the gallery action is
             // wired (same availability as the Gallery tile).
             if (onPickRecentMedia != null) {
-                RecentMediaStrip(onPick = onPickRecentMedia)
+                RecentMediaStrip(onPick = onPickRecentMedia, onBrowseAll = onPickFromGallery)
             }
             if (recentMediaOnly) return@Column
             // Two rows of three. Row 1 is capture/files (Gallery, Camera,
