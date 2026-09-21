@@ -171,6 +171,55 @@ class ComposerCaretVisibilityTest {
         }
     }
 
+    @Test
+    fun mentionCompositionWithCollapsedVisualRangeUsesIdentityMapping() {
+        val npub = "npub1" + "q".repeat(58)
+        val canonicalDraft = "@$npub "
+        val candidate =
+            MentionComposer.Candidate(
+                accountIdHex = "aa".repeat(32),
+                npub = npub,
+                displayName = "Alice",
+            )
+        val focusRequester = FocusRequester()
+        var value by
+            mutableStateOf(
+                TextFieldValue(
+                    text = canonicalDraft,
+                    selection = TextRange(3),
+                    composition = TextRange(2, 3),
+                ),
+            )
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface {
+                    ComposerPill(
+                        textFieldValue = value,
+                        composerFocus = focusRequester,
+                        emojiPickerOpen = false,
+                        onValueChange = { value = it },
+                        onEmojiPickerToggle = {},
+                        onAttachmentsToggle = {},
+                        attachmentSheetOpen = false,
+                        onPickFromGallery = null,
+                        onPickDocument = null,
+                        highlightMentionChips = true,
+                        mentionCandidates = listOf(candidate),
+                    )
+                }
+            }
+        }
+
+        val field = composeRule.onNode(hasSetTextAction())
+        composeRule.runOnIdle { focusRequester.requestFocus() }
+        composeRule.waitForIdle()
+        assertEquals(canonicalDraft, field.fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
+
+        composeRule.runOnIdle { value = value.copy(composition = null) }
+        composeRule.waitForIdle()
+        assertEquals("@Alice ", field.fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
+    }
+
     /** A conversation-key draft restore cancels the prior bulk edit's layout and scroll work. */
     @Test
     fun conversationDraftRestoreSupersedesAnUnsettledBulkReplacement() {

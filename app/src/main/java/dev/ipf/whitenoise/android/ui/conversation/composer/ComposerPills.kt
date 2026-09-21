@@ -487,8 +487,9 @@ internal fun ComposerPill(
         remember(highlightMentionChips, mentionCandidates) {
             if (highlightMentionChips) MentionComposer.candidatesByNpub(mentionCandidates) else emptyMap()
         }
+    val mentionComposition = textFieldValue.composition
     val mentionVisualTransformation =
-        remember(highlightMentionChips, chipColor, mentionCandidateLookup) {
+        remember(highlightMentionChips, chipColor, mentionCandidateLookup, mentionComposition) {
             if (!highlightMentionChips) {
                 VisualTransformation.None
             } else {
@@ -502,6 +503,21 @@ internal fun ComposerPill(
                     // mapping out of bounds, rather than letting it throw.
                     runCatching {
                         val visual = MentionComposer.editingVisualText(text.text, mentionCandidateLookup)
+                        // Legacy BasicTextField reports the IME's composing-character
+                        // bounds through CursorAnchorInfo. A shortened mention label can
+                        // map both ends of a non-empty composing range inside the stored
+                        // `@npub...` to the same visible offset; Compose then forwards an
+                        // empty range to fillBoundingBoxes and crashes. Keep the canonical
+                        // text and identity mapping only for that transient composition.
+                        // Friendly mention labels return as soon as the IME commits it.
+                        val compositionCollapses =
+                            mentionComposition?.takeUnless { it.collapsed }?.let { composition ->
+                                visual.originalToTransformed(composition.min) >=
+                                    visual.originalToTransformed(composition.max)
+                            } == true
+                        if (compositionCollapses) {
+                            return@runCatching TransformedText(text, OffsetMapping.Identity)
+                        }
                         val visualLength = visual.text.length
                         val styled =
                             buildAnnotatedString {
