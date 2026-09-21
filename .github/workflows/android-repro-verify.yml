@@ -21,10 +21,14 @@ permissions:
   contents: read
 
 jobs:
-  verify:
-    name: Verify unsigned production APK reproducibility
+  build:
+    name: Independent unsigned build (${{ matrix.tree }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        tree: [first, second]
 
     steps:
       - name: Checkout
@@ -48,19 +52,66 @@ jobs:
         with:
           cache-disabled: true
 
-      - name: Run reproducibility verifier
-        id: verify
+      # Only downloaded inputs cross runs. Never restore task outputs or transforms.
+      - name: Cache build inputs
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ runner.temp }}/repro-${{ matrix.tree }}/gradle-user-home/wrapper
+            ${{ runner.temp }}/repro-${{ matrix.tree }}/gradle-user-home/caches/modules-2
+            ${{ runner.temp }}/repro-${{ matrix.tree }}/gradle-user-home/caches/whitenoise/marmotkit
+          key: repro-inputs-v1-${{ runner.os }}-${{ matrix.tree }}-${{ hashFiles('gradle/**', '**/*.gradle.kts', 'gradle.properties', 'app/src/main/marmotkit/MARMOT_VERSION') }}
+          restore-keys: repro-inputs-v1-${{ runner.os }}-${{ matrix.tree }}-
+
+      - name: Build isolated unsigned APK
+        shell: bash
+        env:
+          BUILD_TREE: ${{ matrix.tree }}
+        run: |
+          set -euo pipefail
+          ./scripts/repro-ci.sh build "$GITHUB_SHA" \
+            "$RUNNER_TEMP/repro-$BUILD_TREE" "$RUNNER_TEMP/repro-evidence"
+
+      - name: Transfer independent build evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: repro-${{ matrix.tree }}
+          path: ${{ runner.temp }}/repro-evidence/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
+
+  verify:
+    name: Verify unsigned production APK reproducibility
+    needs: build
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Require both independent builds
+        env:
+          BUILD_RESULT: ${{ needs.build.result }}
+        run: test "$BUILD_RESULT" = success
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Download independent evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: repro-*
+          path: ${{ runner.temp }}/repro-inputs
+
+      - name: Compare source, toolchains and unsigned APK bytes
         shell: bash
         run: |
           set -euo pipefail
-          evidence_dir="$RUNNER_TEMP/repro-verify-evidence"
-          mkdir -p "$evidence_dir"
-          ./scripts/repro-verify.sh \
-            --ref "$GITHUB_SHA" \
-            --evidence-dir "$evidence_dir" \
-            | tee repro-verify.log
-          printf 'evidence_dir=%s\n' "$evidence_dir" >> "$GITHUB_OUTPUT"
-          cat "$evidence_dir/repro-build-environment.txt"
+          ./scripts/repro-ci.sh compare "$GITHUB_SHA" \
+            "$RUNNER_TEMP/repro-inputs/repro-first" \
+            "$RUNNER_TEMP/repro-inputs/repro-second" \
+            "$RUNNER_TEMP/repro-verify-evidence" | tee repro-verify.log
 
       - name: Upload verified unsigned APK
         if: github.event_name != 'pull_request'
@@ -68,7 +119,7 @@ jobs:
         with:
           name: whitenoise-repro-verify-${{ github.run_number }}-${{ github.sha }}
           path: |
-            ${{ steps.verify.outputs.evidence_dir }}/
+            ${{ runner.temp }}/repro-verify-evidence/
             repro-verify.log
           if-no-files-found: error
           retention-days: 90

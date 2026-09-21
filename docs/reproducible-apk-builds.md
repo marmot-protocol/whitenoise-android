@@ -12,21 +12,28 @@ reproducibility and what remains out of scope.
 - A minimal build environment with fixed locale/time zone plus isolated `HOME`
   and Gradle state; local Gradle settings and app runtime variables are not
   inherited.
-- A separate `GRADLE_USER_HOME` for each build, so the second build cannot reuse
-  dependency, execution, or build-cache state produced by the first.
+- A separate `GRADLE_USER_HOME` for each build. CI restores only downloaded
+  Maven dependencies, the Gradle wrapper distribution, and pinned MarmotKit inputs
+  from earlier runs. Task outputs, transforms, and configuration caches are never
+  restored; both builds explicitly disable Gradle build/configuration caching.
 - No `local.properties`, no `app/google-services.json`, and no release signing
   environment variables (defaults / empty runtime config only).
 - The exact MarmotKit Android archive is pinned by immutable URL, source SHA,
   and SHA-256. Each isolated build verifies and extracts that same archive
   through Gradle before compiling its Kotlin and JNI payload.
-- The two resulting APK files must be **byte-identical** on that verifier host.
+- The two resulting APK files must be **byte-identical**.
 - Each APK must be **unsigned** (`apksigner verify` must exit 1 with output
   beginning `DOES NOT VERIFY`).
 
 CI workflow [`.github/workflows/android-repro-verify.yml`](../.github/workflows/android-repro-verify.yml)
-runs the same script on tag pushes, every pull request to `master`, and manual dispatch.
+runs two independent builds on separate runners through `scripts/repro-ci.sh`,
+using the same build helpers as the local script, on tag pushes, every pull
+request to `master`, and manual dispatch. A required comparison job checks source
+identity, matching recorded toolchain inputs, unsignedness, and APK bytes.
 Tag/manual runs publish the verified unsigned APK, `SHA256SUMS`, and a toolchain
-report as workflow artifacts; pull requests verify without publishing an APK.
+report as workflow artifacts. Both build jobs transfer unverified APKs through
+one-day workflow artifacts, including on pull requests; these are comparison
+inputs, not release candidates. Pull requests do not publish the verified artifact.
 The unsigned artifact is same-run comparison evidence for the workflow run (90-day
 artifact retention); it is not a durable release distribution asset.
 
@@ -54,9 +61,9 @@ artifact retention); it is not a durable release distribution asset.
   the verifier cleans up its temporary Gradle state. Android SDK packages and
   Maven dependencies are not yet pinned by repository-owned content hashes.
   MarmotKit is pinned separately by the repository-owned lock and archive SHA-256.
-  The two-build check therefore proves path/build-order determinism on one verifier
-  host with that pinned JVM; cross-host matching still requires reconciling the
-  recorded toolchain inputs.
+  The local script checks path/build-order determinism on one host. CI additionally
+  checks two independent runners with identical recorded toolchain inputs; it does
+  not claim reproducibility across arbitrary toolchains or operating systems.
 - **Gradle archive knobs** such as `preserveFileTimestamps` / `reproducibleFileOrder`
   on `AbstractArchiveTask` — Android APK packaging does not use that path; they
   would not change APK output here.

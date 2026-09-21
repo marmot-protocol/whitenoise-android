@@ -132,6 +132,8 @@ grep -Fxq ':app:assembleProductionZapstoreRelease' "$fake_tree/captured-args" ||
   echo 'error: verifier did not request the production Zapstore release task' >&2
   exit 1
 }
+grep -Fxq -- '--no-build-cache' "$fake_tree/captured-args"
+grep -Fxq -- '--no-configuration-cache' "$fake_tree/captured-args"
 grep -Fxq -- "--init-script" "$fake_tree/captured-args" || {
   echo 'error: verifier did not pass a JVM report init script' >&2
   exit 1
@@ -308,6 +310,37 @@ if repro_verify_assert_unsigned_apk "$unsigned_apk" 2>/dev/null; then
   echo 'error: unsigned check succeeded with invalid apksigner override' >&2
   exit 1
 fi
+unset REPRO_VERIFY_APKSIGNER_PATH
+
+export REPRO_VERIFY_APKSIGNER_PATH="$fake_apksigner"
+source_sha=deadbeefdeadbeefdeadbeefdeadbeefdeadbeef
+first="$FIXTURE_DIR/first"
+second="$FIXTURE_DIR/second"
+verified="$FIXTURE_DIR/verified"
+repro_verify_write_evidence "$unsigned_apk" "$source_sha" "$first" >/dev/null
+printf 'source_sha=%s\njava.version=21.0.7\n' "$source_sha" >"$first/repro-build-environment.txt"
+cp -a "$first" "$second"
+bash "$REPO_DIR/scripts/repro-ci.sh" compare "$source_sha" "$first" "$second" "$verified" >/dev/null
+cmp "$first/SHA256SUMS" "$verified/SHA256SUMS"
+
+# Each corrupted input must fail before creating verified evidence.
+for corruption in source toolchain checksum bytes missing; do
+  candidate="$FIXTURE_DIR/$corruption"
+  cp -a "$first" "$candidate"
+  case "$corruption" in
+    source) sed -i 's/source_sha=.*/source_sha=wrong/' "$candidate/repro-build-environment.txt" ;;
+    toolchain) printf 'different-sdk\n' >>"$candidate/repro-build-environment.txt" ;;
+    checksum) printf 'bad checksum\n' >"$candidate/SHA256SUMS" ;;
+    bytes) repro_verify_write_evidence "$tool_error_apk" "$source_sha" "$candidate" >/dev/null ;;
+    missing) rm "$candidate"/*.apk ;;
+  esac
+  if bash "$REPO_DIR/scripts/repro-ci.sh" compare "$source_sha" "$first" "$candidate" \
+    "$FIXTURE_DIR/rejected-$corruption" >/dev/null 2>&1; then
+    printf 'error: comparison accepted %s corruption\n' "$corruption" >&2
+    exit 1
+  fi
+  [[ ! -e "$FIXTURE_DIR/rejected-$corruption" ]]
+done
 unset REPRO_VERIFY_APKSIGNER_PATH
 
 printf 'test-repro-verify.sh passed\n'
