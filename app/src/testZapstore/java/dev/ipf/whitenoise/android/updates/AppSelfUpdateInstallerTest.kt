@@ -4,9 +4,11 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.core.content.FileProvider
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -63,6 +65,16 @@ class AppSelfUpdateInstallerTest {
 
     @Test
     fun launchInstallHonorsInstallerContract() {
+        // Each Robolectric application has a new cache directory; discard prior provider roots.
+        val providerInfo =
+            requireNotNull(
+                context.packageManager.resolveContentProvider(
+                    "${context.packageName}.fileprovider",
+                    PackageManager.GET_META_DATA,
+                ),
+            )
+        val provider = FileProvider()
+        provider.attachInfo(context, providerInfo)
         val apk = verifiedApkFile()
         val capturingContext = CapturingContext(context)
 
@@ -84,6 +96,7 @@ class AppSelfUpdateInstallerTest {
             )
         } finally {
             apk.delete()
+            provider.attachInfo(context, providerInfo)
         }
     }
 
