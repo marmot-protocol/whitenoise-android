@@ -37,7 +37,7 @@ class ShareConnectScreenBehaviorTest {
         composeRule.onNodeWithTag("share_connect.share").performClick()
         composeRule.onNodeWithText("Share profile URL").assertIsDisplayed().performClick()
         composeRule.onNodeWithTag("share_connect.share").performClick()
-        composeRule.onNodeWithText("Share profile picture").assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("Share profile card").assertIsDisplayed().performClick()
         composeRule.runOnIdle {
             assertEquals(1, backCount)
             assertEquals(1, urlShareCount)
