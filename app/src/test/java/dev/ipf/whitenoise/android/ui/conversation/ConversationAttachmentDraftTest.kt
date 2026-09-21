@@ -231,6 +231,20 @@ class ConversationAttachmentDraftTest {
         assertEquals(attachment, afterCleanup.documentsByUriString[uri])
     }
 
+    /** One completed cleanup cannot clear an overlapping removal for the same native attachment. */
+    @Test
+    fun processRemovalTombstoneCountsOverlappingCleanup() {
+        val tombstones = DraftAttachmentRemovalTombstones()
+        val first = tombstones.begin("alice", "group", "attachment")
+        val second = tombstones.begin("alice", "group", "attachment")
+
+        tombstones.complete(first)
+        assertEquals(setOf("attachment"), tombstones.attachmentIds("alice", "group"))
+
+        tombstones.complete(second)
+        assertTrue(tombstones.attachmentIds("alice", "group").isEmpty())
+    }
+
     /** Builds a minimal native draft descriptor for classification tests. */
     private fun attachment(
         mediaType: String,

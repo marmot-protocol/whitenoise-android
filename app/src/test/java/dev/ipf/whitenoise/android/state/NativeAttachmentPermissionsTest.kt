@@ -45,8 +45,8 @@ class NativeAttachmentPermissionsTest {
                         else -> error("stale evaluation must not grant: $method")
                     }
                 }
-            owner.update(owner.invalidate(), engine, listOf("account")) {
-                owner.invalidate()
+            owner.update(owner.invalidate(engine), engine, engine, listOf("account")) {
+                owner.invalidate(engine)
                 AttachmentAutomaticPermissionFfi(true, true, true, true)
             }
             assertEquals(listOf("beginAttachmentPermissionUpdate"), calls)
@@ -70,7 +70,7 @@ class NativeAttachmentPermissionsTest {
                         else -> error(method)
                     }
                 }
-            owner.update(owner.invalidate(), engine, listOf("account", "account")) {
+            owner.update(owner.invalidate(engine), engine, engine, listOf("account", "account")) {
                 AttachmentAutomaticPermissionFfi(false, false, false, false)
             }
             assertEquals(listOf("beginAttachmentPermissionUpdate", "setAttachmentAutomaticPermission"), calls)
@@ -99,21 +99,47 @@ class NativeAttachmentPermissionsTest {
                         else -> error(method)
                     }
                 }
-            val revision = owner.invalidate()
+            val revision = owner.invalidate(engine)
 
             val failed =
-                owner.update(revision, engine, listOf("broken", "healthy")) {
+                owner.update(revision, engine, engine, listOf("broken", "healthy")) {
                     AttachmentAutomaticPermissionFfi(true, false, false, false)
                 }
             assertEquals(setOf("broken"), failed)
             assertTrue("setAttachmentAutomaticPermission:healthy" in calls)
 
             val retryFailed =
-                owner.update(revision, engine, failed.toList()) {
+                owner.update(revision, engine, engine, failed.toList()) {
                     AttachmentAutomaticPermissionFfi(true, false, false, false)
                 }
             assertTrue(retryFailed.isEmpty())
             assertTrue("setAttachmentAutomaticPermission:broken" in calls)
+        }
+
+    /** A replacement runtime invalidates evaluation even when host inputs retain the same values. */
+    @Test
+    fun replacementRuntimeCannotReceiveAStaleGrant() =
+        runTest {
+            val permissions = NativeAttachmentPermissions()
+            val calls = mutableListOf<String>()
+            val original =
+                nativeBoundary { method, _ ->
+                    calls += method
+                    when (method) {
+                        "beginAttachmentPermissionUpdate" -> "old-generation"
+                        else -> error("replacement must fence this call: $method")
+                    }
+                }
+            val replacement = nativeBoundary { method, _ -> error("unexpected replacement call: $method") }
+            val revision = permissions.invalidate(original)
+
+            permissions.update(revision, original, original, listOf("account")) {
+                permissions.invalidate(replacement)
+                AttachmentAutomaticPermissionFfi(true, true, true, true)
+            }
+
+            assertEquals(listOf("beginAttachmentPermissionUpdate"), calls)
+            assertFalse(permissions.isCurrent(revision, original))
         }
 }
 

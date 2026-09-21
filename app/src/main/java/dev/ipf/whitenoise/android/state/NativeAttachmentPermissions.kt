@@ -6,17 +6,25 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 /** Orders host events and prevents an obsolete evaluation from restoring automatic permission. */
 internal class NativeAttachmentPermissions {
     private val revision = AtomicLong()
+    private val runtimeOwner = AtomicReference<Any?>()
     private val updates = Mutex()
 
-    /** Invalidates pending evaluations synchronously, before their coroutine can resume. */
-    fun invalidate(): Long = revision.incrementAndGet()
+    /** Invalidates pending evaluations and binds the next revision to one runtime identity. */
+    fun invalidate(owner: Any?): Long {
+        runtimeOwner.set(owner)
+        return revision.incrementAndGet()
+    }
 
-    /** Whether a retry still belongs to the latest host permission inputs. */
-    fun isCurrent(expectedRevision: Long): Boolean = revision.get() == expectedRevision
+    /** Whether a retry still belongs to both the latest host inputs and native runtime. */
+    fun isCurrent(
+        expectedRevision: Long,
+        expectedOwner: Any,
+    ): Boolean = revision.get() == expectedRevision && runtimeOwner.get() === expectedOwner
 
     /**
      * Revokes before evaluating. Each native generation is consumed at most once;
@@ -25,6 +33,7 @@ internal class NativeAttachmentPermissions {
     @Suppress("TooGenericExceptionCaught") // Isolate failures so one account cannot strand every other account revoked.
     suspend fun update(
         expectedRevision: Long,
+        expectedOwner: Any,
         engine: MarmotInterface,
         accounts: List<String>,
         evaluate: suspend (String) -> AttachmentAutomaticPermissionFfi,
@@ -32,11 +41,11 @@ internal class NativeAttachmentPermissions {
         updates.withLock {
             val failed = mutableSetOf<String>()
             for (account in accounts.distinct()) {
-                if (revision.get() != expectedRevision) break
+                if (!isCurrent(expectedRevision, expectedOwner)) break
                 try {
                     val generation = engine.beginAttachmentPermissionUpdate(account)
                     val permission = evaluate(account)
-                    if (revision.get() == expectedRevision &&
+                    if (isCurrent(expectedRevision, expectedOwner) &&
                         !engine.setAttachmentAutomaticPermission(account, generation, permission)
                     ) {
                         failed += account

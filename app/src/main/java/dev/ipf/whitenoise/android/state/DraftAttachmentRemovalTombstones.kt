@@ -13,7 +13,7 @@ internal data class DraftAttachmentRemovalKey(
  * attachment until that cleanup has actually completed.
  */
 internal class DraftAttachmentRemovalTombstones {
-    private val pending = mutableSetOf<DraftAttachmentRemovalKey>()
+    private val pending = mutableMapOf<DraftAttachmentRemovalKey, Int>()
 
     /** Records user intent before asynchronous native cleanup starts. */
     @Synchronized
@@ -21,12 +21,16 @@ internal class DraftAttachmentRemovalTombstones {
         accountRef: String,
         groupIdHex: String,
         attachmentId: String,
-    ): DraftAttachmentRemovalKey = DraftAttachmentRemovalKey(accountRef, groupIdHex, attachmentId).also(pending::add)
+    ): DraftAttachmentRemovalKey =
+        DraftAttachmentRemovalKey(accountRef, groupIdHex, attachmentId).also { key ->
+            pending[key] = pending.getOrDefault(key, 0) + 1
+        }
 
-    /** Clears only the exact intent whose native cleanup returned successfully. */
+    /** Releases one removal ticket without unblocking any overlapping cleanup for the same attachment. */
     @Synchronized
     fun complete(key: DraftAttachmentRemovalKey) {
-        pending -= key
+        val remaining = pending.getOrDefault(key, 0) - 1
+        if (remaining > 0) pending[key] = remaining else pending -= key
     }
 
     /** Returns attachment ids a new composer instance must exclude from restoration. */
@@ -35,7 +39,7 @@ internal class DraftAttachmentRemovalTombstones {
         accountRef: String,
         groupIdHex: String,
     ): Set<String> =
-        pending
+        pending.keys
             .asSequence()
             .filter { it.accountRef == accountRef && it.groupIdHex == groupIdHex }
             .mapTo(mutableSetOf(), DraftAttachmentRemovalKey::attachmentId)

@@ -1363,23 +1363,24 @@ class WhiteNoiseAppState private constructor(
 
     /** Refreshes runtime-scoped permissions after network, preference, or account changes. */
     internal fun refreshNativeAttachmentPermissions() {
-        val revision = nativeAttachmentPermissions.invalidate()
-        val engine = marmotRuntime?.marmot ?: return
+        val runtime = marmotRuntime
+        val revision = nativeAttachmentPermissions.invalidate(runtime)
+        val engine = runtime?.marmot ?: return
         val accountRefs = accounts.filterNot { it.signedOut }.map { it.label }
         // Marmot binding calls remain on the mutations scope's Main.immediate dispatcher.
         mutationsScope.launch {
             var pending = accountRefs.toSet()
             var attempt = 0
-            while (pending.isNotEmpty() && nativeAttachmentPermissions.isCurrent(revision)) {
+            while (pending.isNotEmpty() && nativeAttachmentPermissions.isCurrent(revision, runtime)) {
                 pending =
-                    nativeAttachmentPermissions.update(revision, engine, pending.toList()) { account ->
+                    nativeAttachmentPermissions.update(revision, runtime, engine, pending.toList()) { account ->
                         loadMediaAutoDownloadMatrix(account).nativePermission(
                             activeNetworkTypes(),
                             hasValidatedInternet(),
                             attachmentDownloadIntents.isAutomaticPaused(account),
                         )
                     }
-                if (!nativeAttachmentPermissions.isCurrent(revision)) return@launch
+                if (!nativeAttachmentPermissions.isCurrent(revision, runtime)) return@launch
                 if (pending.isEmpty()) {
                     attachmentDownloadPolicyRevision += 1
                     return@launch
@@ -1388,10 +1389,26 @@ class WhiteNoiseAppState private constructor(
                 if (attempt >= NATIVE_ATTACHMENT_PERMISSION_RETRY_LIMIT) break
                 delay(NATIVE_ATTACHMENT_PERMISSION_RETRY_DELAY_MILLIS * attempt)
             }
-            if (pending.isNotEmpty() && nativeAttachmentPermissions.isCurrent(revision)) {
+            if (pending.isNotEmpty() && nativeAttachmentPermissions.isCurrent(revision, runtime)) {
                 Log.w("AttachmentPermissions", "permission_update_failed accounts=${pending.size}")
             }
         }
+    }
+
+    /** Publishes a runtime, invalidates obsolete permission work, and seeds synchronization for retained accounts. */
+    private fun publishMarmotRuntime(runtime: AppMarmotRuntime) {
+        marmotRuntime = runtime
+        nativeAttachmentPermissions.invalidate(runtime)
+        mutationsScope.launch {
+            if (marmotRuntime === runtime) refreshNativeAttachmentPermissions()
+        }
+    }
+
+    /** Clears only the runtime that failed and immediately fences its permission callbacks. */
+    private fun clearMarmotRuntime(runtime: AppMarmotRuntime) {
+        if (marmotRuntime !== runtime) return
+        marmotRuntime = null
+        nativeAttachmentPermissions.invalidate(null)
     }
 
     private val bootstrapAttempts = BootstrapAttemptCoordinator()
@@ -4202,7 +4219,7 @@ class WhiteNoiseAppState private constructor(
                             marmotRuntimeFactory(appContext).also { runtime ->
                                 // Publish before start so lifecycle consumers
                                 // and later listener retries can resolve Marmot.
-                                marmotRuntime = runtime
+                                publishMarmotRuntime(runtime)
                                 diagnostics.bind(runtime.marmot)
                                 AvatarImageLoader.attachProfileImageFetcher { url, maxBytes ->
                                     runtime.marmot.downloadProfileImage(url, maxBytes)
@@ -4228,10 +4245,10 @@ class WhiteNoiseAppState private constructor(
                     startupPerformance.stage(PerformancePhase.FAILED_RUNTIME_CLOSE) {
                         withContext(Dispatchers.IO) { runtime.marmot.shutdownAndClose() }
                     }
-                    if (marmotRuntime === runtime) marmotRuntime = null
+                    clearMarmotRuntime(runtime)
                 },
             )
-        marmotRuntime = opened
+        publishMarmotRuntime(opened)
         return opened
     }
 
