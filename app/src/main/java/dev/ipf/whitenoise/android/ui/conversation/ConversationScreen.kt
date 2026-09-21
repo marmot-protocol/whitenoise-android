@@ -642,12 +642,12 @@ internal fun ConversationScreen(
         remember(controller, notificationOpenRequestId) {
             controller to notificationOpenRequestId
         }
-    val projectedEntryUnreadCount = chat.unreadCount.coerceAtMost(Int.MAX_VALUE.toULong()).toInt()
+    val projectedUnreadCount = chat.unreadCount.coerceAtMost(Int.MAX_VALUE.toULong()).toInt()
     val entryProjectionAvailable = chat.projection != null
     val entryUnreadSnapshot =
         rememberConversationEntryUnreadSnapshot(
             controllerIdentity = entryUnreadSessionIdentity,
-            projectionUnread = projectedEntryUnreadCount,
+            projectionUnread = projectedUnreadCount,
             projectionFirstUnreadMessageId = chat.projection?.firstUnreadMessageIdHex,
             projectionAvailable = entryProjectionAvailable,
             // A one-row chat-list seed cannot establish the authoritative unread
@@ -1384,15 +1384,25 @@ internal fun ConversationScreen(
             )
         }
     }
-    val unreadIncomingCount by remember(controller, chat.id) {
-        derivedStateOf {
-            if (!initialTimelineAnchored) {
-                0
-            } else {
-                countUnreadIncoming(controller.timeline, readAnchorMessageId)
+    val unreadIncomingCount by
+        remember(
+            controller,
+            chat.id,
+            projectedUnreadCount,
+            entryProjectionAvailable,
+        ) {
+            derivedStateOf {
+                if (!initialTimelineAnchored) {
+                    0
+                } else {
+                    countUnreadIncoming(
+                        timeline = controller.timeline,
+                        readAnchorMessageId = readAnchorMessageId,
+                        missingAnchorUnreadCount = projectedUnreadCount.takeIf { entryProjectionAvailable },
+                    )
+                }
             }
         }
-    }
     LaunchedEffect(
         controller,
         initialTimelineAnchored,
@@ -2600,7 +2610,7 @@ internal fun ConversationScreen(
     LaunchedEffect(controller, initialTimelineAnchored, controller.timeline.size) {
         if (!initialTimelineAnchored || unreadDivergenceLogged || controller.timeline.isEmpty()) return@LaunchedEffect
         unreadCountDivergenceReport(
-            projectionUnread = projectedEntryUnreadCount,
+            projectionUnread = projectedUnreadCount,
             timeline = controller.timeline,
             readAnchorMessageId = chat.projection?.lastReadMessageIdHex,
         )?.let { report ->
@@ -4061,6 +4071,7 @@ internal fun ConversationScreen(
                                                                 loadConversationTimelineToNewest(
                                                                     hasMoreAfter = { controller.hasMoreAfterTimeline },
                                                                     loadNewer = controller::loadNewerTimelinePage,
+                                                                    returnToLatest = controller::returnToLatestWindow,
                                                                 )
                                                             },
                                                             resolveTailIndex = { currentTailIndex },
@@ -4072,7 +4083,6 @@ internal fun ConversationScreen(
                                                         }
                                                         ConversationJumpToNewestOutcome.Tail -> {
                                                             unreadJumpState = unreadJumpState.suppressCurrentStack()
-                                                            controller.returnToLatestWindow()
                                                         }
                                                         ConversationJumpToNewestOutcome.Cancelled -> Unit
                                                     }

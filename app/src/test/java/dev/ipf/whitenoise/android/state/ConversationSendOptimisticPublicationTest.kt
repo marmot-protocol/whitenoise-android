@@ -176,6 +176,7 @@ class ConversationSendOptimisticPublicationTest {
                     initialMode = ConversationScrollMode.ReadingHistory("older-row", 0),
                 )
             val controller = controller(textPublisher = { _, _, _, _ -> sentSummary() })
+            var awaitedFrames = 0
 
             try {
                 controller.send("sent from history")
@@ -183,9 +184,10 @@ class ConversationSendOptimisticPublicationTest {
                     scrollCoordinator.revealSentAtLiveTail(
                         controller,
                         captureLayout = { error("history reveal must not start the snap settle") },
-                        awaitFrame = { error("a history reader is carried to the row without waiting for a frame") },
+                        awaitFrame = { awaitedFrames += 1 },
                     ),
                 )
+                assertEquals(1, awaitedFrames)
                 assertEquals(
                     "a history reader must be carried to the transcript's newest row",
                     listOf(0),

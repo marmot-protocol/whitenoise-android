@@ -22174,6 +22174,39 @@
     ],
     "source_coverage": [
       {
+        "surface": "An off-window read anchor uses the authoritative unread projection instead of counting retained history",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "internal fun countUnreadIncoming(",
+        "test_ids": [
+          "CON-003"
+        ]
+      },
+      {
+        "surface": "A bounded history window returns directly to its live newest edge",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationWindow.kt",
+        "anchor": "suspend fun ConversationController.returnToLatestWindow()",
+        "test_ids": [
+          "CON-003",
+          "CON-005"
+        ]
+      },
+      {
+        "surface": "History paging starts with half a page of runway before the reader reaches the bounded edge",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationLogic.kt",
+        "anchor": "internal const val OLDER_PAGE_PREFETCH_ROWS",
+        "test_ids": [
+          "CON-003"
+        ]
+      },
+      {
+        "surface": "A send from old history restores the live window before resolving the optimistic tail row",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationSentMessageReveal.kt",
+        "anchor": "fun ConversationScrollCoordinator.revealSentAtLiveTail(",
+        "test_ids": [
+          "CON-005"
+        ]
+      },
+      {
         "surface": "Token-aware text admission safely retries an interrupted runtime call",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "private fun isRetryableTextAdmissionError(",

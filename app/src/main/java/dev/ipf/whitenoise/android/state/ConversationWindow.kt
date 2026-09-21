@@ -419,8 +419,11 @@ suspend fun ConversationController.reportVisibleMessage(messageIdHex: String) {
     applyTimelinePage(page, replaceWindow = true, updatePagination = true)
 }
 
-/** Resumes following new arrivals after the reader jumped to the newest message. */
-suspend fun ConversationController.returnToLatestWindow() {
-    val page = timelineSubscription?.returnToLatest() ?: return
-    applyTimelinePage(page, replaceWindow = true, updatePagination = true)
+/** Replaces a bounded history window with its newest page, reporting whether the newest edge is ready. */
+suspend fun ConversationController.returnToLatestWindow(): Boolean {
+    val subscription = timelineSubscription ?: return false
+    subscription.returnToLatest()?.let { page ->
+        applyTimelinePage(page, replaceWindow = true, updatePagination = true)
+    }
+    return !hasMoreAfterTimeline
 }

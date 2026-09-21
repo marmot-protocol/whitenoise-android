@@ -569,6 +569,35 @@ class ConversationScrollCoordinatorTest {
             assertTrue(writer.writes.all { it == ScrollWrite.Snap(0, 0) })
         }
 
+    /** Resolves a sent row only after an old-date bounded window has returned to newest. */
+    @Test
+    fun sendFromHistoryRestoresNewestWindowBeforeResolvingTail() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator =
+                ConversationScrollCoordinator(
+                    writer = writer,
+                    initialMode = ConversationScrollMode.ReadingHistory("friday-message", 0),
+                )
+            var newestWindowReady = false
+            var awaitedFrames = 0
+
+            val revealed =
+                coordinator.revealSentAtLiveTail(
+                    prepareLatest = {
+                        newestWindowReady = true
+                        true
+                    },
+                    resolveTailIndex = { if (newestWindowReady) 0 else 48 },
+                    awaitFrame = { awaitedFrames += 1 },
+                )
+
+            assertTrue(revealed)
+            assertEquals(1, awaitedFrames)
+            assertEquals(listOf(ScrollWrite.Animate(0, 0)), writer.writes)
+            assertTrue(coordinator.isFollowingTail)
+        }
+
     @Test
     fun unmeasuredViewportIsNotReadyEvenWithBeforeContentPadding() {
         val layout =

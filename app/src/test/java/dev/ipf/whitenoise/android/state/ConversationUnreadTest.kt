@@ -396,6 +396,29 @@ class ConversationUnreadTest {
         assertEquals(2, countUnreadIncoming(timeline, readAnchorMessageId = "evicted"))
     }
 
+    /** Uses the live projection when older paging evicts the UI's durable read watermark. */
+    @Test
+    fun unreadCount_offWindowAnchorUsesProjectionInsteadOfHistoricalWindow() {
+        val historicalWindow = (1..100).map { received("old-$it") }
+
+        assertEquals(
+            0,
+            countUnreadIncoming(
+                timeline = historicalWindow,
+                readAnchorMessageId = "newest-read-message",
+                missingAnchorUnreadCount = 0,
+            ),
+        )
+        assertEquals(
+            3,
+            countUnreadIncoming(
+                timeline = historicalWindow,
+                readAnchorMessageId = "newest-read-message",
+                missingAnchorUnreadCount = 3,
+            ),
+        )
+    }
+
     @Test
     fun unreadCount_duplicateAnchorId_bindsToFirstOccurrence() {
         // Locks `indexOfFirst` semantics. If two rows share a messageIdHex

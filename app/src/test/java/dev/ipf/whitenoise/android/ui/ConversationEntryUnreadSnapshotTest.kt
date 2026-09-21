@@ -298,6 +298,109 @@ class ConversationEntryUnreadSnapshotTest {
             assertEquals(3, loads)
         }
 
+    /** Prefers the live-window command over replaying every newer bounded page. */
+    @Test
+    fun jumpToBottomReturnsLiveWindowDirectlyToNewest() =
+        runTest {
+            var hasMoreAfter = true
+            var directReturns = 0
+            var pageLoads = 0
+
+            val reachedNewest =
+                loadConversationTimelineToNewest(
+                    hasMoreAfter = { hasMoreAfter },
+                    loadNewer = {
+                        pageLoads += 1
+                        false
+                    },
+                    returnToLatest = {
+                        directReturns += 1
+                        hasMoreAfter = false
+                        true
+                    },
+                )
+
+            assertEquals(true, reachedNewest)
+            assertEquals(1, directReturns)
+            assertEquals(0, pageLoads)
+        }
+
+    /** Re-enables live following even when the currently rendered page already reaches newest. */
+    @Test
+    fun jumpAtNewestStillResumesTheLiveWindow() =
+        runTest {
+            var directReturns = 0
+            var pageLoads = 0
+
+            val reachedNewest =
+                loadConversationTimelineToNewest(
+                    hasMoreAfter = { false },
+                    loadNewer = {
+                        pageLoads += 1
+                        false
+                    },
+                    returnToLatest = {
+                        directReturns += 1
+                        true
+                    },
+                )
+
+            assertEquals(true, reachedNewest)
+            assertEquals(1, directReturns)
+            assertEquals(0, pageLoads)
+        }
+
+    /** Falls back to paging when a direct command leaves the newest edge unresolved. */
+    @Test
+    fun jumpToBottomPagesWhenDirectReturnDoesNotReachNewest() =
+        runTest {
+            var remainingPages = 1
+            var directReturns = 0
+
+            val reachedNewest =
+                loadConversationTimelineToNewest(
+                    hasMoreAfter = { remainingPages > 0 },
+                    loadNewer = {
+                        remainingPages -= 1
+                        true
+                    },
+                    returnToLatest = {
+                        directReturns += 1
+                        true
+                    },
+                )
+
+            assertEquals(true, reachedNewest)
+            assertEquals(2, directReturns)
+        }
+
+    /** Preserves forward paging, then retries live following after reaching newest. */
+    @Test
+    fun jumpToBottomFallsBackWhenDirectLatestIsUnavailable() =
+        runTest {
+            var remainingPages = 2
+            var directReturns = 0
+            var pageLoads = 0
+
+            val reachedNewest =
+                loadConversationTimelineToNewest(
+                    hasMoreAfter = { remainingPages > 0 },
+                    loadNewer = {
+                        pageLoads += 1
+                        remainingPages -= 1
+                        true
+                    },
+                    returnToLatest = {
+                        directReturns += 1
+                        false
+                    },
+                )
+
+            assertEquals(true, reachedNewest)
+            assertEquals(2, directReturns)
+            assertEquals(2, pageLoads)
+        }
+
     @Test
     fun jumpToBottomHasNoArbitraryConversationPageLimit() =
         runTest {
