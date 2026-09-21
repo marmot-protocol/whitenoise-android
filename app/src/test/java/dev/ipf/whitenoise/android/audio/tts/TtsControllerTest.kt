@@ -554,7 +554,7 @@ class TtsControllerTest {
         val acceleratedController =
             TtsController(
                 audioFocus = FakeTtsAudioFocus(),
-                maxChunkLength = 4_000,
+                maxChunkLength = 500,
                 speechRate = { requestedRate },
                 wordTicker =
                     TtsEstimatedWordTicker(
@@ -589,7 +589,7 @@ class TtsControllerTest {
         val controlController =
             TtsController(
                 audioFocus = FakeTtsAudioFocus(),
-                maxChunkLength = 4_000,
+                maxChunkLength = 500,
                 speechRate = { 1f },
                 wordTicker =
                     TtsEstimatedWordTicker(
