@@ -79,6 +79,7 @@ internal fun PersonProfileContent(
     onPrivateDetails: () -> Unit,
     onStartGroup: () -> Unit,
     onGroupEntry: () -> Unit,
+    onAddToGroup: () -> Unit = onGroupEntry,
     onPromote: () -> Unit,
     onCopy: () -> Unit,
     onAvatar: () -> Unit,
@@ -130,8 +131,28 @@ internal fun PersonProfileContent(
                         Spacer(Modifier.height(WhiteNoiseSpacing.Section))
                     }
                     SettingsGroup {
-                        row("groups") { row ->
-                            if (showSharedGroups) {
+                        row("start_group") { row ->
+                            SettingsAction(
+                                row,
+                                stringResource(R.string.person_start_group),
+                                onStartGroup,
+                                enabled = !busy,
+                                leading = { Icon(painterResource(R.drawable.ic_group_add), null) },
+                                modifier = Modifier.testTag("person_profile.start_group"),
+                            )
+                        }
+                        row("add_to_group") { row ->
+                            SettingsAction(
+                                row,
+                                stringResource(R.string.person_add_to_group),
+                                onAddToGroup,
+                                enabled = !busy,
+                                leading = { Icon(painterResource(R.drawable.ic_group_add), null) },
+                                modifier = Modifier.testTag("person_profile.add_to_group"),
+                            )
+                        }
+                        if (showSharedGroups) {
+                            row("groups") { row ->
                                 SettingsLink(
                                     row,
                                     stringResource(R.string.person_groups_in_common),
@@ -139,15 +160,6 @@ internal fun PersonProfileContent(
                                     enabled = !busy,
                                     leading = sharedAvatars,
                                     modifier = Modifier.testTag("person_profile.groups"),
-                                )
-                            } else {
-                                SettingsAction(
-                                    row,
-                                    stringResource(R.string.person_add_to_group),
-                                    onGroupEntry,
-                                    enabled = !busy,
-                                    leading = { Icon(painterResource(R.drawable.ic_group_add), null) },
-                                    modifier = Modifier.testTag("person_profile.add_to_group"),
                                 )
                             }
                         }
@@ -159,16 +171,6 @@ internal fun PersonProfileContent(
                                 enabled = !busy,
                                 leading = { Icon(painterResource(R.drawable.ic_edit), null) },
                                 modifier = Modifier.testTag("person_profile.private_details"),
-                            )
-                        }
-                        row("start_group") { row ->
-                            SettingsAction(
-                                row,
-                                stringResource(R.string.person_start_group),
-                                onStartGroup,
-                                enabled = !busy,
-                                leading = { Icon(painterResource(R.drawable.ic_group_add), null) },
-                                modifier = Modifier.testTag("person_profile.start_group"),
                             )
                         }
                         if (canPromote) {

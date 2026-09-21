@@ -2270,6 +2270,7 @@ internal fun MainShell(
                                     conversationScrollSnapshots[scrollKey] = snapshot
                                 }
                             },
+                            onStartGroupWithPeer = profileGroupForegroundState::open,
                             onBack = {
                                 // A very quick Back can leave before the provisional
                                 // open receives its chat-list projection. The entry

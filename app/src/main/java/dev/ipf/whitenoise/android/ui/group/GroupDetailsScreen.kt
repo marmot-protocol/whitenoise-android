@@ -101,6 +101,7 @@ import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.GroupRosterLoadState
+import dev.ipf.whitenoise.android.state.ProfileGroupPickerState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.chats.ChatFolderPickerSheet
@@ -123,6 +124,7 @@ import dev.ipf.whitenoise.android.ui.medialibrary.SharedContentCategory
 import dev.ipf.whitenoise.android.ui.medialibrary.SharedMediaSection
 import dev.ipf.whitenoise.android.ui.medialibrary.rememberSharedMediaTiles
 import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
+import dev.ipf.whitenoise.android.ui.profile.ProfileAddToGroupsContent
 import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
 import dev.ipf.whitenoise.android.ui.settings.ChatBubbleColorsScreen
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
@@ -134,6 +136,7 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsGroupScope
 import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsPanel
+import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
 import dev.ipf.whitenoise.android.ui.settings.SettingsSwitch
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
@@ -230,6 +233,7 @@ internal fun GroupDetailsScreen(
     onAutoOpenAddMemberConsumed: () -> Unit = {},
     // Close details and raise the conversation's message search.
     onOpenSearch: (() -> Unit)? = null,
+    onStartGroupWithPeer: (RecipientSearch.Candidate) -> Unit = {},
 ) {
     val detailsScrollState = key(controller) { rememberScrollState() }
     val membersScrollState = key(controller) { rememberScrollState() }
@@ -240,6 +244,8 @@ internal fun GroupDetailsScreen(
     var showMuteDurationDialog by remember(controller) { mutableStateOf(false) }
     var showNotifyForDialog by remember { mutableStateOf(false) }
     var showVibrationPatternDialog by remember { mutableStateOf(false) }
+    var showDmAddToGroups by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+    var addingDmPeerToGroups by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     // A requested picker stays closed until the roster is authoritative. This
     // avoids excluding candidates against a stale or empty member snapshot.
     var showAddMember by remember { mutableStateOf(false) }
@@ -341,6 +347,58 @@ internal fun GroupDetailsScreen(
             null
         }
     val dmPeerNpub = dmPeerAccountIdHex?.let(appState::npub)
+    val dmAddToGroupsScroll = rememberScrollState()
+    val dmGroupPickerRevision = appState.profileGroupPickerRevision
+    val dmAddableGroupsState =
+        remember(dmPeerAccountIdHex, appState.chatListItems, dmGroupPickerRevision) {
+            dmPeerAccountIdHex?.let(appState::profileAddableGroupsState)
+                ?: ProfileGroupPickerState.empty()
+        }
+    LaunchedEffect(showDmAddToGroups, dmAddableGroupsState.pendingGroupIds) {
+        if (showDmAddToGroups && dmAddableGroupsState.pendingGroupIds.isNotEmpty()) {
+            appState.requestProfileGroupMembers(dmAddableGroupsState.pendingGroupIds)
+        }
+    }
+    if (showDmAddToGroups && dmPeerAccountIdHex != null) {
+        SettingsScaffold(
+            title = stringResource(R.string.person_add_to_group),
+            onBack = { if (!addingDmPeerToGroups) showDmAddToGroups = false },
+        ) {
+            Box(Modifier.fillMaxSize().whiteNoiseVerticalScroll(dmAddToGroupsScroll)) {
+                ProfileAddToGroupsContent(
+                    appState = appState,
+                    targetName = conversationTitle,
+                    state = dmAddableGroupsState,
+                    busy = addingDmPeerToGroups,
+                    onClose = { if (!addingDmPeerToGroups) showDmAddToGroups = false },
+                    onRetry = {
+                        appState.requestProfileGroupMembers(
+                            dmAddableGroupsState.pendingGroupIds,
+                            retry = true,
+                        )
+                    },
+                    onAdd = { groups ->
+                        if (!addingDmPeerToGroups) {
+                            addingDmPeerToGroups = true
+                            appState.launchMutation {
+                                try {
+                                    val added =
+                                        appState.inviteProfileToGroups(
+                                            targetRef = dmPeerAccountIdHex,
+                                            targetGroupIds = groups.map { it.group.groupIdHex },
+                                        )
+                                    if (added) showDmAddToGroups = false
+                                } finally {
+                                    addingDmPeerToGroups = false
+                                }
+                            }
+                        }
+                    },
+                )
+            }
+        }
+        return
+    }
     val canShowEditAction = !isDm && canEdit
     LaunchedEffect(canShowEditAction) {
         if (!canShowEditAction) showEditGroup = false
@@ -1314,6 +1372,38 @@ internal fun GroupDetailsScreen(
                         onClick = onOpenSearch,
                         modifier = Modifier.weight(1f),
                     )
+                }
+            }
+            if (isDm && dmPeerAccountIdHex != null && dmPeerNpub != null) {
+                SettingsSection(stringResource(R.string.profile_actions))
+                SettingsGroup(modifier = Modifier.testTag("chat_info.group_actions")) {
+                    row("start_group") { rowContext ->
+                        SettingsAction(
+                            context = rowContext,
+                            title = stringResource(R.string.person_start_group),
+                            onClick = {
+                                onStartGroupWithPeer(
+                                    RecipientSearch.Candidate(
+                                        accountIdHex = dmPeerAccountIdHex,
+                                        displayName = conversationTitle,
+                                        npub = dmPeerNpub,
+                                    ),
+                                )
+                            },
+                            leading = { Icon(painterResource(R.drawable.ic_group_add), contentDescription = null) },
+                            modifier = Modifier.testTag("chat_info.start_group"),
+                        )
+                    }
+                    row("add_to_group") { rowContext ->
+                        SettingsAction(
+                            context = rowContext,
+                            title = stringResource(R.string.person_add_to_group),
+                            onClick = { showDmAddToGroups = true },
+                            enabled = !addingDmPeerToGroups,
+                            leading = { Icon(painterResource(R.drawable.ic_group_add), contentDescription = null) },
+                            modifier = Modifier.testTag("chat_info.add_to_group"),
+                        )
+                    }
                 }
             }
             controller.lastMutationError?.let { error ->

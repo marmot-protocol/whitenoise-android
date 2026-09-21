@@ -830,12 +830,13 @@ internal fun ProfileSheet(
             onGroupEntry = {
                 if (owner.canAct()) {
                     pickerParent = ProfileSheetPage.PROFILE
-                    page =
-                        if (sharedRows.isNotEmpty() || shared.unresolvedGroupIds.isNotEmpty()) {
-                            ProfileSheetPage.GROUPS_IN_COMMON
-                        } else {
-                            ProfileSheetPage.ADD_TO_GROUPS
-                        }
+                    page = ProfileSheetPage.GROUPS_IN_COMMON
+                }
+            },
+            onAddToGroup = {
+                if (owner.canAct()) {
+                    pickerParent = ProfileSheetPage.PROFILE
+                    page = ProfileSheetPage.ADD_TO_GROUPS
                 }
             },
             onPromote = { if (owner.canAct()) page = ProfileSheetPage.MAKE_ADMIN },
