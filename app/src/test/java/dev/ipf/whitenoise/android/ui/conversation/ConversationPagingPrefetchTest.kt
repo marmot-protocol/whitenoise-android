@@ -24,6 +24,12 @@ class ConversationPagingPrefetchTest {
         assertFalse(prefetch(oldestVisibleIndex = OLDEST_ROW - OLDER_PAGE_PREFETCH_ROWS - 1))
     }
 
+    /** Gives a fast fling half of a 50-row page for the next bounded window to arrive. */
+    @Test
+    fun prefetchMarginKeepsHalfAPageOfRunway() {
+        assertEquals(25, OLDER_PAGE_PREFETCH_ROWS)
+    }
+
     /** Nothing is fetched before the timeline has an anchor, while a page is in flight, or at the end. */
     @Test
     fun prefetchRespectsTheLoadingAndExhaustedGuards() {

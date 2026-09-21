@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.ui.conversation
 import androidx.compose.runtime.withFrameNanos
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.returnToLatestWindow
+import kotlinx.coroutines.CancellationException
 
 /**
  * Reveals the latest rendered row only after the controller has published the
@@ -22,6 +24,13 @@ internal suspend fun ConversationScrollCoordinator.revealSentAtLiveTail(
     awaitFrame: suspend () -> Unit = { withFrameNanos { } },
 ): Boolean =
     revealSentAtLiveTail(
+        prepareLatest = {
+            loadConversationTimelineToNewest(
+                hasMoreAfter = { controller.hasMoreAfterTimeline },
+                loadNewer = controller::loadNewerTimelinePage,
+                returnToLatest = controller::returnToLatestWindow,
+            )
+        },
         resolveTailIndex = {
             val renderedTimelineSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
             conversationTimelineTailListIndex(
@@ -38,6 +47,7 @@ internal suspend fun ConversationScrollCoordinator.revealSentAtLiveTail(
  * optimistic row and bottom input finish measuring.
  */
 internal suspend fun ConversationScrollCoordinator.revealSentAtLiveTail(
+    prepareLatest: suspend () -> Boolean = { true },
     resolveTailIndex: () -> Int,
     captureLayout: ((tailIndex: Int) -> ConversationTailLayout)? = null,
     awaitFrame: suspend () -> Unit = { withFrameNanos { } },
@@ -54,6 +64,13 @@ internal suspend fun ConversationScrollCoordinator.revealSentAtLiveTail(
                 awaitFrame()
                 scrollToTail(resolveTailIndex())
             } else {
+                if (!prepareLatest()) {
+                    throw CancellationException("Conversation newest edge was not available after send")
+                }
+                // The controller replacement is synchronous, but the reversed
+                // LazyColumn needs one frame to install that newest window
+                // before index zero denotes the physical conversation tail.
+                awaitFrame()
                 animateScrollToTail(
                     index = resolveTailIndex(),
                     resolveIndex = { resolveTailIndex() },

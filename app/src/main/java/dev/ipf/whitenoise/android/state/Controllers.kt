@@ -1623,22 +1623,29 @@ internal fun firstUnreadReceivedIndex(
 
 /**
  * Count of received messages positioned after the read anchor in [timeline].
- * A null anchor — or one that has fallen out of the loaded window — is
- * treated as "nothing read yet", so the count starts from the first row.
+ * A null anchor is treated as "nothing read yet", so the count starts from
+ * the first row. When a bounded window has evicted a non-null anchor, callers
+ * can supply [missingAnchorUnreadCount] from the authoritative projection;
+ * counting the historical window itself would label every retained row unread.
  * Anchoring on a message id (not an index) keeps the count stable when
  * load-older prepends shift every index by the same offset.
  */
 internal fun countUnreadIncoming(
     timeline: List<TimelineMessage>,
     readAnchorMessageId: String?,
+    missingAnchorUnreadCount: Int? = null,
 ): Int {
     if (timeline.isEmpty()) return 0
     val anchorIdx =
         readAnchorMessageId?.let { id ->
             timeline.indexOfFirst { it.record.messageIdHex == id }
         } ?: -1
-    return timeline.drop(anchorIdx + 1).count {
-        it.record.direction == "received" && !isDerivedStateKind(it.record.kind)
+    return if (readAnchorMessageId != null && anchorIdx < 0 && missingAnchorUnreadCount != null) {
+        missingAnchorUnreadCount.coerceAtLeast(0)
+    } else {
+        timeline.drop(anchorIdx + 1).count {
+            it.record.direction == "received" && !isDerivedStateKind(it.record.kind)
+        }
     }
 }
 

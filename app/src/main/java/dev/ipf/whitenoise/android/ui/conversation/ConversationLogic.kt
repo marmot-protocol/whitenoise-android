@@ -128,26 +128,32 @@ internal data class ImageAttachmentReadOutcome(
     val overflowed: Boolean = false,
 )
 
-// How many rows from the top to begin prefetching the next older page.
-internal const val OLDER_PAGE_PREFETCH_ROWS = 4
+// Start the next 50-row history page halfway through the current page. Four rows was too little
+// runway for a fast fling: the reader could reach the bounded edge, stop on it, and then resume only
+// after the window arrived.
+internal const val OLDER_PAGE_PREFETCH_ROWS = 25
 
 // Symmetric edge threshold after an unread-anchor load has shifted the bounded window.
 internal const val NEWER_PAGE_PREFETCH_ROWS = 4
 
 /**
- * Walk a bounded timeline back to its physical newest edge before a jump-to-bottom.
- * Each page loader reports whether its bounded window actually advanced, so a
- * failed or corrupt pager stops on the first no-progress result without imposing
- * an arbitrary history-size limit on legitimate conversations.
+ * Restore a bounded timeline to its physical newest edge before a jump-to-bottom.
+ * A live window can return there directly; legacy pagers fall back to walking
+ * forward and stop on the first no-progress result without imposing an arbitrary
+ * history-size limit on legitimate conversations.
  */
 internal suspend fun loadConversationTimelineToNewest(
     hasMoreAfter: () -> Boolean,
     loadNewer: suspend () -> Boolean,
+    returnToLatest: suspend () -> Boolean = { false },
 ): Boolean {
+    if (returnToLatest() && !hasMoreAfter()) return true
     while (hasMoreAfter()) {
         if (!loadNewer()) break
     }
-    return !hasMoreAfter()
+    val reachedNewest = !hasMoreAfter()
+    if (reachedNewest) returnToLatest()
+    return reachedNewest
 }
 
 /**

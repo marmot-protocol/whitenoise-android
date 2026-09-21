@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -29,6 +30,11 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.state.TimelineMessage
+import dev.ipf.whitenoise.android.state.countUnreadIncoming
 import dev.ipf.whitenoise.android.ui.conversation.ConversationJumpToNewestButton
 import dev.ipf.whitenoise.android.ui.conversation.ConversationJumpToNewestOutcome
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollAnchor
@@ -56,6 +62,36 @@ import org.robolectric.annotation.GraphicsMode
 class ConversationUnreadJumpScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    /** Pins the projection-backed badge rendered when paging has evicted the durable read watermark. */
+    @Test
+    fun offWindowReadAnchorRendersProjectedUnreadBadge() {
+        val projectedUnreadCount = 93
+        val unreadIncomingCount =
+            countUnreadIncoming(
+                timeline = listOf(receivedMessage("historical-1"), receivedMessage("historical-2")),
+                readAnchorMessageId = "newest-read-message",
+                missingAnchorUnreadCount = projectedUnreadCount,
+            )
+        assertEquals(projectedUnreadCount, unreadIncomingCount)
+
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                Surface(modifier = Modifier.size(96.dp).testTag(OFF_WINDOW_ROOT_TAG)) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        ConversationJumpToNewestButton(
+                            unreadIncomingCount = unreadIncomingCount,
+                            onClick = {},
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule
+            .onNodeWithTag(OFF_WINDOW_ROOT_TAG)
+            .captureRoboImage("src/test/snapshots/conversation_unread_jump_off_window_projection_dark.png")
+    }
 
     @Test
     @Suppress("LongMethod") // One vertical harness verifies both taps against the same real list state.
@@ -220,7 +256,36 @@ class ConversationUnreadJumpScreenshotTest {
         }
     }
 
+    /** Builds one retained received row so the screenshot exercises the real off-window count fallback. */
+    private fun receivedMessage(id: String): TimelineMessage =
+        TimelineMessage(
+            id = "msg:$id",
+            record =
+                AppMessageRecordFfi(
+                    messageIdHex = id,
+                    direction = "received",
+                    groupIdHex = "group",
+                    sender = "peer",
+                    plaintext = "Historical message",
+                    contentTokens =
+                        MarkdownDocumentFfi(
+                            truncated = false,
+                            blocks = emptyList(),
+                            blankLinesBefore = ByteArray(0),
+                        ),
+                    kind = 9uL,
+                    tags = emptyList(),
+                    sourceEpoch = null,
+                    retentionSeconds = null,
+                    retentionExpiresAt = null,
+                    recordedAt = 1uL,
+                    receivedAt = 1uL,
+                ),
+            status = MessageStatus.Received,
+        )
+
     private companion object {
+        const val OFF_WINDOW_ROOT_TAG = "conversation-unread-jump-off-window-root"
         const val ROOT_TAG = "conversation-unread-jump-root"
         const val LIST_TAG = "conversation-unread-jump-list"
         const val BUTTON_TAG = "conversation-unread-jump-button"
