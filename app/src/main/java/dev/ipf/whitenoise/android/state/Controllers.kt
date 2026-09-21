@@ -103,6 +103,7 @@ import dev.ipf.whitenoise.android.media.shouldCommitPrimaryGroupImageMutation
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolution
 import dev.ipf.whitenoise.android.ui.chats.newchat.directChatPreferenceOrder
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -131,6 +132,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.coroutineContext
 import kotlin.coroutines.resume
 
@@ -2191,6 +2193,46 @@ internal data class OptimisticReactionChange(
     val add: Boolean,
 )
 
+/** Coordinates an immediate removal with the authoritative echo of its preceding reaction add. */
+internal class ReactionProjectionAwaiter(
+    private val timeoutMillis: Long,
+) {
+    private val waiters = ConcurrentHashMap<Pair<String, String>, CompletableDeferred<Boolean>>()
+
+    /** Waits until [confirm] observes the reaction projection, or returns false on failure or timeout. */
+    suspend fun await(
+        targetMessageId: String,
+        emoji: String,
+        isAlreadyProjected: () -> Boolean,
+    ): Boolean {
+        if (isAlreadyProjected()) return true
+        val key = targetMessageId to emoji
+        val waiter = waiters.computeIfAbsent(key) { CompletableDeferred() }
+        if (isAlreadyProjected()) waiter.complete(true)
+        return try {
+            withTimeoutOrNull(timeoutMillis) { waiter.await() } ?: false
+        } finally {
+            waiters.remove(key, waiter)
+        }
+    }
+
+    /** Releases a pending removal after the matching add appears in the authoritative projection. */
+    fun confirm(
+        targetMessageId: String,
+        emoji: String,
+    ) {
+        waiters.remove(targetMessageId to emoji)?.complete(true)
+    }
+
+    /** Releases a pending removal without sending when the preceding reaction add failed. */
+    fun fail(
+        targetMessageId: String,
+        emoji: String,
+    ) {
+        waiters.remove(targetMessageId to emoji)?.complete(false)
+    }
+}
+
 /**
  * Apply a reaction overlay before waiting for the engine, and roll it back only
  * when the authoritative mutation fails. This small orchestration boundary is
@@ -2226,6 +2268,7 @@ internal sealed interface OwnReactionRetractionPlan {
 
 private const val MARMOT_DELETE_EVENT_KIND = 5uL
 private const val MARMOT_REACTION_EVENT_KIND = 7uL
+private const val REACTION_PROJECTION_WAIT_TIMEOUT_MILLIS = 15_000L
 
 /**
  * Selects the safest removal for an own reaction. Target-wide unreact is preferred when the tapped
@@ -6672,6 +6715,7 @@ class ConversationController(
         appState.pendingProjectionsAwaitingBridge(conversationAccountRef, initialGroup.groupIdHex)
     private val optimisticReactionChanges = linkedMapOf<String, OptimisticReactionChange>()
     private val unprojectedOwnReactionEventIds = linkedMapOf<Pair<String, String>, String>()
+    private val reactionProjectionAwaiter = ReactionProjectionAwaiter(REACTION_PROJECTION_WAIT_TIMEOUT_MILLIS)
 
     // DEBUG-only send-latency trace bookkeeping (issue #913): maps a pending
     // optimistic text message's temp id to (traceSequence, monotonicStartMs) so
@@ -8746,7 +8790,15 @@ class ConversationController(
         emoji: String,
         alreadyMine: Boolean,
         ownEmojisBeforeMutation: Set<String>,
+        waitForProjection: Boolean,
     ): Boolean {
+        if (alreadyMine && waitForProjection) {
+            val projected =
+                reactionProjectionAwaiter.await(target, emoji) {
+                    hasProjectedOwnReaction(target, emoji)
+                }
+            check(projected) { "reaction add was not projected before retraction" }
+        }
         appState.withGroupCommitLock(account, group.groupIdHex) {
             if (alreadyMine) {
                 retractOwnReaction(account, target, emoji, ownEmojisBeforeMutation)
@@ -8761,6 +8813,22 @@ class ConversationController(
             }
         }
         return !alreadyMine
+    }
+
+    /** Whether Marmot's authoritative timeline has projected this account's reaction event. */
+    private fun hasProjectedOwnReaction(
+        target: String,
+        emoji: String,
+    ): Boolean {
+        val me = conversationAccountIdHex ?: return false
+        return timelineRecords[target]
+            ?.reactions
+            ?.userReactions
+            .orEmpty()
+            .any { reaction ->
+                reaction.sender.equals(me, ignoreCase = true) &&
+                    reaction.emoji == emoji
+            }
     }
 
     /** Resolves a missing projected reaction id from Marmot's authoritative local event history. */
@@ -8845,6 +8913,11 @@ class ConversationController(
                 }
         val ownEmojisBeforeMutation = reactions[target].orEmpty().filter { it.mine }.mapTo(linkedSetOf()) { it.emoji }
         val alreadyMine = emoji in ownEmojisBeforeMutation
+        val waitForProjection =
+            alreadyMine &&
+                optimisticReactionChanges.values.any { change ->
+                    change.add && change.targetMessageId == target && change.emoji == emoji
+                }
         val optimisticId = UUID.randomUUID().toString()
         val optimisticChange =
             OptimisticReactionChange(
@@ -8859,14 +8932,25 @@ class ConversationController(
                     recomputeReactions()
                 },
                 commit = {
-                    commitReactionMutation(account, target, emoji, alreadyMine, ownEmojisBeforeMutation)
+                    commitReactionMutation(
+                        account,
+                        target,
+                        emoji,
+                        alreadyMine,
+                        ownEmojisBeforeMutation,
+                        waitForProjection,
+                    )
                 },
                 rollback = {
                     optimisticReactionChanges.remove(optimisticId)
+                    if (optimisticChange.add) {
+                        reactionProjectionAwaiter.fail(target, emoji)
+                    }
                     recomputeReactions()
                 },
             )
         mutation.onFailure { throwable ->
+            Log.w("DMConversation", "reaction mutation failed: ${throwable.javaClass.simpleName}")
             appState.presentFailure(R.string.toast_reaction_failed, "MESSAGE_REACTION", throwable)
         }
         val reactionCommitted = mutation.getOrDefault(false)
@@ -11497,12 +11581,18 @@ class ConversationController(
         )
     }
 
+    /** Settles confirmed reaction overlays and releases removals waiting on an add projection. */
     private fun pruneConfirmedOptimisticReactions() {
         confirmedOptimisticReactionKeys(
             activeAccountIdHex = conversationAccountIdHex,
             optimisticChanges = optimisticReactionChanges,
             confirmedSendersByTarget = baseReactionSenders(),
-        ).forEach(optimisticReactionChanges::remove)
+        ).forEach { optimisticId ->
+            val confirmedChange = optimisticReactionChanges.remove(optimisticId) ?: return@forEach
+            if (confirmedChange.add) {
+                reactionProjectionAwaiter.confirm(confirmedChange.targetMessageId, confirmedChange.emoji)
+            }
+        }
     }
 
     private fun upsertProjectedRecord(

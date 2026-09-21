@@ -131,6 +131,48 @@ class CanAcceptReactionTest {
             assertEquals(1, rollbackCount)
         }
 
+    /** An immediate removal remains suspended until the preceding add projects. */
+    @Test
+    fun immediateRemovalWaitsForReactionProjection() =
+        runTest {
+            val awaiter = ReactionProjectionAwaiter(timeoutMillis = 1_000)
+            var projected = false
+            val removal =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    awaiter.await(TARGET, "👍") { projected }
+                }
+
+            assertFalse("removal must not race the unprojected add", removal.isCompleted)
+            projected = true
+            awaiter.confirm(TARGET, "👍")
+
+            assertTrue(removal.await())
+        }
+
+    /** A failed add releases its queued removal without allowing another native mutation. */
+    @Test
+    fun failedReactionAddReleasesQueuedRemovalAsFailure() =
+        runTest {
+            val awaiter = ReactionProjectionAwaiter(timeoutMillis = 1_000)
+            val removal =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    awaiter.await(TARGET, "👍") { false }
+                }
+
+            awaiter.fail(TARGET, "👍")
+
+            assertFalse(removal.await())
+        }
+
+    /** A reaction already present in the authoritative projection never waits for another echo. */
+    @Test
+    fun projectedReactionSkipsProjectionWait() =
+        runTest {
+            val awaiter = ReactionProjectionAwaiter(timeoutMillis = 1_000)
+
+            assertTrue(awaiter.await(TARGET, "👍") { true })
+        }
+
     /** A projected reaction event keeps removal scoped to the tapped emoji. */
     @Test
     fun ownReactionRetractionDeletesKnownReactionEvent() {
