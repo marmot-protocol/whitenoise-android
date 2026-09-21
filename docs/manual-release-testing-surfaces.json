@@ -15666,7 +15666,7 @@
         ]
       },
       {
-        "surface": "profile-qr:string:share_profile_picture",
+        "surface": "profile-qr:string:share_profile_card",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileQrSheet.kt",
         "anchor": "R.string.share_profile_picture",
         "test_ids": [
@@ -20996,7 +20996,7 @@
         ]
       },
       {
-        "surface": "share-connect:string:share_profile_picture",
+        "surface": "share-connect:string:share_profile_card",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
         "anchor": "R.string.share_profile_picture",
         "test_ids": [
