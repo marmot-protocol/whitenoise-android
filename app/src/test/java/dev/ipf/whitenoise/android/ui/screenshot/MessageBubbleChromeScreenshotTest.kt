@@ -676,9 +676,7 @@ private fun AmoledReactionBubble(
             ReactionPillRow(
                 tallies = tallies,
                 enabled = true,
-                onToggle = {},
-                onOverflow = {},
-                onLongPress = null,
+                onOpenDetails = {},
             )
         }
     }

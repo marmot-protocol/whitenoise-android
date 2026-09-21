@@ -75,10 +75,10 @@ class ReactionSummaryChipAmoledStyleTest {
         }
     }
 
-    /** My reaction reads as selected and a tap toggles exactly that emoji. */
+    /** My reaction reads as selected and a tap opens that emoji's reactor list without toggling it. */
     @Test
-    fun currentUserReactionIsExposedAsSelectedSemanticsAndTapToggles() {
-        val toggled = mutableListOf<String>()
+    fun currentUserReactionIsSelectedAndTapOpensItsDetails() {
+        val opened = mutableListOf<String?>()
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true, amoled = true) {
                 Column {
@@ -89,9 +89,7 @@ class ReactionSummaryChipAmoledStyleTest {
                                 ReactionTally(emoji = "❤️", count = 1, mine = false),
                             ),
                         enabled = true,
-                        onToggle = { toggled += it },
-                        onOverflow = {},
-                        onLongPress = null,
+                        onOpenDetails = { opened += it },
                     )
                 }
             }
@@ -99,14 +97,14 @@ class ReactionSummaryChipAmoledStyleTest {
         val pills = composeRule.onAllNodes(hasClickAction())
         pills[0].assertIsSelected()
         pills[1].assertIsNotSelected()
-        pills[1].performClick()
-        composeRule.runOnIdle { assertEquals(listOf("❤️"), toggled) }
+        pills[0].performClick()
+        composeRule.runOnIdle { assertEquals(listOf("👍"), opened) }
     }
 
     /** A fifth emoji collapses into the "+N" pill, which opens the details instead of toggling. */
     @Test
     fun fifthEmojiCollapsesIntoTheOverflowPill() {
-        var overflowOpened = 0
+        val opened = mutableListOf<String?>()
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true, amoled = true) {
                 ReactionPillRow(
@@ -119,9 +117,7 @@ class ReactionSummaryChipAmoledStyleTest {
                             ReactionTally("😮", 1, mine = false),
                         ),
                     enabled = true,
-                    onToggle = {},
-                    onOverflow = { overflowOpened += 1 },
-                    onLongPress = null,
+                    onOpenDetails = { opened += it },
                 )
             }
         }
@@ -130,6 +126,6 @@ class ReactionSummaryChipAmoledStyleTest {
         }
         composeRule.onNodeWithText("😮", useUnmergedTree = true).assertDoesNotExist()
         composeRule.onAllNodes(hasClickAction())[4].performClick()
-        composeRule.runOnIdle { assertEquals(1, overflowOpened) }
+        composeRule.runOnIdle { assertEquals(listOf<String?>(null), opened) }
     }
 }

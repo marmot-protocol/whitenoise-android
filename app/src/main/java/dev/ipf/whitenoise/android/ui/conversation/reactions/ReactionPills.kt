@@ -81,17 +81,15 @@ internal fun reactionPillBorderColor(selected: Boolean): Color {
 }
 
 /**
- * The prototype's reaction row under a bubble: 23dp pills, one per emoji, each inside a 48dp touch row. A tap
- * toggles that reaction, the "+N" pill and a long press open the message's reaction details.
+ * The prototype's reaction row under a bubble: 23dp pills, one per emoji, each inside a 48dp touch row.
+ * Tapping an emoji opens its reactor list; overflow and long press open the unfiltered list.
  */
 @Suppress("FunctionNaming")
 @Composable
 internal fun ReactionPillRow(
     tallies: List<ReactionTally>,
     enabled: Boolean,
-    onToggle: (String) -> Unit,
-    onOverflow: () -> Unit,
-    onLongPress: (() -> Unit)?,
+    onOpenDetails: (String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val pills = remember(tallies) { reactionPills(tallies) }
@@ -101,7 +99,7 @@ internal fun ReactionPillRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         pills.forEachIndexed { index, pill ->
-            ReactionPillItem(pill, index, enabled, onToggle, onOverflow, onLongPress)
+            ReactionPillItem(pill, index, enabled, onOpenDetails)
         }
     }
 }
@@ -113,9 +111,7 @@ private fun ReactionPillItem(
     pill: ReactionPill,
     index: Int,
     enabled: Boolean,
-    onToggle: (String) -> Unit,
-    onOverflow: () -> Unit,
-    onLongPress: (() -> Unit)?,
+    onOpenDetails: (String?) -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val emoji = pill.emoji
@@ -140,10 +136,10 @@ private fun ReactionPillItem(
                             interactionSource = interactionSource,
                             indication = null,
                             role = Role.Button,
-                            onClick = { if (emoji != null) onToggle(emoji) else onOverflow() },
-                            onClickLabel = if (emoji == null) viewReactors else null,
-                            onLongClickLabel = onLongPress?.let { viewReactors },
-                            onLongClick = onLongPress,
+                            onClick = { onOpenDetails(emoji) },
+                            onClickLabel = viewReactors,
+                            onLongClickLabel = viewReactors,
+                            onLongClick = { onOpenDetails(null) },
                         )
                     } else {
                         Modifier

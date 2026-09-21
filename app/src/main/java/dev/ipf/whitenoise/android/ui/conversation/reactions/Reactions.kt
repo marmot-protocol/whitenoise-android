@@ -61,14 +61,19 @@ internal fun Modifier.reactionSummaryAttachment(outgoing: Boolean): Modifier =
         }
     }
 
+/** Shows every reactor, initially filtered to the tapped emoji when one was selected. */
 @Composable
 internal fun ReactionDetailsSheet(
     participants: List<ReactionParticipant>,
     appState: WhiteNoiseAppState,
+    initialEmoji: String? = null,
     onRemoveOwnReaction: ((String) -> Unit)?,
     onDismissRequest: () -> Unit,
 ) {
-    var selectedEmoji by remember(participants) { mutableStateOf<String?>(null) }
+    var selectedEmoji by
+        remember(participants, initialEmoji) {
+            mutableStateOf(initialEmoji?.takeIf { emoji -> participants.any { it.emoji == emoji } })
+        }
     val activeAccountId = appState.activeAccount?.accountIdHex
     val emojiCounts =
         remember(participants) {
