@@ -7,6 +7,9 @@
     <string name="notification_channel_dictation_description">Mesaj düzenleyicideki etkin dikte oturumunu denetler</string>
     <string name="dictation_settings_title">Dikte</string>
     <string name="dictation_settings_explainer">White Noise, yüklü bir konuşma tanıma hizmetini kullanır. Sesi bu hizmet işler; White Noise yalnızca döndürülen metni yapıştırılana veya gönderilene kadar bellekte tutar.</string>
+    <string name="dictation_ostt_recommendation_title">Offline Speech to Text’i edinin</string>
+    <string name="dictation_ostt_recommendation_summary">Özel, cihaz üzerinde dikte için önerilen yazıya dökme uygulaması. Zapstore’da mevcuttur, Google Play’de değildir.</string>
+    <string name="dictation_ostt_recommendation_open_failed">Zapstore’daki Offline Speech to Text sayfası açılamadı.</string>
     <string name="dictation_finish_title">Dikteyi bitir</string>
     <string name="dictation_finish_manual">Yapıştır veya Gönder’i seçtiğimde</string>
     <string name="dictation_finish_after_silence">%1$d saniye sessizlikten sonra</string>

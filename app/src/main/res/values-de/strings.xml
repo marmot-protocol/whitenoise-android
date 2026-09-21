@@ -1707,6 +1707,9 @@
     <string name="notification_channel_dictation_description">Steuert eine aktive Diktatsitzung im Nachrichtenfeld</string>
     <string name="dictation_settings_title">Diktat</string>
     <string name="dictation_settings_explainer">White Noise verwendet einen installierten Spracherkennungsdienst. Dieser Dienst verarbeitet das Audio; White Noise behält nur den zurückgegebenen Text im Arbeitsspeicher, bis er eingefügt oder gesendet wird.</string>
+    <string name="dictation_ostt_recommendation_title">Offline Speech to Text installieren</string>
+    <string name="dictation_ostt_recommendation_summary">Empfohlene Transkriptions-App für privates Diktieren auf dem Gerät. Erhältlich bei Zapstore, nicht bei Google Play.</string>
+    <string name="dictation_ostt_recommendation_open_failed">Die Seite von Offline Speech to Text auf Zapstore konnte nicht geöffnet werden.</string>
     <string name="dictation_finish_title">Diktat beenden</string>
     <string name="dictation_finish_manual">Wenn ich Einfügen oder Senden wähle</string>
     <string name="dictation_finish_after_silence">Nach %1$d Sekunden Stille</string>

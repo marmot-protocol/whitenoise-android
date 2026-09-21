@@ -121,7 +121,7 @@ internal class ConversationDictationCallerAudio internal constructor(
         },
     private val elapsedRealtime: () -> Long = SystemClock::elapsedRealtime,
 ) {
-    private val lastSpeechAt = AtomicLong(elapsedRealtime())
+    private val lastSpeechAt = AtomicLong(NO_SPEECH_AT)
     private val recording = AtomicBoolean(false)
     private val finishing = AtomicBoolean(false)
     private val postActionReadsRemaining = AtomicInteger(0)
@@ -217,8 +217,12 @@ internal class ConversationDictationCallerAudio internal constructor(
     /** Includes partial, queued, and in-flight audio until acknowledged or discarded. */
     fun hasPending(): Boolean = buffer.hasPending
 
-    /** Measures quiet capture time independently of delayed provider speech callbacks. */
-    fun silenceMillis(): Long = (elapsedRealtime() - lastSpeechAt.get()).coerceAtLeast(0L)
+    /** Measures quiet capture time only after actual PCM speech, independently of provider callbacks. */
+    fun silenceMillis(): Long? =
+        lastSpeechAt
+            .get()
+            .takeUnless { it == NO_SPEECH_AT }
+            ?.let { (elapsedRealtime() - it).coerceAtLeast(0L) }
 
     /** Releases the generation lease without clearing a capture failure waiting for its successor. */
     @Synchronized
@@ -328,6 +332,8 @@ internal class ConversationDictationCallerAudio internal constructor(
     }
 
     companion object {
+        private const val NO_SPEECH_AT = -1L
+
         /** Opens one logical capture without allocating a provider pipe yet. */
         fun open(sessionId: Long): ConversationDictationCallerAudio? =
             openRecorder()?.let { recorder ->

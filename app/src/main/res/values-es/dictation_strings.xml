@@ -7,6 +7,9 @@
     <string name="notification_channel_dictation_description">Controla una sesión de dictado activa en el compositor</string>
     <string name="dictation_settings_title">Dictado</string>
     <string name="dictation_settings_explainer">White Noise usa un servicio de reconocimiento de voz instalado. Ese servicio procesa el audio; White Noise solo conserva en memoria el texto devuelto hasta que se pega o se envía.</string>
+    <string name="dictation_ostt_recommendation_title">Obtener Offline Speech to Text</string>
+    <string name="dictation_ostt_recommendation_summary">Aplicación de transcripción recomendada para el dictado privado en el dispositivo. Disponible en Zapstore, no en Google Play.</string>
+    <string name="dictation_ostt_recommendation_open_failed">No se pudo abrir la página de Offline Speech to Text en Zapstore.</string>
     <string name="dictation_finish_title">Terminar dictado</string>
     <string name="dictation_finish_manual">Cuando elija Pegar o Enviar</string>
     <string name="dictation_finish_after_silence">Después de %1$d segundos de silencio</string>

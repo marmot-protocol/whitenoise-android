@@ -7,6 +7,9 @@
     <string name="notification_channel_dictation_description">控制当前的消息编辑器听写会话</string>
     <string name="dictation_settings_title">听写</string>
     <string name="dictation_settings_explainer">White Noise 使用已安装的语音识别服务。该服务负责音频处理；White Noise 只在内存中保留返回的文本，直到粘贴或发送。</string>
+    <string name="dictation_ostt_recommendation_title">获取 Offline Speech to Text</string>
+    <string name="dictation_ostt_recommendation_summary">推荐用于私密本地听写的转写应用。可从 Zapstore 获取，Google Play 不提供。</string>
+    <string name="dictation_ostt_recommendation_open_failed">无法打开 Zapstore 上的 Offline Speech to Text 页面。</string>
     <string name="dictation_finish_title">结束听写</string>
     <string name="dictation_finish_manual">选择“粘贴”或“发送”时</string>
     <string name="dictation_finish_after_silence">静音 %1$d 秒后</string>
