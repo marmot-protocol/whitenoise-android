@@ -189,14 +189,25 @@ class PushTokenStore(
             (preferences.getLong(KEY_WAKE_RETRY_AT, 0L) - nowMs).takeIf { it in 1L..PUSH_WAKE_MAX_BACKOFF_MS } ?: 0L
         }
 
-    /** Reserves one actual native attempt durably before entering the shared catch-up lane. */
+    /** Reports whether durable attempt admission succeeded, was ineligible, or failed to persist. */
+    internal sealed interface PushWakeAttemptReservation {
+        data class Claimed(
+            val claim: PushWakeAttemptClaim,
+        ) : PushWakeAttemptReservation
+
+        data object Rejected : PushWakeAttemptReservation
+
+        data object PersistenceFailed : PushWakeAttemptReservation
+    }
+
+    /** Reserves one native attempt while keeping an ineligible wake distinct from a failed commit. */
     @SuppressLint("ApplySharedPref")
-    internal fun claimPushWakeAttempt(nowMs: Long): PushWakeAttemptClaim? =
+    internal fun reservePushWakeAttempt(nowMs: Long): PushWakeAttemptReservation =
         synchronized(LOCK) {
             val priorAttempts = pushWakeAttempts()
             val exhausted = priorAttempts >= PUSH_WAKE_MAX_ATTEMPTS
             if (!pushWakeCatchUpPending() || exhausted || pushWakeRetryDelay(nowMs) > 0L) {
-                return@synchronized null
+                return@synchronized PushWakeAttemptReservation.Rejected
             }
             val priorRetryAtMs = preferences.getLong(KEY_WAKE_RETRY_AT, 0L)
             val committed =
@@ -208,8 +219,16 @@ class PushTokenStore(
                             putLong(KEY_WAKE_RETRY_AT, nowMs + PUSH_WAKE_MAX_BACKOFF_MS)
                         }
                     }.commit()
-            PushWakeAttemptClaim(priorAttempts, priorRetryAtMs).takeIf { committed }
+            if (committed) {
+                PushWakeAttemptReservation.Claimed(PushWakeAttemptClaim(priorAttempts, priorRetryAtMs))
+            } else {
+                PushWakeAttemptReservation.PersistenceFailed
+            }
         }
+
+    /** Compatibility helper for callers that only need the reserved attempt, if any. */
+    internal fun claimPushWakeAttempt(nowMs: Long): PushWakeAttemptClaim? =
+        (reservePushWakeAttempt(nowMs) as? PushWakeAttemptReservation.Claimed)?.claim
 
     /** Restores the exact budget snapshot when lifecycle changed before the reserved native attempt began. */
     @SuppressLint("ApplySharedPref")

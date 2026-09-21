@@ -116,6 +116,35 @@ class PushWakeBookkeepingFailureTest {
             }
         }
 
+    /** A failed admission commit remains rejected while emitting its privacy-safe failure phase. */
+    @Test
+    fun failedAdmissionCommitIsRejectedAndDiagnosed() =
+        runBlocking {
+            val context: Application = RuntimeEnvironment.getApplication()
+            val preferences = context.getSharedPreferences("push-wake-failed-admission", Context.MODE_PRIVATE)
+            preferences.edit().clear().commit()
+            val baseStore = PushTokenStore(preferences)
+            try {
+                assertTrue(baseStore.recordPendingPushWakeCatchUp())
+                startDiagnostics()
+                val budget =
+                    PushWakeAttemptBudget(
+                        store = PushTokenStore(FailingAdmissionCommitPreferences(preferences)),
+                        storageDispatcher = Dispatchers.Unconfined,
+                        nowMs = { 1_000L },
+                    )
+
+                assertEquals(PushWakeAdmission.Rejected, budget.reserve())
+                assertTrue(baseStore.pushWakeCatchUpPending())
+                assertEquals(0, baseStore.pushWakeAttempts())
+                assertPersistenceFailureLogged()
+            } finally {
+                stopDiagnostics()
+                baseStore.clearPendingPushWakeCatchUp()
+                preferences.edit().clear().commit()
+            }
+        }
+
     /** A failed stale-identity restore is diagnosed without escaping non-cancellable settlement. */
     @Test
     fun failedStaleIdentityRestoreDoesNotThrow() =
@@ -212,6 +241,29 @@ class PushWakeBookkeepingFailureTest {
                 }
             }
         }
+
+    /** Rejects only the attempt-admission commit without mutating the backing preferences. */
+    private class FailingAdmissionCommitPreferences(
+        private val delegate: SharedPreferences,
+    ) : SharedPreferences by delegate {
+        override fun edit(): SharedPreferences.Editor {
+            val editor = delegate.edit()
+            return object : SharedPreferences.Editor by editor {
+                private var recordsAttempt = false
+
+                override fun putInt(
+                    key: String?,
+                    value: Int,
+                ): SharedPreferences.Editor {
+                    if (key == "push_wake_attempts") recordsAttempt = true
+                    editor.putInt(key, value)
+                    return this
+                }
+
+                override fun commit(): Boolean = if (recordsAttempt) false else editor.commit()
+            }
+        }
+    }
 
     /** Rejects only attempt completion while retaining the pending wake and claimed attempt. */
     private class FailingCompletionCommitPreferences(

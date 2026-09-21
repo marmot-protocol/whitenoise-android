@@ -465,7 +465,7 @@
     <string name="diagnostics">診斷</string>
     <string name="diagnostics_settings_subtitle">繼電器健康狀況和 MLS 內部結構</string>
     <string name="performance_logs">效能記錄</string>
-    <string name="performance_logs_description">暫時將保護隱私的計時事件寫入 Logcat。30 分鐘後或應用程式重新啟動時停止。</string>
+    <string name="performance_logs_description">暫時在此裝置上收集保護隱私的計時事件。30 分鐘後或應用程式重新啟動時停止。</string>
     <string name="performance_logs_active">已啟用 · 剩餘 %1$d 分鐘</string>
     <string name="performance_logs_inactive">未啟用</string>
     <string name="copy_performance_logs">複製效能記錄</string>

@@ -114,14 +114,17 @@ changes the delivery invariant during activation.
 
 ## Automated validation
 
-Final settled-source results:
+The broad checks below were completed before the latest admission-diagnostic and localization
+review fixes. Per maintainer direction, only directly related tests were rerun locally for those
+final changes; the hosted matrix is responsible for the full current-head gate.
 
 | Check | Result |
 | --- | --- |
-| Change-aware completion gate, `--visual none` for the final non-visual review fixes | PASS; final post-rebase run 2m 16s |
+| Change-aware completion gate, `--visual none` before the latest review fixes | PASS; post-rebase run 2m 16s; current-head rerun delegated to hosted CI |
 | Both debug variants and instrumentation compilation | PASS |
 | Formatting, static analysis, alternate-variant Android lint | PASS |
 | Final review-focused primary-variant tests | 114 passed, 0 failures/errors/skips; 11 suites |
+| Latest admission/store regressions | 44 passed, 0 failures/errors/skips; 2 suites |
 | Alternate-variant focused tests | 241 recovery-focused tests plus the 21-test affected ordering class passed separately; 0 failures/errors/skips |
 | Post-rebase CI regression set | PASS; 45 tests in each debug variant, 0 failures/errors/skips |
 | Full alternate variant | PASS; 9,169 tests, 0 failures/errors, 1 skipped; 5m 41s |
@@ -221,14 +224,15 @@ fast exit only; it does not measure energy impact.
 Those observations apply to the recorded 2026-09-20 candidate. Device and battery qualification
 was not repeated after the final 2026-09-21 master rebase, so it is not current-head evidence.
 
-The final post-review Dev APK was built for arm64 with SHA-256
+The most recent installed Dev APK was built for arm64 before the latest review fixes, with SHA-256
 `b9844f73af4e3e3eb5a5fbbe96b49f446ddb623d316c3a93f7ced15e4cb5503f`. It reports package
 `dev.ipf.whitenoise.android.dev`, version `2026.9.21-dev-debug`, version code 19, and arm64-v8a.
 This exact candidate was installed in place on Pixel `46131FDAS003CG` with `adb install -r -t`.
 The installed APK hash matches the candidate, the signing certificate and native library match
 the prior installation, the original first-install timestamp and three account records remain,
 and a cold launch resumed `MainActivity` without a fatal, migration, database, or startup error
-in the privacy-filtered log check. No app was uninstalled and no app data was cleared.
+in the privacy-filtered log check. No app was uninstalled and no app data was cleared. No APK was
+built or installed for the latest admission-diagnostic and localization-only review revision.
 
 A fresh private pre-install archive is retained at
 `/Users/mubarak/Workspace/marmot-protocol/pixel-fcm-recovery-20260921.X7NSnz`. The data archive
@@ -254,7 +258,7 @@ the preserved pre-install APK SHA-256 is
 ## Source and artifacts
 
 The source/test patch relative to the base revision is SHA-256
-`7a7338dd95767c16882970c75a0574427cfd120b5ef8dfe8af0e230753036281`.
+`b064fafd09a02bd03cd9b57bc5ac49cef8783d7f7a31eb5d3b7d13a7eaf4a283`.
 This hashes `git diff origin/master --binary -- app/src`. The native dependency remains unchanged.
 
 Final qualification APK hashes:

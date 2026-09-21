@@ -841,7 +841,7 @@
     <string name="notifications_are_off_detail">Attivale nelle impostazioni Android per usare queste opzioni.</string>
     <string name="delivery">Consegna</string>
     <string name="notification_delivery_push">Notifiche push</string>
-    <string name="notification_delivery_push_detail">Si attiva brevemente quando potrebbe esserci nuova attività, quindi controlla i messaggi in modo sicuro.</string>
+    <string name="notification_delivery_push_detail">L’app si riattiva brevemente quando potrebbe esserci nuova attività, quindi controlla i messaggi in modo sicuro.</string>
     <string name="notification_delivery_local_detail">Mantiene una connessione persistente mentre le notifiche sono abilitate.</string>
     <string name="notification_device_policy">Stato del dispositivo</string>
     <string name="notification_device_policy_detail">Le autorizzazioni e i criteri della batteria possono ritardare entrambe le modalità di consegna. Lo stato si aggiorna quando torni a questa schermata.</string>

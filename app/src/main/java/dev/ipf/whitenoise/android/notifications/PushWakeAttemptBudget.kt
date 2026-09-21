@@ -15,8 +15,15 @@ internal class PushWakeAttemptBudget(
             if (!store.pushWakeCatchUpPending()) {
                 PushWakeAdmission.Admitted(claim = null)
             } else {
-                store.claimPushWakeAttempt(nowMs())?.let(PushWakeAdmission::Admitted)
-                    ?: PushWakeAdmission.Rejected
+                when (val reservation = store.reservePushWakeAttempt(nowMs())) {
+                    is PushTokenStore.PushWakeAttemptReservation.Claimed ->
+                        PushWakeAdmission.Admitted(reservation.claim)
+                    PushTokenStore.PushWakeAttemptReservation.Rejected -> PushWakeAdmission.Rejected
+                    PushTokenStore.PushWakeAttemptReservation.PersistenceFailed -> {
+                        reportPersistenceFailure()
+                        PushWakeAdmission.Rejected
+                    }
+                }
             }
         }
 

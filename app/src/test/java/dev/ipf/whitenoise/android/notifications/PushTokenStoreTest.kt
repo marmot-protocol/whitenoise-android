@@ -64,7 +64,19 @@ class PushTokenStoreTest {
         val preferences = FakeSharedPreferences(ArrayDeque(listOf(true, false)))
         val store = PushTokenStore(preferences)
         assertTrue(store.recordPendingPushWakeCatchUp())
-        assertNull(store.claimPushWakeAttempt(1_000L))
+        assertEquals(
+            PushTokenStore.PushWakeAttemptReservation.PersistenceFailed,
+            store.reservePushWakeAttempt(1_000L),
+        )
+    }
+
+    /** A wake that cannot consume the bounded budget remains a normal rejection. */
+    @Test
+    fun wakeBudgetKeepsNormalRejectionDistinctFromPersistenceFailure() {
+        assertEquals(
+            PushTokenStore.PushWakeAttemptReservation.Rejected,
+            store().reservePushWakeAttempt(1_000L),
+        )
     }
 
     /** Losing acknowledgement can cause another fetch after restart but cannot report durable success. */
