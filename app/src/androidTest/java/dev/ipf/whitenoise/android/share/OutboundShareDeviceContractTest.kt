@@ -1,7 +1,12 @@
 package dev.ipf.whitenoise.android.share
 
+import android.app.Activity
 import android.content.ComponentName
 import android.content.Intent
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.os.ResultReceiver
 import android.provider.OpenableColumns
 import android.view.KeyEvent
 import androidx.core.content.FileProvider
@@ -16,17 +21,20 @@ import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.StagedMessageShareStreams
 import dev.ipf.whitenoise.android.ui.conversation.media.messageShareAttachmentSources
 import dev.ipf.whitenoise.android.ui.conversation.media.stageMessageShareStreams
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.security.MessageDigest
 
 @RunWith(AndroidJUnit4::class)
 class OutboundShareDeviceContractTest {
-    /** An external receiver reads and decodes only the generated stream explicitly granted to it. */
+    /** An external receiver reads exactly the generated stream explicitly granted to it. */
     @Test
     fun generatedQrCardIsReadableButItsCacheNeighborIsNot() =
         runBlocking {
@@ -46,27 +54,46 @@ class OutboundShareDeviceContractTest {
                     ),
                 )
             val neighborUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", neighbor)
-            val results = externalContext.getSharedPreferences(OutboundShareTestTargetActivity.RESULTS, 0)
-            results.edit().clear().commit()
+            val expectedStreamSha256 = sha256(staged.file.readBytes())
+            val result = CompletableDeferred<Pair<Int, Bundle?>>()
+            val receiver =
+                object : ResultReceiver(Handler(Looper.getMainLooper())) {
+                    override fun onReceiveResult(
+                        resultCode: Int,
+                        resultData: Bundle?,
+                    ) {
+                        result.complete(resultCode to resultData)
+                    }
+                }
             try {
                 val share =
                     outboundShareIntent("https://example.test/profile", listOf(staged.stream))
                         .setComponent(ComponentName(externalContext, OutboundShareTestTargetActivity::class.java))
                         .putExtra(OutboundShareTestTargetActivity.EXTRA_NEIGHBOR_URI, neighborUri.toString())
+                        .putExtra(OutboundShareTestTargetActivity.EXTRA_RESULT_RECEIVER, receiver)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
                 context.startActivity(share)
-                instrumentation.waitForIdleSync()
+                val (resultCode, resultData) = withTimeout(10_000) { result.await() }
 
-                assertTrue(results.getBoolean(OutboundShareTestTargetActivity.KEY_COMPLETE, false))
-                assertEquals(payload, results.getString(OutboundShareTestTargetActivity.KEY_DECODED_QR, null))
-                assertFalse(results.getBoolean(OutboundShareTestTargetActivity.KEY_NEIGHBOR_READABLE, true))
+                assertEquals(Activity.RESULT_OK, resultCode)
+                assertEquals(
+                    expectedStreamSha256,
+                    resultData?.getString(OutboundShareTestTargetActivity.KEY_STREAM_SHA256),
+                )
+                assertFalse(resultData?.getBoolean(OutboundShareTestTargetActivity.KEY_NEIGHBOR_READABLE, true) ?: true)
             } finally {
                 staged.file.delete()
                 neighbor.delete()
-                results.edit().clear().commit()
             }
         }
+
+    /** Produces a stable digest for comparing the staged file with the bytes read by the receiver. */
+    private fun sha256(bytes: ByteArray): String =
+        MessageDigest
+            .getInstance("SHA-256")
+            .digest(bytes)
+            .joinToString("") { byte -> "%02x".format(byte) }
 
     /** A receiving app reads each staged attachment by its own sanitized name, never by the cache file's. */
     @Test
