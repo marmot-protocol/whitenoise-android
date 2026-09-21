@@ -10,6 +10,7 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.updateQuickAccountSwitching
 import dev.ipf.whitenoise.android.ui.chats.ChatListTopBar
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -19,7 +20,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** Actual Chats avatar and sheet route wiring retains direct Settings and the existing Add Identity owner. */
+/** With quick switching off, Chats retains the full selector, Settings, and existing Add Identity owner. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
 class ChatsProfileSwitcherFlowTest {
@@ -70,6 +71,7 @@ class ChatsProfileSwitcherFlowTest {
                 profileRefreshRequest = {},
                 preferences = prefs,
             )
+        app.updateQuickAccountSwitching(false)
         composeRule.setContent {
             WhiteNoiseTheme {
                 ChatListTopBar(

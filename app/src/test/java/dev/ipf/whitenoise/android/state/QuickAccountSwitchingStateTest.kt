@@ -12,7 +12,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Which accounts the chat list offers beside the active avatar, and the scope of the opt-in that reveals them.
+ * Which accounts the chat list offers beside the active avatar, and the scope of the preference that reveals them.
  *
  * The order is the stable native one, deliberately independent of the selector's active-first presentation.
  */
@@ -47,8 +47,8 @@ class QuickAccountSwitchingStateTest {
         assertEquals(listOf(C), quickSwitchAccounts(listOf(A, B, C), A.label, true) { it.label != B.label })
     }
 
-    /** The explicit app-wide value survives new account owners and sign-out; clearing app preferences resets it. */
-    @Test fun preferenceDefaultsOffPersistsAcrossAccountsAndResetsWithErase() {
+    /** The default is on; explicit choices survive owners/sign-out until app preferences are erased. */
+    @Test fun preferenceDefaultsOnAndExplicitOffPersistsUntilErase() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val preferences = context.getSharedPreferences("quick-switch-preference-test", Context.MODE_PRIVATE)
         preferences.edit().clear().commit()
@@ -66,13 +66,19 @@ class QuickAccountSwitchingStateTest {
             preferences = preferences,
         )
         val first = state(listOf(A, B), A.label)
-        assertFalse(first.quickAccountSwitching)
-        first.updateQuickAccountSwitching(true)
+        assertTrue(first.quickAccountSwitching)
+        first.updateQuickAccountSwitching(false)
         assertEquals(A.label, first.activeAccountRef)
+        assertFalse(state(listOf(A, B, C), C.label).quickAccountSwitching)
+        assertFalse(state(listOf(A.copy(signedOut = true), B), B.label).quickAccountSwitching)
+
+        val reenabled = state(listOf(A, B), A.label)
+        reenabled.updateQuickAccountSwitching(true)
         assertTrue(state(listOf(A, B, C), C.label).quickAccountSwitching)
-        assertTrue(state(listOf(A.copy(signedOut = true), B), B.label).quickAccountSwitching)
+
+        reenabled.updateQuickAccountSwitching(false)
         preferences.edit().clear().commit()
-        assertFalse(state(listOf(A, B), A.label).quickAccountSwitching)
+        assertTrue(state(listOf(A, B), A.label).quickAccountSwitching)
     }
 
     /** Destructive transitions empty the row and reject a switch before a native request can start. */
