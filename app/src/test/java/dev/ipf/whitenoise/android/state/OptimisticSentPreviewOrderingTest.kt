@@ -174,12 +174,20 @@ class OptimisticSentPreviewOrderingTest {
         controller.rollbackOptimisticSentPreview("chat-b", "temp-b")
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(20))
         assertEquals(
-            "message-chat-b",
+            "unrelated-confirmed-b",
             controller.items
                 .single()
                 .projection
                 ?.lastMessage
                 ?.messageIdHex,
+        )
+        assertEquals(
+            ChatListMessageDeliveryStateFfi.DELIVERED,
+            controller.items
+                .single()
+                .projection
+                ?.lastMessage
+                ?.deliveryState,
         )
     }
 

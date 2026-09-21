@@ -3974,10 +3974,14 @@ class ChatsController private constructor(
         val rowKey = chatRowKey(groupIdHex)
         val state = optimisticChatListPreviewByGroup[rowKey].takeIf { accountRef != null } ?: return
         val removedReservation = state.reservedActivitySequenceById.remove(optimisticMessageIdHex) != null
-        val removedEntry = state.entries.remove(optimisticMessageIdHex) != null
+        val removedEntry = state.entries.remove(optimisticMessageIdHex)
         val removedFallback = state.failedFallbackEntry?.preview?.messageIdHex == optimisticMessageIdHex
         if (removedFallback) state.failedFallbackEntry = null
-        if (!removedReservation && !removedEntry && !removedFallback) return
+        if (!removedReservation && removedEntry == null && !removedFallback) return
+        removedEntry
+            ?.pendingAuthoritativeRow
+            ?.takeIf { row -> row.lastMessage?.deliveryState == ChatListMessageDeliveryStateFfi.DELIVERED }
+            ?.let { row -> foldOptimisticChatListBaseline(state, row) }
         materializeOptimisticChatListPreview(rowKey, state)
         scheduleRecompute()
     }

@@ -6,9 +6,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.LayoutDirection
@@ -19,6 +21,7 @@ import dev.ipf.marmotkit.ChatListDraftPreviewFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.SelectedChatPreviewFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -64,6 +67,30 @@ class ChatRowsPortScreenshotTest {
         }
         composeRule.onNodeWithText(ChatRowPortFixtures.PREVIEW).assertDoesNotExist()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/chat_row_expired_selected_preview.png")
+    }
+
+    /** The accepted-pending chat-list row replaces its sending clock with the delivered check. */
+    @Test
+    fun acceptedPendingRowTransitionsFromSendingToSent() {
+        val state = ChatRowPortFixtures.state(context)
+        val row = mutableStateOf(ChatRowPortFixtures.item(delivery = ChatListMessageDeliveryStateFfi.PENDING))
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                Surface(Modifier.fillMaxSize()) {
+                    Column {
+                        ChatRow(item = row.value, appState = state, onClick = {}, onOpenProfile = {})
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithContentDescription(context.getString(R.string.sending)).assertExists()
+        composeRule.runOnIdle {
+            row.value = ChatRowPortFixtures.item(delivery = ChatListMessageDeliveryStateFfi.DELIVERED)
+        }
+        composeRule.onNodeWithContentDescription(context.getString(R.string.sending)).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.sent)).assertExists()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/chat_row_accepted_pending_delivered_light.png")
     }
 
     /** Rows light. */
