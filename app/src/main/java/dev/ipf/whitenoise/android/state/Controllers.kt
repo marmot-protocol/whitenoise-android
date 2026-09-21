@@ -689,55 +689,6 @@ data class TimelineMessage(
 )
 
 /**
- * Whether two timeline records would render the same bubble. Ephemeral
- * observation/order timestamps are deliberately ignored, while every
- * user-visible projection — including typed media — participates.
- */
-internal fun timelineRecordsRenderEqual(
-    a: TimelineMessageRecordFfi,
-    b: TimelineMessageRecordFfi,
-): Boolean = timelineRecordEnvelopeEqual(a, b) && timelineRecordContentEqual(a, b)
-
-private fun timelineRecordEnvelopeEqual(
-    a: TimelineMessageRecordFfi,
-    b: TimelineMessageRecordFfi,
-): Boolean =
-    a.messageIdHex == b.messageIdHex &&
-        a.sourceMessageIdHex == b.sourceMessageIdHex &&
-        a.clientToken == b.clientToken &&
-        a.direction == b.direction &&
-        a.groupIdHex == b.groupIdHex &&
-        a.sender == b.sender &&
-        a.kind == b.kind
-
-private fun timelineRecordContentEqual(
-    a: TimelineMessageRecordFfi,
-    b: TimelineMessageRecordFfi,
-): Boolean =
-    a.plaintext == b.plaintext &&
-        markdownDocumentsRenderEqual(a.contentTokens, b.contentTokens) &&
-        a.tags == b.tags &&
-        a.replyToMessageIdHex == b.replyToMessageIdHex &&
-        a.replyPreview == b.replyPreview &&
-        a.mediaJson == b.mediaJson &&
-        a.media == b.media &&
-        a.agentTextStreamJson == b.agentTextStreamJson &&
-        a.deleted == b.deleted &&
-        a.deletedByMessageIdHex == b.deletedByMessageIdHex &&
-        a.invalidationStatus == b.invalidationStatus &&
-        a.retentionSeconds == b.retentionSeconds &&
-        a.retentionExpiresAt == b.retentionExpiresAt &&
-        a.reactions == b.reactions
-
-private fun markdownDocumentsRenderEqual(
-    a: MarkdownDocumentFfi,
-    b: MarkdownDocumentFfi,
-): Boolean =
-    a.truncated == b.truncated &&
-        a.blocks == b.blocks &&
-        a.blankLinesBefore.contentEquals(b.blankLinesBefore)
-
-/**
  * Local optimistic state for an in-flight edit of one's own message: the new
  * body to display immediately and whether the kind-1009 publish is still
  * [MessageStatus.Pending] or has [MessageStatus.Failed]. [preEditText] is the
