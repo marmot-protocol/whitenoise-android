@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -259,7 +260,11 @@ private fun TtsTransportProgress(
                 isPreparing -> Text(stringResource(R.string.tts_bar_preparing))
                 remainingSeconds != null ->
                     Text(
-                        stringResource(R.string.tts_bar_seconds_remaining, remainingSeconds),
+                        pluralStringResource(
+                            R.plurals.tts_bar_seconds_remaining,
+                            remainingSeconds,
+                            remainingSeconds,
+                        ),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

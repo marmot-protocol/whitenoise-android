@@ -1431,7 +1431,9 @@
     <string name="tts_bar_previous_message">上一条消息</string>
     <string name="tts_bar_next_message">下一条消息</string>
     <string name="tts_bar_progress">第 %1$d/%2$d 句，第 %3$d/%4$d 条消息</string>
-    <string name="tts_bar_seconds_remaining">约剩 %1$d 秒</string>
+    <plurals name="tts_bar_seconds_remaining">
+        <item quantity="other">约剩 %1$d 秒</item>
+    </plurals>
     <string name="tts_bar_stop">停止朗读</string>
     <string name="tts_bar_return_to_source">返回正在朗读的消息</string>
     <string name="tts_source_unavailable">正在朗读的消息已不可用</string>

@@ -1455,7 +1455,10 @@
     <string name="tts_bar_previous_message">Mensagem anterior</string>
     <string name="tts_bar_next_message">Próxima mensagem</string>
     <string name="tts_bar_progress">Frase %1$d de %2$d, mensagem %3$d de %4$d</string>
-    <string name="tts_bar_seconds_remaining">~%1$d s restantes</string>
+    <plurals name="tts_bar_seconds_remaining">
+        <item quantity="one">~%1$d s restante</item>
+        <item quantity="other">~%1$d s restantes</item>
+    </plurals>
     <string name="tts_bar_stop">Parar leitura</string>
     <string name="tts_bar_return_to_source">Voltar à mensagem lida</string>
     <string name="tts_source_unavailable">A mensagem lida já não está disponível</string>

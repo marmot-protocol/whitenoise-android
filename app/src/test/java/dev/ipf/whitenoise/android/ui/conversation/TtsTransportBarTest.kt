@@ -119,7 +119,9 @@ class TtsTransportBarTest {
 
         composeRule.onNodeWithText("Preview").assertDoesNotExist()
         composeRule.onNodeWithText(app.getString(R.string.tts_bar_progress, 3, 8, 2, 12)).assertDoesNotExist()
-        composeRule.onNodeWithText(app.getString(R.string.tts_bar_seconds_remaining, 12)).assertIsDisplayed()
+        composeRule
+            .onNodeWithText(app.resources.getQuantityString(R.plurals.tts_bar_seconds_remaining, 12, 12))
+            .assertIsDisplayed()
     }
 
     @Test
@@ -141,7 +143,9 @@ class TtsTransportBarTest {
         composeRule
             .onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo))
             .assertCountEquals(0)
-        composeRule.onNodeWithText(app.getString(R.string.tts_bar_seconds_remaining, 12)).assertIsDisplayed()
+        composeRule
+            .onNodeWithText(app.resources.getQuantityString(R.plurals.tts_bar_seconds_remaining, 12, 12))
+            .assertIsDisplayed()
     }
 
     /** Paused state offers play without losing navigation. */

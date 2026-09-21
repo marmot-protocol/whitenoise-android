@@ -179,8 +179,17 @@ class TtsController internal constructor(
     fun estimatedMessageRemainingSeconds(): Int? =
         queue.estimatedMessageRemainingSeconds(
             pace.msPerUnitAt1x,
-            speechRate(),
+            audibleSpeechRate(),
         )
+
+    /**
+     * The rate the audible utterance actually started at. A rate change only re-queues pending
+     * chunks at the next boundary, so the sentence being spoken keeps the rate it was enqueued
+     * with — reading the requested rate here would shorten the estimate before playback speeds
+     * up. With nothing audible, after a pause or a re-queue, the requested rate is the one the
+     * next chunk will use.
+     */
+    private fun audibleSpeechRate(): Float = activeTiming?.rate ?: speechRate()
 
     private val preparationRequests =
         dev.ipf.whitenoise.android.state
