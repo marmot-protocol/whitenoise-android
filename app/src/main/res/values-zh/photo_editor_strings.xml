@@ -73,6 +73,6 @@
     <string name="photo_editor_apply">应用</string>
     <string name="photo_editor_keep_editing">继续编辑</string>
     <string name="photo_editor_quality_low">低</string>
-    <string name="photo_editor_quality_explanation">照片的位置信息和可识别的元数据会被移除。“原图”保留受支持的图像数据，其他格式会被安全地重新编码。视频和文件保留原始数据。</string>
+    <string name="photo_editor_quality_explanation">照片的位置和设备信息始终会被移除。“原图”会在格式允许时保留图像数据，其他格式则会重新编码。视频和文件按原样发送。</string>
     <string name="photo_editor_original_edited">编辑后的照片使用高质量。原始图像会保留以供继续编辑。</string>
 </resources>

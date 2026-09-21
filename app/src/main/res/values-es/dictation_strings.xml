@@ -6,7 +6,7 @@
     <string name="notification_channel_dictation">Dictado</string>
     <string name="notification_channel_dictation_description">Controla una sesión de dictado activa en el compositor</string>
     <string name="dictation_settings_title">Dictado</string>
-    <string name="dictation_settings_explainer">White Noise usa un servicio de reconocimiento de voz instalado. Ese servicio procesa el audio; White Noise solo conserva en memoria el texto devuelto hasta que se pega o se envía.</string>
+    <string name="dictation_settings_explainer">El servicio de voz instalado en este dispositivo procesa el audio y puede enviarlo a su proveedor. White Noise conserva el texto que devuelve solo hasta que lo pegas o lo envías.</string>
     <string name="dictation_ostt_recommendation_title">Obtener Offline Speech to Text</string>
     <string name="dictation_ostt_recommendation_summary">Aplicación de transcripción recomendada para el dictado privado en el dispositivo. Disponible en Zapstore, no en Google Play.</string>
     <string name="dictation_ostt_recommendation_open_failed">No se pudo abrir la página de Offline Speech to Text en Zapstore.</string>
@@ -17,6 +17,6 @@
     <string name="dictation_result_paste">Pegar en el borrador</string>
     <string name="dictation_result_paste_description">Revisar o editar el texto antes de enviarlo</string>
     <string name="dictation_result_send">Enviar mensaje</string>
-    <string name="dictation_result_send_description">Enviar solo si el chat y el borrador originales no han cambiado</string>
-    <string name="dictation_send_safety_note">El envío falla de forma segura: si cambian el borrador original, los miembros o la sesión, White Noise conserva la transcripción para revisarla en vez de enviarla.</string>
+    <string name="dictation_result_send_description">Solo se envía si el chat y el borrador no han cambiado</string>
+    <string name="dictation_send_safety_note">Si el chat o el borrador cambian antes de que se envíe el mensaje, el texto se queda en tu borrador para que puedas revisarlo.</string>
 </resources>

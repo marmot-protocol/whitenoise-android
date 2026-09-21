@@ -6,7 +6,7 @@
     <string name="notification_channel_dictation">Dettatura</string>
     <string name="notification_channel_dictation_description">Gestisce una sessione di dettatura attiva nel compositore</string>
     <string name="dictation_settings_title">Dettatura</string>
-    <string name="dictation_settings_explainer">White Noise usa un servizio di riconoscimento vocale installato. Il servizio elabora l’audio; White Noise conserva in memoria solo il testo restituito finché non viene incollato o inviato.</string>
+    <string name="dictation_settings_explainer">Il servizio vocale installato su questo dispositivo elabora l’audio e può inviarlo al proprio fornitore. White Noise conserva il testo restituito solo finché non lo incolli o lo invii.</string>
     <string name="dictation_ostt_recommendation_title">Ottieni Offline Speech to Text</string>
     <string name="dictation_ostt_recommendation_summary">App di trascrizione consigliata per la dettatura privata sul dispositivo. Disponibile su Zapstore, non su Google Play.</string>
     <string name="dictation_ostt_recommendation_open_failed">Impossibile aprire la pagina di Offline Speech to Text su Zapstore.</string>
@@ -17,6 +17,6 @@
     <string name="dictation_result_paste">Incolla nella bozza</string>
     <string name="dictation_result_paste_description">Controlla o modifica il testo prima di inviarlo</string>
     <string name="dictation_result_send">Invia messaggio</string>
-    <string name="dictation_result_send_description">Invia solo se la chat e la bozza originali non sono cambiate</string>
-    <string name="dictation_send_safety_note">L’invio si interrompe in sicurezza: se la bozza originale, i membri o la sessione cambiano, White Noise conserva la trascrizione per la revisione invece di inviarla.</string>
+    <string name="dictation_result_send_description">Invia solo se la chat e la bozza non sono cambiate</string>
+    <string name="dictation_send_safety_note">Se la chat o la bozza cambiano prima dell’invio del messaggio, il testo resta nella bozza così puoi controllarlo.</string>
 </resources>
