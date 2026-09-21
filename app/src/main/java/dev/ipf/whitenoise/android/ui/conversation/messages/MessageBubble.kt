@@ -169,17 +169,21 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-/** Draws semantic highlight or monochrome directional borders; saved colours only affect non-AMOLED fills. */
+/** Draws semantic, saved-colour, or directional AMOLED borders in that precedence order. */
 @Composable
 internal fun messageBubbleBorder(
     highlighted: Boolean,
     mine: Boolean,
     persistedFailure: Boolean = false,
+    customBorderArgb: Long? = null,
+    mentionAccentArgb: Long? = null,
 ): BorderStroke? {
     val amoledAccent = amoledDirectionalAccentColor(mine)
     return when {
         persistedFailure -> null
         highlighted -> BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary)
+        mentionAccentArgb != null && amoledAccent != null -> BorderStroke(2.dp, colorFromArgb(mentionAccentArgb))
+        customBorderArgb != null && amoledAccent != null -> BorderStroke(2.dp, colorFromArgb(customBorderArgb))
         amoledAccent != null -> BorderStroke(2.dp, amoledAccent)
         else -> null
     }

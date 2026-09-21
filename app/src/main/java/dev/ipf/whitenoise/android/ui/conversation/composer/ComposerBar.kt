@@ -1146,7 +1146,18 @@ internal fun ComposerBar(
                                 if (editingMessageId == null) attachmentContent?.invoke()
                                 if (editingMessageId != null || replyingTo != null) {
                                     Box(
-                                        Modifier.padding(8.dp).clip(MaterialTheme.shapes.large),
+                                        // The accessory owns its shape. A second outer clip with a different
+                                        // radius trims the AMOLED reply outline at all four corners. The edit
+                                        // row keeps the existing wrapper clip because it uses the same shape.
+                                        Modifier
+                                            .padding(8.dp)
+                                            .then(
+                                                if (editingMessageId != null) {
+                                                    Modifier.clip(MaterialTheme.shapes.large)
+                                                } else {
+                                                    Modifier
+                                                },
+                                            ),
                                     ) {
                                         if (editingMessageId != null) {
                                             Row(

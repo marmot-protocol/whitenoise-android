@@ -120,10 +120,53 @@ class ChatBubbleColorsScreenBehaviorTest {
         }
     }
 
-    /** Renders the editor in the light theme for the account defaults or one chat, counting Back calls. */
-    private fun show(groupIdHex: String? = null) {
+    /** AMOLED exposes the same editor and saves its choices in the theme-specific account defaults. */
+    @Test
+    fun amoledEditorSavesOutlineColors() {
+        appState.updateThemeMode(AppThemeMode.Amoled)
+        show(darkTheme = true, amoled = true)
+
+        composeRule.onNodeWithText("Their message").assertExists()
+        composeRule.onNodeWithText("Your message").assertExists()
+        composeRule.onNodeWithText("AMOLED action buttons use fixed white", substring = true).assertDoesNotExist()
+        composeRule.onNode(swatch("#B91C1C", "mine")).performScrollTo().performClick()
+        composeRule.onNodeWithTag("bubble_colors.save").assertIsEnabled().performClick()
+
+        composeRule.runOnIdle {
+            assertEquals(0xFFB91C1CL, appState.globalBubbleColorArgb(BubbleTheme.Amoled, BubbleSide.Mine))
+            assertEquals(1, backCount)
+        }
+    }
+
+    /** An AMOLED chat override inherits account outlines and Reset removes only the chat values. */
+    @Test
+    fun amoledChatOverrideInheritsAndResetsToAccountOutlines() {
+        appState.updateThemeMode(AppThemeMode.Amoled)
+        appState.updateGlobalBubbleColor(BubbleTheme.Amoled, BubbleSide.Mine, 0xFFB91C1CL)
+        appState.updateChatBubbleColor("group-1", BubbleSide.Other, 0xFF15803DL)
+        show(groupIdHex = "group-1", darkTheme = true, amoled = true)
+
+        composeRule.onNode(swatch("#B91C1C", "mine")).assertIsSelected()
+        composeRule.onNode(swatch("#15803D", "other")).assertIsSelected()
+        composeRule.onNodeWithTag("bubble_colors.menu").performClick()
+        composeRule.onNodeWithText("Reset to global colors").performClick()
+        composeRule.onNodeWithTag("bubble_colors.save").assertIsEnabled().performClick()
+
+        composeRule.runOnIdle {
+            assertNull(appState.chatBubbleColorArgb("group-1", BubbleSide.Mine))
+            assertNull(appState.chatBubbleColorArgb("group-1", BubbleSide.Other))
+            assertEquals(0xFFB91C1CL, appState.globalBubbleColorArgb(BubbleTheme.Amoled, BubbleSide.Mine))
+        }
+    }
+
+    /** Renders the editor for the account defaults or one chat, counting Back calls. */
+    private fun show(
+        groupIdHex: String? = null,
+        darkTheme: Boolean = false,
+        amoled: Boolean = false,
+    ) {
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = false) {
+            WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
                 ChatBubbleColorsScreen(appState = appState, onBack = { backCount++ }, groupIdHex = groupIdHex)
             }
         }

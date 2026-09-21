@@ -167,6 +167,10 @@ class ReplyPreviewCardTest {
     @Test
     fun replyAccessoryDark() = renderAccessory("reply_accessory_dark", dark = true)
 
+    /** AMOLED quote geometry keeps one continuous rounded outline around all four corners. */
+    @Test
+    fun replyAccessoryAmoled() = renderAccessory("reply_accessory_amoled", dark = true, amoled = true)
+
     /** Long unavailable/warning text and logical trailing dismissal remain reachable in RTL. */
     @Test
     fun replyAccessoryLargeRtl() = renderAccessory("reply_accessory_large_rtl", rtl = true, scale = 2f)
@@ -175,6 +179,7 @@ class ReplyPreviewCardTest {
     private fun renderAccessory(
         name: String,
         dark: Boolean = false,
+        amoled: Boolean = false,
         rtl: Boolean = false,
         scale: Float = 1f,
     ) {
@@ -182,7 +187,7 @@ class ReplyPreviewCardTest {
         val direction = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
         val excerpt = "A reply excerpt with enough words to occupy two lines without losing the original content."
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = dark, fontScale = scale) {
+            WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = scale) {
                 CompositionLocalProvider(LocalLayoutDirection provides direction) {
                     Column(Modifier.width(300.dp).testTag("reply-fixture")) {
                         ReplyPreviewCard(

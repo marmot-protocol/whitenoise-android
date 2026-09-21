@@ -42,6 +42,10 @@ class ChatBubbleColorsPreviewScreenshotTest {
     @Test
     fun chatBubbleColorsScreenLight() = capture(AppThemeMode.Light, "chat_bubble_colors_screen_light.png")
 
+    /** AMOLED editor previews saved colours as outlines around pure-black bubbles. */
+    @Test
+    fun chatBubbleColorsScreenAmoled() = capture(AppThemeMode.Amoled, "chat_bubble_colors_screen_amoled.png")
+
     /** Renders the editor, checks the preview order and records the window. */
     private fun capture(
         mode: AppThemeMode,
@@ -49,7 +53,10 @@ class ChatBubbleColorsPreviewScreenshotTest {
     ) {
         val appState = testAppState(mode)
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = mode == AppThemeMode.Dark) {
+            WhiteNoiseTheme(
+                darkTheme = mode != AppThemeMode.Light,
+                amoled = mode == AppThemeMode.Amoled,
+            ) {
                 ChatBubbleColorsScreen(appState = appState, onBack = {})
             }
         }
@@ -79,7 +86,12 @@ class ChatBubbleColorsPreviewScreenshotTest {
             activeAccountRef = ACCOUNT_REF,
         ).also {
             it.updateThemeMode(mode)
-            val theme = if (mode == AppThemeMode.Dark) BubbleTheme.Dark else BubbleTheme.Light
+            val theme =
+                when (mode) {
+                    AppThemeMode.Dark -> BubbleTheme.Dark
+                    AppThemeMode.Amoled -> BubbleTheme.Amoled
+                    else -> BubbleTheme.Light
+                }
             it.updateGlobalBubbleColor(theme, BubbleSide.Mine, SAVED_MINE)
         }
 

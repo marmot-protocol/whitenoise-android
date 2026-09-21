@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -49,6 +50,7 @@ internal fun MessageBubbleFrame(
     shape: Shape = MaterialTheme.shapes.large,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val amoled = isAmoledSurfaceTheme()
     val highlightProgress =
         animateFloatAsState(
             targetValue = if (highlighted) 1f else 0f,
@@ -72,7 +74,7 @@ internal fun MessageBubbleFrame(
             mentionedSelf = mentionedSelf,
             mentionedYouLabel = mentionedYouLabel,
             accentArgb = presentation.mentionAccentArgb,
-            integratedWithBorder = isAmoledSurfaceTheme(),
+            integratedWithBorder = amoled,
         )
 
     Surface(
@@ -80,12 +82,7 @@ internal fun MessageBubbleFrame(
         color = colorFromArgb(presentation.backgroundArgb),
         contentColor = colorFromArgb(presentation.contentArgb),
         shape = shape,
-        border =
-            messageBubbleBorder(
-                highlighted = false,
-                mine = mine,
-                persistedFailure = presentation.suppressBorder,
-            ),
+        border = messageFrameBorder(presentation, mine, mentionedSelf, amoled),
     ) {
         Column(
             modifier = bubbleContentModifier(contentModifier),
@@ -117,6 +114,7 @@ internal fun MediaCaptionFrame(
     media: @Composable ColumnScope.() -> Unit,
     caption: @Composable ColumnScope.() -> Unit,
 ) {
+    val amoled = isAmoledSurfaceTheme()
     val highlightProgress =
         animateFloatAsState(
             targetValue = if (highlighted) 1f else 0f,
@@ -140,7 +138,7 @@ internal fun MediaCaptionFrame(
             mentionedSelf = mentionedSelf,
             mentionedYouLabel = mentionedYouLabel,
             accentArgb = presentation.mentionAccentArgb,
-            integratedWithBorder = isAmoledSurfaceTheme(),
+            integratedWithBorder = amoled,
         )
 
     Surface(
@@ -148,12 +146,7 @@ internal fun MediaCaptionFrame(
         color = colorFromArgb(presentation.backgroundArgb),
         contentColor = colorFromArgb(presentation.contentArgb),
         shape = shape,
-        border =
-            messageBubbleBorder(
-                highlighted = false,
-                mine = mine,
-                persistedFailure = presentation.suppressBorder,
-            ),
+        border = messageFrameBorder(presentation, mine, mentionedSelf, amoled),
     ) {
         MediaSupplementEnvelope(
             alignEnd = alignEnd,
@@ -235,6 +228,22 @@ private enum class MediaEnvelopeSlot {
 
 private val bubbleContentArrangement = Arrangement.spacedBy(6.dp)
 
+/** Resolves the one visible border owned by a plain or media message frame. */
+@Composable
+private fun messageFrameBorder(
+    presentation: BubblePresentation,
+    mine: Boolean,
+    mentionedSelf: Boolean,
+    amoled: Boolean,
+): BorderStroke? =
+    messageBubbleBorder(
+        highlighted = false,
+        mine = mine,
+        persistedFailure = presentation.suppressBorder,
+        customBorderArgb = presentation.borderOverrideArgb,
+        mentionAccentArgb = presentation.mentionAccentArgb.takeIf { mentionedSelf && amoled },
+    )
+
 /** Content insets inside the bubble frame. */
 private fun bubbleContentModifier(contentModifier: Modifier): Modifier =
     contentModifier
@@ -298,24 +307,29 @@ private fun messageTargetHighlightModifier(
         Modifier
     }
 
+/** Adds mention semantics and draws the rail only when the bubble border does not own the highlight. */
 private fun messageMentionFrameModifier(
     mentionedSelf: Boolean,
     mentionedYouLabel: String,
     accentArgb: Long,
     integratedWithBorder: Boolean,
 ): Modifier =
-    if (mentionedSelf) {
+    if (!mentionedSelf) {
         Modifier
-            .semantics { contentDescription = mentionedYouLabel }
-            .drawWithCache {
+    } else {
+        val semanticModifier = Modifier.semantics { contentDescription = mentionedYouLabel }
+        if (integratedWithBorder) {
+            semanticModifier
+        } else {
+            semanticModifier.drawWithCache {
                 val railWidth = 3.dp.toPx()
                 val bounds =
                     messageMentionRailBounds(
                         frameSize = size,
                         layoutDirection = layoutDirection,
                         railWidth = railWidth,
-                        edgeInset = if (integratedWithBorder) 1.dp.toPx() else 4.dp.toPx(),
-                        verticalInset = if (integratedWithBorder) 14.dp.toPx() else 4.dp.toPx(),
+                        edgeInset = 4.dp.toPx(),
+                        verticalInset = 4.dp.toPx(),
                     )
                 val railColor = colorFromArgb(accentArgb)
                 onDrawWithContent {
@@ -328,8 +342,7 @@ private fun messageMentionFrameModifier(
                     )
                 }
             }
-    } else {
-        Modifier
+        }
     }
 
 internal fun messageMentionRailBounds(

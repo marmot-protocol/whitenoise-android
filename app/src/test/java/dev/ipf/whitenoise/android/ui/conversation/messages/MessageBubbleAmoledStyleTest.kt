@@ -94,13 +94,15 @@ class MessageBubbleAmoledStyleTest {
         }
     }
 
-    /** Amoled custom color keeps monochrome directional bubble border. */
+    /** AMOLED keeps a black fill while applying each saved colour to the complete bubble border. */
     @Test
-    fun amoledCustomColorKeepsMonochromeDirectionalBubbleBorder() {
-        val customArgb = 0xFF336699L
+    fun amoledCustomColorPaintsTheBubbleBorder() {
+        val sentCustomArgb = 0xFF336699L
+        val receivedCustomArgb = 0xFFCC7722L
         var backgroundArgb = 0L
         var contentArgb = 0L
         var expectedContentArgb = 0L
+        var borderOverrideArgb: Long? = null
         var sentBorder: BorderStroke? = null
         var receivedBorder: BorderStroke? = null
 
@@ -110,7 +112,7 @@ class MessageBubbleAmoledStyleTest {
                     messageBubblePresentation(
                         deleted = false,
                         mine = true,
-                        customArgb = customArgb,
+                        customArgb = sentCustomArgb,
                     )
                 val expectedContent =
                     MaterialTheme.colorScheme.onSurfaceVariant
@@ -120,17 +122,20 @@ class MessageBubbleAmoledStyleTest {
                     messageBubbleBorder(
                         highlighted = false,
                         mine = true,
+                        customBorderArgb = presentation.borderOverrideArgb,
                     )
                 val received =
                     messageBubbleBorder(
                         highlighted = false,
                         mine = false,
+                        customBorderArgb = receivedCustomArgb,
                     )
 
                 SideEffect {
                     backgroundArgb = presentation.backgroundArgb
                     contentArgb = presentation.contentArgb
                     expectedContentArgb = expectedContent
+                    borderOverrideArgb = presentation.borderOverrideArgb
                     sentBorder = sent
                     receivedBorder = received
                 }
@@ -140,10 +145,37 @@ class MessageBubbleAmoledStyleTest {
         composeRule.runOnIdle {
             assertEquals(OPAQUE_BLACK_ARGB, backgroundArgb)
             assertEquals(expectedContentArgb, contentArgb)
+            assertEquals(sentCustomArgb, borderOverrideArgb)
             assertEquals(2.dp, requireNotNull(sentBorder).width)
             assertEquals(2.dp, requireNotNull(receivedBorder).width)
-            assertEquals(Color.White, borderColor(sentBorder))
-            assertEquals(Color.White.copy(alpha = 0.7f), borderColor(receivedBorder))
+            assertEquals(Color(sentCustomArgb), borderColor(sentBorder))
+            assertEquals(Color(receivedCustomArgb), borderColor(receivedBorder))
+        }
+    }
+
+    /** A received self-mention replaces the custom AMOLED outline instead of adding an interior rail. */
+    @Test
+    fun amoledSelfMentionAccentOverridesCustomOutline() {
+        val customArgb = 0xFF336699L
+        val mentionArgb = 0xFFFFCC00L
+        var border: BorderStroke? = null
+
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                val resolved =
+                    messageBubbleBorder(
+                        highlighted = false,
+                        mine = false,
+                        customBorderArgb = customArgb,
+                        mentionAccentArgb = mentionArgb,
+                    )
+                SideEffect { border = resolved }
+            }
+        }
+
+        composeRule.runOnIdle {
+            assertEquals(2.dp, requireNotNull(border).width)
+            assertEquals(Color(mentionArgb), borderColor(border))
         }
     }
 

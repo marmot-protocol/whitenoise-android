@@ -1426,6 +1426,8 @@
     <string name="action_color_detail">Escolha o destaque de ação para o tema %1$s. Fundos e superfícies neutras permanecem iguais.</string>
     <string name="chat_bubble_colors_global_detail">Escolha as cores padrão das mensagens para o tema %1$s.</string>
     <string name="chat_bubble_colors_chat_detail">Substitui esta conversa em todos os temas. Redefina para usar os padrões do tema %1$s atual.</string>
+    <string name="chat_bubble_colors_global_amoled_detail">Escolha as cores padrão dos contornos das mensagens para o tema AMOLED. O interior dos balões permanece preto puro.</string>
+    <string name="chat_bubble_colors_chat_amoled_detail">Substitui esta conversa em todos os temas. AMOLED usa estas cores nos contornos; Claro e Escuro usam-nas no preenchimento. Redefina para usar os padrões AMOLED da conta.</string>
     <string name="more_options">Mais opções</string>
     <string name="reset_to_global_colors">Redefinir para as cores globais</string>
 
@@ -1593,7 +1595,7 @@
     <string name="external_open_failed_detail">Este destino não está disponível no momento. Tente novamente ou volte para Sobre e licenças.</string>
     <string name="developer_tools_unlocked">Ferramentas de desenvolvedor desbloqueadas</string>
     <string name="developer_tools_already_enabled">As ferramentas de desenvolvedor já estão ativadas</string>
-    <string name="appearance_outline_colors_fixed">AMOLED usa cores brancas fixas para ações e balões. Mude o tema para personalizar as cores.</string>
+    <string name="appearance_outline_colors_fixed">AMOLED usa branco fixo nos botões de ação. Os contornos dos balões podem ser personalizados em Cores dos balões.</string>
     <string name="appearance_theme">Tema</string>
     <string name="appearance_theme_help">O padrão do sistema segue o seu dispositivo. Claro e Escuro mantêm a aparência selecionada. AMOLED usa um fundo preto com contornos brancos.</string>
     <string name="appearance_amoled_detail">Preto puro com contornos brancos nítidos.</string>

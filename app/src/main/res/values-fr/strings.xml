@@ -1426,6 +1426,8 @@
     <string name="action_color_detail">Choisissez l’accent d’action pour le thème %1$s. Les arrière-plans et les surfaces neutres restent inchangés.</string>
     <string name="chat_bubble_colors_global_detail">Choisissez les couleurs de message par défaut pour le thème %1$s.</string>
     <string name="chat_bubble_colors_chat_detail">Remplace les couleurs de cette discussion dans tous les thèmes. Réinitialisez pour utiliser les valeurs par défaut du thème %1$s actuel.</string>
+    <string name="chat_bubble_colors_global_amoled_detail">Choisissez les couleurs de contour des messages par défaut pour le thème AMOLED. L’intérieur des bulles reste noir pur.</string>
+    <string name="chat_bubble_colors_chat_amoled_detail">Remplace les couleurs de cette discussion dans tous les thèmes. AMOLED utilise ces couleurs pour les contours, et les thèmes Clair et Sombre pour le remplissage. Réinitialisez pour utiliser les valeurs par défaut AMOLED du compte.</string>
     <string name="more_options">Plus d’options</string>
     <string name="reset_to_global_colors">Rétablir les couleurs globales</string>
 
@@ -1593,7 +1595,7 @@
     <string name="external_open_failed_detail">Cette destination est indisponible pour le moment. Réessayez ou revenez à À propos et licences.</string>
     <string name="developer_tools_unlocked">Outils de développement débloqués</string>
     <string name="developer_tools_already_enabled">Les outils de développement sont déjà activés</string>
-    <string name="appearance_outline_colors_fixed">AMOLED utilise des couleurs blanches fixes pour les actions et les bulles. Changez de thème pour personnaliser les couleurs.</string>
+    <string name="appearance_outline_colors_fixed">AMOLED utilise du blanc fixe pour les boutons d’action. Les contours des bulles sont personnalisables dans Couleurs des bulles.</string>
     <string name="appearance_theme">Thème</string>
     <string name="appearance_theme_help">Par défaut, le système suit votre appareil. Clair et Sombre conservent l\'apparence choisie. AMOLED utilise un fond noir avec des contours blancs.</string>
     <string name="appearance_amoled_detail">Noir pur avec des contours blancs nets.</string>

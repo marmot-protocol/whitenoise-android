@@ -308,6 +308,22 @@ class ComposerBarScreenshotTest {
             .captureRoboImage("src/test/snapshots/composer_dictation_idle_reply_compact_large_font.png")
     }
 
+    /** Captures the production AMOLED reply card without an outer mismatched-radius clip. */
+    @Test
+    fun composerReplyAmoledCompactLargeFont() {
+        render(
+            darkTheme = true,
+            amoled = true,
+            draft = "Reply draft",
+            width = 320,
+            fontScale = 1.6f,
+            showReply = true,
+        )
+        composeRule
+            .onNodeWithTag(TAG)
+            .captureRoboImage("src/test/snapshots/composer_reply_amoled_compact_large_font.png")
+    }
+
     /** Captures that dictation remains unavailable while editing an existing message. */
     @Test
     fun composerDictationEditConstraintCompactRtl() {

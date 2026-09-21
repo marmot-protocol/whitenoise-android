@@ -123,16 +123,16 @@ class MessageBubbleFrameTest {
         composeRule.onNodeWithTag(HIGHLIGHTED_MEDIA_TAG).assertIsDisplayed()
     }
 
-    /** Saved custom color does not override neutral amoled reply accents. */
+    /** AMOLED custom outlines do not recolour the neutral reply content inside the bubble. */
     @Test
     fun savedCustomColorDoesNotOverrideNeutralAmoledReplyAccents() {
         val presentation = customAmoledPresentation()
 
         assertEquals(
-            OPAQUE_WHITE,
+            null,
             replyPreviewAccentArgb(
                 insideBubble = true,
-                customBubbleColorActive = true,
+                customBubbleColorActive = false,
                 presentation = presentation,
             ),
         )
@@ -140,7 +140,7 @@ class MessageBubbleFrameTest {
             null,
             replyPreviewAccentArgb(
                 insideBubble = false,
-                customBubbleColorActive = true,
+                customBubbleColorActive = false,
                 presentation = presentation,
             ),
         )
@@ -198,7 +198,7 @@ class MessageBubbleFrameTest {
 
         composeRule.waitForIdle()
         assertEquals(OPAQUE_BLACK_ARGB, presentation.backgroundArgb)
-        assertEquals(null, presentation.borderOverrideArgb)
+        assertEquals(CUSTOM_BACKGROUND, presentation.borderOverrideArgb)
         assertEquals(MENTION_ACCENT, presentation.mentionAccentArgb)
         assertEquals(OPAQUE_WHITE.toInt(), captionContentArgb.get())
         assertEquals(OPAQUE_WHITE.toInt(), plainContentArgb.get())
@@ -208,8 +208,9 @@ class MessageBubbleFrameTest {
         composeRule.onNodeWithText("Quoted message").assertIsDisplayed()
     }
 
+    /** Standard-theme mention rails use logical start and stay inside the frame. */
     @Test
-    fun mentionRailUsesLogicalStartAndStaysInsideTheFrame() {
+    fun standardThemeMentionRailUsesLogicalStartAndStaysInsideTheFrame() {
         val frameSize = Size(width = 120f, height = 60f)
         val ltr =
             messageMentionRailBounds(
