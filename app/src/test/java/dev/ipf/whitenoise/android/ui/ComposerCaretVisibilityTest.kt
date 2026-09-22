@@ -373,9 +373,13 @@ class ComposerCaretVisibilityTest {
         assertEquals(selection, field.fetchSemanticsNode().config[SemanticsProperties.TextSelectionRange])
         field.assertActiveCaretVisible()
 
-        composeRule
-            .onNodeWithContentDescription(app.getString(R.string.composer_resize))
-            .performSemanticsAction(SemanticsActions.OnClick)
+        val resizeAction =
+            composeRule
+                .onNodeWithContentDescription(app.getString(R.string.composer_resize))
+                .fetchSemanticsNode()
+                .config[SemanticsActions.CustomActions]
+                .single()
+        composeRule.runOnIdle { assertTrue(resizeAction.action()) }
         composeRule.waitForIdle()
 
         assertEquals(initialChangeCount + 2, bottomInputChanges)

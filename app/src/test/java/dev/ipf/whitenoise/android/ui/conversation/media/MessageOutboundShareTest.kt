@@ -1,22 +1,21 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
 import android.provider.OpenableColumns
-import androidx.core.content.FileProvider
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
+import dev.ipf.whitenoise.android.FileProviderStrategyCacheRule
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -27,13 +26,10 @@ import java.io.IOException
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class MessageOutboundShareTest {
+    @get:Rule
+    val fileProviderStrategyCacheRule = FileProviderStrategyCacheRule()
+
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-
-    @Before
-    fun clearProviderStrategyBeforeTest() = clearFileProviderStrategyCache()
-
-    @After
-    fun clearProviderStrategyAfterTest() = clearFileProviderStrategyCache()
 
     @Test
     fun payloadDecisionCoversTextFileCaptionAndAttachmentOnly() {
@@ -281,10 +277,4 @@ class MessageOutboundShareTest {
             .listFiles()
             ?.filter(File::isFile)
             .orEmpty()
-
-    private fun clearFileProviderStrategyCache() {
-        val cacheField = FileProvider::class.java.getDeclaredField("sCache").apply { isAccessible = true }
-        @Suppress("UNCHECKED_CAST")
-        (cacheField.get(null) as MutableMap<String, *>).clear()
-    }
 }

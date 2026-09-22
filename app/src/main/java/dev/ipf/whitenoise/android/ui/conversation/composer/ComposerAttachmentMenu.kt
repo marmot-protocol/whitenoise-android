@@ -82,7 +82,6 @@ internal fun ComposerAttachmentMenu(
     onLocation: (() -> Unit)?,
     onUser: (() -> Unit)?,
     onContact: (() -> Unit)?,
-    onRecentMedia: (() -> Unit)?,
 ) {
     val items =
         listOfNotNull(
@@ -97,9 +96,6 @@ internal fun ComposerAttachmentMenu(
             onUser?.let { WhiteNoiseMenuItem(stringResource(R.string.attach_contact), it, R.drawable.ic_person) },
             onContact?.let {
                 WhiteNoiseMenuItem(stringResource(R.string.attachment_device_contact), it, R.drawable.ic_person)
-            },
-            onRecentMedia?.let {
-                WhiteNoiseMenuItem(stringResource(R.string.attachment_recent_media), it, R.drawable.ic_image)
             },
         )
     val density = LocalDensity.current

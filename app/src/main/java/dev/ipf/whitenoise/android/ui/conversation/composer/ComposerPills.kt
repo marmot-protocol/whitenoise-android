@@ -23,7 +23,6 @@ import androidx.compose.foundation.content.TransferableContent
 import androidx.compose.foundation.content.consume
 import androidx.compose.foundation.content.contentReceiver
 import androidx.compose.foundation.content.hasMediaType
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -97,7 +96,6 @@ import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
-import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.scrollBy
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -135,6 +133,7 @@ import kotlin.math.roundToInt
 
 internal const val COMPOSER_RESIZE_HANDLE_TAG = "composer-resize-handle"
 internal const val COMPOSER_RESIZE_GESTURE_TAG = "composer-resize-gesture"
+internal const val COMPOSER_RESIZE_ACCESSIBILITY_TAG = "composer-resize-accessibility"
 internal const val COMPOSER_RESIZE_INDICATOR_TAG = "composer-resize-indicator"
 internal const val COMPOSER_PILL_SURFACE_TAG = "composer-pill-surface"
 
@@ -860,24 +859,7 @@ internal fun ComposerPill(
                 Modifier
                     .fillMaxWidth()
                     .then(expandedHeightModifier)
-                    .semantics {
-                        if (inputContentVisible && !multilineControlsSuppressed) {
-                            customActions =
-                                listOf(
-                                    CustomAccessibilityAction(toggleDescription) {
-                                        latestOnExpansionToggle()
-                                        true
-                                    },
-                                )
-                            if (expandedLayout) {
-                                contentDescription = resizeComposerDescription
-                                onClick(toggleDescription) {
-                                    latestOnExpansionToggle()
-                                    true
-                                }
-                            }
-                        }
-                    }.testTag(COMPOSER_PILL_SURFACE_TAG),
+                    .testTag(COMPOSER_PILL_SURFACE_TAG),
         ) {
             Column(modifier = Modifier.then(expandedHeightModifier)) {
                 if (accessoryContent != null) {
@@ -1241,12 +1223,31 @@ internal fun ComposerPill(
         }
 
         if (inputContentVisible && !multilineControlsSuppressed) {
+            if (composerCanResize) {
+                Box(
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopCenter)
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .testTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG)
+                            .semantics {
+                                contentDescription = resizeComposerDescription
+                                customActions =
+                                    listOf(
+                                        CustomAccessibilityAction(toggleDescription) {
+                                            latestOnExpansionToggle()
+                                            true
+                                        },
+                                    )
+                            },
+                )
+            }
             // This existing padding contains no editor or accessory content. A
             // border-only pointer owner leaves reading drags and selection to
-            // BasicTextField; the full surface exposes the accessible action.
+            // BasicTextField; a separate semantics leaf exposes the accessible action.
             ComposerResizeGestureStrip(
                 showHandle = composerCanResize,
-                onExpansionToggle = onExpansionToggle,
                 onHeightDragStarted = { latestOnHeightDragStarted() },
                 onHeightDrag = { latestOnHeightDrag(it) },
                 onHeightDragStopped = { latestOnHeightDragStopped() },
@@ -1271,7 +1272,6 @@ private fun Modifier.boundedComposerAccessory(): Modifier =
 @Suppress("FunctionNaming", "LongMethod")
 private fun ComposerResizeGestureStrip(
     showHandle: Boolean,
-    onExpansionToggle: () -> Unit,
     onHeightDragStarted: () -> Unit,
     onHeightDrag: (Float) -> Unit,
     onHeightDragStopped: () -> Unit,
@@ -1285,7 +1285,6 @@ private fun ComposerResizeGestureStrip(
     val latestOnHeightDragSettled by rememberUpdatedState(onHeightDragSettled)
     val latestOnHeightDragCancelled by rememberUpdatedState(onHeightDragCancelled)
     var gestureCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
-    val latestOnExpansionToggle by rememberUpdatedState(onExpansionToggle)
 
     Box(
         modifier =
@@ -1320,8 +1319,6 @@ private fun ComposerResizeGestureStrip(
                             if (cancel != null) cancel() else latestOnHeightDragStopped()
                         },
                     )
-                }.pointerInput(Unit) {
-                    detectTapGestures(onTap = { latestOnExpansionToggle() })
                 },
         contentAlignment = Alignment.Center,
     ) {

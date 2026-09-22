@@ -3,5 +3,4 @@
     <string name="attachment_camera">Appareil photo</string>
     <string name="attachment_photos_videos">Photos et vidéos</string>
     <string name="attachment_device_contact">Contact de l’appareil</string>
-    <string name="attachment_recent_media">Médias récents</string>
 </resources>

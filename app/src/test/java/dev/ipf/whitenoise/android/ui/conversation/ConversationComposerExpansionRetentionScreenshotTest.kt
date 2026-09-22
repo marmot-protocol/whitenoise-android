@@ -276,7 +276,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         assertTrue("another account should stay automatic", composerHeight() > manualHeight + 64f)
 
         composeRule.runOnIdle { route = Route(ACCOUNT_A, GROUP_A) }
-        resizeGesture().performClick()
+        performAccessibleResizeAction()
         assertResizeHandleToggleLabel(R.string.composer_collapse)
         composeRule.onNode(hasSetTextAction()).performClick()
         composeRule.runOnIdle { checkNotNull(overlayCallback).onBackInvoked() }
@@ -579,7 +579,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         composeRule.waitUntil(timeoutMillis = 5_000) { publisherStarted.isCompleted }
         composeRule.onNode(hasSetTextAction()).performTextReplacement(newerDraft)
         composeRule.waitForIdle()
-        resizeGesture().performClick()
+        performAccessibleResizeAction()
         assertResizeHandleToggleLabel(R.string.composer_collapse)
 
         releaseSuccess.complete(Unit)
@@ -611,9 +611,24 @@ class ConversationComposerExpansionRetentionScreenshotTest {
     /** Returns the accessible resize action exposed by the composer pill. */
     private fun resizeHandle() = composeRule.onNodeWithContentDescription(context.getString(R.string.composer_resize))
 
-    /** Verifies the localized tap action exposed by the visible resize handle. */
+    /** Invokes the named resize path retained for accessibility services. */
+    private fun performAccessibleResizeAction() {
+        val action =
+            resizeHandle()
+                .fetchSemanticsNode()
+                .config[SemanticsActions.CustomActions]
+                .single()
+        composeRule.runOnUiThread { check(action.action()) }
+    }
+
+    /** Verifies the localized custom action exposed by the visible resize handle. */
     private fun assertResizeHandleToggleLabel(labelRes: Int) {
-        val label = resizeHandle().fetchSemanticsNode().config[SemanticsActions.OnClick].label
+        val label =
+            resizeHandle()
+                .fetchSemanticsNode()
+                .config[SemanticsActions.CustomActions]
+                .single()
+                .label
         assertEquals(context.getString(labelRes), label)
     }
 

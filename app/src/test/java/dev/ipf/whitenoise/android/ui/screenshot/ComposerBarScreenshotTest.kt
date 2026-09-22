@@ -11,6 +11,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -227,7 +228,7 @@ class ComposerBarScreenshotTest {
     @Test
     fun composerBarFullScreenLargeRtl() {
         renderLongComposer(darkTheme = true, largeRtl = true)
-        composeRule.onNodeWithContentDescription(app.getString(R.string.composer_resize)).performClick()
+        performAccessibleResizeAction()
         composeRule.waitForIdle()
         composeRule
             .onNodeWithTag(LONG_TAG)
@@ -485,6 +486,17 @@ class ComposerBarScreenshotTest {
         assertTrue(accessory.top >= border.bottom && accessory.bottom <= editor.top)
         assertTrue(editor.bottom <= surface.bottom)
         assertTrue(editor.width > 0f && editor.height > 0f)
+    }
+
+    /** Invokes the named resize path retained for accessibility services. */
+    private fun performAccessibleResizeAction() {
+        val action =
+            composeRule
+                .onNodeWithContentDescription(app.getString(R.string.composer_resize))
+                .fetchSemanticsNode()
+                .config[SemanticsActions.CustomActions]
+                .single()
+        composeRule.runOnUiThread { check(action.action()) }
     }
 
     /** Composes the surface under test with the given fixture. */

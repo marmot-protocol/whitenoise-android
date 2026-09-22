@@ -81,9 +81,9 @@ class ComposerAttachmentSheetBehaviorTest {
         composeRule.onNodeWithText(string(R.string.download_files)).assertIsDisplayed()
     }
 
-    /** Gallery tile fires callback and closes the sheet. */
+    /** The sole media entry invokes the system picker directly and closes the menu. */
     @Test
-    fun galleryTileFiresCallbackAndClosesTheSheet() {
+    fun mediaEntryInvokesGalleryOnceAndClosesTheMenu() {
         var galleryClicks = 0
         renderComposer(onPickFromGallery = { galleryClicks++ })
         openAttachmentSheet()

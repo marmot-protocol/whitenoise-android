@@ -58,6 +58,7 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
+import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_ACCESSIBILITY_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_GESTURE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_INDICATOR_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
@@ -84,46 +85,40 @@ class ComposerExpansionBehaviorTest {
 
     private val app = ApplicationProvider.getApplicationContext<android.app.Application>()
 
-    /** Expand and collapse keep the same editor draft. */
+    /** A stationary resize-strip tap leaves expansion, draft, selection, and focus unchanged. */
     @Test
-    fun expandAndCollapseKeepTheSameEditorDraft() {
+    fun stationaryResizeTapDoesNotExpandOrFocusTheComposer() {
         val draft = longDraft()
+        val selection = TextRange(draft.indexOf("controls"))
         render(draft)
+        val editor = composeRule.onNode(hasSetTextAction())
+        editor.performClick()
+        editor.performTextInputSelection(selection)
         val automaticHeight =
             composeRule
                 .onNodeWithTag(TAG)
                 .fetchSemanticsNode()
                 .boundsInRoot.height
 
-        resizeGesture().performClick()
+        resizeGesture().performTouchInput { click(center) }
         composeRule.waitForIdle()
 
-        val fullHeight =
+        val finalHeight =
             composeRule
                 .onNodeWithTag(TAG)
                 .fetchSemanticsNode()
                 .boundsInRoot.height
-        assertTrue("full screen should be materially taller than auto-grow", fullHeight > automaticHeight * 1.5f)
-        composeRule.onNodeWithText(draft).assertExists()
-
-        resizeGesture().performClick()
-        composeRule.waitForIdle()
-
-        val collapsedHeight =
-            composeRule
-                .onNodeWithTag(TAG)
-                .fetchSemanticsNode()
-                .boundsInRoot.height
+        assertTrue("a stationary handle tap must not resize", abs(finalHeight - automaticHeight) <= 1f)
+        assertEditorState(editor, draft, selection)
         assertTrue(
-            "collapse should return to the measured auto-grow height",
-            abs(collapsedHeight - automaticHeight) <= 1f,
+            "the composer surface must not expose an ordinary click action",
+            !pillSurface().fetchSemanticsNode().config.contains(SemanticsActions.OnClick),
         )
-        composeRule.onNodeWithText(draft).assertExists()
     }
 
-    /** Tap full screen and collapse animate height monotonically. */
+    /** The named accessibility resize action still expands and collapses monotonically. */
     @Test
-    fun tapFullScreenAndCollapseAnimateHeightMonotonically() {
+    fun accessibleResizeActionAnimatesExpansionAndCollapseMonotonically() {
         val draft = longDraft()
         val selection = TextRange(draft.indexOf("controls"))
         render(draft)
@@ -137,7 +132,7 @@ class ComposerExpansionBehaviorTest {
 
         val expansionFrames =
             withManualClock {
-                resizeGesture().performClick()
+                performAccessibleResizeAction()
                 composeRule.runOnIdle { }
                 sampleComposerHeights(expectedBottom = fixedBottom)
             }
@@ -147,14 +142,14 @@ class ComposerExpansionBehaviorTest {
 
         assertMonotonic(expansionFrames + fullHeight, increasing = true)
         assertTrue(
-            "tap-to-full-screen must expose an intermediate animated height",
+            "accessible full-screen expansion must expose an intermediate animated height",
             expansionFrames.any { it > automaticHeight + 1f && it < fullHeight - 1f },
         )
         assertEditorState(editor, draft, selection)
 
         val collapseFrames =
             withManualClock {
-                resizeGesture().performClick()
+                performAccessibleResizeAction()
                 composeRule.runOnIdle { }
                 sampleComposerHeights(expectedBottom = fixedBottom)
             }
@@ -189,11 +184,11 @@ class ComposerExpansionBehaviorTest {
         listOf(TextRange(0), TextRange(draft.length / 2), TextRange(draft.length)).forEach { selection ->
             editor.performTextInputSelection(selection)
             composeRule.waitForIdle()
-            resizeGesture().performClick()
+            performAccessibleResizeAction()
             composeRule.waitForIdle()
 
             withManualClock {
-                resizeGesture().performClick()
+                performAccessibleResizeAction()
                 composeRule.runOnIdle { }
                 // Drive well past the collapse animation before judging rest.
                 sampleComposerHeights(frameCount = 30)
@@ -236,17 +231,39 @@ class ComposerExpansionBehaviorTest {
         assertResizeHandleToggleLabel(R.string.composer_expand_full_screen)
     }
 
-    /** The accessible surface keeps a large target without adding a visible handle. */
+    /** The dedicated accessibility leaf keeps a large target without adding a visible handle. */
     @Test
-    fun resizeAccessibilityBelongsToTheWholeSurfaceWithoutVisibleHandle() {
+    fun resizeAccessibilityUsesADedicatedTopEdgeLeafWithoutVisibleHandle() {
         render(longDraft())
         val target = composerControlBounds(R.string.composer_resize)
         val surface = pillSurface().fetchSemanticsNode().boundsInRoot
-        assertEquals(surface, target)
+        assertEquals(surface.top, target.top, 1f)
+        assertEquals(surface.width, target.width, 1f)
+        assertEquals(48f, target.height, 1f)
         assertTrue(target.height >= 48f && target.width >= 96f)
         composeRule.onNodeWithTag(COMPOSER_RESIZE_INDICATOR_TAG, useUnmergedTree = true).assertDoesNotExist()
         val actions = resizeHandle().fetchSemanticsNode().config[SemanticsActions.CustomActions]
         assertTrue(actions.any { it.label == app.getString(R.string.composer_expand_full_screen) })
+    }
+
+    /** The resize action owns a dedicated semantics leaf without an ordinary click action. */
+    @Test
+    fun resizeAccessibilityActionOwnsADedicatedLeafWithoutClickBehavior() {
+        render(longDraft())
+        val node =
+            composeRule
+                .onNodeWithTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG, useUnmergedTree = true)
+                .fetchSemanticsNode()
+        assertTrue("the resize target must remain a leaf", node.children.isEmpty())
+        assertTrue(
+            "the resize leaf must own the named expand action",
+            node.config[SemanticsActions.CustomActions]
+                .any { it.label == app.getString(R.string.composer_expand_full_screen) },
+        )
+        assertTrue(
+            "the accessibility leaf must not restore ordinary tap behavior",
+            !node.config.contains(SemanticsActions.OnClick),
+        )
     }
 
     /** The eight-pixel border gesture stays above the first editable line with no outside reservation. */
@@ -282,9 +299,12 @@ class ComposerExpansionBehaviorTest {
     fun twoLinesKeepTheExistingCompactComposer() {
         render("First line\nSecond line")
 
-        composeRule
-            .onNodeWithContentDescription(app.getString(R.string.composer_resize))
-            .assertDoesNotExist()
+        val surface = pillSurface().fetchSemanticsNode().boundsInRoot
+        val resize = resizeHandle().fetchSemanticsNode().boundsInRoot
+        assertEquals(surface.top, resize.top, 1f)
+        assertEquals(48f, resize.height, 1f)
+        assertEquals(104f, surface.height, 1f)
+        assertResizeHandleToggleLabel(R.string.composer_expand_full_screen)
     }
 
     /** Line thresholds animate monotonically and preserve focus draft and selection. */
@@ -737,7 +757,7 @@ class ComposerExpansionBehaviorTest {
         val editor = composeRule.onNode(hasSetTextAction())
         editor.performClick()
         editor.performTextInputSelection(TextRange(draft.length))
-        resizeGesture().performClick()
+        performAccessibleResizeAction()
         composeRule.waitForIdle()
         val expandedHeight = composerHeight()
         resizeGesture().performTouchInput {
@@ -968,7 +988,7 @@ class ComposerExpansionBehaviorTest {
         renderRotatable(draft) { landscape }
         composeRule.waitForIdle()
 
-        resizeGesture().performClick()
+        performAccessibleResizeAction()
         composeRule.waitForIdle()
         val fullScreenHeight = composerHeight()
         assertTrue("full-screen mode should consume most of the viewport", fullScreenHeight > 500f)
@@ -1049,9 +1069,10 @@ class ComposerExpansionBehaviorTest {
             onTopBarClick = { topBarClicks += 1 },
         )
 
-        resizeGesture().performClick()
+        performAccessibleResizeAction()
         composeRule.waitForIdle()
         val fullScreenHandle = composerControlBounds(R.string.composer_resize)
+        val fullScreenHeight = composerHeight()
         assertTrue("full-screen resize target must stay below top-bar interactions", fullScreenHandle.top >= 64f)
         assertEquals("prototype surface top clearance", 64f + statusBarInsetPx + 24f, fullScreenHandle.top, 1f)
 
@@ -1059,7 +1080,8 @@ class ComposerExpansionBehaviorTest {
         composeRule.waitForIdle()
 
         assertEquals("resize handle tap must not reach the top bar", 0, topBarClicks)
-        assertResizeHandleToggleLabel(R.string.composer_expand_full_screen)
+        assertTrue("resize handle tap must not collapse full screen", abs(composerHeight() - fullScreenHeight) <= 1f)
+        assertResizeHandleToggleLabel(R.string.composer_collapse)
     }
 
     /** First line center tap targets the editor without changing expansion. */
@@ -1109,7 +1131,7 @@ class ComposerExpansionBehaviorTest {
 
         editor.performClick()
         editor.assertIsFocused()
-        resizeGesture().performClick()
+        performAccessibleResizeAction()
         composeRule.waitForIdle()
         assertResizeHandleToggleLabel(R.string.composer_collapse)
         assertEquals(OnBackInvokedDispatcher.PRIORITY_OVERLAY, overlayPriority)
@@ -1337,13 +1359,21 @@ class ComposerExpansionBehaviorTest {
         assertEquals(selection, editor.fetchSemanticsNode().config[SemanticsProperties.TextSelectionRange])
     }
 
-    // The handle is one control for both resize paths; its current tap
-    // outcome (expand vs collapse) is exposed as the click action's label.
+    /** Invokes the named non-drag resize path retained for accessibility services. */
+    private fun performAccessibleResizeAction() {
+        val action = resizeHandle().fetchSemanticsNode().config[SemanticsActions.CustomActions].single()
+        composeRule.runOnUiThread {
+            assertTrue("the accessibility resize action must handle the request", action.action())
+        }
+    }
+
+    /** Asserts the current label of the named accessibility resize action. */
     private fun assertResizeHandleToggleLabel(labelRes: Int) {
         val label =
             resizeHandle()
                 .fetchSemanticsNode()
-                .config[SemanticsActions.OnClick]
+                .config[SemanticsActions.CustomActions]
+                .single()
                 .label
         assertEquals(app.getString(labelRes), label)
     }

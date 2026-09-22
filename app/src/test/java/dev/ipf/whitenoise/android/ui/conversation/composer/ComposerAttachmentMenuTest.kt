@@ -38,7 +38,6 @@ class ComposerAttachmentMenuTest {
                     onLocation = {},
                     onUser = {},
                     onContact = {},
-                    onRecentMedia = {},
                 )
             }
         }

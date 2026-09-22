@@ -2533,22 +2533,6 @@
         ]
       },
       {
-        "surface": "AttachmentActionTile",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/AttachmentSheet.kt",
-        "anchor": "fun AttachmentActionTile(",
-        "test_ids": [
-          "MED-001"
-        ]
-      },
-      {
-        "surface": "ComposerAttachmentSheetPane",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/AttachmentSheet.kt",
-        "anchor": "fun ComposerAttachmentSheetPane(",
-        "test_ids": [
-          "MED-001"
-        ]
-      },
-      {
         "surface": "ComposerAccessoryRemoveButton",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAccessoryRemoveButton.kt",
         "anchor": "fun ComposerAccessoryRemoveButton(",
@@ -3484,22 +3468,6 @@
         "surface": "VoiceWaveform",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
         "anchor": "fun VoiceWaveform(",
-        "test_ids": [
-          "MED-001"
-        ]
-      },
-      {
-        "surface": "RecentMediaStrip",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RecentMedia.kt",
-        "anchor": "fun RecentMediaStrip(",
-        "test_ids": [
-          "MED-001"
-        ]
-      },
-      {
-        "surface": "RecentThumb",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RecentMedia.kt",
-        "anchor": "fun RecentThumb(",
         "test_ids": [
           "MED-001"
         ]
@@ -10709,14 +10677,6 @@
         "surface": "string:attachment_photos_videos",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAttachmentMenu.kt",
         "anchor": "R.string.attachment_photos_videos",
-        "test_ids": [
-          "MED-001"
-        ]
-      },
-      {
-        "surface": "string:attachment_recent_media",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAttachmentMenu.kt",
-        "anchor": "R.string.attachment_recent_media",
         "test_ids": [
           "MED-001"
         ]
@@ -22015,38 +21975,6 @@
         ]
       },
       {
-        "surface": "permission:android.permission.READ_EXTERNAL_STORAGE",
-        "source": "app/src/main/AndroidManifest.xml",
-        "anchor": "android.permission.READ_EXTERNAL_STORAGE",
-        "test_ids": [
-          "MED-002"
-        ]
-      },
-      {
-        "surface": "permission:android.permission.READ_MEDIA_IMAGES",
-        "source": "app/src/main/AndroidManifest.xml",
-        "anchor": "android.permission.READ_MEDIA_IMAGES",
-        "test_ids": [
-          "MED-002"
-        ]
-      },
-      {
-        "surface": "permission:android.permission.READ_MEDIA_VIDEO",
-        "source": "app/src/main/AndroidManifest.xml",
-        "anchor": "android.permission.READ_MEDIA_VIDEO",
-        "test_ids": [
-          "MED-002"
-        ]
-      },
-      {
-        "surface": "permission:android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
-        "source": "app/src/main/AndroidManifest.xml",
-        "anchor": "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
-        "test_ids": [
-          "MED-002"
-        ]
-      },
-      {
         "surface": "permission:android.permission.RECEIVE_BOOT_COMPLETED",
         "source": "app/src/main/AndroidManifest.xml",
         "anchor": "android.permission.RECEIVE_BOOT_COMPLETED",
@@ -23863,28 +23791,11 @@
         ]
       },
       {
-        "surface": "source:app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/AttachmentSheet.kt",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/AttachmentSheet.kt",
-        "anchor": "AttachmentSheet",
+        "surface": "source:app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAttachmentSheetState.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAttachmentSheetState.kt",
+        "anchor": "ComposerAttachmentSheetState",
         "test_ids": [
-          "MED-001",
-          "MED-002",
-          "MED-003",
-          "MED-004",
-          "MED-005",
-          "MED-006",
-          "MED-007",
-          "MED-008",
-          "MED-009",
-          "MED-010",
-          "MED-011",
-          "MED-012",
-          "MED-013",
-          "MED-014",
-          "MED-015",
-          "MED-016",
-          "MED-017",
-          "MED-018"
+          "MED-001"
         ]
       },
       {

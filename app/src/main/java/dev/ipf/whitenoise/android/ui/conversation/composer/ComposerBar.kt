@@ -5,7 +5,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.VectorConverter
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -107,42 +106,29 @@ private val ComposerSettleDeadband = 24.dp
 
 /**
  * Whether the composer bottom cluster (reply preview, edit banner, mention
- * picker, input row, and inline emoji/attachment panes) should apply
+ * picker, input row, and inline emoji pane) should apply
  * [imePadding]. Suppressed while the emoji pane owns the bottom region so the
  * keyboard/emoji swap does not double-count insets (#808, #895, #1109), but
  * restored while the emoji search field is active so the IME cannot cover the
- * filtered results grid (#1222). The attachment sheet owns the bottom region
- * the same way the emoji pane does, and has no in-pane text input.
+ * filtered results grid (#1222).
  */
 internal fun composerBottomClusterAppliesImePadding(
     showEmojiPane: Boolean,
     composerEmojiSearchActive: Boolean,
-    showAttachmentPane: Boolean = false,
-): Boolean = (!showEmojiPane || composerEmojiSearchActive) && !showAttachmentPane
+): Boolean = !showEmojiPane || composerEmojiSearchActive
 
 internal fun composerBottomClusterModifier(
     showEmojiPane: Boolean,
     composerEmojiSearchActive: Boolean,
     base: Modifier = Modifier,
-    showAttachmentPane: Boolean = false,
 ): Modifier {
     val withNav = base.navigationBarsPadding()
-    return if (composerBottomClusterAppliesImePadding(showEmojiPane, composerEmojiSearchActive, showAttachmentPane)) {
+    return if (composerBottomClusterAppliesImePadding(showEmojiPane, composerEmojiSearchActive)) {
         withNav.imePadding()
     } else {
         withNav
     }
 }
-
-/**
- * While the attachment pane replaces an animating IME, reserve at least the
- * IME's live height. The pane then follows the system inset down in one smooth
- * handoff and naturally stops shrinking when its own content becomes taller.
- */
-internal fun composerAttachmentPaneMinimumHeight(
-    showAttachmentPane: Boolean,
-    currentImeHeight: androidx.compose.ui.unit.Dp,
-): androidx.compose.ui.unit.Dp = if (showAttachmentPane) currentImeHeight else 0.dp
 
 /**
  * A focus request emits its own focus callback. Ignore that callback while a
@@ -380,7 +366,6 @@ internal fun ComposerBar(
     draftGroupIdHex: String? = null,
     onAfterSend: () -> Unit = {},
     onPickFromGallery: (() -> Unit)? = null,
-    onPickRecentMedia: ((Uri) -> Unit)? = null,
     onCaptureFromCamera: (() -> Unit)? = null,
     onPickDocument: (() -> Unit)? = null,
     onShareLocation: (() -> Unit)? = null,
@@ -441,7 +426,7 @@ internal fun ComposerBar(
     textState: ComposerTextState = rememberComposerTextState(draftKey, initialDraft),
     // Hoisted so the conversation screen can dismiss the sheet on an outside
     // tap; defaults to a private instance for other call sites.
-    attachmentSheetState: ComposerAttachmentSheetState = rememberComposerAttachmentSheetState(),
+    attachmentSheetState: ComposerAttachmentSheetState = rememberAttachmentState(),
     attachmentContent: (@Composable () -> Unit)? = null,
     hasPendingAttachments: Boolean = false,
     attachmentsPreparing: Boolean = false,
@@ -662,7 +647,6 @@ internal fun ComposerBar(
         mutableStateOf(composerImePaneHeightMemory[configuration.orientation] ?: 0.dp)
     }
     var lockedComposerEmojiPaneHeight by remember(configuration.orientation) { mutableStateOf(0.dp) }
-    var lockedComposerAttachmentPaneHeight by remember(configuration.orientation) { mutableStateOf(0.dp) }
     LaunchedEffect(targetImePaneHeight, composerEmojiPickerOpen, attachmentSheetState.isOpen) {
         rememberedImePaneHeight =
             updatedComposerRememberedImeHeight(
@@ -719,29 +703,6 @@ internal fun ComposerBar(
                 emojiPaneHeightAnim.animateTo(target, tween(durationMillis = 250, easing = FastOutSlowInEasing))
             }
         }
-    }
-    // Attachment sheet: shares the emoji pane's IME-height model so opening
-    // either surface swaps seamlessly with the keyboard and with each other.
-    val attachmentPaneHeight =
-        composerEmojiPaneHeight(
-            lockedPaneHeight = lockedComposerAttachmentPaneHeight,
-            currentImeHeight = currentImePaneHeight,
-            targetImeHeight = targetImePaneHeight,
-            rememberedImeHeight = rememberedImePaneHeight,
-        )
-    val attachmentPaneAlpha by animateFloatAsState(
-        targetValue = if (attachmentSheetState.recentMediaOpen) 1f else 0f,
-        animationSpec = tween(durationMillis = 120),
-        label = "composerAttachmentPaneAlpha",
-    )
-    val showAttachmentPane = attachmentSheetState.recentMediaOpen || attachmentPaneAlpha > 0.01f
-    val attachmentPaneMinimumHeight =
-        composerAttachmentPaneMinimumHeight(
-            showAttachmentPane = showAttachmentPane,
-            currentImeHeight = currentImePaneHeight,
-        )
-    LaunchedEffect(showAttachmentPane) {
-        if (!showAttachmentPane) lockedComposerAttachmentPaneHeight = 0.dp
     }
     // The sheet state is hoisted; make sure it never stays open once this
     // composer leaves composition (search or selection mode swaps the bar).
@@ -970,40 +931,8 @@ internal fun ComposerBar(
         attachmentSheetState.open()
     }
 
-    /** Opens the recent-media pane, dismissing the emoji picker and any pending keyboard restore. */
-    fun openRecentMediaPane() {
-        composerKeyboardRestorePending = false
-        composerEmojiPickerRequested = false
-        composerEmojiPickerOpen = false
-        lockedComposerAttachmentPaneHeight =
-            composerEmojiPaneTargetHeight(
-                currentImeHeight = currentImePaneHeight,
-                targetImeHeight = targetImePaneHeight,
-                rememberedImeHeight = rememberedImePaneHeight,
-            )
-        attachmentSheetState.openRecentMedia()
-        onBottomInputChanged()
-        focusManager.clearFocus(force = true)
-        keyboardController?.hide()
-    }
-
-    fun restoreKeyboardFromAttachmentSheet() {
-        if (!shouldStartComposerKeyboardRestore(attachmentSheetState.isOpen, composerKeyboardRestorePending)) return
-        if (lockedComposerAttachmentPaneHeight == 0.dp) {
-            lockedComposerAttachmentPaneHeight =
-                composerEmojiPaneTargetHeight(
-                    currentImeHeight = currentImePaneHeight,
-                    targetImeHeight = targetImePaneHeight,
-                    rememberedImeHeight = rememberedImePaneHeight,
-                )
-        }
-        composerKeyboardRestorePending = true
-        onBottomInputChanged()
-        runCatching { composerFocus.requestFocus() }
-        keyboardController?.show()
-    }
-    LaunchedEffect(showEmojiPane, showAttachmentPane) {
-        if (!showEmojiPane && !showAttachmentPane) customInputPaneHeightPx = 0f
+    LaunchedEffect(showEmojiPane) {
+        if (!showEmojiPane) customInputPaneHeightPx = 0f
     }
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val statusBarTop = with(density) { WindowInsets.statusBars.getTop(this).toDp() }
@@ -1011,7 +940,6 @@ internal fun ComposerBar(
             composerBottomClusterAppliesImePadding(
                 showEmojiPane = showEmojiPane,
                 composerEmojiSearchActive = composerEmojiSearchActive,
-                showAttachmentPane = showAttachmentPane,
             )
         val bottomInset =
             with(density) {
@@ -1112,7 +1040,6 @@ internal fun ComposerBar(
                 showEmojiPane = showEmojiPane,
                 composerEmojiSearchActive = composerEmojiSearchActive,
                 base = Modifier.fillMaxWidth(),
-                showAttachmentPane = showAttachmentPane,
             ),
         ) {
             Column(
@@ -1370,11 +1297,10 @@ internal fun ComposerBar(
                         composerFocus = composerFocus,
                         emojiPickerOpen = composerEmojiPickerRequested,
                         onComposerFocusChanged = { focused ->
-                            // A tap on the text field while a pane is open asks
-                            // for the keyboard; the restore functions' pending
-                            // guard drops the echo of their own focus request.
+                            // A tap on the text field while the emoji pane is open
+                            // asks for the keyboard; the pending guard drops the
+                            // echo of that focus request.
                             if (focused && composerEmojiPickerOpen) restoreKeyboardFromEmojiPane()
-                            if (focused && attachmentSheetState.recentMediaOpen) restoreKeyboardFromAttachmentSheet()
                             onComposerFocusChanged(focused)
                         },
                         onValueChange = { value ->
@@ -1397,11 +1323,11 @@ internal fun ComposerBar(
                                 openComposerAttachmentSheet()
                             }
                         },
-                        attachmentSheetOpen = attachmentSheetState.recentMediaOpen,
+                        attachmentSheetOpen = false,
                         attachmentMenu = { bounds ->
                             ComposerAttachmentMenu(
                                 anchorBounds = bounds,
-                                expanded = attachmentSheetState.isOpen && !attachmentSheetState.recentMediaOpen,
+                                expanded = attachmentSheetState.isOpen,
                                 onDismiss = attachmentSheetState::dismiss,
                                 onCamera = onCaptureFromCamera,
                                 onGallery = onPickFromGallery,
@@ -1409,7 +1335,6 @@ internal fun ComposerBar(
                                 onLocation = onShareLocation,
                                 onUser = onShareUser,
                                 onContact = onShareContact,
-                                onRecentMedia = onPickRecentMedia?.let { { openRecentMediaPane() } },
                             )
                         },
                         preImeBackEnabled = !composerEmojiPickerOpen && !attachmentSheetState.isOpen,
@@ -1593,88 +1518,27 @@ internal fun ComposerBar(
                     }
                 }
             }
-            if (showEmojiPane || showAttachmentPane) {
-                // Box, not stacked children — during the 120ms crossfade both panes
-                // can be visible and stacking them would double the cluster height.
+            if (showEmojiPane) {
                 Box(
                     Modifier
                         .fillMaxWidth()
                         .onSizeChanged { customInputPaneHeightPx = it.height.toFloat() },
                 ) {
-                    if (showEmojiPane) {
-                        ComposerEmojiPickerPane(
-                            height = emojiPaneHeightAnim.value,
-                            alpha = 1f,
-                            recentEmojis = recentEmojis,
-                            onEmojiUsed = onEmojiUsed,
-                            onEmojiPicked = { emoji ->
-                                val updated = insertEmojiAtSelection(textFieldValue, emoji)
-                                applyComposerFieldValue(updated)
-                            },
-                            onBackspace = ::deleteFromComposer,
-                            onSearchActiveChange = {
-                                composerEmojiSearchActive = it
-                                onBottomInputChanged()
-                            },
-                        )
-                    }
-                    if (showAttachmentPane) {
-                        ComposerAttachmentSheetPane(
-                            recentMediaOnly = true,
-                            alpha = attachmentPaneAlpha,
-                            minimumHeight = attachmentPaneMinimumHeight,
-                            onPickRecentMedia =
-                                onPickRecentMedia?.let { pick ->
-                                    { uri ->
-                                        attachmentSheetState.dismiss()
-                                        pick(uri)
-                                    }
-                                },
-                            onPickFromGallery =
-                                onPickFromGallery?.let { pick ->
-                                    {
-                                        attachmentSheetState.dismiss()
-                                        pick()
-                                    }
-                                },
-                            onPickDocument =
-                                onPickDocument?.let { pick ->
-                                    {
-                                        attachmentSheetState.dismiss()
-                                        pick()
-                                    }
-                                },
-                            onCaptureFromCamera =
-                                onCaptureFromCamera?.let { capture ->
-                                    {
-                                        attachmentSheetState.dismiss()
-                                        capture()
-                                    }
-                                },
-                            onShareLocation =
-                                onShareLocation?.let { share ->
-                                    {
-                                        attachmentSheetState.dismiss()
-                                        share()
-                                    }
-                                },
-                            onShareUser =
-                                onShareUser?.let { share ->
-                                    {
-                                        attachmentSheetState.dismiss()
-                                        share()
-                                    }
-                                },
-                            onShareContact =
-                                onShareContact?.let { share ->
-                                    {
-                                        attachmentSheetState.dismiss()
-                                        share()
-                                    }
-                                },
-                            onComingSoon = { appState?.present(R.string.coming_soon) },
-                        )
-                    }
+                    ComposerEmojiPickerPane(
+                        height = emojiPaneHeightAnim.value,
+                        alpha = 1f,
+                        recentEmojis = recentEmojis,
+                        onEmojiUsed = onEmojiUsed,
+                        onEmojiPicked = { emoji ->
+                            val updated = insertEmojiAtSelection(textFieldValue, emoji)
+                            applyComposerFieldValue(updated)
+                        },
+                        onBackspace = ::deleteFromComposer,
+                        onSearchActiveChange = {
+                            composerEmojiSearchActive = it
+                            onBottomInputChanged()
+                        },
+                    )
                 }
             }
         }

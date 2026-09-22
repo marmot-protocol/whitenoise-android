@@ -63,13 +63,18 @@ class ComposerResizeHandleTest {
     @Test
     fun theExpandedComposerKeepsItsAccessibleResizeAction() {
         render(ComposerExpansionMode.Manual, draft = "Line one\nLine two\nLine three")
-        val actions =
+        val semantics =
             composeRule
-                .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
+                .onNodeWithTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG, useUnmergedTree = true)
                 .fetchSemanticsNode()
                 .config
-                .getOrNull(SemanticsActions.CustomActions)
+        val actions = semantics.getOrNull(SemanticsActions.CustomActions)
         assertTrue("the pill must keep an accessible resize action", !actions.isNullOrEmpty())
+        assertEquals(
+            "the resize surface must not expose a default click",
+            null,
+            semantics.getOrNull(SemanticsActions.OnClick),
+        )
     }
 
     /**
