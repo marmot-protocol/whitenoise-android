@@ -484,6 +484,15 @@
         ]
       },
       {
+        "surface": "Global transient notice bottom obstruction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "val globalTransientNoticeInsets: WindowInsets",
+        "test_ids": [
+          "PRO-001",
+          "SET-023"
+        ]
+      },
+      {
         "surface": "TransientNoticeTimeoutEffect",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
         "anchor": "fun TransientNoticeTimeoutEffect(",
@@ -948,6 +957,14 @@
         "test_ids": [
           "CHL-001",
           "SEC-012"
+        ]
+      },
+      {
+        "surface": "ChatListViewportOwner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListViewportOwner.kt",
+        "anchor": "data class ChatListViewportOwner(",
+        "test_ids": [
+          "NAV-005"
         ]
       },
       {
@@ -2268,6 +2285,14 @@
         ]
       },
       {
+        "surface": "Notification message route broad-snapshot authority",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/InactiveNotificationRouteStage.kt",
+        "anchor": "fun notificationMessageRouteChatListReady(",
+        "test_ids": [
+          "NTF-009"
+        ]
+      },
+      {
         "surface": "ConversationScreen",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "anchor": "fun ConversationScreen(",
@@ -2378,6 +2403,14 @@
         "surface": "GroupRecoveryCard",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
         "anchor": "fun GroupRecoveryCard(",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "Fresh group creation recovery-read policy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/FreshGroupCreation.kt",
+        "anchor": "fun groupRecoveryReadFailureIsPresentable(",
         "test_ids": [
           "GRP-021"
         ]
@@ -3893,6 +3926,14 @@
         "anchor": "fun FocusedReactionTarget(",
         "test_ids": [
           "MSG-004",
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "focusedReactionItemsPerRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "fun focusedReactionItemsPerRow(",
+        "test_ids": [
           "MSG-005"
         ]
       },
@@ -22629,6 +22670,14 @@
         ]
       },
       {
+        "surface": "Dictation platform-error cause mapping",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "fun Int.toConversationDictationFailure(",
+        "test_ids": [
+          "DIC-003"
+        ]
+      },
+      {
         "surface": "Dictation automatic completion observes captured speech and drains the tail",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
         "anchor": "private fun finishAfterCallerAudioSilence(",
@@ -23016,6 +23065,14 @@
         "test_ids": [
           "GRP-017",
           "CHL-002"
+        ]
+      },
+      {
+        "surface": "Removal-of-self actor fallback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/GroupSystemEvents.kt",
+        "anchor": "fun actorNameOrSomeone(",
+        "test_ids": [
+          "GRP-006"
         ]
       },
       {

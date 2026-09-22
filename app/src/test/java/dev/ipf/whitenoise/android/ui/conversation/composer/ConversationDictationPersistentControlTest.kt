@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
+import android.content.Context
+import android.speech.SpeechRecognizer
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
@@ -11,17 +13,22 @@ import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
@@ -31,6 +38,7 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
 import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
+import dev.ipf.whitenoise.android.audio.toConversationDictationFailure
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -234,6 +242,23 @@ class ConversationDictationPersistentControlTest {
             assertTrue(action.right - action.left >= 48.dp)
             assertTrue(action.bottom - action.top >= 48.dp)
         }
+    }
+
+    /**
+     * A provider that accepted the session and then reported ERROR_SERVER has proved nothing about
+     * the network, so the failure names the provider rather than a connection it never attempted.
+     */
+    @Test
+    fun serverFailureNamesTheProviderInsteadOfClaimingAConnectionFailure() {
+        val fixture = fixture(TextFieldValue(""))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        fixture.platform.listener.onError(SpeechRecognizer.ERROR_SERVER.toConversationDictationFailure())
+        render(fixture)
+
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        composeRule.onNodeWithText(context.getString(R.string.dictation_provider_unavailable)).assertIsDisplayed()
+        composeRule.onAllNodesWithText(context.getString(R.string.dictation_network_error)).assertCountEquals(0)
+        composeRule.onNodeWithContentDescription("Open the speech service").assertIsDisplayed()
     }
 
     private fun render(
