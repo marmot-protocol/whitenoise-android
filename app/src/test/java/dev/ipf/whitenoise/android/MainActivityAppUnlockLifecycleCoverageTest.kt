@@ -32,7 +32,27 @@ class MainActivityAppUnlockLifecycleCoverageTest {
             composeIndex > installIndex,
         )
         assertFalse("requestAppUnlock must reuse the lifecycle-bound prompt", requestBody.contains("BiometricPrompt("))
-        assertTrue(launchBody.contains("appUnlockPrompt.authenticate(promptInfo)"))
+        assertTrue(launchBody.contains("appUnlockPrompt.authenticate(promptInfo, cryptoObject)"))
+    }
+
+    @Test
+    fun successfulUnlockRequiresKeystoreBackedCryptoBeforeCompletingTheSession() {
+        val launchBody = functionBody("launchAppUnlockPrompt")
+        val callbackBody = functionBody("createAppUnlockPrompt")
+        val ownershipCheckIndex = callbackBody.indexOf("appState.appUnlockSessions.owns(sessionId, hostId)")
+        val cryptoVerificationIndex = callbackBody.indexOf("appUnlockCryptoGate.verify(result, expectedCipher)")
+        val sessionCompletionIndex = callbackBody.indexOf("appState.appUnlockSessions.complete(")
+
+        assertTrue(launchBody.contains("appUnlockCryptoGate.createCryptoObject()"))
+        assertTrue(launchBody.contains("appUnlockPromptHostState.expectedCipher = cryptoObject.cipher"))
+        assertTrue(launchBody.contains("appUnlockPrompt.authenticate(promptInfo, cryptoObject)"))
+        assertTrue("Session ownership must be checked before consuming crypto", ownershipCheckIndex >= 0)
+        assertTrue("AuthenticationResult crypto must be verified", cryptoVerificationIndex >= 0)
+        assertTrue(cryptoVerificationIndex > ownershipCheckIndex)
+        assertTrue(
+            "Keystore-backed crypto must succeed before the app unlock session completes",
+            sessionCompletionIndex > cryptoVerificationIndex,
+        )
     }
 
     @Test
