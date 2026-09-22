@@ -56,6 +56,12 @@ class MainActivityAppUnlockLifecycleCoverageTest {
     }
 
     @Test
+    fun promptHostStateIsVisibleToAndroidxReflection() {
+        assertTrue(source.contains("internal class AppUnlockPromptHostState : ViewModel()"))
+        assertFalse(source.contains("private class AppUnlockPromptHostState : ViewModel()"))
+    }
+
+    @Test
     fun recreatedActivityReattachesWithoutLaunchingTheSameSessionAgain() {
         val installBody = functionBody("installAppUnlockPrompt")
         val requestBody = functionBody("requestAppUnlock")
@@ -77,8 +83,7 @@ class MainActivityAppUnlockLifecycleCoverageTest {
     fun everyTerminalCallbackIsBoundToTheCurrentSession() {
         val callbackBody = functionBody("createAppUnlockPrompt")
 
-        assertTrue(callbackBody.contains("sessionId ?: return"))
-        assertTrue(callbackBody.contains("hostId ?: return"))
+        assertTrue(callbackBody.contains("if (sessionId == null || hostId == null) return"))
         assertTrue(callbackBody.contains("appState.appUnlockSessions.complete("))
         assertTrue(callbackBody.contains("appState.markAppUnlockSucceeded("))
         assertTrue(callbackBody.contains("appState.appUnlockSessions.terminate("))

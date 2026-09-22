@@ -552,51 +552,50 @@ class MainActivity : AppCompatActivity() {
             ContextCompat.getMainExecutor(this),
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                    sessionId ?: return
-                    hostId ?: return
+                    if (sessionId == null || hostId == null) return
                     if (!appState.appUnlockSessions.owns(sessionId, hostId)) {
                         traceAppUnlock(sessionId, "stale-success-ignored")
-                        return
-                    }
-                    val expectedCipher = appUnlockPromptHostState.expectedCipher
-                    appUnlockPromptHostState.expectedCipher = null
-                    if (!appUnlockCryptoGate.verify(result, expectedCipher)) {
-                        if (
-                            appState.appUnlockSessions.terminate(
-                                sessionId = sessionId,
-                                hostId = hostId,
-                            )
-                        ) {
-                            appUnlockPromptHostState.clear()
-                            appState.markAppUnlockFailed(AppText.Resource(R.string.app_lock_auth_failed))
-                            attachedAppUnlockSessionId = null
-                            attachedAppUnlockHostId = null
-                            traceAppUnlock(sessionId, "prompt-crypto-failed")
-                        }
-                        return
-                    }
-                    val accepted =
-                        appState.appUnlockSessions.complete(
-                            sessionId = sessionId,
-                            hostId = hostId,
-                            foregroundReturnExpiresAtElapsedRealtime =
-                                foregroundReturnExpiryElapsedRealtime(
-                                    nowElapsedRealtime = SystemClock.elapsedRealtime(),
-                                    hostResumed = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED),
-                                ),
-                        )
-                    if (accepted) {
-                        appUnlockPromptHostState.clear()
-                        appState.markAppUnlockSucceeded(
-                            dismissRetainedVisibleConversation =
-                                foregroundConversationDismissal.shouldDismissAfterUnlock(),
-                        )
-                        attachedAppUnlockSessionId = null
-                        attachedAppUnlockHostId = null
-                        traceAppUnlock(sessionId, "prompt-succeeded")
-                        releaseAppLockBackgroundSecureFlag()
                     } else {
-                        traceAppUnlock(sessionId, "stale-success-ignored")
+                        val expectedCipher = appUnlockPromptHostState.expectedCipher
+                        appUnlockPromptHostState.expectedCipher = null
+                        if (!appUnlockCryptoGate.verify(result, expectedCipher)) {
+                            if (
+                                appState.appUnlockSessions.terminate(
+                                    sessionId = sessionId,
+                                    hostId = hostId,
+                                )
+                            ) {
+                                appUnlockPromptHostState.clear()
+                                appState.markAppUnlockFailed(AppText.Resource(R.string.app_lock_auth_failed))
+                                attachedAppUnlockSessionId = null
+                                attachedAppUnlockHostId = null
+                                traceAppUnlock(sessionId, "prompt-crypto-failed")
+                            }
+                        } else {
+                            val accepted =
+                                appState.appUnlockSessions.complete(
+                                    sessionId = sessionId,
+                                    hostId = hostId,
+                                    foregroundReturnExpiresAtElapsedRealtime =
+                                        foregroundReturnExpiryElapsedRealtime(
+                                            nowElapsedRealtime = SystemClock.elapsedRealtime(),
+                                            hostResumed = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED),
+                                        ),
+                                )
+                            if (accepted) {
+                                appUnlockPromptHostState.clear()
+                                appState.markAppUnlockSucceeded(
+                                    dismissRetainedVisibleConversation =
+                                        foregroundConversationDismissal.shouldDismissAfterUnlock(),
+                                )
+                                attachedAppUnlockSessionId = null
+                                attachedAppUnlockHostId = null
+                                traceAppUnlock(sessionId, "prompt-succeeded")
+                                releaseAppLockBackgroundSecureFlag()
+                            } else {
+                                traceAppUnlock(sessionId, "stale-success-ignored")
+                            }
+                        }
                     }
                 }
 
@@ -822,7 +821,7 @@ private const val PRE_COMPOSE_BACKGROUND_DARK = 0xFF0F1112.toInt()
 private val appUnlockHostIds = AtomicLong()
 private const val APP_UNLOCK_FOREGROUND_HANDOFF_MILLIS = 5_000L
 
-private class AppUnlockPromptHostState : ViewModel() {
+internal class AppUnlockPromptHostState : ViewModel() {
     var sessionId: Long? = null
     var expectedCipher: Cipher? = null
 
