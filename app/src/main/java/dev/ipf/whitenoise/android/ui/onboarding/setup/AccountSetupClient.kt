@@ -110,7 +110,7 @@ internal class MarmotAccountSetupClient(
             marmot.userProfile(account)
         }
 
-    /** Executes explicit decisions, then advances optional follows and confirmed-missing lists. */
+    /** Executes explicit decisions, then advances optional follows. */
     override suspend fun execute(request: SetupRequest): OnboardingSnapshotFfi? =
         withContext(Dispatchers.IO) {
             val result = dispatch(request)
@@ -126,6 +126,7 @@ internal class MarmotAccountSetupClient(
             when (action) {
                 OnboardingActionFfi.RETRY -> marmot.retryOnboardingStep(account, step)
                 OnboardingActionFfi.CONTINUE_WITHOUT -> marmot.continueOnboardingWithout(account, step)
+                // MDK appends defaults while preserving the checked list and its NIP-65 roles.
                 OnboardingActionFfi.USE_RECOMMENDED_RELAYS ->
                     marmot.proposeOnboardingRecommendedRelays(
                         account,
