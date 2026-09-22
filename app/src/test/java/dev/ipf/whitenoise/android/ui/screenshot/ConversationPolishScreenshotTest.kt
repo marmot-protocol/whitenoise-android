@@ -241,7 +241,8 @@ class ConversationPolishScreenshotTest {
             canSpeak = true,
             canSelectText = true,
             canSave = true,
-            quickReactionEmojis = listOf("👍", "❤️", "😂", "😮", "😢"),
+            // The real configuration holds six slots, so the baseline has to show six.
+            quickReactionEmojis = listOf("👍", "❤️", "👎", "😂", "😮", "😢"),
             onDismissRequest = {},
             onReact = {},
             onOpenEmojiPicker = {},

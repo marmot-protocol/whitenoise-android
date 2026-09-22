@@ -11,7 +11,6 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -19,7 +18,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -72,6 +71,7 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
@@ -84,6 +84,7 @@ import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import dev.ipf.whitenoise.android.ui.theme.outlineSelectionColor
 import kotlinx.coroutines.launch
+import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 /** One visible native capability; dispatch remains in the owning message. */
@@ -380,7 +381,31 @@ internal fun FocusedMessageActions(
     }
 }
 
-/** Quick reactions on the menu-group surface: 48dp targets, 40dp state layer, 36dp selected disc, 28dp emoji. */
+/**
+ * Balances the reaction rail over as few rows as the width allows, so every configured choice keeps
+ * its 48dp target instead of being pushed past a scrolling edge that announces nothing.
+ *
+ * A width that fits everything keeps the single row the rail has always been. Otherwise the items
+ * are spread evenly — six reactions plus the full picker become 4 and 3 rather than 6 and a lone
+ * trailing button.
+ */
+internal fun focusedReactionItemsPerRow(
+    itemCount: Int,
+    availableWidth: Dp,
+): Int {
+    if (itemCount <= 1) return itemCount.coerceAtLeast(1)
+    val step = FocusedReactionTargetSize + FocusedReactionItemSpacing
+    val fitting = ((availableWidth + FocusedReactionItemSpacing) / step).toInt().coerceAtLeast(1)
+    // A width that holds everything leaves one row, and the even split then returns every item.
+    val rows = ceil(itemCount.toFloat() / fitting).toInt()
+    return ceil(itemCount.toFloat() / rows).toInt()
+}
+
+/**
+ * Quick reactions on the menu-group surface: 48dp targets, 40dp state layer, 36dp selected disc, 28dp emoji.
+ * The rail wraps rather than scrolling horizontally, because a sixth configured reaction used to sit
+ * beyond the viewport at the compact 360dp width with no affordance that it was there at all.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FocusedReactionRail(
@@ -397,13 +422,14 @@ private fun FocusedReactionRail(
         tonalElevation = MenuDefaults.TonalElevation,
         shadowElevation = MenuDefaults.ShadowElevation,
     ) {
-        Row(
-            modifier = Modifier.padding(FocusedReactionRailInset),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Row(
-                modifier = Modifier.weight(1f, fill = false).horizontalScroll(rememberScrollState()),
+        BoxWithConstraints(modifier = Modifier.padding(FocusedReactionRailInset)) {
+            // The full picker travels with the reactions, so it wraps with them instead of
+            // competing with them for one row's worth of width.
+            val perRow = focusedReactionItemsPerRow(quickReactions.size + 1, maxWidth)
+            FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(FocusedReactionItemSpacing),
+                verticalArrangement = Arrangement.spacedBy(FocusedReactionItemSpacing),
+                maxItemsInEachRow = perRow,
             ) {
                 quickReactions.forEach { emoji ->
                     FocusedReactionTarget(
@@ -412,8 +438,8 @@ private fun FocusedReactionRail(
                         onClick = { onReact(emoji) },
                     )
                 }
+                FocusedMoreReactionsTarget(onClick = onMoreReactions)
             }
-            FocusedMoreReactionsTarget(onClick = onMoreReactions)
         }
     }
 }
