@@ -7956,6 +7956,7 @@ class ConversationController(
      * the authoritative projection reports publication. Native convergence owns
      * accepted delivery; the host never invents another semantic send to retry it.
      */
+    @Suppress("LongMethod") // Retry admission, tracing, and lock ownership form one atomic policy boundary.
     private suspend fun publishTextWithRetry(
         replyTarget: String?,
         account: String,
@@ -8977,6 +8978,7 @@ class ConversationController(
         return optimisticMessages.entries.firstOrNull { (_, item) -> item.record == message }?.key
     }
 
+    @Suppress("ReturnCount") // Distinct unavailable-account/key exits precede the single lock-arbitrated result.
     private suspend fun cancelOptimisticSendResult(
         message: AppMessageRecordFfi,
         optimisticKeyOverride: String? = null,
@@ -9040,8 +9042,7 @@ class ConversationController(
                 .asSequence()
                 .filter { (key, phase) ->
                     phase == OptimisticSendPhase.CANCELLED && key !in discardedDuringRetry
-                }
-                .map { (key, _) -> key }
+                }.map { (key, _) -> key }
                 .toList()
         cancelledKeys
             .take((cancelledKeys.size - MAX_CANCELLED_SEND_TOMBSTONES).coerceAtLeast(0))
@@ -9897,6 +9898,7 @@ class ConversationController(
     }
 
     /** Settle a manual text retry without republishing an uncertain delivery. */
+    @Suppress("LongMethod") // Each failure classification owns different cleanup and user-visible recovery state.
     private fun handleFailedSendRetryFailure(
         throwable: Throwable,
         key: String,

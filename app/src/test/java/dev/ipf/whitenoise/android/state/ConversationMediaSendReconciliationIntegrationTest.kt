@@ -195,6 +195,7 @@ class ConversationMediaSendReconciliationIntegrationTest {
         }
 
     /** Exercises the default production path: no injected uploader or publisher test seam. */
+    @Suppress("LongMethod") // The native proxy and both cancellation/admission outcomes share one fixture.
     private fun assertDraftlessMediaUsesTokenBoundNativeAdmission(
         mediaType: String,
         fileName: String,

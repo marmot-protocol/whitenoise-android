@@ -234,6 +234,14 @@
         ]
       },
       {
+        "surface": "toast couldnt delete pending message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_couldnt_delete_message",
+        "test_ids": [
+          "MSG-019"
+        ]
+      },
+      {
         "surface": "toast couldnt reset group",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "R.string.toast_couldnt_reset_group",
