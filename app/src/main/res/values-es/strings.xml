@@ -235,6 +235,10 @@
     <string name="members">Miembros:</string>
     <string name="add_member">Añadir miembros</string>
     <string name="add_member_already_in_group">%1$s ya está en este grupo</string>
+    <string name="large_group_invite_warning_title">Grupo grande</string>
+    <string name="large_group_invite_warning_message">En grupos de 50 miembros o más, es posible que las invitaciones adicionales no se entreguen de forma fiable.</string>
+    <string name="large_group_invite_confirm_title">¿Invitar a un grupo grande?</string>
+    <string name="large_group_invite_confirm_message">En grupos de 50 miembros o más, es posible que las invitaciones adicionales no se entreguen de forma fiable. Aun así, puedes continuar.</string>
     <string name="invite_pending">Invitación pendiente: %1$s</string>
     <string name="latest_group_error">Último error del grupo: %1$s</string>
     <string name="actions">Acciones</string>

@@ -91,6 +91,7 @@ import dev.ipf.whitenoise.android.ui.conversation.conversationScrollKey
 import dev.ipf.whitenoise.android.ui.conversation.hasVisibleComposer
 import dev.ipf.whitenoise.android.ui.conversation.media.attachmentInstallerHandoffEffect
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardOperationStatusHost
+import dev.ipf.whitenoise.android.ui.conversation.rememberConversationSurfaceState
 import dev.ipf.whitenoise.android.ui.profile.ProfileSheet
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticsScreen
 import dev.ipf.whitenoise.android.ui.settings.SettingsHomeViewport
@@ -1882,7 +1883,12 @@ internal fun MainShell(
         selectedOrPendingConversationController
             ?: accountOwnedExitingConversationContent?.controller
     val selectedConversationSurfaceState =
-        remember(selectedOrPendingConversationController, appState.runtimeGeneration) { ConversationSurfaceState() }
+        rememberConversationSurfaceState(
+            controllerIdentity = selectedOrPendingConversationController,
+            accountRef = conversationAccountRef,
+            chatId = controllerChatId,
+            runtimeGeneration = appState.runtimeGeneration,
+        )
     val conversationTimelineVisibility = remember { ConversationTimelineVisibilityOwner<ConversationController>() }
     val currentConversationTimelineOwner by rememberUpdatedState(selectedOrPendingConversationController)
     val currentConversationTimelineRequestId by

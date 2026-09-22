@@ -64,7 +64,11 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -212,6 +216,29 @@ internal fun GroupDetailsLocalDeleteControl(
 // Members shown in Group Details before the "See all" expander.
 private const val GROUP_MEMBERS_PREVIEW_COUNT = 5
 
+/** Save just the stable picker fields needed to restore an in-progress Add Members selection. */
+internal val AddMemberSelectionSaver =
+    listSaver<SnapshotStateList<RecipientSearch.Candidate>, String>(
+        save = { selected ->
+            selected.flatMap { candidate ->
+                listOf(candidate.accountIdHex, candidate.displayName, candidate.npub)
+            }
+        },
+        restore = { saved ->
+            saved
+                .chunked(3)
+                .mapNotNull { fields ->
+                    fields.takeIf { it.size == 3 }?.let {
+                        RecipientSearch.Candidate(
+                            accountIdHex = it[0],
+                            displayName = it[1],
+                            npub = it[2],
+                        )
+                    }
+                }.toMutableStateList()
+        },
+    )
+
 /** Chat overview that keeps native membership, moderation and notification owners behind its presentation. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -248,8 +275,14 @@ internal fun GroupDetailsScreen(
     var addingDmPeerToGroups by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     // A requested picker stays closed until the roster is authoritative. This
     // avoids excluding candidates against a stale or empty member snapshot.
-    var showAddMember by remember { mutableStateOf(false) }
-    val addMemberAutoOpened = remember { autoOpenAddMember }
+    var showAddMember by rememberSaveable(controller.group.groupIdHex) { mutableStateOf(false) }
+    val addSelection =
+        rememberSaveable(controller.group.groupIdHex, saver = AddMemberSelectionSaver) {
+            mutableStateListOf<RecipientSearch.Candidate>()
+        }
+    var showLargeGroupInviteConfirmation by
+        rememberSaveable(controller.group.groupIdHex) { mutableStateOf(false) }
+    val addMemberAutoOpened = rememberSaveable(controller.group.groupIdHex) { autoOpenAddMember }
     var membersExpanded by remember(controller) { mutableStateOf(false) }
     var memberSearchOpen by remember(controller) { mutableStateOf(false) }
     var memberQuery by remember(controller) { mutableStateOf("") }
@@ -330,7 +363,11 @@ internal fun GroupDetailsScreen(
         }
     }
     LaunchedEffect(canAdministerMembers) {
-        if (!canAdministerMembers) showAddMember = false
+        if (!canAdministerMembers) {
+            showAddMember = false
+            showLargeGroupInviteConfirmation = false
+            addSelection.clear()
+        }
     }
     val noShareTargetText = stringResource(R.string.no_share_target_available)
     val groupTitleCopy = rememberGroupTitleCopy()
@@ -580,6 +617,8 @@ internal fun GroupDetailsScreen(
     // competing mutation won the controller's single-flight guard.
     LaunchedEffect(showAddMember, controller.pendingInviteMemberRefs) {
         if (showAddMember && controller.pendingInviteMemberRefs.isNotEmpty()) {
+            showLargeGroupInviteConfirmation = false
+            addSelection.clear()
             if (addMemberAutoOpened) onBack() else showAddMember = false
         }
     }
@@ -729,10 +768,39 @@ internal fun GroupDetailsScreen(
     }
 
     if (showAddMember && canAdministerMembers) {
-        // remember scoped to this branch: the selection resets every time the
-        // picker is reopened.
-        val addSelection = remember { mutableStateListOf<RecipientSearch.Candidate>() }
         val adding = activeMutation?.action == GroupMutationAction.InviteMember
+        val inviteProjection =
+            largeGroupInviteProjection(
+                rosterReady = rosterReady,
+                authoritativeMemberIds = controller.members.map { it.memberIdHex },
+                activeAccountIdHex = activeAccountIdHex,
+                pendingInviteMemberIds = controller.pendingInviteMemberRefs,
+                stagedRecipientIds = addSelection.map { it.accountIdHex },
+            )
+
+        /** Submits the currently staged, normalized recipients and closes the picker only after native success. */
+        fun submitSelectedInvites() {
+            if (!canAdministerMembers) return
+            val refs = addSelection.map { it.accountIdHex }
+            // Members are added as regular members; admin is granted
+            // per-member afterward from the profile sheet. The old bulk
+            // "add as admin" toggle couldn't express per-member intent for
+            // a multi-select add, so it's gone.
+            runGroupMutation(
+                action = GroupMutationAction.InviteMember,
+                mutation = { controller.inviteMembers(refs, addAsAdmin = false) },
+                onSuccess = {
+                    addSelection.clear()
+                    if (addMemberAutoOpened) onBack() else showAddMember = false
+                },
+            )
+        }
+
+        LaunchedEffect(showLargeGroupInviteConfirmation, inviteProjection?.shouldWarn) {
+            if (showLargeGroupInviteConfirmation && inviteProjection?.shouldWarn == false) {
+                showLargeGroupInviteConfirmation = false
+            }
+        }
         ContactPickerScreen(
             appState = appState,
             title = stringResource(R.string.add_member),
@@ -742,23 +810,18 @@ internal fun GroupDetailsScreen(
                 // conversation (via the details onBack) rather than exposing the
                 // details body the user never intended to see.
                 if (!adding) {
+                    showLargeGroupInviteConfirmation = false
+                    addSelection.clear()
                     if (addMemberAutoOpened) onBack() else showAddMember = false
                 }
             },
             onConfirm = confirm@{
-                if (!canAdministerMembers) return@confirm
-                val refs = addSelection.map { it.accountIdHex }
-                // Members are added as regular members; admin is granted
-                // per-member afterward from the profile sheet. The old bulk
-                // "add as admin" toggle couldn't express per-member intent for
-                // a multi-select add, so it's gone.
-                runGroupMutation(
-                    action = GroupMutationAction.InviteMember,
-                    mutation = { controller.inviteMembers(refs, addAsAdmin = false) },
-                    onSuccess = {
-                        if (addMemberAutoOpened) onBack() else showAddMember = false
-                    },
-                )
+                if (!canAdministerMembers || !rosterReady) return@confirm
+                if (inviteProjection?.shouldWarn == true) {
+                    showLargeGroupInviteConfirmation = true
+                } else {
+                    submitSelectedInvites()
+                }
             },
             confirmIcon = Icons.Default.Check,
             confirmLabel = stringResource(R.string.add_member),
@@ -769,7 +832,21 @@ internal fun GroupDetailsScreen(
             autoSelectResolvedIdentifier = true,
             excludeAccountIdHexes =
                 (controller.presentedMembers.map { it.memberIdHex } + controller.pendingInviteMemberRefs).toSet(),
+            footer = {
+                if (inviteProjection?.shouldWarn == true) {
+                    LargeGroupInviteWarningBanner()
+                }
+            },
         )
+        if (showLargeGroupInviteConfirmation && inviteProjection?.shouldWarn == true) {
+            LargeGroupInviteConfirmationDialog(
+                onContinue = {
+                    showLargeGroupInviteConfirmation = false
+                    submitSelectedInvites()
+                },
+                onDismiss = { showLargeGroupInviteConfirmation = false },
+            )
+        }
         return
     }
 

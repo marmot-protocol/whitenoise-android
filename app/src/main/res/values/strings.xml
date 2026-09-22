@@ -291,6 +291,10 @@
     <string name="members">Members</string>
     <string name="add_member">Add Members</string>
     <string name="add_member_already_in_group">%1$s is already in this group</string>
+    <string name="large_group_invite_warning_title">Large group</string>
+    <string name="large_group_invite_warning_message">In groups of 50 or more members, additional invitations might not be delivered reliably.</string>
+    <string name="large_group_invite_confirm_title">Invite to a large group?</string>
+    <string name="large_group_invite_confirm_message">In groups of 50 or more members, additional invitations might not be delivered reliably. You can still continue.</string>
     <!-- @-mention composer picker (#414) -->
     <string name="mention_picker_title">Mention a member</string>
     <string name="mention_picker_member">Mention %1$s</string>
