@@ -225,15 +225,18 @@ internal val AddMemberSelectionSaver =
             }
         },
         restore = { saved ->
-            saved.chunked(3).mapNotNull { fields ->
-                fields.takeIf { it.size == 3 }?.let {
-                    RecipientSearch.Candidate(
-                        accountIdHex = it[0],
-                        displayName = it[1],
-                        npub = it[2],
-                    )
+            saved
+                .chunked(3)
+                .mapNotNull { fields ->
+                    fields.takeIf { it.size == 3 }?.let {
+                        RecipientSearch.Candidate(
+                            accountIdHex = it[0],
+                            displayName = it[1],
+                            npub = it[2],
+                        )
+                    }
                 }
-            }.toMutableStateList()
+                .toMutableStateList()
         },
     )
 
