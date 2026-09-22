@@ -72,6 +72,7 @@ internal fun largeGroupInviteProjection(
 
 /** Persistent disclosure shown in the Add Members picker once the projected group reaches the threshold. */
 @Composable
+@Suppress("FunctionNaming")
 internal fun LargeGroupInviteWarningBanner(
     modifier: Modifier = Modifier,
 ) {
@@ -110,6 +111,7 @@ internal fun LargeGroupInviteWarningBanner(
 
 /** Explicit, non-destructive confirmation required immediately before dispatching a large-group invite. */
 @Composable
+@Suppress("FunctionNaming")
 internal fun LargeGroupInviteConfirmationDialog(
     onContinue: () -> Unit,
     onDismiss: () -> Unit,
