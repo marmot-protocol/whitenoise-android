@@ -25,18 +25,19 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.ConversationDictationDeliveryMode
 import dev.ipf.whitenoise.android.state.ConversationDictationPreferences
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.SpeechChoice
 import dev.ipf.whitenoise.android.ui.common.SpeechChoiceDialog
 
 /** Which dictation picker is open. */
-private enum class DictationSetting { Finish, }
+private enum class DictationSetting { Finish, Result }
 
 /**
- * Dictation: the recognition provider, when a pause ends a phrase, and what happens to the transcript, followed by
- * Android's own voice-input settings. Sending on finish keeps its safety note (D04: provider precedence and the
- * delivery default stay production's).
+ * Dictation: the recognition provider, when a pause ends a phrase, and — only once a pause can end one — what
+ * automatic completion does with the transcript, followed by Android's own voice-input settings. Sending on finish
+ * keeps its safety note (D04: provider precedence and the delivery default stay production's).
  */
 @Suppress("FunctionNaming", "LongMethod")
 @Composable
@@ -121,7 +122,24 @@ internal fun DictationSettingsScreen(
                             value = dictationFinishLabel(preferences.finishAfterSilenceMillis),
                         )
                     }
+                    // Only automatic completion consults this, so it has nothing to say while
+                    // Paste and Send are the only things that can end a dictation.
+                    if (preferences.finishAfterSilenceMillis != null) {
+                        row("result") { context ->
+                            SettingsLink(
+                                context = context,
+                                title = stringResource(R.string.dictation_result_title),
+                                onClick = { picker = DictationSetting.Result },
+                                value = stringResource(dictationDeliveryLabel(preferences.silenceDeliveryMode)),
+                            )
+                        }
+                    }
                 }
+            }
+            if (preferences.finishAfterSilenceMillis != null &&
+                preferences.silenceDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish
+            ) {
+                item { SettingsExplainer(stringResource(R.string.dictation_send_safety_note)) }
             }
             item {
                 SettingsGroup(modifier = Modifier.testTag("dictation.system.group")) {
@@ -179,6 +197,22 @@ internal fun DictationSettingsScreen(
                         },
                 onDismiss = { picker = null },
             )
+        DictationSetting.Result ->
+            SpeechChoiceDialog(
+                title = stringResource(R.string.dictation_result_title),
+                choices =
+                    ConversationDictationDeliveryMode.entries.map { mode ->
+                        SpeechChoice(
+                            title = stringResource(dictationDeliveryLabel(mode)),
+                            selected = preferences.silenceDeliveryMode == mode,
+                            subtitle = stringResource(dictationDeliveryDescription(mode)),
+                        ) {
+                            picker = null
+                            appState.conversationDictationPreferences.setSilenceDeliveryMode(mode)
+                        }
+                    },
+                onDismiss = { picker = null },
+            )
         null -> Unit
     }
 }
@@ -189,6 +223,22 @@ private fun dictationFinishLabel(finishAfterSilenceMillis: Long?): String =
     finishAfterSilenceMillis?.let {
         stringResource(R.string.dictation_finish_after_silence, it / MILLIS_PER_SECOND)
     } ?: stringResource(R.string.dictation_finish_manual)
+
+/** What automatic completion does with the transcript. */
+@androidx.annotation.StringRes
+private fun dictationDeliveryLabel(mode: ConversationDictationDeliveryMode): Int =
+    when (mode) {
+        ConversationDictationDeliveryMode.PasteIntoDraft -> R.string.dictation_result_paste
+        ConversationDictationDeliveryMode.SendOnFinish -> R.string.dictation_result_send
+    }
+
+/** The consequence of each delivery mode, shown beneath it in the picker. */
+@androidx.annotation.StringRes
+private fun dictationDeliveryDescription(mode: ConversationDictationDeliveryMode): Int =
+    when (mode) {
+        ConversationDictationDeliveryMode.PasteIntoDraft -> R.string.dictation_result_paste_description
+        ConversationDictationDeliveryMode.SendOnFinish -> R.string.dictation_result_send_description
+    }
 
 /** Hands off to Android's voice-input settings, falling back to the settings root. */
 private fun openVoiceInputSettings(context: Context): Boolean =

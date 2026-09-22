@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.audio.ConversationDictationDeliveryMode
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.TransientNotice
@@ -199,13 +200,14 @@ class SettingsScreenScreenshotTest {
     }
 
     /**
-     * Verifies the settings sheet persists an explicit silence threshold and offers no delivery default.
+     * Verifies the delivery choice appears only once a pause can end a dictation, and retracts again.
      *
-     * Paste or send is chosen per dictation now, so the screen must not carry a "when finished"
-     * choice that could send a later dictation nobody asked it to.
+     * The row governs automatic completion alone. While Paste and Send are the only things that can
+     * finish a dictation there is nothing for it to decide, so offering it there would imply a
+     * stored default that could send a later dictation nobody asked it to.
      */
     @Test
-    fun dictationSettingsWriteExplicitFinishAndOfferNoDeliveryDefault() {
+    fun dictationDeliveryChoiceAppearsOnlyWhileSilenceCanFinishADictation() {
         val appState = dictationAppState()
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -213,10 +215,22 @@ class SettingsScreenScreenshotTest {
             }
         }
 
+        composeRule.onNodeWithText("When finished").assertDoesNotExist()
+
         composeRule.onNodeWithText("Finish dictation").performClick()
         composeRule.onNodeWithText("After 5 seconds of silence").performClick()
+        composeRule.onNodeWithText("When finished").performClick()
+        composeRule.onNodeWithText("Send message").performClick()
 
         assertEquals(5_000L, appState.conversationDictationPreferences.current().finishAfterSilenceMillis)
+        assertEquals(
+            ConversationDictationDeliveryMode.SendOnFinish,
+            appState.conversationDictationPreferences.current().silenceDeliveryMode,
+        )
+
+        composeRule.onNodeWithText("Finish dictation").performClick()
+        composeRule.onNodeWithText("When I choose Paste or Send").performClick()
+
         composeRule.onNodeWithText("When finished").assertDoesNotExist()
     }
 

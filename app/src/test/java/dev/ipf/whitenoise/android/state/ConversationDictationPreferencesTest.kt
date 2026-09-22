@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import android.content.ComponentName
 import android.content.Context
+import dev.ipf.whitenoise.android.audio.ConversationDictationDeliveryMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Before
@@ -21,23 +22,26 @@ class ConversationDictationPreferencesTest {
         preferences().edit().clear().commit()
     }
 
-    /** Verifies new installs default to explicit completion. */
+    /** Verifies new installs default to explicit completion and non-sending draft insertion. */
     @Test
-    fun defaultsToManualFinish() {
+    fun defaultsToManualFinishAndPasteIntoDraft() {
         val state = ConversationDictationPreferences(context, preferences()).current()
 
         assertNull(state.finishAfterSilenceMillis)
+        assertEquals(ConversationDictationDeliveryMode.PasteIntoDraft, state.silenceDeliveryMode)
         assertNull(state.recognitionServiceOverride)
     }
 
-    /** Verifies only supported endpointing values persist. */
+    /** Verifies only supported endpointing values persist and send mode requires explicit selection. */
     @Test
-    fun persistsOnlySupportedSilenceThresholds() {
+    fun persistsOnlySupportedSilenceThresholdsAndExplicitSendMode() {
         val original = ConversationDictationPreferences(context, preferences())
         original.setFinishAfterSilenceMillis(5_000L)
+        original.setSilenceDeliveryMode(ConversationDictationDeliveryMode.SendOnFinish)
 
         val restored = ConversationDictationPreferences(context, preferences())
         assertEquals(5_000L, restored.current().finishAfterSilenceMillis)
+        assertEquals(ConversationDictationDeliveryMode.SendOnFinish, restored.current().silenceDeliveryMode)
 
         restored.setFinishAfterSilenceMillis(2_000L)
         assertNull(restored.current().finishAfterSilenceMillis)

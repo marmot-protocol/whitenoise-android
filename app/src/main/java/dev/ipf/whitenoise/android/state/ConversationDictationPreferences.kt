@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.pm.PackageInfoCompat
+import dev.ipf.whitenoise.android.audio.ConversationDictationDeliveryMode
 import dev.ipf.whitenoise.android.audio.ConversationDictationProviderChoice
 import dev.ipf.whitenoise.android.audio.conversationDictationRecognitionServiceComponent
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,6 +14,7 @@ import org.json.JSONObject
 
 internal data class ConversationDictationPreferenceState(
     val finishAfterSilenceMillis: Long?,
+    val silenceDeliveryMode: ConversationDictationDeliveryMode = ConversationDictationDeliveryMode.PasteIntoDraft,
     val recognitionServiceOverride: ComponentName? = null,
     val providerSelection: ConversationDictationProviderChoice? = null,
 )
@@ -44,6 +46,17 @@ internal class ConversationDictationPreferences(
         update(current().copy(finishAfterSilenceMillis = normalized))
     }
 
+    /**
+     * Persists what automatic completion does with the transcript.
+     *
+     * Only silence-triggered completion reads this. An explicit Paste or Send always carries its own
+     * choice, so this can never override a button someone pressed.
+     */
+    fun setSilenceDeliveryMode(value: ConversationDictationDeliveryMode) {
+        if (current().silenceDeliveryMode == value) return
+        update(current().copy(silenceDeliveryMode = value))
+    }
+
     /** Persists an explicit service identity, or clears it to follow Android's system default. */
     fun setRecognitionServiceOverride(value: ComponentName?) {
         val selection =
@@ -70,8 +83,10 @@ internal class ConversationDictationPreferences(
         preferences
             .edit()
             .putLong(KEY_FINISH_AFTER_SILENCE, value.finishAfterSilenceMillis ?: MANUAL_FINISH)
-            // Paste or send is chosen per dictation now. Dropping the stored default on the first
-            // write means an upgrade cannot leave a "send when finished" behind to act on later.
+            .putString(KEY_SILENCE_DELIVERY_MODE, value.silenceDeliveryMode.name)
+            // The old key governed every completion, including the ones a person ended by hand.
+            // Dropping it on the first write keeps an upgrade from acting on a choice made under
+            // those wider rules, so the narrower setting above starts from paste.
             .remove(KEY_DELIVERY_MODE)
             .remove(KEY_RECOGNITION_SERVICE_OVERRIDE)
             .putString(KEY_PROVIDER_SELECTION, value.providerSelection?.let(::encodeSelection))
@@ -79,18 +94,23 @@ internal class ConversationDictationPreferences(
     }
 
     /**
-     * Reads preferences fail-closed to manual finish.
+     * Reads preferences fail-closed to manual finish and paste-into-draft.
      *
-     * A stored delivery mode from before per-use actions is not read at all, so an upgrade cannot
-     * carry someone's old "send when finished" into a session that would act on it.
+     * The pre-per-use key is never read, so an upgrade cannot carry someone's old app-wide
+     * "send when finished" into a session that would act on it.
      */
     private fun readState(): ConversationDictationPreferenceState {
         val silence =
             preferences
                 .getLong(KEY_FINISH_AFTER_SILENCE, MANUAL_FINISH)
                 .takeIf(ALLOWED_SILENCE_MILLIS::contains)
+        val silenceDelivery =
+            preferences
+                .getString(KEY_SILENCE_DELIVERY_MODE, null)
+                ?.let { stored -> ConversationDictationDeliveryMode.entries.firstOrNull { it.name == stored } }
+                ?: ConversationDictationDeliveryMode.PasteIntoDraft
         val selection = decodeSelection(preferences.getString(KEY_PROVIDER_SELECTION, null))
-        return ConversationDictationPreferenceState(silence, selection?.service, selection)
+        return ConversationDictationPreferenceState(silence, silenceDelivery, selection?.service, selection)
     }
 
     private fun encodeSelection(value: ConversationDictationProviderChoice): String =
@@ -140,6 +160,7 @@ internal class ConversationDictationPreferences(
         private const val PREFERENCES_NAME = "whitenoise.composer_dictation"
         private const val KEY_FINISH_AFTER_SILENCE = "finishAfterSilenceMillis"
         private const val KEY_DELIVERY_MODE = "deliveryMode"
+        private const val KEY_SILENCE_DELIVERY_MODE = "silenceDeliveryMode"
         private const val KEY_PROVIDER_SELECTION = "providerSelection"
         private const val KEY_RECOGNITION_SERVICE_OVERRIDE = "recognitionServiceOverride"
         private const val MANUAL_FINISH = -1L

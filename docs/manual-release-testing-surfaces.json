@@ -6,45 +6,31 @@
         "surface": "Pinned selected-message preview expiry",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatPreviewExpiry.kt",
         "anchor": "fun rememberChatPreviewExpired(",
-        "test_ids": [
-          "MSG-018"
-        ]
+        "test_ids": ["MSG-018"]
       },
       {
         "surface": "Native host-managed permission fencing",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentPermissions.kt",
         "anchor": "internal class NativeAttachmentPermissions",
-        "test_ids": [
-          "MED-019",
-          "MED-020"
-        ]
+        "test_ids": ["MED-019", "MED-020"]
       },
       {
         "surface": "Quick account switching preference",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/QuickAccountSwitchingPreference.kt",
         "anchor": "internal class QuickAccountSwitchingPreference",
-        "test_ids": [
-          "NAV-005",
-          "ACC-017",
-          "SET-001"
-        ]
+        "test_ids": ["NAV-005", "ACC-017", "SET-001"]
       },
       {
         "surface": "Native attachment transfer observation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentTransfers.kt",
         "anchor": "private suspend fun NativeTransferFeed.nextState()",
-        "test_ids": [
-          "MED-019",
-          "MED-020"
-        ]
+        "test_ids": ["MED-019", "MED-020"]
       },
       {
         "surface": "Durable caller-correlated composer admission",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/DurableLocalSends.kt",
         "anchor": "sendComposerTextWithToken(",
-        "test_ids": [
-          "MSG-017"
-        ]
+        "test_ids": ["MSG-017"]
       },
       {
         "surface": "Key package inventory load failure toast",
@@ -7187,6 +7173,24 @@
         "surface": "DictationSettingsScreen",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
         "anchor": "fun DictationSettingsScreen(",
+        "test_ids": [
+          "DIC-002",
+          "DIC-004"
+        ]
+      },
+      {
+        "surface": "dictationDeliveryDescription",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "fun dictationDeliveryDescription(",
+        "test_ids": [
+          "DIC-002",
+          "DIC-004"
+        ]
+      },
+      {
+        "surface": "dictationDeliveryLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "fun dictationDeliveryLabel(",
         "test_ids": [
           "DIC-002",
           "DIC-004"
@@ -18949,6 +18953,60 @@
         ]
       },
       {
+        "surface": "setting:dictation_result_paste",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "R.string.dictation_result_paste",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "setting:dictation_result_paste_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "R.string.dictation_result_paste_description",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "setting:dictation_result_send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "R.string.dictation_result_send",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "setting:dictation_result_send_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "R.string.dictation_result_send_description",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "setting:dictation_result_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "R.string.dictation_result_title",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:dictation_send_safety_note",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "R.string.dictation_send_safety_note",
+        "test_ids": [
+          "DIC-002",
+          "DIC-004"
+        ]
+      },
+      {
         "surface": "string:dictation_settings_explainer",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
         "anchor": "R.string.dictation_settings_explainer",
@@ -22261,25 +22319,19 @@
         "surface": "Token-aware text admission safely retries an interrupted runtime call",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "private fun isRetryableTextAdmissionError(",
-        "test_ids": [
-          "MSG-017"
-        ]
+        "test_ids": ["MSG-017"]
       },
       {
         "surface": "Pending-send retries use a caller-owned safety classifier",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationRetryPolicy.kt",
         "anchor": "retryableFailure: (Throwable) -> Boolean",
-        "test_ids": [
-          "MSG-017"
-        ]
+        "test_ids": ["MSG-017"]
       },
       {
         "surface": "Native attachment status and cancellation share one IO bridge turn",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentTransfers.kt",
         "anchor": "internal suspend fun WhiteNoiseAppState.cancelNativeAttachment(",
-        "test_ids": [
-          "MED-020"
-        ]
+        "test_ids": ["MED-020"]
       },
       {
         "surface": "Attachment worker completed-body retention failure",
@@ -22375,6 +22427,14 @@
         "surface": "Dictation automatic completion observes captured speech and drains the tail",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
         "anchor": "private fun finishAfterCallerAudioSilence(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "Dictation automatic completion delivers by the stored silence choice only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "private fun completeAfterSilence(",
         "test_ids": [
           "DIC-002"
         ]
@@ -25790,7 +25850,7 @@
       {
         "surface": "User-facing copy audit: strings rewritten for plain, non-protocol wording across onboarding, profile, groups, media, dictation and diagnostics",
         "source": "app/src/main/res/values/strings.xml",
-        "anchor": "name=\"folder_rule_hint\"",
+        "anchor": "name=\"dictation_send_safety_note\"",
         "test_ids": [
           "ONB-003",
           "ONB-008",
@@ -25822,14 +25882,6 @@
         "anchor": "fun translated(",
         "test_ids": [
           "MED-006"
-        ]
-      },
-      {
-        "surface": "A dictation that ends on its own pastes into the draft and never sends",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
-        "anchor": "private fun deliverTranscript(",
-        "test_ids": [
-          "DIC-002"
         ]
       }
     ],

@@ -1207,6 +1207,9 @@ class WhiteNoiseAppState private constructor(
             finishAfterSilenceMillis = {
                 conversationDictationPreferences.current().finishAfterSilenceMillis
             },
+            silenceDeliveryMode = {
+                conversationDictationPreferences.current().silenceDeliveryMode
+            },
             sendTranscriptIfOriginUnchanged = ::sendDictationTranscriptIfOriginUnchanged,
         )
     }

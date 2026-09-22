@@ -1929,15 +1929,15 @@ class ConversationDictationControllerTest {
     }
 
     /**
-     * A silence finish never reaches the send pipeline, even when one is wired and ready.
+     * Automatic completion sends its final tail when that is what the silence setting asks for.
      *
-     * The app-wide "send when finished" default is retired, so the only way a dictation leaves the
-     * device is someone tapping Send. This drives a session that ends because the room went quiet
-     * with a working dispatcher attached, and proves it is never called.
+     * This is the one path allowed to send without a button press, and only because someone chose
+     * it for silence specifically, so it shares the short-tail endpoint and delivery pipeline Paste
+     * uses rather than a shortcut of its own.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun configuredSilenceNeverReachesTheSendPipeline() =
+    fun configuredSilenceFinishesShortCallerAudioAndSendsItsFinalTail() =
         runTest {
             val sent = mutableListOf<String>()
             val platform =
@@ -1950,6 +1950,7 @@ class ConversationDictationControllerTest {
                     draft = TextFieldValue("Draft", TextRange(5)),
                     platform = platform,
                     finishAfterSilenceMillis = { 3_000L },
+                    silenceDeliveryMode = { ConversationDictationDeliveryMode.SendOnFinish },
                     targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
                     targetValidationScope = this,
                     sendTranscriptIfOriginUnchanged = { request ->
@@ -1964,9 +1965,104 @@ class ConversationDictationControllerTest {
             platform.listener.onResult("complete short tail")
             advanceUntilIdle()
 
-            assertEquals("a silence finish must not send anything", emptyList<String>(), sent)
-            assertEquals("Draft complete short tail", fixture.drafts.getValue(key()).text)
+            assertEquals(listOf("Draft complete short tail"), sent)
+            assertEquals("", fixture.drafts.getValue(key()).text)
             assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        }
+
+    /** Automatic completion leaves the transcript in the draft unless silence was set to send. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun configuredSilenceLeavesItsTailInTheDraftWhenPasteIsChosen() =
+        runTest {
+            val sent = mutableListOf<String>()
+            val platform =
+                FakePlatform().apply {
+                    pendingCallerAudio = true
+                    capturedSilenceMillis = 0L
+                }
+            val fixture =
+                fixture(
+                    draft = TextFieldValue("Draft", TextRange(5)),
+                    platform = platform,
+                    finishAfterSilenceMillis = { 3_000L },
+                    silenceDeliveryMode = { ConversationDictationDeliveryMode.PasteIntoDraft },
+                    targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        sent += request.payload
+                        true
+                    },
+                )
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            platform.capturedSilenceMillis = 3_000L
+            fixture.scheduler.advanceBy(3_000L)
+            platform.pendingCallerAudio = false
+            platform.listener.onResult("complete short tail")
+            advanceUntilIdle()
+
+            assertEquals("the default automatic choice must not send", emptyList<String>(), sent)
+            assertEquals("Draft complete short tail", fixture.drafts.getValue(key()).text)
+        }
+
+    /**
+     * A stored send choice governs automatic completion only, never one a person ended by hand.
+     *
+     * This is the whole point of narrowing the setting: Done finishes the dictation before the
+     * silence timer ever fires, so the transcript belongs in the draft even though the stored
+     * choice for silence says send.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun aStoredSendChoiceDoesNotReachACompletionEndedByHand() =
+        runTest {
+            val sent = mutableListOf<String>()
+            val fixture =
+                fixture(
+                    draft = TextFieldValue("Draft", TextRange(5)),
+                    finishAfterSilenceMillis = { 3_000L },
+                    silenceDeliveryMode = { ConversationDictationDeliveryMode.SendOnFinish },
+                    targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        sent += request.payload
+                        true
+                    },
+                )
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.controller.stop()
+            fixture.platform.listener.onResult("ended by hand")
+            advanceUntilIdle()
+
+            assertEquals("Done must not inherit the silence setting", emptyList<String>(), sent)
+            assertEquals("Draft ended by hand", fixture.drafts.getValue(key()).text)
+        }
+
+    /** An explicit Paste wins over a stored send choice for the same session. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun anExplicitPasteWinsOverAStoredSendChoice() =
+        runTest {
+            val sent = mutableListOf<String>()
+            val fixture =
+                fixture(
+                    draft = TextFieldValue("Draft", TextRange(5)),
+                    finishAfterSilenceMillis = { 3_000L },
+                    silenceDeliveryMode = { ConversationDictationDeliveryMode.SendOnFinish },
+                    targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        sent += request.payload
+                        true
+                    },
+                )
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.controller.paste()
+            fixture.platform.listener.onResult("chosen by hand")
+            advanceUntilIdle()
+
+            assertEquals("a pressed Paste must win", emptyList<String>(), sent)
+            assertEquals("Draft chosen by hand", fixture.drafts.getValue(key()).text)
         }
 
     /** Buffered live speech must not be mistaken for provider silence between 30-second chunks. */
@@ -4254,6 +4350,9 @@ class ConversationDictationControllerTest {
         },
         stopDurableSession: () -> Unit = {},
         finishAfterSilenceMillis: () -> Long? = { null },
+        silenceDeliveryMode: () -> ConversationDictationDeliveryMode = {
+            ConversationDictationDeliveryMode.PasteIntoDraft
+        },
         sendTranscriptIfOriginUnchanged: suspend (ConversationDictationSendRequest) -> Boolean = { false },
         onReadinessEvent: (ConversationDictationReadinessEvent) -> Unit = {},
     ): Fixture {
@@ -4296,6 +4395,7 @@ class ConversationDictationControllerTest {
                 elapsedRealtime = scheduler::now,
                 scheduleTimeout = scheduler::schedule,
                 finishAfterSilenceMillis = finishAfterSilenceMillis,
+                silenceDeliveryMode = silenceDeliveryMode,
                 sendTranscriptIfOriginUnchanged = sendTranscriptIfOriginUnchanged,
                 onReadinessEvent = onReadinessEvent,
             )

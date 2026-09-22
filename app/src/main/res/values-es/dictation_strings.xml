@@ -13,4 +13,10 @@
     <string name="dictation_finish_title">Terminar dictado</string>
     <string name="dictation_finish_manual">Cuando elija Pegar o Enviar</string>
     <string name="dictation_finish_after_silence">Después de %1$d segundos de silencio</string>
+    <string name="dictation_result_title">Al terminar</string>
+    <string name="dictation_result_paste">Pegar en el borrador</string>
+    <string name="dictation_result_paste_description">Revisar o editar el texto antes de enviarlo</string>
+    <string name="dictation_result_send">Enviar mensaje</string>
+    <string name="dictation_result_send_description">Solo se envía si el chat y el borrador no han cambiado</string>
+    <string name="dictation_send_safety_note">Si el chat o el borrador cambian antes de que se envíe el mensaje, el texto se queda en tu borrador para que puedas revisarlo.</string>
 </resources>

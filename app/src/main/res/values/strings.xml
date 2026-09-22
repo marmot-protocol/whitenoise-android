@@ -1435,6 +1435,12 @@
     <string name="dictation_finish_title">Finish dictation</string>
     <string name="dictation_finish_manual">When I choose Paste or Send</string>
     <string name="dictation_finish_after_silence">After %1$d seconds of silence</string>
+    <string name="dictation_result_title">When finished</string>
+    <string name="dictation_result_paste">Paste into draft</string>
+    <string name="dictation_result_paste_description">Review or edit the text before sending</string>
+    <string name="dictation_result_send">Send message</string>
+    <string name="dictation_result_send_description">Sends only if the chat and draft haven’t changed</string>
+    <string name="dictation_send_safety_note">If the chat or draft changes before the message sends, the text stays in your draft so you can review it.</string>
     <string name="voice_message_play">Play voice message</string>
     <string name="voice_message_pause">Pause voice message</string>
     <string name="voice_message_speed">Playback speed %1$s</string>

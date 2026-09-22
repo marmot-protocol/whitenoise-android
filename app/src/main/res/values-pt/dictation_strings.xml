@@ -13,4 +13,10 @@
     <string name="dictation_finish_title">Terminar ditado</string>
     <string name="dictation_finish_manual">Quando escolher Colar ou Enviar</string>
     <string name="dictation_finish_after_silence">Após %1$d segundos de silêncio</string>
+    <string name="dictation_result_title">Quando terminar</string>
+    <string name="dictation_result_paste">Colar no rascunho</string>
+    <string name="dictation_result_paste_description">Rever ou editar o texto antes de enviar</string>
+    <string name="dictation_result_send">Enviar mensagem</string>
+    <string name="dictation_result_send_description">Envia apenas se a conversa e o rascunho não tiverem mudado</string>
+    <string name="dictation_send_safety_note">Se a conversa ou o rascunho mudar antes de a mensagem ser enviada, o texto permanece no seu rascunho para você revisar.</string>
 </resources>
