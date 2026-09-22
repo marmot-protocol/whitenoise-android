@@ -1715,12 +1715,6 @@
     <string name="dictation_finish_title">Diktat beenden</string>
     <string name="dictation_finish_manual">Wenn ich Einfügen oder Senden wähle</string>
     <string name="dictation_finish_after_silence">Nach %1$d Sekunden Stille</string>
-    <string name="dictation_result_title">Nach Abschluss</string>
-    <string name="dictation_result_paste">In Entwurf einfügen</string>
-    <string name="dictation_result_paste_description">Text vor dem Senden prüfen oder bearbeiten</string>
-    <string name="dictation_result_send">Nachricht senden</string>
-    <string name="dictation_result_send_description">Sendet nur, wenn Chat und Entwurf unverändert sind</string>
-    <string name="dictation_send_safety_note">Ändert sich der Chat oder der Entwurf vor dem Senden, bleibt der Text in deinem Entwurf, damit du ihn prüfen kannst.</string>
     <string name="dictation_microphone_muted">Mikrofonzugriff ist deaktiviert</string>
     <string name="dictation_microphone_muted_help">Aktiviere den Mikrofonzugriff in den Android-Datenschutzeinstellungen oder den Schnelleinstellungen und versuche das Diktieren erneut.</string>
     <!-- Imported-account preflight (#2519). -->

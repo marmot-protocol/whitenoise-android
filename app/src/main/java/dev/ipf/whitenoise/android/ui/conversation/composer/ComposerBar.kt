@@ -1444,6 +1444,7 @@ internal fun ComposerBar(
                                     ConversationDictationCompactActions(
                                         state = dictationState,
                                         controller = activeController,
+                                        actionColors = actionColors,
                                     )
                                 }
                             },

@@ -4,7 +4,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.pm.PackageInfoCompat
-import dev.ipf.whitenoise.android.audio.ConversationDictationDeliveryMode
 import dev.ipf.whitenoise.android.audio.ConversationDictationProviderChoice
 import dev.ipf.whitenoise.android.audio.conversationDictationRecognitionServiceComponent
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,7 +13,6 @@ import org.json.JSONObject
 
 internal data class ConversationDictationPreferenceState(
     val finishAfterSilenceMillis: Long?,
-    val deliveryMode: ConversationDictationDeliveryMode,
     val recognitionServiceOverride: ComponentName? = null,
     val providerSelection: ConversationDictationProviderChoice? = null,
 )
@@ -46,12 +44,6 @@ internal class ConversationDictationPreferences(
         update(current().copy(finishAfterSilenceMillis = normalized))
     }
 
-    /** Persists the user's explicit paste-or-send terminal behavior. */
-    fun setDeliveryMode(value: ConversationDictationDeliveryMode) {
-        if (current().deliveryMode == value) return
-        update(current().copy(deliveryMode = value))
-    }
-
     /** Persists an explicit service identity, or clears it to follow Android's system default. */
     fun setRecognitionServiceOverride(value: ComponentName?) {
         val selection =
@@ -78,25 +70,27 @@ internal class ConversationDictationPreferences(
         preferences
             .edit()
             .putLong(KEY_FINISH_AFTER_SILENCE, value.finishAfterSilenceMillis ?: MANUAL_FINISH)
-            .putString(KEY_DELIVERY_MODE, value.deliveryMode.name)
+            // Paste or send is chosen per dictation now. Dropping the stored default on the first
+            // write means an upgrade cannot leave a "send when finished" behind to act on later.
+            .remove(KEY_DELIVERY_MODE)
             .remove(KEY_RECOGNITION_SERVICE_OVERRIDE)
             .putString(KEY_PROVIDER_SELECTION, value.providerSelection?.let(::encodeSelection))
             .apply()
     }
 
-    /** Reads preferences fail-closed to manual finish and paste-to-draft. */
+    /**
+     * Reads preferences fail-closed to manual finish.
+     *
+     * A stored delivery mode from before per-use actions is not read at all, so an upgrade cannot
+     * carry someone's old "send when finished" into a session that would act on it.
+     */
     private fun readState(): ConversationDictationPreferenceState {
         val silence =
             preferences
                 .getLong(KEY_FINISH_AFTER_SILENCE, MANUAL_FINISH)
                 .takeIf(ALLOWED_SILENCE_MILLIS::contains)
-        val delivery =
-            preferences
-                .getString(KEY_DELIVERY_MODE, null)
-                ?.let { stored -> ConversationDictationDeliveryMode.entries.firstOrNull { it.name == stored } }
-                ?: ConversationDictationDeliveryMode.PasteIntoDraft
         val selection = decodeSelection(preferences.getString(KEY_PROVIDER_SELECTION, null))
-        return ConversationDictationPreferenceState(silence, delivery, selection?.service, selection)
+        return ConversationDictationPreferenceState(silence, selection?.service, selection)
     }
 
     private fun encodeSelection(value: ConversationDictationProviderChoice): String =

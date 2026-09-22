@@ -13,10 +13,4 @@
     <string name="dictation_finish_title">Dikteyi bitir</string>
     <string name="dictation_finish_manual">Yapıştır veya Gönder’i seçtiğimde</string>
     <string name="dictation_finish_after_silence">%1$d saniye sessizlikten sonra</string>
-    <string name="dictation_result_title">Bittiğinde</string>
-    <string name="dictation_result_paste">Taslağa yapıştır</string>
-    <string name="dictation_result_paste_description">Göndermeden önce metni gözden geçirin veya düzenleyin</string>
-    <string name="dictation_result_send">Mesaj gönder</string>
-    <string name="dictation_result_send_description">Yalnızca sohbet ve taslak değişmediyse gönderir</string>
-    <string name="dictation_send_safety_note">Mesaj gönderilmeden önce sohbet veya taslak değişirse metin, gözden geçirebilmeniz için taslağınızda kalır.</string>
 </resources>

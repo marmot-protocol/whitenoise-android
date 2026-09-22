@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
-import dev.ipf.whitenoise.android.audio.ConversationDictationDeliveryMode
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.TransientNotice
@@ -199,9 +198,14 @@ class SettingsScreenScreenshotTest {
         }
     }
 
-    /** Verifies settings sheets persist explicit silence completion and send-on-finish choices. */
+    /**
+     * Verifies the settings sheet persists an explicit silence threshold and offers no delivery default.
+     *
+     * Paste or send is chosen per dictation now, so the screen must not carry a "when finished"
+     * choice that could send a later dictation nobody asked it to.
+     */
     @Test
-    fun dictationSettingsWriteExplicitFinishAndDeliverySelections() {
+    fun dictationSettingsWriteExplicitFinishAndOfferNoDeliveryDefault() {
         val appState = dictationAppState()
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -211,14 +215,9 @@ class SettingsScreenScreenshotTest {
 
         composeRule.onNodeWithText("Finish dictation").performClick()
         composeRule.onNodeWithText("After 5 seconds of silence").performClick()
-        composeRule.onNodeWithText("When finished").performClick()
-        composeRule.onNodeWithText("Send message").performClick()
 
         assertEquals(5_000L, appState.conversationDictationPreferences.current().finishAfterSilenceMillis)
-        assertEquals(
-            ConversationDictationDeliveryMode.SendOnFinish,
-            appState.conversationDictationPreferences.current().deliveryMode,
-        )
+        composeRule.onNodeWithText("When finished").assertDoesNotExist()
     }
 
     /** The settings home with Alice signed in, a self-updating build and no-op callbacks. */

@@ -13,10 +13,4 @@
     <string name="dictation_finish_title">結束聽寫</string>
     <string name="dictation_finish_manual">當我選擇「貼上」或「傳送」時</string>
     <string name="dictation_finish_after_silence">靜音 %1$d 秒後</string>
-    <string name="dictation_result_title">完成時</string>
-    <string name="dictation_result_paste">貼到草稿</string>
-    <string name="dictation_result_paste_description">傳送前檢閱或編輯文字</string>
-    <string name="dictation_result_send">傳送訊息</string>
-    <string name="dictation_result_send_description">僅在聊天和草稿未變更時傳送</string>
-    <string name="dictation_send_safety_note">如果訊息傳送前聊天或草稿有所變更，文字會保留在草稿中供你檢閱。</string>
 </resources>

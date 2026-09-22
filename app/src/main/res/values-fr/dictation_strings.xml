@@ -13,10 +13,4 @@
     <string name="dictation_finish_title">Terminer la dictée</string>
     <string name="dictation_finish_manual">Lorsque je choisis Coller ou Envoyer</string>
     <string name="dictation_finish_after_silence">Après %1$d secondes de silence</string>
-    <string name="dictation_result_title">Une fois terminée</string>
-    <string name="dictation_result_paste">Coller dans le brouillon</string>
-    <string name="dictation_result_paste_description">Relire ou modifier le texte avant l’envoi</string>
-    <string name="dictation_result_send">Envoyer le message</string>
-    <string name="dictation_result_send_description">N’envoie que si la discussion et le brouillon sont inchangés</string>
-    <string name="dictation_send_safety_note">Si la discussion ou le brouillon change avant l’envoi du message, le texte reste dans votre brouillon pour que vous puissiez le vérifier.</string>
 </resources>

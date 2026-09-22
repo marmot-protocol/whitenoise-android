@@ -420,9 +420,6 @@ internal class ConversationDictationController internal constructor(
         true
     },
     private val stopDurableSession: () -> Unit = {},
-    private val deliveryMode: () -> ConversationDictationDeliveryMode = {
-        ConversationDictationDeliveryMode.PasteIntoDraft
-    },
     private val sendTranscriptIfOriginUnchanged: suspend (ConversationDictationSendRequest) -> Boolean = { false },
     private val disclosureAccepted: () -> Boolean,
     private val markDisclosureAccepted: () -> Unit,
@@ -451,9 +448,6 @@ internal class ConversationDictationController internal constructor(
         tryAcquireMicrophone: () -> Boolean,
         releaseMicrophone: () -> Unit,
         finishAfterSilenceMillis: () -> Long? = { null },
-        deliveryMode: () -> ConversationDictationDeliveryMode = {
-            ConversationDictationDeliveryMode.PasteIntoDraft
-        },
         sendTranscriptIfOriginUnchanged: suspend (ConversationDictationSendRequest) -> Boolean = { false },
     ) : this(
         platform = AndroidConversationDictationPlatform(context.applicationContext),
@@ -472,7 +466,6 @@ internal class ConversationDictationController internal constructor(
         },
         stopDurableSession = { ConversationDictationForegroundService.stop(context.applicationContext) },
         finishAfterSilenceMillis = finishAfterSilenceMillis,
-        deliveryMode = deliveryMode,
         sendTranscriptIfOriginUnchanged = sendTranscriptIfOriginUnchanged,
         disclosureAccepted = {
             context
@@ -584,7 +577,7 @@ internal class ConversationDictationController internal constructor(
     val processingDeliveryMode: ConversationDictationDeliveryMode?
         get() =
             if (finishRequested && inActiveRecognitionState) {
-                requestedDeliveryMode ?: state.target?.deliveryMode
+                requestedDeliveryMode ?: ConversationDictationDeliveryMode.PasteIntoDraft
             } else {
                 null
             }
@@ -699,7 +692,6 @@ internal class ConversationDictationController internal constructor(
                 capturedDraftRevision = capturedRevision,
                 mode = mode,
                 finishAfterSilenceMillis = finishAfterSilenceMillis()?.takeIf { it > 0L },
-                deliveryMode = deliveryMode(),
             )
         if (!targetAvailable(target)) return false
         if (!runCatching(platform::prepareProviderSelection).getOrDefault(false)) {
@@ -2375,7 +2367,10 @@ internal class ConversationDictationController internal constructor(
         target: ConversationDictationTarget,
         transcript: String,
     ) {
-        val deliveryMode = requestedDeliveryMode ?: target.deliveryMode
+        // Only an explicit Send asks for one. A session that ended on its own — silence timeout,
+        // restoration, a target captured before the app-wide default was retired — pastes into the
+        // draft, so nothing leaves the device without someone choosing it.
+        val deliveryMode = requestedDeliveryMode ?: ConversationDictationDeliveryMode.PasteIntoDraft
         if (deliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {
             sendTranscriptOnFinish(sessionId, target, transcript)
             return

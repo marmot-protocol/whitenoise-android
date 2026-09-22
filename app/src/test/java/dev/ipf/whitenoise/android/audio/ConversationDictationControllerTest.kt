@@ -31,7 +31,6 @@ class ConversationDictationControllerTest {
                     draft = TextFieldValue("typed", TextRange(5)),
                     targetReplyAvailable = { true },
                     targetValidationScope = this,
-                    deliveryMode = { ConversationDictationDeliveryMode.SendOnFinish },
                     sendTranscriptIfOriginUnchanged = {
                         dispatched = it
                         false
@@ -49,7 +48,7 @@ class ConversationDictationControllerTest {
                 fixture.controller.state.target
                     ?.replyToMessageIdHex,
             )
-            fixture.controller.stop()
+            fixture.controller.send()
             fixture.platform.listener.onResult("reply by voice")
             advanceUntilIdle()
 
@@ -522,7 +521,6 @@ class ConversationDictationControllerTest {
             val fixture =
                 fixture(
                     draft = TextFieldValue("Keep", TextRange(4)),
-                    deliveryMode = { ConversationDictationDeliveryMode.SendOnFinish },
                     targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
                     targetValidationScope = this,
                     sendTranscriptIfOriginUnchanged = { request ->
@@ -1930,10 +1928,16 @@ class ConversationDictationControllerTest {
         assertEquals(1, fixture.writes)
     }
 
-    /** Send-on-finish shares the same short-tail endpoint and immutable delivery pipeline as Paste. */
+    /**
+     * A silence finish never reaches the send pipeline, even when one is wired and ready.
+     *
+     * The app-wide "send when finished" default is retired, so the only way a dictation leaves the
+     * device is someone tapping Send. This drives a session that ends because the room went quiet
+     * with a working dispatcher attached, and proves it is never called.
+     */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun configuredSilenceFinishesShortCallerAudioAndSendsItsFinalTail() =
+    fun configuredSilenceNeverReachesTheSendPipeline() =
         runTest {
             val sent = mutableListOf<String>()
             val platform =
@@ -1946,7 +1950,6 @@ class ConversationDictationControllerTest {
                     draft = TextFieldValue("Draft", TextRange(5)),
                     platform = platform,
                     finishAfterSilenceMillis = { 3_000L },
-                    deliveryMode = { ConversationDictationDeliveryMode.SendOnFinish },
                     targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
                     targetValidationScope = this,
                     sendTranscriptIfOriginUnchanged = { request ->
@@ -1961,8 +1964,8 @@ class ConversationDictationControllerTest {
             platform.listener.onResult("complete short tail")
             advanceUntilIdle()
 
-            assertEquals(listOf("Draft complete short tail"), sent)
-            assertEquals("", fixture.drafts.getValue(key()).text)
+            assertEquals("a silence finish must not send anything", emptyList<String>(), sent)
+            assertEquals("Draft complete short tail", fixture.drafts.getValue(key()).text)
             assertTrue(fixture.controller.state is ConversationDictationState.Idle)
         }
 
@@ -2714,7 +2717,6 @@ class ConversationDictationControllerTest {
                     draft = TextFieldValue("Draft", TextRange(5)),
                     targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
                     targetValidationScope = this,
-                    deliveryMode = { ConversationDictationDeliveryMode.SendOnFinish },
                     sendTranscriptIfOriginUnchanged = { request ->
                         assertEquals(0L, request.expectedDraftRevision)
                         assertEquals("Draft", request.expectedDraftText)
@@ -2723,7 +2725,7 @@ class ConversationDictationControllerTest {
                     },
                 )
             fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
-            fixture.controller.stop()
+            fixture.controller.send()
             val listener = fixture.platform.listener
             listener.onResult("dictated")
             listener.onResult("duplicate")
@@ -2746,7 +2748,6 @@ class ConversationDictationControllerTest {
                     draft = TextFieldValue("Draft", TextRange(5)),
                     targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
                     targetValidationScope = this,
-                    deliveryMode = { ConversationDictationDeliveryMode.SendOnFinish },
                     sendTranscriptIfOriginUnchanged = { request ->
                         assertTrue(request.beginDispatch())
                         draftAtDispatch = drafts.getValue(key()).text
@@ -2755,7 +2756,7 @@ class ConversationDictationControllerTest {
                 )
             drafts = fixture.drafts
             fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
-            fixture.controller.stop()
+            fixture.controller.send()
             fixture.platform.listener.onResult("dictated")
             advanceUntilIdle()
 
@@ -2774,14 +2775,13 @@ class ConversationDictationControllerTest {
                     draft = TextFieldValue("Draft", TextRange(5)),
                     targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
                     targetValidationScope = this,
-                    deliveryMode = { ConversationDictationDeliveryMode.SendOnFinish },
                     sendTranscriptIfOriginUnchanged = { request ->
                         assertTrue(request.beginDispatch())
                         false
                     },
                 )
             fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
-            fixture.controller.stop()
+            fixture.controller.send()
             fixture.platform.listener.onResult("dictated")
             advanceUntilIdle()
 
@@ -2798,7 +2798,6 @@ class ConversationDictationControllerTest {
         val fixture =
             fixture(
                 draft = TextFieldValue("Draft", TextRange(5)),
-                deliveryMode = { ConversationDictationDeliveryMode.SendOnFinish },
                 sendTranscriptIfOriginUnchanged = {
                     sendCalls += 1
                     true
@@ -2897,7 +2896,6 @@ class ConversationDictationControllerTest {
                     draft = TextFieldValue("Draft", TextRange(5)),
                     targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
                     targetValidationScope = this,
-                    deliveryMode = { ConversationDictationDeliveryMode.PasteIntoDraft },
                     sendTranscriptIfOriginUnchanged = { request ->
                         sent += request.payload
                         true
@@ -3092,7 +3090,6 @@ class ConversationDictationControllerTest {
                     draft = TextFieldValue("Draft", TextRange(5)),
                     targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
                     targetValidationScope = this,
-                    deliveryMode = { ConversationDictationDeliveryMode.SendOnFinish },
                     stopDurableSession = { durableStops += 1 },
                     sendTranscriptIfOriginUnchanged = { request ->
                         sendStarted.complete(Unit)
@@ -3103,7 +3100,7 @@ class ConversationDictationControllerTest {
                 )
 
             fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
-            fixture.controller.stop()
+            fixture.controller.send()
             fixture.platform.listener.onResult("dictated")
             runCurrent()
 
@@ -3135,14 +3132,13 @@ class ConversationDictationControllerTest {
                     draft = TextFieldValue("Draft", TextRange(5)),
                     targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
                     targetValidationScope = this,
-                    deliveryMode = { ConversationDictationDeliveryMode.SendOnFinish },
                     sendTranscriptIfOriginUnchanged = {
                         sendCalls += 1
                         false
                     },
                 )
             rejected.controller.requestStart(ACCOUNT, GROUP, rejected.drafts.getValue(key()))
-            rejected.controller.stop()
+            rejected.controller.send()
             rejected.platform.listener.onResult("dictated")
             advanceUntilIdle()
 
@@ -3155,7 +3151,6 @@ class ConversationDictationControllerTest {
                     draft = TextFieldValue("Draft", TextRange(5)),
                     targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
                     targetValidationScope = this,
-                    deliveryMode = { ConversationDictationDeliveryMode.SendOnFinish },
                     sendTranscriptIfOriginUnchanged = {
                         sendCalls += 1
                         true
@@ -3163,7 +3158,7 @@ class ConversationDictationControllerTest {
                 )
             edited.controller.requestStart(ACCOUNT, GROUP, edited.drafts.getValue(key()))
             edited.edit(key(), TextFieldValue("Draft changed"))
-            edited.controller.stop()
+            edited.controller.send()
             edited.platform.listener.onResult("dictated")
             advanceUntilIdle()
 
@@ -3182,14 +3177,13 @@ class ConversationDictationControllerTest {
                 fixture(
                     draft = TextFieldValue("Draft", TextRange(5)),
                     targetValidationScope = this,
-                    deliveryMode = { ConversationDictationDeliveryMode.SendOnFinish },
                     sendTranscriptIfOriginUnchanged = {
                         sendCalls += 1
                         true
                     },
                 )
             fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
-            fixture.controller.stop()
+            fixture.controller.send()
             fixture.platform.listener.onResult("dictated")
 
             fixture.controller.cancel()
@@ -4260,9 +4254,6 @@ class ConversationDictationControllerTest {
         },
         stopDurableSession: () -> Unit = {},
         finishAfterSilenceMillis: () -> Long? = { null },
-        deliveryMode: () -> ConversationDictationDeliveryMode = {
-            ConversationDictationDeliveryMode.PasteIntoDraft
-        },
         sendTranscriptIfOriginUnchanged: suspend (ConversationDictationSendRequest) -> Boolean = { false },
         onReadinessEvent: (ConversationDictationReadinessEvent) -> Unit = {},
     ): Fixture {
@@ -4305,7 +4296,6 @@ class ConversationDictationControllerTest {
                 elapsedRealtime = scheduler::now,
                 scheduleTimeout = scheduler::schedule,
                 finishAfterSilenceMillis = finishAfterSilenceMillis,
-                deliveryMode = deliveryMode,
                 sendTranscriptIfOriginUnchanged = sendTranscriptIfOriginUnchanged,
                 onReadinessEvent = onReadinessEvent,
             )
