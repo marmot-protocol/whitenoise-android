@@ -191,6 +191,7 @@ internal class NotificationBootstrapTestFixture(
     val nativePushSettingWrites = CopyOnWriteArrayList<Pair<String, Boolean>>()
     val clearedPushRegistrations = CopyOnWriteArrayList<String>()
     val upsertedPushRegistrations = CopyOnWriteArrayList<String>()
+    val upsertedPushTokens = CopyOnWriteArrayList<String>()
     val markdownParseCalls = AtomicInteger(0)
     val notificationTimelineCalls = AtomicInteger(0)
     val notificationMessageHistoryCalls = AtomicInteger(0)
@@ -354,6 +355,7 @@ internal class NotificationBootstrapTestFixture(
                 "upsertPushRegistration" -> {
                     val accountRef = arguments?.get(0) as String
                     upsertedPushRegistrations += accountRef
+                    upsertedPushTokens += arguments[2] as String
                     onUpsertPushRegistration?.invoke(accountRef)
                     PushRegistrationSyncResultFfi(
                         registration =

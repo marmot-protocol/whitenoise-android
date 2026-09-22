@@ -8381,9 +8381,7 @@ class WhiteNoiseAppState private constructor(
                 }
             }
         } finally {
-            notificationDeliveryModeIntent.runIfCurrent(intentGeneration) {
-                notificationDeliveryModeBusy = false
-            }
+            finishNotificationDeliveryModeTransaction(intentGeneration)
         }
     }
 
@@ -8737,10 +8735,17 @@ class WhiteNoiseAppState private constructor(
                     }
                 }
             } finally {
-                notificationDeliveryModeIntent.runIfCurrent(owner.intentGeneration) {
-                    notificationDeliveryModeBusy = false
-                }
+                finishNotificationDeliveryModeTransaction(owner.intentGeneration)
             }
+        }
+    }
+
+    /** Clears the latest cutover and drains token work that arrived while it owned the mode lock. */
+    private suspend fun finishNotificationDeliveryModeTransaction(intentGeneration: Long) = withContext(NonCancellable) {
+        if (!notificationDeliveryModeIntent.isCurrent(intentGeneration)) return@withContext
+        notificationDeliveryModeMutex.withLock {
+            val latest = notificationDeliveryModeIntent.runIfCurrent(intentGeneration) { notificationDeliveryModeBusy = false }
+            if (latest && pushTokenStore.nativePushRegistrationSyncPending()) syncNativePushRegistrationIfEnabled()
         }
     }
 

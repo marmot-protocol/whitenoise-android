@@ -227,8 +227,7 @@ class PushTokenStore(
         }
 
     /** Compatibility helper for callers that only need the reserved attempt, if any. */
-    internal fun claimPushWakeAttempt(nowMs: Long): PushWakeAttemptClaim? =
-        (reservePushWakeAttempt(nowMs) as? PushWakeAttemptReservation.Claimed)?.claim
+    internal fun claimPushWakeAttempt(nowMs: Long): PushWakeAttemptClaim? = (reservePushWakeAttempt(nowMs) as? PushWakeAttemptReservation.Claimed)?.claim
 
     /** Restores the exact budget snapshot when lifecycle changed before the reserved native attempt began. */
     @SuppressLint("ApplySharedPref")

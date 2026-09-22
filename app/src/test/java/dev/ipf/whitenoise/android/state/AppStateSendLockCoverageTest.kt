@@ -156,6 +156,12 @@ class AppStateSendLockCoverageTest {
         val disableBody = appStateFunctionBody("disableNativePushForPersistentDelivery")
         val rollbackBody = appStateFunctionBody("rollbackNativePushMode")
         val rotationBody = appStateFunctionBody("onPushTokenRotated")
+        val finishBody = appStateFunctionBody("finishNotificationDeliveryModeTransaction")
+        val modeEntryBodies =
+            listOf(
+                appStateFunctionBody("setNotificationDeliveryMode"),
+                appStateFunctionBody("launchNotificationDeliveryModeReconciliation"),
+            )
 
         listOf(disableBody, rollbackBody).forEach { body ->
             val lockIndex = body.indexOf("nativePushSyncMutex.withLock")
@@ -180,6 +186,21 @@ class AppStateSendLockCoverageTest {
             rotationBody.indexOf("recordPendingNativePushRegistrationSync()") in
                 0 until rotationBody.indexOf("if (!notificationDeliveryModeBusy)"),
         )
+        assertTrue(
+            "the latest delivery transaction must drain token work after clearing busy state under its mutex",
+            finishBody.indexOf("notificationDeliveryModeMutex.withLock") in
+                0 until finishBody.indexOf("notificationDeliveryModeBusy = false") &&
+                finishBody.indexOf("notificationDeliveryModeBusy = false") in
+                0 until finishBody.indexOf("nativePushRegistrationSyncPending()") &&
+                finishBody.indexOf("nativePushRegistrationSyncPending()") in
+                0 until finishBody.indexOf("syncNativePushRegistrationIfEnabled()"),
+        )
+        modeEntryBodies.forEach { body ->
+            assertTrue(
+                "every busy delivery-mode entry point must settle through the token-work handoff",
+                body.contains("finishNotificationDeliveryModeTransaction"),
+            )
+        }
     }
 
     @Test

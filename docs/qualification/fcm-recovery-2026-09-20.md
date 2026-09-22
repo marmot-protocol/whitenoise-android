@@ -1,7 +1,7 @@
 # Android push recovery qualification — 2026-09-20
 
 Implementation source: isolated branch `fix/fcm-durable-recovery`, based on refreshed
-master `b3bf1acc3ec681fea1459cf392656208187cc3dd`. `scope-selection.json` records this
+master `f1c02fc888acbd68de053a2ecba1a30d1be90691`. `scope-selection.json` records this
 same final qualification base. The original checkout and native
 dependency pin are unchanged. This report covers the Android implementation and does
 not establish a fix for the reported 2026.9.17 open-chat symptom.
@@ -114,9 +114,9 @@ changes the delivery invariant during activation.
 
 ## Automated validation
 
-The broad checks below were completed before the latest admission-diagnostic and localization
-review fixes. Per maintainer direction, only directly related tests were rerun locally for those
-final changes; the hosted matrix is responsible for the full current-head gate.
+The broad checks below were completed before the latest token-rotation handoff fix. Per maintainer
+direction, only directly related tests were rerun locally for the final changes; the hosted matrix
+is responsible for the full current-head gate.
 
 | Check | Result |
 | --- | --- |
@@ -125,6 +125,8 @@ final changes; the hosted matrix is responsible for the full current-head gate.
 | Formatting, static analysis, alternate-variant Android lint | PASS |
 | Final review-focused primary-variant tests | 114 passed, 0 failures/errors/skips; 11 suites |
 | Latest admission/store regressions | 44 passed, 0 failures/errors/skips; 2 suites |
+| Latest delivery-mode/token-rotation regressions | 101 passed, 0 failures/errors/skips; 4 suites |
+| Previous hosted static-analysis failure | The single reported expression-body formatting violation is corrected; current-head hosted rerun pending |
 | Alternate-variant focused tests | 241 recovery-focused tests plus the 21-test affected ordering class passed separately; 0 failures/errors/skips |
 | Post-rebase CI regression set | PASS; 45 tests in each debug variant, 0 failures/errors/skips |
 | Full alternate variant | PASS; 9,169 tests, 0 failures/errors, 1 skipped; 5m 41s |
@@ -141,7 +143,7 @@ generation coalescing, native-lane serialization, worker cancellation, completio
 acknowledgement races, delivery-mode cutover and rollback, battery-policy projection,
 diagnostic correlation/privacy, and updated settings behavior.
 
-After the final 2026-09-21 rebase, the exact CI regression set covers recovery tracing,
+After the prior 2026-09-21 rebase, the exact CI regression set covered recovery tracing,
 suspend-then-publish ownership guards, the state-source growth ratchet, denied-permission
 delivery preservation, and all 29 delivery-mode recovery cases. It passed all 45 tests in
 both debug variants. A full primary-variant run executed 9,122 tests and exposed one test-only
@@ -222,7 +224,7 @@ available CPU/running-time totals. No statistics were reset. This supports the n
 fast exit only; it does not measure energy impact.
 
 Those observations apply to the recorded 2026-09-20 candidate. Device and battery qualification
-was not repeated after the final 2026-09-21 master rebase, so it is not current-head evidence.
+was not repeated after the latest 2026-09-22 master rebase, so it is not current-head evidence.
 
 The most recent installed Dev APK was built for arm64 before the latest review fixes, with SHA-256
 `b9844f73af4e3e3eb5a5fbbe96b49f446ddb623d316c3a93f7ced15e4cb5503f`. It reports package
@@ -232,7 +234,7 @@ The installed APK hash matches the candidate, the signing certificate and native
 the prior installation, the original first-install timestamp and three account records remain,
 and a cold launch resumed `MainActivity` without a fatal, migration, database, or startup error
 in the privacy-filtered log check. No app was uninstalled and no app data was cleared. No APK was
-built or installed for the latest admission-diagnostic and localization-only review revision.
+built or installed for the later admission, localization, or token-handoff review revisions.
 
 A fresh private pre-install archive is retained at
 `/Users/mubarak/Workspace/marmot-protocol/pixel-fcm-recovery-20260921.X7NSnz`. The data archive
@@ -258,7 +260,7 @@ the preserved pre-install APK SHA-256 is
 ## Source and artifacts
 
 The source/test patch relative to the base revision is SHA-256
-`b064fafd09a02bd03cd9b57bc5ac49cef8783d7f7a31eb5d3b7d13a7eaf4a283`.
+`472a9a170a9752a689e010474a6b01823f0bbf974f49b75d6dc757c0f365d921`.
 This hashes `git diff origin/master --binary -- app/src`. The native dependency remains unchanged.
 
 Final qualification APK hashes:

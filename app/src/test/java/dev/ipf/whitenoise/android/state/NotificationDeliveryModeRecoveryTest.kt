@@ -913,6 +913,64 @@ class NotificationDeliveryModeRecoveryTest {
             }
         }
 
+    /** A rejected cutover drains token rotation recorded while the delivery mutex was busy. */
+    @Test
+    fun tokenRotationDuringRejectedLocalCutoverIsDrained() =
+        runBlocking {
+            val persistStarted = CountDownLatch(1)
+            val releasePersist = CountDownLatch(1)
+            val platform =
+                RecordingNativePushFallbackPlatform(
+                    context = context,
+                    startResults = ArrayDeque(listOf(false)),
+                    beforePersist = {
+                        persistStarted.countDown()
+                        check(releasePersist.await(10, TimeUnit.SECONDS))
+                    },
+                )
+            val fixture =
+                fixture(
+                    platform = platform,
+                    nativeEnabled = true,
+                    accounts = listOf(account(ACCOUNT_A), account(ACCOUNT_B)),
+                    fcmAvailable = true,
+                )
+            val store = PushTokenStore.create(context)
+            try {
+                fixture.bootstrap()
+                fixture.runWithMainLooperPumping {
+                    withTimeout(2_000L) { while (fixture.appState.notificationDeliveryModeBusy) yield() }
+                }
+                fixture.replaceNotificationSettings(settings(ACCOUNT_B, nativeEnabled = true))
+                store.setToken("old-token")
+                assertTrue(fixture.runWithMainLooperPumping { fixture.appState.syncNativePushRegistrationIfEnabled() })
+                fixture.upsertedPushRegistrations.clear()
+                fixture.upsertedPushTokens.clear()
+
+                val local = async { fixture.appState.setNotificationDeliveryMode(NotificationDeliveryMode.Local) }
+                withTimeout(2_000L) { while (persistStarted.count > 0L) yield() }
+                fixture.runWithMainLooperPumping {
+                    fixture.appState.onPushTokenRotated("rotated-token")
+                    withTimeout(2_000L) { while (!store.nativePushRegistrationSyncPending()) yield() }
+                }
+                releasePersist.countDown()
+
+                assertFalse(fixture.runWithMainLooperPumping { local.await() })
+                fixture.runWithMainLooperPumping {
+                    withTimeout(5_000L) { while (store.nativePushRegistrationSyncPending()) yield() }
+                }
+                assertEquals(setOf(ACCOUNT_A, ACCOUNT_B), fixture.upsertedPushRegistrations.toSet())
+                assertEquals(setOf("rotated-token"), fixture.upsertedPushTokens.toSet())
+                assertTrue(fixture.notificationSettings(ACCOUNT_A).nativePushEnabled)
+                assertTrue(fixture.notificationSettings(ACCOUNT_B).nativePushEnabled)
+            } finally {
+                releasePersist.countDown()
+                store.clearPendingNativePushRegistrationSync()
+                store.setToken("")
+                fixture.close()
+            }
+        }
+
     /** Runtime replacement rejects held registration and retains the prior global transport. */
     @Test
     fun runtimeReplacementFencesHeldFcmSelection() =
