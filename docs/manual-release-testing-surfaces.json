@@ -22283,6 +22283,15 @@
     ],
     "source_coverage": [
       {
+        "surface": "Direct-message headers prefer the viewer's private contact nickname",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/ConversationHeaderTitle.kt",
+        "anchor": "internal fun conversationHeaderTitle(",
+        "test_ids": [
+          "CON-001",
+          "PRO-004"
+        ]
+      },
+      {
         "surface": "An off-window read anchor uses the authoritative unread projection instead of counting retained history",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "internal fun countUnreadIncoming(",

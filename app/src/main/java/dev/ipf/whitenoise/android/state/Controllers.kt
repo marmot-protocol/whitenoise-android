@@ -6597,6 +6597,15 @@ class ConversationController(
         }
 
     /**
+     * The DM peer whose private nickname may title this conversation, else null (#2766).
+     *
+     * A pending invite is excluded because its title is the "Invite from …" line, which already
+     * resolves the inviter through the nickname-aware member title.
+     */
+    val dmNicknamePeerAccount: String?
+        get() = avatarAccount?.takeIf { isDm && !group.pendingConfirmation }
+
+    /**
      * Avatar URL for the conversation top bar. A group's own avatar wins; a 1:1
      * DM falls back to the peer's profile picture so the top bar matches the
      * chat-list row instead of showing a blank/initials placeholder (#837).

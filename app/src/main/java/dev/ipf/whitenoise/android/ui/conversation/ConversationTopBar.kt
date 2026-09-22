@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
+import dev.ipf.whitenoise.android.core.conversationHeaderTitle
 import dev.ipf.whitenoise.android.core.selectedChatPresentationTitle
 import dev.ipf.whitenoise.android.state.ChatListAvatarSeed
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -85,10 +86,15 @@ internal fun ConversationTopBar(
     performanceSelectorsEnabled: Boolean = BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS,
 ) {
     // MDK 0.10.0 prepares the conversation title inside the live window; fall back to the app's own
-    // projection until the first replacement arrives or when the seam has no window.
+    // projection until the first replacement arrives or when the seam has no window. A DM peer's
+    // private nickname is Android-owned and outranks both, per [conversationHeaderTitle] (#2766).
     val liveTitle =
-        selectedChatPresentationTitle(controller.window.header?.selected, groupTitleCopy)
-            ?: controller.title(groupTitleCopy)
+        conversationHeaderTitle(
+            dmPeerAccountIdHex = controller.dmNicknamePeerAccount,
+            contactNickname = appState::contactNickname,
+            preparedTitle = selectedChatPresentationTitle(controller.window.header?.selected, groupTitleCopy),
+            projectedTitle = { controller.title(groupTitleCopy) },
+        )
     val liveGroup = controller.group
     val liveAvatarAccount = controller.avatarAccount
     val liveMembersLoaded = controller.membersLoaded
