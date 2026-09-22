@@ -6,8 +6,15 @@ import dev.ipf.marmotkit.GroupSystemEventProvenanceFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -15,11 +22,61 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.time.Duration
+import java.util.concurrent.ConcurrentLinkedQueue
+import kotlin.coroutines.CoroutineContext
 
 /** Regression coverage for preserving MDK's authoritative timeline order (#1578). */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class ConversationAuthoritativeTimelineOrderingTest {
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun newerAuthoritativeOrderWinsAnOlderSuspendedPreparation() =
+        runTest {
+            val dispatcher = PausedPreparationDispatcher()
+            val scripted =
+                ScriptedConversationLiveSubscriptions(
+                    timelineScripts = emptyList(),
+                    group = conversationTimelineTestGroup(),
+                )
+            val controller =
+                ConversationController(
+                    appState = conversationTimelineTestAppState(scripted.subscriptions),
+                    initialGroup = conversationTimelineTestGroup(),
+                    initialMemberSnapshot = conversationTimelineMemberSnapshot(),
+                    groupRosterReader = { _, _ -> conversationTimelineGroupRoster() },
+                    windowPreparationDispatcher = dispatcher,
+                )
+            try {
+                val stale =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        controller.applyTimelinePage(
+                            timelinePage(appRecord(100uL)),
+                            replaceWindow = true,
+                            updatePagination = true,
+                        )
+                    }
+                assertFalse(stale.isCompleted)
+                val newest =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        controller.applyTimelinePage(
+                            timelinePage(membershipRecord(200uL), appRecord(100uL)),
+                            replaceWindow = true,
+                            updatePagination = true,
+                        )
+                    }
+
+                dispatcher.runPending()
+                advanceUntilIdle()
+
+                assertEquals(emptyList<String>(), stale.await())
+                newest.await()
+                assertAuthoritativePair(controller)
+            } finally {
+                controller.onCleared()
+            }
+        }
+
     @Test
     fun pageDoesNotRestartFinalStream() =
         runBlocking {
@@ -430,6 +487,21 @@ class ConversationAuthoritativeTimelineOrderingTest {
             groupRosterReader = { _, _ -> conversationTimelineGroupRoster() },
             startOnConstruction = true,
         )
+
+    private class PausedPreparationDispatcher : CoroutineDispatcher() {
+        private val pending = ConcurrentLinkedQueue<Runnable>()
+
+        override fun dispatch(
+            context: CoroutineContext,
+            block: Runnable,
+        ) {
+            pending += block
+        }
+
+        fun runPending() {
+            while (true) pending.poll()?.run() ?: return
+        }
+    }
 
     private companion object {
         const val SOURCE_EPOCH = 7uL

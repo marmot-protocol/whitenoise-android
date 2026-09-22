@@ -130,9 +130,11 @@ import dev.ipf.whitenoise.android.state.hasKnownTranscriptPresentation
 import dev.ipf.whitenoise.android.state.loadMessageAvailability
 import dev.ipf.whitenoise.android.state.loadUntilMessageAvailable
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
+import dev.ipf.whitenoise.android.state.markComposerReadyForPresentationTiming
 import dev.ipf.whitenoise.android.state.mediaReferencesFor
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.reconcileConversationUnreadJump
+import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
 import dev.ipf.whitenoise.android.state.reportVisibleMessage
 import dev.ipf.whitenoise.android.state.returnToLatestWindow
@@ -3217,6 +3219,12 @@ internal fun ConversationScreen(
                     createOpenConversationTiming,
                     ChatCreateOpenConversationTimingEvent.ComposerReady,
                 )
+        }
+    }
+    LaunchedEffect(controller, composerGate) {
+        if (composerGate == ComposerGate.COMPOSER) {
+            withFrameNanos { }
+            controller.markComposerReadyForPresentationTiming()
         }
     }
     val mentionPicker =

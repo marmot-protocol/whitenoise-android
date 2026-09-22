@@ -42,11 +42,18 @@ class ProductObservationGateTest {
     @Test
     fun entryEventsHaveAFiniteExpandedSchema() {
         val added = androidProductRegistry.filter { it.name !in MarmotTraceSection.hostTimingNames.values }
-        assertEquals(listOf("app_android_entry"), added.map { it.name })
+        assertEquals(
+            listOf(
+                "app_android_entry",
+                "app_conversation_window_visible",
+                "app_conversation_composer_ready",
+            ),
+            added.map { it.name },
+        )
         assertEquals(
             listOf("notification", "profile", "share"),
             added
-                .single()
+                .first { it.name == "app_android_entry" }
                 .properties
                 .single()
                 .choices,

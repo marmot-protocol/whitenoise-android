@@ -1,8 +1,11 @@
 package dev.ipf.whitenoise.android.state
 
-import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
+import dev.ipf.whitenoise.android.core.TimelineProjector
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.withContext
 
 /**
  * How one authoritative window replaces what the timeline is holding.
@@ -28,95 +31,165 @@ internal enum class WindowApplyMode {
 /** Whether this mode reconciles optimistic sends and admits delayed projections. */
 internal val WindowApplyMode.reconcilesOptimistic: Boolean get() = this == WindowApplyMode.REPLACE
 
-/**
- * What one window application decided before it began touching the timeline indexes.
- *
- * The Markdown a row already has, and the rows the window dropped, can only be read before the
- * indexes change, so they are settled up front and carried through the application.
- */
-internal class WindowApplyPlan(
+/** Immutable controller state needed to prepare one window without touching Compose state. */
+internal data class WindowApplySnapshot(
+    val heldRecords: List<TimelineMessageRecordFfi>,
+    val pendingProjectionIds: Set<String>,
+)
+
+internal fun currentWindowApplySnapshot(
+    heldRecords: Collection<TimelineMessageRecordFfi>,
+    pendingProjectionIds: Collection<String>,
+) = WindowApplySnapshot(heldRecords.toList(), pendingProjectionIds.toSet())
+
+/** Pure result of interpreting a native window before the main-thread commit. */
+internal data class PreparedWindowRow(
+    val record: TimelineMessageRecordFfi,
+    val actionRecord: AppMessageRecordFfi,
+    val needsProjection: Boolean,
+    val reconcilesOptimistic: Boolean,
+)
+
+/** Pure result of interpreting a native window before the main-thread commit. */
+internal data class PreparedWindowApply(
+    val rows: List<PreparedWindowRow>,
     val mode: WindowApplyMode,
-    private val carriedTokens: Map<String, MarkdownDocumentFfi>,
-    private val heldBefore: Map<String, TimelineMessageRecordFfi>,
-    /** Rows whose tally must be recomputed: everything added, altered or dropped by this window. */
-    val touchedIds: MutableSet<String>,
-    private val reconcilesNewRows: Boolean,
-) {
-    /** Whether the whole window is being rebuilt rather than extended. */
-    val replaces: Boolean get() = mode == WindowApplyMode.REPLACE
+    val departedIds: Set<String>,
+    val authoritativeOrder: Map<String, ULong>,
+    val touchedIds: Set<String>,
+    val profileIds: Set<String>,
+    val projectionCount: Int,
+)
 
-    /**
-     * Whether this row may claim a pending optimistic send.
-     *
-     * A newer page can install the authoritative row for a send whose optimistic bubble is still
-     * waiting, before the live NEW_MESSAGE update arrives, so rows the page newly adds still
-     * reconcile. Rows it merely retained do not, or the delayed same-text matcher could consume an
-     * unrelated optimistic message from further up the window.
-     */
-    fun reconciles(messageIdHex: String): Boolean = replaces || (reconcilesNewRows && messageIdHex !in entryRows)
+/** Deterministic work counters plus separately measured preparation and main-commit durations. */
+data class WindowApplyPerformanceSample(
+    val preparedRowCount: Int,
+    val committedProjectionCount: Int,
+    val preparationNanos: Long,
+    val mainCommitNanos: Long,
+)
 
-    /**
-     * The record as it should be projected, with Markdown carried over when its text is unchanged,
-     * recording whether it differs from what the timeline already held.
-     */
-    private var entryRows: Set<String> = emptySet()
+internal data class TimedPreparedWindowApply(
+    val value: PreparedWindowApply,
+    val durationNanos: Long,
+)
 
-    /** Records which rows the timeline held on entry, before this window removed any. */
-    fun rememberEntryRows(ids: Set<String>) {
-        entryRows = ids
+internal fun TimedPreparedWindowApply.performanceSample(
+    prepared: PreparedWindowApply,
+    commitStartedAtNanos: Long,
+    commitFinishedAtNanos: Long,
+) = WindowApplyPerformanceSample(
+    preparedRowCount = prepared.rows.size,
+    committedProjectionCount = prepared.projectionCount,
+    preparationNanos = durationNanos,
+    mainCommitNanos = (commitFinishedAtNanos - commitStartedAtNanos).coerceAtLeast(0L),
+)
+
+internal suspend fun prepareWindowApplyOn(
+    dispatcher: CoroutineDispatcher,
+    nanoTime: () -> Long,
+    page: TimelinePageFfi,
+    snapshot: WindowApplySnapshot,
+    replaceWindow: Boolean,
+    reconcileNewExtendedRecords: Boolean,
+): TimedPreparedWindowApply =
+    withContext(dispatcher) {
+        val startedAt = nanoTime()
+        TimedPreparedWindowApply(
+            value = prepareWindowApply(page, snapshot, replaceWindow, reconcileNewExtendedRecords),
+            durationNanos = (nanoTime() - startedAt).coerceAtLeast(0L),
+        )
     }
 
-    fun carry(
-        record: TimelineMessageRecordFfi,
-        current: TimelineMessageRecordFfi?,
-    ): TimelineMessageRecordFfi {
-        val carried = record.withCarriedMarkdownTokens(carriedTokens, heldBefore)
-        if (current == null || !timelineRecordsRenderEqual(current, carried)) {
-            touchedIds.add(carried.messageIdHex)
-        }
-        return carried
-    }
-}
+/** Excludes stream starts whose terminal row landed in the same window. */
+internal fun windowStreamIdsToLaunch(
+    streamIds: List<String>,
+    isRemoved: (String) -> Boolean,
+): List<String> = streamIds.filterNot(isRemoved)
 
 /**
- * Settles what this window means before any index changes: which mode applies, the Markdown already
- * parsed for its rows, and, when extending, the rows the window no longer holds.
+ * Derives the immutable part of a window application.
+ *
+ * Callers may run this on a background dispatcher: it only reads [snapshot] and [page], and returns
+ * fresh collections for the main-thread commit to consume.
  */
-internal fun ConversationController.planWindowApply(
+@Suppress("LongMethod") // Keep the pure snapshot-to-diff derivation in one background-safe operation.
+internal fun prepareWindowApply(
     page: TimelinePageFfi,
+    snapshot: WindowApplySnapshot,
     replaceWindow: Boolean,
     reconcileNewExtendedRecords: Boolean = false,
-): WindowApplyPlan {
+): PreparedWindowApply {
     val mode = if (replaceWindow) WindowApplyMode.REPLACE else WindowApplyMode.EXTEND
-    val carriedTokens = timelineRecords.markdownTokensFor(page.messages.map { it.messageIdHex })
-    // Snapshot what the timeline holds before any removal, so both the Markdown carry and the
-    // newly-added test below see the window as it was on entry.
-    val heldBefore = timelineRecords.toMap()
-    val departed = if (mode == WindowApplyMode.EXTEND) removeRowsAbsentFromPage(page) else emptySet()
-    return WindowApplyPlan(
-        mode = mode,
-        carriedTokens = carriedTokens,
-        heldBefore = if (mode == WindowApplyMode.EXTEND) heldBefore else emptyMap(),
-        touchedIds = departed.toMutableSet(),
-        reconcilesNewRows = reconcileNewExtendedRecords,
-    ).also { it.rememberEntryRows(heldBefore.keys) }
-}
-
-/**
- * Drops the rows an extended window no longer holds.
- *
- * Only rows the window itself dropped are removed. A projection still waiting for its media bridge
- * is kept: its send is mid-flight and the bridge insert, not this page, decides where it lands.
- * Returns the ids removed, so reaction tallies can be recomputed for them.
- */
-internal fun ConversationController.removeRowsAbsentFromPage(page: TimelinePageFfi): Set<String> {
-    val retained = page.messages.mapTo(mutableSetOf()) { it.messageIdHex }
-    val departed =
-        timelineRecords.keys.filterTo(mutableSetOf()) { id ->
-            id !in retained && id !in pendingProjectionsAwaitingBridge
+    val heldBefore = snapshot.heldRecords.associateBy(TimelineMessageRecordFfi::messageIdHex)
+    val retainedIds = page.messages.mapTo(linkedSetOf()) { it.messageIdHex }
+    val departedIds =
+        if (mode == WindowApplyMode.EXTEND) {
+            snapshot.heldRecords
+                .asSequence()
+                .map(TimelineMessageRecordFfi::messageIdHex)
+                .filter { it !in retainedIds && it !in snapshot.pendingProjectionIds }
+                .toCollection(linkedSetOf())
+        } else {
+            emptySet()
         }
-    departed.forEach(::removeProjectedRecord)
-    return departed
+    val carriedTokens =
+        if (mode == WindowApplyMode.EXTEND) {
+            heldBefore.markdownTokensFor(retainedIds)
+        } else {
+            emptyMap()
+        }
+    val rows =
+        page.messages.map { record ->
+            val carried = record.withCarriedMarkdownTokens(carriedTokens, heldBefore)
+            val current = heldBefore[record.messageIdHex]
+            PreparedWindowRow(
+                record = carried,
+                actionRecord = TimelineProjector.toAppMessageRecord(carried),
+                needsProjection =
+                    mode == WindowApplyMode.REPLACE ||
+                        current == null ||
+                        !timelineRecordsRenderEqual(current, carried),
+                reconcilesOptimistic =
+                    mode.reconcilesOptimistic ||
+                        (reconcileNewExtendedRecords && record.messageIdHex !in heldBefore),
+            )
+        }
+    val touchedIds =
+        buildSet {
+            addAll(departedIds)
+            rows
+                .asSequence()
+                .filter(PreparedWindowRow::needsProjection)
+                .mapTo(this) { it.record.messageIdHex }
+        }
+    val authoritativeOrder =
+        buildMap {
+            page.messages.forEachIndexed { index, record ->
+                if (record.usesAuthoritativePageOrder()) {
+                    put(record.messageIdHex, index.toULong())
+                }
+            }
+        }
+    val profileIds =
+        buildSet {
+            rows.forEach { row ->
+                add(row.record.sender)
+                row.record.replyPreview?.let { add(it.sender) }
+                row.record.reactions.userReactions
+                    .forEach { add(it.sender) }
+            }
+        }
+
+    return PreparedWindowApply(
+        rows = rows,
+        mode = mode,
+        departedIds = departedIds,
+        authoritativeOrder = authoritativeOrder,
+        touchedIds = touchedIds,
+        profileIds = profileIds,
+        projectionCount = rows.count(PreparedWindowRow::needsProjection),
+    )
 }
 
 /**

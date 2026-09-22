@@ -30,24 +30,48 @@ internal enum class ProductObservation(
     fun event(): ProductEventFfi = ProductEventFfi(event, listOf(ProductEventPropertyFfi(property, value)))
 }
 
+internal fun WhiteNoiseAppState.recordProductObservation(
+    observation: ProductObservation,
+    ticket: Long? = diagnostics.observations.ticket(),
+) = recordProductEvent(observation.event(), ticket)
+
 /**
  * Extends Danny's timing scope with Android entry attribution. The new registry fingerprint also
  * requires a fresh MDK receipt from users who granted through the former relay-only disclosure.
  */
 internal val androidProductRegistry: List<ProductEventSchemaFfi> =
     MarmotTraceSection.hostTimingRegistry +
-        ProductEventSchemaFfi(
-            name = "app_android_entry",
-            mode = ProductEventModeFfi.AGGREGATE,
-            properties =
-                listOf(
-                    ProductPropertySchemaFfi(
-                        "source",
-                        ProductPropertyKindFfi.ENUM,
-                        listOf("notification", "profile", "share"),
+        listOf(
+            ProductEventSchemaFfi(
+                name = "app_android_entry",
+                mode = ProductEventModeFfi.AGGREGATE,
+                properties =
+                    listOf(
+                        ProductPropertySchemaFfi(
+                            "source",
+                            ProductPropertyKindFfi.ENUM,
+                            listOf("notification", "profile", "share"),
+                        ),
                     ),
-                ),
+            ),
+            conversationPresentationSchema(ConversationPresentationStage.WINDOW_VISIBLE),
+            conversationPresentationSchema(ConversationPresentationStage.COMPOSER_READY),
         )
+
+private fun conversationPresentationSchema(stage: ConversationPresentationStage) =
+    ProductEventSchemaFfi(
+        name = stage.eventName,
+        mode = ProductEventModeFfi.AGGREGATE,
+        properties =
+            listOf(
+                ProductPropertySchemaFfi("elapsed", ProductPropertyKindFfi.DURATION_BUCKET, emptyList()),
+                ProductPropertySchemaFfi(
+                    "outcome",
+                    ProductPropertyKindFfi.ENUM,
+                    ConversationPresentationOutcome.entries.map(ConversationPresentationOutcome::value),
+                ),
+            ),
+    )
 
 /** Memory-only admission gate; MDK owns consent receipts, sessions, aggregation and delivery. */
 internal class ProductObservationGate {

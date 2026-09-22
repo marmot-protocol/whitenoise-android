@@ -7,8 +7,15 @@ import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.core.TimelineProjector
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -17,6 +24,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.util.concurrent.ConcurrentLinkedQueue
+import kotlin.coroutines.CoroutineContext
 
 /**
  * An older page slides the bounded window by one page. Rows the window still holds must keep their
@@ -25,6 +34,88 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class ConversationTimelineExtendApplyTest {
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun newerWindowDiscardsAnOlderSuspendedExtendPreparation() =
+        runTest {
+            val dispatcher = PausedPreparationDispatcher()
+            val scripted =
+                ScriptedConversationLiveSubscriptions(
+                    timelineScripts = emptyList(),
+                    group = conversationTimelineTestGroup(),
+                )
+            val appState = conversationTimelineTestAppState(scripted.subscriptions)
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = conversationTimelineTestGroup(),
+                    initialMemberSnapshot = conversationTimelineMemberSnapshot(),
+                    groupRosterReader = { _, _ -> conversationTimelineGroupRoster() },
+                    windowPreparationDispatcher = dispatcher,
+                )
+            try {
+                val stale =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        controller.applyTimelinePage(
+                            page(listOf(row(FIRST), row(SECOND))),
+                            replaceWindow = false,
+                            updatePagination = true,
+                        )
+                    }
+                assertFalse(stale.isCompleted)
+                val newest =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        controller.applyTimelinePage(
+                            page(listOf(row(SECOND), row(THIRD))),
+                            replaceWindow = true,
+                            updatePagination = true,
+                        )
+                    }
+
+                dispatcher.runPending()
+                advanceUntilIdle()
+
+                assertEquals(emptyList<String>(), stale.await())
+                newest.await()
+                assertEquals(listOf(SECOND, THIRD), timelineMessageIds(controller))
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    @Test
+    fun largeWindowMeasuresPreparationSeparatelyAndCommitsOnlyItsDiff() =
+        runBlocking {
+            val seed =
+                (0 until 200).map { index ->
+                    timelineRecord(
+                        messageId = index.toString(16).padStart(64, '0'),
+                        timelineAt = index.toULong(),
+                        plaintext = "row-$index",
+                    )
+                }
+            val measurements = mutableListOf<WindowApplyPerformanceSample>()
+            withController(seed = seed, onWindowApplyMeasured = measurements::add) { controller, _ ->
+                measurements.clear()
+                val extended =
+                    seed.mapIndexed { index, record ->
+                        if (index == 99) record.copy(plaintext = "edited") else record
+                    }
+
+                controller.applyTimelinePage(
+                    page(extended),
+                    replaceWindow = false,
+                    updatePagination = true,
+                )
+
+                val sample = measurements.single()
+                assertEquals(200, sample.preparedRowCount)
+                assertEquals(1, sample.committedProjectionCount)
+                assertTrue(sample.preparationNanos >= 0L)
+                assertTrue(sample.mainCommitNanos >= 0L)
+            }
+        }
+
     /**
      * Rows the extended window kept are not re-projected: their held record survives by identity,
      * which is what makes a page cost the rows that changed rather than the whole window.
@@ -214,9 +305,25 @@ class ConversationTimelineExtendApplyTest {
         shadowOf(Looper.getMainLooper()).idle()
     }
 
+    private class PausedPreparationDispatcher : CoroutineDispatcher() {
+        private val pending = ConcurrentLinkedQueue<Runnable>()
+
+        override fun dispatch(
+            context: CoroutineContext,
+            block: Runnable,
+        ) {
+            pending += block
+        }
+
+        fun runPending() {
+            while (true) pending.poll()?.run() ?: return
+        }
+    }
+
     /** Owns a controller seeded with [seed] as its opening window. */
     private suspend fun withController(
         seed: List<TimelineMessageRecordFfi>,
+        onWindowApplyMeasured: (WindowApplyPerformanceSample) -> Unit = {},
         block: suspend (ConversationController, WhiteNoiseAppState) -> Unit,
     ) {
         val subscription = ScriptedConversationTimelineSubscription(snapshotPage = page(seed))
@@ -233,6 +340,7 @@ class ConversationTimelineExtendApplyTest {
                 initialMemberSnapshot = conversationTimelineMemberSnapshot(),
                 groupRosterReader = { _, _ -> conversationTimelineGroupRoster() },
                 startOnConstruction = true,
+                onWindowApplyMeasured = onWindowApplyMeasured,
             )
         try {
             // Apply the opening window here rather than waiting on subscription startup: under the

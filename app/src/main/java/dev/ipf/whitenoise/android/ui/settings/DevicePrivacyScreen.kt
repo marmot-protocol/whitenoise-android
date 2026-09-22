@@ -17,6 +17,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppLockDelay
 import dev.ipf.whitenoise.android.state.ProductObservation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
 
 /**
