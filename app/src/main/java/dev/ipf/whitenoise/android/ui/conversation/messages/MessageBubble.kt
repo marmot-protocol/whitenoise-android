@@ -2958,12 +2958,6 @@ internal fun MessageBubble(
                             participants = participants,
                             appState = appState,
                             initialEmoji = reactionSheetInitialEmoji,
-                            onRemoveOwnReaction =
-                                if (readOnly || deleted) {
-                                    null
-                                } else {
-                                    { emoji -> appState.launchMutation { controller.toggleReaction(emoji, record) } }
-                                },
                             onDismissRequest = {
                                 reactionSheetOpen = false
                                 reactionSheetInitialEmoji = null

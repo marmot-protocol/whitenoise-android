@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -194,6 +195,54 @@ class CanAcceptReactionTest {
             addResult.complete(null)
 
             assertEquals(null, awaitImmediateReactionEventId(addResult) { "stale-event" })
+        }
+
+    /** Same-emoji mutations never overlap, so each transition observes the settled predecessor. */
+    @Test
+    fun reactionMutationsForTheSameKeyAreSingleFlight() =
+        runTest {
+            val singleFlight = ReactionMutationSingleFlight()
+            val firstStarted = CompletableDeferred<Unit>()
+            val releaseFirst = CompletableDeferred<Unit>()
+            val order = mutableListOf<String>()
+            val first =
+                backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) {
+                    singleFlight.run(TARGET to "👍") {
+                        order += "first-start"
+                        firstStarted.complete(Unit)
+                        releaseFirst.await()
+                        order += "first-end"
+                    }
+                }
+            firstStarted.await()
+            val second =
+                backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) {
+                    singleFlight.run(TARGET to "👍") {
+                        order += "second"
+                    }
+                }
+
+            assertEquals(listOf("first-start"), order)
+            releaseFirst.complete(Unit)
+            first.join()
+            second.join()
+            assertEquals(listOf("first-start", "first-end", "second"), order)
+        }
+
+    /** A blank immediate-add result waits for local history instead of failing on its first stale read. */
+    @Test
+    fun missingImmediateAddIdWaitsForAuthoritativeHistory() =
+        runTest {
+            var reads = 0
+
+            val resolved =
+                awaitReactionEventHistory(expectedEmoji = "👍", retryDelayMillis = 0L) {
+                    reads += 1
+                    if (reads < 3) emptyMap() else mapOf("👍" to "reaction-event")
+                }
+
+            assertEquals(mapOf("👍" to "reaction-event"), resolved)
+            assertEquals(3, reads)
         }
 
     /** A projected reaction event keeps removal scoped to the tapped emoji. */

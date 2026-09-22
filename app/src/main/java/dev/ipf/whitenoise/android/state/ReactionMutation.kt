@@ -6,6 +6,9 @@ import dev.ipf.whitenoise.android.core.ReactionTally
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** One optimistic change to the active account's reaction on a message. */
 internal data class OptimisticReactionChange(
@@ -21,6 +24,37 @@ internal data class ReactionMutationCoordination(
     val precedingAdd: Deferred<String?>?,
     val addCompletion: CompletableDeferred<String?>?,
 )
+
+/** Serializes mutations for the same message and emoji while leaving unrelated reactions independent. */
+internal class ReactionMutationSingleFlight {
+    private val mutexes = mutableMapOf<Pair<String, String>, Mutex>()
+
+    /** Runs [mutation] after any earlier mutation for [key] has fully settled. */
+    suspend fun <T> run(
+        key: Pair<String, String>,
+        mutation: suspend () -> T,
+    ): T {
+        val mutex = synchronized(mutexes) { mutexes.getOrPut(key) { Mutex() } }
+        return mutex.withLock { mutation() }
+    }
+}
+
+/** Waits briefly for an immediate add's event to become visible in authoritative local history. */
+internal suspend fun awaitReactionEventHistory(
+    expectedEmoji: String,
+    attempts: Int = 6,
+    retryDelayMillis: Long = 75L,
+    read: suspend () -> Map<String, String>?,
+): Map<String, String>? {
+    require(attempts > 0) { "attempts must be positive" }
+    var latest: Map<String, String>? = null
+    repeat(attempts) { attempt ->
+        latest = read()
+        if (!latest?.get(expectedEmoji).isNullOrBlank()) return latest
+        if (attempt < attempts - 1) delay(retryDelayMillis * (attempt + 1))
+    }
+    return latest
+}
 
 /**
  * Applies a reaction overlay before waiting for the engine, rolling it back when the authoritative

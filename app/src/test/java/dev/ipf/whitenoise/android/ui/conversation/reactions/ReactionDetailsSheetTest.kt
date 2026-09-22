@@ -5,10 +5,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -56,7 +58,6 @@ class ReactionDetailsSheetTest {
                     participants = participants,
                     appState = appState,
                     initialEmoji = "👍",
-                    onRemoveOwnReaction = {},
                 )
             }
         }
@@ -70,6 +71,8 @@ class ReactionDetailsSheetTest {
         composeRule
             .onNodeWithText("$allLabel · 3", substring = false)
             .assertIsSelected()
+        composeRule
+            .onRoot()
             .captureRoboImage("src/test/snapshots/reaction_details_filter_retained_after_live_update.png")
         composeRule.onNodeWithText("🔥 1", substring = false).performClick().assertIsSelected()
 
@@ -87,6 +90,40 @@ class ReactionDetailsSheetTest {
         assertEquals("👍", retainedReactionFilter("👍", participants))
         assertEquals(null, retainedReactionFilter("🔥", participants))
         assertEquals(null, retainedReactionFilter(null, participants))
+    }
+
+    /** The details surface groups a sender's emojis and never turns the identity row into a remove action. */
+    @Test
+    fun reactorRowsAreGroupedAndReadOnly() {
+        val participants =
+            listOf(
+                participant(sender = ACCOUNT_ID, emoji = "👍", reactedAt = 1uL),
+                participant(sender = ACCOUNT_ID, emoji = "🔥", reactedAt = 2uL),
+                participant(sender = OTHER_ACCOUNT_ID, emoji = "👍", reactedAt = 3uL),
+            )
+        val grouped = groupedReactionParticipants(participants)
+
+        assertEquals(
+            listOf(
+                ReactionParticipantGroup(ACCOUNT_ID, listOf("👍", "🔥")),
+                ReactionParticipantGroup(OTHER_ACCOUNT_ID, listOf("👍")),
+            ),
+            grouped,
+        )
+
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ReactionDetailsContent(
+                    participants = participants,
+                    appState = appState(),
+                )
+            }
+        }
+
+        composeRule
+            .onNodeWithText(context.getString(R.string.you), substring = true)
+            .assertHasNoClickAction()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/reaction_details_read_only_grouped.png")
     }
 
     /** Builds the minimal application state needed by the reaction-details surface. */

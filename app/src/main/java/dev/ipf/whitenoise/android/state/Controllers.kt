@@ -6447,6 +6447,7 @@ class ConversationController(
     private val optimisticReactionChanges = linkedMapOf<String, OptimisticReactionChange>()
     private val unprojectedOwnReactionEventIds = linkedMapOf<Pair<String, String>, String>()
     private val inFlightOwnReactionAdds = linkedMapOf<Pair<String, String>, CompletableDeferred<String?>>()
+    private val reactionMutationSingleFlight = ReactionMutationSingleFlight()
 
     // DEBUG-only send-latency trace bookkeeping (issue #913): maps a pending
     // optimistic text message's temp id to (traceSequence, monotonicStartMs) so
@@ -8572,6 +8573,13 @@ class ConversationController(
             } else {
                 null
             }
+        if (removeBeforeProjection && preferredEventId.isNullOrBlank()) {
+            // This is only a visibility barrier. retractOwnReaction deliberately rereads history
+            // under the group commit lock before choosing event-scoped delete versus unreact.
+            awaitReactionEventHistory(emoji) {
+                resolveActiveOwnReactionEventIds(account, target, requireNotNull(conversationAccountIdHex))
+            }
+        }
         appState.withGroupCommitLock(account, group.groupIdHex) {
             retractOwnReaction(account, target, emoji, ownEmojisBeforeMutation, preferredEventId)
         }
@@ -8695,6 +8703,17 @@ class ConversationController(
                     appState.present(R.string.toast_reaction_failed)
                     return
                 }
+        reactionMutationSingleFlight.run(target.lowercase() to emoji) {
+            toggleReactionOnce(account, target, emoji)
+        }
+    }
+
+    /** Applies one serialized desired-state transition for a message and emoji. */
+    private suspend fun toggleReactionOnce(
+        account: String,
+        target: String,
+        emoji: String,
+    ) {
         val ownEmojisBeforeMutation = reactions[target].orEmpty().filter { it.mine }.mapTo(linkedSetOf()) { it.emoji }
         val alreadyMine = emoji in ownEmojisBeforeMutation
         val coordination = reactionMutationCoordination(target, emoji, alreadyMine)
@@ -8736,7 +8755,11 @@ class ConversationController(
                 },
             )
         mutation.onFailure { throwable ->
-            Log.w("DMConversation", "reaction mutation failed: ${throwable.javaClass.simpleName}")
+            if (BuildConfig.DEBUG) {
+                Log.w("DMConversation", "reaction mutation failed", throwable)
+            } else {
+                Log.w("DMConversation", "reaction mutation failed: ${throwable.javaClass.simpleName}")
+            }
             appState.presentFailure(R.string.toast_reaction_failed, "MESSAGE_REACTION", throwable)
         }
         val reactionCommitted = mutation.getOrDefault(false)
