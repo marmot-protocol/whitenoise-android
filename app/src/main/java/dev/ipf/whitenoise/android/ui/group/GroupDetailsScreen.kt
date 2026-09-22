@@ -778,6 +778,7 @@ internal fun GroupDetailsScreen(
                 stagedRecipientIds = addSelection.map { it.accountIdHex },
             )
 
+        /** Submits the currently staged, normalized recipients and closes the picker only after native success. */
         fun submitSelectedInvites() {
             if (!canAdministerMembers) return
             val refs = addSelection.map { it.accountIdHex }

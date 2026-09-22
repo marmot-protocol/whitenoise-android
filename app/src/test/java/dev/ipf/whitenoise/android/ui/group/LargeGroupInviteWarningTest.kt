@@ -7,6 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LargeGroupInviteWarningTest {
+    /** Covers the boundary cases required by the issue without relying on UI state. */
     @Test
     fun thresholdCasesUseTheAuthoritativeRosterAndStagedRecipients() {
         assertFalse(projection(existing = 48, selected = listOf("new-a")).shouldWarn)
@@ -16,6 +17,7 @@ class LargeGroupInviteWarningTest {
         assertTrue(projection(existing = 50, selected = listOf("new-a")).shouldWarn)
     }
 
+    /** Proves normalization prevents existing, pending, and repeated staged identities from being counted twice. */
     @Test
     fun existingPendingSelectedAndActiveMembersAreCountedOnce() {
         val result =
@@ -31,6 +33,7 @@ class LargeGroupInviteWarningTest {
         assertTrue(result?.shouldWarn == true)
     }
 
+    /** Ensures the active account contributes to the projection when an incomplete roster omits it. */
     @Test
     fun activeAccountIsIncludedWhenTheRosterDoesNotContainIt() {
         val result =
@@ -46,6 +49,7 @@ class LargeGroupInviteWarningTest {
         assertTrue(result?.shouldWarn == true)
     }
 
+    /** Rejects a projection until the controller has supplied an authoritative roster. */
     @Test
     fun unresolvedRosterNeverProducesAMisleadingCount() {
         assertNull(
@@ -59,6 +63,7 @@ class LargeGroupInviteWarningTest {
         )
     }
 
+    /** Builds a standard authoritative projection for concise threshold assertions. */
     private fun projection(
         existing: Int,
         selected: List<String> = emptyList(),
@@ -73,5 +78,6 @@ class LargeGroupInviteWarningTest {
             ),
         )
 
+    /** Generates stable unique member identities for projection fixtures. */
     private fun memberIds(count: Int): List<String> = List(count) { index -> "member-$index" }
 }

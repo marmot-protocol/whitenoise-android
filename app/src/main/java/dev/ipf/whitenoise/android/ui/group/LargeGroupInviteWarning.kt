@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -22,6 +23,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
@@ -55,6 +57,7 @@ internal fun largeGroupInviteProjection(
 
     val uniqueMembers = LinkedHashSet<String>()
 
+    /** Normalizes one optional identity before adding it to the projected member set. */
     fun addMember(memberIdHex: String?) {
         memberIdHex
             ?.trim()
@@ -95,12 +98,18 @@ internal fun LargeGroupInviteWarningBanner(modifier: Modifier = Modifier) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     text = stringResource(R.string.large_group_invite_warning_title),
-                    style = MaterialTheme.typography.titleSmall,
+                    style =
+                        MaterialTheme.typography.titleSmall.copy(
+                            textDirection = TextDirection.ContentOrLtr,
+                        ),
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
                     text = stringResource(R.string.large_group_invite_warning_message),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style =
+                        MaterialTheme.typography.bodyMedium.copy(
+                            textDirection = TextDirection.ContentOrLtr,
+                        ),
                 )
             }
         }
@@ -118,9 +127,17 @@ internal fun LargeGroupInviteConfirmationDialog(
         modifier = Modifier.testTag(LARGE_GROUP_INVITE_CONFIRMATION_TAG),
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Default.WarningAmber, contentDescription = null) },
-        title = { Text(stringResource(R.string.large_group_invite_confirm_title)) },
+        title = {
+            Text(
+                text = stringResource(R.string.large_group_invite_confirm_title),
+                style = LocalTextStyle.current.copy(textDirection = TextDirection.ContentOrLtr),
+            )
+        },
         text = {
-            Text(stringResource(R.string.large_group_invite_confirm_message))
+            Text(
+                text = stringResource(R.string.large_group_invite_confirm_message),
+                style = LocalTextStyle.current.copy(textDirection = TextDirection.ContentOrLtr),
+            )
         },
         confirmButton = {
             TextButton(onClick = onContinue) {

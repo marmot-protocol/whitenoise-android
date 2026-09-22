@@ -33,12 +33,15 @@ class LargeGroupInviteWarningScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Records the persistent warning against the light color scheme. */
     @Test
     fun warningLight() = captureWarning("large_group_invite_warning_light.png", dark = false, amoled = false)
 
+    /** Records the persistent warning against the standard dark color scheme. */
     @Test
     fun warningDark() = captureWarning("large_group_invite_warning_dark.png", dark = true, amoled = false)
 
+    /** Verifies large English fallback text keeps readable direction inside an RTL AMOLED layout. */
     @Test
     fun warningAmoledLargeRtl() {
         composeRule.setContent {
@@ -56,6 +59,7 @@ class LargeGroupInviteWarningScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/large_group_invite_warning_amoled_large_rtl.png")
     }
 
+    /** Verifies the explicit confirmation remains readable with large fallback text in RTL AMOLED mode. */
     @Test
     fun confirmationAmoledLargeRtl() {
         composeRule.setContent {
@@ -75,6 +79,7 @@ class LargeGroupInviteWarningScreenshotTest {
             .captureRoboImage("src/test/snapshots/large_group_invite_confirmation_amoled_large_rtl.png")
     }
 
+    /** Renders a bounded warning fixture with the requested theme for deterministic baseline capture. */
     private fun captureWarning(
         name: String,
         dark: Boolean,
