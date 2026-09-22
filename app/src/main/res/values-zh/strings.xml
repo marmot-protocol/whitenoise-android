@@ -178,6 +178,8 @@
     <string name="profile_unfollow">移除联系人</string>
     <string name="profile_block">屏蔽</string>
     <string name="profile_unblock">取消屏蔽</string>
+    <string name="profile_mute_in_group">在此群组中静音</string>
+    <string name="profile_unmute_in_group">取消在此群组中的静音</string>
     <string name="blocked_users">已屏蔽的用户</string>
     <string name="blocked_users_empty">你还没有屏蔽任何人。</string>
     <string name="blocked_users_detail">被屏蔽的用户无法直接给你发消息。共同的群组仍可正常使用，历史记录保留在此设备上。</string>

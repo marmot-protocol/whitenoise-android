@@ -568,6 +568,38 @@
         ]
       },
       {
+        "surface": "Per-member group notification mute preference",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/MemberMutePreferences.kt",
+        "anchor": "class MemberMutePreferences",
+        "test_ids": [
+          "NTF-012"
+        ]
+      },
+      {
+        "surface": "Per-member group mute row state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileMemberMuteRowState.kt",
+        "anchor": "data class ProfileMemberMuteRowState",
+        "test_ids": [
+          "NTF-012"
+        ]
+      },
+      {
+        "surface": "R.string.profile_mute_in_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.profile_mute_in_group",
+        "test_ids": [
+          "NTF-012"
+        ]
+      },
+      {
+        "surface": "R.string.profile_unmute_in_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.profile_unmute_in_group",
+        "test_ids": [
+          "NTF-012"
+        ]
+      },
+      {
         "surface": "Quick-switch slot capacity and overflow fallback",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/AccountSwitcher.kt",
         "anchor": "fun quickSwitchSlotCapacity(",

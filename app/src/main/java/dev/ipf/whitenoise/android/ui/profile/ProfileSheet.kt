@@ -52,6 +52,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
@@ -92,13 +93,16 @@ import dev.ipf.whitenoise.android.share.presentOutboundShareFailure
 import dev.ipf.whitenoise.android.state.BlockOutcome
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.MemberMutePreferences
 import dev.ipf.whitenoise.android.state.ProfileGroupPickerLoadState
 import dev.ipf.whitenoise.android.state.ProfileGroupPickerState
 import dev.ipf.whitenoise.android.state.ToastMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isUserBlocked
+import dev.ipf.whitenoise.android.state.memberMutePreferences
 import dev.ipf.whitenoise.android.state.presentationNpubFromReference
 import dev.ipf.whitenoise.android.state.rethrowIfCancellation
+import dev.ipf.whitenoise.android.state.setMemberMutedInGroup
 import dev.ipf.whitenoise.android.state.setUserBlocked
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
@@ -555,6 +559,22 @@ internal fun ProfileSheet(
     // state-layer addable-groups helper still rejects self as a defensive check
     // for the add-to-existing-groups path.
     val targetIsSelf = hex?.let { activeAccountHex?.equals(it, ignoreCase = true) == true } == true
+    // Per-member group mute (#2782). Only a profile opened from inside a group
+    // conversation has a group to scope the preference to, so DMs and every
+    // other entry point leave the key — and therefore the row — null. The
+    // conversation's own account owns the entry, which is the active one except
+    // during a notification-routed early open.
+    val memberMuteGroupIdHex = adminController?.takeUnless { it.isDm }?.group?.groupIdHex
+    val memberMuteAccountRef = adminController?.boundAccountRef ?: appState.activeAccountRef
+    val mutedMemberKeys by appState.memberMutePreferences.state.collectAsState()
+    val memberMuteKey =
+        remember(memberMuteAccountRef, memberMuteGroupIdHex, hex, targetIsSelf) {
+            MemberMutePreferences.memberKeyOrNull(
+                accountRef = memberMuteAccountRef,
+                groupIdHex = memberMuteGroupIdHex,
+                senderIdHex = hex?.takeUnless { targetIsSelf },
+            )
+        }
     // Keyed by account as well as profile: the failure path deliberately keeps the
     // previous value, which would otherwise carry one account's relationship into
     // the next and offer the wrong follow/unfollow.
@@ -792,6 +812,21 @@ internal fun ProfileSheet(
                             blockBusy = false
                         }
                     }
+                }
+            },
+            memberMute =
+                memberMuteKey?.let {
+                    ProfileMemberMuteRowState(muted = it in mutedMemberKeys, enabled = owner.canAct())
+                },
+            onMemberMute = {
+                val key = memberMuteKey
+                if (owner.canAct() && key != null) {
+                    appState.setMemberMutedInGroup(
+                        accountRef = memberMuteAccountRef,
+                        groupIdHex = memberMuteGroupIdHex,
+                        memberIdHex = hex,
+                        muted = key !in mutedMemberKeys,
+                    )
                 }
             },
             onFollow = {

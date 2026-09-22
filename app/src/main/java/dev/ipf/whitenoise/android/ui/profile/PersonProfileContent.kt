@@ -87,6 +87,8 @@ internal fun PersonProfileContent(
     onCopyLightning: () -> Unit,
     block: ProfileBlockRowState? = null,
     onBlock: () -> Unit = {},
+    memberMute: ProfileMemberMuteRowState? = null,
+    onMemberMute: () -> Unit = {},
     sharedAvatars: @Composable () -> Unit = {},
     error: @Composable () -> Unit = {},
     adminActions: @Composable () -> Unit = {},
@@ -211,6 +213,18 @@ internal fun PersonProfileContent(
                                 },
                                 modifier = Modifier.testTag(PROFILE_FOLLOW_ACTION_TAG),
                             )
+                        }
+                        if (memberMute != null) {
+                            row("member_mute") { row ->
+                                SettingsAction(
+                                    row,
+                                    stringResource(memberMuteActionLabel(memberMute)),
+                                    onMemberMute,
+                                    enabled = memberMute.enabled,
+                                    leading = { Icon(painterResource(R.drawable.ic_notifications_off), null) },
+                                    modifier = Modifier.testTag(PROFILE_MEMBER_MUTE_ACTION_TAG),
+                                )
+                            }
                         }
                         if (block != null) {
                             row("block") { row ->
@@ -432,5 +446,11 @@ internal fun PersonProfileBottomAction(
 /** Unblock reads as the inverse of the confirmed state, never of a request still in flight. */
 private fun blockActionLabel(block: ProfileBlockRowState): Int {
     val label = if (block.blocked) R.string.profile_unblock else R.string.profile_block
+    return label
+}
+
+/** Unmute reads as the inverse of the stored preference, so a success flips the row's own copy. */
+private fun memberMuteActionLabel(memberMute: ProfileMemberMuteRowState): Int {
+    val label = if (memberMute.muted) R.string.profile_unmute_in_group else R.string.profile_mute_in_group
     return label
 }
