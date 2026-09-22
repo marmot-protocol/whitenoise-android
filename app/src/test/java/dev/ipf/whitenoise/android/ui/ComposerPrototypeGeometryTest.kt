@@ -202,9 +202,13 @@ class ComposerPrototypeGeometryTest {
                 .fetchSemanticsNode()
                 .boundsInRoot.height
         assertTrue(expandedHeight > originalHeight)
-        composeRule
-            .onNodeWithContentDescription(app.getString(R.string.composer_resize))
-            .performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
+        val collapseAction =
+            composeRule
+                .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
+                .fetchSemanticsNode()
+                .config[SemanticsActions.CustomActions]
+                .single()
+        composeRule.runOnIdle { assertTrue(collapseAction.action()) }
         composeRule.waitForIdle()
         assertEquals(value, state.valueState.value)
         assertEquals(

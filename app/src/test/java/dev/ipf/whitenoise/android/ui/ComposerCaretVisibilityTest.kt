@@ -15,7 +15,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
@@ -28,10 +28,10 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
-import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.TimelineReplyDisplay
+import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerExpansionMode
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerPill
@@ -373,9 +373,13 @@ class ComposerCaretVisibilityTest {
         assertEquals(selection, field.fetchSemanticsNode().config[SemanticsProperties.TextSelectionRange])
         field.assertActiveCaretVisible()
 
-        composeRule
-            .onNodeWithContentDescription(app.getString(R.string.composer_resize))
-            .performSemanticsAction(SemanticsActions.OnClick)
+        val resizeAction =
+            composeRule
+                .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
+                .fetchSemanticsNode()
+                .config[SemanticsActions.CustomActions]
+                .single()
+        composeRule.runOnIdle { assertTrue(resizeAction.action()) }
         composeRule.waitForIdle()
 
         assertEquals(initialChangeCount + 2, bottomInputChanges)
