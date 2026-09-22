@@ -45,7 +45,9 @@ class LargeGroupInviteWarningScreenshotTest {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                 WhiteNoiseTheme(darkTheme = true, amoled = true, fontScale = 1.6f) {
                     Surface(Modifier.fillMaxSize()) {
-                        LargeGroupInviteWarningBanner()
+                        Box(Modifier.padding(top = 24.dp)) {
+                            LargeGroupInviteWarningBanner()
+                        }
                     }
                 }
             }
