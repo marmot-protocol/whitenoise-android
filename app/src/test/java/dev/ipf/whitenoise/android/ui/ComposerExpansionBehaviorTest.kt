@@ -58,6 +58,7 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
+import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_ACCESSIBILITY_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_GESTURE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_INDICATOR_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
@@ -230,17 +231,39 @@ class ComposerExpansionBehaviorTest {
         assertResizeHandleToggleLabel(R.string.composer_expand_full_screen)
     }
 
-    /** The accessible surface keeps a large target without adding a visible handle. */
+    /** The dedicated accessibility leaf keeps a large target without adding a visible handle. */
     @Test
-    fun resizeAccessibilityBelongsToTheWholeSurfaceWithoutVisibleHandle() {
+    fun resizeAccessibilityUsesADedicatedTopEdgeLeafWithoutVisibleHandle() {
         render(longDraft())
         val target = composerControlBounds(R.string.composer_resize)
         val surface = pillSurface().fetchSemanticsNode().boundsInRoot
-        assertEquals(surface, target)
+        assertEquals(surface.top, target.top, 1f)
+        assertEquals(surface.width, target.width, 1f)
+        assertEquals(48f, target.height, 1f)
         assertTrue(target.height >= 48f && target.width >= 96f)
         composeRule.onNodeWithTag(COMPOSER_RESIZE_INDICATOR_TAG, useUnmergedTree = true).assertDoesNotExist()
         val actions = resizeHandle().fetchSemanticsNode().config[SemanticsActions.CustomActions]
         assertTrue(actions.any { it.label == app.getString(R.string.composer_expand_full_screen) })
+    }
+
+    /** The resize action owns a dedicated semantics leaf without an ordinary click action. */
+    @Test
+    fun resizeAccessibilityActionOwnsADedicatedLeafWithoutClickBehavior() {
+        render(longDraft())
+        val node =
+            composeRule
+                .onNodeWithTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG, useUnmergedTree = true)
+                .fetchSemanticsNode()
+        assertTrue("the resize target must remain a leaf", node.children.isEmpty())
+        assertTrue(
+            "the resize leaf must own the named expand action",
+            node.config[SemanticsActions.CustomActions]
+                .any { it.label == app.getString(R.string.composer_expand_full_screen) },
+        )
+        assertTrue(
+            "the accessibility leaf must not restore ordinary tap behavior",
+            !node.config.contains(SemanticsActions.OnClick),
+        )
     }
 
     /** The eight-pixel border gesture stays above the first editable line with no outside reservation. */
@@ -1335,7 +1358,7 @@ class ComposerExpansionBehaviorTest {
 
     /** Invokes the named non-drag resize path retained for accessibility services. */
     private fun performAccessibleResizeAction() {
-        val action = pillSurface().fetchSemanticsNode().config[SemanticsActions.CustomActions].single()
+        val action = resizeHandle().fetchSemanticsNode().config[SemanticsActions.CustomActions].single()
         composeRule.runOnUiThread {
             assertTrue("the accessibility resize action must handle the request", action.action())
         }
@@ -1344,7 +1367,7 @@ class ComposerExpansionBehaviorTest {
     /** Asserts the current label of the named accessibility resize action. */
     private fun assertResizeHandleToggleLabel(labelRes: Int) {
         val label =
-            pillSurface()
+            resizeHandle()
                 .fetchSemanticsNode()
                 .config[SemanticsActions.CustomActions]
                 .single()

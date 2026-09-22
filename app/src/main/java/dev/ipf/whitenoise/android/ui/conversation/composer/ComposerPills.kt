@@ -133,6 +133,7 @@ import kotlin.math.roundToInt
 
 internal const val COMPOSER_RESIZE_HANDLE_TAG = "composer-resize-handle"
 internal const val COMPOSER_RESIZE_GESTURE_TAG = "composer-resize-gesture"
+internal const val COMPOSER_RESIZE_ACCESSIBILITY_TAG = "composer-resize-accessibility"
 internal const val COMPOSER_RESIZE_INDICATOR_TAG = "composer-resize-indicator"
 internal const val COMPOSER_PILL_SURFACE_TAG = "composer-pill-surface"
 
@@ -858,20 +859,7 @@ internal fun ComposerPill(
                 Modifier
                     .fillMaxWidth()
                     .then(expandedHeightModifier)
-                    .semantics {
-                        if (inputContentVisible && !multilineControlsSuppressed) {
-                            customActions =
-                                listOf(
-                                    CustomAccessibilityAction(toggleDescription) {
-                                        latestOnExpansionToggle()
-                                        true
-                                    },
-                                )
-                            if (expandedLayout) {
-                                contentDescription = resizeComposerDescription
-                            }
-                        }
-                    }.testTag(COMPOSER_PILL_SURFACE_TAG),
+                    .testTag(COMPOSER_PILL_SURFACE_TAG),
         ) {
             Column(modifier = Modifier.then(expandedHeightModifier)) {
                 if (accessoryContent != null) {
@@ -1235,9 +1223,29 @@ internal fun ComposerPill(
         }
 
         if (inputContentVisible && !multilineControlsSuppressed) {
+            if (expandedLayout) {
+                Box(
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopCenter)
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .testTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG)
+                            .semantics {
+                                contentDescription = resizeComposerDescription
+                                customActions =
+                                    listOf(
+                                        CustomAccessibilityAction(toggleDescription) {
+                                            latestOnExpansionToggle()
+                                            true
+                                        },
+                                    )
+                            },
+                )
+            }
             // This existing padding contains no editor or accessory content. A
             // border-only pointer owner leaves reading drags and selection to
-            // BasicTextField; the full surface exposes the accessible action.
+            // BasicTextField; a separate semantics leaf exposes the accessible action.
             ComposerResizeGestureStrip(
                 showHandle = composerCanResize,
                 onHeightDragStarted = { latestOnHeightDragStarted() },
