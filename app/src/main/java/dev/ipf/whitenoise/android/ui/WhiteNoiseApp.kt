@@ -11,14 +11,17 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
@@ -126,6 +129,20 @@ internal fun TransientNoticeTimeoutEffect(
     }
 }
 
+/**
+ * The bottom obstruction an app-global confirmation has to clear.
+ *
+ * The keyboard already reaches past the navigation bar, so padding for both would lift the notice
+ * by their sum. Taking the taller of the two leaves exactly one gap, and reading it through
+ * [windowInsetsPadding] keeps an inset an ancestor has already consumed — the shell applies
+ * `imePadding()` for the persistent dictation strip — from being applied a second time here.
+ */
+internal val globalTransientNoticeInsets: WindowInsets
+    @Composable get() = WindowInsets.ime.union(WindowInsets.navigationBars)
+
+/** True only for a notice this host owns: conversation-scoped ones are rendered by the conversation. */
+internal fun TransientNotice?.isGlobalTransientNotice(): Boolean = this != null && conversation == null
+
 @Composable
 @Suppress("FunctionNaming")
 internal fun GlobalTransientNotice(
@@ -135,7 +152,10 @@ internal fun GlobalTransientNotice(
     notice?.takeIf { it.conversation == null }?.let {
         InlineConfirmationNotice(
             notice = it,
-            modifier = modifier.navigationBarsPadding().testTag(GLOBAL_TRANSIENT_NOTICE_TAG),
+            modifier =
+                modifier
+                    .windowInsetsPadding(globalTransientNoticeInsets)
+                    .testTag(GLOBAL_TRANSIENT_NOTICE_TAG),
         )
     }
 }
@@ -150,6 +170,11 @@ internal fun ShellTransientNoticeLayout(
     persistentBottomContent: @Composable () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
+    // Only the bottom edge is a real obstruction here; consuming the full inset would also eat
+    // left/right navigation-bar padding that this layout never re-applies, letting content render
+    // under a side navigation bar while a global notice is visible.
+    val bottomObstruction = globalTransientNoticeInsets.only(WindowInsetsSides.Bottom)
+    val noticeOwnsTheBottom = notice.isGlobalTransientNotice()
     Column(modifier.fillMaxSize()) {
         persistentTopContent()
         Box(
@@ -159,6 +184,16 @@ internal fun ShellTransientNoticeLayout(
                 .then(
                     if (persistentTopContentConsumesStatusBars) {
                         Modifier.consumeWindowInsets(WindowInsets.statusBars)
+                    } else {
+                        Modifier
+                    },
+                ).then(
+                    // While the notice stands clear of the keyboard and navigation bar, the
+                    // destination is already measured above both, so its own inset-aware bottom
+                    // chrome — a StickyFormActionBar, a composer — must not lift over the same
+                    // obstruction again and float a gap above the confirmation.
+                    if (noticeOwnsTheBottom) {
+                        Modifier.consumeWindowInsets(bottomObstruction)
                     } else {
                         Modifier
                     },

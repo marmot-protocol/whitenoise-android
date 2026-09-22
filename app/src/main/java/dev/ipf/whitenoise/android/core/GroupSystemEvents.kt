@@ -248,6 +248,24 @@ object GroupSystemEvents {
         senderHex: String,
     ): String? = event.actor ?: senderHex.takeIf { it.isNotBlank() }
 
+    /**
+     * The actor name to render for a membership event, given what could be resolved locally.
+     *
+     * Every one of these events but one can honestly fall back to "Someone" when the actor has no
+     * locally known name. The removal of the reader cannot: [summary] already has a truthful
+     * actorless form for it — "You were removed" — and substituting "Someone" first defeats that
+     * branch while adding nothing the notification's own title has not already said. Returning null
+     * lets the passive form do its job; every other event keeps the fallback it has always had.
+     */
+    fun actorNameOrSomeone(
+        event: GroupSystemEvent,
+        resolvedActorName: String?,
+        subjectIsSelf: Boolean,
+        someone: String,
+    ): String? =
+        resolvedActorName
+            ?: someone.takeUnless { subjectIsSelf && event.systemType == TypeMemberRemoved }
+
     /** Sanitized old/new rename names when a real previous name is known. */
     fun renameDiffNames(event: GroupSystemEvent): GroupRenameDiffNames? =
         if (event.fromAuthenticatedStateProjection && event.systemType == TypeGroupRenamed) {

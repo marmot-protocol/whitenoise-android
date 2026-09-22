@@ -503,12 +503,38 @@ class MessageActionMenuLayoutTest {
         assertEquals(48f, bounds.height, 0.5f)
     }
 
+    /** A full six-slot configuration keeps every reaction, and the full picker, inside the popup. */
     @Test
     fun emojiPickerStaysVisibleWithMaximumQuickReactions() {
+        assertMaximumQuickReactionsFitThePopup(fontScale = 1f, layoutDirection = LayoutDirection.Ltr)
+    }
+
+    /** Mirroring the popup must not push the sixth configured choice past its edge either. */
+    @Test
+    fun maximumQuickReactionsStayInsideThePopupInRtl() {
+        assertMaximumQuickReactionsFitThePopup(fontScale = 1f, layoutDirection = LayoutDirection.Rtl)
+    }
+
+    /** A supported larger font scale may grow the popup but may not hide a configured choice. */
+    @Test
+    fun maximumQuickReactionsStayInsideThePopupAtLargeFontScale() {
+        assertMaximumQuickReactionsFitThePopup(fontScale = 1.3f, layoutDirection = LayoutDirection.Ltr)
+    }
+
+    /**
+     * Renders the six configured choices at the compact width and asserts each one — and the
+     * full-picker action — is displayed within the popup with its accessible touch target intact.
+     */
+    private fun assertMaximumQuickReactionsFitThePopup(
+        fontScale: Float,
+        layoutDirection: LayoutDirection,
+    ) {
+        val emojis = listOf("❤️", "👍", "👎", "😂", "😮", "😢")
         renderMenu(
-            fontScale = 1f,
+            fontScale = fontScale,
+            layoutDirection = layoutDirection,
             canReact = true,
-            quickReactionEmojis = listOf("❤️", "👍", "👎", "😂", "😮", "😢"),
+            quickReactionEmojis = emojis,
         )
 
         val menu =
@@ -516,6 +542,18 @@ class MessageActionMenuLayoutTest {
                 .onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG)
                 .fetchSemanticsNode()
                 .boundsInRoot
+        emojis.forEach { emoji ->
+            val reaction =
+                composeRule
+                    .onNodeWithTag("$MESSAGE_ACTION_REACTION_TEST_TAG:$emoji")
+                    .assertIsDisplayed()
+                    .fetchSemanticsNode()
+                    .boundsInRoot
+            assertTrue("$emoji starts outside the popup", reaction.left >= menu.left - BOUNDS_TOLERANCE_PX)
+            assertTrue("$emoji ends outside the popup", reaction.right <= menu.right + BOUNDS_TOLERANCE_PX)
+            assertTrue("$emoji lost its touch target", reaction.width >= TOUCH_TARGET_PX)
+            assertTrue("$emoji lost its touch target", reaction.height >= TOUCH_TARGET_PX)
+        }
         val picker =
             composeRule
                 .onNodeWithContentDescription("Open emoji picker")
@@ -523,7 +561,10 @@ class MessageActionMenuLayoutTest {
                 .fetchSemanticsNode()
                 .boundsInRoot
 
-        assertTrue(picker.right <= menu.right)
+        assertTrue(picker.left >= menu.left - BOUNDS_TOLERANCE_PX)
+        assertTrue(picker.right <= menu.right + BOUNDS_TOLERANCE_PX)
+        assertTrue(picker.width >= TOUCH_TARGET_PX)
+        assertTrue(picker.height >= TOUCH_TARGET_PX)
     }
 
     /** Composes the menu under test with the given fixture. */
@@ -648,4 +689,9 @@ class MessageActionMenuLayoutTest {
             actionRowHeight = rowHeight.dp,
             reactionRowHeight = reactionHeight.dp,
         ).value.toInt()
+
+    private companion object {
+        const val TOUCH_TARGET_PX = 48f
+        const val BOUNDS_TOLERANCE_PX = 0.5f
+    }
 }

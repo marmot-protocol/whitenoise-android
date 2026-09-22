@@ -195,7 +195,6 @@ internal fun ChatsScreen(
     val groupTitleCopy = rememberGroupTitleCopy()
     var showNewChatFlow by rememberSaveable { mutableStateOf(false) }
     val openNewMessageFlow = { showNewChatFlow = true }
-    var pendingBulkDelete by remember { mutableStateOf<List<ChatListItem>?>(null) }
     var actionSheetChatId by
         remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<String?>(null) }
     val actionMenuOwner = remember(appState.activeAccountRef, appState.runtimeGeneration) { ChatContextMenuOwner() }
@@ -290,6 +289,12 @@ internal fun ChatsScreen(
     // An archived-only folder is a view switch as well as a filter: it swaps
     // the source list to archived chats (replacing the old Archived chip).
     val showArchived = selectedFolderRule?.archivedOnly == true
+    // A confirmation still holding the previous account's or list variant's rows must not survive
+    // into the next one, where those rows are not even addressable.
+    var pendingBulkDelete by
+        remember(appState.activeAccountRef, appState.runtimeGeneration, showArchived) {
+            mutableStateOf<List<ChatListItem>?>(null)
+        }
     val searchFocusRequester = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
 
@@ -581,7 +586,16 @@ internal fun ChatsScreen(
             }
         }
     }
-    val chatListState = key(showArchived) { rememberLazyListState() }
+    // The quick switcher can retain this frame across an account flip, so the viewport is keyed to
+    // the account, runtime and list that produced it. Within one account the owner is unchanged,
+    // so opening a conversation and coming back still restores where the reader was.
+    val viewportOwner =
+        ChatListViewportOwner(
+            accountRef = appState.activeAccountRef,
+            runtimeGeneration = appState.runtimeGeneration,
+            showArchived = showArchived,
+        )
+    val chatListState = key(viewportOwner) { rememberLazyListState() }
     val userGestureGeneration = rememberChatListUserGestureGeneration(chatListState)
     LaunchedEffect(chatListState, actionSheetChatId, actionMenuOwner.token, actionMenuOwner.pointerHeld) {
         val anchorId = actionSheetChatId ?: return@LaunchedEffect
@@ -970,7 +984,9 @@ internal fun ChatsScreen(
     // deep, hide only after they climb back to ≤ 2. The 3–4 dead band keeps a
     // quick scroll wiggle near the threshold from toggling the button (issue
     // #413). The previous decision keeps the band sticky.
-    var jumpToTopVisible by remember(showArchived) { mutableStateOf(false) }
+    // Derived from the viewport, so it resets with the viewport rather than carrying the previous
+    // account's depth into a list that now starts at the top.
+    var jumpToTopVisible by remember(viewportOwner) { mutableStateOf(false) }
     // Observe scroll-index changes in an effect so the whole screen does not
     // subscribe to every LazyColumn index update during a fling.
     val chatListWindowView = if (showArchived) ChatListViewFfi.ARCHIVED else ChatListViewFfi.CHATS

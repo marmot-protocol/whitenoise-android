@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.audio
 import android.speech.SpeechRecognizer
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationRecovery
+import dev.ipf.whitenoise.android.ui.conversation.composer.dictationFailureRecovery
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -219,25 +221,29 @@ class ConversationDictationControllerTest {
         assertEquals("Keep", fixture.drafts.getValue(key()).text)
     }
 
+    /** A provider that accepted the session and then failed is the provider's to fix, not the network's. */
     @Test
-    fun offlineVoiceInputServerFailureOffersProviderSetupInsteadOfNetworkRetry() {
-        listOf("dev.notune.transcribe", "dev.notune.transcribe.callerfix").forEach { providerPackage ->
-            assertEquals(
-                ConversationDictationFailure.ProviderUnavailable,
-                SpeechRecognizer.ERROR_SERVER.toConversationDictationFailure(providerPackage),
-            )
-        }
+    fun serverFailureOffersProviderSetupInsteadOfNetworkRetry() {
+        assertEquals(
+            ConversationDictationFailure.ProviderUnavailable,
+            SpeechRecognizer.ERROR_SERVER.toConversationDictationFailure(),
+        )
+        assertEquals(
+            ConversationDictationRecovery.SpeechProviderSetup,
+            dictationFailureRecovery(SpeechRecognizer.ERROR_SERVER.toConversationDictationFailure()),
+        )
     }
 
+    /** Only the two codes that carry network evidence may still claim a network cause. */
     @Test
-    fun serverAndNetworkFailuresFromOtherProvidersKeepNetworkRecovery() {
+    fun onlyTheNetworkCodesKeepNetworkRecovery() {
         assertEquals(
             ConversationDictationFailure.Network,
-            SpeechRecognizer.ERROR_SERVER.toConversationDictationFailure("example.network.recognizer"),
+            SpeechRecognizer.ERROR_NETWORK.toConversationDictationFailure(),
         )
         assertEquals(
             ConversationDictationFailure.Network,
-            SpeechRecognizer.ERROR_NETWORK.toConversationDictationFailure("dev.notune.transcribe"),
+            SpeechRecognizer.ERROR_NETWORK_TIMEOUT.toConversationDictationFailure(),
         )
     }
 

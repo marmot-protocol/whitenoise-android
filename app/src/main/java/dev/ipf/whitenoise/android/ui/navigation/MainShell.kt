@@ -824,7 +824,6 @@ internal fun MainShell(
                 notificationMessageRouteChatListReady(
                     chatListReady = broadChatListReady,
                     targetPresent = target.groupIdHex in availableGroupIds,
-                    preloadState = exactPreloadState,
                 )
             } else {
                 broadChatListReady
@@ -1174,6 +1173,13 @@ internal fun MainShell(
                                     }
                                 }
                             }
+                        } else {
+                            // The exact read has answered inconclusively and its one retry is
+                            // spent. Inconclusive is not terminal: release the routing overlay and
+                            // leave the tap pending for a later chat-list update to resolve,
+                            // rather than claiming a conversation that may well exist is gone.
+                            releaseNotificationFirstFrameGate(routingRequestId)
+                            routingNotification = false
                         }
                     }
                     null -> {
@@ -1709,6 +1715,15 @@ internal fun MainShell(
     val openGroupFromGroupCreateCompletion: (ChatListItem, Long) -> Unit = { item, requestToken ->
         if (commitGroupCreateCompletionOpen(item.group.groupIdHex, requestToken)) {
             chatListReturnHeadSnap = openGroupFromProfileSheet(chatListReturnHeadSnap)
+            // The conversation cannot otherwise tell a group that was created moments ago from one
+            // that has been around, and the two deserve different answers when an advisory
+            // recovery read fails. `selectedChatJustCreated` stays false: it drives the DM-only
+            // composer focus and subtitle hint, which a group create does not want.
+            appState.freshGroupCreations.record(
+                accountRef = appState.activeAccountRef,
+                groupIdHex = item.group.groupIdHex,
+                runtimeGeneration = appState.runtimeGeneration,
+            )
             selectedChatOpenContext = ConversationOpenContext()
             selectedChatJustCreated = false
             selectedChatOpenedAsDmHint = false
