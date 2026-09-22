@@ -22283,6 +22283,15 @@
     ],
     "source_coverage": [
       {
+        "surface": "A send-failure notice is retired when that same send recovers",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/SendFailureNotices.kt",
+        "anchor": "internal fun WhiteNoiseAppState.dismissSendFailureNotice(",
+        "test_ids": [
+          "MSG-017",
+          "MED-003"
+        ]
+      },
+      {
         "surface": "One canonical decision lets an attachment transfer reach the network",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentDownloadPolicy.kt",
         "anchor": "internal fun attachmentTransferAllowsNetwork(",

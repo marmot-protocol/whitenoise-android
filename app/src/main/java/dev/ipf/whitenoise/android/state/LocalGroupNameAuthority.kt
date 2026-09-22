@@ -109,7 +109,10 @@ internal fun LocalGroupNameAuthority.reconciledPresentation(
 }
 
 /** [presentation] carrying [name] as its literal title. */
-internal fun ConversationPresentationFfi.withLocalGroupTitle(name: String): ConversationPresentationFfi = copy(title = PresentationTextFfi.Literal(name))
+internal fun ConversationPresentationFfi.withLocalGroupTitle(name: String): ConversationPresentationFfi {
+    val literal = PresentationTextFfi.Literal(name)
+    return copy(title = literal)
+}
 
 /** [record] with the newest locally committed name applied; the same instance when nothing changed. */
 internal fun LocalGroupNameAuthority.reconciled(record: AppGroupRecordFfi): AppGroupRecordFfi {

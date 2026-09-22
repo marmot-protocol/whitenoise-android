@@ -121,6 +121,9 @@ data class ToastMessage(
     val copyable: Boolean = false,
     val tier: NoticeTier = NoticeTier.ActionableError,
     val diagnosticReport: String? = null,
+    // The send attempt this notice reports, when it reports one, so a later
+    // recovery of that same send can retire it (#2666).
+    val sendAttempt: SendFailureAttempt? = null,
 )
 
 data class TransientNotice(

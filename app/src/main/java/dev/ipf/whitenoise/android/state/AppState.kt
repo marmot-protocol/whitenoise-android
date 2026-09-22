@@ -9206,6 +9206,7 @@ class WhiteNoiseAppState private constructor(
         copyable: Boolean = false,
         diagnosticReport: String? = null,
         tier: NoticeTier = NoticeTier.ActionableError,
+        sendAttempt: SendFailureAttempt? = null,
     ) {
         val safeReport = diagnosticReport?.trim()?.takeIf(String::isNotEmpty)
         toast =
@@ -9218,6 +9219,7 @@ class WhiteNoiseAppState private constructor(
                 copyable = copyable && safeReport != null,
                 tier = tier,
                 diagnosticReport = safeReport,
+                sendAttempt = sendAttempt,
             )
     }
 
