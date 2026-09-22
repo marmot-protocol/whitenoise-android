@@ -6331,6 +6331,15 @@
         ]
       },
       {
+        "surface": "IdentityImageCropTopBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
+        "anchor": "fun IdentityImageCropTopBar(",
+        "test_ids": [
+          "PRO-002",
+          "GRP-003"
+        ]
+      },
+      {
         "surface": "IdentityImageCropCanvas",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
         "anchor": "fun IdentityImageCropCanvas(",
@@ -6361,6 +6370,15 @@
         "surface": "string:identity_crop_cancel",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
         "anchor": "R.string.cancel",
+        "test_ids": [
+          "PRO-002",
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "string:identity_crop_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
+        "anchor": "R.string.photo_editor_crop",
         "test_ids": [
           "PRO-002",
           "GRP-003"
