@@ -39,6 +39,7 @@ class DisappearingMessagesPickerScreenshotTest {
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
     private val nativePickers = mutableMapOf<Any?, NumberPicker>()
 
+    /** Preset ordering keeps the clearer three-month option above the shorter four-week fallback. */
     @Test
     fun presetListShowsThreeMonthsAboveFourWeeks() {
         render(currentSecs = 0L)
