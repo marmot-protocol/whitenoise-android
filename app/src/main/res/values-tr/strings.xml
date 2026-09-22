@@ -1156,7 +1156,7 @@
     <string name="folder_manual_hint">Buraya eklediğiniz sohbetler, otomatik kurallarla eşleşmese bile dahil olmaya devam eder.</string>
     <string name="folder_rules">Otomatik kurallar</string>
     <string name="folder_keyword_hint">Bir sohbet başlığı veya grup açıklamasıyla eşleştirin. Seçilen herhangi bir kişiyle yapılan sohbetler de eşleşir.</string>
-    <string name="folder_rule_hint">Sohbetlerin, seçtiğiniz tüm kurallarla eşleşmesi gerekir. Kaldırdığınız bir sohbet, hâlâ eşleşiyorsa geri gelir.</string>
+    <string name="folder_rule_hint">Sohbetler, seçilen kişi veya anahtar sözcük kurallarından herhangi biriyle eşleşirse dahil edilir. Kategori seçenekleri bu eşleşmeleri daraltır. Kaldırdığınız bir sohbet hâlâ eşleşiyorsa geri gelir.</string>
     <string name="folder_preview">Önizleme</string>
     <string name="folder_discard_title">Değişiklikler silinsin mi?</string>
     <string name="folder_discard_detail">Klasör değişiklikleriniz kaydedilmedi.</string>
@@ -1307,7 +1307,7 @@
     <string name="disappearing_1_hour">1 saat</string>
     <string name="disappearing_5_minutes">5 dakika</string>
     <string name="disappearing_30_seconds">30 saniye</string>
-    <string name="disappearing_explainer">Yeni mesajlar, okunsun ya da okunmasın, seçtiğiniz sürenin sonunda herkes için kalıcı olarak silinir.</string>
+    <string name="disappearing_explainer">Okunmamış gelen mesajların süresi, onları okuduğunuzda başlar. Diğer yeni mesajlar seçtiğiniz süre sonunda herkes için kalıcı olarak silinir.</string>
     <string name="disappearing_seconds_format">%1$d saniye</string>
     <string name="disappearing_unit_seconds">Saniye</string>
     <string name="disappearing_set">Ayarla</string>
@@ -1810,7 +1810,7 @@
     <string name="usage_diagnostics_logs_separate">Bu cihazdaki tüm profillerin temizlenmiş teknik günlükleri, ayrı olarak paylaşılır.</string>
     <string name="usage_diagnostics_renew">Kullanım paylaşımı artık özellik etkinliğini de kapsıyor; güncellenen ayrıntıları inceleyip seçiminizi yeniden yapın.</string>
     <string name="usage_diagnostics_status">Kullanım: %1$s. Telemetri: %2$s.</string>
-    <string name="usage_diagnostics_error">Paylaşım tercihiniz kaydedilemedi. Yeniden deneyin.</string>
+    <string name="usage_diagnostics_error">Ayarlar yüklenemedi veya kaydedilemedi.</string>
     <string name="usage_diagnostics_off">Kapalı</string>
     <string name="usage_diagnostics_permission_needed">Onay gerekiyor</string>
     <string name="usage_diagnostics_unconfigured">Yapılandırılmadı</string>

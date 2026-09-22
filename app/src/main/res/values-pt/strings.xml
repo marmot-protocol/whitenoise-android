@@ -1158,7 +1158,7 @@
     <string name="folder_manual_hint">Os chats que você adicionar aqui continuam incluídos, mesmo quando não correspondem às regras automáticas.</string>
     <string name="folder_rules">Regras automáticas</string>
     <string name="folder_keyword_hint">Corresponde ao título do chat ou à descrição do grupo. Chats com qualquer pessoa selecionada também correspondem.</string>
-    <string name="folder_rule_hint">Os chats precisam atender a todas as regras que você selecionar. Um chat que você remover volta se continuar atendendo às regras.</string>
+    <string name="folder_rule_hint">Os chats correspondem quando atendem a qualquer regra selecionada de pessoa ou palavra-chave. As opções de categoria restringem essas correspondências. Um chat removido volta se ainda corresponder.</string>
     <string name="folder_preview">Pré-visualização</string>
     <string name="folder_discard_title">Descartar as alterações?</string>
     <string name="folder_discard_detail">As alterações da pasta não foram salvas.</string>
@@ -1309,7 +1309,7 @@
     <string name="disappearing_1_hour">1 hora</string>
     <string name="disappearing_5_minutes">5 minutos</string>
     <string name="disappearing_30_seconds">30 segundos</string>
-    <string name="disappearing_explainer">As novas mensagens, lidas ou não, são excluídas permanentemente para todos após a duração que você escolher.</string>
+    <string name="disappearing_explainer">As mensagens recebidas não lidas iniciam o temporizador quando você as lê. As outras mensagens novas são excluídas permanentemente para todos após o período escolhido.</string>
     <string name="disappearing_seconds_format">%1$d segundos</string>
     <string name="disappearing_unit_seconds">Segundos</string>
     <string name="disappearing_set">Definir</string>
@@ -1812,7 +1812,7 @@
     <string name="usage_diagnostics_logs_separate">Registos técnicos depurados de todos os perfis neste dispositivo, partilhados separadamente.</string>
     <string name="usage_diagnostics_renew">O compartilhamento de uso agora inclui a atividade dos recursos. Revise os detalhes atualizados e faça sua escolha novamente.</string>
     <string name="usage_diagnostics_status">Utilização: %1$s. Telemetria: %2$s.</string>
-    <string name="usage_diagnostics_error">Não foi possível salvar sua escolha de compartilhamento. Tente novamente.</string>
+    <string name="usage_diagnostics_error">Não foi possível carregar ou salvar as configurações.</string>
     <string name="usage_diagnostics_off">Desativado</string>
     <string name="usage_diagnostics_permission_needed">Consentimento necessário</string>
     <string name="usage_diagnostics_unconfigured">Não configurado</string>

@@ -1156,7 +1156,7 @@
     <string name="folder_manual_hint">Hier hinzugefügte Chats bleiben enthalten, auch wenn sie nicht zu den automatischen Regeln passen.</string>
     <string name="folder_rules">Automatische Regeln</string>
     <string name="folder_keyword_hint">Passt auf Chat-Titel oder Gruppenbeschreibung. Chats mit einer ausgewählten Person passen ebenfalls.</string>
-    <string name="folder_rule_hint">Chats müssen allen ausgewählten Regeln entsprechen. Ein entfernter Chat kommt zurück, wenn er weiterhin passt.</string>
+    <string name="folder_rule_hint">Chats werden aufgenommen, wenn sie einer ausgewählten Personen- oder Stichwortregel entsprechen. Kategorieoptionen grenzen diese Treffer ein. Ein entfernter Chat kommt zurück, wenn er weiterhin passt.</string>
     <string name="folder_preview">Vorschau</string>
     <string name="folder_discard_title">Änderungen verwerfen?</string>
     <string name="folder_discard_detail">Deine Ordneränderungen wurden nicht gespeichert.</string>
@@ -1307,7 +1307,7 @@
     <string name="disappearing_1_hour">1 Stunde</string>
     <string name="disappearing_5_minutes">5 Minuten</string>
     <string name="disappearing_30_seconds">30 Sekunden</string>
-    <string name="disappearing_explainer">Neue Nachrichten werden nach der gewählten Dauer für alle endgültig gelöscht – ob gelesen oder nicht.</string>
+    <string name="disappearing_explainer">Ungelesene empfangene Nachrichten starten ihren Timer, wenn du sie liest. Andere neue Nachrichten werden nach der gewählten Dauer für alle endgültig gelöscht.</string>
     <string name="disappearing_seconds_format">%1$d Sekunden</string>
     <string name="disappearing_unit_seconds">Sekunden</string>
     <string name="disappearing_set">Festlegen</string>
@@ -1829,7 +1829,7 @@
     <string name="usage_diagnostics_logs_separate">Bereinigte technische Protokolle aller Profile auf diesem Gerät, die separat geteilt werden.</string>
     <string name="usage_diagnostics_renew">Die Nutzungsfreigabe umfasst jetzt auch Funktionsaktivitäten. Sieh dir die aktualisierten Angaben an und triff deine Wahl erneut.</string>
     <string name="usage_diagnostics_status">Nutzung: %1$s. Telemetrie: %2$s.</string>
-    <string name="usage_diagnostics_error">Deine Freigabeauswahl konnte nicht gespeichert werden. Versuch es erneut.</string>
+    <string name="usage_diagnostics_error">Einstellungen konnten nicht geladen oder gespeichert werden.</string>
     <string name="usage_diagnostics_off">Aus</string>
     <string name="usage_diagnostics_permission_needed">Zustimmung erforderlich</string>
     <string name="usage_diagnostics_unconfigured">Nicht konfiguriert</string>

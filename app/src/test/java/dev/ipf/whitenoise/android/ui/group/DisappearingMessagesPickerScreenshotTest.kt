@@ -11,9 +11,11 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
 import androidx.test.core.app.ApplicationProvider
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -30,7 +32,7 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en")
-class DisappearingMessagesPickerTest {
+class DisappearingMessagesPickerScreenshotTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
@@ -43,6 +45,19 @@ class DisappearingMessagesPickerTest {
 
         composeRule.onNodeWithText(context.getString(R.string.disappearing_90_days)).assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.disappearing_4_weeks)).assertIsDisplayed()
+    }
+
+    /** The rendered picker explains the unread-received read anchor and keeps a deterministic baseline. */
+    @Test
+    fun explainerMatchesReadAnchoredRetentionBehavior() {
+        render(currentSecs = 0L)
+
+        composeRule
+            .onNodeWithText(
+                "Unread messages you receive start their timer when you read them. " +
+                    "Other new messages are permanently deleted for everyone after your chosen duration.",
+            ).assertIsDisplayed()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/disappearing_messages_picker.png")
     }
 
     @Test

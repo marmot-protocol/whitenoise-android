@@ -89,6 +89,7 @@ class SignInRecoveryConsentTest {
         composeRule.onNodeWithText(string(R.string.identity_entry_error_import_failed)).assertExists()
     }
 
+    /** An ordinary sign-in only presents recovery consent; it never performs recovery before confirmation. */
     @Test
     fun theSignInAttemptItselfNeverRecovers() {
         val engine = recoveryRequiredEngine()

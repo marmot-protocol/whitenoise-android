@@ -1158,7 +1158,7 @@
     <string name="folder_manual_hint">Les discussions ajoutées ici restent incluses, même si elles ne correspondent pas aux règles automatiques.</string>
     <string name="folder_rules">Règles automatiques</string>
     <string name="folder_keyword_hint">Correspond au titre d’une discussion ou à la description d’un groupe. Les discussions avec une personne sélectionnée correspondent aussi.</string>
-    <string name="folder_rule_hint">Les discussions doivent correspondre à toutes les règles sélectionnées. Une discussion que vous retirez revient si elle correspond toujours.</string>
+    <string name="folder_rule_hint">Les discussions correspondent si elles respectent au moins une règle de personne ou de mot-clé sélectionnée. Les options de catégorie affinent ces résultats. Une discussion retirée réapparaît si elle correspond toujours.</string>
     <string name="folder_preview">Aperçu</string>
     <string name="folder_discard_title">Abandonner les modifications ?</string>
     <string name="folder_discard_detail">Vos modifications du dossier n’ont pas été enregistrées.</string>
@@ -1309,7 +1309,7 @@
     <string name="disappearing_1_hour">1 heure</string>
     <string name="disappearing_5_minutes">5 minutes</string>
     <string name="disappearing_30_seconds">30 secondes</string>
-    <string name="disappearing_explainer">Les nouveaux messages, lus ou non, sont définitivement supprimés pour tout le monde après la durée choisie.</string>
+    <string name="disappearing_explainer">Les messages reçus non lus démarrent leur délai lorsque vous les lisez. Les autres nouveaux messages sont définitivement supprimés pour tout le monde après la durée choisie.</string>
     <string name="disappearing_seconds_format">%1$d secondes</string>
     <string name="disappearing_unit_seconds">Secondes</string>
     <string name="disappearing_set">Définir</string>
@@ -1812,7 +1812,7 @@
     <string name="usage_diagnostics_logs_separate">Journaux techniques nettoyés de tous les profils sur cet appareil, partagés séparément.</string>
     <string name="usage_diagnostics_renew">Le partage d’utilisation couvre désormais l’activité des fonctionnalités : consultez les informations mises à jour et faites de nouveau votre choix.</string>
     <string name="usage_diagnostics_status">Utilisation : %1$s. Télémétrie : %2$s.</string>
-    <string name="usage_diagnostics_error">Impossible d’enregistrer votre choix de partage. Réessayez.</string>
+    <string name="usage_diagnostics_error">Impossible de charger ou d’enregistrer les réglages.</string>
     <string name="usage_diagnostics_off">Désactivé</string>
     <string name="usage_diagnostics_permission_needed">Consentement requis</string>
     <string name="usage_diagnostics_unconfigured">Non configuré</string>

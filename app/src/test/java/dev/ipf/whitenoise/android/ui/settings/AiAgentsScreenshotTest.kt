@@ -46,6 +46,7 @@ class AiAgentsScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/ai_agents_codex_setup_sheet.png")
     }
 
+    /** Renders the shared deterministic AI Agents fixture before each screenshot exercises its own state. */
     private fun render() {
         composeRule.setContent {
             WhiteNoiseTheme {

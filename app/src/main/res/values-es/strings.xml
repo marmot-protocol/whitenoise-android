@@ -1158,7 +1158,7 @@
     <string name="folder_manual_hint">Los chats que añadas aquí seguirán incluidos aunque no cumplan las reglas automáticas.</string>
     <string name="folder_rules">Reglas automáticas</string>
     <string name="folder_keyword_hint">Coincide con el título del chat o la descripción del grupo. Los chats con cualquier persona seleccionada también coinciden.</string>
-    <string name="folder_rule_hint">Los chats deben cumplir todas las reglas que selecciones. Un chat que quites volverá si sigue cumpliéndolas.</string>
+    <string name="folder_rule_hint">Los chats coinciden si cumplen alguna regla seleccionada de persona o palabra clave. Las opciones de categoría acotan esas coincidencias. Un chat que quites volverá si aún coincide.</string>
     <string name="folder_preview">Vista previa</string>
     <string name="folder_discard_title">¿Descartar los cambios?</string>
     <string name="folder_discard_detail">Los cambios de la carpeta no se han guardado.</string>
@@ -1309,7 +1309,7 @@
     <string name="disappearing_1_hour">1 hora</string>
     <string name="disappearing_5_minutes">5 minutos</string>
     <string name="disappearing_30_seconds">30 segundos</string>
-    <string name="disappearing_explainer">Los mensajes nuevos, leídos o no, se eliminan permanentemente para todos después del tiempo que elijas.</string>
+    <string name="disappearing_explainer">Los mensajes recibidos sin leer inician su temporizador cuando los lees. Los demás mensajes nuevos se eliminan para todos de forma permanente tras el periodo que elijas.</string>
     <string name="disappearing_seconds_format">%1$d segundos</string>
     <string name="disappearing_unit_seconds">Segundos</string>
     <string name="disappearing_set">Establecer</string>
@@ -1812,7 +1812,7 @@
     <string name="usage_diagnostics_logs_separate">Registros técnicos depurados de todos los perfiles de este dispositivo, compartidos por separado.</string>
     <string name="usage_diagnostics_renew">Ahora también se comparte la actividad de las funciones: revisa los detalles actualizados y vuelve a elegir.</string>
     <string name="usage_diagnostics_status">Uso: %1$s. Telemetría: %2$s.</string>
-    <string name="usage_diagnostics_error">No se pudo guardar tu elección. Inténtalo de nuevo.</string>
+    <string name="usage_diagnostics_error">No se pudo cargar o guardar la configuración.</string>
     <string name="usage_diagnostics_off">Desactivado</string>
     <string name="usage_diagnostics_permission_needed">Se necesita consentimiento</string>
     <string name="usage_diagnostics_unconfigured">Sin configurar</string>

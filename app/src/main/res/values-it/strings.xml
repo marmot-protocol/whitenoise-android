@@ -1158,7 +1158,7 @@
     <string name="folder_manual_hint">Le chat che aggiungi qui restano incluse anche se non corrispondono alle regole automatiche.</string>
     <string name="folder_rules">Regole automatiche</string>
     <string name="folder_keyword_hint">Corrisponde al titolo di una chat o alla descrizione di un gruppo. Anche le chat con una persona selezionata corrispondono.</string>
-    <string name="folder_rule_hint">Le chat devono soddisfare tutte le regole che selezioni. Una chat che rimuovi torna se continua a soddisfarle.</string>
+    <string name="folder_rule_hint">Le chat corrispondono se soddisfano una regola selezionata per persona o parola chiave. Le opzioni di categoria restringono le corrispondenze. Una chat rimossa ricompare se corrisponde ancora.</string>
     <string name="folder_preview">Anteprima</string>
     <string name="folder_discard_title">Annullare le modifiche?</string>
     <string name="folder_discard_detail">Le modifiche alla cartella non sono state salvate.</string>
@@ -1309,7 +1309,7 @@
     <string name="disappearing_1_hour">1 ora</string>
     <string name="disappearing_5_minutes">5 minuti</string>
     <string name="disappearing_30_seconds">30 secondi</string>
-    <string name="disappearing_explainer">I nuovi messaggi, letti o no, vengono eliminati definitivamente per tutti dopo la durata che scegli.</string>
+    <string name="disappearing_explainer">I messaggi ricevuti non letti avviano il timer quando li leggi. Gli altri nuovi messaggi vengono eliminati definitivamente per tutti dopo la durata scelta.</string>
     <string name="disappearing_seconds_format">%1$d secondi</string>
     <string name="disappearing_unit_seconds">Secondi</string>
     <string name="disappearing_set">Imposta</string>
@@ -1812,7 +1812,7 @@
     <string name="usage_diagnostics_logs_separate">Log tecnici ripuliti di tutti i profili su questo dispositivo, condivisi separatamente.</string>
     <string name="usage_diagnostics_renew">La condivisione dei dati d’uso ora comprende l’attività delle funzionalità: controlla i dettagli aggiornati ed esprimi di nuovo la tua scelta.</string>
     <string name="usage_diagnostics_status">Utilizzo: %1$s. Telemetria: %2$s.</string>
-    <string name="usage_diagnostics_error">Impossibile salvare la tua scelta di condivisione. Riprova.</string>
+    <string name="usage_diagnostics_error">Impossibile caricare o salvare le impostazioni.</string>
     <string name="usage_diagnostics_off">Condivisione disattivata</string>
     <string name="usage_diagnostics_permission_needed">Consenso necessario</string>
     <string name="usage_diagnostics_unconfigured">Configurazione assente</string>

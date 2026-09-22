@@ -84,7 +84,7 @@
     <string name="folder_manual_hint">Chats you add here stay included, even when they do not match the automatic rules.</string>
     <string name="folder_rules">Automatic rules</string>
     <string name="folder_keyword_hint">Match a chat title or group description. Chats with any selected person also match.</string>
-    <string name="folder_rule_hint">Chats must match every rule you select. A chat you remove comes back if it still matches.</string>
+    <string name="folder_rule_hint">Chats match when they meet any selected person or keyword rule. Category options narrow those matches. A chat you remove comes back if it still matches.</string>
     <string name="folder_preview">Preview</string>
     <string name="folder_discard_title">Discard changes?</string>
     <string name="folder_discard_detail">Your folder changes have not been saved.</string>
@@ -1519,7 +1519,7 @@
     <string name="disappearing_1_hour">1 hour</string>
     <string name="disappearing_5_minutes">5 minutes</string>
     <string name="disappearing_30_seconds">30 seconds</string>
-    <string name="disappearing_explainer">New messages, read or not, are permanently deleted for everyone after your chosen duration.</string>
+    <string name="disappearing_explainer">Unread messages you receive start their timer when you read them. Other new messages are permanently deleted for everyone after your chosen duration.</string>
     <string name="disappearing_seconds_format">%1$d seconds</string>
     <string name="disappearing_unit_seconds">Seconds</string>
     <string name="disappearing_set">Set</string>
@@ -1922,7 +1922,7 @@
     <string name="usage_diagnostics_logs_separate">Sanitized technical logs from every profile on this device, shared separately.</string>
     <string name="usage_diagnostics_renew">Usage sharing now covers feature activity, so review the updated details and make your choice again.</string>
     <string name="usage_diagnostics_status">Usage: %1$s. Telemetry: %2$s.</string>
-    <string name="usage_diagnostics_error">Couldn’t save your sharing choice. Try again.</string>
+    <string name="usage_diagnostics_error">Couldn’t load or save settings.</string>
     <string name="usage_diagnostics_off">Off</string>
     <string name="usage_diagnostics_permission_needed">Permission needed</string>
     <string name="usage_diagnostics_unconfigured">Not configured</string>

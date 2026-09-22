@@ -1200,7 +1200,7 @@
     <string name="folder_manual_hint">Чаты, которые вы сюда добавляете, остаются включенными, даже если они не соответствуют автоматическим правилам.</string>
     <string name="folder_rules">Автоматические правила</string>
     <string name="folder_keyword_hint">Сопоставьте заголовок чата или описание группы. Также совпадают чаты с любым выбранным человеком.</string>
-    <string name="folder_rule_hint">Чат должен соответствовать всем выбранным правилам. Удалённый чат вернётся, если он по-прежнему им соответствует.</string>
+    <string name="folder_rule_hint">Чаты попадают в папку, если соответствуют любому выбранному правилу по участнику или ключевому слову. Параметры категорий сужают результаты. Удалённый чат вернётся, если всё ещё соответствует правилам.</string>
     <string name="folder_preview">Предпросмотр</string>
     <string name="folder_discard_title">Отменить изменения?</string>
     <string name="folder_discard_detail">Изменения в папке не сохранены.</string>
@@ -1361,7 +1361,7 @@
     <string name="disappearing_1_hour">1 час</string>
     <string name="disappearing_5_minutes">5 минут</string>
     <string name="disappearing_30_seconds">30 секунд</string>
-    <string name="disappearing_explainer">Новые сообщения, прочитанные или нет, навсегда удаляются у всех по истечении выбранного вами срока.</string>
+    <string name="disappearing_explainer">Таймер непрочитанных входящих сообщений запускается, когда вы их читаете. Остальные новые сообщения навсегда удаляются у всех по истечении выбранного срока.</string>
     <string name="disappearing_seconds_format">%1$d сек.</string>
     <string name="disappearing_unit_seconds">Секунды</string>
     <string name="disappearing_set">Задать</string>
@@ -1866,7 +1866,7 @@
     <string name="usage_diagnostics_logs_separate">Очищенные технические журналы всех профилей на этом устройстве, передаваемые отдельно.</string>
     <string name="usage_diagnostics_renew">Передача данных об использовании теперь охватывает активность функций. Ознакомьтесь с обновлёнными сведениями и сделайте выбор заново.</string>
     <string name="usage_diagnostics_status">Использование: %1$s. Телеметрия: %2$s.</string>
-    <string name="usage_diagnostics_error">Не удалось сохранить ваш выбор. Повторите попытку.</string>
+    <string name="usage_diagnostics_error">Не удалось загрузить или сохранить настройки.</string>
     <string name="usage_diagnostics_off">Выключено</string>
     <string name="usage_diagnostics_permission_needed">Требуется согласие</string>
     <string name="usage_diagnostics_unconfigured">Не настроено</string>

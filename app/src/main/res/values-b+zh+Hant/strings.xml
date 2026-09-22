@@ -1139,7 +1139,7 @@
     <string name="folder_manual_hint">你在此新增的聊天會一直包含在內，即使它們不符合自動規則。</string>
     <string name="folder_rules">自動規則</string>
     <string name="folder_keyword_hint">符合聊天標題或群組說明。包含任一所選人員的聊天也會符合。</string>
-    <string name="folder_rule_hint">聊天必須符合你選取的所有規則。你移除的聊天若仍然符合規則，就會再次出現。</string>
+    <string name="folder_rule_hint">聊天只要符合任一選取的人員或關鍵字規則就會配對。類別選項會進一步縮小配對範圍。你移除的聊天若仍然符合規則，就會再次出現。</string>
     <string name="folder_preview">預覽</string>
     <string name="folder_discard_title">捨棄變更？</string>
     <string name="folder_discard_detail">你的資料夾變更尚未儲存。</string>
@@ -1285,7 +1285,7 @@
     <string name="disappearing_1_hour">1 小時</string>
     <string name="disappearing_5_minutes">5 分鐘</string>
     <string name="disappearing_30_seconds">30 秒</string>
-    <string name="disappearing_explainer">無論是否已讀，新訊息都會在你設定的時間過後對所有人永久刪除。</string>
+    <string name="disappearing_explainer">未讀的已接收訊息會在你閱讀時開始計時。其他新訊息會在你設定的時長後對所有人永久刪除。</string>
     <string name="disappearing_seconds_format">%1$d 秒</string>
     <string name="disappearing_unit_seconds">秒</string>
     <string name="disappearing_set">設定</string>
@@ -1787,7 +1787,7 @@
     <string name="usage_diagnostics_logs_separate">此裝置上所有個人檔案的已清理技術記錄，單獨分享。</string>
     <string name="usage_diagnostics_renew">使用情況分享現在涵蓋功能活動，請查看更新後的說明並重新做出選擇。</string>
     <string name="usage_diagnostics_status">使用情況：%1$s。遙測：%2$s。</string>
-    <string name="usage_diagnostics_error">無法儲存你的分享選擇。請再試一次。</string>
+    <string name="usage_diagnostics_error">無法載入或儲存設定。</string>
     <string name="usage_diagnostics_off">已關閉</string>
     <string name="usage_diagnostics_permission_needed">需要同意</string>
     <string name="usage_diagnostics_unconfigured">未設定</string>
