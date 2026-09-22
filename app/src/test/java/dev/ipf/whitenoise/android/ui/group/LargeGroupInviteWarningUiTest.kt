@@ -110,13 +110,7 @@ class LargeGroupInviteWarningUiTest {
         lateinit var selection: SnapshotStateList<RecipientSearch.Candidate>
         lateinit var confirmationOpen: MutableState<Boolean>
         restoration.setContent {
-            surfaceState =
-                rememberConversationSurfaceState(
-                    controllerIdentity = "controller-a",
-                    accountRef = "account-a",
-                    chatId = "chat-a",
-                    runtimeGeneration = 1,
-                )
+            surfaceState = rememberConversationSurfaceState("controller-a", "account-a", "chat-a", 1)
             if (surfaceState.showDetails.value) {
                 selection =
                     rememberSaveable("group-a", saver = AddMemberSelectionSaver) {
