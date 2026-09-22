@@ -3497,6 +3497,14 @@
         ]
       },
       {
+        "surface": "RecentMediaContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RecentMedia.kt",
+        "anchor": "fun RecentMediaContent(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
         "surface": "RecentThumb",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RecentMedia.kt",
         "anchor": "fun RecentThumb(",
@@ -10714,9 +10722,25 @@
         ]
       },
       {
-        "surface": "string:attachment_recent_media",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAttachmentMenu.kt",
-        "anchor": "R.string.attachment_recent_media",
+        "surface": "string:recent_media_browse_all",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RecentMedia.kt",
+        "anchor": "R.string.recent_media_browse_all",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "string:recent_media_enable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RecentMedia.kt",
+        "anchor": "R.string.recent_media_enable",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "string:recent_media_manage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RecentMedia.kt",
+        "anchor": "R.string.recent_media_manage",
         "test_ids": [
           "MED-001"
         ]
