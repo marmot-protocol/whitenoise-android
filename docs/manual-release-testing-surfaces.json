@@ -468,6 +468,15 @@
         ]
       },
       {
+        "surface": "Global transient notice bottom obstruction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "val globalTransientNoticeInsets: WindowInsets",
+        "test_ids": [
+          "PRO-001",
+          "SET-023"
+        ]
+      },
+      {
         "surface": "TransientNoticeTimeoutEffect",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
         "anchor": "fun TransientNoticeTimeoutEffect(",
