@@ -944,6 +944,14 @@
         ]
       },
       {
+        "surface": "ChatListViewportOwner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListViewportOwner.kt",
+        "anchor": "data class ChatListViewportOwner(",
+        "test_ids": [
+          "NAV-005"
+        ]
+      },
+      {
         "surface": "ConnectivityEdgeRefreshEffects",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ConnectivityBannerEffects.kt",
         "anchor": "fun ConnectivityEdgeRefreshEffects(",

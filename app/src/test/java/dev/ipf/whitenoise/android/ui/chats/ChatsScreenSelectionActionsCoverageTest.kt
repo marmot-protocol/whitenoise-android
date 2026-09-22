@@ -216,7 +216,9 @@ class ChatsScreenSelectionActionsCoverageTest {
         listOf(
             "globalSearchState:",
             "onGlobalSearchStateChange:",
-            "val chatListState = key(showArchived) { rememberLazyListState() }",
+            // Keyed by the viewport's owner — account, runtime generation and list variant — so a
+            // retained frame cannot carry one account's position into another's list.
+            "val chatListState = key(viewportOwner) { rememberLazyListState() }",
         ).forEach { declaration ->
             assertTrue(
                 "$declaration must remain outside the editor swap so closing it preserves list state",
