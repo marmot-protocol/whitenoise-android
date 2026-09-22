@@ -82,7 +82,7 @@ internal fun reactionPillBorderColor(selected: Boolean): Color {
 
 /**
  * The prototype's reaction row under a bubble: 23dp pills, one per emoji, each inside a 48dp touch row.
- * Tapping an emoji opens its reactor list; overflow and long press open the unfiltered list.
+ * Every tap opens the unfiltered reactor list so the details surface consistently starts on All.
  */
 @Suppress("FunctionNaming")
 @Composable
@@ -136,7 +136,7 @@ private fun ReactionPillItem(
                             interactionSource = interactionSource,
                             indication = null,
                             role = Role.Button,
-                            onClick = { onOpenDetails(emoji) },
+                            onClick = { onOpenDetails(null) },
                             onClickLabel = viewReactors,
                             onLongClickLabel = viewReactors,
                             onLongClick = { onOpenDetails(null) },

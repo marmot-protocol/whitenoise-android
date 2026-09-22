@@ -250,6 +250,14 @@
         ]
       },
       {
+        "surface": "Reaction mutation rejected",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_reaction_failed",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
         "surface": "AppSelfUpdateCancelActions",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/AppSelfUpdateDialog.kt",
         "anchor": "fun AppSelfUpdateCancelActions(",

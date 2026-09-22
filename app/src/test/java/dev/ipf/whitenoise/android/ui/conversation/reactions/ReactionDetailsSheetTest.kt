@@ -38,7 +38,7 @@ class ReactionDetailsSheetTest {
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
-    /** User-selected filters survive live updates and fall back to All only when they disappear. */
+    /** The sheet starts on All; user-selected filters survive updates until they disappear. */
     @Test
     fun liveParticipantUpdatesPreserveTheSelectedFilter() {
         val initialParticipants =
@@ -57,14 +57,13 @@ class ReactionDetailsSheetTest {
                 ReactionDetailsContent(
                     participants = participants,
                     appState = appState,
-                    initialEmoji = "👍",
                     onRemoveOwnReaction = {},
                 )
             }
         }
 
-        composeRule.onNodeWithText("👍 1", substring = false).assertIsSelected()
-        composeRule.onNodeWithText("$allLabel · 2", substring = false).performClick().assertIsSelected()
+        composeRule.onNodeWithText("$allLabel · 2", substring = false).assertIsSelected()
+        composeRule.onNodeWithText("👍 1", substring = false).assertIsNotSelected()
 
         val joinedParticipants =
             initialParticipants + participant(sender = THIRD_ACCOUNT_ID, emoji = "👍", reactedAt = 3uL)

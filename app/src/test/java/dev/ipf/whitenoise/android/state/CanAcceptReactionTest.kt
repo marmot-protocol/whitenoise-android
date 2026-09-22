@@ -2,14 +2,11 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MessageTagFfi
-import dev.ipf.whitenoise.android.core.ReactionTally
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -71,162 +68,130 @@ class CanAcceptReactionTest {
         assertFalse(acceptsReaction(disbanded = true))
     }
 
+    /** Replacing one overlay makes every tap visible before any native mutation completes. */
     @Test
-    fun blockedCommitDoesNotDelayOptimisticReaction() =
-        runTest {
-            val releaseCommit = CompletableDeferred<Unit>()
-            val optimistic = linkedMapOf<String, OptimisticReactionChange>()
-            var renderedTallies = emptyList<ReactionTally>()
-            var rollbackCount = 0
+    fun latestReactionIntentRendersImmediately() {
+        val optimistic = linkedMapOf<String, OptimisticReactionChange>()
 
-            val mutation =
+        optimistic["intent"] = OptimisticReactionChange(TARGET, "👍", add = true)
+        assertTrue(renderTallies(optimistic).single().mine)
+
+        optimistic["intent"] = OptimisticReactionChange(TARGET, "👍", add = false)
+        assertTrue(renderTallies(optimistic).isEmpty())
+    }
+
+    /** A rapid opposite tap returns to the original state without sending either native mutation. */
+    @Test
+    fun rapidOppositeReactionIntentsConflateBeforeCommit() =
+        runTest {
+            val key = TARGET to "👍"
+            val conflator = ReactionIntentConflator()
+            val commits = mutableListOf<Boolean>()
+            val first = conflator.submit(key, desiredMine = true)
+            val drain =
                 async(start = CoroutineStart.UNDISPATCHED) {
-                    runOptimisticReactionMutation(
-                        applyOptimistic = {
-                            optimistic["pending"] = OptimisticReactionChange(TARGET, "👍", add = true)
-                            renderedTallies = renderTallies(optimistic)
-                        },
-                        commit = {
-                            releaseCommit.await()
-                            true
-                        },
-                        rollback = {
-                            optimistic.remove("pending")
-                            renderedTallies = renderTallies(optimistic)
-                            rollbackCount += 1
-                        },
-                    )
-                }
-
-            assertEquals(listOf("👍"), renderedTallies.map { it.emoji })
-            assertTrue("the optimistic chip must belong to the active account", renderedTallies.single().mine)
-            assertFalse("the engine commit should still be waiting", mutation.isCompleted)
-            releaseCommit.complete(Unit)
-
-            assertTrue(mutation.await().getOrThrow())
-            assertEquals("a successful commit keeps the overlay until its echo", setOf("pending"), optimistic.keys)
-            assertEquals(0, rollbackCount)
-        }
-
-    @Test
-    fun failedCommitRollsBackOptimisticReaction() =
-        runTest {
-            val optimistic = linkedMapOf<String, OptimisticReactionChange>()
-            var renderedTallies = emptyList<ReactionTally>()
-            var rollbackCount = 0
-
-            val mutation =
-                runOptimisticReactionMutation(
-                    applyOptimistic = {
-                        optimistic["pending"] = OptimisticReactionChange(TARGET, "👍", add = true)
-                        renderedTallies = renderTallies(optimistic)
-                    },
-                    commit = { error("relay unavailable") },
-                    rollback = {
-                        optimistic.remove("pending")
-                        renderedTallies = renderTallies(optimistic)
-                        rollbackCount += 1
-                    },
-                )
-
-            assertTrue(mutation.isFailure)
-            assertTrue(renderedTallies.isEmpty())
-            assertEquals(1, rollbackCount)
-        }
-
-    /** Cancelling an in-flight add removes the optimistic chip instead of leaving removal latched. */
-    @Test
-    fun cancelledCommitRollsBackOptimisticReaction() =
-        runTest {
-            val optimistic = linkedMapOf<String, OptimisticReactionChange>()
-            var rollbackCount = 0
-            val mutation =
-                async(start = CoroutineStart.UNDISPATCHED) {
-                    runOptimisticReactionMutation(
-                        applyOptimistic = {
-                            optimistic["pending"] = OptimisticReactionChange(TARGET, "👍", add = true)
-                        },
-                        commit = { awaitCancellation() },
-                        rollback = {
-                            optimistic.remove("pending")
-                            rollbackCount += 1
-                        },
-                    )
-                }
-
-            assertEquals(setOf("pending"), optimistic.keys)
-            mutation.cancelAndJoin()
-
-            assertTrue(optimistic.isEmpty())
-            assertEquals(1, rollbackCount)
-        }
-
-    /** An immediate removal remains suspended only until the preceding add returns its event id. */
-    @Test
-    fun immediateRemovalWaitsForReactionAddResult() =
-        runTest {
-            val addResult = CompletableDeferred<String?>()
-            val removal =
-                async(start = CoroutineStart.UNDISPATCHED) {
-                    awaitImmediateReactionEventId(addResult) { null }
-                }
-
-            assertFalse("removal must not race the in-flight add", removal.isCompleted)
-            addResult.complete("reaction-event")
-
-            assertEquals("reaction-event", removal.await())
-        }
-
-    /** A completed add can hand off its cached id after leaving the in-flight registry. */
-    @Test
-    fun immediateRemovalUsesCachedReactionEventId() =
-        runTest {
-            assertEquals(
-                "cached-reaction-event",
-                awaitImmediateReactionEventId(precedingAdd = null) { "cached-reaction-event" },
-            )
-        }
-
-    /** A failed add hands null to the queued removal so no unrelated event can be deleted. */
-    @Test
-    fun failedReactionAddDoesNotProduceRetractionEventId() =
-        runTest {
-            val addResult = CompletableDeferred<String?>()
-            addResult.complete(null)
-
-            assertEquals(null, awaitImmediateReactionEventId(addResult) { "stale-event" })
-        }
-
-    /** Same-emoji mutations never overlap, so each transition observes the settled predecessor. */
-    @Test
-    fun reactionMutationsForTheSameKeyAreSingleFlight() =
-        runTest {
-            val singleFlight = ReactionMutationSingleFlight()
-            val firstStarted = CompletableDeferred<Unit>()
-            val releaseFirst = CompletableDeferred<Unit>()
-            val order = mutableListOf<String>()
-            val first =
-                backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) {
-                    singleFlight.run(TARGET to "👍") {
-                        order += "first-start"
-                        firstStarted.complete(Unit)
-                        releaseFirst.await()
-                        order += "first-end"
-                    }
-                }
-            firstStarted.await()
-            val second =
-                backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) {
-                    singleFlight.run(TARGET to "👍") {
-                        order += "second"
+                    drainReactionIntent(
+                        key = key,
+                        conflator = conflator,
+                        initialMine = false,
+                        settleDelayMillis = 1L,
+                    ) { desiredMine ->
+                        commits += desiredMine
                     }
                 }
 
-            assertEquals(listOf("first-start"), order)
-            releaseFirst.complete(Unit)
-            first.join()
-            second.join()
-            assertEquals(listOf("first-start", "first-end", "second"), order)
+            assertTrue(first.shouldDrain)
+            assertFalse(conflator.submit(key, desiredMine = false).shouldDrain)
+            val outcome = drain.await() as ReactionIntentDrainOutcome.Settled
+
+            assertTrue(commits.isEmpty())
+            assertFalse(outcome.mutated)
+            assertFalse(outcome.finalMine)
+        }
+
+    /** A failed operation that a newer tap superseded cannot surface a stale reaction error. */
+    @Test
+    fun supersededReactionFailureSettlesLatestIntentWithoutError() =
+        runTest {
+            val key = TARGET to "👍"
+            val conflator = ReactionIntentConflator()
+            val commitStarted = CompletableDeferred<Unit>()
+            val releaseFailure = CompletableDeferred<Unit>()
+            conflator.submit(key, desiredMine = true)
+            val drain =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    drainReactionIntent(
+                        key = key,
+                        conflator = conflator,
+                        initialMine = false,
+                        settleDelayMillis = 0L,
+                    ) {
+                        commitStarted.complete(Unit)
+                        releaseFailure.await()
+                        error("superseded")
+                    }
+                }
+
+            commitStarted.await()
+            assertFalse(conflator.submit(key, desiredMine = false).shouldDrain)
+            releaseFailure.complete(Unit)
+            val outcome = drain.await() as ReactionIntentDrainOutcome.Settled
+
+            assertFalse(outcome.finalMine)
+            assertFalse(outcome.mutated)
+        }
+
+    /** A tap during an accepted add converges afterward without overlapping native mutations. */
+    @Test
+    fun inFlightReactionCommitConvergesToTheNewestIntent() =
+        runTest {
+            val key = TARGET to "👍"
+            val conflator = ReactionIntentConflator()
+            val addStarted = CompletableDeferred<Unit>()
+            val releaseAdd = CompletableDeferred<Unit>()
+            val commits = mutableListOf<Boolean>()
+            conflator.submit(key, desiredMine = true)
+            val drain =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    drainReactionIntent(
+                        key = key,
+                        conflator = conflator,
+                        initialMine = false,
+                        settleDelayMillis = 0L,
+                    ) { desiredMine ->
+                        commits += desiredMine
+                        if (desiredMine) {
+                            addStarted.complete(Unit)
+                            releaseAdd.await()
+                        }
+                    }
+                }
+
+            addStarted.await()
+            assertFalse(conflator.submit(key, desiredMine = false).shouldDrain)
+            releaseAdd.complete(Unit)
+            val outcome = drain.await() as ReactionIntentDrainOutcome.Settled
+
+            assertEquals(listOf(true, false), commits)
+            assertFalse(outcome.finalMine)
+            assertTrue(outcome.mutated)
+        }
+
+    /** Native back-pressure retries while the same intent remains current. */
+    @Test
+    fun busyReactionMutationRetriesWithoutSurfacingFailure() =
+        runTest {
+            var attempts = 0
+
+            val result =
+                retryBusyReactionMutation(retryDelayMillis = 0L) {
+                    attempts += 1
+                    if (attempts < 3) throw MarmotKitException.RuntimeBusy()
+                    "committed"
+                }
+
+            assertEquals("committed", result)
+            assertEquals(3, attempts)
         }
 
     /** A blank immediate-add result waits for local history instead of failing on its first stale read. */

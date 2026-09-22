@@ -78,12 +78,11 @@ internal fun Modifier.reactionSummaryAttachment(outgoing: Boolean): Modifier =
         }
     }
 
-/** Shows every reactor, initially filtered to the tapped emoji when one was selected. */
+/** Shows every reactor and always starts on the All filter. */
 @Composable
 internal fun ReactionDetailsSheet(
     participants: List<ReactionParticipant>,
     appState: WhiteNoiseAppState,
-    initialEmoji: String? = null,
     onRemoveOwnReaction: ((String) -> Unit)?,
     onDismissRequest: () -> Unit,
 ) {
@@ -95,7 +94,6 @@ internal fun ReactionDetailsSheet(
         ReactionDetailsContent(
             participants = participants,
             appState = appState,
-            initialEmoji = initialEmoji,
             onRemoveOwnReaction = onRemoveOwnReaction,
         )
     }
@@ -107,13 +105,9 @@ internal fun ReactionDetailsSheet(
 internal fun ReactionDetailsContent(
     participants: List<ReactionParticipant>,
     appState: WhiteNoiseAppState,
-    initialEmoji: String? = null,
     onRemoveOwnReaction: ((String) -> Unit)?,
 ) {
-    var selectedEmoji by
-        remember(initialEmoji) {
-            mutableStateOf(initialEmoji)
-        }
+    var selectedEmoji by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(participants, selectedEmoji) {
         val retainedFilter = retainedReactionFilter(selectedEmoji, participants)
         if (retainedFilter != selectedEmoji) selectedEmoji = retainedFilter
