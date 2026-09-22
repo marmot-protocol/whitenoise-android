@@ -111,6 +111,19 @@ internal fun nextRetryBackoffMillis(
     }
 }
 
+/**
+ * The one send attempt a failure notice is about (#2666).
+ *
+ * A failed send keeps its optimistic key across a retry, so the retry that finally succeeds is
+ * recognisably the same attempt as the failure still on screen. The account and group are part of
+ * the identity so a notice is never retired by an unrelated conversation or another profile.
+ */
+data class SendFailureAttempt(
+    val accountRef: String?,
+    val groupIdHex: String,
+    val optimisticKey: String,
+)
+
 data class ToastMessage(
     val title: AppText,
     val detail: AppText? = null,

@@ -3831,24 +3831,7 @@ class ChatsController private constructor(
         // (not just the group record), so patch both the chat row and the group
         // record to keep them consistent.
         (optimisticChatListPreviewByGroup[rowKey]?.baselineRow ?: chatRowsByGroup[rowKey])?.let { row ->
-            val projectedName = record.name.ifBlank { row.groupName }
-            val renamed = projectedName != row.groupName
-            if (renamed) {
-                // The rename is already durable; its subscription row settles later (#2696). Carry
-                // it on the row, its prepared title, and the selected presentation the list reads.
-                localGroupNames.record(record.groupIdHex, row.groupName, projectedName)
-                selectedPresentationsByGroup =
-                    selectedPresentationsByGroup[rowKey]?.let { presentation ->
-                        selectedPresentationsByGroup + (rowKey to presentation.withLocalGroupTitle(projectedName))
-                    } ?: selectedPresentationsByGroup
-            }
-            val updated =
-                row.copy(
-                    archived = record.archived,
-                    pendingConfirmation = record.pendingConfirmation,
-                    groupName = projectedName,
-                    title = if (renamed) projectedName else row.title,
-                )
+            val updated = locallyProjectedChatRow(rowKey, row, record)
             optimisticChatListPreviewByGroup[rowKey]?.let { state ->
                 state.baselineRow = updated
                 materializeOptimisticChatListPreview(rowKey, state)
@@ -3857,6 +3840,34 @@ class ChatsController private constructor(
             }
         }
         foldGroup(record, invalidateMembers = members == null)
+    }
+
+    /**
+     * Patches [row] from a locally committed [record].
+     *
+     * A rename also moves the prepared row title and the selected presentation the list displays,
+     * searches and sorts by, and is retained against a stale pre-rename snapshot (#2696).
+     */
+    private fun locallyProjectedChatRow(
+        rowKey: String,
+        row: ChatListRowFfi,
+        record: AppGroupRecordFfi,
+    ): ChatListRowFfi {
+        val projectedName = record.name.ifBlank { row.groupName }
+        val renamed = projectedName != row.groupName
+        if (renamed) {
+            localGroupNames.record(record.groupIdHex, row.groupName, projectedName)
+            selectedPresentationsByGroup =
+                selectedPresentationsByGroup[rowKey]?.let { presentation ->
+                    selectedPresentationsByGroup + (rowKey to presentation.withLocalGroupTitle(projectedName))
+                } ?: selectedPresentationsByGroup
+        }
+        return row.copy(
+            archived = record.archived,
+            pendingConfirmation = record.pendingConfirmation,
+            groupName = projectedName,
+            title = if (renamed) projectedName else row.title,
+        )
     }
 
     fun applyProfileGroupDetails(
@@ -10669,7 +10680,7 @@ class ConversationController(
     suspend fun loadOlderTimelinePage(): Boolean = loadOlderPage()
 
     /** Pages the subscription window newer; true when the window actually advanced. */
-    suspend fun loadNewerTimelinePage(origin: ConversationPagingOrigin = ConversationPagingOrigin.EXPLICIT): Boolean = loadNewerPage(origin)
+    suspend fun loadNewerTimelinePage(origin: PagingOrigin = PagingOrigin.EXPLICIT): Boolean = loadNewerPage(origin)
 
     suspend fun loadUntilMessageAvailable(
         messageIdHex: String,
@@ -10828,8 +10839,10 @@ class ConversationController(
      */
     private suspend fun loadOlderPage(anchorMessageIdHex: String? = null): Boolean = loadOlderPageInternal(anchorMessageIdHex) == ConversationPageLoad.ADVANCED
 
-    private suspend fun loadNewerPage(origin: ConversationPagingOrigin = ConversationPagingOrigin.EXPLICIT): Boolean =
-        loadNewerPageInternal(origin) == ConversationPageLoad.ADVANCED
+    private suspend fun loadNewerPage(origin: PagingOrigin = PagingOrigin.EXPLICIT): Boolean {
+        val load = loadNewerPageInternal(origin)
+        return load == ConversationPageLoad.ADVANCED
+    }
 
     // Bounds the opportunistic forward prefetch after a failure the reader is never shown (#2764).
     internal val automaticNewerPaging = AutomaticNewerPagingGuard()

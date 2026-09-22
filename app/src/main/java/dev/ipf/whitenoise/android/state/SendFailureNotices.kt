@@ -7,19 +7,6 @@ import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 
 /**
- * The one send attempt a failure notice is about (#2666).
- *
- * A failed send keeps its optimistic key across a retry, so the retry that finally succeeds is
- * recognisably the same attempt as the failure still on screen. The account and group are part of
- * the identity so a notice is never retired by an unrelated conversation or another profile.
- */
-data class SendFailureAttempt(
-    val accountRef: String?,
-    val groupIdHex: String,
-    val optimisticKey: String,
-)
-
-/**
  * Reports a send failure to the user without leaking engine internals. The
  * engine's message can name internal state machines and transitions (for
  * example an `illegal queue_app_message transition from PendingPublish`),
