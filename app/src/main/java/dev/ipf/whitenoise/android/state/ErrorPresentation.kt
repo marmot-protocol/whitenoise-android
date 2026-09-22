@@ -50,8 +50,9 @@ fun WhiteNoiseAppState.presentFailure(
     operationCode: String,
     throwable: Throwable,
     detail: AppText = AppText.Resource(R.string.error_try_again),
+    sendAttempt: SendFailureAttempt? = null,
 ) {
-    presentFailure(AppText.Resource(titleRes), operationCode, throwable, detail)
+    presentFailure(AppText.Resource(titleRes), operationCode, throwable, detail, sendAttempt)
 }
 
 fun WhiteNoiseAppState.presentFailure(
@@ -59,6 +60,7 @@ fun WhiteNoiseAppState.presentFailure(
     operationCode: String,
     throwable: Throwable,
     detail: AppText = AppText.Resource(R.string.error_try_again),
+    sendAttempt: SendFailureAttempt? = null,
 ) {
     val presentation = privacySafeErrorPresentation(operationCode, throwable, detail)
     presentText(
@@ -66,5 +68,6 @@ fun WhiteNoiseAppState.presentFailure(
         detail = presentation.message,
         copyable = true,
         diagnosticReport = presentation.report,
+        sendAttempt = sendAttempt,
     )
 }

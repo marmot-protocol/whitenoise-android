@@ -28,6 +28,7 @@ import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
@@ -42,6 +43,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -1228,6 +1230,137 @@ class ConversationSendRetryIntegrationTest {
             )
         }
 
+    /** A retry that publishes retires the failure notice its own first attempt raised (#2666). */
+    @Test
+    fun successfulRetryDismissesItsStaleFailureNotice() =
+        runTest {
+            val appState = appState()
+            var attempts = 0
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        attempts += 1
+                        if (attempts == 1) throw MarmotKitException.Publish("signer rejected event")
+                        successfulSendSummary()
+                    },
+                )
+
+            appState.sendConversationText(controller, "retry me")
+            assertNotNull("the first failure must be reported", appState.toast)
+
+            controller.retryFailedSend(controller.timeline.single())
+
+            assertNull("a recovered send must not keep claiming it failed", appState.toast)
+        }
+
+    /** Reaching the durable accepted-pending state counts as recovery for the same notice. */
+    @Test
+    fun acceptedPendingRetryDismissesItsStaleFailureNotice() =
+        runTest {
+            val appState = appState()
+            var attempts = 0
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        attempts += 1
+                        if (attempts == 1) throw MarmotKitException.Publish("signer rejected event")
+                        successfulSendSummary().copy(
+                            published = 0u,
+                            acceptDisposition = SendAcceptDispositionFfi.ACCEPTED_PENDING,
+                        )
+                    },
+                )
+
+            appState.sendConversationText(controller, "accept me")
+            assertNotNull(appState.toast)
+
+            controller.retryFailedSend(controller.timeline.single())
+
+            assertNull(appState.toast)
+        }
+
+    /** A retry that fails again keeps current failure feedback on screen. */
+    @Test
+    fun failedRetryKeepsTheCurrentFailureNotice() =
+        runTest {
+            val appState = appState()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ -> throw MarmotKitException.Publish("signer rejected event") },
+                )
+
+            appState.sendConversationText(controller, "keep failing")
+            controller.retryFailedSend(controller.timeline.single())
+
+            assertNotNull("a still-failing send must keep its error", appState.toast)
+            assertEquals(MessageStatus.Failed, controller.timeline.single().status)
+        }
+
+    /** Recovery retires only its own notice, never a newer unrelated one. */
+    @Test
+    fun recoveryLeavesANewerUnrelatedNoticeAlone() =
+        runTest {
+            val appState = appState()
+            var attempts = 0
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        attempts += 1
+                        if (attempts == 1) throw MarmotKitException.Publish("signer rejected event")
+                        successfulSendSummary()
+                    },
+                )
+
+            appState.sendConversationText(controller, "retry me")
+            appState.present(R.string.toast_group_updated)
+            val unrelated = appState.toast
+
+            controller.retryFailedSend(controller.timeline.single())
+
+            assertEquals("an unrelated notice must survive another send's recovery", unrelated, appState.toast)
+        }
+
+    /** A recovery in one conversation cannot dismiss another conversation's failure. */
+    @Test
+    fun recoveryDoesNotDismissAnotherConversationsFailure() =
+        runTest {
+            val appState = appState()
+            val failing =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ -> throw MarmotKitException.Publish("signer rejected event") },
+                )
+            val recovering =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group().copy(groupIdHex = OTHER_GROUP_ID),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ -> successfulSendSummary() },
+                )
+
+            appState.sendConversationText(failing, "this one failed")
+            val failureNotice = appState.toast
+            assertNotNull(failureNotice)
+
+            appState.sendConversationText(recovering, "this one worked")
+
+            assertEquals("another chat's failure is still true", failureNotice, appState.toast)
+        }
+
     private fun successfulSendSummary() =
         SendSummaryFfi(
             published = 1u,
@@ -1524,6 +1657,7 @@ class ConversationSendRetryIntegrationTest {
         const val ACCOUNT_REF = "alice"
         val ACCOUNT_ID = "a1".repeat(32)
         val GROUP_ID = "b2".repeat(32)
+        val OTHER_GROUP_ID = "b4".repeat(32)
         const val REPLY_MESSAGE_ID = "reply-message"
         val CONFIRMED_MESSAGE_ID = "c3".repeat(32)
     }

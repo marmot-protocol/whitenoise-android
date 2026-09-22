@@ -3,6 +3,40 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "Send failure caused by a transient relay outage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/SendFailureNotices.kt",
+        "anchor": "R.string.toast_send_connection_failed",
+        "test_ids": [
+          "MSG-017",
+          "CON-005"
+        ]
+      },
+      {
+        "surface": "Send deferred while the chat is still hydrating",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/SendFailureNotices.kt",
+        "anchor": "R.string.toast_chat_still_loading",
+        "test_ids": [
+          "MSG-017"
+        ]
+      },
+      {
+        "surface": "Send refused while the group's outbound queue is full",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/SendFailureNotices.kt",
+        "anchor": "R.string.toast_send_queue_full",
+        "test_ids": [
+          "MSG-017"
+        ]
+      },
+      {
+        "surface": "Generic send failure notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/SendFailureNotices.kt",
+        "anchor": "R.string.toast_send_failed",
+        "test_ids": [
+          "MSG-017",
+          "CON-005"
+        ]
+      },
+      {
         "surface": "Pinned selected-message preview expiry",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatPreviewExpiry.kt",
         "anchor": "fun rememberChatPreviewExpired(",
@@ -22210,6 +22244,69 @@
       }
     ],
     "source_coverage": [
+      {
+        "surface": "Viewport-driven forward prefetch stands down after an unanswered page",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationPagingPrefetch.kt",
+        "anchor": "internal fun shouldPrefetchNewer(",
+        "test_ids": [
+          "CON-005",
+          "CON-003"
+        ]
+      },
+      {
+        "surface": "Automatic forward prefetch recovers without reporting a paging failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationForwardPrefetchGuard.kt",
+        "anchor": "internal class AutomaticNewerPagingGuard",
+        "test_ids": [
+          "CON-005",
+          "CON-003"
+        ]
+      },
+      {
+        "surface": "A send-failure notice is retired when that same send recovers",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/SendFailureNotices.kt",
+        "anchor": "internal fun WhiteNoiseAppState.dismissSendFailureNotice(",
+        "test_ids": [
+          "MSG-017",
+          "MED-003"
+        ]
+      },
+      {
+        "surface": "One canonical decision lets an attachment transfer reach the network",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentDownloadPolicy.kt",
+        "anchor": "internal fun attachmentTransferAllowsNetwork(",
+        "test_ids": [
+          "MED-019",
+          "SET-012"
+        ]
+      },
+      {
+        "surface": "Automatic remote media downloads stay off on metered networks by default",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/MediaAutoDownloadMigration.kt",
+        "anchor": "internal fun migratedMediaAutoDownloadMatrix(",
+        "test_ids": [
+          "SET-010",
+          "MED-019"
+        ]
+      },
+      {
+        "surface": "A committed group rename is retained on its chat-list row until the subscription agrees",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalGroupNameAuthority.kt",
+        "anchor": "internal class LocalGroupNameAuthority",
+        "test_ids": [
+          "GRP-002",
+          "CHL-016"
+        ]
+      },
+      {
+        "surface": "Direct-message headers prefer the viewer's private contact nickname",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/ConversationHeaderTitle.kt",
+        "anchor": "internal fun conversationHeaderTitle(",
+        "test_ids": [
+          "CON-001",
+          "PRO-004"
+        ]
+      },
       {
         "surface": "An off-window read anchor uses the authoritative unread projection instead of counting retained history",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",

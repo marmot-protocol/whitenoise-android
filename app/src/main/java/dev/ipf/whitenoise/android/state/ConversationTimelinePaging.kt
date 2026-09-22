@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import android.os.SystemClock
+import android.util.Log
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
@@ -17,6 +18,9 @@ import kotlinx.coroutines.withContext
 
 /** The timeline seam these helpers page; aliased so their signatures fit the column limit. */
 private typealias PagingHandle = ConversationTimelineSubscriptionHandle
+
+/** Why a page was asked for; aliased for the same reason as [PagingHandle]. */
+internal typealias PagingOrigin = ConversationPagingOrigin
 
 /**
  * How many times a page waits out a not-ready window before giving up.
@@ -104,20 +108,34 @@ internal suspend fun ConversationController.loadOlderPageInternal(anchorId: Stri
     }
 }
 
-/** Pages the window towards newer history, back down to the live tail. */
+/**
+ * Pages the window towards newer history, back down to the live tail.
+ *
+ * [origin] decides what a failure means. An explicit navigation or retry keeps the bottom-edge
+ * retry affordance it has always had. An automatic prefetch — the viewport drifting to the newest
+ * edge, which a successful send does on its own — recovers quietly instead: the loaded
+ * conversation and the sent message are already correct, so the reader is told nothing, the
+ * failure is logged with its privacy-safe operation code, and [AutomaticNewerPagingGuard] bounds
+ * the retries so the effect cannot re-issue the page on every layout pass (#2764).
+ */
 @Suppress("TooGenericExceptionCaught", "ReturnCount")
-internal suspend fun ConversationController.loadNewerPageInternal(): ConversationPageLoad {
+internal suspend fun ConversationController.loadNewerPageInternal(origin: PagingOrigin): ConversationPageLoad {
     val subscription = timelineSubscription
     if (!hasMoreAfter || isLoadingOlder) return ConversationPageLoad.NO_PROGRESS
     if (subscription == null) return ConversationPageLoad.INACTIVE
+    val automatic = origin == ConversationPagingOrigin.AUTOMATIC
+    if (automatic && automaticNewerPaging.blocked) return ConversationPageLoad.NO_PROGRESS
     val priorMessageIds = timelineRecords.keys.toSet()
-    pageError = null
+    // An opportunistic page must not clear a failure the reader can still act on; it clears only
+    // the matching newer-page failure, and only once newer rows have actually arrived.
+    if (!automatic) pageError = null
     isLoadingOlder = true
     return try {
         val outcome = pageNewerIfActive(subscription)
         when (outcome) {
             null -> ConversationPageLoad.INACTIVE
-            is TimelinePageOutcome.Unchanged -> unchangedPageLoad(outcome, ConversationSearchPageDirection.NEWER)
+            is TimelinePageOutcome.Unchanged ->
+                unchangedPageLoad(outcome, ConversationSearchPageDirection.NEWER, origin)
             is TimelinePageOutcome.Advanced -> {
                 applyTimelinePage(
                     outcome.page,
@@ -125,7 +143,8 @@ internal suspend fun ConversationController.loadNewerPageInternal(): Conversatio
                     updatePagination = true,
                     reconcileNewExtendedRecords = true,
                 )
-                failedPageDirection = null
+                clearRecoveredNewerPageFailure()
+                automaticNewerPaging.reset()
                 protectedTimelineMessageIds.clear()
                 if (hasLoadedOlderPages) {
                     protectedTimelineMessageIds.addAll(timelineRecords.keys)
@@ -136,11 +155,23 @@ internal suspend fun ConversationController.loadNewerPageInternal(): Conversatio
     } catch (cancel: CancellationException) {
         throw cancel
     } catch (throwable: Throwable) {
-        reportPageFailure(ConversationSearchPageDirection.NEWER, throwable)
+        reportPageFailure(ConversationSearchPageDirection.NEWER, throwable, origin)
         ConversationPageLoad.FAILED
     } finally {
         isLoadingOlder = false
     }
+}
+
+/**
+ * Retires a newer-page failure once newer rows have arrived.
+ *
+ * Only the matching direction is cleared, so an older-page failure the reader still has a retry row
+ * for, and any unrelated subscription error, survive a forward recovery.
+ */
+private fun ConversationController.clearRecoveredNewerPageFailure() {
+    if (failedPageDirection != ConversationSearchPageDirection.NEWER) return
+    failedPageDirection = null
+    pageError = null
 }
 
 /**
@@ -166,24 +197,38 @@ private fun ConversationController.progressPageLoad(priorMessageIds: Set<String>
 private fun ConversationController.unchangedPageLoad(
     outcome: TimelinePageOutcome.Unchanged,
     direction: ConversationSearchPageDirection,
+    origin: ConversationPagingOrigin = ConversationPagingOrigin.EXPLICIT,
 ): ConversationPageLoad =
     when (outcome.reason) {
         TIMED_OUT -> {
-            reportPageFailure(direction, MarmotWindowDeadline(direction))
+            reportPageFailure(direction, MarmotWindowDeadline(direction), origin)
             ConversationPageLoad.TIMED_OUT
         }
         NOT_READY -> {
-            reportPageFailure(direction, MarmotWindowNotReady(direction))
+            reportPageFailure(direction, MarmotWindowNotReady(direction), origin)
             ConversationPageLoad.NOT_READY
         }
         else -> ConversationPageLoad.NO_PROGRESS
     }
 
-/** Records a page failure so the screen's existing retry affordance appears for this direction. */
+/**
+ * Records a page failure so the screen's existing retry affordance appears for this direction.
+ *
+ * An automatic forward prefetch reports nothing to the reader: its content is opportunistic, so it
+ * only counts against the recovery budget and leaves a privacy-safe marker — the operation code and
+ * the attempt number, never the engine's message — in the log.
+ */
 private fun ConversationController.reportPageFailure(
     direction: ConversationSearchPageDirection,
     cause: Throwable,
+    origin: ConversationPagingOrigin = ConversationPagingOrigin.EXPLICIT,
 ) {
+    if (origin == ConversationPagingOrigin.AUTOMATIC) {
+        automaticNewerPaging.recordFailure()
+        val attempt = automaticNewerPaging.consecutiveFailures
+        Log.w("DMConversation", "automatic_page_failed operation=${pageOperation(direction)} attempt=$attempt")
+        return
+    }
     failedPageDirection = direction
     pageError =
         privacySafeErrorPresentation(

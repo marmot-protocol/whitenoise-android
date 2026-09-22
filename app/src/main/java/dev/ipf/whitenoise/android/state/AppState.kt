@@ -6836,7 +6836,7 @@ class WhiteNoiseAppState private constructor(
         // value. The in-memory matrix still updates so the UI reflects the toggle;
         // a later toggle once the account resolves persists it to the right bucket.
         val key = mediaAutoDownloadPrefKeyOrNull(activeAccountRef) ?: return
-        preferences.edit().putString(key, updated.toPreference()).apply()
+        persistMediaAutoDownloadMatrix(preferences, key, updated)
         refreshNativeAttachmentPermissions()
     }
 
@@ -7245,14 +7245,17 @@ class WhiteNoiseAppState private constructor(
         val account = accountRef?.let { ref -> accounts.firstOrNull { it.label == ref }?.accountIdHex }
         val key = mediaAutoDownloadPrefKeyOrNull(accountRef)
         val stored = key?.let { preferences.getString(it, null) }
-        if (stored != null) return MediaAutoDownloadMatrix.fromPreference(stored)
+        if (key != null && stored != null) {
+            // An untouched pre-#2699 default becomes the metered-safe one exactly once.
+            return migratedMediaAutoDownloadMatrix(preferences, key, MediaAutoDownloadMatrix.fromPreference(stored))
+        }
         // Only consume the legacy global key once a real account is bound, so
         // the migrated value lands on the user's account rather than the
         // transient pre-bootstrap "default" bucket.
         val seeded = if (account != null) migratedDefaultMatrix() else MediaAutoDownloadMatrix.DEFAULT
         // Don't seed the shared "default" bucket when the account is unresolved;
         // keep DEFAULT in memory and persist once a real account key exists.
-        if (key != null) preferences.edit().putString(key, seeded.toPreference()).apply()
+        if (key != null) persistMediaAutoDownloadMatrix(preferences, key, seeded)
         return seeded
     }
 
@@ -9203,6 +9206,7 @@ class WhiteNoiseAppState private constructor(
         copyable: Boolean = false,
         diagnosticReport: String? = null,
         tier: NoticeTier = NoticeTier.ActionableError,
+        sendAttempt: SendFailureAttempt? = null,
     ) {
         val safeReport = diagnosticReport?.trim()?.takeIf(String::isNotEmpty)
         toast =
@@ -9215,6 +9219,7 @@ class WhiteNoiseAppState private constructor(
                 copyable = copyable && safeReport != null,
                 tier = tier,
                 diagnosticReport = safeReport,
+                sendAttempt = sendAttempt,
             )
     }
 

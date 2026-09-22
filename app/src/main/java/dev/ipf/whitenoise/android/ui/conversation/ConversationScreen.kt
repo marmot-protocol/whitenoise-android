@@ -114,6 +114,7 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
 import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
+import dev.ipf.whitenoise.android.state.ConversationPagingOrigin
 import dev.ipf.whitenoise.android.state.ConversationUnreadJumpState
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.MessageStatus
@@ -2573,34 +2574,32 @@ internal fun ConversationScreen(
     // that edge so chronological scrolling never ends at a stale window tail.
     LaunchedEffect(listState, controller) {
         snapshotFlow {
-            if (
-                !initialTimelineAnchored ||
-                !controller.hasMoreAfterTimeline ||
-                controller.isLoadingOlder
-            ) {
-                false
-            } else {
-                val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
-                val liveTrailingRowCount = controller.conversationTrailingRowCount(liveRenderedSize)
-                val liveNewestEdgeIndex =
-                    conversationTimelineTailListIndex(liveRenderedSize, liveTrailingRowCount)
-                        // An edit-only page has no message-backed tail yet; retain
-                        // forward paging from the rows below the newest edge.
-                        ?: liveTrailingRowCount
-                // Reversed list: the newest edge is the low-index end, so the
-                // lowest visible row is what approaches it.
-                val newestVisibleIndex =
+            val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
+            val liveTrailingRowCount = controller.conversationTrailingRowCount(liveRenderedSize)
+            val liveNewestEdgeIndex =
+                conversationTimelineTailListIndex(liveRenderedSize, liveTrailingRowCount)
+                    // An edit-only page has no message-backed tail yet; retain
+                    // forward paging from the rows below the newest edge.
+                    ?: liveTrailingRowCount
+            shouldPrefetchNewer(
+                anchored = initialTimelineAnchored,
+                hasMoreAfter = controller.hasMoreAfterTimeline,
+                isLoadingOlder = controller.isLoadingOlder,
+                // A send leaves the viewport on this edge, so a forward page the engine could not
+                // answer must not be re-issued on every layout pass (#2764). Any page that
+                // advances, including a live-window update, releases the block.
+                newerPrefetchBlocked = controller.automaticNewerPagingBlocked,
+                newestVisibleIndex =
                     timelineViewport
                         .readingLayoutInfo()
                         .visibleItemsInfo
                         .firstOrNull()
-                        ?.index ?: Int.MAX_VALUE
-                // Keep the established inclusive N-row prefetch window.
-                newestVisibleIndex <= liveNewestEdgeIndex + NEWER_PAGE_PREFETCH_ROWS - 1
-            }
+                        ?.index ?: Int.MAX_VALUE,
+                newestEdgeIndex = liveNewestEdgeIndex,
+            )
         }.distinctUntilChanged()
             .filter { it }
-            .collect { controller.loadNewerTimelinePage() }
+            .collect { controller.loadNewerTimelinePage(ConversationPagingOrigin.AUTOMATIC) }
     }
     var entryUnreadDividerRetired by remember(entryUnreadSessionIdentity) { mutableStateOf(false) }
     LaunchedEffect(controller, entryFirstUnreadMessageId, controller.timeline) {

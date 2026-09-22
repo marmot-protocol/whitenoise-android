@@ -1546,54 +1546,6 @@ internal fun unreadCountDivergenceReport(
     )
 }
 
-/**
- * Reports a send failure to the user without leaking engine internals. The
- * engine's message can name internal state machines and transitions (for
- * example an `illegal queue_app_message transition from PendingPublish`),
- * which is meaningless to a user and is not ours to put on screen; the raw
- * text stays in the log until the privacy-safe report path exists.
- */
-internal fun presentSendFailure(
-    appState: WhiteNoiseAppState,
-    throwable: Throwable,
-) {
-    if (BuildConfig.DEBUG) {
-        Log.w("DMSend", "send failed", throwable)
-    } else {
-        Log.w("DMSend", "send_failed")
-    }
-    val message = sendFailureMessageRes(throwable)
-    when (throwable) {
-        is MarmotKitException.GroupSendQueueFull,
-        is MarmotKitException.GroupHydrationPending,
-        -> appState.present(message)
-        else -> appState.presentFailure(message, "MESSAGE_SEND", throwable)
-    }
-}
-
-/**
- * The engine refuses a send outright when a group's outbound queue is full: the
- * message was never accepted, and the backlog clears on the group's own schedule
- * rather than on any timer this app could pick. That earns its own wording, since
- * the generic failure invites a retry the engine has already ruled out.
- *
- * A hydration-pending group is the opposite case — transient by design, the
- * runtime promotes it shortly after account readiness — so that one gets
- * wording that invites the retry instead of announcing a failure.
- */
-@StringRes
-internal fun sendFailureMessageRes(throwable: Throwable): Int =
-    when (throwable) {
-        is MarmotKitException.GroupSendQueueFull -> R.string.toast_send_queue_full
-        is MarmotKitException.GroupHydrationPending -> R.string.toast_chat_still_loading
-        else ->
-            if (isTransientRelaySendError(throwable)) {
-                R.string.toast_send_connection_failed
-            } else {
-                R.string.toast_send_failed
-            }
-    }
-
 internal fun logUnreadCountDivergence(
     tag: String,
     report: UnreadCountDivergenceReport,
@@ -2814,6 +2766,9 @@ class ChatsController private constructor(
         get() = chatRowsByGroup.values
     private var groupRecordsById = mapOf<String, AppGroupRecordFfi>()
 
+    // Holds a locally committed rename on its row until the subscription agrees (#2696).
+    private val localGroupNames = LocalGroupNameAuthority()
+
     // Whole-second activity timestamps need an in-memory tie-break that follows
     // the order local/live activity is accepted. This is bounded to one scalar
     // per materialized row and cleared with the backing projection on bind.
@@ -3876,12 +3831,7 @@ class ChatsController private constructor(
         // (not just the group record), so patch both the chat row and the group
         // record to keep them consistent.
         (optimisticChatListPreviewByGroup[rowKey]?.baselineRow ?: chatRowsByGroup[rowKey])?.let { row ->
-            val updated =
-                row.copy(
-                    archived = record.archived,
-                    pendingConfirmation = record.pendingConfirmation,
-                    groupName = record.name.ifBlank { row.groupName },
-                )
+            val updated = locallyProjectedChatRow(rowKey, row, record)
             optimisticChatListPreviewByGroup[rowKey]?.let { state ->
                 state.baselineRow = updated
                 materializeOptimisticChatListPreview(rowKey, state)
@@ -3890,6 +3840,34 @@ class ChatsController private constructor(
             }
         }
         foldGroup(record, invalidateMembers = members == null)
+    }
+
+    /**
+     * Patches [row] from a locally committed [record].
+     *
+     * A rename also moves the prepared row title and the selected presentation the list displays,
+     * searches and sorts by, and is retained against a stale pre-rename snapshot (#2696).
+     */
+    private fun locallyProjectedChatRow(
+        rowKey: String,
+        row: ChatListRowFfi,
+        record: AppGroupRecordFfi,
+    ): ChatListRowFfi {
+        val projectedName = record.name.ifBlank { row.groupName }
+        val renamed = projectedName != row.groupName
+        if (renamed) {
+            localGroupNames.record(record.groupIdHex, row.groupName, projectedName)
+            selectedPresentationsByGroup =
+                selectedPresentationsByGroup[rowKey]?.let { presentation ->
+                    selectedPresentationsByGroup + (rowKey to presentation.withLocalGroupTitle(projectedName))
+                } ?: selectedPresentationsByGroup
+        }
+        return row.copy(
+            archived = record.archived,
+            pendingConfirmation = record.pendingConfirmation,
+            groupName = projectedName,
+            title = if (renamed) projectedName else row.title,
+        )
     }
 
     fun applyProfileGroupDetails(
@@ -4180,7 +4158,10 @@ class ChatsController private constructor(
     /** Atomically replaces both base rows and their matching selected presentation. */
     private fun replacePresentedChatRows(rows: List<PresentedChatRowFfi>) {
         selectedPresentationsByGroup =
-            rows.associate { presented -> chatRowKey(presented.row.groupIdHex) to presented.presentation }
+            rows.associate { presented ->
+                chatRowKey(presented.row.groupIdHex) to
+                    localGroupNames.reconciledPresentation(presented.row, presented.presentation)
+            }
         // MarmotKit 0.10.1 stores avatars durably and names each row's asset here; the row prefers those
         // bytes over fetching its URL, so a cached avatar survives being offline.
         selectedAvatarAssetsByGroup =
@@ -4198,9 +4179,10 @@ class ChatsController private constructor(
 
     /** Folds one authoritative row and mirrors it into any mounted conversation. */
     private fun foldChatRow(
-        row: ChatListRowFfi,
+        incoming: ChatListRowFfi,
         trigger: ChatListUpdateTriggerFfi? = null,
     ) {
+        val row = localGroupNames.reconciled(incoming)
         if (trigger == ChatListUpdateTriggerFfi.MUTE_CHANGED || trigger == ChatListUpdateTriggerFfi.SNAPSHOT_REFRESH) {
             appState.acceptAuthoritativeMuteProjection(accountRef, row.groupIdHex, row.muted, row.mutedUntilMs)
         }
@@ -4291,7 +4273,8 @@ class ChatsController private constructor(
     }
 
     /** Replaces the chat-list window and refreshes mounted conversation metadata. */
-    private fun replaceChatRows(rows: List<ChatListRowFfi>) {
+    private fun replaceChatRows(incoming: List<ChatListRowFfi>) {
+        val rows = incoming.map(localGroupNames::reconciled)
         rows.forEach {
             appState.acceptAuthoritativeMuteProjection(accountRef, it.groupIdHex, it.muted, it.mutedUntilMs)
         }
@@ -4363,6 +4346,7 @@ class ChatsController private constructor(
             failedMemberFetches.remove(removedRow.groupIdHex)
             selfOnlyDirectGraceRetryGroups.remove(removedRow.groupIdHex)
             presentationMembersByGroup = presentationMembersByGroup - removedRow.groupIdHex
+            localGroupNames.forget(removedRow.groupIdHex)
             noteMaterializedGroupMembershipChanged()
             scheduleRecompute()
         }
@@ -6017,6 +6001,10 @@ class ConversationController(
         { account, groupIdHex, archived ->
             appState.marmotIo { setGroupArchived(account, groupIdHex, archived) }
         },
+    private val groupProfileUpdater: suspend (String, String, String?, String?) -> Unit =
+        { account, groupIdHex, name, description ->
+            appState.marmotIo { updateGroupProfile(account, groupIdHex, name, description) }
+        },
     private val clockMillis: () -> Long = System::currentTimeMillis,
     private val inviteAcceptor: InviteAcceptor = { account, groupIdHex ->
         appState.marmotIo(MarmotTraceSection.ACCEPT_GROUP_INVITE) {
@@ -6080,6 +6068,9 @@ class ConversationController(
         get() = pendingArchiveIntent?.archived ?: group.archived
 
     private var acceptedInvitePeerAccount by mutableStateOf<String?>(null)
+
+    // Retains a locally committed rename against a stale group-state snapshot (#2696).
+    private val localGroupNames = LocalGroupNameAuthority()
 
     /**
      * Latest chat-list projection for this conversation, kept live even while
@@ -6595,6 +6586,15 @@ class ConversationController(
                 )
             return GroupProjector.avatarAccount(group, identity.otherMemberAccount, identity.memberCount)
         }
+
+    /**
+     * The DM peer whose private nickname may title this conversation, else null (#2766).
+     *
+     * A pending invite is excluded because its title is the "Invite from …" line, which already
+     * resolves the inviter through the nickname-aware member title.
+     */
+    val dmNicknamePeerAccount: String?
+        get() = avatarAccount?.takeIf { isDm && !group.pendingConfirmation }
 
     /**
      * Avatar URL for the conversation top bar. A group's own avatar wins; a 1:1
@@ -7169,7 +7169,8 @@ class ConversationController(
     internal fun applyGroupStateForTest(update: AppGroupRecordFfi) = applyGroupState(update)
 
     /** Applies a canonical group update while retaining only a still-unresolved stale action fence. */
-    private fun applyGroupState(update: AppGroupRecordFfi) {
+    private fun applyGroupState(incoming: AppGroupRecordFfi) {
+        val update = localGroupNames.reconciled(incoming)
         val previousGroup = group
         groupRecoveryLifetime.advance()
         val previousRetention = group.disappearingMessageSecs
@@ -7500,6 +7501,9 @@ class ConversationController(
                         replaceWindow = true,
                         updatePagination = true,
                     )
+                // An authoritative window is the recovery a stood-down forward prefetch was
+                // waiting for, so the viewport may ask for newer content again (#2764).
+                automaticNewerPaging.reset()
                 publishRecoveryTimelineProjection(batch.mapNotNull { it.recoveryGeneration }.maxOrNull())
                 // Scroll-driven mark-read in the UI layer handles
                 // the user-visible read pointer.
@@ -7833,7 +7837,7 @@ class ConversationController(
                 result = PerformanceResult.FAILURE,
             )
             forgetSendTrace(tempId)
-            presentSendFailure(appState, throwable)
+            presentSendFailure(appState, throwable, sendFailureAttempt(optimisticKey))
             onTerminalFailure()
         }
     }
@@ -8496,7 +8500,7 @@ class ConversationController(
                 // path runs) or explicitly discards.
                 publishTimelineFromIndexes()
                 if (BuildConfig.DEBUG) Log.w("DMConversation", "media upload failed", throwable)
-                presentSendFailure(appState, throwable)
+                presentSendFailure(appState, throwable, sendFailureAttempt(key))
             }
         } finally {
             appState.untrackInFlightMediaUpload(conversationAccountRef, group.groupIdHex, key, uploadJob)
@@ -8909,9 +8913,17 @@ class ConversationController(
     // path putting the message back as Failed.
     private val discardedDuringRetry = mutableSetOf<String>()
 
+    /**
+     * Settles the durable-acceptance callback for [optimisticKey], and retires the send-failure
+     * notice that attempt raised: once the engine owns the send, the notice is no longer true (#2666).
+     */
     private fun completeDurableAcceptance(optimisticKey: String) {
         durableAcceptanceCallbacks.remove(optimisticKey)?.invoke()
+        appState.dismissSendFailureNotice(sendFailureAttempt(optimisticKey))
     }
+
+    /** Correlation key for a notice raised by the send attempt on optimistic [key]. */
+    private fun sendFailureAttempt(key: String) = SendFailureAttempt(conversationAccountRef, group.groupIdHex, key)
 
     private fun rollbackOptimisticChatListPreview(optimisticMessageIdHex: String) {
         appState.rollbackOptimisticSentPreview(conversationAccountRef, group.groupIdHex, optimisticMessageIdHex)
@@ -9602,7 +9614,7 @@ class ConversationController(
                     ),
                 )
                 publishTimelineFromIndexes()
-                presentSendFailure(appState, throwable)
+                presentSendFailure(appState, throwable, sendFailureAttempt(key))
             }
         }
     }
@@ -9988,21 +10000,36 @@ class ConversationController(
             val updatedDescription = description.trim().takeIf { it.isNotEmpty() }
             runCatchingCancellable {
                 appState.withGroupCommitLock(account, group.groupIdHex) {
-                    appState.marmotIo {
-                        updateGroupProfile(
-                            account,
-                            group.groupIdHex,
-                            updatedName,
-                            updatedDescription,
-                        )
-                    }
+                    groupProfileUpdater(account, group.groupIdHex, updatedName, updatedDescription)
                 }
+                // Reflect the committed profile locally so the header and every chat-list
+                // projection agree immediately, rather than after the group-state
+                // subscription converges (#2696).
+                applyLocalGroupProfile(updatedName.orEmpty(), updatedDescription.orEmpty(), account)
                 presentConversationTransient(R.string.toast_group_updated)
                 true
             }.onFailure {
                 recordMutationFailure(R.string.toast_couldnt_update_group, "GROUP_PROFILE_UPDATE", it)
             }.getOrDefault(false)
         }
+
+    /**
+     * Installs a just-committed group profile locally and hands it to the chat list (#2696).
+     *
+     * [LocalGroupNameAuthority] then retains the new name against a pre-rename snapshot that was
+     * already in flight, while a genuinely newer authoritative commit still wins.
+     */
+    private fun applyLocalGroupProfile(
+        name: String,
+        description: String,
+        account: String,
+    ) {
+        val updated = group.copy(name = name, description = description)
+        if (updated == group) return
+        localGroupNames.record(group.groupIdHex, previousName = group.name, committedName = name)
+        group = updated
+        appState.applyLocalGroupUpdate(updated, account)
+    }
 
     suspend fun updateGroupAvatarUrl(url: String?): Boolean =
         withMutationLockResult(false) {
@@ -10656,7 +10683,7 @@ class ConversationController(
     suspend fun loadOlderTimelinePage(): Boolean = loadOlderPage()
 
     /** Pages the subscription window newer; true when the window actually advanced. */
-    suspend fun loadNewerTimelinePage(): Boolean = loadNewerPage()
+    suspend fun loadNewerTimelinePage(origin: PagingOrigin = PagingOrigin.EXPLICIT): Boolean = loadNewerPage(origin)
 
     suspend fun loadUntilMessageAvailable(
         messageIdHex: String,
@@ -10815,7 +10842,18 @@ class ConversationController(
      */
     private suspend fun loadOlderPage(anchorMessageIdHex: String? = null): Boolean = loadOlderPageInternal(anchorMessageIdHex) == ConversationPageLoad.ADVANCED
 
-    private suspend fun loadNewerPage(): Boolean = loadNewerPageInternal() == ConversationPageLoad.ADVANCED
+    /** Pages the window newer for [origin]; true only when new rows arrived. */
+    private suspend fun loadNewerPage(origin: PagingOrigin = PagingOrigin.EXPLICIT): Boolean {
+        val load = loadNewerPageInternal(origin)
+        return load == ConversationPageLoad.ADVANCED
+    }
+
+    // Bounds the opportunistic forward prefetch after a failure the reader is never shown (#2764).
+    internal val automaticNewerPaging = AutomaticNewerPagingGuard()
+
+    /** Whether viewport-driven forward prefetch should stand down until a page advances. */
+    val automaticNewerPagingBlocked: Boolean
+        get() = automaticNewerPaging.blocked
 
     /**
      * Whether an older page failed in a way the reader must retry.

@@ -134,11 +134,16 @@ data class MediaAutoDownloadMatrix(
 
     companion object {
         /**
-         * Suggested defaults from issue #407:
+         * Defaults from issue #407, with every type off for Metered (#2699):
          *  - Wi-Fi:    Images ON,  Audio ON,  Video ON,  Documents OFF
          *  - Mobile:   Images ON,  Audio ON,  Video OFF, Documents OFF
          *  - Roaming:  Images OFF, Audio OFF, Video OFF, Documents OFF
-         *  - Metered:  Images ON,  Audio OFF, Video OFF, Documents OFF
+         *  - Metered:  Images OFF, Audio OFF, Video OFF, Documents OFF
+         *
+         * Android classifies a metered Wi-Fi hotspot and an ordinary cellular connection alike, and
+         * the most-restrictive rule means one enabled Metered cell is enough to authorize a remote
+         * fetch on either. Automatic downloads therefore stay off there until the account's owner
+         * turns them on; manual download and already-cached media are unaffected.
          */
         val DEFAULT: MediaAutoDownloadMatrix =
             MediaAutoDownloadMatrix(
@@ -149,10 +154,18 @@ data class MediaAutoDownloadMatrix(
 
                     add(MediaAutoDownloadType.Image to MediaAutoDownloadNetwork.Mobile)
                     add(MediaAutoDownloadType.Audio to MediaAutoDownloadNetwork.Mobile)
-
-                    add(MediaAutoDownloadType.Image to MediaAutoDownloadNetwork.Metered)
                 },
             )
+
+        /**
+         * The pre-#2699 default, which enabled `Image × Metered`.
+         *
+         * Only a stored matrix still exactly equal to this one is migrated to [DEFAULT]: anything
+         * else is a configuration its account's owner arrived at, including a deliberate metered
+         * opt-in that happens to reproduce these cells after the migration has run once.
+         */
+        val LEGACY_METERED_IMAGE_DEFAULT: MediaAutoDownloadMatrix =
+            DEFAULT.withToggle(MediaAutoDownloadType.Image, MediaAutoDownloadNetwork.Metered, on = true)
 
         /**
          * Inverse of [toPreference]. Unknown/garbage cells are skipped rather

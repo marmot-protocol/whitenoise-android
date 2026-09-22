@@ -40,6 +40,8 @@ internal class ScriptedConversationTimelineSubscription(
     private val forwardsPage: TimelinePageFfi = emptyTimelinePage(),
     /** Outcomes handed to successive backward pages; the configured window is used once it runs dry. */
     private val backwardsOutcomes: MutableList<TimelinePageOutcome> = mutableListOf(),
+    /** Outcomes handed to successive forward pages; the configured window is used once it runs dry. */
+    private val forwardsOutcomes: MutableList<TimelinePageOutcome> = mutableListOf(),
 ) : ConversationTimelineSubscriptionHandle {
     private val lifecycleEvents = CopyOnWriteArrayList<String>()
     private val windows = Channel<TimelinePageFfi>(Channel.UNLIMITED)
@@ -98,8 +100,14 @@ internal class ScriptedConversationTimelineSubscription(
         return null
     }
 
-    /** Returns the configured forward-pagination window. */
-    override suspend fun paginateForwards(count: UInt): TimelinePageOutcome = Advanced(forwardsPage)
+    val forwardsCallCount: Int
+        get() = lifecycleEvents.count { it == "paginateForwards" }
+
+    /** Returns the next scripted forward outcome, or the configured window once the script runs dry. */
+    override suspend fun paginateForwards(count: UInt): TimelinePageOutcome {
+        lifecycleEvents += "paginateForwards"
+        return forwardsOutcomes.removeFirstOrNull() ?: Advanced(forwardsPage)
+    }
 
     /** Records closure and unblocks any pending live-window read. */
     override fun close() {
