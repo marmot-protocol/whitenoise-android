@@ -199,6 +199,64 @@ class AccountSwitchFirstFrameTopBarScreenshotTest {
         }
     }
 
+    /** Four signed-in accounts at normal phone width keep three separated quick-switch targets (#2796). */
+    @Test
+    fun quickSwitchAvatarsKeepSeparatedSlotsAtNormalWidth() {
+        captureQuickSwitchStack(
+            snapshotName = "account_switch_quick_switch_spacing_normal_width.png",
+            surplusAccounts = 0,
+            expectOverflow = false,
+        )
+    }
+
+    /** A constrained bar trades quick targets for the overflow chip rather than compressing them (#2796). */
+    @Test
+    @Config(sdk = [36], qualifiers = "w320dp-h780dp-mdpi")
+    fun quickSwitchAvatarsCollapseIntoOverflowAtConstrainedWidth() {
+        captureQuickSwitchStack(
+            snapshotName = "account_switch_quick_switch_spacing_constrained_width.png",
+            surplusAccounts = 2,
+            expectOverflow = true,
+        )
+    }
+
+    /** Records the header's quick-switch stack with an unread dot and [surplusAccounts] beyond the three shown. */
+    private fun captureQuickSwitchStack(
+        snapshotName: String,
+        surplusAccounts: Int,
+        expectOverflow: Boolean,
+    ) {
+        val surplus =
+            (1..surplusAccounts).map { index ->
+                account("surplus-$index", (0x44 + index).toString(16).repeat(32))
+            }
+        val appState =
+            appState(
+                otherAccounts =
+                    listOf(
+                        account(STUDIO_REF, STUDIO_ID),
+                        account(WORK_REF, WORK_ID),
+                        account("travel", "44".repeat(32)),
+                    ) + surplus,
+            )
+        appState.updateAccountUnreadCount(WORK_REF, 2uL)
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                Surface(color = MaterialTheme.colorScheme.background) {
+                    Box(Modifier.fillMaxWidth().testTag(SPACING_SCREENSHOT_TAG)) {
+                        AccountTopBar(appState, LayoutDirection.Ltr)
+                    }
+                }
+            }
+        }
+        composeRule.onNodeWithTag(OTHER_ACCOUNT_STACK_TAG).assertIsDisplayed()
+        val overflow = composeRule.onNodeWithTag(OTHER_ACCOUNT_OVERFLOW_TAG, useUnmergedTree = true)
+        if (expectOverflow) overflow.assertExists() else overflow.assertDoesNotExist()
+        composeRule
+            .onNodeWithTag(SPACING_SCREENSHOT_TAG)
+            .captureRoboImage("src/test/snapshots/$snapshotName")
+    }
+
     /** Records one baseline per account target. */
     @Suppress("LongMethod") // Keep both directions on the same real header-to-selector route.
     private fun captureAllAccountTargets(
@@ -342,6 +400,7 @@ class AccountSwitchFirstFrameTopBarScreenshotTest {
     private companion object {
         const val SCREENSHOT_TAG = "account-switch-first-frame-seeded-profiles"
         const val UNREAD_SCREENSHOT_TAG = "account-switch-active-unread-dot"
+        const val SPACING_SCREENSHOT_TAG = "account-switch-quick-switch-spacing"
         const val ACTIVE_REF = "personal"
         const val STUDIO_REF = "studio"
         const val WORK_REF = "work"

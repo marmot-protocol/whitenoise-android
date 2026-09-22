@@ -568,6 +568,15 @@
         ]
       },
       {
+        "surface": "Quick-switch slot capacity and overflow fallback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/AccountSwitcher.kt",
+        "anchor": "fun quickSwitchSlotCapacity(",
+        "test_ids": [
+          "NAV-005",
+          "NAV-006"
+        ]
+      },
+      {
         "surface": "ProfileSwitcherSheet",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/ProfileSwitcherSheet.kt",
         "anchor": "fun ProfileSwitcherSheet(",
