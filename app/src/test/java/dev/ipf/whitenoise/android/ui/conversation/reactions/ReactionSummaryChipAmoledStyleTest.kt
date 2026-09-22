@@ -75,7 +75,7 @@ class ReactionSummaryChipAmoledStyleTest {
         }
     }
 
-    /** My reaction reads as selected and a tap opens that emoji's reactor list without toggling it. */
+    /** My reaction reads as selected and a tap opens the unfiltered reactor list without toggling it. */
     @Test
     fun currentUserReactionIsSelectedAndTapOpensItsDetails() {
         val opened = mutableListOf<String?>()
@@ -98,7 +98,7 @@ class ReactionSummaryChipAmoledStyleTest {
         pills[0].assertIsSelected()
         pills[1].assertIsNotSelected()
         pills[0].performClick()
-        composeRule.runOnIdle { assertEquals(listOf("👍"), opened) }
+        composeRule.runOnIdle { assertEquals(listOf<String?>(null), opened) }
     }
 
     /** A fifth emoji collapses into the "+N" pill, which opens the details instead of toggling. */

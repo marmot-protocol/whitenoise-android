@@ -158,9 +158,9 @@ class DeletedMessageLocalRemovalTest {
         placeholder().assertIsDisplayed()
     }
 
-    /** A reaction tap opens its filtered reactor list, which remote deletion then closes. */
+    /** A reaction tap opens the All reactor list, which remote deletion then closes. */
     @Test
-    fun reactionTapOpensFilteredDetailsAndRemoteDeletionClosesThem() {
+    fun reactionTapOpensAllDetailsAndRemoteDeletionClosesThem() {
         val surface = renderLive(reactions = reactedSummary())
         val viewReactorsAction =
             SemanticsMatcher("has view reactors action") {
@@ -169,8 +169,8 @@ class DeletedMessageLocalRemovalTest {
             }
         composeRule.onNode(viewReactorsAction, useUnmergedTree = true).performClick()
         val reactionFilterAll = "${string(R.string.reaction_filter_all)} · 1"
-        composeRule.onNodeWithText(reactionFilterAll, substring = false).assertIsDisplayed()
-        composeRule.onNodeWithText("👍 1", substring = false).assertIsSelected()
+        composeRule.onNodeWithText(reactionFilterAll, substring = false).assertIsSelected()
+        composeRule.onNodeWithText("👍 1", substring = false).assertIsDisplayed()
 
         composeRule.mainClock.autoAdvance = false
         surface.markDeleted()
