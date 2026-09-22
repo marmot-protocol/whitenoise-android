@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -135,6 +136,9 @@ class ConversationAuthoritativeTimelineScreenshotTest {
         composeRule.waitForIdle()
         unconfirmedRow.assertIsDisplayed()
         systemRow.assertIsDisplayed()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithText("Wave hi").fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithText("Wave hi").assertIsDisplayed()
         appRow.assertIsDisplayed()
         val unconfirmedTop = unconfirmedRow.fetchSemanticsNode().boundsInRoot.top

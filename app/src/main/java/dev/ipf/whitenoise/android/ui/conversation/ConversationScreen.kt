@@ -3958,21 +3958,20 @@ internal fun ConversationScreen(
                                         composerGate = composerGate,
                                         onWave =
                                             if (composerGate == ComposerGate.COMPOSER && canWave()) {
-                                                { accountIdHex ->
-                                                    appState.launchMutation {
-                                                        if (!canWave()) {
-                                                            return@launchMutation
-                                                        }
-                                                        val npub = appState.npubForDisplay(accountIdHex)
-                                                        if (npub.isBlank()) {
-                                                            appState.present(R.string.send_failed)
-                                                            return@launchMutation
-                                                        }
-                                                        controller.send("👋 @$npub", onAccepted = {
-                                                            acceptedSendRevealedTranscript = true
-                                                            revealSentMessage()
-                                                        })
+                                                wave@{ accountIdHex, onAccepted ->
+                                                    if (!canWave()) {
+                                                        return@wave
                                                     }
+                                                    val npub = appState.npubForDisplay(accountIdHex)
+                                                    if (npub.isBlank()) {
+                                                        appState.present(R.string.send_failed)
+                                                        return@wave
+                                                    }
+                                                    controller.send("👋 @$npub", onAccepted = {
+                                                        onAccepted()
+                                                        acceptedSendRevealedTranscript = true
+                                                        revealSentMessage()
+                                                    })
                                                 }
                                             } else {
                                                 null

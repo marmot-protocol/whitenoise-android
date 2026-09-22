@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import android.content.Context
+import android.content.SharedPreferences
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -27,6 +29,7 @@ import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -48,6 +52,8 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.rememberGroupSystemCopy
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** Flat inset the prototype gives a system-event row on both sides. */
 private val GroupSystemRowVerticalPadding = 8.dp
@@ -66,7 +72,8 @@ internal fun GroupSystemRow(
     appState: WhiteNoiseAppState,
     groupSystem: GroupSystemEventFfi? = null,
     onDeleteForMe: (() -> Unit)? = null,
-    onWave: ((String) -> Unit)? = null,
+    onWave: (suspend (String, () -> Unit) -> Unit)? = null,
+    waveAccountRef: String? = appState.activeAccountRef,
 ) {
     val copy = rememberGroupSystemCopy()
     val event =
@@ -155,9 +162,7 @@ internal fun GroupSystemRow(
             }
             val waveTarget = waveTarget(event, appState.activeAccount?.accountIdHex)
             if (waveTarget != null && onWave != null) {
-                TextButton(onClick = { onWave(waveTarget) }) {
-                    Text(stringResource(R.string.wave_hi))
-                }
+                WaveHiButton(record, appState, waveAccountRef, waveTarget, onWave)
             }
         }
         // Developer-mode only: keep the one-line summary as the default and tuck
@@ -199,6 +204,60 @@ internal fun GroupSystemRow(
                 MessageDebugRow(style = debugStyle, record = record)
             }
         }
+    }
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun WaveHiButton(
+    record: AppMessageRecordFfi,
+    appState: WhiteNoiseAppState,
+    accountRef: String?,
+    target: String,
+    onWave: suspend (String, () -> Unit) -> Unit,
+) {
+    if (accountRef == null || record.messageIdHex.isBlank()) {
+        return
+    }
+    val context = LocalContext.current.applicationContext
+    val key = "${accountRef.length}:$accountRef:${record.groupIdHex}:${record.messageIdHex}"
+    var preferences by remember(key) { mutableStateOf<SharedPreferences?>(null) }
+    var dismissed by remember(key) { mutableStateOf(true) }
+    var sending by remember(key) { mutableStateOf(false) }
+    LaunchedEffect(context, key) {
+        // This is a local action dismissal, like Delete for me, not message or delivery data.
+        val stored =
+            withContext(Dispatchers.IO) {
+                context.getSharedPreferences("whitenoise.wave_dismissals", Context.MODE_PRIVATE).let {
+                    it to it.getBoolean(key, false)
+                }
+            }
+        preferences = stored.first
+        dismissed = stored.second
+    }
+    if (dismissed) {
+        return
+    }
+    TextButton(
+        enabled = !sending,
+        onClick = wave@{
+            if (sending) {
+                return@wave
+            }
+            sending = true
+            appState.launchMutation {
+                try {
+                    onWave(target) {
+                        dismissed = true
+                        requireNotNull(preferences).edit().putBoolean(key, true).apply()
+                    }
+                } finally {
+                    sending = false
+                }
+            }
+        },
+    ) {
+        Text(stringResource(R.string.wave_hi))
     }
 }
 
