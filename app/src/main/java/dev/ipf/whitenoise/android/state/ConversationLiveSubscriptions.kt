@@ -11,6 +11,9 @@ import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.state.TimelinePageOutcome.Advanced
 import kotlinx.coroutines.CancellationException
 
+/** Attempts allowed for not-ready or superseded exact-message jumps before asking the reader to retry. */
+internal const val CONVERSATION_JUMP_RETRY_ATTEMPTS = 4
+
 /**
  * Lifecycle-shaped seam for conversation live subscriptions. Production binds
  * UniFFI handles; tests supply scripted implementations without subclassing FFI
@@ -48,14 +51,28 @@ internal interface ConversationTimelineSubscriptionHandle {
     /** Reports the row the reader sees; null when the seam has no window or nothing newer was installed. */
     suspend fun setVisibleAnchor(messageIdHex: String): TimelinePageFfi? = null
 
-    /** Recenters on a retained message; throws `ConversationWindowMessageNotRetained` when MDK dropped it. */
-    suspend fun jumpToMessage(messageIdHex: String): TimelinePageFfi? = null
+    /** Recenters on a retained message, preserving whether MDK advanced, delayed, or rejected the target. */
+    suspend fun jumpToMessage(messageIdHex: String): ConversationJumpOutcome = ConversationJumpOutcome.Unsupported
 
     /** Resumes following the tail; null when the seam has no window or nothing newer was installed. */
     suspend fun returnToLatest(): TimelinePageFfi? = null
 
     /** Wakes pending window operations before [close]; a no-op on seams without a window. */
     suspend fun cancel() = Unit
+}
+
+/** Result of asking the active timeline seam to materialize one exact message. */
+internal sealed interface ConversationJumpOutcome {
+    /** A real conversation window answered with its normal page outcome. */
+    data class Window(
+        val outcome: TimelinePageOutcome,
+    ) : ConversationJumpOutcome
+
+    /** MDK proved that the requested message is not retained in the visible projection. */
+    data object Missing : ConversationJumpOutcome
+
+    /** The legacy whole-timeline seam has no exact-message jump command. */
+    data object Unsupported : ConversationJumpOutcome
 }
 
 internal interface ConversationGroupStateSubscriptionHandle {

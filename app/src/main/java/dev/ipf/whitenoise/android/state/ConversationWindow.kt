@@ -263,10 +263,17 @@ internal class FfiConversationWindowHandle(
             window.setVisibleAnchor(revision, messageIdHex, CONVERSATION_WINDOW_DEFAULT_DEADLINE)
         }
 
-    /** Recenters the window on a retained message; throws when MDK no longer retains it. */
-    override suspend fun jumpToMessage(messageIdHex: String): TimelinePageFfi? =
-        installer.command(rethrowMissingTarget = true) { revision ->
-            window.jumpToMessage(revision, messageIdHex, CONVERSATION_WINDOW_DEFAULT_DEADLINE)
+    /** Recenters the window without collapsing a retryable delay into a missing-target answer. */
+    @Suppress("SwallowedException")
+    override suspend fun jumpToMessage(messageIdHex: String): ConversationJumpOutcome =
+        try {
+            ConversationJumpOutcome.Window(
+                installer.commandOutcome(rethrowMissingTarget = true) { revision ->
+                    window.jumpToMessage(revision, messageIdHex, CONVERSATION_WINDOW_DEFAULT_DEADLINE)
+                },
+            )
+        } catch (missing: MarmotKitException.ConversationWindowMessageNotRetained) {
+            ConversationJumpOutcome.Missing
         }
 
     /** Resumes following the tail; null when nothing newer was installed. */

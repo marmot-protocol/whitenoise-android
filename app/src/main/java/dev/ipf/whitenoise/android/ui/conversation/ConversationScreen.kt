@@ -117,6 +117,7 @@ import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.ConversationPagingOrigin
 import dev.ipf.whitenoise.android.state.ConversationUnreadJumpState
 import dev.ipf.whitenoise.android.state.ErrorPresentation
+import dev.ipf.whitenoise.android.state.MessageAvailability
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -126,6 +127,8 @@ import dev.ipf.whitenoise.android.state.chatCreateOpenConversationTimingStage
 import dev.ipf.whitenoise.android.state.countUnreadIncoming
 import dev.ipf.whitenoise.android.state.currentTtsConversationDestination
 import dev.ipf.whitenoise.android.state.hasKnownTranscriptPresentation
+import dev.ipf.whitenoise.android.state.loadMessageAvailability
+import dev.ipf.whitenoise.android.state.loadUntilMessageAvailable
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
 import dev.ipf.whitenoise.android.state.mediaReferencesFor
 import dev.ipf.whitenoise.android.state.presentFailure
@@ -2064,11 +2067,18 @@ internal fun ConversationScreen(
                 }
                 navigationState.targetHighlight.highlightWhile(targetMessageId) {
                     if (!navigationRequest.isCurrent()) return@highlightWhile false
-                    val available = controller.loadUntilMessageAvailable(targetMessageId)
+                    val availability = controller.loadMessageAvailability(targetMessageId)
                     if (!navigationRequest.isCurrent()) return@highlightWhile false
-                    if (!available) {
-                        appState.present(R.string.toast_original_message_unavailable)
-                        return@highlightWhile false
+                    when (availability) {
+                        MessageAvailability.AVAILABLE -> Unit
+                        MessageAvailability.MISSING -> {
+                            appState.present(R.string.toast_original_message_unavailable)
+                            return@highlightWhile false
+                        }
+                        MessageAvailability.RETRYABLE -> {
+                            appState.present(R.string.error_loaded_content_kept)
+                            return@highlightWhile false
+                        }
                     }
                     // Resolve the target in the rendered (edit-filtered) list the
                     // LazyColumn shows — an unfiltered index is off by the edits above it.

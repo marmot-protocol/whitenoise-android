@@ -10630,6 +10630,22 @@
         ]
       },
       {
+        "surface": "Retryable exact-message jump notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "R.string.error_loaded_content_kept",
+        "test_ids": [
+          "CON-003"
+        ]
+      },
+      {
+        "surface": "Authoritative missing reply-target notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "R.string.toast_original_message_unavailable",
+        "test_ids": [
+          "CON-003"
+        ]
+      },
+      {
         "surface": "setting:error_conversation_membership_unavailable",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "anchor": "R.string.error_conversation_membership_unavailable",
