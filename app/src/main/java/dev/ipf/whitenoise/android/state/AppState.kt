@@ -8741,13 +8741,14 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** Clears the latest cutover and drains token work that arrived while it owned the mode lock. */
-    private suspend fun finishNotificationDeliveryModeTransaction(epoch: Long) = withContext(NonCancellable) {
-        if (!notificationDeliveryModeIntent.isCurrent(epoch)) return@withContext
-        notificationDeliveryModeMutex.withLock {
-            val latest = notificationDeliveryModeIntent.runIfCurrent(epoch) { notificationDeliveryModeBusy = false }
-            if (latest && pushTokenStore.nativePushRegistrationSyncPending()) syncNativePushRegistrationIfEnabled()
+    private suspend fun finishNotificationDeliveryModeTransaction(epoch: Long) =
+        withContext(NonCancellable) {
+            if (!notificationDeliveryModeIntent.isCurrent(epoch)) return@withContext
+            notificationDeliveryModeMutex.withLock {
+                val latest = notificationDeliveryModeIntent.runIfCurrent(epoch) { notificationDeliveryModeBusy = false }
+                if (latest && pushTokenStore.nativePushRegistrationSyncPending()) syncNativePushRegistrationIfEnabled()
+            }
         }
-    }
 
     /** Captures every lifetime that can invalidate a device-wide delivery cutover. */
     @Suppress("ReturnCount")

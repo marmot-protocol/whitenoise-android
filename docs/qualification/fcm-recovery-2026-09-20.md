@@ -1,7 +1,7 @@
 # Android push recovery qualification — 2026-09-20
 
 Implementation source: isolated branch `fix/fcm-durable-recovery`, based on refreshed
-master `f1c02fc888acbd68de053a2ecba1a30d1be90691`. `scope-selection.json` records this
+master `cad86210268b4194795b1b11f93b992bc8796c73`. `scope-selection.json` records this
 same final qualification base. The original checkout and native
 dependency pin are unchanged. This report covers the Android implementation and does
 not establish a fix for the reported 2026.9.17 open-chat symptom.
@@ -126,9 +126,9 @@ is responsible for the full current-head gate.
 | Final review-focused primary-variant tests | 114 passed, 0 failures/errors/skips; 11 suites |
 | Latest admission/store regressions | 44 passed, 0 failures/errors/skips; 2 suites |
 | Latest delivery-mode/token-rotation regressions | 101 passed, 0 failures/errors/skips; 4 suites |
-| Latest hosted-failure regressions | PASS in both debug variants; 111 tests per variant, 222 total, 0 failures/errors/skips; 6 suites |
-| Latest hosted static-analysis failures | Three changed-line length violations were corrected; current-head hosted rerun pending |
-| Latest hosted unit-test failures | The settlement path is registered as generation-guarded, and the DNS deadline fixture deterministically starts stalled work around its completed public answer; current-head hosted rerun pending |
+| Latest hosted-failure regressions | PASS in both debug variants; 122 tests per variant, 244 total, 0 failures/errors/skips; 5 suites |
+| Latest hosted static-analysis failures | The two formatter-required expression-body layouts were corrected; current-head hosted rerun pending |
+| Latest hosted unit-test failure | The notification-startup regression now awaits the completed current notification write before asserting that the equivalent final card is not rewritten; current-head hosted rerun pending |
 | Alternate-variant focused tests | 241 recovery-focused tests plus the 21-test affected ordering class passed separately; 0 failures/errors/skips |
 | Post-rebase CI regression set | PASS; 45 tests in each debug variant, 0 failures/errors/skips |
 | Full alternate variant | PASS; 9,169 tests, 0 failures/errors, 1 skipped; 5m 41s |
@@ -168,7 +168,14 @@ settle, and account activation can itself await notification work. The test now 
 cross-account cache invalidation boundary directly. This preserves the intended proof that a
 cache-generation change rejects the held stale write without coupling the proof to unrelated
 account-switch settlement. The exact regression and all 21 tests in its class pass in both build
-variants. A new exact-head hosted matrix is required after this report is pushed.
+variants. A later hosted run exposed two formatter-only expression-body violations and an
+ordering race in the notification-startup regression: notification-manager state could become
+visible before the post-write test hook advanced. The maintained test now awaits that current
+write before asserting that the equivalent final card is not rewritten. `PushTokenStoreTest`,
+`StateSourceSizeCeilingTest`, `NotificationStartupOrderingTest`,
+`NotificationDeliveryModeRecoveryTest`, and `AppStateSendLockCoverageTest` pass in both debug
+variants: 122 tests per variant, 244 total, with no failures, errors, or skips. A new exact-head
+hosted matrix is required after this report is pushed.
 
 The completion/acknowledgement settlement regressions and their cancellation variants pass
 in both build variants. The current earlier-review probe bundle also passes. The supplied
@@ -263,7 +270,7 @@ the preserved pre-install APK SHA-256 is
 ## Source and artifacts
 
 The source/test patch relative to the base revision is SHA-256
-`79b62e634b7d921ef80a2d10a3df84639bd3900bfeab4f2f522cc582f0f0f497`.
+`bfd7dedced0a88b6f75d477a367580d6b6995974c4884ee27e310ddc7370d3b4`.
 This hashes `git diff origin/master --binary -- app/src`. The native dependency remains unchanged.
 
 Final qualification APK hashes:

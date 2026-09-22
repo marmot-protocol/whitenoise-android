@@ -67,8 +67,9 @@ class StateSourceSizeCeilingTest {
         // the interactive branch loads and fences it before publication.
         // Durable push-wake recovery adds the covered lifecycle owner, generation fences,
         // finite attempt settlement, and notification-delivery cutover orchestration.
+        // Its covered final settlement needs one formatter-required expression-body continuation.
         // Play/Zapstore unit tests and Kover run in required CI; keep merged size exact.
-        const val APP_STATE_MAX_LINES = 11317
+        const val APP_STATE_MAX_LINES = 11307
 
         /** Counts physical source lines with the same trailing-newline semantics as `wc -l`. */
         internal fun sourceLineCount(file: File): Int = file.bufferedReader().useLines { lines -> lines.count() }

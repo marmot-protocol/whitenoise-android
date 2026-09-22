@@ -1,6 +1,6 @@
 {
   "work_item": "Android notification recovery and tracker #2692 children #2503, #2675, #2676",
-  "base_revision": "f1c02fc888acbd68de053a2ecba1a30d1be90691",
+  "base_revision": "cad86210268b4194795b1b11f93b992bc8796c73",
   "mandatory": [
     {
       "capability": "priority-aware dispatch",

@@ -155,6 +155,7 @@ class NotificationStartupOrderingTest {
                 withNotificationWriteCount { writes ->
                     fixture.bootstrap()
                     fixture.awaitNotificationPosted()
+                    awaitWrites(writes, expected = 1)
 
                     assertEquals(
                         "already final",
