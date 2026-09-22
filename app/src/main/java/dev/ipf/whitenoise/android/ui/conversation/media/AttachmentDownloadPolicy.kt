@@ -26,6 +26,21 @@ internal fun shouldMaterializeAttachmentAutomatically(
         hasRetainedPlaintext ||
         (!automaticDownloadsPaused && (mediaAutoDownloadAllowed || mine))
 
+/**
+ * The one decision that lets a materialization reach the network (#2699).
+ *
+ * A request the reader made themselves always may. Automatic work is re-asked here, at the
+ * transfer boundary, against the live policy — [automaticNetworkAllowed] is read when the transfer
+ * starts, not when the row was composed — so a queued or retried automatic request cannot begin a
+ * remote fetch once the connection has become metered. Every remote message-media renderer,
+ * animated images included, routes its automatic bytes through this decision instead of inferring
+ * safety from composition state.
+ */
+internal fun attachmentTransferAllowsNetwork(
+    intent: AttachmentMaterializationIntent,
+    automaticNetworkAllowed: Boolean,
+): Boolean = intent == AttachmentMaterializationIntent.Interactive || automaticNetworkAllowed
+
 /** One source of truth for policy-granted and user-granted materialization. */
 internal enum class AttachmentMaterializationIntent {
     Idle,

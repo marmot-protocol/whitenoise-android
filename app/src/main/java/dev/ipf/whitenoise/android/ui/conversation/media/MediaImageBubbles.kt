@@ -232,8 +232,7 @@ internal fun MediaImageBubble(
                     reference = reference,
                     mine = mine,
                     priority = materializationIntent.priority,
-                    allowNetwork =
-                        materializationIntent == AttachmentMaterializationIntent.Interactive || automaticNetworkAllowed,
+                    allowNetwork = attachmentTransferAllowsNetwork(materializationIntent, automaticNetworkAllowed),
                 ) ?: run {
                     cachedPlaintextOnEntry = false
                     materializationIntent =
@@ -644,8 +643,7 @@ internal fun MediaImageGridTile(
                     reference = reference,
                     mine = mine,
                     priority = materializationIntent.priority,
-                    allowNetwork =
-                        materializationIntent == AttachmentMaterializationIntent.Interactive || automaticNetworkAllowed,
+                    allowNetwork = attachmentTransferAllowsNetwork(materializationIntent, automaticNetworkAllowed),
                 ) ?: run {
                     cachedPlaintextOnEntry = false
                     materializationIntent =

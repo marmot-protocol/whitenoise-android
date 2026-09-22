@@ -22283,6 +22283,24 @@
     ],
     "source_coverage": [
       {
+        "surface": "One canonical decision lets an attachment transfer reach the network",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentDownloadPolicy.kt",
+        "anchor": "internal fun attachmentTransferAllowsNetwork(",
+        "test_ids": [
+          "MED-019",
+          "SET-012"
+        ]
+      },
+      {
+        "surface": "Automatic remote media downloads stay off on metered networks by default",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/MediaAutoDownloadMigration.kt",
+        "anchor": "internal fun migratedMediaAutoDownloadMatrix(",
+        "test_ids": [
+          "SET-010",
+          "MED-019"
+        ]
+      },
+      {
         "surface": "A committed group rename is retained on its chat-list row until the subscription agrees",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalGroupNameAuthority.kt",
         "anchor": "internal class LocalGroupNameAuthority",

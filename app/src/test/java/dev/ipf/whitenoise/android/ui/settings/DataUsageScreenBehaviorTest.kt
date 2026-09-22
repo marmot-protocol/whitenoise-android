@@ -1,9 +1,11 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -69,7 +71,7 @@ class DataUsageScreenBehaviorTest {
     /** A network switch in the Photos dialog writes the matrix at once; Done leaves the row summary updated. */
     @Test
     fun photosNetworkSwitchWritesImmediately() {
-        composeRule.onNodeWithText("Wi-Fi, Mobile data, Metered network").assertExists()
+        composeRule.onAllNodesWithText(METERED_SUMMARY).assertCountEquals(0)
         composeRule.onNodeWithText("Photos").performClick()
         composeRule.onNodeWithTag("download.network.WiFi").performClick()
         composeRule.runOnIdle {
@@ -77,10 +79,34 @@ class DataUsageScreenBehaviorTest {
             assertFalse(matrix.isEnabled(MediaAutoDownloadType.Image, MediaAutoDownloadNetwork.WiFi))
         }
         composeRule.onNodeWithText("Done").performClick()
-        composeRule.onNodeWithText("Mobile data, Metered network").assertExists()
+        composeRule.onNodeWithText("Mobile data").assertExists()
         composeRule.onNodeWithText("Reset download settings").assertIsEnabled().performClick()
         composeRule.runOnIdle { assertEquals(MediaAutoDownloadMatrix.DEFAULT, appState.mediaAutoDownloadMatrix) }
         composeRule.onNodeWithText("Reset download settings").assertIsNotEnabled()
+    }
+
+    /** Photos omit metered networks by default, and an explicit opt-in adds them back (#2699). */
+    @Test
+    fun photosExcludeMeteredNetworksUntilExplicitlyEnabled() {
+        composeRule.runOnIdle {
+            assertFalse(
+                appState.mediaAutoDownloadMatrix
+                    .isEnabled(MediaAutoDownloadType.Image, MediaAutoDownloadNetwork.Metered),
+            )
+        }
+        composeRule.onAllNodesWithText(METERED_SUMMARY).assertCountEquals(0)
+        composeRule.onNodeWithText("Photos").performClick()
+        composeRule.onNodeWithTag("download.network.Metered").performClick()
+        composeRule.runOnIdle {
+            assertTrue(
+                appState.mediaAutoDownloadMatrix
+                    .isEnabled(MediaAutoDownloadType.Image, MediaAutoDownloadNetwork.Metered),
+            )
+        }
+        composeRule.onNodeWithText("Done").performClick()
+        composeRule.onNodeWithText(METERED_SUMMARY).assertExists()
+        composeRule.onNodeWithText("Reset download settings").assertIsEnabled().performClick()
+        composeRule.runOnIdle { assertEquals(MediaAutoDownloadMatrix.DEFAULT, appState.mediaAutoDownloadMatrix) }
     }
 
     /** Files download nowhere by default and say so. */
@@ -118,6 +144,7 @@ class DataUsageScreenBehaviorTest {
 
     private companion object {
         const val ACCOUNT_REF = "account-a"
+        const val METERED_SUMMARY = "Wi-Fi, Mobile data, Metered network"
         const val STOP_CONFIRMATION =
             "Clear waiting automatic downloads for this profile? " +
                 "Active downloads and downloads you started yourself will continue."

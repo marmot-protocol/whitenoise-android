@@ -6,7 +6,9 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/** Cell-by-cell defaults, the most-restrictive rule, and the serialization the preference store uses. */
 class MediaAutoDownloadMatrixTest {
+    /** The shipped matrix matches the #407 table with every type off for Metered (#2699). */
     @Test
     fun defaultMatchesSuggestedTableCellByCell() {
         val m = MediaAutoDownloadMatrix.DEFAULT
@@ -29,8 +31,8 @@ class MediaAutoDownloadMatrixTest {
         assertFalse(m.isEnabled(MediaAutoDownloadType.Video, MediaAutoDownloadNetwork.Roaming))
         assertFalse(m.isEnabled(MediaAutoDownloadType.Document, MediaAutoDownloadNetwork.Roaming))
 
-        // Metered: Images ON, Audio OFF, Video OFF, Documents OFF
-        assertTrue(m.isEnabled(MediaAutoDownloadType.Image, MediaAutoDownloadNetwork.Metered))
+        // Metered: everything OFF (#2699)
+        assertFalse(m.isEnabled(MediaAutoDownloadType.Image, MediaAutoDownloadNetwork.Metered))
         assertFalse(m.isEnabled(MediaAutoDownloadType.Audio, MediaAutoDownloadNetwork.Metered))
         assertFalse(m.isEnabled(MediaAutoDownloadType.Video, MediaAutoDownloadNetwork.Metered))
         assertFalse(m.isEnabled(MediaAutoDownloadType.Document, MediaAutoDownloadNetwork.Metered))
@@ -52,6 +54,7 @@ class MediaAutoDownloadMatrixTest {
         assertFalse(m.shouldAutoDownload(MediaAutoDownloadType.Video, emptySet()))
     }
 
+    /** One OFF cell among the matching networks denies the fetch, including every metered shape. */
     @Test
     fun mostRestrictiveRuleAppliesAcrossMatchingNetworks() {
         val m = MediaAutoDownloadMatrix.DEFAULT
@@ -62,12 +65,39 @@ class MediaAutoDownloadMatrixTest {
                 setOf(MediaAutoDownloadNetwork.WiFi, MediaAutoDownloadNetwork.Metered),
             ),
         )
-        // {WiFi, Metered}: Image is ON for both -> yes.
-        assertTrue(
+        // {WiFi, Metered}: Image is ON@WiFi but OFF@Metered -> no (#2699).
+        assertFalse(
             m.shouldAutoDownload(
                 MediaAutoDownloadType.Image,
                 setOf(MediaAutoDownloadNetwork.WiFi, MediaAutoDownloadNetwork.Metered),
             ),
+        )
+        // {Mobile, Metered}, the ordinary cellular shape, denies it for the same reason.
+        assertFalse(
+            m.shouldAutoDownload(
+                MediaAutoDownloadType.Image,
+                setOf(MediaAutoDownloadNetwork.Mobile, MediaAutoDownloadNetwork.Metered),
+            ),
+        )
+        // A metered VPN whose stale tunnel still reports Wi-Fi and cellular stays denied.
+        assertFalse(
+            m.shouldAutoDownload(
+                MediaAutoDownloadType.Image,
+                setOf(
+                    MediaAutoDownloadNetwork.WiFi,
+                    MediaAutoDownloadNetwork.Mobile,
+                    MediaAutoDownloadNetwork.Metered,
+                ),
+            ),
+        )
+        // An explicit metered opt-in restores it on exactly that connection.
+        assertTrue(
+            m
+                .withToggle(MediaAutoDownloadType.Image, MediaAutoDownloadNetwork.Metered, on = true)
+                .shouldAutoDownload(
+                    MediaAutoDownloadType.Image,
+                    setOf(MediaAutoDownloadNetwork.WiFi, MediaAutoDownloadNetwork.Metered),
+                ),
         )
     }
 
@@ -115,6 +145,7 @@ class MediaAutoDownloadMatrixTest {
         assertFalse(m.isEnabled(MediaAutoDownloadType.Image, MediaAutoDownloadNetwork.WiFi))
     }
 
+    /** The shipped default and a custom matrix both survive a preference round trip. */
     @Test
     fun serializeDeserializeRoundTrips() {
         val original = MediaAutoDownloadMatrix.DEFAULT
@@ -126,6 +157,13 @@ class MediaAutoDownloadMatrixTest {
                 .withToggle(MediaAutoDownloadType.Document, MediaAutoDownloadNetwork.WiFi, on = true)
                 .withToggle(MediaAutoDownloadType.Video, MediaAutoDownloadNetwork.Roaming, on = true)
         assertEquals(custom, MediaAutoDownloadMatrix.fromPreference(custom.toPreference()))
+
+        // An explicit metered opt-in reloads as itself rather than as the shipped default.
+        val meteredOptIn =
+            MediaAutoDownloadMatrix.DEFAULT
+                .withToggle(MediaAutoDownloadType.Image, MediaAutoDownloadNetwork.Metered, on = true)
+        assertEquals(meteredOptIn, MediaAutoDownloadMatrix.fromPreference(meteredOptIn.toPreference()))
+        assertNotEquals(MediaAutoDownloadMatrix.DEFAULT, meteredOptIn)
     }
 
     @Test
@@ -192,6 +230,7 @@ class MediaAutoDownloadMatrixTest {
         )
     }
 
+    /** An unknown or offline connection reports no conditions, and the gate fails closed. */
     @Test
     fun matchingUnknownConnectionYieldsEmptySoTheGateSaysNo() {
         val none =
