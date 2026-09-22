@@ -258,6 +258,22 @@
         ]
       },
       {
+        "surface": "Reaction mutation rejected",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_reaction_failed",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "Reaction terminal mutation failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ReactionMutationPresentation.kt",
+        "anchor": "R.string.toast_reaction_failed",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
         "surface": "AppSelfUpdateCancelActions",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/AppSelfUpdateDialog.kt",
         "anchor": "fun AppSelfUpdateCancelActions(",
@@ -4749,9 +4765,33 @@
         ]
       },
       {
+        "surface": "ReactionDetailsContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+        "anchor": "fun ReactionDetailsContent(",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "ReactionFilterChips",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+        "anchor": "fun ReactionFilterChips(",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
         "surface": "ReactionParticipantRow",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
         "anchor": "fun ReactionParticipantRow(",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "ReactionParticipantSupportingText",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+        "anchor": "fun ReactionParticipantSupportingText(",
         "test_ids": [
           "MSG-005"
         ]
@@ -10600,6 +10640,22 @@
         ]
       },
       {
+        "surface": "Retryable exact-message jump notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "R.string.error_loaded_content_kept",
+        "test_ids": [
+          "CON-003"
+        ]
+      },
+      {
+        "surface": "Authoritative missing reply-target notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "R.string.toast_original_message_unavailable",
+        "test_ids": [
+          "CON-003"
+        ]
+      },
+      {
         "surface": "setting:error_conversation_membership_unavailable",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "anchor": "R.string.error_conversation_membership_unavailable",
@@ -12304,6 +12360,30 @@
         "anchor": "R.string.view_reactors",
         "test_ids": [
           "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:reaction_filter_all",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+        "anchor": "R.string.reaction_filter_all",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "string:reaction_tap_to_remove",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+        "anchor": "R.string.reaction_tap_to_remove",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "string:you",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+        "anchor": "R.string.you",
+        "test_ids": [
+          "MSG-005"
         ]
       },
       {
@@ -22533,6 +22613,14 @@
         ]
       },
       {
+        "surface": "Dictation automatic completion delivers by the stored silence choice only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "private fun completeAfterSilence(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
         "surface": "Dictation no-speech retries are bounded to the exact speech-bearing caller-audio chunk",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
         "anchor": "private fun advancePastRejectedCallerAudio(",
@@ -22793,6 +22881,16 @@
         "test_ids": [
           "CON-004",
           "CHL-002"
+        ]
+      },
+      {
+        "surface": "Opt-in text/media send and attachment-fetch diagnostics retain privacy-bounded checkpoints across controller replacement",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/PendingSendDiagnostics.kt",
+        "anchor": "internal class PendingSendDiagnosticTracker(",
+        "test_ids": [
+          "CHL-002",
+          "CON-002",
+          "SET-021"
         ]
       },
       {

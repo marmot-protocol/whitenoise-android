@@ -268,7 +268,8 @@ class AppStateSendLockCoverageTest {
         assertTrue(
             "discardFailedSend must arbitrate stale failure actions through the shared cancellation lock",
             "suspend fun discardFailedSend" in controllersSource().readText() &&
-                "cancelOptimisticSendResult(current.record, optimisticKeyOverride = key)" in body,
+                "cancelOptimisticSendResult(current.record" in body &&
+                "optimisticKeyOverride = key" in body,
         )
     }
 

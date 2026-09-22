@@ -112,6 +112,29 @@ class ChatListWindowSetTest {
             assertNull(windows.setVisibleAnchor(ChatListViewFfi.CHATS, "CHATS-a"))
             assertEquals(1uL, windows.installed(ChatListViewFfi.CHATS)?.sequence)
         }
+
+    /** A shifted capped window can page back to rows before its retained front. */
+    @Test
+    fun pagesBackwardOnlyWhenRowsExistBeforeTheWindow() =
+        runBlocking {
+            val chats =
+                FakeWindow(
+                    ChatListViewFfi.CHATS,
+                    rows = listOf("CHATS-middle"),
+                    hasMoreBefore = true,
+                )
+            val handles =
+                CHAT_LIST_WINDOW_VIEWS.associateWith { view ->
+                    if (view == ChatListViewFfi.CHATS) chats else FakeWindow(view)
+                }
+            val windows = ChatListWindowSet.open("acct") { _, view -> handles.getValue(view) }
+
+            assertNull(windows.pageBackward(ChatListViewFfi.ARCHIVED))
+            val paged = windows.pageBackward(ChatListViewFfi.CHATS)
+
+            assertEquals(listOf(0uL to ChatListPageDirectionFfi.BACKWARD), chats.pageCalls)
+            assertEquals(listOf("CHATS-page", "CHATS-middle"), paged?.rows?.map { it.row.groupIdHex })
+        }
 }
 
 /** Polls a condition driven by the IO-dispatched receive loops, failing after five seconds. */
@@ -125,6 +148,7 @@ private suspend fun awaitUntil(condition: () -> Boolean) {
 private class FakeWindow(
     private val view: ChatListViewFfi,
     rows: List<String> = emptyList(),
+    private val hasMoreBefore: Boolean = false,
     private val hasMoreAfter: Boolean = false,
 ) : ChatListWindowHandle {
     private val updates = Channel<ChatListWindowSnapshotFfi>(Channel.UNLIMITED)
@@ -161,7 +185,14 @@ private class FakeWindow(
     ): ChatListWindowSnapshotFfi {
         throwScriptedFailure()
         pageCalls += sequence to direction
-        current = snapshot(sequence + 1uL, current.rows.map { it.row.groupIdHex } + "$view-page")
+        val ids = current.rows.map { it.row.groupIdHex }
+        val rows =
+            if (direction == ChatListPageDirectionFfi.BACKWARD) {
+                listOf("$view-page") + ids
+            } else {
+                ids + "$view-page"
+            }
+        current = snapshot(sequence + 1uL, rows)
         return current
     }
 
@@ -204,7 +235,7 @@ private class FakeWindow(
         sequence = sequence,
         view = view,
         rows = rows.map(::presentedRow),
-        hasMoreBefore = false,
+        hasMoreBefore = hasMoreBefore,
         hasMoreAfter = hasMoreAfter,
         anchor = ChatListAnchorOutcomeFfi.Top,
     )

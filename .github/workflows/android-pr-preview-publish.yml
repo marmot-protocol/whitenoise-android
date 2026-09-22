@@ -8,13 +8,14 @@ on:
     workflows: [Android PR APK]
     types: [completed]
 
-permissions:
-  actions: read
-  contents: read
-  pull-requests: write
+permissions: {}
 
 jobs:
   prepare:
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
       (github.event.workflow_run.event == 'pull_request' || github.event.workflow_run.event == 'workflow_dispatch') &&
@@ -78,6 +79,12 @@ jobs:
 
   publish:
     needs: prepare
+    permissions:
+      actions: read
+      # Signed candidates are assets on one dedicated prerelease so browsers
+      # receive APK MIME and filename headers.
+      contents: write
+      pull-requests: write
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
@@ -105,7 +112,7 @@ jobs:
         run: |
           .github/scripts/test-pr-preview-contract.sh
           .github/scripts/test-pr-preview-validation.sh
-          .github/scripts/test-upload-pr-apk-to-blossom.sh
+          .github/scripts/test-publish-pr-apk-to-github-release.sh
           node --test .github/scripts/update-pr-preview-links.test.js
 
       - name: Download candidates from completed run
@@ -231,15 +238,14 @@ jobs:
       - name: Publish previews
         id: publish
         env:
-          BLOSSOM_SERVER: https://nostr.download
-          BLOSSOM_UPLOAD_NSEC: ${{ secrets.BLOSSOM_UPLOAD_NSEC }}
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          go install github.com/fiatjaf/nak@62fa610a063b708743456e49f9befaef4a441a37
           for channel in stable isolated; do
             apk=$(find "signed/$channel" -type f -name '*.apk' -print -quit)
-            url=$(APK_PATH="$apk" .github/scripts/upload-pr-apk-to-blossom.sh)
+            url=$(APK_PATH="$apk" PREVIEW_CHANNEL="$channel" \
+              .github/scripts/publish-pr-apk-to-github-release.sh)
             remote_sha=$(curl --fail --location --retry 3 --retry-all-errors --max-time 240 "$url" | sha256sum | awk '{print $1}')
             local_sha=$(sha256sum "$apk" | awk '{print $1}')
             [[ "$remote_sha" == "$local_sha" ]] || {

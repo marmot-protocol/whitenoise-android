@@ -96,7 +96,7 @@ jobs:
 
       - name: Test PR preview publisher
         if: matrix.phase == 'tooling'
-        run: bash .github/scripts/test-upload-pr-apk-to-blossom.sh
+        run: bash .github/scripts/test-publish-pr-apk-to-github-release.sh
 
       - name: Test release and staging transport tooling
         if: matrix.phase == 'tooling'

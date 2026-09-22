@@ -28,7 +28,7 @@ class ConversationDictationPreferencesTest {
         val state = ConversationDictationPreferences(context, preferences()).current()
 
         assertNull(state.finishAfterSilenceMillis)
-        assertEquals(ConversationDictationDeliveryMode.PasteIntoDraft, state.deliveryMode)
+        assertEquals(ConversationDictationDeliveryMode.PasteIntoDraft, state.silenceDeliveryMode)
         assertNull(state.recognitionServiceOverride)
     }
 
@@ -37,11 +37,11 @@ class ConversationDictationPreferencesTest {
     fun persistsOnlySupportedSilenceThresholdsAndExplicitSendMode() {
         val original = ConversationDictationPreferences(context, preferences())
         original.setFinishAfterSilenceMillis(5_000L)
-        original.setDeliveryMode(ConversationDictationDeliveryMode.SendOnFinish)
+        original.setSilenceDeliveryMode(ConversationDictationDeliveryMode.SendOnFinish)
 
         val restored = ConversationDictationPreferences(context, preferences())
         assertEquals(5_000L, restored.current().finishAfterSilenceMillis)
-        assertEquals(ConversationDictationDeliveryMode.SendOnFinish, restored.current().deliveryMode)
+        assertEquals(ConversationDictationDeliveryMode.SendOnFinish, restored.current().silenceDeliveryMode)
 
         restored.setFinishAfterSilenceMillis(2_000L)
         assertNull(restored.current().finishAfterSilenceMillis)

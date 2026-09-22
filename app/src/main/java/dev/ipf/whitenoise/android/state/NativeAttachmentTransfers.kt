@@ -5,6 +5,9 @@ import dev.ipf.marmotkit.AttachmentTransferSnapshotFfi
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.AttachmentTransferStatusFfi
 import dev.ipf.marmotkit.AttachmentTransferSubscription
+import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
+import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
+import dev.ipf.whitenoise.android.diagnostics.PerformanceResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -84,6 +87,7 @@ internal suspend fun WhiteNoiseAppState.acquireNativeAttachment(
     request: AttachmentTransferRequest,
     priority: AttachmentDownloadPriority,
     allowExplicitRetry: Boolean = true,
+    diagnostics: AttachmentFetchDiagnostics? = null,
 ): AttachmentTransferRequest {
     val target =
         request.nativeTarget() ?: findNativeAttachment(request)?.target
@@ -92,13 +96,23 @@ internal suspend fun WhiteNoiseAppState.acquireNativeAttachment(
     if (hasNativeAttachment(resolved)) return resolved
 
     val ffiTarget = target.toFfi()
+    diagnostics?.phase(
+        phase = PerformancePhase.ATTACHMENT_NATIVE_SNAPSHOT,
+        result = PerformanceResult.PENDING,
+        layer = PerformanceLayer.FFI,
+    )
     val initial =
         marmotIo {
             attachmentTransferSnapshot(request.accountRef, request.groupIdHex, listOf(ffiTarget))
         }
-    initial.items.singleOrNull()?.takeIf { it.state == AttachmentTransferStateFfi.READY }?.let {
-        if (hasNativeAttachment(resolved)) return resolved
-    }
+    initial.items
+        .singleOrNull()
+        ?.also { diagnostics?.transferUpdate(it.state) }
+        ?.takeIf {
+            it.state == AttachmentTransferStateFfi.READY
+        }?.let {
+            if (hasNativeAttachment(resolved)) return resolved
+        }
 
     awaitNativeAttachment(
         open = {
@@ -108,6 +122,14 @@ internal suspend fun WhiteNoiseAppState.acquireNativeAttachment(
                 },
             )
         },
+        onDemand = {
+            diagnostics?.phase(
+                phase = PerformancePhase.ATTACHMENT_NATIVE_DEMAND,
+                result = PerformanceResult.PENDING,
+                layer = PerformanceLayer.FFI,
+            )
+        },
+        onState = { state -> diagnostics?.transferUpdate(state) },
     ) {
         marmotIo {
             if (priority == AttachmentDownloadPriority.Automatic) {
@@ -131,12 +153,14 @@ internal suspend fun WhiteNoiseAppState.acquireNativeAttachment(
 /** Installs native subscription ownership before caller cancellation can resume, then always releases it. */
 internal suspend fun awaitNativeAttachment(
     open: suspend () -> NativeTransferFeed,
+    onDemand: () -> Unit = {},
+    onState: (AttachmentTransferStateFfi) -> Unit = {},
     demand: suspend () -> AttachmentTransferStateFfi?,
 ) {
     var owned: NativeTransferFeed? = null
     try {
         withContext(NonCancellable) { owned = open() }
-        observeNativeAttachment(checkNotNull(owned), demand)
+        observeNativeAttachment(checkNotNull(owned), demand, onDemand, onState)
     } finally {
         owned?.close()
     }
@@ -145,25 +169,30 @@ internal suspend fun awaitNativeAttachment(
 /** Lexically owns observation even if demand fails or its caller stops waiting. */
 internal suspend fun awaitNativeAttachment(
     feed: NativeTransferFeed,
+    onDemand: () -> Unit = {},
+    onState: (AttachmentTransferStateFfi) -> Unit = {},
     demand: suspend () -> AttachmentTransferStateFfi?,
 ) {
-    feed.use { observeNativeAttachment(it, demand) }
+    feed.use { observeNativeAttachment(it, demand, onDemand, onState) }
 }
 
 /** Waits for one demanded acquisition after ownership has already been made cancellation-safe. */
 private suspend fun observeNativeAttachment(
     updates: NativeTransferFeed,
     demand: suspend () -> AttachmentTransferStateFfi?,
+    onDemand: () -> Unit,
+    onState: (AttachmentTransferStateFfi) -> Unit,
 ) {
     // The subscription starts with a pre-demand snapshot; it must not be
     // mistaken for the terminal outcome of the acquisition we are starting.
-    updates.nextState()
-    var state = demand()
+    updates.nextState().also(onState)
+    onDemand()
+    var state = demand()?.also(onState)
     while (state != AttachmentTransferStateFfi.READY) {
         if (state in NATIVE_TRANSFER_TERMINAL_FAILURES) {
             throw NativeAttachmentTerminalException(requireNotNull(state))
         }
-        state = updates.nextState()
+        state = updates.nextState().also(onState)
     }
 }
 

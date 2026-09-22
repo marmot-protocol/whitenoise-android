@@ -42,6 +42,10 @@ internal class ScriptedConversationTimelineSubscription(
     private val backwardsOutcomes: MutableList<TimelinePageOutcome> = mutableListOf(),
     /** Outcomes handed to successive forward pages; the configured window is used once it runs dry. */
     private val forwardsOutcomes: MutableList<TimelinePageOutcome> = mutableListOf(),
+    /** Exact-message jump results handed to successive navigation attempts. */
+    private val jumpOutcomes: MutableList<ConversationJumpOutcome> = mutableListOf(),
+    /** Optional unmodeled jump failure used to verify the controller keeps loaded content. */
+    private val jumpFailure: Throwable? = null,
 ) : ConversationTimelineSubscriptionHandle {
     private val lifecycleEvents = CopyOnWriteArrayList<String>()
     private val windows = Channel<TimelinePageFfi>(Channel.UNLIMITED)
@@ -87,6 +91,9 @@ internal class ScriptedConversationTimelineSubscription(
     val anchorReports: List<String>
         get() = anchorCalls.toList()
 
+    val jumpCallCount: Int
+        get() = lifecycleEvents.count { it == "jumpToMessage" }
+
     /** Returns the next scripted backward outcome, or the configured window once the script runs dry. */
     override suspend fun paginateBackwards(count: UInt): TimelinePageOutcome {
         lifecycleEvents += "paginateBackwards"
@@ -107,6 +114,13 @@ internal class ScriptedConversationTimelineSubscription(
     override suspend fun paginateForwards(count: UInt): TimelinePageOutcome {
         lifecycleEvents += "paginateForwards"
         return forwardsOutcomes.removeFirstOrNull() ?: Advanced(forwardsPage)
+    }
+
+    /** Returns the next scripted exact-message jump result. */
+    override suspend fun jumpToMessage(messageIdHex: String): ConversationJumpOutcome {
+        lifecycleEvents += "jumpToMessage"
+        jumpFailure?.let { throw it }
+        return jumpOutcomes.removeFirstOrNull() ?: ConversationJumpOutcome.Unsupported
     }
 
     /** Records closure and unblocks any pending live-window read. */

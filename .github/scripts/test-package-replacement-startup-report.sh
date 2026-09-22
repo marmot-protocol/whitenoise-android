@@ -18,9 +18,9 @@ WaitTime: 1640
 Complete
 EOF
   cat >"$fixture_dir/startup.log" <<'EOF'
-I/WNPerf(1234): schema=1 session=p#1 op=app_start phase=ffi_return elapsed_ms=221 duration_ms=200 result=success layer=ffi
-I/WNPerf(1234): schema=1 session=p#1 op=app_start phase=system_splash_handoff elapsed_ms=1498 result=success layer=android
-I/WNPerf(1234): schema=1 session=p#1 op=app_start phase=first_local_frame elapsed_ms=2288 result=success layer=android
+I/WNPerf(1234): schema=2 app_rev=app1234 mdk_rev=mdk5678 session=p#1 op=app_start phase=ffi_return elapsed_ms=221 duration_ms=200 result=success layer=ffi
+I/WNPerf(1234): schema=2 app_rev=app1234 mdk_rev=mdk5678 session=p#1 op=app_start phase=system_splash_handoff elapsed_ms=1498 result=success layer=android
+I/WNPerf(1234): schema=2 app_rev=app1234 mdk_rev=mdk5678 session=p#1 op=app_start phase=first_local_frame elapsed_ms=2288 result=success layer=android
 EOF
   cat >"$fixture_dir/device.txt" <<'EOF'
 captured_at_utc=2026-08-14T03:00:00Z

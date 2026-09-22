@@ -94,6 +94,8 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.collectGlobalAttachments
+import dev.ipf.whitenoise.android.state.hasEarlierChats
+import dev.ipf.whitenoise.android.state.loadEarlierChats
 import dev.ipf.whitenoise.android.state.loadMoreChats
 import dev.ipf.whitenoise.android.state.reportVisibleChat
 import dev.ipf.whitenoise.android.state.returnChatListToTop
@@ -971,21 +973,50 @@ internal fun ChatsScreen(
     var jumpToTopVisible by remember(showArchived) { mutableStateOf(false) }
     // Observe scroll-index changes in an effect so the whole screen does not
     // subscribe to every LazyColumn index update during a fling.
-    LaunchedEffect(chatListState) {
+    val chatListWindowView = if (showArchived) ChatListViewFfi.ARCHIVED else ChatListViewFfi.CHATS
+    val currentVisibleItems by rememberUpdatedState(visibleItems)
+    val currentVisibleChatIds by rememberUpdatedState(visibleChatIds)
+    val currentSearchActive by rememberUpdatedState(searchActive)
+    val hasEarlierChats = controller.hasEarlierChats(chatListWindowView)
+    LaunchedEffect(chatListState, controller, chatListWindowView, hasEarlierChats) {
         snapshotFlow { chatListState.firstVisibleItemIndex }
             .distinctUntilChanged()
             .collect { firstVisibleIndex ->
-                if (firstVisibleIndex >= CHAT_LIST_JUMP_TO_TOP_SHOW_INDEX) {
-                    jumpToTopVisible = true
-                } else if (firstVisibleIndex <= CHAT_LIST_JUMP_TO_TOP_HIDE_INDEX) {
-                    jumpToTopVisible = false
-                }
+                jumpToTopVisible =
+                    shouldShowChatListJumpToTop(
+                        firstVisibleIndex = firstVisibleIndex,
+                        hasMoreBefore = hasEarlierChats,
+                        wasVisible = jumpToTopVisible,
+                        showIndex = CHAT_LIST_JUMP_TO_TOP_SHOW_INDEX,
+                        hideIndex = CHAT_LIST_JUMP_TO_TOP_HIDE_INDEX,
+                    )
             }
     }
     // MarmotKit 0.10.0 serves the list as a bounded window (50 rows initially, 200 retained).
-    // Ask for the next page once the reader nears the end, and report the settled visible row
-    // so later replacements keep it in place instead of resetting to the top.
-    val chatListWindowView = if (showArchived) ChatListViewFfi.ARCHIVED else ChatListViewFfi.CHATS
+    // Page in either direction near a retained edge, and report the settled visible row so later
+    // replacements keep it in place instead of resetting to the top.
+    LaunchedEffect(chatListState, controller, chatListWindowView, hasEarlierChats) {
+        snapshotFlow {
+            val firstVisibleIndex =
+                chatListState.layoutInfo.visibleItemsInfo
+                    .firstOrNull()
+                    ?.index
+                    ?: -1
+            firstVisibleIndex to currentSearchActive
+        }.distinctUntilChanged()
+            .collect { (firstVisibleIndex, searching) ->
+                if (
+                    shouldPageChatListBackward(
+                        firstVisibleIndex = firstVisibleIndex,
+                        hasMoreBefore = hasEarlierChats,
+                        searchActive = searching,
+                        prefetchRows = CHAT_LIST_WINDOW_PREFETCH_ROWS,
+                    )
+                ) {
+                    controller.loadEarlierChats(chatListWindowView)
+                }
+            }
+    }
     LaunchedEffect(chatListState, controller, chatListWindowView) {
         snapshotFlow {
             val info = chatListState.layoutInfo
@@ -1000,9 +1031,6 @@ internal fun ChatsScreen(
     // The list also holds the inline load-error row, the pinned boundary and search headers, so the
     // settled row is resolved by its item key rather than by index. Search rows are a filtered projection
     // of the window and are never reported as its anchor.
-    val currentVisibleItems by rememberUpdatedState(visibleItems)
-    val currentVisibleChatIds by rememberUpdatedState(visibleChatIds)
-    val currentSearchActive by rememberUpdatedState(searchActive)
     LaunchedEffect(chatListState, controller, chatListWindowView) {
         snapshotFlow {
             val settledRowId =
