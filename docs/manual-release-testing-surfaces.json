@@ -4739,6 +4739,22 @@
         ]
       },
       {
+        "surface": "ReactionDetailsContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+        "anchor": "fun ReactionDetailsContent(",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "ReactionFilterChips",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+        "anchor": "fun ReactionFilterChips(",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
         "surface": "ReactionParticipantRow",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
         "anchor": "fun ReactionParticipantRow(",
@@ -12294,6 +12310,14 @@
         "anchor": "R.string.view_reactors",
         "test_ids": [
           "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:reaction_filter_all",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+        "anchor": "R.string.reaction_filter_all",
+        "test_ids": [
+          "MSG-005"
         ]
       },
       {
