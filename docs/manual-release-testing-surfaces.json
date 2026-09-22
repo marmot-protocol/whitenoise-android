@@ -2266,6 +2266,14 @@
         ]
       },
       {
+        "surface": "Notification message route broad-snapshot authority",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/InactiveNotificationRouteStage.kt",
+        "anchor": "fun notificationMessageRouteChatListReady(",
+        "test_ids": [
+          "NTF-009"
+        ]
+      },
+      {
         "surface": "ConversationScreen",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "anchor": "fun ConversationScreen(",

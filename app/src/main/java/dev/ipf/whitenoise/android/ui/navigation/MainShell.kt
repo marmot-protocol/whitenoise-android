@@ -823,7 +823,6 @@ internal fun MainShell(
                 notificationMessageRouteChatListReady(
                     chatListReady = broadChatListReady,
                     targetPresent = target.groupIdHex in availableGroupIds,
-                    preloadState = exactPreloadState,
                 )
             } else {
                 broadChatListReady
@@ -1173,6 +1172,13 @@ internal fun MainShell(
                                     }
                                 }
                             }
+                        } else {
+                            // The exact read has answered inconclusively and its one retry is
+                            // spent. Inconclusive is not terminal: release the routing overlay and
+                            // leave the tap pending for a later chat-list update to resolve,
+                            // rather than claiming a conversation that may well exist is gone.
+                            releaseNotificationFirstFrameGate(routingRequestId)
+                            routingNotification = false
                         }
                     }
                     null -> {

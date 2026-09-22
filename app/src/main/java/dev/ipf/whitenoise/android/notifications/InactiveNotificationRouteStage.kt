@@ -25,20 +25,20 @@ internal fun notificationPreloadStuckLoading(
     key: NotificationMessagePreloadKey?,
 ): Boolean = preload.stateFor(key) is NotificationMessagePreloadState.Loading
 
-/** A broad-list absence cannot outrun an exact in-flight or completed target read. */
+/**
+ * A ready broad snapshot decides a message route only for a target it actually contains.
+ *
+ * The broad chat list can be bound to the right account, finished loading, and still not carry a
+ * row that the exact per-group projection would find. Absence there is therefore not evidence that
+ * the conversation is gone, and treating it as evidence is how a tap on a live conversation came
+ * back with "That conversation is no longer available". An absent target hands the decision to the
+ * exact per-group read instead, whose two inconclusive outcomes keep the tap pending rather than
+ * inventing a terminal answer.
+ */
 internal fun notificationMessageRouteChatListReady(
     chatListReady: Boolean,
     targetPresent: Boolean,
-    preloadState: NotificationMessagePreloadState<*>?,
-): Boolean =
-    chatListReady &&
-        (
-            targetPresent ||
-                (
-                    preloadState !is NotificationMessagePreloadState.Loading &&
-                        preloadState !is NotificationMessagePreloadState.Ready
-                )
-        )
+): Boolean = chatListReady && targetPresent
 
 /** A failed pre-activation read gets one exact retry after the target account becomes active. */
 internal fun shouldRetryNotificationMessageLoadAfterActivation(
