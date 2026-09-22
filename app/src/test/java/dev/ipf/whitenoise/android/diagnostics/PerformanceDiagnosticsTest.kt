@@ -233,7 +233,7 @@ class PerformanceDiagnosticSchemaTest {
         emitter.stop()
 
         assertEquals(PerformanceDiagnosticEmitter.SESSION_EVENT_LIMIT, emitter.output.snapshot().size)
-        assertTrue(emitter.output.snapshot().all { it.startsWith("schema=1 ") })
+        assertTrue(emitter.output.snapshot().all { it.startsWith("schema=2 ") })
         assertTrue(emitter.output.snapshot().none { "payload=" in it || "account=" in it || "token=" in it })
     }
 
