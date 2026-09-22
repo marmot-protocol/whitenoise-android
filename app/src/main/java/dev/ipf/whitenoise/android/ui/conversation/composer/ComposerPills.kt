@@ -1223,7 +1223,7 @@ internal fun ComposerPill(
         }
 
         if (inputContentVisible && !multilineControlsSuppressed) {
-            if (expandedLayout) {
+            if (composerCanResize) {
                 Box(
                     modifier =
                         Modifier

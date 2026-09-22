@@ -65,7 +65,7 @@ class ComposerResizeHandleTest {
         render(ComposerExpansionMode.Manual, draft = "Line one\nLine two\nLine three")
         val semantics =
             composeRule
-                .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
+                .onNodeWithTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG, useUnmergedTree = true)
                 .fetchSemanticsNode()
                 .config
         val actions = semantics.getOrNull(SemanticsActions.CustomActions)

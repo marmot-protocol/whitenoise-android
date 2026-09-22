@@ -32,6 +32,7 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
+import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_ACCESSIBILITY_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -178,10 +179,10 @@ class ComposerPrototypeGeometryTest {
         capture("composer_prototype_narrow_large_rtl")
     }
 
-    /** Compact mode retains native expansion through the surface accessibility action. */
+    /** A compact two-line draft expands through the dedicated accessibility action. */
     @Test
     fun compactSurfaceCanExpandAndCollapseWithoutChangingTheDraftOrSelection() {
-        val value = TextFieldValue("Short draft", TextRange(2, 5))
+        val value = TextFieldValue("Short draft\nsecond line", TextRange(2, 5))
         val state = ComposerTextState(value)
         render(state)
         val originalHeight =
@@ -191,7 +192,7 @@ class ComposerPrototypeGeometryTest {
                 .boundsInRoot.height
         val actions =
             composeRule
-                .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
+                .onNodeWithTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG, useUnmergedTree = true)
                 .fetchSemanticsNode()
                 .config[SemanticsActions.CustomActions]
         composeRule.runOnIdle { assertTrue(actions.single().action()) }
@@ -204,7 +205,7 @@ class ComposerPrototypeGeometryTest {
         assertTrue(expandedHeight > originalHeight)
         val collapseAction =
             composeRule
-                .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
+                .onNodeWithTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG, useUnmergedTree = true)
                 .fetchSemanticsNode()
                 .config[SemanticsActions.CustomActions]
                 .single()

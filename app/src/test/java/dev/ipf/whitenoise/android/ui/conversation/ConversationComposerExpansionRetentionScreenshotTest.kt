@@ -614,8 +614,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
     /** Invokes the named resize path retained for accessibility services. */
     private fun performAccessibleResizeAction() {
         val action =
-            composeRule
-                .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
+            resizeHandle()
                 .fetchSemanticsNode()
                 .config[SemanticsActions.CustomActions]
                 .single()

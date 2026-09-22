@@ -17,7 +17,6 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
@@ -26,7 +25,6 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MessageTextCopy
-import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
@@ -268,8 +266,7 @@ class ComposerSendAcceptanceBoundaryTest {
     /** Invokes the named resize path retained for accessibility services. */
     private fun performAccessibleResizeAction() {
         val action =
-            composeRule
-                .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
+            resizeHandle()
                 .fetchSemanticsNode()
                 .config[SemanticsActions.CustomActions]
                 .single()

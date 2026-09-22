@@ -168,7 +168,7 @@ class ConversationComposerFullScreenRetentionScreenshotTest {
     private fun performAccessibleResizeAction() {
         val action =
             composeRule
-                .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
+                .onNodeWithContentDescription(context.getString(R.string.composer_resize))
                 .fetchSemanticsNode()
                 .config[SemanticsActions.CustomActions]
                 .single()
