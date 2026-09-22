@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 import androidx.compose.runtime.withFrameNanos
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.ConversationPagingOrigin
 import dev.ipf.whitenoise.android.state.returnToLatestWindow
 import kotlinx.coroutines.CancellationException
 
@@ -27,7 +28,9 @@ internal suspend fun ConversationScrollCoordinator.revealSentAtLiveTail(
         prepareLatest = {
             loadConversationTimelineToNewest(
                 hasMoreAfter = { controller.hasMoreAfterTimeline },
-                loadNewer = controller::loadNewerTimelinePage,
+                // The reveal follows a send rather than a request for newer pages, so a window the
+                // engine cannot answer recovers quietly instead of reporting a paging failure (#2764).
+                loadNewer = { controller.loadNewerTimelinePage(ConversationPagingOrigin.AUTOMATIC) },
                 returnToLatest = controller::returnToLatestWindow,
             )
         },

@@ -41,6 +41,29 @@ internal fun shouldPrefetchOlder(
     return canPage && idle && withinMargin
 }
 
+/**
+ * Whether the reader is close enough to the newest loaded row to fetch the page ahead of it.
+ *
+ * [newerPrefetchBlocked] is the forward counterpart of the older-page block (#2764): a send lands
+ * the viewport on the newest edge, so a forward page the engine cannot answer would otherwise be
+ * asked for again on every layout pass. The block releases as soon as any forward page advances,
+ * and it never stands in the way of a deliberate newer-page navigation or retry.
+ */
+internal fun shouldPrefetchNewer(
+    anchored: Boolean,
+    hasMoreAfter: Boolean,
+    isLoadingOlder: Boolean,
+    newerPrefetchBlocked: Boolean,
+    newestVisibleIndex: Int,
+    newestEdgeIndex: Int,
+): Boolean {
+    val canPage = anchored && hasMoreAfter
+    val idle = !isLoadingOlder && !newerPrefetchBlocked
+    // Reversed list: the newest edge is the low-index end, so the lowest visible row approaches it.
+    val withinMargin = newestVisibleIndex <= newestEdgeIndex + NEWER_PAGE_PREFETCH_ROWS - 1
+    return canPage && idle && withinMargin
+}
+
 /** Prefix of an ordinary message row's list key. */
 private const val MESSAGE_KEY_PREFIX = "msg:"
 

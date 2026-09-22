@@ -10669,7 +10669,7 @@ class ConversationController(
     suspend fun loadOlderTimelinePage(): Boolean = loadOlderPage()
 
     /** Pages the subscription window newer; true when the window actually advanced. */
-    suspend fun loadNewerTimelinePage(): Boolean = loadNewerPage()
+    suspend fun loadNewerTimelinePage(origin: ConversationPagingOrigin = ConversationPagingOrigin.EXPLICIT): Boolean = loadNewerPage(origin)
 
     suspend fun loadUntilMessageAvailable(
         messageIdHex: String,
@@ -10828,7 +10828,15 @@ class ConversationController(
      */
     private suspend fun loadOlderPage(anchorMessageIdHex: String? = null): Boolean = loadOlderPageInternal(anchorMessageIdHex) == ConversationPageLoad.ADVANCED
 
-    private suspend fun loadNewerPage(): Boolean = loadNewerPageInternal() == ConversationPageLoad.ADVANCED
+    private suspend fun loadNewerPage(origin: ConversationPagingOrigin = ConversationPagingOrigin.EXPLICIT): Boolean =
+        loadNewerPageInternal(origin) == ConversationPageLoad.ADVANCED
+
+    // Bounds the opportunistic forward prefetch after a failure the reader is never shown (#2764).
+    internal val automaticNewerPaging = AutomaticNewerPagingGuard()
+
+    /** Whether viewport-driven forward prefetch should stand down until a page advances. */
+    val automaticNewerPagingBlocked: Boolean
+        get() = automaticNewerPaging.blocked
 
     /**
      * Whether an older page failed in a way the reader must retry.
