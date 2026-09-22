@@ -2140,6 +2140,13 @@ class WhiteNoiseAppState private constructor(
     private val acceptedPendingTextOptimisticIdsByConversation =
         mutableMapOf<String, MutableMap<String, String>>()
 
+    // Stable client-key phase for each optimistic send. The controller keeps
+    // this beside the retained optimistic row so a replacement conversation
+    // can still distinguish cancellable pre-acceptance work from an intent
+    // already owned by MDK.
+    private val optimisticSendPhasesByConversation =
+        mutableMapOf<String, MutableMap<String, OptimisticSendPhase>>()
+
     // Retained-upload bytes survive screen disposal so a user who navigates
     // out of a chat mid-send and returns sees the pending bubble still carry
     // its preview/filename instead of an empty placeholder. Cap (and sizeOf
@@ -2803,6 +2810,15 @@ class WhiteNoiseAppState private constructor(
             acceptedPendingTextOptimisticIdsByConversation.getOrPut(key) { mutableMapOf() }
         }
 
+    internal fun optimisticSendPhases(
+        accountRef: String?,
+        groupIdHex: String,
+    ): MutableMap<String, OptimisticSendPhase> =
+        synchronized(conversationStateLock) {
+            val key = retainConversationState(accountRef, groupIdHex)
+            optimisticSendPhasesByConversation.getOrPut(key) { mutableMapOf() }
+        }
+
     /** Resolves a delivered chat-list projection to the exact accepted-pending optimistic send. */
     internal fun acceptedPendingTextOptimisticId(
         accountRef: String?,
@@ -2902,6 +2918,7 @@ class WhiteNoiseAppState private constructor(
         optimisticSendPositionPreservesByConversation.remove(staleKey)
         retentionAtSendByConversation.remove(staleKey)
         acceptedPendingTextOptimisticIdsByConversation.remove(staleKey)
+        optimisticSendPhasesByConversation.remove(staleKey)
         retainedMediaUploadsByConversation.remove(staleKey)
         activeUploadKeysByConversation.remove(staleKey)
         pendingProjectionsAwaitingBridgeByConversation.remove(staleKey)
@@ -5434,6 +5451,8 @@ class WhiteNoiseAppState private constructor(
             retentionAtSendByConversation.clear()
             acceptedPendingTextOptimisticIdsByConversation.values.forEach { it.clear() }
             acceptedPendingTextOptimisticIdsByConversation.clear()
+            optimisticSendPhasesByConversation.values.forEach { it.clear() }
+            optimisticSendPhasesByConversation.clear()
         }
         // Cancel any in-flight downloads (their Deferred may hold plaintext or
         // a retained-media outcome) and drop both indexes so the next session

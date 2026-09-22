@@ -394,7 +394,7 @@ internal fun MessageBubble(
         if (readOnly) {
             MessageDeleteCapability(canDeleteForMe = false, canDeleteForEveryone = false)
         } else {
-            controller.deleteCapabilityFor(record, alreadyDeleted = deleted)
+            controller.deleteCapabilityFor(record, alreadyDeleted = deleted, optimisticKeyOverride = item.id)
         }
     val tombstoneCleanupUnavailable = deleted && !deleteCapability.canDeleteForMe
     // Convergence reasons and local publish failures keep their content and
@@ -1024,7 +1024,7 @@ internal fun MessageBubble(
         // the optimistic tombstone rollback restores the bubble either way.
         appState.launchMutation {
             try {
-                val removed = controller.deleteMessage(record)
+                val removed = controller.deleteMessage(record, optimisticKeyOverride = item.id)
                 if (removed) deleteDialogOpen = false
             } finally {
                 // Cancellation must not leave the flag stuck true, which would

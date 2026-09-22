@@ -662,7 +662,7 @@ class ConversationSendRetryIntegrationTest {
         }
 
     @Test
-    fun discardingAnInFlightRetryStillClearsTheDraftAfterDurableAcceptance() =
+    fun retryAdmissionWinsAgainstAStaleDiscardAction() =
         runTest {
             val appState = appState()
             appState.setDraft(GROUP_ID, TextFieldValue("discard while retrying"))
@@ -695,15 +695,152 @@ class ConversationSendRetryIntegrationTest {
             val retry = async { controller.retryFailedSend(failedItem) }
             retryStarted.await()
 
-            controller.discardFailedSend(failedItem)
-            assertEquals(emptyList<TimelineMessage>(), controller.timeline)
-            assertEquals("discard while retrying", appState.draftFor(GROUP_ID))
+            val discard = async { controller.discardFailedSend(failedItem) }
+            runCurrent()
+            assertFalse(discard.isCompleted)
 
             acceptRetry.complete(Unit)
             retry.await()
+            discard.await()
 
             assertEquals(null, appState.draftFor(GROUP_ID))
-            assertEquals(emptyList<TimelineMessage>(), controller.timeline)
+            assertEquals(MessageStatus.Sent, controller.timeline.single().status)
+            assertEquals(
+                CONFIRMED_MESSAGE_ID,
+                controller.timeline
+                    .single()
+                    .record.messageIdHex,
+            )
+        }
+
+    @Test
+    fun cancellationBeforeAdmissionPreventsTextAndReplyPublication() =
+        runTest {
+            val parseStarted = CompletableDeferred<Unit>()
+            val releaseParse = CompletableDeferred<Unit>()
+            var publishCalls = 0
+            val controller =
+                ConversationController(
+                    appState = appState(),
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    markdownParser = {
+                        parseStarted.complete(Unit)
+                        releaseParse.await()
+                        MarkdownDocumentFfi(
+                            truncated = false,
+                            blocks = emptyList(),
+                            blankLinesBefore = ByteArray(0),
+                        )
+                    },
+                    textPublisher = { _, _, _, _ ->
+                        publishCalls += 1
+                        successfulSendSummary()
+                    },
+                )
+            controller.replyingTo = timelineAppMessage(REPLY_MESSAGE_ID)
+
+            val send = async(start = CoroutineStart.UNDISPATCHED) { controller.send("cancel this reply") }
+            parseStarted.await()
+            val pending = controller.timeline.single().record
+
+            assertTrue(controller.deleteMessage(pending, presentFailure = false))
+            assertTrue(controller.deleteMessage(pending, presentFailure = false))
+            assertTrue(controller.timeline.isEmpty())
+
+            releaseParse.complete(Unit)
+            send.await()
+
+            assertEquals(0, publishCalls)
+            assertTrue(controller.timeline.isEmpty())
+        }
+
+    @Test
+    fun cancelledSendTombstonesStayBounded() =
+        runTest {
+            val appState = appState()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        throw MarmotKitException.Publish("relay rejected event")
+                    },
+                )
+
+            repeat(70) { index ->
+                controller.send("cancel failed send $index")
+                controller.discardFailedSend(controller.timeline.single())
+            }
+
+            val phases = appState.optimisticSendPhases(ACCOUNT_REF, GROUP_ID)
+            assertEquals(64, phases.size)
+            assertTrue(phases.values.all { it == OptimisticSendPhase.CANCELLED })
+        }
+
+    @Test
+    fun staleFailedActionUsesTheStableOptimisticKeyAfterRecordRefresh() =
+        runTest {
+            val appState = appState()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        throw MarmotKitException.Publish("relay rejected event")
+                    },
+                )
+            controller.send("retry refresh")
+            val captured = controller.timeline.single()
+            val refreshed =
+                captured.copy(
+                    record = captured.record.copy(messageIdHex = "00000000-0000-4000-8000-000000000001"),
+                )
+            appState.optimisticMessages(ACCOUNT_REF, GROUP_ID)[captured.id] = refreshed
+
+            assertTrue(
+                controller
+                    .deleteCapabilityFor(refreshed.record, optimisticKeyOverride = captured.id)
+                    .canDeleteForEveryone,
+            )
+            controller.discardFailedSend(captured)
+
+            assertTrue(controller.timeline.isEmpty())
+        }
+
+    @Test
+    fun acceptedPendingAdmissionRejectsDeletionAndRetainsTheBubble() =
+        runTest {
+            val admissionStarted = CompletableDeferred<Unit>()
+            val finishAdmission = CompletableDeferred<Unit>()
+            val controller =
+                ConversationController(
+                    appState = appState(),
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        admissionStarted.complete(Unit)
+                        finishAdmission.await()
+                        pendingLocalSend()
+                    },
+                )
+            val send = async(start = CoroutineStart.UNDISPATCHED) { controller.send("durably queued") }
+            admissionStarted.await()
+            val pending = controller.timeline.single().record
+
+            val deletion = async { controller.deleteMessage(pending, presentFailure = false) }
+            runCurrent()
+            assertFalse(deletion.isCompleted)
+            finishAdmission.complete(Unit)
+            send.await()
+
+            assertFalse(deletion.await())
+            assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+            val capability = controller.deleteCapabilityFor(controller.timeline.single().record)
+            assertFalse(capability.canDeleteForEveryone)
+            assertFalse(capability.canDeleteForMe)
         }
 
     @Test
