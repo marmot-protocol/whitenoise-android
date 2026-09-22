@@ -235,8 +235,9 @@ fast exit only; it does not measure energy impact.
 Those observations apply to the recorded 2026-09-20 candidate. Device and battery qualification
 was not repeated after the latest 2026-09-22 master rebase, so it is not current-head evidence.
 
-The current-head Dev APK was built for arm64 from `958e9dc41549587b0591bb07eed8a90ae4c50172`,
-with SHA-256 `297e6ac7a31aaf8307230fab237365719e353211dcb89379662a9c73994a1bd1`. It reports package
+The rebased Dev APK was built for arm64 from app-source commit
+`b193dd93b93084f993e2695bb24bc1895211a3a3`, with SHA-256
+`387a77d12045746811bcea02edb2b06c59b7e0b3bff684308e6aa8b5a09ada21`. It reports package
 `dev.ipf.whitenoise.android.dev`, version `2026.9.21-dev-debug`, version code 19, and arm64-v8a.
 This exact candidate was installed in place on Pixel `46131FDAS003CG` with `adb install -r -t`.
 The installed APK hash matches the candidate, the signing certificate and native library match
@@ -264,8 +265,9 @@ the preserved pre-install APK SHA-256 is
   this candidate under the original open-chat reproduction, so that issue is not claimed fixed.
 - Authoritative already-read notification suppression remains deferred with its native
   dependency. Existing eligibility and cancellation behavior remains unchanged.
-- Live Project 7 item data verified on 2026-09-21 that issue #2676 and pull request #2712 are each
-  present once with `In Progress` status. No merge or release was created.
+- Live Project 7 item data verified on 2026-09-22 that issues #2503, #2675, #2676, parent
+  tracker #2692, and pull request #2712 are present with `In Progress` status. No merge or
+  release was created.
 
 ## Source and artifacts
 
