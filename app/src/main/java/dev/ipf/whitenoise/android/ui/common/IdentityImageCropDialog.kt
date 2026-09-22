@@ -15,12 +15,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -83,7 +86,7 @@ internal fun IdentityImageCropDialog(
                         .windowInsetsPadding(WindowInsets.safeDrawing)
                         .testTag("identity_crop.dialog"),
             ) {
-                IdentityImageCropTopBar(onDismiss = onDismiss)
+                IdentityImageCropTopBar(onDismiss = onDismiss, onConfirm = { onConfirm(crop) })
                 Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     IdentityImageCropCanvas(
                         preview = preview,
@@ -93,32 +96,38 @@ internal fun IdentityImageCropDialog(
                         onCrop = { transform -> crop = transform(crop) },
                     )
                 }
-                IdentityImageCropActions(
-                    onRotate = { crop = crop.rotatedClockwise() },
-                    onConfirm = { onConfirm(crop) },
-                )
+                IdentityImageCropActions(onRotate = { crop = crop.rotatedClockwise() })
             }
         }
     }
 }
 
-/** Leaves by the same close affordance the rest of the app's full-screen flows use. */
+/**
+ * Close, title and accept, laid out the way the conversation photo editor already does it.
+ *
+ * Accepting is a text action rather than a filled task button: this is an editor being dismissed
+ * with a result, not a form being submitted, and the app bar is where its flows put that.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming")
 @Composable
-private fun IdentityImageCropTopBar(onDismiss: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = IdentityImageCropDefaults.MaskInset),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconButton(onClick = onDismiss, modifier = Modifier.testTag("identity_crop.cancel")) {
-            Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.cancel))
-        }
-        Text(
-            text = stringResource(R.string.photo_editor_crop),
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(start = IdentityImageCropDefaults.MaskInset),
-        )
-    }
+private fun IdentityImageCropTopBar(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    TopAppBar(
+        title = { Text(stringResource(R.string.photo_editor_crop)) },
+        navigationIcon = {
+            IconButton(onClick = onDismiss, modifier = Modifier.testTag("identity_crop.cancel")) {
+                Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.close))
+            }
+        },
+        actions = {
+            TextButton(onClick = onConfirm, modifier = Modifier.testTag("identity_crop.confirm")) {
+                Text(stringResource(R.string.done))
+            }
+        },
+    )
 }
 
 /** The masked square that shows exactly the pixels the crop selects. */
@@ -186,16 +195,13 @@ private fun IdentityImageCropCanvas(
     }
 }
 
-/** Turning is a quiet icon beside the one action that finishes the job. */
+/** Turning sits under the picture, the only control the canvas itself needs. */
 @Suppress("FunctionNaming")
 @Composable
-private fun IdentityImageCropActions(
-    onRotate: () -> Unit,
-    onConfirm: () -> Unit,
-) {
+private fun IdentityImageCropActions(onRotate: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(IdentityImageCropDefaults.EdgePadding),
-        horizontalArrangement = Arrangement.spacedBy(IdentityImageCropDefaults.ActionSpacing),
+        horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         FilledTonalIconButton(onClick = onRotate, modifier = Modifier.testTag("identity_crop.rotate")) {
@@ -203,12 +209,6 @@ private fun IdentityImageCropActions(
                 painterResource(R.drawable.ic_refresh),
                 contentDescription = stringResource(R.string.photo_editor_rotate_clockwise),
             )
-        }
-        WhiteNoiseButton(
-            onClick = onConfirm,
-            modifier = Modifier.weight(1f).testTag("identity_crop.confirm"),
-        ) {
-            Text(stringResource(R.string.done))
         }
     }
 }

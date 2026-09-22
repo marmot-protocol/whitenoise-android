@@ -6367,9 +6367,9 @@
         ]
       },
       {
-        "surface": "string:identity_crop_cancel",
+        "surface": "string:identity_crop_close",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
-        "anchor": "R.string.cancel",
+        "anchor": "R.string.close",
         "test_ids": [
           "PRO-002",
           "GRP-003"
