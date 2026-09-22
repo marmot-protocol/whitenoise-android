@@ -584,6 +584,22 @@
         ]
       },
       {
+        "surface": "Bounded profile banner decode variant",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/AvatarImageLoader.kt",
+        "anchor": "fun profileBannerDecodeDimension(",
+        "test_ids": [
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "Profile banner decode target from the rendered box",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileBannerDecodeTarget.kt",
+        "anchor": "fun profileBannerTargetWidthPx(",
+        "test_ids": [
+          "PRO-002"
+        ]
+      },
+      {
         "surface": "R.string.profile_mute_in_group",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
         "anchor": "R.string.profile_mute_in_group",

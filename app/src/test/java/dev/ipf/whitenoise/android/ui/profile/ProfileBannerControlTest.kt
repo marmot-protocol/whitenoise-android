@@ -120,7 +120,7 @@ class ProfileBannerControlTest {
                     bannerUrl = "https://example.com/banner.jpg",
                     isValid = true,
                     isUploading = isUploading,
-                    imageLoader = { ImageBitmap(3, 1) },
+                    imageLoader = { _, _ -> ImageBitmap(3, 1) },
                     onClick = {},
                 )
             }
@@ -141,7 +141,7 @@ class ProfileBannerControlTest {
                     bannerUrl = "https://example.com/banner.jpg",
                     isValid = true,
                     isUploading = false,
-                    imageLoader = { null },
+                    imageLoader = { _, _ -> null },
                     onClick = {},
                 )
             }
@@ -161,7 +161,7 @@ class ProfileBannerControlTest {
                     bannerUrl = bannerUrl,
                     isValid = true,
                     isUploading = false,
-                    imageLoader = { url ->
+                    imageLoader = { url, _ ->
                         loadedUrls += url
                         ImageBitmap(2, 1)
                     },
@@ -181,5 +181,31 @@ class ProfileBannerControlTest {
 
         composeRule.runOnIdle { bannerUrl = null }
         composeRule.onNodeWithText(app.getString(R.string.profile_banner_placeholder)).assertIsDisplayed()
+    }
+
+    /** A 3x device asks the loader for the physical width it draws, not for the avatar cap (#2762). */
+    @Test
+    @Config(qualifiers = "en-w360dp-h780dp-xxhdpi")
+    fun bannerAsksTheLoaderForItsRenderedPhysicalWidth() {
+        val requestedWidths = mutableListOf<Int>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ProfileBannerControl(
+                    bannerUrl = "https://example.com/banner.jpg",
+                    isValid = true,
+                    isUploading = false,
+                    imageLoader = { _, targetWidthPx ->
+                        requestedWidths += targetWidthPx
+                        ImageBitmap(targetWidthPx, targetWidthPx / 2)
+                    },
+                    onClick = {},
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(listOf(app.resources.displayMetrics.widthPixels), requestedWidths)
+        assertTrue("a 3x banner must ask for far more than the 512px avatar cap", requestedWidths.first() > 512)
+        composeRule.onNodeWithTag(PROFILE_BANNER_CONTROL_TAG).assertIsDisplayed()
     }
 }

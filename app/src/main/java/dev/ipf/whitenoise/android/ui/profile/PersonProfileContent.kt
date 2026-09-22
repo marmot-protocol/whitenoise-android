@@ -269,9 +269,12 @@ private fun PersonProfileIdentity(
 ) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val avatarSize = (maxWidth * 0.32f).coerceIn(104.dp, 152.dp)
+        // The banner is inset from the hero's full width, so its bounded decode
+        // is derived from the box it actually fills (#2762).
+        val bannerWidthPx = profileBannerTargetWidthPx(maxWidth - WhiteNoiseSpacing.CompactScreenMargin * 2)
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             person.bannerUrl?.let { url ->
-                val banner = rememberProfileBannerLoadState(url)
+                val banner = rememberProfileBannerLoadState(url, bannerWidthPx)
                 if (banner.visible) {
                     Box(
                         Modifier

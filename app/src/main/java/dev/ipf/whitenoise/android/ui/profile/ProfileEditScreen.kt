@@ -49,6 +49,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -127,12 +128,18 @@ internal fun ProfileBannerControl(
     isUploading: Boolean,
     isProfileLoaded: Boolean = true,
     showValidationError: Boolean = true,
-    imageLoader: suspend (String) -> ImageBitmap? = { AvatarImageLoader.load(it) },
+    imageLoader: suspend (String, Int) -> ImageBitmap? = AvatarImageLoader::loadBanner,
     onClick: () -> Unit,
 ) {
-    var bannerImage by remember(bannerUrl) { mutableStateOf(AvatarImageLoader.peek(bannerUrl)) }
-    LaunchedEffect(bannerUrl) {
-        if (bannerImage == null && bannerUrl != null) bannerImage = imageLoader(bannerUrl)
+    // A 2:1 banner fills the screen's width, so it is decoded for that box
+    // rather than through the avatar cap it used to share (#2762).
+    val targetWidthPx = profileBannerTargetWidthPx(LocalConfiguration.current.screenWidthDp.dp)
+    var bannerImage by
+        remember(bannerUrl, targetWidthPx) {
+            mutableStateOf(AvatarImageLoader.peekBanner(bannerUrl, targetWidthPx))
+        }
+    LaunchedEffect(bannerUrl, targetWidthPx) {
+        if (bannerImage == null && bannerUrl != null) bannerImage = imageLoader(bannerUrl, targetWidthPx)
     }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,

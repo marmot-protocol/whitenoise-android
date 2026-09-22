@@ -16,6 +16,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -1069,17 +1070,24 @@ internal data class ProfileBannerLoadState(
     val visible: Boolean get() = image != null || !settled
 }
 
+/**
+ * Banner load state for a surface [targetWidthPx] physical pixels wide.
+ *
+ * The width selects the loader's bounded banner decode, so the image is resolved for the box it
+ * actually fills instead of being upscaled from the avatar cap (#2762).
+ */
 @Composable
 internal fun rememberProfileBannerLoadState(
     bannerUrl: String,
-    peek: (String) -> ImageBitmap? = AvatarImageLoader::peek,
-    load: suspend (String) -> ImageBitmap? = AvatarImageLoader::load,
+    targetWidthPx: Int,
+    peek: (String, Int) -> ImageBitmap? = AvatarImageLoader::peekBanner,
+    load: suspend (String, Int) -> ImageBitmap? = AvatarImageLoader::loadBanner,
 ): ProfileBannerLoadState {
-    var image by remember(bannerUrl) { mutableStateOf(peek(bannerUrl)) }
-    var settled by remember(bannerUrl) { mutableStateOf(image != null) }
-    LaunchedEffect(bannerUrl) {
+    var image by remember(bannerUrl, targetWidthPx) { mutableStateOf(peek(bannerUrl, targetWidthPx)) }
+    var settled by remember(bannerUrl, targetWidthPx) { mutableStateOf(image != null) }
+    LaunchedEffect(bannerUrl, targetWidthPx) {
         if (image == null) {
-            image = load(bannerUrl)
+            image = load(bannerUrl, targetWidthPx)
             settled = true
         }
     }
@@ -1090,10 +1098,13 @@ internal fun rememberProfileBannerLoadState(
 @Suppress("FunctionNaming")
 internal fun ProfileBannerImage(
     bannerUrl: String,
-    peek: (String) -> ImageBitmap? = AvatarImageLoader::peek,
-    load: suspend (String) -> ImageBitmap? = AvatarImageLoader::load,
+    peek: (String, Int) -> ImageBitmap? = AvatarImageLoader::peekBanner,
+    load: suspend (String, Int) -> ImageBitmap? = AvatarImageLoader::loadBanner,
 ) {
-    ProfileBannerImage(rememberProfileBannerLoadState(bannerUrl, peek, load))
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val targetWidthPx = profileBannerTargetWidthPx(maxWidth)
+        ProfileBannerImage(rememberProfileBannerLoadState(bannerUrl, targetWidthPx, peek, load))
+    }
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)

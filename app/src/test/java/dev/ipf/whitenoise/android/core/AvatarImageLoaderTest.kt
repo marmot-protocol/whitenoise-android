@@ -9,6 +9,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -217,6 +218,105 @@ class AvatarImageLoaderTest {
             assertNotNull(AvatarImageLoader.load(url))
             assertEquals(1, fetchCount)
         }
+
+    /** An avatar entry can never answer a banner request for the same URL (#2762). */
+    @Test
+    fun cachedAvatarNeverSatisfiesABannerRequest() =
+        runBlocking {
+            val fetches = AtomicInteger()
+            val url = "https://profiles.example/variant-banner.png"
+            AvatarImageLoader.attachProfileImageFetcher { _, _ ->
+                fetches.incrementAndGet()
+                Base64.getDecoder().decode(ONE_PIXEL_PNG_BASE64)
+            }
+
+            assertNotNull(AvatarImageLoader.load(url))
+            assertNull("an avatar entry must not be visible to a banner peek", AvatarImageLoader.peekBanner(url, 1080))
+            assertNotNull(AvatarImageLoader.loadBanner(url, 1080))
+
+            assertEquals(2, fetches.get())
+            assertNotNull(AvatarImageLoader.peek(url))
+            assertNotNull(AvatarImageLoader.peekBanner(url, 1080))
+        }
+
+    /** Banner widths that round into one bucket share a decode; different buckets keep their own. */
+    @Test
+    fun compatibleBannerRequestsCoalesceWhileDifferentBucketsDoNot() =
+        runBlocking {
+            val fetches = AtomicInteger()
+            val released = CompletableDeferred<Unit>()
+            val url = "https://profiles.example/coalescing-banner.png"
+            AvatarImageLoader.attachProfileImageFetcher { _, _ ->
+                fetches.incrementAndGet()
+                released.await()
+                Base64.getDecoder().decode(ONE_PIXEL_PNG_BASE64)
+            }
+
+            val compatible =
+                listOf(1030, 1080, 1280).map { width ->
+                    async(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
+                        AvatarImageLoader.loadBanner(url, width)
+                    }
+                }
+            released.complete(Unit)
+            withTimeout(5_000) { compatible.awaitAll() }
+            assertEquals("widths in one bucket must share a single fetch", 1, fetches.get())
+
+            assertNotNull(withTimeout(5_000) { AvatarImageLoader.loadBanner(url, 1400) })
+            assertEquals("a wider bucket needs its own bounded decode", 2, fetches.get())
+        }
+
+    /** Account teardown retires every variant, not just the avatar entries. */
+    @Test
+    fun clearRetiresBannerEntriesAlongsideAvatars() =
+        runBlocking {
+            val url = "https://profiles.example/teardown-banner.png"
+            AvatarImageLoader.attachProfileImageFetcher { _, _ ->
+                Base64.getDecoder().decode(ONE_PIXEL_PNG_BASE64)
+            }
+            assertNotNull(AvatarImageLoader.load(url))
+            assertNotNull(AvatarImageLoader.loadBanner(url, 1080))
+
+            AvatarImageLoader.clear()
+
+            assertNull(AvatarImageLoader.peek(url))
+            assertNull(AvatarImageLoader.peekBanner(url, 1080))
+        }
+
+    /** Only the banner variant carries its target in the cache key, so avatar entries are untouched. */
+    @Test
+    fun profileImageCacheKeysSeparateVariantsAndTargets() {
+        val url = "https://profiles.example/keys.png"
+        assertEquals(url, profileImageCacheKey(url, ProfileImageVariant.AVATAR, 512))
+        assertNotEquals(
+            profileImageCacheKey(url, ProfileImageVariant.AVATAR, 512),
+            profileImageCacheKey(url, ProfileImageVariant.BANNER, 512),
+        )
+        assertNotEquals(
+            profileImageCacheKey(url, ProfileImageVariant.BANNER, 1024),
+            profileImageCacheKey(url, ProfileImageVariant.BANNER, 1280),
+        )
+    }
+
+    /** Requested widths round up into shared buckets, floored at the avatar cap and capped overall. */
+    @Test
+    fun bannerDecodeDimensionBucketsAndBoundsTheRequestedWidth() {
+        assertEquals(512, profileBannerDecodeDimension(0))
+        assertEquals(512, profileBannerDecodeDimension(-100))
+        assertEquals(512, profileBannerDecodeDimension(400))
+        assertEquals(1024, profileBannerDecodeDimension(1024))
+        assertEquals(1280, profileBannerDecodeDimension(1030))
+        assertEquals(1280, profileBannerDecodeDimension(1080))
+        assertEquals(PROFILE_BANNER_MAX_DIMENSION, profileBannerDecodeDimension(4000))
+    }
+
+    /** A wide banner keeps its full target, while a near-square source is cut back to fit the byte budget. */
+    @Test
+    fun boundedDecodeDimensionHonoursTheDecodedByteBudget() {
+        assertEquals(1536, boundedDecodeDimension(width = 4000, height = 2000, maxDimension = 1536))
+        assertEquals(768, boundedDecodeDimension(width = 4000, height = 4000, maxDimension = 1536))
+        assertEquals(512, boundedDecodeDimension(width = 4000, height = 4000, maxDimension = 512))
+    }
 
     private companion object {
         const val ONE_PIXEL_PNG_BASE64 =
