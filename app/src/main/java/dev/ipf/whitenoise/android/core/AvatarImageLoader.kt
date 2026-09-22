@@ -25,11 +25,14 @@ object AvatarImageLoader {
     // budgets the shared helpers below apply.
     private const val MAX_BANNER_BYTES = 4 * 1024 * 1024
 
-    // Byte-budgeted cache. With ~1MB worst-case decoded avatar and typical
-    // <400KB, the first 16MB holds dozens of avatars without unbounded memory
-    // growth; the second 8MB is the banner allowance, so a banner entry cannot
-    // evict the avatar working set that was sized against it.
-    private const val CACHE_SIZE_BYTES = 24 * 1024 * 1024
+    // Byte-budgeted cache, one budget per decode variant. With ~1MB worst-case
+    // decoded avatar and typical <400KB, 16MB holds dozens of avatars without
+    // unbounded memory growth — the size this cache has always been. Banners get
+    // their own 8MB rather than a share of that, because a single banner entry
+    // can be worth eight avatars and a combined LRU would let a run of them
+    // evict the avatar working set by plain recency (#2762).
+    private const val AVATAR_CACHE_SIZE_BYTES = 16 * 1024 * 1024
+    private const val BANNER_CACHE_SIZE_BYTES = 8 * 1024 * 1024
     private const val FAILURE_TTL_MS = 60_000L
     private const val FAILURE_CACHE_MAX_ENTRIES = 512
     private const val FETCH_CONCURRENCY = 4
@@ -40,13 +43,7 @@ object AvatarImageLoader {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val fetchGate = AvatarFetchGate(REGULAR_FETCH_CONCURRENCY, NOTIFICATION_FETCH_CONCURRENCY)
     private val lock = Any()
-    private val cache =
-        object : LruCache<String, ImageBitmap>(CACHE_SIZE_BYTES) {
-            override fun sizeOf(
-                key: String,
-                value: ImageBitmap,
-            ): Int = value.asAndroidBitmap().byteCount.coerceAtLeast(1)
-        }
+    private val cache = PartitionedProfileImageCache(AVATAR_CACHE_SIZE_BYTES, BANNER_CACHE_SIZE_BYTES)
     private val inFlight = mutableMapOf<String, AvatarInFlightRequest>()
 
     // staleness-exempt: captured request-lifetime tokens for bounded queued work, not a counter owner.
@@ -452,6 +449,9 @@ internal data class ProfileImageRequest(
     val cacheKey: String get() = profileImageCacheKey(url, variant, maxDimension)
 }
 
+/** Marks a banner cache key, so the partition an entry belongs to can be read back off its key. */
+private const val BANNER_CACHE_KEY_PREFIX = "banner:"
+
 /** Avatar entries keep the bare URL, so durable seeds and every existing caller are unchanged. */
 internal fun profileImageCacheKey(
     url: String,
@@ -460,8 +460,73 @@ internal fun profileImageCacheKey(
 ): String =
     when (variant) {
         ProfileImageVariant.AVATAR -> url
-        ProfileImageVariant.BANNER -> "banner:$maxDimension $url"
+        ProfileImageVariant.BANNER -> "$BANNER_CACHE_KEY_PREFIX$maxDimension $url"
     }
+
+/** The variant [cacheKey] was built for; an avatar key is the bare profile-image URL. */
+internal fun profileImageVariantOf(cacheKey: String): ProfileImageVariant =
+    if (cacheKey.startsWith(BANNER_CACHE_KEY_PREFIX)) {
+        ProfileImageVariant.BANNER
+    } else {
+        ProfileImageVariant.AVATAR
+    }
+
+/**
+ * The loader's in-memory cache, split into one byte budget per decode variant.
+ *
+ * Separate keys stop a banner request from being *answered* by an avatar-sized bitmap, but on one
+ * shared LRU they would not stop it from *evicting* one: a banner entry can be worth eight avatars,
+ * so a few of them walking through the cache would push the avatar working set out by ordinary
+ * recency, and #2762 requires the avatar ceiling to stay exactly where it was. Two budgets make
+ * that structural rather than hopeful — a banner entry can only ever evict banner entries. Callers
+ * still see one cache and keep passing the key they already built.
+ */
+internal class PartitionedProfileImageCache(
+    avatarBytes: Int,
+    bannerBytes: Int,
+) {
+    private val avatars = byteBudgetedCache(avatarBytes)
+    private val banners = byteBudgetedCache(bannerBytes)
+
+    /** The image held for [cacheKey], looked up only in the partition its variant owns. */
+    fun get(cacheKey: String): ImageBitmap? = partitionFor(cacheKey).get(cacheKey)
+
+    /** Publishes [image] under [cacheKey], charging it to its own variant's budget. */
+    fun put(
+        cacheKey: String,
+        image: ImageBitmap,
+    ) {
+        partitionFor(cacheKey).put(cacheKey, image)
+    }
+
+    /** Drops every entry of every variant, for account teardown. */
+    fun evictAll() {
+        avatars.evictAll()
+        banners.evictAll()
+    }
+
+    /** Bytes currently charged to [variant]'s budget, so each ceiling can be asserted directly. */
+    fun byteSize(variant: ProfileImageVariant): Int = partition(variant).size()
+
+    private fun partitionFor(cacheKey: String) = partition(profileImageVariantOf(cacheKey))
+
+    private fun partition(variant: ProfileImageVariant) =
+        when (variant) {
+            ProfileImageVariant.AVATAR -> avatars
+            ProfileImageVariant.BANNER -> banners
+        }
+
+    private companion object {
+        /** An LRU bounded by the decoded bytes it holds rather than by entry count. */
+        fun byteBudgetedCache(maxBytes: Int) =
+            object : LruCache<String, ImageBitmap>(maxBytes) {
+                override fun sizeOf(
+                    key: String,
+                    value: ImageBitmap,
+                ): Int = value.asAndroidBitmap().byteCount.coerceAtLeast(1)
+            }
+    }
+}
 
 /** Decoded pixels are ARGB_8888, so a target's memory cost is four bytes each. */
 private const val DECODED_BYTES_PER_PIXEL = 4

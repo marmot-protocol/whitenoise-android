@@ -1,5 +1,9 @@
 package dev.ipf.whitenoise.android.core
 
+import android.graphics.Bitmap
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -318,7 +322,88 @@ class AvatarImageLoaderTest {
         assertEquals(512, boundedDecodeDimension(width = 4000, height = 4000, maxDimension = 512))
     }
 
+    /**
+     * Banner pressure past the whole former budget still cannot evict a cached avatar (#2762).
+     *
+     * The banner entries published here total more than a single combined cache could have held, so
+     * on the shared LRU this replaced the avatar — least recently used of the lot — would have been
+     * the first thing dropped. The oldest banner going missing is what proves the pressure was real
+     * rather than the budget quietly absorbing it.
+     */
+    @Test
+    fun bannerEntriesCannotEvictTheCachedAvatarWorkingSet() {
+        val avatarUrl = "https://profiles.example/pressure-avatar.png"
+        val bannerUrl = "https://profiles.example/pressure-banner.png"
+        AvatarImageLoader.putCached(avatarUrl, solidImage(AVATAR_EDGE_PX, AVATAR_EDGE_PX))
+        val widths = (1..BANNER_PRESSURE_ENTRIES).map { it * PROFILE_BANNER_TARGET_BUCKET_PX }
+
+        widths.forEach { width ->
+            AvatarImageLoader.putCachedBanner(bannerUrl, width, solidImage(BANNER_EDGE_PX, BANNER_EDGE_PX))
+        }
+
+        assertNotNull(
+            "a banner run larger than the whole former cache must not evict an avatar",
+            AvatarImageLoader.peek(avatarUrl),
+        )
+        assertNull(
+            "the oldest banner must have been evicted, or the run applied no pressure at all",
+            AvatarImageLoader.peekBanner(bannerUrl, widths.first()),
+        )
+        assertNotNull(
+            "the newest banner stays cached within the banner budget",
+            AvatarImageLoader.peekBanner(bannerUrl, widths.last()),
+        )
+    }
+
+    /** Each variant is charged only to its own budget, and evicts only its own entries. */
+    @Test
+    fun partitionedCacheHoldsEachVariantToItsOwnBudget() {
+        val entry = solidImage(AVATAR_EDGE_PX, AVATAR_EDGE_PX)
+        val entryBytes = entry.asAndroidBitmap().byteCount
+        val cache = PartitionedProfileImageCache(avatarBytes = entryBytes * 2, bannerBytes = entryBytes)
+        val avatarKey = profileImageCacheKey("https://profiles.example/a.png", ProfileImageVariant.AVATAR, 512)
+        val firstBanner = profileImageCacheKey("https://profiles.example/a.png", ProfileImageVariant.BANNER, 1024)
+        val secondBanner = profileImageCacheKey("https://profiles.example/a.png", ProfileImageVariant.BANNER, 1280)
+
+        cache.put(avatarKey, entry)
+        cache.put(firstBanner, entry)
+        cache.put(secondBanner, entry)
+
+        assertNotNull("the banner budget filling up cannot reach the avatar partition", cache.get(avatarKey))
+        assertNull("a banner evicts only the banner before it", cache.get(firstBanner))
+        assertNotNull(cache.get(secondBanner))
+        assertEquals(entryBytes, cache.byteSize(ProfileImageVariant.AVATAR))
+        assertEquals(entryBytes, cache.byteSize(ProfileImageVariant.BANNER))
+    }
+
+    /** A cache key resolves back to the variant it was built for, which is what picks its partition. */
+    @Test
+    fun cacheKeysResolveBackToTheirVariant() {
+        val url = "https://profiles.example/variant-of.png"
+        assertEquals(
+            ProfileImageVariant.AVATAR,
+            profileImageVariantOf(profileImageCacheKey(url, ProfileImageVariant.AVATAR, 512)),
+        )
+        assertEquals(
+            ProfileImageVariant.BANNER,
+            profileImageVariantOf(profileImageCacheKey(url, ProfileImageVariant.BANNER, 1280)),
+        )
+    }
+
+    /** An opaque ARGB_8888 bitmap of the given size, sized for the cache's byte budgets. */
+    private fun solidImage(
+        width: Int,
+        height: Int,
+    ): ImageBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).asImageBitmap()
+
     private companion object {
+        const val AVATAR_EDGE_PX = 512
+        const val BANNER_EDGE_PX = 1024
+
+        // 4MB each against the 8MB banner budget, and 32MB in total — more than
+        // the 24MB a single combined cache would ever have held.
+        const val BANNER_PRESSURE_ENTRIES = 8
+
         const val ONE_PIXEL_PNG_BASE64 =
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
     }
