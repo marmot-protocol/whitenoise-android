@@ -138,7 +138,7 @@ class WhiteNoiseAppStateTtsAutoReadTest {
         enableDeviceCredential()
         val appState = testAppState()
         appState.updateRequireAppUnlock(true)
-        appState.markAppUnlockSucceeded()
+        completeCurrentAppUnlock(appState)
         appState.ttsController.attachEngine(FakeSessionEngine())
         assertTrue(
             appState.speakAloud(
@@ -158,7 +158,7 @@ class WhiteNoiseAppStateTtsAutoReadTest {
         val appState = testAppState()
         appState.updateAppLockDelay(AppLockDelay.OneMinute)
         appState.updateRequireAppUnlock(true)
-        appState.markAppUnlockSucceeded()
+        completeCurrentAppUnlock(appState)
         appState.ttsController.attachEngine(FakeSessionEngine())
         assertTrue(
             appState.speakAloud(
@@ -180,7 +180,7 @@ class WhiteNoiseAppStateTtsAutoReadTest {
         enableDeviceCredential()
         val appState = testAppState()
         appState.updateRequireAppUnlock(true)
-        appState.markAppUnlockSucceeded()
+        completeCurrentAppUnlock(appState)
         appState.ttsController.attachEngine(FakeSessionEngine())
         assertTrue(
             appState.speakAloud(
@@ -193,6 +193,198 @@ class WhiteNoiseAppStateTtsAutoReadTest {
 
         assertTrue(appState.appLockScreenVisible)
         assertTrue(appState.ttsController.state.value is TtsState.Idle)
+    }
+
+    @Test
+    fun duplicateForegroundEvaluationKeepsTheCurrentUnlockSession() {
+        enableDeviceCredential()
+        val appState = testAppState()
+        appState.updateRequireAppUnlock(true)
+        val sessionId = requireNotNull(appState.appUnlockSessions.activeSessionId)
+
+        appState.setAppInForeground(false)
+        appState.setAppInForeground(true)
+        appState.maybeShowAppLockForForeground()
+
+        assertEquals(sessionId, appState.appUnlockSessions.activeSessionId)
+        assertEquals(sessionId, appState.appUnlockPromptRequestId)
+        assertTrue(appState.appLockScreenVisible)
+    }
+
+    @Test
+    fun staleAndDuplicateTerminalCallbacksCannotUnlockANewerSession() {
+        enableDeviceCredential()
+        val appState = testAppState()
+        appState.updateRequireAppUnlock(true)
+        val firstSessionId = requireNotNull(appState.appUnlockSessions.activeSessionId)
+        assertTrue(appState.appUnlockSessions.attachHost(firstSessionId, hostId = 10, replaceExistingHost = false))
+        assertTrue(appState.terminateAppUnlock(firstSessionId, hostId = 10))
+
+        appState.requestAppUnlock()
+        val secondSessionId = requireNotNull(appState.appUnlockSessions.activeSessionId)
+        assertTrue(appState.appUnlockSessions.attachHost(secondSessionId, hostId = 20, replaceExistingHost = false))
+
+        assertFalse(
+            appState.completeAppUnlock(
+                sessionId = firstSessionId,
+                hostId = 10,
+                foregroundReturnExpiresAtElapsedRealtime = null,
+                dismissRetainedVisibleConversation = false,
+            ),
+        )
+        assertTrue(appState.appLockScreenVisible)
+        assertEquals(secondSessionId, appState.appUnlockSessions.activeSessionId)
+        assertTrue(
+            appState.completeAppUnlock(
+                sessionId = secondSessionId,
+                hostId = 20,
+                foregroundReturnExpiresAtElapsedRealtime = null,
+                dismissRetainedVisibleConversation = false,
+            ),
+        )
+        assertFalse(
+            appState.completeAppUnlock(
+                sessionId = secondSessionId,
+                hostId = 20,
+                foregroundReturnExpiresAtElapsedRealtime = null,
+                dismissRetainedVisibleConversation = false,
+            ),
+        )
+        assertFalse(appState.appLockScreenVisible)
+    }
+
+    @Test
+    fun successfulPromptLifecycleReturnBypassesExactlyOneForegroundRelock() {
+        enableDeviceCredential()
+        val appState = testAppState()
+        appState.updateRequireAppUnlock(true)
+        val sessionId = requireNotNull(appState.appUnlockSessions.activeSessionId)
+        assertTrue(appState.appUnlockSessions.attachHost(sessionId, hostId = 10, replaceExistingHost = false))
+        assertTrue(
+            appState.completeAppUnlock(
+                sessionId = sessionId,
+                hostId = 10,
+                foregroundReturnExpiresAtElapsedRealtime = 5_000L,
+                dismissRetainedVisibleConversation = false,
+            ),
+        )
+
+        assertTrue(appState.appUnlockSessions.consumeForegroundReturn(nowElapsedRealtime = 4_999L))
+        assertFalse(appState.appLockScreenVisible)
+        assertEquals(null, appState.appUnlockSessions.activeSessionId)
+
+        appState.maybeShowAppLockForForeground()
+        assertTrue(appState.appLockScreenVisible)
+        assertEquals(sessionId + 1L, appState.appUnlockSessions.activeSessionId)
+    }
+
+    @Test
+    fun resumedPromptHostClearsAnAlreadyHandledForegroundReturn() {
+        enableDeviceCredential()
+        val appState = testAppState()
+        appState.updateRequireAppUnlock(true)
+        val sessionId = requireNotNull(appState.appUnlockSessions.activeSessionId)
+        assertTrue(appState.appUnlockSessions.attachHost(sessionId, hostId = 10, replaceExistingHost = false))
+        assertTrue(
+            appState.completeAppUnlock(
+                sessionId = sessionId,
+                hostId = 10,
+                foregroundReturnExpiresAtElapsedRealtime = 5_000L,
+                dismissRetainedVisibleConversation = false,
+            ),
+        )
+
+        appState.appUnlockSessions.clearForegroundReturn()
+        appState.maybeShowAppLockForForeground()
+
+        assertTrue(appState.appLockScreenVisible)
+        assertEquals(sessionId + 1L, appState.appUnlockSessions.activeSessionId)
+    }
+
+    @Test
+    fun expiredPromptLifecycleReturnCannotBypassALaterForegroundLock() {
+        enableDeviceCredential()
+        val appState = testAppState()
+        appState.updateRequireAppUnlock(true)
+        val sessionId = requireNotNull(appState.appUnlockSessions.activeSessionId)
+        assertTrue(appState.appUnlockSessions.attachHost(sessionId, hostId = 10, replaceExistingHost = false))
+        assertTrue(
+            appState.completeAppUnlock(
+                sessionId = sessionId,
+                hostId = 10,
+                foregroundReturnExpiresAtElapsedRealtime = 5_000L,
+                dismissRetainedVisibleConversation = false,
+            ),
+        )
+
+        assertFalse(appState.appUnlockSessions.consumeForegroundReturn(nowElapsedRealtime = 5_001L))
+        appState.maybeShowAppLockForForeground()
+
+        assertTrue(appState.appLockScreenVisible)
+        assertEquals(sessionId + 1L, appState.appUnlockSessions.activeSessionId)
+    }
+
+    @Test
+    fun realBackgroundCycleInvalidatesPromptLifecycleReturn() {
+        enableDeviceCredential()
+        val appState = testAppState()
+        appState.updateRequireAppUnlock(true)
+        val sessionId = requireNotNull(appState.appUnlockSessions.activeSessionId)
+        assertTrue(appState.appUnlockSessions.attachHost(sessionId, hostId = 10, replaceExistingHost = false))
+        assertTrue(
+            appState.completeAppUnlock(
+                sessionId = sessionId,
+                hostId = 10,
+                foregroundReturnExpiresAtElapsedRealtime = Long.MAX_VALUE,
+                dismissRetainedVisibleConversation = false,
+            ),
+        )
+
+        appState.setAppInForeground(false)
+        appState.setAppInForeground(true)
+
+        assertTrue(appState.appLockScreenVisible)
+        assertEquals(sessionId + 1L, appState.appUnlockSessions.activeSessionId)
+    }
+
+    @Test
+    fun explicitRetryCannotReplaceAnActivePlatformPrompt() {
+        enableDeviceCredential()
+        val appState = testAppState()
+        appState.updateRequireAppUnlock(true)
+        val activeSessionId = requireNotNull(appState.appUnlockSessions.activeSessionId)
+        assertTrue(appState.appUnlockSessions.attachHost(activeSessionId, hostId = 10, replaceExistingHost = false))
+
+        appState.requestAppUnlock()
+
+        assertEquals(activeSessionId, appState.appUnlockSessions.activeSessionId)
+        assertTrue(
+            appState.completeAppUnlock(
+                sessionId = activeSessionId,
+                hostId = 10,
+                foregroundReturnExpiresAtElapsedRealtime = null,
+                dismissRetainedVisibleConversation = false,
+            ),
+        )
+        assertFalse(appState.appLockScreenVisible)
+    }
+
+    @Test
+    fun terminalPromptErrorKeepsTheProtectedScreenAndRequiresANewRetrySession() {
+        enableDeviceCredential()
+        val appState = testAppState()
+        appState.updateRequireAppUnlock(true)
+        val failedSessionId = requireNotNull(appState.appUnlockSessions.activeSessionId)
+        assertTrue(appState.appUnlockSessions.attachHost(failedSessionId, hostId = 10, replaceExistingHost = false))
+
+        assertTrue(appState.terminateAppUnlock(failedSessionId, hostId = 10))
+        assertTrue(appState.appLockScreenVisible)
+        assertEquals(null, appState.appUnlockSessions.activeSessionId)
+        assertTrue(appState.appUnlockError != null)
+
+        appState.requestAppUnlock()
+        assertEquals(failedSessionId + 1L, appState.appUnlockSessions.activeSessionId)
+        assertEquals(null, appState.appUnlockError)
     }
 
     @Test
@@ -422,6 +614,38 @@ class WhiteNoiseAppStateTtsAutoReadTest {
             .extract<ShadowBiometricManager>(
                 context.getSystemService(android.hardware.biometrics.BiometricManager::class.java),
             ).setCanAuthenticate(true)
+    }
+
+    private fun completeCurrentAppUnlock(appState: WhiteNoiseAppState) {
+        val sessionId = requireNotNull(appState.appUnlockSessions.activeSessionId)
+        check(appState.appUnlockSessions.attachHost(sessionId, hostId = 1, replaceExistingHost = false))
+        check(
+            appState.completeAppUnlock(
+                sessionId = sessionId,
+                hostId = 1,
+                foregroundReturnExpiresAtElapsedRealtime = null,
+            ),
+        )
+    }
+
+    private fun WhiteNoiseAppState.completeAppUnlock(
+        sessionId: Long,
+        hostId: Long,
+        foregroundReturnExpiresAtElapsedRealtime: Long?,
+        dismissRetainedVisibleConversation: Boolean = true,
+    ): Boolean {
+        if (!appUnlockSessions.complete(sessionId, hostId, foregroundReturnExpiresAtElapsedRealtime)) return false
+        markAppUnlockSucceeded(dismissRetainedVisibleConversation = dismissRetainedVisibleConversation)
+        return true
+    }
+
+    private fun WhiteNoiseAppState.terminateAppUnlock(
+        sessionId: Long,
+        hostId: Long,
+    ): Boolean {
+        if (!appUnlockSessions.terminate(sessionId, hostId)) return false
+        markAppUnlockFailed()
+        return true
     }
 
     private fun testAppStateWithTwoAccounts(activeAccountRef: String): WhiteNoiseAppState =

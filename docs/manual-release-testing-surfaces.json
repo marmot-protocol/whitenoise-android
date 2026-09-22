@@ -22558,6 +22558,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/MainActivity.kt",
         "anchor": "WhiteNoiseApp",
         "test_ids": [
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
           "SYS-001",
           "SYS-002",
           "SYS-003",
@@ -22569,6 +22572,43 @@
           "SYS-009",
           "SYS-010",
           "SYS-011"
+        ]
+      },
+      {
+        "surface": "Lifecycle-stable app unlock session ownership",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppLockSettings.kt",
+        "anchor": "internal data class AppUnlockSessionState(",
+        "test_ids": [
+          "SEC-002",
+          "SEC-003",
+          "SEC-004"
+        ]
+      },
+      {
+        "surface": "App-lock failed-attempt message from the platform callback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/MainActivity.kt",
+        "anchor": "R.string.app_lock_auth_failed",
+        "test_ids": [
+          "SEC-002",
+          "SEC-004"
+        ]
+      },
+      {
+        "surface": "App-lock prompt-launch unavailable message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/MainActivity.kt",
+        "anchor": "R.string.app_lock_auth_unavailable",
+        "test_ids": [
+          "SEC-002",
+          "SEC-004"
+        ]
+      },
+      {
+        "surface": "App-lock terminal cancellation fallback message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.app_lock_auth_cancelled",
+        "test_ids": [
+          "SEC-002",
+          "SEC-004"
         ]
       },
       {
