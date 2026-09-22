@@ -41,5 +41,8 @@ class MarmotClient(
                 "wss://relay.us.whitenoise.chat",
                 "wss://relay.eu.whitenoise.chat",
             )
+
+        // Existing identities may never have published to our messaging relays.
+        val discoveryRelays = bootstrapRelays + listOf("wss://purplepag.es", "wss://relay.vertexlab.io", "wss://nos.lol")
     }
 }

@@ -6,14 +6,13 @@ import dev.ipf.marmotkit.OnboardingFindingFfi
 import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingRepairProposalFfi
 import dev.ipf.marmotkit.OnboardingSnapshotFfi
-import dev.ipf.marmotkit.OnboardingStatusFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.lang.reflect.Proxy
 
-/** Proves automatic defaults use only the published API and never approve replacement of existing records. */
+/** Proves imported relay lists are never published by automatic setup advancement. */
 class AccountSetupDefaultsTest {
     /** Healthy relay lists need no replacement or publication while the device decision is pending. */
     @Test fun healthyAccountDoesNotRepublishItsExistingLists() =
@@ -29,36 +28,28 @@ class AccountSetupDefaultsTest {
             assertEquals(profile, advance(profile))
         }
 
-    /** After the profile decision, follows and missing relay defaults require no extra confirmation taps. */
-    @Test fun completedProfileAdvancesToDeviceConsent() =
+    /** An empty result on our sources must never authorize publication for an imported identity. */
+    @Test fun missingListsRequireConsent() =
         runTest {
-            val device = setupSnapshot(OnboardingStepFfi.SINGLE_DEVICE, listOf(OnboardingActionFfi.CONTINUE_ANYWAY))
-            val result =
-                advance(
-                    setupSnapshot(OnboardingStepFfi.FOLLOWS),
-                    "continueOnboardingWithout" to missing(OnboardingStepFfi.RELAYS),
-                    "proposeOnboardingRecommendedRelays" to proposal(OnboardingStepFfi.RELAYS),
-                    "approveOnboardingRepair" to missing(OnboardingStepFfi.INBOX_RELAYS),
-                    "proposeOnboardingRecommendedRelays" to proposal(OnboardingStepFfi.INBOX_RELAYS),
-                    "approveOnboardingRepair" to device,
+            for (step in listOf(OnboardingStepFfi.RELAYS, OnboardingStepFfi.INBOX_RELAYS)) {
+                val missing = missing(step)
+                assertEquals(missing, advance(missing))
+                assertEquals(
+                    missing,
+                    advance(setupSnapshot(OnboardingStepFfi.FOLLOWS), "continueOnboardingWithout" to missing),
                 )
-            assertEquals(device, result)
+            }
         }
 
-    /** A confirmed-missing list approval uses the epoch returned with the proposed repair. */
-    @Test fun missingRelayApprovalRetainsTheProposalEpoch() =
-        runTest {
-            val device = setupSnapshot(OnboardingStepFfi.SINGLE_DEVICE, listOf(OnboardingActionFfi.CONTINUE_ANYWAY))
-            val proposed = proposal(OnboardingStepFfi.RELAYS).copy(recoveryEpoch = "proposal-epoch")
-            assertEquals(
-                device,
-                advance(
-                    missing(OnboardingStepFfi.RELAYS),
-                    "proposeOnboardingRecommendedRelays" to proposed,
-                    "approveOnboardingRepairInEpoch" to device,
-                ),
-            )
-        }
+    /** Imported identities use public discovery sources as well as messaging relays. */
+    @Test fun discoveryIncludesIndexers() {
+        val options = setupOptions()
+        assertEquals(dev.ipf.whitenoise.android.core.MarmotClient.bootstrapRelays, options.defaultRelays)
+        assertEquals(
+            options.defaultRelays + listOf("wss://purplepag.es", "wss://relay.vertexlab.io", "wss://nos.lol"),
+            options.discoveryRelays,
+        )
+    }
 
     /** Mixed, inconclusive, and unhealthy findings must not turn a missing-list hint into permission. */
     @Test fun uncertainOrUnhealthyListsNeverPublishAutomatically() =
@@ -77,19 +68,6 @@ class AccountSetupDefaultsTest {
             }
         }
 
-    /** Discovery may change before proposal creation; an existing event requires explicit replacement consent. */
-    @Test fun newlyDiscoveredExistingRecordStopsBeforeApproval() =
-        runTest {
-            val existing = proposal(OnboardingStepFfi.RELAYS, "existing-record")
-            assertEquals(
-                existing,
-                advance(
-                    missing(OnboardingStepFfi.RELAYS),
-                    "proposeOnboardingRecommendedRelays" to existing,
-                ),
-            )
-        }
-
     /** Restored decisions and cancellation are durable user intent, never a new automatic publication grant. */
     @Test fun savedProposalAndPendingCancellationAreUntouched() =
         runTest {
@@ -97,43 +75,6 @@ class AccountSetupDefaultsTest {
             assertEquals(proposed, advance(proposed))
             val cancelling = missing(OnboardingStepFfi.RELAYS).copy(cancellationPending = true)
             assertEquals(cancelling, advance(cancelling))
-        }
-
-    /** Signer denial stops the sequence without another automatic request to Amber. */
-    @Test fun signerRejectionRequiresAnExplicitRetry() =
-        runTest {
-            val denied = proposal(OnboardingStepFfi.INBOX_RELAYS)
-            denied.steps.first { it.step == OnboardingStepFfi.INBOX_RELAYS }.apply {
-                status = OnboardingStatusFfi.WAITING_FOR_SIGNER
-                actions = listOf(OnboardingActionFfi.RECONNECT_SIGNER)
-            }
-            assertEquals(
-                denied,
-                advance(
-                    missing(OnboardingStepFfi.INBOX_RELAYS),
-                    "proposeOnboardingRecommendedRelays" to proposal(OnboardingStepFfi.INBOX_RELAYS),
-                    "approveOnboardingRepair" to denied,
-                ),
-            )
-        }
-
-    /** Native approval owns the final discovery fence; a rejected attempt must not loop and try again. */
-    @Test fun changedRecordDuringApprovalStopsTheAutomaticSequence() =
-        runTest {
-            val changed = missing(OnboardingStepFfi.RELAYS)
-            changed.steps.first { it.step == OnboardingStepFfi.RELAYS }.apply {
-                status = OnboardingStatusFfi.RETRYABLE_FAILURE
-                findings = listOf(OnboardingFindingFfi(OnboardingIssueFfi.RECORD_CHANGED, null))
-                actions = listOf(OnboardingActionFfi.RETRY)
-            }
-            assertEquals(
-                changed,
-                advance(
-                    missing(OnboardingStepFfi.RELAYS),
-                    "proposeOnboardingRecommendedRelays" to proposal(OnboardingStepFfi.RELAYS),
-                    "approveOnboardingRepair" to changed,
-                ),
-            )
         }
 
     /** Builds positive missing evidence, separate from empty or incomplete discovery. */

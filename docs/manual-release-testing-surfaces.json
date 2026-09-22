@@ -25243,9 +25243,9 @@
         ]
       },
       {
-        "surface": "Automatic defaults skip only follows and preserve the native profile decision",
+        "surface": "Automatic setup skips only follows and requires explicit relay publication",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupDefaults.kt",
-        "anchor": "private fun OnboardingStepStateFfi.canSkipFollows()",
+        "anchor": "suspend fun advance(initial: OnboardingSnapshotFfi)",
         "test_ids": [
           "ONB-013",
           "ONB-014"
