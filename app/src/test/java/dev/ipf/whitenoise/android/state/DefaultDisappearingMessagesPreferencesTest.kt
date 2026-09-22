@@ -83,7 +83,10 @@ class DefaultDisappearingMessagesPreferencesTest {
         disappearingCustomUnits.forEach { unit ->
             (1..unit.max).forEach { value ->
                 val seconds = value.toLong() * unit.seconds
-                assertTrue("expected $value x ${unit.seconds} to be valid", isValidDisappearingMessageDurationSeconds(seconds))
+                assertTrue(
+                    "expected $value x ${unit.seconds} to be valid",
+                    isValidDisappearingMessageDurationSeconds(seconds),
+                )
             }
         }
     }

@@ -34,12 +34,13 @@ internal class DefaultDisappearingMessagesPreferences(
         accountRef: String?,
         seconds: Long,
     ): Boolean {
-        val key = preferenceKey(accountRef) ?: return false
-        if (!isValidDisappearingMessageDurationSeconds(seconds)) return false
+        val key = preferenceKey(accountRef)
+        if (key == null || !isValidDisappearingMessageDurationSeconds(seconds)) return false
         synchronized(mutationLock) {
-            if (_durations.value[key] == seconds && preferences.contains(key)) return true
-            preferences.edit().putLong(key, seconds).apply()
-            _durations.value = _durations.value + (key to seconds)
+            if (_durations.value[key] != seconds || !preferences.contains(key)) {
+                preferences.edit().putLong(key, seconds).apply()
+                _durations.value = _durations.value + (key to seconds)
+            }
         }
         return true
     }
