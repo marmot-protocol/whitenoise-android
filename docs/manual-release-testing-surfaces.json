@@ -22870,6 +22870,14 @@
         ]
       },
       {
+        "surface": "Removal-of-self actor fallback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/GroupSystemEvents.kt",
+        "anchor": "fun actorNameOrSomeone(",
+        "test_ids": [
+          "GRP-006"
+        ]
+      },
+      {
         "surface": "notification-first-post:group_system_admin_added",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
         "anchor": "R.string.group_system_admin_added",
