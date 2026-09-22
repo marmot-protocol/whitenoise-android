@@ -1159,7 +1159,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
         "anchor": "fun ContactPickerScreen(",
         "test_ids": [
-          "NCH-001"
+          "NCH-001",
+          "GRP-005"
         ]
       },
       {
@@ -5022,6 +5023,22 @@
         ]
       },
       {
+        "surface": "LargeGroupInviteConfirmationDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/LargeGroupInviteWarning.kt",
+        "anchor": "fun LargeGroupInviteConfirmationDialog(",
+        "test_ids": [
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "LargeGroupInviteWarningBanner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/LargeGroupInviteWarning.kt",
+        "anchor": "fun LargeGroupInviteWarningBanner(",
+        "test_ids": [
+          "GRP-005"
+        ]
+      },
+      {
         "surface": "DangerLeading",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "fun DangerLeading(",
@@ -5066,7 +5083,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "fun GroupDetailsScreen(",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "GRP-005"
         ]
       },
       {
