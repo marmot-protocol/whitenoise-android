@@ -2814,6 +2814,9 @@ class ChatsController private constructor(
         get() = chatRowsByGroup.values
     private var groupRecordsById = mapOf<String, AppGroupRecordFfi>()
 
+    // Holds a locally committed rename on its row until the subscription agrees (#2696).
+    private val localGroupNames = LocalGroupNameAuthority()
+
     // Whole-second activity timestamps need an in-memory tie-break that follows
     // the order local/live activity is accepted. This is bounded to one scalar
     // per materialized row and cleared with the backing projection on bind.
@@ -3876,11 +3879,23 @@ class ChatsController private constructor(
         // (not just the group record), so patch both the chat row and the group
         // record to keep them consistent.
         (optimisticChatListPreviewByGroup[rowKey]?.baselineRow ?: chatRowsByGroup[rowKey])?.let { row ->
+            val projectedName = record.name.ifBlank { row.groupName }
+            val renamed = projectedName != row.groupName
+            if (renamed) {
+                // The rename is already durable; its subscription row settles later (#2696). Carry
+                // it on the row, its prepared title, and the selected presentation the list reads.
+                localGroupNames.record(record.groupIdHex, row.groupName, projectedName)
+                selectedPresentationsByGroup =
+                    selectedPresentationsByGroup[rowKey]?.let { presentation ->
+                        selectedPresentationsByGroup + (rowKey to presentation.withLocalGroupTitle(projectedName))
+                    } ?: selectedPresentationsByGroup
+            }
             val updated =
                 row.copy(
                     archived = record.archived,
                     pendingConfirmation = record.pendingConfirmation,
-                    groupName = record.name.ifBlank { row.groupName },
+                    groupName = projectedName,
+                    title = if (renamed) projectedName else row.title,
                 )
             optimisticChatListPreviewByGroup[rowKey]?.let { state ->
                 state.baselineRow = updated
@@ -4180,7 +4195,10 @@ class ChatsController private constructor(
     /** Atomically replaces both base rows and their matching selected presentation. */
     private fun replacePresentedChatRows(rows: List<PresentedChatRowFfi>) {
         selectedPresentationsByGroup =
-            rows.associate { presented -> chatRowKey(presented.row.groupIdHex) to presented.presentation }
+            rows.associate { presented ->
+                chatRowKey(presented.row.groupIdHex) to
+                    localGroupNames.reconciledPresentation(presented.row, presented.presentation)
+            }
         // MarmotKit 0.10.1 stores avatars durably and names each row's asset here; the row prefers those
         // bytes over fetching its URL, so a cached avatar survives being offline.
         selectedAvatarAssetsByGroup =
@@ -4198,9 +4216,10 @@ class ChatsController private constructor(
 
     /** Folds one authoritative row and mirrors it into any mounted conversation. */
     private fun foldChatRow(
-        row: ChatListRowFfi,
+        incoming: ChatListRowFfi,
         trigger: ChatListUpdateTriggerFfi? = null,
     ) {
+        val row = localGroupNames.reconciled(incoming)
         if (trigger == ChatListUpdateTriggerFfi.MUTE_CHANGED || trigger == ChatListUpdateTriggerFfi.SNAPSHOT_REFRESH) {
             appState.acceptAuthoritativeMuteProjection(accountRef, row.groupIdHex, row.muted, row.mutedUntilMs)
         }
@@ -4291,7 +4310,8 @@ class ChatsController private constructor(
     }
 
     /** Replaces the chat-list window and refreshes mounted conversation metadata. */
-    private fun replaceChatRows(rows: List<ChatListRowFfi>) {
+    private fun replaceChatRows(incoming: List<ChatListRowFfi>) {
+        val rows = incoming.map(localGroupNames::reconciled)
         rows.forEach {
             appState.acceptAuthoritativeMuteProjection(accountRef, it.groupIdHex, it.muted, it.mutedUntilMs)
         }
@@ -4363,6 +4383,7 @@ class ChatsController private constructor(
             failedMemberFetches.remove(removedRow.groupIdHex)
             selfOnlyDirectGraceRetryGroups.remove(removedRow.groupIdHex)
             presentationMembersByGroup = presentationMembersByGroup - removedRow.groupIdHex
+            localGroupNames.forget(removedRow.groupIdHex)
             noteMaterializedGroupMembershipChanged()
             scheduleRecompute()
         }
@@ -6017,6 +6038,10 @@ class ConversationController(
         { account, groupIdHex, archived ->
             appState.marmotIo { setGroupArchived(account, groupIdHex, archived) }
         },
+    private val groupProfileUpdater: suspend (String, String, String?, String?) -> Unit =
+        { account, groupIdHex, name, description ->
+            appState.marmotIo { updateGroupProfile(account, groupIdHex, name, description) }
+        },
     private val clockMillis: () -> Long = System::currentTimeMillis,
     private val inviteAcceptor: InviteAcceptor = { account, groupIdHex ->
         appState.marmotIo(MarmotTraceSection.ACCEPT_GROUP_INVITE) {
@@ -6080,6 +6105,9 @@ class ConversationController(
         get() = pendingArchiveIntent?.archived ?: group.archived
 
     private var acceptedInvitePeerAccount by mutableStateOf<String?>(null)
+
+    // Retains a locally committed rename against a stale group-state snapshot (#2696).
+    private val localGroupNames = LocalGroupNameAuthority()
 
     /**
      * Latest chat-list projection for this conversation, kept live even while
@@ -7178,7 +7206,8 @@ class ConversationController(
     internal fun applyGroupStateForTest(update: AppGroupRecordFfi) = applyGroupState(update)
 
     /** Applies a canonical group update while retaining only a still-unresolved stale action fence. */
-    private fun applyGroupState(update: AppGroupRecordFfi) {
+    private fun applyGroupState(incoming: AppGroupRecordFfi) {
+        val update = localGroupNames.reconciled(incoming)
         val previousGroup = group
         groupRecoveryLifetime.advance()
         val previousRetention = group.disappearingMessageSecs
@@ -9997,21 +10026,36 @@ class ConversationController(
             val updatedDescription = description.trim().takeIf { it.isNotEmpty() }
             runCatchingCancellable {
                 appState.withGroupCommitLock(account, group.groupIdHex) {
-                    appState.marmotIo {
-                        updateGroupProfile(
-                            account,
-                            group.groupIdHex,
-                            updatedName,
-                            updatedDescription,
-                        )
-                    }
+                    groupProfileUpdater(account, group.groupIdHex, updatedName, updatedDescription)
                 }
+                // Reflect the committed profile locally so the header and every chat-list
+                // projection agree immediately, rather than after the group-state
+                // subscription converges (#2696).
+                applyLocalGroupProfile(updatedName.orEmpty(), updatedDescription.orEmpty(), account)
                 presentConversationTransient(R.string.toast_group_updated)
                 true
             }.onFailure {
                 recordMutationFailure(R.string.toast_couldnt_update_group, "GROUP_PROFILE_UPDATE", it)
             }.getOrDefault(false)
         }
+
+    /**
+     * Installs a just-committed group profile locally and hands it to the chat list (#2696).
+     *
+     * [LocalGroupNameAuthority] then retains the new name against a pre-rename snapshot that was
+     * already in flight, while a genuinely newer authoritative commit still wins.
+     */
+    private fun applyLocalGroupProfile(
+        name: String,
+        description: String,
+        account: String,
+    ) {
+        val updated = group.copy(name = name, description = description)
+        if (updated == group) return
+        localGroupNames.record(group.groupIdHex, previousName = group.name, committedName = name)
+        group = updated
+        appState.applyLocalGroupUpdate(updated, account)
+    }
 
     suspend fun updateGroupAvatarUrl(url: String?): Boolean =
         withMutationLockResult(false) {

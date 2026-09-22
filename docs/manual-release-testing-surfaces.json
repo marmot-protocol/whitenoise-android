@@ -22283,6 +22283,15 @@
     ],
     "source_coverage": [
       {
+        "surface": "A committed group rename is retained on its chat-list row until the subscription agrees",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalGroupNameAuthority.kt",
+        "anchor": "internal class LocalGroupNameAuthority",
+        "test_ids": [
+          "GRP-002",
+          "CHL-016"
+        ]
+      },
+      {
         "surface": "Direct-message headers prefer the viewer's private contact nickname",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/core/ConversationHeaderTitle.kt",
         "anchor": "internal fun conversationHeaderTitle(",
