@@ -69,7 +69,7 @@ class ConversationDictationForegroundServiceTest {
                     if (autoReady) ready()
                     true
                 },
-                deliveryMode = { preference },
+                silenceDeliveryMode = { preference },
                 sendTranscriptIfOriginUnchanged = { request ->
                     request.beginDispatch().also { if (it) sent += request.payload }
                 },

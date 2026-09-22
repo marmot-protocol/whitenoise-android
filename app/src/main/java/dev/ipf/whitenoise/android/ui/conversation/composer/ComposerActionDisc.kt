@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
@@ -31,9 +32,11 @@ internal fun ComposerActionDisc(
     contentColor: Color,
     description: String,
     @DrawableRes icon: Int,
+    enabled: Boolean = true,
+    width: Dp = 40.dp,
 ) {
     val outline = amoledOutlineBorder()
-    IconButton(onClick = onClick, modifier = Modifier.width(40.dp).height(48.dp)) {
+    IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.width(width).height(48.dp)) {
         Surface(
             modifier = Modifier.size(32.dp),
             shape = CircleShape,

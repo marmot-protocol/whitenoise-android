@@ -22523,6 +22523,14 @@
         ]
       },
       {
+        "surface": "Dictation automatic completion delivers by the stored silence choice only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "private fun completeAfterSilence(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
         "surface": "Dictation no-speech retries are bounded to the exact speech-bearing caller-audio chunk",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
         "anchor": "private fun advancePastRejectedCallerAudio(",

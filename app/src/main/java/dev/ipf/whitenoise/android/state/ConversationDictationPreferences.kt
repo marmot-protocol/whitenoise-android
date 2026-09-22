@@ -14,7 +14,7 @@ import org.json.JSONObject
 
 internal data class ConversationDictationPreferenceState(
     val finishAfterSilenceMillis: Long?,
-    val deliveryMode: ConversationDictationDeliveryMode,
+    val silenceDeliveryMode: ConversationDictationDeliveryMode = ConversationDictationDeliveryMode.PasteIntoDraft,
     val recognitionServiceOverride: ComponentName? = null,
     val providerSelection: ConversationDictationProviderChoice? = null,
 )
@@ -46,10 +46,15 @@ internal class ConversationDictationPreferences(
         update(current().copy(finishAfterSilenceMillis = normalized))
     }
 
-    /** Persists the user's explicit paste-or-send terminal behavior. */
-    fun setDeliveryMode(value: ConversationDictationDeliveryMode) {
-        if (current().deliveryMode == value) return
-        update(current().copy(deliveryMode = value))
+    /**
+     * Persists what automatic completion does with the transcript.
+     *
+     * Only silence-triggered completion reads this. An explicit Paste or Send always carries its own
+     * choice, so this can never override a button someone pressed.
+     */
+    fun setSilenceDeliveryMode(value: ConversationDictationDeliveryMode) {
+        if (current().silenceDeliveryMode == value) return
+        update(current().copy(silenceDeliveryMode = value))
     }
 
     /** Persists an explicit service identity, or clears it to follow Android's system default. */
@@ -78,25 +83,34 @@ internal class ConversationDictationPreferences(
         preferences
             .edit()
             .putLong(KEY_FINISH_AFTER_SILENCE, value.finishAfterSilenceMillis ?: MANUAL_FINISH)
-            .putString(KEY_DELIVERY_MODE, value.deliveryMode.name)
+            .putString(KEY_SILENCE_DELIVERY_MODE, value.silenceDeliveryMode.name)
+            // The old key governed every completion, including the ones a person ended by hand.
+            // Dropping it on the first write keeps an upgrade from acting on a choice made under
+            // those wider rules, so the narrower setting above starts from paste.
+            .remove(KEY_DELIVERY_MODE)
             .remove(KEY_RECOGNITION_SERVICE_OVERRIDE)
             .putString(KEY_PROVIDER_SELECTION, value.providerSelection?.let(::encodeSelection))
             .apply()
     }
 
-    /** Reads preferences fail-closed to manual finish and paste-to-draft. */
+    /**
+     * Reads preferences fail-closed to manual finish and paste-into-draft.
+     *
+     * The pre-per-use key is never read, so an upgrade cannot carry someone's old app-wide
+     * "send when finished" into a session that would act on it.
+     */
     private fun readState(): ConversationDictationPreferenceState {
         val silence =
             preferences
                 .getLong(KEY_FINISH_AFTER_SILENCE, MANUAL_FINISH)
                 .takeIf(ALLOWED_SILENCE_MILLIS::contains)
-        val delivery =
+        val silenceDelivery =
             preferences
-                .getString(KEY_DELIVERY_MODE, null)
+                .getString(KEY_SILENCE_DELIVERY_MODE, null)
                 ?.let { stored -> ConversationDictationDeliveryMode.entries.firstOrNull { it.name == stored } }
                 ?: ConversationDictationDeliveryMode.PasteIntoDraft
         val selection = decodeSelection(preferences.getString(KEY_PROVIDER_SELECTION, null))
-        return ConversationDictationPreferenceState(silence, delivery, selection?.service, selection)
+        return ConversationDictationPreferenceState(silence, silenceDelivery, selection?.service, selection)
     }
 
     private fun encodeSelection(value: ConversationDictationProviderChoice): String =
@@ -146,6 +160,7 @@ internal class ConversationDictationPreferences(
         private const val PREFERENCES_NAME = "whitenoise.composer_dictation"
         private const val KEY_FINISH_AFTER_SILENCE = "finishAfterSilenceMillis"
         private const val KEY_DELIVERY_MODE = "deliveryMode"
+        private const val KEY_SILENCE_DELIVERY_MODE = "silenceDeliveryMode"
         private const val KEY_PROVIDER_SELECTION = "providerSelection"
         private const val KEY_RECOGNITION_SERVICE_OVERRIDE = "recognitionServiceOverride"
         private const val MANUAL_FINISH = -1L

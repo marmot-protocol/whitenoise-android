@@ -61,7 +61,7 @@ internal data class ConversationDictationTarget(
     val mode: ConversationDictationMode,
     val replyToMessageIdHex: String? = null,
     val finishAfterSilenceMillis: Long? = null,
-    val deliveryMode: ConversationDictationDeliveryMode = ConversationDictationDeliveryMode.PasteIntoDraft,
+    val silenceDeliveryMode: ConversationDictationDeliveryMode = ConversationDictationDeliveryMode.PasteIntoDraft,
 ) {
     /** Compares the stable account and group identifiers without changing the captured target. */
     fun matchesConversation(
@@ -420,7 +420,7 @@ internal class ConversationDictationController internal constructor(
         true
     },
     private val stopDurableSession: () -> Unit = {},
-    private val deliveryMode: () -> ConversationDictationDeliveryMode = {
+    private val silenceDeliveryMode: () -> ConversationDictationDeliveryMode = {
         ConversationDictationDeliveryMode.PasteIntoDraft
     },
     private val sendTranscriptIfOriginUnchanged: suspend (ConversationDictationSendRequest) -> Boolean = { false },
@@ -451,7 +451,7 @@ internal class ConversationDictationController internal constructor(
         tryAcquireMicrophone: () -> Boolean,
         releaseMicrophone: () -> Unit,
         finishAfterSilenceMillis: () -> Long? = { null },
-        deliveryMode: () -> ConversationDictationDeliveryMode = {
+        silenceDeliveryMode: () -> ConversationDictationDeliveryMode = {
             ConversationDictationDeliveryMode.PasteIntoDraft
         },
         sendTranscriptIfOriginUnchanged: suspend (ConversationDictationSendRequest) -> Boolean = { false },
@@ -472,7 +472,7 @@ internal class ConversationDictationController internal constructor(
         },
         stopDurableSession = { ConversationDictationForegroundService.stop(context.applicationContext) },
         finishAfterSilenceMillis = finishAfterSilenceMillis,
-        deliveryMode = deliveryMode,
+        silenceDeliveryMode = silenceDeliveryMode,
         sendTranscriptIfOriginUnchanged = sendTranscriptIfOriginUnchanged,
         disclosureAccepted = {
             context
@@ -584,7 +584,7 @@ internal class ConversationDictationController internal constructor(
     val processingDeliveryMode: ConversationDictationDeliveryMode?
         get() =
             if (finishRequested && inActiveRecognitionState) {
-                requestedDeliveryMode ?: state.target?.deliveryMode
+                requestedDeliveryMode ?: ConversationDictationDeliveryMode.PasteIntoDraft
             } else {
                 null
             }
@@ -699,7 +699,7 @@ internal class ConversationDictationController internal constructor(
                 capturedDraftRevision = capturedRevision,
                 mode = mode,
                 finishAfterSilenceMillis = finishAfterSilenceMillis()?.takeIf { it > 0L },
-                deliveryMode = deliveryMode(),
+                silenceDeliveryMode = silenceDeliveryMode(),
             )
         if (!targetAvailable(target)) return false
         if (!runCatching(platform::prepareProviderSelection).getOrDefault(false)) {
@@ -2170,6 +2170,7 @@ internal class ConversationDictationController internal constructor(
                     requireNotNull(currentCapturedSilence),
                 )
             !generationHasSpeech && accumulatedTranscript.isNotBlank() -> {
+                if (requestedDeliveryMode == null) requestedDeliveryMode = target.silenceDeliveryMode
                 finishRequested = true
                 cancelPendingRestart()
                 clearRecognitionGeneration(
@@ -2200,8 +2201,19 @@ internal class ConversationDictationController internal constructor(
             silenceTimeoutHandle?.cancel()
             silenceTimeoutHandle = null
             silenceDeadlineElapsedMillis = null
-            stop()
+            completeAfterSilence(target)
         }
+    }
+
+    /**
+     * Completes a session the silence timer ended, using the stored automatic-completion choice.
+     *
+     * A Paste or Send already pressed has recorded its own choice, so this returns rather than
+     * replacing it: the stored setting only ever decides a completion nobody asked for.
+     */
+    private fun completeAfterSilence(target: ConversationDictationTarget) {
+        if (requestedDeliveryMode != null) return
+        stopWithDeliveryMode(target.silenceDeliveryMode)
     }
 
     /** Appends one provider-final segment; generation ownership rejects duplicate callbacks. */
@@ -2375,7 +2387,10 @@ internal class ConversationDictationController internal constructor(
         target: ConversationDictationTarget,
         transcript: String,
     ) {
-        val deliveryMode = requestedDeliveryMode ?: target.deliveryMode
+        // A pressed Paste or Send sets this, and so does the silence timer from the choice stored
+        // for automatic completion. Everything else — restoration, a target captured before that
+        // setting existed — pastes into the draft rather than sending on its own.
+        val deliveryMode = requestedDeliveryMode ?: ConversationDictationDeliveryMode.PasteIntoDraft
         if (deliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {
             sendTranscriptOnFinish(sessionId, target, transcript)
             return

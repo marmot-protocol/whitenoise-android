@@ -199,15 +199,23 @@ class SettingsScreenScreenshotTest {
         }
     }
 
-    /** Verifies settings sheets persist explicit silence completion and send-on-finish choices. */
+    /**
+     * Verifies the delivery choice appears only once a pause can end a dictation, and retracts again.
+     *
+     * The row governs automatic completion alone. While Paste and Send are the only things that can
+     * finish a dictation there is nothing for it to decide, so offering it there would imply a
+     * stored default that could send a later dictation nobody asked it to.
+     */
     @Test
-    fun dictationSettingsWriteExplicitFinishAndDeliverySelections() {
+    fun dictationDeliveryChoiceAppearsOnlyWhileSilenceCanFinishADictation() {
         val appState = dictationAppState()
         composeRule.setContent {
             WhiteNoiseTheme {
                 DictationSettingsScreen(appState = appState, onBack = {})
             }
         }
+
+        composeRule.onNodeWithText("When finished").assertDoesNotExist()
 
         composeRule.onNodeWithText("Finish dictation").performClick()
         composeRule.onNodeWithText("After 5 seconds of silence").performClick()
@@ -217,8 +225,13 @@ class SettingsScreenScreenshotTest {
         assertEquals(5_000L, appState.conversationDictationPreferences.current().finishAfterSilenceMillis)
         assertEquals(
             ConversationDictationDeliveryMode.SendOnFinish,
-            appState.conversationDictationPreferences.current().deliveryMode,
+            appState.conversationDictationPreferences.current().silenceDeliveryMode,
         )
+
+        composeRule.onNodeWithText("Finish dictation").performClick()
+        composeRule.onNodeWithText("When I choose Paste or Send").performClick()
+
+        composeRule.onNodeWithText("When finished").assertDoesNotExist()
     }
 
     /** The settings home with Alice signed in, a self-updating build and no-op callbacks. */
