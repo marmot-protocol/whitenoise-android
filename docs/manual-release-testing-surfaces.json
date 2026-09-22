@@ -4763,6 +4763,14 @@
         ]
       },
       {
+        "surface": "ReactionParticipantSupportingText",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+        "anchor": "fun ReactionParticipantSupportingText(",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
         "surface": "ReplyPreviewCard",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/replies/ReplyPreviewCard.kt",
         "anchor": "fun ReplyPreviewCard(",
@@ -12316,6 +12324,22 @@
         "surface": "string:reaction_filter_all",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
         "anchor": "R.string.reaction_filter_all",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "string:reaction_tap_to_remove",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+        "anchor": "R.string.reaction_tap_to_remove",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "string:you",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+        "anchor": "R.string.you",
         "test_ids": [
           "MSG-005"
         ]
