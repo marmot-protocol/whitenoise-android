@@ -15,6 +15,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.time.Duration
 
 /**
  * Opportunistic forward prefetch — what a successful send triggers by landing the viewport on the
@@ -128,6 +129,28 @@ class ConversationForwardPrefetchOriginTest {
                 controller.loadNewerPageInternal(ConversationPagingOrigin.AUTOMATIC)
 
                 assertTrue("an older-page retry row is still the reader's to act on", controller.olderPageBlocked)
+            }
+        }
+
+    /** An authoritative live window is recovery too, so the reader never has to act. */
+    @Test
+    fun liveWindowReplacementReleasesTheBlock() =
+        runBlocking {
+            val stuck = MutableList<TimelinePageOutcome>(FORWARD_SCRIPT_SIZE) { notReady() }
+            val subscription = subscriptionWith(forwardsOutcomes = stuck)
+            withController(subscription) { controller ->
+                repeat(CONVERSATION_AUTOMATIC_NEWER_PAGE_ATTEMPTS) {
+                    controller.loadNewerPageInternal(ConversationPagingOrigin.AUTOMATIC)
+                }
+                assertTrue(controller.automaticNewerPagingBlocked)
+
+                awaitConversationCondition { subscription.nextWindowCallCount >= 1 }
+                subscription.emitWindow(newerPage())
+                awaitConversationCondition { subscription.nextWindowCallCount >= 2 }
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(10))
+
+                awaitConversationCondition(timeoutMs = 15_000) { !controller.automaticNewerPagingBlocked }
+                assertFalse(controller.automaticNewerPagingBlocked)
             }
         }
 

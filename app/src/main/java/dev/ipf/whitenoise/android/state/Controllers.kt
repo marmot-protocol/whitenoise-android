@@ -7501,6 +7501,9 @@ class ConversationController(
                         replaceWindow = true,
                         updatePagination = true,
                     )
+                // An authoritative window is the recovery a stood-down forward prefetch was
+                // waiting for, so the viewport may ask for newer content again (#2764).
+                automaticNewerPaging.reset()
                 publishRecoveryTimelineProjection(batch.mapNotNull { it.recoveryGeneration }.maxOrNull())
                 // Scroll-driven mark-read in the UI layer handles
                 // the user-visible read pointer.
