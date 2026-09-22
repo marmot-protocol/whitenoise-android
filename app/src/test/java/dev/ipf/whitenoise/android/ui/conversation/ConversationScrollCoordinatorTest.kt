@@ -1409,7 +1409,7 @@ class ConversationScrollCoordinatorTest {
                 .substringAfter("fun navigateToReplyTarget(item: TimelineMessage)")
                 .substringBefore("fun jumpToNextUnreadMention")
         val highlight = replyNavigation.indexOf("targetHighlight.highlightWhile(targetMessageId)")
-        val load = replyNavigation.indexOf("loadUntilMessageAvailable", startIndex = highlight)
+        val load = replyNavigation.indexOf("loadMessageAvailability", startIndex = highlight)
         val center = replyNavigation.indexOf("centerTimelineItemAt", startIndex = load)
 
         assertTrue("reply target highlighting must start before paging", highlight >= 0 && load > highlight)
@@ -1439,7 +1439,7 @@ class ConversationScrollCoordinatorTest {
         )
         assertTrue(
             "reply navigation must re-check ownership after paging and before centering",
-            replyNavigation.indexOf("val available = controller.loadUntilMessageAvailable") <
+            replyNavigation.indexOf("val availability = controller.loadMessageAvailability") <
                 replyNavigation.lastIndexOf("if (!navigationRequest.isCurrent())") &&
                 replyNavigation.lastIndexOf("if (!navigationRequest.isCurrent())") <
                 replyNavigation.indexOf("centerTimelineItemAt"),

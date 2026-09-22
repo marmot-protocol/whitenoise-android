@@ -82,25 +82,23 @@ class ConversationWindowHandleTest {
             assertFalse(initial === fallback)
         }
 
-    /** A missing jump target is surfaced to the caller; other window errors are absorbed. */
+    /** A missing jump target stays distinct from a retryable not-ready window. */
     @Test
-    fun jumpSurfacesMissingTargetOnly() =
+    fun jumpDistinguishesMissingTargetFromRetryableDelay() =
         runBlocking {
             val fake = FakeConversationWindow(snapshot(sequence = 1uL, messageIds = listOf("m1")))
             val handle = FfiConversationWindowHandle(fake, release = fake::release)
             handle.snapshot()
 
             fake.failNextCommandWith = MarmotKitException.ConversationWindowNotReady()
-            assertNull(handle.setVisibleAnchor("m1"))
+            val delayed = handle.jumpToMessage("m1") as ConversationJumpOutcome.Window
+            assertEquals(
+                ConversationWindowUnchangedReason.NOT_READY,
+                (delayed.outcome as TimelinePageOutcome.Unchanged).reason,
+            )
 
             fake.failNextCommandWith = MarmotKitException.ConversationWindowMessageNotRetained()
-            var missing = false
-            try {
-                handle.jumpToMessage("gone")
-            } catch (expected: MarmotKitException.ConversationWindowMessageNotRetained) {
-                missing = true
-            }
-            assertTrue(missing)
+            assertSame(ConversationJumpOutcome.Missing, handle.jumpToMessage("gone"))
         }
 
     /** A malformed anchor id, such as an optimistic row's local id, is absorbed instead of escaping to the caller. */

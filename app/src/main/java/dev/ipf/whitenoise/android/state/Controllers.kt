@@ -10784,54 +10784,6 @@ class ConversationController(
     /** Pages the subscription window newer; true when the window actually advanced. */
     suspend fun loadNewerTimelinePage(origin: PagingOrigin = PagingOrigin.EXPLICIT): Boolean = loadNewerPage(origin)
 
-    suspend fun loadUntilMessageAvailable(
-        messageIdHex: String,
-        maxOlderPages: Int = ReplyNavigation.MaxOlderPages,
-    ): Boolean {
-        if (jumpWindowToMessage(messageIdHex)) return true
-        var loadedPageCount = 0
-        while (
-            ReplyNavigation.shouldLoadOlder(
-                targetLoaded = timelineRecords.containsKey(messageIdHex),
-                hasMoreBefore = hasMoreBefore,
-                loadedPageCount = loadedPageCount,
-                maxOlderPages = maxOlderPages,
-            )
-        ) {
-            if (!loadOlderPage()) break
-            loadedPageCount += 1
-        }
-        return timelineRecords.containsKey(messageIdHex)
-    }
-
-    /**
-     * Recenters the live window on a retained message; false when MDK no longer retains it or there is no
-     * window. Runs under the same active-call guard as pagination so a concurrent teardown cannot close the
-     * native handle while the jump is in flight.
-     */
-    private suspend fun jumpWindowToMessage(messageIdHex: String): Boolean {
-        val page = timelineSubscription?.let { jumpIfSubscriptionActive(it, messageIdHex) }
-        if (page == null) return false
-        applyTimelinePage(page, replaceWindow = true, updatePagination = true)
-        return timelineRecords.containsKey(messageIdHex)
-    }
-
-    /** The jump under the pagination guard; null once torn down, superseded, or when MDK dropped the target. */
-    private suspend fun jumpIfSubscriptionActive(
-        subscription: ConversationTimelineSubscriptionHandle,
-        messageIdHex: String,
-    ): TimelinePageFfi? =
-        timelineSubscriptionActiveCallMutex.withLock {
-            val stillActive =
-                synchronized(liveSubscriptionLock) {
-                    !accountTeardownRequested && timelineSubscription === subscription
-                }
-            if (!stillActive) return@withLock null
-            runCatchingCancellable {
-                withContext(Dispatchers.IO) { subscription.jumpToMessage(messageIdHex) }
-            }.getOrNull()
-        }
-
     /**
      * Page the exact chat-list first-unread boundary into the initial window.
      * Unlike interactive reply navigation, entry positioning must not silently

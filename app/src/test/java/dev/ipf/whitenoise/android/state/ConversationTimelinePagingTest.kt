@@ -147,6 +147,154 @@ class ConversationTimelinePagingTest {
             }
         }
 
+    /** A hydrated reply target retries a transient not-ready jump and installs the exact window. */
+    @Test
+    fun replyTargetRetriesNotReadyJumpAndMaterializes() =
+        runBlocking {
+            val target = record(TARGET_ID, timelineAt = 50uL)
+            val subscription =
+                ScriptedConversationTimelineSubscription(
+                    snapshotPage = page(listOf(record(SEED_ID, timelineAt = 200uL)), hasMoreBefore = true),
+                    jumpOutcomes =
+                        mutableListOf(
+                            ConversationJumpOutcome.Window(
+                                outcome(ConversationWindowUnchangedReason.NOT_READY),
+                            ),
+                            ConversationJumpOutcome.Window(
+                                TimelinePageOutcome.Advanced(page(listOf(target), hasMoreBefore = true)),
+                            ),
+                        ),
+                )
+            withController(subscription) { controller ->
+                settle()
+
+                val availability = controller.loadMessageAvailability(TARGET_ID)
+
+                assertEquals(MessageAvailability.AVAILABLE, availability)
+                assertEquals(2, subscription.jumpCallCount)
+                assertTrue(controller.timeline.any { it.record.messageIdHex == TARGET_ID })
+                assertEquals(0, subscription.backwardsCallCount)
+            }
+        }
+
+    /** A revision race immediately retries against the newest installed window revision. */
+    @Test
+    fun replyTargetRetriesSupersededJumpAndMaterializes() =
+        runBlocking {
+            val target = record(TARGET_ID, timelineAt = 50uL)
+            val subscription =
+                ScriptedConversationTimelineSubscription(
+                    snapshotPage = page(listOf(record(SEED_ID, timelineAt = 200uL)), hasMoreBefore = true),
+                    jumpOutcomes =
+                        mutableListOf(
+                            ConversationJumpOutcome.Window(
+                                outcome(ConversationWindowUnchangedReason.SUPERSEDED),
+                            ),
+                            ConversationJumpOutcome.Window(
+                                TimelinePageOutcome.Advanced(page(listOf(target), hasMoreBefore = true)),
+                            ),
+                        ),
+                )
+            withController(subscription) { controller ->
+                settle()
+
+                val availability = controller.loadMessageAvailability(TARGET_ID)
+
+                assertEquals(MessageAvailability.AVAILABLE, availability)
+                assertEquals(2, subscription.jumpCallCount)
+                assertEquals(0, subscription.backwardsCallCount)
+            }
+        }
+
+    /** An advanced replacement that omits the requested id is delayed, never authoritative absence. */
+    @Test
+    fun replyTargetAdvancedWindowWithoutTargetRemainsRetryable() =
+        runBlocking {
+            val subscription =
+                ScriptedConversationTimelineSubscription(
+                    snapshotPage = page(listOf(record(SEED_ID, timelineAt = 200uL)), hasMoreBefore = true),
+                    jumpOutcomes =
+                        mutableListOf(
+                            ConversationJumpOutcome.Window(
+                                TimelinePageOutcome.Advanced(
+                                    page(listOf(record(OLDER_ID, timelineAt = 100uL)), hasMoreBefore = true),
+                                ),
+                            ),
+                        ),
+                )
+            withController(subscription) { controller ->
+                settle()
+
+                val availability = controller.loadMessageAvailability(TARGET_ID)
+
+                assertEquals(MessageAvailability.RETRYABLE, availability)
+                assertEquals(1, subscription.jumpCallCount)
+                assertEquals(0, subscription.backwardsCallCount)
+            }
+        }
+
+    /** A timed-out exact jump is retryable and never falls through to a false missing-target result. */
+    @Test
+    fun replyTargetTimeoutRemainsRetryable() =
+        runBlocking {
+            val subscription =
+                ScriptedConversationTimelineSubscription(
+                    snapshotPage = page(listOf(record(SEED_ID, timelineAt = 200uL)), hasMoreBefore = true),
+                    jumpOutcomes =
+                        mutableListOf(
+                            ConversationJumpOutcome.Window(
+                                outcome(ConversationWindowUnchangedReason.TIMED_OUT),
+                            ),
+                        ),
+                )
+            withController(subscription) { controller ->
+                settle()
+
+                val availability = controller.loadMessageAvailability(TARGET_ID)
+
+                assertEquals(MessageAvailability.RETRYABLE, availability)
+                assertEquals(0, subscription.backwardsCallCount)
+            }
+        }
+
+    /** An unmodeled native jump failure keeps the loaded window and offers a retry instead of crashing. */
+    @Test
+    fun replyTargetJumpFailureRemainsRetryable() =
+        runBlocking {
+            val subscription =
+                ScriptedConversationTimelineSubscription(
+                    snapshotPage = page(listOf(record(SEED_ID, timelineAt = 200uL)), hasMoreBefore = true),
+                    jumpFailure = IllegalStateException("scripted jump failure"),
+                )
+            withController(subscription) { controller ->
+                settle()
+
+                val availability = controller.loadMessageAvailability(TARGET_ID)
+
+                assertEquals(MessageAvailability.RETRYABLE, availability)
+                assertEquals(1, subscription.jumpCallCount)
+                assertEquals(0, subscription.backwardsCallCount)
+            }
+        }
+
+    /** Only an explicit missing-target answer is classified as missing on a real window. */
+    @Test
+    fun replyTargetExplicitMissingRemainsMissing() =
+        runBlocking {
+            val subscription =
+                ScriptedConversationTimelineSubscription(
+                    snapshotPage = page(listOf(record(SEED_ID, timelineAt = 200uL)), hasMoreBefore = true),
+                    jumpOutcomes = mutableListOf(ConversationJumpOutcome.Missing),
+                )
+            withController(subscription) { controller ->
+                settle()
+
+                val availability = controller.loadMessageAvailability(TARGET_ID)
+
+                assertEquals(MessageAvailability.MISSING, availability)
+            }
+        }
+
     /**
      * Every phase a history page can emit is part of the closed WNPerf vocabulary, so a diagnostics
      * session on a tester's device cannot be asked to log a name the schema does not define.
@@ -232,6 +380,7 @@ class ConversationTimelinePagingTest {
     private companion object {
         val SEED_ID = "aa".repeat(32)
         val OLDER_ID = "bb".repeat(32)
+        val TARGET_ID = "cc".repeat(32)
         val ANCHOR_THEN_PAGE = setOf("setVisibleAnchor", "paginateBackwards")
     }
 }

@@ -92,6 +92,13 @@ internal class ChatListWindowSet private constructor(
             handle.page(sequence, ChatListPageDirectionFfi.FORWARD, CHAT_LIST_WINDOW_PAGE_ROWS)
         }
 
+    /** Loads the preceding page of [view] when the retained window is no longer at the true top. */
+    suspend fun pageBackward(view: ChatListViewFfi): ChatListWindowSnapshotFfi? =
+        command(view) { handle, sequence ->
+            if (installed[view]?.hasMoreBefore != true) return@command null
+            handle.page(sequence, ChatListPageDirectionFfi.BACKWARD, CHAT_LIST_WINDOW_PAGE_ROWS)
+        }
+
     /** Reports the row the user sees so the window keeps it across replacements; null when unchanged. */
     suspend fun setVisibleAnchor(
         view: ChatListViewFfi,
@@ -211,6 +218,13 @@ suspend fun ChatsController.loadMoreChats(view: ChatListViewFfi = ChatListViewFf
     if (windows.pageForward(view) != null) applyChatListWindowRows(account, windows.rows)
 }
 
+/** Loads rows before the retained active window when the reader approaches its shifted front. */
+suspend fun ChatsController.loadEarlierChats(view: ChatListViewFfi = ChatListViewFfi.CHATS) {
+    val windows = chatListWindows ?: return
+    val account = accountRef ?: return
+    if (windows.pageBackward(view) != null) applyChatListWindowRows(account, windows.rows)
+}
+
 /** Reports the chat the user actually sees so window replacements keep it in place. */
 suspend fun ChatsController.reportVisibleChat(
     groupIdHex: String,
@@ -232,4 +246,10 @@ suspend fun ChatsController.returnChatListToTop(view: ChatListViewFfi = ChatList
 fun ChatsController.hasMoreChats(view: ChatListViewFfi = ChatListViewFfi.CHATS): Boolean {
     val windows = chatListWindows ?: return false
     return windows.hasMoreAfter(view)
+}
+
+/** Whether MDK retains active chats before the front of the currently rendered window. */
+fun ChatsController.hasEarlierChats(view: ChatListViewFfi = ChatListViewFfi.CHATS): Boolean {
+    val windows = chatListWindows ?: return false
+    return windows.installed(view)?.hasMoreBefore == true
 }
