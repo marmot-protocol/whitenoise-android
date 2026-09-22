@@ -91,9 +91,8 @@ internal fun isValidDisappearingMessageDurationSeconds(seconds: Long): Boolean =
                 seconds / unit.seconds in 1L..unit.max.toLong()
         }
 
-internal fun WhiteNoiseAppState.defaultDisappearingMessagesSeconds(
-    accountRef: String? = activeAccountRef,
-): Long = defaultDisappearingMessagesPreferences.durationFor(accountRef)
+internal fun WhiteNoiseAppState.defaultDisappearingMessagesSeconds(accountRef: String? = activeAccountRef): Long =
+    defaultDisappearingMessagesPreferences.durationFor(accountRef)
 
 internal fun WhiteNoiseAppState.setDefaultDisappearingMessagesSeconds(
     seconds: Long,
