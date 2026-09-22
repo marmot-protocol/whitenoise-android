@@ -22457,6 +22457,14 @@
         ]
       },
       {
+        "surface": "Dictation platform-error cause mapping",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "fun Int.toConversationDictationFailure(",
+        "test_ids": [
+          "DIC-003"
+        ]
+      },
+      {
         "surface": "Dictation automatic completion observes captured speech and drains the tail",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
         "anchor": "private fun finishAfterCallerAudioSilence(",
