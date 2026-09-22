@@ -4,7 +4,6 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerEmojiPickerFallbackHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerEmojiPickerSearchExtraHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerPaneRestoreStep
-import dev.ipf.whitenoise.android.ui.conversation.composer.composerAttachmentPaneMinimumHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerEmojiPaneHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerEmojiPaneRestoreStep
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerEmojiPaneTargetHeight
@@ -41,30 +40,6 @@ class ComposerEmojiPaneLayoutTest {
             shouldStartComposerKeyboardRestore(
                 paneOpen = false,
                 keyboardRestorePending = false,
-            ),
-        )
-    }
-
-    @Test
-    fun attachmentPaneTracksTheAnimatedImeHeightDuringTheHandoff() {
-        listOf(900.dp, 700.dp, 400.dp, 0.dp).forEach { animatedImeHeight ->
-            assertEquals(
-                animatedImeHeight,
-                composerAttachmentPaneMinimumHeight(
-                    showAttachmentPane = true,
-                    currentImeHeight = animatedImeHeight,
-                ),
-            )
-        }
-    }
-
-    @Test
-    fun hiddenAttachmentPaneDoesNotReserveImeHeight() {
-        assertEquals(
-            0.dp,
-            composerAttachmentPaneMinimumHeight(
-                showAttachmentPane = false,
-                currentImeHeight = 900.dp,
             ),
         )
     }

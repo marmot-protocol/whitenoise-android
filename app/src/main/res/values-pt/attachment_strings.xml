@@ -3,6 +3,4 @@
     <string name="attachment_camera">Câmara</string>
     <string name="attachment_photos_videos">Fotos e vídeos</string>
     <string name="attachment_device_contact">Contacto do dispositivo</string>
-    <string name="attachment_recent_media">Multimédia recente</string>
-    <string name="recent_media_browse_all">Ver todas as fotos e vídeos</string>
 </resources>

@@ -41,7 +41,6 @@ class ComposerAttachmentSheetBehaviorTest {
 
     private fun renderComposer(
         onPickFromGallery: (() -> Unit)? = {},
-        onPickRecentMedia: ((android.net.Uri) -> Unit)? = {},
         onCaptureFromCamera: (() -> Unit)? = null,
         onPickDocument: (() -> Unit)? = {},
         onShareLocation: (() -> Unit)? = null,
@@ -57,7 +56,6 @@ class ComposerAttachmentSheetBehaviorTest {
                         onCancelReply = {},
                         onSend = { _, _ -> },
                         onPickFromGallery = onPickFromGallery,
-                        onPickRecentMedia = onPickRecentMedia,
                         onCaptureFromCamera = onCaptureFromCamera,
                         onPickDocument = onPickDocument,
                         onShareLocation = onShareLocation,
@@ -80,24 +78,19 @@ class ComposerAttachmentSheetBehaviorTest {
         renderComposer()
         openAttachmentSheet()
         composeRule.onNodeWithText(string(R.string.attachment_photos_videos)).assertIsDisplayed()
-        composeRule.onNodeWithText(string(R.string.attachment_recent_media)).assertDoesNotExist()
         composeRule.onNodeWithText(string(R.string.download_files)).assertIsDisplayed()
     }
 
-    /** The sole media entry opens recent picks, then Browse all invokes the system picker once. */
+    /** The sole media entry invokes the system picker directly and closes the menu. */
     @Test
-    fun mediaEntryOpensRecentPaneAndBrowseAllInvokesGalleryOnce() {
+    fun mediaEntryInvokesGalleryOnceAndClosesTheMenu() {
         var galleryClicks = 0
         renderComposer(onPickFromGallery = { galleryClicks++ })
         openAttachmentSheet()
         composeRule.onNodeWithText(string(R.string.attachment_photos_videos)).performClick()
         composeRule.waitForIdle()
-        assertEquals(0, galleryClicks)
-        composeRule.onNodeWithText(string(R.string.attachment_photos_videos)).assertDoesNotExist()
-        composeRule.onNodeWithText(string(R.string.recent_media_browse_all)).performClick()
-        composeRule.waitForIdle()
         assertEquals(1, galleryClicks)
-        composeRule.onNodeWithText(string(R.string.recent_media_browse_all)).assertDoesNotExist()
+        composeRule.onNodeWithText(string(R.string.attachment_photos_videos)).assertDoesNotExist()
     }
 
     /** Document tile fires callback. */

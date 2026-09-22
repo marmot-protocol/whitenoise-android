@@ -158,7 +158,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
-import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerAttachmentSheetState
+import dev.ipf.whitenoise.android.ui.conversation.composer.rememberAttachmentState
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerShareRevision
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberConversationMentionPickerState
@@ -3271,7 +3271,7 @@ internal fun ConversationScreen(
 
     // Hoisted from ComposerBar so a tap on the transcript can dismiss the
     // attachment sheet — the composer itself stays interactive while it's open.
-    val composerAttachmentSheet = rememberComposerAttachmentSheetState()
+    val composerAttachmentSheet = rememberAttachmentState()
 
     fun startBatchDelete(
         attempts: List<BatchDeleteAttempt>,
@@ -3592,10 +3592,6 @@ internal fun ConversationScreen(
                     imagePickerLauncher.launch(
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
                     )
-                },
-                onPickRecentMedia = { uri ->
-                    pendingMediaSlots =
-                        appendPendingMediaSlots(pendingMediaSlots, listOf(uri), MEDIA_PICKER_MAX_ITEMS)
                 },
                 onCaptureFromCamera = {
                     val granted =

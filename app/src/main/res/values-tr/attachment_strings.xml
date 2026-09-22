@@ -3,6 +3,4 @@
     <string name="attachment_camera">Kamera</string>
     <string name="attachment_photos_videos">Fotoğraflar ve videolar</string>
     <string name="attachment_device_contact">Cihaz kişisi</string>
-    <string name="attachment_recent_media">Son medya</string>
-    <string name="recent_media_browse_all">Tüm fotoğraf ve videolara göz at</string>
 </resources>
