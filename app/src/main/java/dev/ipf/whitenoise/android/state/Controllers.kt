@@ -7738,7 +7738,7 @@ class ConversationController(
                     timelineOrder = optimisticOrder,
                     acceptedPendingTextOptimisticIdsByMessageId = acceptedPendingTextOptimisticIds,
                 )
-            recordAcceptedPendingDiagnostics(tempId, reconciliation)
+            appState.pendingSendDiagnostics.recordAcceptedPending(tempId, reconciliation.acceptedPending)
             convergeAcceptedPendingTextSend(account, reconciliation, tempId)
             if (reconciliation.awaitingProjection) {
                 appState.pendingSendDiagnostics.update(tempId, PerformanceSendStage.WAITING_PROJECTION)
@@ -7846,26 +7846,6 @@ class ConversationController(
     private fun isRetryableTextAdmissionError(throwable: Throwable): Boolean =
         isTransientRelaySendError(throwable) ||
             (textPublisher == null && isTransientRuntimeWorkerError(throwable))
-
-    /** Marks native durable ownership without inventing an unavailable inner MDK queue phase. */
-    private fun recordAcceptedPendingDiagnostics(
-        optimisticId: String,
-        reconciliation: SuccessfulTextSendReconciliation,
-    ) {
-        if (!reconciliation.acceptedPending) return
-        appState.pendingSendDiagnostics.milestone(
-            optimisticId,
-            PerformancePhase.DURABLE_ACCEPTED,
-            PerformanceSendStage.ACCEPTED_PENDING,
-            layer = PerformanceLayer.MDK,
-        )
-        appState.pendingSendDiagnostics.milestone(
-            optimisticId,
-            PerformancePhase.ENGINE_PHASE_UNAVAILABLE,
-            PerformanceSendStage.ACCEPTED_PENDING,
-            layer = PerformanceLayer.MDK,
-        )
-    }
 
     /** Keeps accepted-pending settlement alive when navigation disposes this conversation's visible route. */
     private suspend fun convergeAcceptedPendingTextSend(
@@ -9576,7 +9556,7 @@ class ConversationController(
                     timelineOrder = order,
                     acceptedPendingTextOptimisticIdsByMessageId = acceptedPendingTextOptimisticIds,
                 )
-            recordAcceptedPendingDiagnostics(tempId, reconciliation)
+            appState.pendingSendDiagnostics.recordAcceptedPending(tempId, reconciliation.acceptedPending)
             convergeAcceptedPendingTextSend(account, reconciliation, tempId)
             if (reconciliation.awaitingProjection) {
                 appState.pendingSendDiagnostics.update(tempId, PerformanceSendStage.WAITING_PROJECTION)

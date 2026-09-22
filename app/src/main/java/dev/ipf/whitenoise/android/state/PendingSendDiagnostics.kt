@@ -25,6 +25,14 @@ internal data class PendingSendDiagnosticEvent(
     val connectivity: PerformanceConnectivity? = null,
 )
 
+/** Maps the existing privacy-safe aggregate signals to the closed performance schema. */
+internal fun ConnectivitySignals.toPerformanceConnectivity(): PerformanceConnectivity =
+    when {
+        !hasValidatedInternet -> PerformanceConnectivity.OFFLINE
+        relaysConnected -> PerformanceConnectivity.ONLINE_WITH_RELAY
+        else -> PerformanceConnectivity.ONLINE_NO_RELAY
+    }
+
 /**
  * Keeps opt-in send diagnostics alive across conversation-controller replacement.
  *
@@ -241,6 +249,26 @@ internal class PendingSendDiagnosticTracker(
         const val MAX_TRACKED_SENDS = 64
         private const val WNPERF_SESSION_DURATION_MS = 30L * 60L * 1_000L
     }
+}
+
+/** Marks native durable ownership without inventing an unavailable inner MDK queue phase. */
+internal fun PendingSendDiagnosticTracker.recordAcceptedPending(
+    optimisticId: String,
+    acceptedPending: Boolean,
+) {
+    if (!acceptedPending) return
+    milestone(
+        optimisticId,
+        PerformancePhase.DURABLE_ACCEPTED,
+        PerformanceSendStage.ACCEPTED_PENDING,
+        layer = PerformanceLayer.MDK,
+    )
+    milestone(
+        optimisticId,
+        PerformancePhase.ENGINE_PHASE_UNAVAILABLE,
+        PerformanceSendStage.ACCEPTED_PENDING,
+        layer = PerformanceLayer.MDK,
+    )
 }
 
 /** Routes tracker events through the privacy-reviewed typed WNPerf emitter. */

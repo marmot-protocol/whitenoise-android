@@ -92,7 +92,6 @@ import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
-import dev.ipf.whitenoise.android.diagnostics.PerformanceConnectivity
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
 import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
@@ -6985,14 +6984,7 @@ class WhiteNoiseAppState private constructor(
         PendingSendDiagnosticTracker(
             scope = mutationsScope,
             nowMs = SystemClock::elapsedRealtime,
-            connectivity = {
-                val signals = connectivitySignals.value
-                when {
-                    !signals.hasValidatedInternet -> PerformanceConnectivity.OFFLINE
-                    signals.relaysConnected -> PerformanceConnectivity.ONLINE_WITH_RELAY
-                    else -> PerformanceConnectivity.ONLINE_NO_RELAY
-                }
-            },
+            connectivity = { connectivitySignals.value.toPerformanceConnectivity() },
         )
 
     private fun updateConnectivitySignals(

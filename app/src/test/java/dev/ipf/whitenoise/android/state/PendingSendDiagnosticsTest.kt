@@ -109,18 +109,23 @@ class PendingSendDiagnosticsTest {
 
     @Test
     fun textSendAndBothProjectionSurfacesUseTheProcessOwnedTracker() {
-        val source =
+        val controllersSource =
             sequenceOf(
                 File("src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
                 File("app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
             ).first(File::isFile).readText()
+        val trackerSource =
+            sequenceOf(
+                File("src/main/java/dev/ipf/whitenoise/android/state/PendingSendDiagnostics.kt"),
+                File("app/src/main/java/dev/ipf/whitenoise/android/state/PendingSendDiagnostics.kt"),
+            ).first(File::isFile).readText()
 
-        assertTrue(source.contains("pendingSendDiagnostics.track(tempId, trace)"))
-        assertTrue(source.contains("PerformancePhase.PENDING_CHECKPOINT_10S").not())
-        assertTrue(source.contains("PerformancePhase.DURABLE_ACCEPTED"))
-        assertTrue(source.contains("PerformancePhase.ENGINE_PHASE_UNAVAILABLE"))
-        assertTrue(source.contains("PerformancePhase.CHAT_LIST_SETTLED"))
-        assertTrue(source.contains("PerformancePhase.TIMELINE_SETTLED"))
+        assertTrue(controllersSource.contains("pendingSendDiagnostics.track(tempId, trace)"))
+        assertTrue(controllersSource.contains("PerformancePhase.PENDING_CHECKPOINT_10S").not())
+        assertTrue(trackerSource.contains("PerformancePhase.DURABLE_ACCEPTED"))
+        assertTrue(trackerSource.contains("PerformancePhase.ENGINE_PHASE_UNAVAILABLE"))
+        assertTrue(controllersSource.contains("PerformancePhase.CHAT_LIST_SETTLED"))
+        assertTrue(controllersSource.contains("PerformancePhase.TIMELINE_SETTLED"))
     }
 
     private fun trace(): PerformanceTrace =
