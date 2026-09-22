@@ -235,8 +235,7 @@ internal val AddMemberSelectionSaver =
                             npub = it[2],
                         )
                     }
-                }
-                .toMutableStateList()
+                }.toMutableStateList()
         },
     )
 
