@@ -22720,6 +22720,16 @@
         ]
       },
       {
+        "surface": "Opt-in pending-send diagnostics retain privacy-bounded 10-second and 60-second checkpoints across controller replacement",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/PendingSendDiagnostics.kt",
+        "anchor": "internal class PendingSendDiagnosticTracker(",
+        "test_ids": [
+          "CHL-002",
+          "CON-002",
+          "SET-021"
+        ]
+      },
+      {
         "surface": "Conversation replacements deduplicate profile requests and retain completed stream state",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "suspend fun applyTimelinePage(",
