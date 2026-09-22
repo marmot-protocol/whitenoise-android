@@ -900,7 +900,6 @@ internal fun MessageBubble(
     var forwardSheetOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var editHistoryOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var reactionSheetOpen by remember(record.messageIdHex) { mutableStateOf(false) }
-    var reactionSheetInitialEmoji by remember(record.messageIdHex) { mutableStateOf<String?>(null) }
     var customizeReactionsOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var configureReactionsDraft by remember(record.messageIdHex) { mutableStateOf<List<String>>(emptyList()) }
     var configureReactionSlot by remember(record.messageIdHex) { mutableStateOf<Int?>(null) }
@@ -960,7 +959,6 @@ internal fun MessageBubble(
             forwardSheetOpen = false
             editHistoryOpen = false
             reactionSheetOpen = false
-            reactionSheetInitialEmoji = null
             customizeReactionsOpen = false
             configureReactionSlot = null
             deleteDialogOpen = false
@@ -2934,9 +2932,8 @@ internal fun MessageBubble(
                     mine = mine,
                     visibilityState = reactionVisibilityState,
                     enabled = !deleted,
-                    onClick = { emoji ->
+                    onClick = {
                         if (!deleted) {
-                            reactionSheetInitialEmoji = emoji
                             reactionSheetOpen = true
                         }
                     },
@@ -2950,14 +2947,12 @@ internal fun MessageBubble(
                     LaunchedEffect(participants.isEmpty()) {
                         if (participants.isEmpty()) {
                             reactionSheetOpen = false
-                            reactionSheetInitialEmoji = null
                         }
                     }
                     if (participants.isNotEmpty()) {
                         ReactionDetailsSheet(
                             participants = participants,
                             appState = appState,
-                            initialEmoji = reactionSheetInitialEmoji,
                             onRemoveOwnReaction =
                                 if (readOnly || deleted) {
                                     null
@@ -2966,7 +2961,6 @@ internal fun MessageBubble(
                                 },
                             onDismissRequest = {
                                 reactionSheetOpen = false
-                                reactionSheetInitialEmoji = null
                             },
                         )
                     }

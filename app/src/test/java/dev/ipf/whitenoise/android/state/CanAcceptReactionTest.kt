@@ -2,8 +2,8 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MessageTagFfi
-import dev.ipf.whitenoise.android.core.ReactionTally
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -68,104 +68,167 @@ class CanAcceptReactionTest {
         assertFalse(acceptsReaction(disbanded = true))
     }
 
+    /** Replacing one overlay makes every tap visible before any native mutation completes. */
     @Test
-    fun blockedCommitDoesNotDelayOptimisticReaction() =
-        runTest {
-            val releaseCommit = CompletableDeferred<Unit>()
-            val optimistic = linkedMapOf<String, OptimisticReactionChange>()
-            var renderedTallies = emptyList<ReactionTally>()
-            var rollbackCount = 0
+    fun latestReactionIntentRendersImmediately() {
+        val optimistic = linkedMapOf<String, OptimisticReactionChange>()
 
-            val mutation =
+        optimistic["intent"] = OptimisticReactionChange(TARGET, "👍", add = true)
+        assertTrue(renderTallies(optimistic).single().mine)
+
+        optimistic["intent"] = OptimisticReactionChange(TARGET, "👍", add = false)
+        assertTrue(renderTallies(optimistic).isEmpty())
+    }
+
+    /** A rapid opposite tap returns to the original state without sending either native mutation. */
+    @Test
+    fun rapidOppositeReactionIntentsConflateBeforeCommit() =
+        runTest {
+            val key = TARGET to "👍"
+            val conflator = ReactionIntentConflator()
+            val commits = mutableListOf<Boolean>()
+            val first = conflator.submit(key, desiredMine = true)
+            val drain =
                 async(start = CoroutineStart.UNDISPATCHED) {
-                    runOptimisticReactionMutation(
-                        applyOptimistic = {
-                            optimistic["pending"] = OptimisticReactionChange(TARGET, "👍", add = true)
-                            renderedTallies = renderTallies(optimistic)
-                        },
-                        commit = {
-                            releaseCommit.await()
-                            true
-                        },
-                        rollback = {
-                            optimistic.remove("pending")
-                            renderedTallies = renderTallies(optimistic)
-                            rollbackCount += 1
-                        },
-                    )
+                    drainReactionIntent(
+                        key = key,
+                        conflator = conflator,
+                        initialMine = false,
+                        settleDelayMillis = 1L,
+                    ) { desiredMine ->
+                        commits += desiredMine
+                    }
                 }
 
-            assertEquals(listOf("👍"), renderedTallies.map { it.emoji })
-            assertTrue("the optimistic chip must belong to the active account", renderedTallies.single().mine)
-            assertFalse("the engine commit should still be waiting", mutation.isCompleted)
-            releaseCommit.complete(Unit)
+            assertTrue(first.shouldDrain)
+            assertFalse(conflator.submit(key, desiredMine = false).shouldDrain)
+            val outcome = drain.await() as ReactionIntentDrainOutcome.Settled
 
-            assertTrue(mutation.await().getOrThrow())
-            assertEquals("a successful commit keeps the overlay until its echo", setOf("pending"), optimistic.keys)
-            assertEquals(0, rollbackCount)
+            assertTrue(commits.isEmpty())
+            assertFalse(outcome.mutated)
+            assertFalse(outcome.finalMine)
         }
 
+    /** A failed operation that a newer tap superseded cannot surface a stale reaction error. */
     @Test
-    fun failedCommitRollsBackOptimisticReaction() =
+    fun supersededReactionFailureSettlesLatestIntentWithoutError() =
         runTest {
-            val optimistic = linkedMapOf<String, OptimisticReactionChange>()
-            var renderedTallies = emptyList<ReactionTally>()
-            var rollbackCount = 0
-
-            val mutation =
-                runOptimisticReactionMutation(
-                    applyOptimistic = {
-                        optimistic["pending"] = OptimisticReactionChange(TARGET, "👍", add = true)
-                        renderedTallies = renderTallies(optimistic)
-                    },
-                    commit = { error("relay unavailable") },
-                    rollback = {
-                        optimistic.remove("pending")
-                        renderedTallies = renderTallies(optimistic)
-                        rollbackCount += 1
-                    },
-                )
-
-            assertTrue(mutation.isFailure)
-            assertTrue(renderedTallies.isEmpty())
-            assertEquals(1, rollbackCount)
-        }
-
-    /** An immediate removal remains suspended only until the preceding add returns its event id. */
-    @Test
-    fun immediateRemovalWaitsForReactionAddResult() =
-        runTest {
-            val addResult = CompletableDeferred<String?>()
-            val removal =
+            val key = TARGET to "👍"
+            val conflator = ReactionIntentConflator()
+            val commitStarted = CompletableDeferred<Unit>()
+            val releaseFailure = CompletableDeferred<Unit>()
+            conflator.submit(key, desiredMine = true)
+            val drain =
                 async(start = CoroutineStart.UNDISPATCHED) {
-                    awaitImmediateReactionEventId(addResult) { null }
+                    drainReactionIntent(
+                        key = key,
+                        conflator = conflator,
+                        initialMine = false,
+                        settleDelayMillis = 0L,
+                    ) {
+                        commitStarted.complete(Unit)
+                        releaseFailure.await()
+                        error("superseded")
+                    }
                 }
 
-            assertFalse("removal must not race the in-flight add", removal.isCompleted)
-            addResult.complete("reaction-event")
+            commitStarted.await()
+            assertFalse(conflator.submit(key, desiredMine = false).shouldDrain)
+            releaseFailure.complete(Unit)
+            val outcome = drain.await() as ReactionIntentDrainOutcome.Settled
 
-            assertEquals("reaction-event", removal.await())
+            assertFalse(outcome.finalMine)
+            assertFalse(outcome.mutated)
         }
 
-    /** A completed add can hand off its cached id after leaving the in-flight registry. */
+    /** A tap during an accepted add converges afterward without overlapping native mutations. */
     @Test
-    fun immediateRemovalUsesCachedReactionEventId() =
+    fun inFlightReactionCommitConvergesToTheNewestIntent() =
         runTest {
-            assertEquals(
-                "cached-reaction-event",
-                awaitImmediateReactionEventId(precedingAdd = null) { "cached-reaction-event" },
-            )
+            val key = TARGET to "👍"
+            val conflator = ReactionIntentConflator()
+            val addStarted = CompletableDeferred<Unit>()
+            val releaseAdd = CompletableDeferred<Unit>()
+            val commits = mutableListOf<Boolean>()
+            conflator.submit(key, desiredMine = true)
+            val drain =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    drainReactionIntent(
+                        key = key,
+                        conflator = conflator,
+                        initialMine = false,
+                        settleDelayMillis = 0L,
+                    ) { desiredMine ->
+                        commits += desiredMine
+                        if (desiredMine) {
+                            addStarted.complete(Unit)
+                            releaseAdd.await()
+                        }
+                    }
+                }
+
+            addStarted.await()
+            assertFalse(conflator.submit(key, desiredMine = false).shouldDrain)
+            releaseAdd.complete(Unit)
+            val outcome = drain.await() as ReactionIntentDrainOutcome.Settled
+
+            assertEquals(listOf(true, false), commits)
+            assertFalse(outcome.finalMine)
+            assertTrue(outcome.mutated)
         }
 
-    /** A failed add hands null to the queued removal so no unrelated event can be deleted. */
+    /** Native back-pressure retries while the same intent remains current. */
     @Test
-    fun failedReactionAddDoesNotProduceRetractionEventId() =
+    fun busyReactionMutationRetriesWithoutSurfacingFailure() =
         runTest {
-            val addResult = CompletableDeferred<String?>()
-            addResult.complete(null)
+            var attempts = 0
 
-            assertEquals(null, awaitImmediateReactionEventId(addResult) { "stale-event" })
+            val result =
+                retryBusyReactionMutation(retryDelayMillis = 0L) {
+                    attempts += 1
+                    if (attempts < 3) throw MarmotKitException.RuntimeBusy()
+                    "committed"
+                }
+
+            assertEquals("committed", result)
+            assertEquals(3, attempts)
         }
+
+    /** A blank immediate-add result waits for local history instead of failing on its first stale read. */
+    @Test
+    fun missingImmediateAddIdWaitsForAuthoritativeHistory() =
+        runTest {
+            var reads = 0
+
+            val resolved =
+                awaitReactionEventHistory(expectedEmoji = "👍", retryDelayMillis = 0L) {
+                    reads += 1
+                    if (reads < 3) emptyMap() else mapOf("👍" to "reaction-event")
+                }
+
+            assertEquals(mapOf("👍" to "reaction-event"), resolved)
+            assertEquals(3, reads)
+        }
+
+    /** A blank unprojected marker cannot hide the valid event id that projection later supplies. */
+    @Test
+    fun blankUnprojectedMarkerPreservesProjectedReactionEventId() {
+        val projected = mapOf("👍" to "projected-event")
+
+        assertEquals(
+            projected,
+            knownReactionEventIds(projected, "👍", unprojectedEventId = "", authoritativeEventIds = null),
+        )
+        assertEquals(
+            mapOf("👍" to "unprojected-event"),
+            knownReactionEventIds(
+                projected,
+                "👍",
+                unprojectedEventId = "unprojected-event",
+                authoritativeEventIds = null,
+            ),
+        )
+    }
 
     /** A projected reaction event keeps removal scoped to the tapped emoji. */
     @Test
@@ -175,20 +238,20 @@ class CanAcceptReactionTest {
             planOwnReactionRetraction(
                 emoji = "👍",
                 knownEventIdByEmoji = mapOf("👍" to "reaction-event"),
-                ownEmojisBeforeMutation = setOf("👍", "🔥"),
+                authoritativeOwnEmojis = setOf("👍", "🔥"),
             ),
         )
     }
 
-    /** A sole own reaction can use target-wide unreact while its event id is still missing. */
+    /** An authoritatively sole own reaction can use target-wide unreact while its event id is missing. */
     @Test
-    fun soleOwnReactionFallsBackToTargetUnreactBeforeProjectionEcho() {
+    fun authoritativelySoleOwnReactionFallsBackToTargetUnreactBeforeProjectionEcho() {
         assertEquals(
             OwnReactionRetractionPlan.UnreactTarget,
             planOwnReactionRetraction(
                 emoji = "👍",
                 knownEventIdByEmoji = emptyMap(),
-                ownEmojisBeforeMutation = setOf("👍"),
+                authoritativeOwnEmojis = setOf("👍"),
             ),
         )
     }
@@ -201,7 +264,33 @@ class CanAcceptReactionTest {
             planOwnReactionRetraction(
                 emoji = "👍",
                 knownEventIdByEmoji = mapOf("👍" to "reaction-event"),
-                ownEmojisBeforeMutation = setOf("👍"),
+                authoritativeOwnEmojis = setOf("👍"),
+            ),
+        )
+    }
+
+    /** A stale sole projection deletes only the tapped event when history contains another emoji. */
+    @Test
+    fun authoritativeSecondEmojiPreventsTargetWideUnreact() {
+        assertEquals(
+            OwnReactionRetractionPlan.DeleteReactionMessage("thumb-event"),
+            planOwnReactionRetraction(
+                emoji = "👍",
+                knownEventIdByEmoji = mapOf("👍" to "thumb-event", "🔥" to "fire-event"),
+                authoritativeOwnEmojis = setOf("👍", "🔥"),
+            ),
+        )
+    }
+
+    /** Failed authoritative lookup still prefers a known tapped event over target-wide unreact. */
+    @Test
+    fun unknownAuthoritativeStateDeletesKnownTappedEvent() {
+        assertEquals(
+            OwnReactionRetractionPlan.DeleteReactionMessage("thumb-event"),
+            planOwnReactionRetraction(
+                emoji = "👍",
+                knownEventIdByEmoji = mapOf("👍" to "thumb-event"),
+                authoritativeOwnEmojis = null,
             ),
         )
     }
@@ -214,7 +303,7 @@ class CanAcceptReactionTest {
             planOwnReactionRetraction(
                 emoji = "👍",
                 knownEventIdByEmoji = emptyMap(),
-                ownEmojisBeforeMutation = setOf("👍"),
+                authoritativeOwnEmojis = null,
                 preferredEventId = "new-reaction-event",
             ),
         )
@@ -228,8 +317,23 @@ class CanAcceptReactionTest {
             planOwnReactionRetraction(
                 emoji = "👍",
                 knownEventIdByEmoji = emptyMap(),
-                ownEmojisBeforeMutation = setOf("👍", "🔥"),
+                authoritativeOwnEmojis = setOf("👍", "🔥"),
             ),
+        )
+    }
+
+    /** Raw history exposes every active own emoji so sole-ness never relies on projection alone. */
+    @Test
+    fun rawHistoryFindsAllActiveOwnReactions() {
+        val records =
+            listOf(
+                rawRecord(id = "thumb-event", kind = 7uL, plaintext = "👍", target = TARGET, recordedAt = 1uL),
+                rawRecord(id = "fire-event", kind = 7uL, plaintext = "🔥", target = TARGET, recordedAt = 2uL),
+            )
+
+        assertEquals(
+            mapOf("🔥" to "fire-event", "👍" to "thumb-event"),
+            activeOwnReactionEventIdsByEmoji(records, ACCOUNT, TARGET),
         )
     }
 

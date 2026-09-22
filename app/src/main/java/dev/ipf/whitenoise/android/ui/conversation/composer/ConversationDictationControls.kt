@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Refresh
@@ -56,6 +55,8 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDeliveryMode
 import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
+import dev.ipf.whitenoise.android.ui.common.AccountActionColors
+import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import kotlin.math.PI
 import kotlin.math.sin
 
@@ -124,6 +125,7 @@ internal fun ConversationDictationCompactActions(
     state: ConversationDictationState,
     controller: ConversationDictationController,
     modifier: Modifier = Modifier,
+    actionColors: AccountActionColors = accountActionColors(appState = null),
 ) {
     if (state is ConversationDictationState.Idle) return
     val status =
@@ -149,7 +151,7 @@ internal fun ConversationDictationCompactActions(
             horizontalArrangement = Arrangement.End,
         ) {
             if (state.hasActiveRecognitionActions) {
-                ConversationDictationActiveActions(controller)
+                ConversationDictationActiveActions(controller, actionColors)
             } else {
                 ConversationDictationPrimaryAction(
                     state = state,
@@ -216,7 +218,10 @@ private fun ConversationDictationState.compactActionsWidth(captureInProgress: Bo
  * Keeps all three explicit outcomes visible for the lifetime of app-owned recognition.
  */
 @Composable
-private fun ConversationDictationActiveActions(controller: ConversationDictationController) {
+private fun ConversationDictationActiveActions(
+    controller: ConversationDictationController,
+    actionColors: AccountActionColors,
+) {
     val pasteLabel = stringResource(R.string.paste)
     val sendLabel = stringResource(R.string.send)
     if (controller.captureInProgress) {
@@ -247,12 +252,8 @@ private fun ConversationDictationActiveActions(controller: ConversationDictation
             Icon(Icons.Default.ContentPaste, contentDescription = pasteLabel)
         }
     }
-    IconButton(
-        onClick = controller::send,
-        enabled = controller.completionActionsEnabled,
-        modifier = Modifier.size(48.dp),
-    ) {
-        if (controller.processingDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {
+    if (controller.processingDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {
+        IconButton(onClick = controller::send, enabled = false, modifier = Modifier.size(48.dp)) {
             CircularProgressIndicator(
                 modifier =
                     Modifier
@@ -261,9 +262,21 @@ private fun ConversationDictationActiveActions(controller: ConversationDictation
                         .semantics { contentDescription = sendLabel },
                 strokeWidth = 2.dp,
             )
-        } else {
-            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = sendLabel)
         }
+    } else {
+        // The same disc the composer sends with: sending a dictation is sending a message, and the
+        // two should not look like different actions.
+        ComposerActionDisc(
+            onClick = controller::send,
+            containerColor = actionColors.container,
+            contentColor = actionColors.content,
+            description = sendLabel,
+            icon = R.drawable.ic_arrow_upward,
+            enabled = controller.completionActionsEnabled,
+            // The composer's disc is 40dp wide because it sits in a crowded row. These three
+            // commands are the whole control, and each keeps a 48dp target.
+            width = 48.dp,
+        )
     }
 }
 

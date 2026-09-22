@@ -11,11 +11,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.union
@@ -168,7 +170,10 @@ internal fun ShellTransientNoticeLayout(
     persistentBottomContent: @Composable () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
-    val bottomObstruction = globalTransientNoticeInsets
+    // Only the bottom edge is a real obstruction here; consuming the full inset would also eat
+    // left/right navigation-bar padding that this layout never re-applies, letting content render
+    // under a side navigation bar while a global notice is visible.
+    val bottomObstruction = globalTransientNoticeInsets.only(WindowInsetsSides.Bottom)
     val noticeOwnsTheBottom = notice.isGlobalTransientNotice()
     Column(modifier.fillMaxSize()) {
         persistentTopContent()

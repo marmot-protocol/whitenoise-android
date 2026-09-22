@@ -193,10 +193,6 @@ internal fun ChatsScreen(
     val groupTitleCopy = rememberGroupTitleCopy()
     var showNewChatFlow by rememberSaveable { mutableStateOf(false) }
     val openNewMessageFlow = { showNewChatFlow = true }
-    // A confirmation still holding the previous account's rows must not survive into the next one,
-    // where those rows are not even addressable.
-    var pendingBulkDelete by
-        remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<List<ChatListItem>?>(null) }
     var actionSheetChatId by
         remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<String?>(null) }
     val actionMenuOwner = remember(appState.activeAccountRef, appState.runtimeGeneration) { ChatContextMenuOwner() }
@@ -291,6 +287,12 @@ internal fun ChatsScreen(
     // An archived-only folder is a view switch as well as a filter: it swaps
     // the source list to archived chats (replacing the old Archived chip).
     val showArchived = selectedFolderRule?.archivedOnly == true
+    // A confirmation still holding the previous account's or list variant's rows must not survive
+    // into the next one, where those rows are not even addressable.
+    var pendingBulkDelete by
+        remember(appState.activeAccountRef, appState.runtimeGeneration, showArchived) {
+            mutableStateOf<List<ChatListItem>?>(null)
+        }
     val searchFocusRequester = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
 

@@ -1,6 +1,9 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
+import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
+import dev.ipf.whitenoise.android.diagnostics.PerformanceResult
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.toByteArray
 import kotlinx.coroutines.CancellationException
@@ -45,30 +48,83 @@ internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
     persistInteractiveIntent: Boolean = true,
     allowExplicitRetry: Boolean = true,
 ): AttachmentPlaintext {
+    val diagnostics = AttachmentFetchDiagnostics.begin(priority)
     val cacheKey = request.run { mediaCacheKey(accountRef, groupIdHex, messageIdHex, attachmentIndex) }
     promoteQueuedAttachmentAcquisition(cacheKey, priority, allowExplicitRetry)
-    return resolveAttachmentPlaintext(
-        loadMemory = { withContext(Dispatchers.Main.immediate) { cachedMediaPlaintext(cacheKey) } },
-        loadDisk = { cancellationCheck, onAcquired ->
-            loadAttachmentDiskPlaintext(cacheKey, cancellationCheck, onAcquired)
-        },
-        cacheMemory = { bytes ->
-            withContext(Dispatchers.Main.immediate) { cacheMediaPlaintext(cacheKey, bytes) }
-        },
-        clearInteractiveIntent = {
-            clearInteractiveAttachmentIntentAfterSuccess(request, priority, persistInteractiveIntent)
-        },
-        loadMiss = {
-            acquireAttachmentPlaintextSource(
-                cacheKey = cacheKey,
-                request = request,
-                priority = priority,
-                persistInteractiveIntent = persistInteractiveIntent,
-                allowExplicitRetry = allowExplicitRetry,
+    return diagnostics.recordAttachmentFetchOutcome {
+        resolveAttachmentPlaintext(
+            loadMemory = {
+                val startedAtMs = diagnostics?.startSpan()
+                withContext(Dispatchers.Main.immediate) { cachedMediaPlaintext(cacheKey) }.also { cached ->
+                    diagnostics?.phase(
+                        phase = PerformancePhase.ATTACHMENT_MEMORY_LOOKUP,
+                        result = if (cached == null) PerformanceResult.PENDING else PerformanceResult.SUCCESS,
+                        layer = PerformanceLayer.STORAGE,
+                        durationMs = startedAtMs?.let { diagnostics.startSpan() - it } ?: 0L,
+                    )
+                }
+            },
+            loadDisk = { cancellationCheck, onAcquired ->
+                val startedAtMs = diagnostics?.startSpan()
+                loadAttachmentDiskPlaintext(cacheKey, cancellationCheck, onAcquired).also { cached ->
+                    diagnostics?.phase(
+                        phase = PerformancePhase.ATTACHMENT_DISK_LOOKUP,
+                        result = if (cached == null) PerformanceResult.PENDING else PerformanceResult.SUCCESS,
+                        layer = PerformanceLayer.STORAGE,
+                        durationMs = startedAtMs?.let { diagnostics.startSpan() - it } ?: 0L,
+                    )
+                }
+            },
+            cacheMemory = { bytes ->
+                withContext(Dispatchers.Main.immediate) { cacheMediaPlaintext(cacheKey, bytes) }
+            },
+            clearInteractiveIntent = {
+                clearInteractiveAttachmentIntentAfterSuccess(request, priority, persistInteractiveIntent)
+            },
+            loadMiss = {
+                diagnostics?.phase(
+                    phase = PerformancePhase.ATTACHMENT_ACQUISITION_START,
+                    result = PerformanceResult.PENDING,
+                    layer = PerformanceLayer.MDK,
+                )
+                acquireAttachmentPlaintextSource(
+                    cacheKey = cacheKey,
+                    request = request,
+                    priority = priority,
+                    persistInteractiveIntent = persistInteractiveIntent,
+                    allowExplicitRetry = allowExplicitRetry,
+                    diagnostics = diagnostics,
+                )
+            },
+        ).also {
+            diagnostics?.phase(
+                phase = PerformancePhase.ATTACHMENT_PLAINTEXT_READY,
+                layer = PerformanceLayer.STORAGE,
             )
-        },
-    )
+        }
+    }
 }
+
+/** Records only closed success, cancellation, or failure shape around one fetch. */
+@Suppress("TooGenericExceptionCaught") // This boundary intentionally classifies every non-cancellation failure.
+private suspend fun AttachmentFetchDiagnostics?.recordAttachmentFetchOutcome(
+    block: suspend () -> AttachmentPlaintext,
+): AttachmentPlaintext =
+    try {
+        block()
+    } catch (cancellation: CancellationException) {
+        this?.phase(
+            phase = PerformancePhase.ATTACHMENT_FETCH_FAILED,
+            result = PerformanceResult.DROPPED,
+        )
+        throw cancellation
+    } catch (throwable: Throwable) {
+        this?.phase(
+            phase = PerformancePhase.ATTACHMENT_FETCH_FAILED,
+            result = PerformanceResult.FAILURE,
+        )
+        throw throwable
+    }
 
 /** Moves an already-shared automatic owner before cache probes can let another queued transfer win. */
 private fun WhiteNoiseAppState.promoteQueuedAttachmentAcquisition(
@@ -119,6 +175,7 @@ private suspend fun WhiteNoiseAppState.acquireAttachmentPlaintextSource(
     priority: AttachmentDownloadPriority,
     persistInteractiveIntent: Boolean,
     allowExplicitRetry: Boolean,
+    diagnostics: AttachmentFetchDiagnostics?,
 ): AttachmentPlaintext {
     promoteActiveAttachmentAcquisition(cacheKey, request, priority, allowExplicitRetry)
     val resolved =
@@ -126,7 +183,7 @@ private suspend fun WhiteNoiseAppState.acquireAttachmentPlaintextSource(
             val target = resolveNativeAttachmentTarget(request) ?: throw AttachmentReferenceNotReadyException()
             val qualifiedRequest = request.copy(sourceMessageIdHex = target.sourceMessageIdHex)
             if (!hasNativeAttachment(qualifiedRequest)) {
-                acquireNativeAttachment(qualifiedRequest, priority, allowExplicitRetry)
+                acquireNativeAttachment(qualifiedRequest, priority, allowExplicitRetry, diagnostics)
             }
             AttachmentAcquisitionOutcome.NativeRetained(qualifiedRequest)
         }.await()
