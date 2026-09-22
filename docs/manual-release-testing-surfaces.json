@@ -23905,6 +23905,18 @@
         ]
       },
       {
+        "surface": "Wave hi greets the added member from an authenticated group-system row",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationRows.kt",
+        "anchor": "R.string.wave_hi",
+        "test_ids": ["CON-019"]
+      },
+      {
+        "surface": "Wave sends a mention without changing the composer draft",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "onWave =",
+        "test_ids": ["CON-019"]
+      },
+      {
         "surface": "An empty conversation explains its disappearing-message policy without claiming history was lost",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationEmptyState.kt",
         "anchor": "internal fun conversationEmptyState(",

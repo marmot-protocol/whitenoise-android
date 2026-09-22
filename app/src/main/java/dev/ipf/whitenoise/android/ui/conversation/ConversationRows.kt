@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,6 +37,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -219,6 +221,7 @@ internal fun GroupSystemRow(
     appState: WhiteNoiseAppState,
     groupSystem: GroupSystemEventFfi? = null,
     onDeleteForMe: (() -> Unit)? = null,
+    onWave: ((String) -> Unit)? = null,
 ) {
     val copy = rememberGroupSystemCopy()
     val event =
@@ -265,40 +268,57 @@ internal fun GroupSystemRow(
                 .padding(vertical = GroupSystemRowVerticalPadding),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box {
-            Text(
-                text = summary,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier =
-                    Modifier
-                        .widthIn(max = 440.dp)
-                        .then(
-                            if (onDeleteForMe != null && record.messageIdHex.isNotBlank()) {
-                                Modifier.combinedClickable(
-                                    onClick = {},
-                                    onLongClick = { actionMenuOpen = true },
-                                )
-                            } else {
-                                Modifier
-                            },
-                        ),
-            )
-            DropdownMenu(
-                expanded = actionMenuOpen,
-                onDismissRequest = { actionMenuOpen = false },
-                shape = MenuDefaults.shape,
-                border = amoledSurfaceBorderStroke(),
-            ) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.delete_for_me)) },
-                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
-                    onClick = {
-                        actionMenuOpen = false
-                        onDeleteForMe?.invoke()
-                    },
+        FlowRow(
+            horizontalArrangement = Arrangement.Center,
+            itemVerticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box {
+                Text(
+                    text = summary,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier =
+                        Modifier
+                            .widthIn(max = 440.dp)
+                            .then(
+                                if (onDeleteForMe != null && record.messageIdHex.isNotBlank()) {
+                                    Modifier.combinedClickable(
+                                        onClick = {},
+                                        onLongClick = { actionMenuOpen = true },
+                                    )
+                                } else {
+                                    Modifier
+                                },
+                            ),
                 )
+                DropdownMenu(
+                    expanded = actionMenuOpen,
+                    onDismissRequest = { actionMenuOpen = false },
+                    shape = MenuDefaults.shape,
+                    border = amoledSurfaceBorderStroke(),
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.delete_for_me)) },
+                        leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                        onClick = {
+                            actionMenuOpen = false
+                            onDeleteForMe?.invoke()
+                        },
+                    )
+                }
+            }
+            val waveTarget =
+                event?.subject?.takeIf {
+                    event.fromAuthenticatedStateProjection &&
+                        event.systemType == "member_added" &&
+                        it.isNotBlank() &&
+                        !GroupSystemEvents.isSelf(appState.activeAccount?.accountIdHex, it)
+                }
+            if (waveTarget != null && onWave != null) {
+                TextButton(onClick = { onWave(waveTarget) }) {
+                    Text(stringResource(R.string.wave_hi))
+                }
             }
         }
         // Developer-mode only: keep the one-line summary as the default and tuck

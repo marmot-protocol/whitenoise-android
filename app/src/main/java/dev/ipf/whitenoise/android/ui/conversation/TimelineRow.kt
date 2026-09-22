@@ -77,6 +77,7 @@ internal fun TimelineRow(
     ttsQuickTransportViewportLock: TtsQuickTransportViewportLock? = null,
     ttsSentenceLayoutSink: ConversationTtsSentenceLayoutSink? = null,
     onTtsSentenceSeek: (TtsState) -> Unit = {},
+    onWave: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier.fillMaxWidth()) {
@@ -135,6 +136,7 @@ internal fun TimelineRow(
                         record = item.record,
                         appState = appState,
                         groupSystem = item.projected?.groupSystem,
+                        onWave = onWave,
                         onDeleteForMe =
                             if (controller.group.pendingConfirmation) {
                                 null

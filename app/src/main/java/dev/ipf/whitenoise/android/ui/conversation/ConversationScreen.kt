@@ -3950,6 +3950,35 @@ internal fun ConversationScreen(
                                         onQuickReactionsSave = { saveQuickReactionEmojis(it) },
                                         onReplyPreviewClick = { navigateToReplyTarget(it) },
                                         composerGate = composerGate,
+                                        onWave =
+                                            if (
+                                                composerGate == ComposerGate.COMPOSER &&
+                                                controller.canSendMessages &&
+                                                controller.editingMessageId == null &&
+                                                controller.replyingTo == null
+                                            ) {
+                                                { accountIdHex ->
+                                                    appState.launchMutation {
+                                                        if (!controller.canSendMessages ||
+                                                            controller.editingMessageId != null ||
+                                                            controller.replyingTo != null
+                                                        ) {
+                                                            return@launchMutation
+                                                        }
+                                                        val npub = appState.npubForDisplay(accountIdHex)
+                                                        if (npub.isBlank()) {
+                                                            appState.present(R.string.send_failed)
+                                                            return@launchMutation
+                                                        }
+                                                        controller.send("👋 @$npub", onAccepted = {
+                                                            acceptedSendRevealedTranscript = true
+                                                            revealSentMessage()
+                                                        })
+                                                    }
+                                                }
+                                            } else {
+                                                null
+                                            },
                                         onBack = exitConversation,
                                         mentionCandidates = mentionPicker.candidates,
                                         mentionPickerEnabled = mentionPicker.enabled,
