@@ -92,6 +92,7 @@ import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
+import dev.ipf.whitenoise.android.diagnostics.PerformanceConnectivity
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
 import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
@@ -5390,6 +5391,7 @@ class WhiteNoiseAppState private constructor(
      */
     private fun clearInMemoryMediaCaches() {
         assertMainThread { "clearInMemoryMediaCaches" }
+        pendingSendDiagnostics.clear()
         mediaPlaintextCache.clear()
         mediaThumbnailCache.clear()
         bumpMediaCacheRevision()
@@ -6977,6 +6979,21 @@ class WhiteNoiseAppState private constructor(
      */
     private val connectivitySignalOwner = ConnectivitySignalOwner()
     val connectivitySignals = connectivitySignalOwner.signals
+
+    /** Process-owned, bounded send tracing that survives conversation-screen disposal. */
+    internal val pendingSendDiagnostics =
+        PendingSendDiagnosticTracker(
+            scope = mutationsScope,
+            nowMs = SystemClock::elapsedRealtime,
+            connectivity = {
+                val signals = connectivitySignals.value
+                when {
+                    !signals.hasValidatedInternet -> PerformanceConnectivity.OFFLINE
+                    signals.relaysConnected -> PerformanceConnectivity.ONLINE_WITH_RELAY
+                    else -> PerformanceConnectivity.ONLINE_NO_RELAY
+                }
+            },
+        )
 
     private fun updateConnectivitySignals(
         hasValidatedInternet: Boolean? = null,

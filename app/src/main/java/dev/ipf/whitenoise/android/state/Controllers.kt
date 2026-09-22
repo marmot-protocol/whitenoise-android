@@ -91,6 +91,7 @@ import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
 import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import dev.ipf.whitenoise.android.diagnostics.PerformanceResult
+import dev.ipf.whitenoise.android.diagnostics.PerformanceSendStage
 import dev.ipf.whitenoise.android.diagnostics.PerformanceTrace
 import dev.ipf.whitenoise.android.media.GroupImageMutationFailure
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
@@ -2634,6 +2635,10 @@ class ChatsController private constructor(
                 )
             }
         entryKey?.let { acceptedEntryKey ->
+            appState.pendingSendDiagnostics.surfaceSettled(
+                acceptedEntryKey,
+                PerformancePhase.CHAT_LIST_SETTLED,
+            )
             state.entries[acceptedEntryKey]
                 ?.takeIf { it.confirmedMessageIdHex == null }
                 ?.let { entry ->
@@ -5774,11 +5779,6 @@ private const val TIMELINE_BATCH_CAP = 32
 // one frame without delaying the next paint.
 private const val TIMELINE_BATCH_DRAIN_MS = 6L
 
-// DEBUG-only bound on the send-latency trace map (issue #913). Small: at most a
-// handful of sends are in flight before their echo reconciles; the cap only
-// guards against a burst of never-echoed sends leaking entries.
-private const val SEND_TRACE_MAX_TRACKED = 64
-
 internal fun groupWithPublicAvatar(
     group: AppGroupRecordFfi,
     avatarUrl: String?,
@@ -6448,16 +6448,6 @@ class ConversationController(
     private val unprojectedOwnReactionEventIds = linkedMapOf<Pair<String, String>, String>()
     private val inFlightOwnReactionAdds = linkedMapOf<Pair<String, String>, CompletableDeferred<String?>>()
 
-    // DEBUG-only send-latency trace bookkeeping (issue #913): maps a pending
-    // optimistic text message's temp id to (traceSequence, monotonicStartMs) so
-    // the engine-echo reconcile that flips the bubble pending → sent
-    // (upsertProjectedRecord) can log the accepted → echoed-reconcile latency —
-    // the "self-echo drives the flip" candidate. Short-lived lifecycle state:
-    // entries are added on optimistic send and removed on reconcile; bounded so
-    // a burst of never-echoed sends can't grow it. Holds no protocol data (only
-    // a local temp id, a one-run sequence string, and a monotonic long), so it
-    // is not an Android-owned cache of White Noise data (AGENTS.md).
-    private val sendTraceByTempId = linkedMapOf<String, PerformanceTrace>()
     private val controllerScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val initialTimelineSubscriptionRead =
         SingleFlightBoundedInitialResourceRead<ConversationTimelineSubscriptionHandle>(
@@ -7680,6 +7670,7 @@ class ConversationController(
         // screen. The chat-list order is reserved, but its preview waits for
         // the parser so raw Markdown never flashes there.
         sendTrace(trace, PerformancePhase.OPTIMISTIC_SHOWN, result = PerformanceResult.PENDING)
+        appState.pendingSendDiagnostics.update(tempId, PerformanceSendStage.OPTIMISTIC)
         // Starts as the plain-rendered record so every failure path below has a
         // valid record even if hydration is cut short; the styled rebind lands
         // inside the same try region as the publish it precedes.
@@ -7747,7 +7738,11 @@ class ConversationController(
                     timelineOrder = optimisticOrder,
                     acceptedPendingTextOptimisticIdsByMessageId = acceptedPendingTextOptimisticIds,
                 )
-            convergeAcceptedPendingTextSend(account, reconciliation)
+            recordAcceptedPendingDiagnostics(tempId, reconciliation)
+            convergeAcceptedPendingTextSend(account, reconciliation, tempId)
+            if (reconciliation.awaitingProjection) {
+                appState.pendingSendDiagnostics.update(tempId, PerformanceSendStage.WAITING_PROJECTION)
+            }
             if (!reconciliation.acceptedPending) {
                 transferRetentionAtSend(tempId, reconciliation.confirmedId)
                 appState.commitOptimisticSentPreview(
@@ -7806,6 +7801,7 @@ class ConversationController(
                     result = PerformanceResult.PENDING,
                     layer = PerformanceLayer.TRANSPORT,
                 )
+                appState.pendingSendDiagnostics.update(tempId, PerformanceSendStage.DELIVERY_UNCERTAIN)
                 Log.w(
                     "ConversationController",
                     "message delivery uncertain; keeping pending type=${throwable.javaClass.simpleName}",
@@ -7851,11 +7847,40 @@ class ConversationController(
         isTransientRelaySendError(throwable) ||
             (textPublisher == null && isTransientRuntimeWorkerError(throwable))
 
+    /** Marks native durable ownership without inventing an unavailable inner MDK queue phase. */
+    private fun recordAcceptedPendingDiagnostics(
+        optimisticId: String,
+        reconciliation: SuccessfulTextSendReconciliation,
+    ) {
+        if (!reconciliation.acceptedPending) return
+        appState.pendingSendDiagnostics.milestone(
+            optimisticId,
+            PerformancePhase.DURABLE_ACCEPTED,
+            PerformanceSendStage.ACCEPTED_PENDING,
+            layer = PerformanceLayer.MDK,
+        )
+        appState.pendingSendDiagnostics.milestone(
+            optimisticId,
+            PerformancePhase.ENGINE_PHASE_UNAVAILABLE,
+            PerformanceSendStage.ACCEPTED_PENDING,
+            layer = PerformanceLayer.MDK,
+        )
+    }
+
     /** Keeps accepted-pending settlement alive when navigation disposes this conversation's visible route. */
     private suspend fun convergeAcceptedPendingTextSend(
         account: String,
         reconciliation: SuccessfulTextSendReconciliation,
+        optimisticId: String,
     ) {
+        if (!reconciliation.acceptedPending) return
+        appState.pendingSendDiagnostics.milestone(
+            optimisticId,
+            PerformancePhase.CONVERGENCE_START,
+            PerformanceSendStage.CONVERGENCE,
+            layer = PerformanceLayer.MDK,
+        )
+        var deferred = false
         runAcceptedPendingTextConvergence(
             acceptedPending = reconciliation.acceptedPending,
             converge = {
@@ -7864,12 +7889,20 @@ class ConversationController(
                 }
             },
             onFailure = { throwable ->
+                deferred = true
                 Log.w(
                     "ConversationController",
                     "accepted-pending convergence deferred; keeping preview pending",
                     throwable,
                 )
             },
+        )
+        appState.pendingSendDiagnostics.milestone(
+            optimisticId,
+            if (deferred) PerformancePhase.CONVERGENCE_DEFERRED else PerformancePhase.CONVERGENCE_RETURN,
+            PerformanceSendStage.WAITING_PROJECTION,
+            result = if (deferred) PerformanceResult.FAILURE else PerformanceResult.PENDING,
+            layer = PerformanceLayer.MDK,
         )
     }
 
@@ -7891,13 +7924,14 @@ class ConversationController(
             retryPendingConversationSend(
                 connectivityRecoveryGeneration = appState.validatedConnectivityRecoveryGeneration,
                 retryableFailure = ::isRetryableTextAdmissionError,
-                onTransientFailure = { attempt, _ -> logSendRetry(trace, attempt) },
+                onTransientFailure = { attempt, _ -> logSendRetry(trace, clientToken, attempt) },
             ) { attempt ->
                 // Serialize only this commit-producing FFI attempt. Releasing the
                 // commit lock before retry backoff keeps reactions and other
                 // mutations usable; the outer text-order lock keeps later text
                 // sends behind this one until its outcome is known.
                 val lockWaitStartMs = trace?.let { traceNowMs() }
+                updatePendingSendStage(clientToken, PerformanceSendStage.WAITING_COMMIT_LOCK, attempt)
                 appState.withGroupCommitLock(account, group.groupIdHex) {
                     val lockHeldAtMs = trace?.let { traceNowMs() }
                     sendTrace(
@@ -7906,6 +7940,7 @@ class ConversationController(
                         durationMs = lockHeldAtMs?.minus(lockWaitStartMs ?: lockHeldAtMs) ?: 0L,
                         attempt = attempt,
                     )
+                    updatePendingSendStage(clientToken, PerformanceSendStage.FFI_ADMISSION, attempt)
                     // Measure admission separately from transport publication.
                     val ffiStartMs = trace?.let { traceNowMs() }
                     sendTrace(
@@ -7960,6 +7995,7 @@ class ConversationController(
      */
     private suspend fun logSendRetry(
         trace: PerformanceTrace?,
+        optimisticId: String,
         attempt: Int,
     ) {
         if (trace == null) return
@@ -7970,8 +8006,19 @@ class ConversationController(
             result = PerformanceResult.FAILURE,
             layer = PerformanceLayer.TRANSPORT,
             attempt = attempt,
-            queueDepth = health?.let { it.totalRelays.toInt() - it.connected.toInt() },
+            connectedRelays = health?.connected?.toInt(),
+            totalRelays = health?.totalRelays?.toInt(),
         )
+        updatePendingSendStage(optimisticId, PerformanceSendStage.WAITING_COMMIT_LOCK, attempt)
+    }
+
+    /** Updates the closed stage sampled if this send crosses a pending checkpoint. */
+    private fun updatePendingSendStage(
+        optimisticId: String,
+        stage: PerformanceSendStage,
+        attempt: Int,
+    ) {
+        appState.pendingSendDiagnostics.update(optimisticId, stage, attempt)
     }
 
     /**
@@ -9497,6 +9544,7 @@ class ConversationController(
                 return
             }
             retryTrace = PerformanceDiagnostics.begin(PerformanceOperation.TEXT_SEND)
+            rememberSendTrace(tempId, retryTrace)
             sendTrace(
                 retryTrace,
                 PerformancePhase.MANUAL_RETRY,
@@ -9511,6 +9559,7 @@ class ConversationController(
                 messageById.remove(tempId)
                 retentionAtSendByMessageId.remove(tempId)
                 rollbackOptimisticChatListPreview(tempId)
+                forgetSendTrace(tempId)
                 publishTimelineFromIndexes()
                 return
             }
@@ -9527,7 +9576,13 @@ class ConversationController(
                     timelineOrder = order,
                     acceptedPendingTextOptimisticIdsByMessageId = acceptedPendingTextOptimisticIds,
                 )
-            convergeAcceptedPendingTextSend(account, reconciliation)
+            recordAcceptedPendingDiagnostics(tempId, reconciliation)
+            convergeAcceptedPendingTextSend(account, reconciliation, tempId)
+            if (reconciliation.awaitingProjection) {
+                appState.pendingSendDiagnostics.update(tempId, PerformanceSendStage.WAITING_PROJECTION)
+            } else {
+                forgetSendTrace(tempId)
+            }
             if (!reconciliation.acceptedPending) {
                 transferRetentionAtSend(tempId, reconciliation.confirmedId)
                 appState.commitOptimisticSentPreview(
@@ -9575,6 +9630,7 @@ class ConversationController(
                 messageById.remove(tempId)
                 retentionAtSendByMessageId.remove(tempId)
                 rollbackOptimisticChatListPreview(tempId)
+                forgetSendTrace(tempId)
                 publishTimelineFromIndexes()
             }
             throwable.isUseAfterEviction() -> {
@@ -9583,6 +9639,7 @@ class ConversationController(
                 durableAcceptanceCallbacks.remove(key)
                 messageById.remove(tempId)
                 retentionAtSendByMessageId.remove(tempId)
+                forgetSendTrace(tempId)
                 publishTimelineFromIndexes()
                 markActiveAccountRemovedFromMembers(account)
             }
@@ -9596,6 +9653,7 @@ class ConversationController(
                     result = PerformanceResult.PENDING,
                     layer = PerformanceLayer.TRANSPORT,
                 )
+                appState.pendingSendDiagnostics.update(tempId, PerformanceSendStage.DELIVERY_UNCERTAIN)
                 publishTimelineFromIndexes()
             }
             else -> {
@@ -9614,6 +9672,7 @@ class ConversationController(
                     ),
                 )
                 publishTimelineFromIndexes()
+                forgetSendTrace(tempId)
                 presentSendFailure(appState, throwable, sendFailureAttempt(key))
             }
         }
@@ -12763,7 +12822,8 @@ class ConversationController(
         result: PerformanceResult = PerformanceResult.SUCCESS,
         layer: PerformanceLayer = PerformanceLayer.ANDROID,
         attempt: Int? = null,
-        queueDepth: Int? = null,
+        connectedRelays: Int? = null,
+        totalRelays: Int? = null,
         count: Int? = null,
     ) {
         if (trace == null) return
@@ -12775,7 +12835,8 @@ class ConversationController(
             result = result,
             layer = layer,
             attempt = attempt,
-            queueDepth = queueDepth,
+            connectedRelays = connectedRelays,
+            totalRelays = totalRelays,
             count = count,
         )
     }
@@ -12787,16 +12848,11 @@ class ConversationController(
         tempId: String,
         trace: PerformanceTrace?,
     ) {
-        if (trace == null) return
-        sendTraceByTempId[tempId] = trace
-        while (sendTraceByTempId.size > SEND_TRACE_MAX_TRACKED) {
-            val oldest = sendTraceByTempId.keys.firstOrNull() ?: break
-            sendTraceByTempId.remove(oldest)
-        }
+        appState.pendingSendDiagnostics.track(tempId, trace)
     }
 
     private fun forgetSendTrace(tempId: String) {
-        sendTraceByTempId.remove(tempId)
+        appState.pendingSendDiagnostics.forget(tempId)
     }
 
     // Called when the engine echo reconciles a pending optimistic bubble into a
@@ -12806,8 +12862,16 @@ class ConversationController(
     // success block, the "subscription churn / self-echo drives the flip"
     // candidate in issue #913.
     private fun traceEchoReconcile(optimisticId: String) {
-        val trace = sendTraceByTempId.remove(optimisticId) ?: return
-        sendTrace(trace, PerformancePhase.ECHO_RECONCILE)
+        appState.pendingSendDiagnostics.milestone(
+            optimisticId,
+            PerformancePhase.ECHO_RECONCILE,
+            PerformanceSendStage.WAITING_PROJECTION,
+            result = PerformanceResult.SUCCESS,
+        )
+        appState.pendingSendDiagnostics.surfaceSettled(
+            optimisticId,
+            PerformancePhase.TIMELINE_SETTLED,
+        )
     }
 
     init {

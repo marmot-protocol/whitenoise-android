@@ -7,6 +7,13 @@ import java.util.concurrent.atomic.AtomicLong
 
 private const val ROUTINE_SPAN_THRESHOLD_MS = 5L
 
+/** Restricts compile-time source revisions to a short non-user-controlled token. */
+private fun sanitizePerformanceRevision(value: String): String =
+    value
+        .take(PerformanceDiagnosticEmitter.REVISION_LENGTH_LIMIT)
+        .takeIf { it.isNotEmpty() && it.all { character -> character.isLetterOrDigit() || character in "._-" } }
+        ?: PerformanceDiagnosticEmitter.UNKNOWN_REVISION
+
 /** Operations accepted by the privacy-reviewed WNPerf schema. */
 internal enum class PerformanceOperation(
     val wireName: String,
@@ -83,12 +90,21 @@ internal enum class PerformancePhase(
     TRANSPORT_COMPLETE("transport_complete"),
     FFI_ERROR("ffi_error"),
     TRANSIENT_RETRY("transient_retry"),
+    DURABLE_ACCEPTED("durable_accepted"),
+    ENGINE_PHASE_UNAVAILABLE("engine_phase_unavailable"),
+    CONVERGENCE_START("convergence_start"),
+    CONVERGENCE_RETURN("convergence_return"),
+    CONVERGENCE_DEFERRED("convergence_deferred"),
+    PENDING_CHECKPOINT_10S("pending_checkpoint_10s"),
+    PENDING_CHECKPOINT_60S("pending_checkpoint_60s"),
     DELIVERY_UNCERTAIN("delivery_uncertain"),
     SENT_FLIP("sent_flip"),
     SEND_COMPLETE("send_complete"),
     SEND_FAILED("send_failed"),
     MANUAL_RETRY("manual_retry"),
     ECHO_RECONCILE("echo_reconcile"),
+    TIMELINE_SETTLED("timeline_settled"),
+    CHAT_LIST_SETTLED("chat_list_settled"),
     EVENTS_DROPPED("events_dropped"),
     PAGE_ANCHOR("page_anchor"),
     PAGE_WINDOW("page_window"),
@@ -115,6 +131,28 @@ internal enum class PerformanceLayer(
     TRANSPORT("transport"),
 }
 
+/** Closed Android-visible send stage sampled by delayed-pending checkpoints. */
+internal enum class PerformanceSendStage(
+    val wireName: String,
+) {
+    OPTIMISTIC("optimistic"),
+    WAITING_COMMIT_LOCK("waiting_commit_lock"),
+    FFI_ADMISSION("ffi_admission"),
+    ACCEPTED_PENDING("accepted_pending"),
+    CONVERGENCE("convergence"),
+    WAITING_PROJECTION("waiting_projection"),
+    DELIVERY_UNCERTAIN("delivery_uncertain"),
+}
+
+/** Coarse connectivity snapshot; it deliberately exposes no relay identity or URL. */
+internal enum class PerformanceConnectivity(
+    val wireName: String,
+) {
+    OFFLINE("offline"),
+    ONLINE_NO_RELAY("online_no_relay"),
+    ONLINE_WITH_RELAY("online_with_relay"),
+}
+
 internal class PerformanceTrace internal constructor(
     val operation: PerformanceOperation,
     val trigger: PerformanceTrigger? = null,
@@ -136,15 +174,20 @@ internal data class PerformanceDiagnosticStatus(
 }
 
 /**
- * Pure bounded emitter used by [PerformanceDiagnostics]. Inputs are limited to
- * enums and bounded numbers, so identifiers and user-controlled text cannot
- * enter the serialized log line by construction.
+ * Pure bounded emitter used by [PerformanceDiagnostics]. Event inputs are
+ * limited to enums and bounded numbers; source revisions are compile-time
+ * values restricted to a short safe character set. Identifiers and
+ * user-controlled text therefore cannot enter serialized lines.
  */
 internal class PerformanceDiagnosticEmitter(
     private val available: Boolean,
+    appRevision: String,
+    mdkRevision: String,
     private val nowMs: () -> Long,
     private val sink: (String) -> Unit,
 ) {
+    private val appRevision = sanitizePerformanceRevision(appRevision)
+    private val mdkRevision = sanitizePerformanceRevision(mdkRevision)
     private var activeUntilMs = 0L
     private var sessionStartedAtMs = 0L
     private var emittedCount = 0
@@ -215,8 +258,11 @@ internal class PerformanceDiagnosticEmitter(
         result: PerformanceResult = PerformanceResult.SUCCESS,
         layer: PerformanceLayer = PerformanceLayer.ANDROID,
         attempt: Int? = null,
-        queueDepth: Int? = null,
+        connectedRelays: Int? = null,
+        totalRelays: Int? = null,
         count: Int? = null,
+        sendStage: PerformanceSendStage? = null,
+        connectivity: PerformanceConnectivity? = null,
     ) {
         val currentTrace = trace ?: return
         val now = nowMs()
@@ -243,8 +289,11 @@ internal class PerformanceDiagnosticEmitter(
                     result = result,
                     layer = layer,
                     attempt = attempt,
-                    queueDepth = queueDepth,
+                    connectedRelays = connectedRelays,
+                    totalRelays = totalRelays,
                     count = count,
+                    sendStage = sendStage,
+                    connectivity = connectivity,
                 ),
             )
             emittedCount += 1
@@ -260,11 +309,18 @@ internal class PerformanceDiagnosticEmitter(
         result: PerformanceResult,
         layer: PerformanceLayer,
         attempt: Int?,
-        queueDepth: Int?,
+        connectedRelays: Int?,
+        totalRelays: Int?,
         count: Int?,
+        sendStage: PerformanceSendStage?,
+        connectivity: PerformanceConnectivity?,
     ): String =
         buildString {
-            append("schema=1 session=p#")
+            append("schema=2 app_rev=")
+            append(appRevision)
+            append(" mdk_rev=")
+            append(mdkRevision)
+            append(" session=p#")
             append(trace.sessionGeneration)
             append(" op=")
             append(trace.operation.wireName)
@@ -286,13 +342,25 @@ internal class PerformanceDiagnosticEmitter(
                 append(" attempt=")
                 append(it.coerceIn(0, ATTEMPT_LIMIT))
             }
-            queueDepth?.let {
-                append(" queue_depth=")
+            connectedRelays?.let {
+                append(" relay_connected=")
+                append(it.coerceIn(0, NUMERIC_COUNT_LIMIT))
+            }
+            totalRelays?.let {
+                append(" relay_total=")
                 append(it.coerceIn(0, NUMERIC_COUNT_LIMIT))
             }
             count?.let {
                 append(" count=")
                 append(it.coerceIn(0, NUMERIC_COUNT_LIMIT))
+            }
+            sendStage?.let {
+                append(" send_stage=")
+                append(it.wireName)
+            }
+            connectivity?.let {
+                append(" connectivity=")
+                append(it.wireName)
             }
         }
 
@@ -316,8 +384,11 @@ internal class PerformanceDiagnosticEmitter(
                         result = PerformanceResult.DROPPED,
                         layer = PerformanceLayer.ANDROID,
                         attempt = null,
-                        queueDepth = null,
+                        connectedRelays = null,
+                        totalRelays = null,
                         count = droppedCount,
+                        sendStage = null,
+                        connectivity = null,
                     ),
                 )
                 emittedCount += 1
@@ -350,6 +421,8 @@ internal class PerformanceDiagnosticEmitter(
         const val DATA_EVENT_LIMIT = SESSION_EVENT_LIMIT - 1
         const val ATTEMPT_LIMIT = 100
         const val NUMERIC_COUNT_LIMIT = 1_000_000
+        const val REVISION_LENGTH_LIMIT = 40
+        const val UNKNOWN_REVISION = "unknown"
     }
 }
 
@@ -358,6 +431,8 @@ internal object PerformanceDiagnostics {
     private val emitter =
         PerformanceDiagnosticEmitter(
             available = BuildConfig.ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS,
+            appRevision = BuildConfig.APP_SHORT_SHA,
+            mdkRevision = BuildConfig.MDK_SHORT_SHA,
             nowMs = SystemClock::elapsedRealtime,
             sink = { line -> Log.i(LOG_TAG, line) },
         )
@@ -396,10 +471,26 @@ internal object PerformanceDiagnostics {
         result: PerformanceResult = PerformanceResult.SUCCESS,
         layer: PerformanceLayer = PerformanceLayer.ANDROID,
         attempt: Int? = null,
-        queueDepth: Int? = null,
+        connectedRelays: Int? = null,
+        totalRelays: Int? = null,
         count: Int? = null,
+        sendStage: PerformanceSendStage? = null,
+        connectivity: PerformanceConnectivity? = null,
     ) {
-        emitter.record(trace, phase, elapsedMs, durationMs, result, layer, attempt, queueDepth, count)
+        emitter.record(
+            trace,
+            phase,
+            elapsedMs,
+            durationMs,
+            result,
+            layer,
+            attempt,
+            connectedRelays,
+            totalRelays,
+            count,
+            sendStage,
+            connectivity,
+        )
     }
 
     private const val LOG_TAG = "WNPerf"

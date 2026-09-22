@@ -36,8 +36,11 @@ class PerformanceDiagnosticSchemaTest {
             result = PerformanceResult.SUCCESS,
             layer = PerformanceLayer.FFI,
             attempt = Int.MAX_VALUE,
-            queueDepth = Int.MIN_VALUE,
+            connectedRelays = Int.MIN_VALUE,
+            totalRelays = Int.MAX_VALUE,
             count = Int.MAX_VALUE,
+            sendStage = PerformanceSendStage.WAITING_PROJECTION,
+            connectivity = PerformanceConnectivity.ONLINE_NO_RELAY,
         )
 
         assertSchemaAllowlists(lines.single())
@@ -74,14 +77,17 @@ class PerformanceDiagnosticSchemaTest {
 
     private fun assertSchemaAllowlists(line: String) {
         assertEquals(
-            "schema=1 session=p#1 op=text_send phase=ffi_return " +
+            "schema=2 app_rev=app1234 mdk_rev=mdk5678 session=p#1 op=text_send phase=ffi_return " +
                 "elapsed_ms=1800000 duration_ms=1800000 result=success layer=ffi " +
-                "attempt=100 queue_depth=0 count=1000000",
+                "attempt=100 relay_connected=0 relay_total=1000000 count=1000000 " +
+                "send_stage=waiting_projection connectivity=online_no_relay",
             line,
         )
         assertEquals(
             listOf(
                 "schema",
+                "app_rev",
+                "mdk_rev",
                 "session",
                 "op",
                 "phase",
@@ -90,8 +96,11 @@ class PerformanceDiagnosticSchemaTest {
                 "result",
                 "layer",
                 "attempt",
-                "queue_depth",
+                "relay_connected",
+                "relay_total",
                 "count",
+                "send_stage",
+                "connectivity",
             ),
             line.split(' ').map { it.substringBefore('=') },
         )
@@ -108,7 +117,7 @@ class PerformanceDiagnosticSchemaTest {
             ),
             PerformanceOperation.entries.mapTo(mutableSetOf()) { it.wireName },
         )
-        assertTrue(PerformancePhase.entries.all { it.wireName.matches(Regex("[a-z_]+")) })
+        assertTrue(PerformancePhase.entries.all { it.wireName.matches(Regex("[a-z0-9_]+")) })
         assertEquals(
             setOf("pending", "success", "failure", "dropped"),
             PerformanceResult.entries.mapTo(mutableSetOf()) { it.wireName },
@@ -116,6 +125,11 @@ class PerformanceDiagnosticSchemaTest {
         assertEquals(
             setOf("android", "ffi", "mdk", "storage", "transport"),
             PerformanceLayer.entries.mapTo(mutableSetOf()) { it.wireName },
+        )
+        assertTrue(PerformanceSendStage.entries.all { it.wireName.matches(Regex("[a-z_]+")) })
+        assertEquals(
+            setOf("offline", "online_no_relay", "online_with_relay"),
+            PerformanceConnectivity.entries.mapTo(mutableSetOf()) { it.wireName },
         )
     }
 
@@ -269,11 +283,36 @@ class PerformanceDiagnosticSchemaTest {
         denied.forEach { value -> assertTrue(lines.none { value in it }) }
     }
 
+    @Test
+    fun sourceRevisionsAreStrictlySanitizedAndBounded() {
+        val lines = mutableListOf<String>()
+        val emitter =
+            PerformanceDiagnosticEmitter(
+                available = true,
+                appRevision = "bad revision with spaces",
+                mdkRevision = "a".repeat(100),
+                nowMs = { 0L },
+                sink = lines::add,
+            )
+        emitter.start()
+        val trace = assertNotNullTrace(emitter.begin(PerformanceOperation.TEXT_SEND))
+        emitter.record(trace, PerformancePhase.ACCEPTED, elapsedMs = 0L)
+
+        assertTrue(lines.single().startsWith("schema=2 app_rev=unknown mdk_rev=${"a".repeat(40)} "))
+    }
+
     private fun emitter(
         available: Boolean = true,
         now: () -> Long = { 0L },
         lines: MutableList<String> = mutableListOf(),
-    ): PerformanceDiagnosticEmitter = PerformanceDiagnosticEmitter(available, now, lines::add)
+    ): PerformanceDiagnosticEmitter =
+        PerformanceDiagnosticEmitter(
+            available = available,
+            appRevision = "app1234",
+            mdkRevision = "mdk5678",
+            nowMs = now,
+            sink = lines::add,
+        )
 
     private fun assertNotNullTrace(trace: PerformanceTrace?): PerformanceTrace {
         assertNotNull(trace)
@@ -299,6 +338,7 @@ class PerformanceDiagnosticBuildGateTest {
         val debug = gradle.substringAfter("debug {").substringBefore("release {")
 
         assertTrue(defaultConfig.contains("ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS\", \"false"))
+        assertTrue(defaultConfig.contains("APP_SHORT_SHA\", buildShortSha.asBuildConfigString()"))
         assertFalse(production.contains("ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS\", \"true"))
         assertTrue(dev.contains("ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS\", \"true"))
         assertTrue(preview.contains("ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS\", \"true"))
