@@ -494,6 +494,7 @@ internal class ConversationDictationController internal constructor(
         private set
 
     private val completionRevisions = mutableStateMapOf<ConversationDictationKey, Int>()
+    private val pendingSendRevisions = mutableStateMapOf<ConversationDictationKey, Int>()
     private var nextSessionId = 0L
     private val notificationInstanceId = UUID.randomUUID().toString()
     private var nextRecognitionGenerationId = 0L
@@ -612,6 +613,12 @@ internal class ConversationDictationController internal constructor(
         accountRef: String,
         groupIdHex: String,
     ): Int = completionRevisions[ConversationDictationKey.from(accountRef, groupIdHex)] ?: 0
+
+    /** Returns the revision of the latest dictated send whose pending row entered the timeline. */
+    fun pendingSendRevision(
+        accountRef: String,
+        groupIdHex: String,
+    ): Int = pendingSendRevisions[ConversationDictationKey.from(accountRef, groupIdHex)] ?: 0
 
     /** Whether the current immutable target belongs to the supplied conversation. */
     fun isOwnedBy(
@@ -2579,6 +2586,8 @@ internal class ConversationDictationController internal constructor(
     ) {
         if (state.sessionId != sessionId || dispatchedSessionId != sessionId) return
         conversationDictationDiagnostic("event=send_outcome outcome=pending_visible")
+        val key = ConversationDictationKey.from(target.accountRef, target.groupIdHex)
+        pendingSendRevisions[key] = (pendingSendRevisions[key] ?: 0) + 1
         // The conversation controller now owns the pending send. Detach this job before
         // completing dictation so clearRecognitionSession does not cancel its transport.
         sendJob = null
