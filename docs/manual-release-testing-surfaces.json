@@ -23905,6 +23905,12 @@
         ]
       },
       {
+        "surface": "Delete for me on a group-system row",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationRows.kt",
+        "anchor": "R.string.delete_for_me",
+        "test_ids": ["MSG-008"]
+      },
+      {
         "surface": "Wave hi greets the added member from an authenticated group-system row",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationRows.kt",
         "anchor": "R.string.wave_hi",
