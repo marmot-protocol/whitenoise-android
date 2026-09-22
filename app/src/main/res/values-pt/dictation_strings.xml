@@ -6,7 +6,7 @@
     <string name="notification_channel_dictation">Ditado</string>
     <string name="notification_channel_dictation_description">Controla uma sessão de ditado ativa no compositor</string>
     <string name="dictation_settings_title">Ditado</string>
-    <string name="dictation_settings_explainer">O White Noise usa um serviço de reconhecimento de voz instalado. Esse serviço processa o áudio; o White Noise mantém na memória apenas o texto devolvido até que seja colado ou enviado.</string>
+    <string name="dictation_settings_explainer">O serviço de voz instalado neste dispositivo processa o áudio e pode enviá-lo ao provedor dele. O White Noise mantém o texto devolvido apenas até você colar ou enviar.</string>
     <string name="dictation_ostt_recommendation_title">Obter Offline Speech to Text</string>
     <string name="dictation_ostt_recommendation_summary">Aplicativo de transcrição recomendado para ditado privado no dispositivo. Disponível na Zapstore, não no Google Play.</string>
     <string name="dictation_ostt_recommendation_open_failed">Não foi possível abrir a página do Offline Speech to Text na Zapstore.</string>
@@ -17,6 +17,6 @@
     <string name="dictation_result_paste">Colar no rascunho</string>
     <string name="dictation_result_paste_description">Rever ou editar o texto antes de enviar</string>
     <string name="dictation_result_send">Enviar mensagem</string>
-    <string name="dictation_result_send_description">Enviar apenas se a conversa e o rascunho originais não tiverem mudado</string>
-    <string name="dictation_send_safety_note">O envio falha de forma segura: se o rascunho original, os membros ou a sessão mudarem, o White Noise mantém a transcrição para revisão em vez de a enviar.</string>
+    <string name="dictation_result_send_description">Envia apenas se a conversa e o rascunho não tiverem mudado</string>
+    <string name="dictation_send_safety_note">Se a conversa ou o rascunho mudar antes de a mensagem ser enviada, o texto permanece no seu rascunho para você revisar.</string>
 </resources>

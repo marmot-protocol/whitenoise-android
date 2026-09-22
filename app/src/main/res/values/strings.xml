@@ -84,7 +84,7 @@
     <string name="folder_manual_hint">Chats you add here stay included, even when they do not match the automatic rules.</string>
     <string name="folder_rules">Automatic rules</string>
     <string name="folder_keyword_hint">Match a chat title or group description. Chats with any selected person also match.</string>
-    <string name="folder_rule_hint">These settings narrow automatic matches. Archived only switches automatic matches to archived chats. Removing an included chat does not exclude it if a rule still matches.</string>
+    <string name="folder_rule_hint">Chats match when they meet any selected person or keyword rule. Category options narrow those matches. A chat you remove comes back if it still matches.</string>
     <string name="folder_preview">Preview</string>
     <string name="folder_discard_title">Discard changes?</string>
     <string name="folder_discard_detail">Your folder changes have not been saved.</string>
@@ -269,7 +269,7 @@
     <string name="profile_add_nickname_and_notes">Add nickname &amp; notes</string>
     <string name="profile_contact_name_hint">Name</string>
     <string name="profile_contact_notes_hint">Notes</string>
-    <string name="profile_contact_editor_private_hint">Only you see nickname and notes on this device. Clearing a nickname restores their profile name. Saved nicknames are cleaned and capped at 80 characters.</string>
+    <string name="profile_contact_editor_private_hint">Nicknames and notes stay on this device and are visible only to you. Clear the nickname to show the profile name again. Nicknames can be up to 80 characters.</string>
     <string name="dismiss">Dismiss</string>
     <string name="edit">Edit</string>
     <string name="edit_group_info_title">Edit Group</string>
@@ -357,7 +357,7 @@
     <string name="confirm_leave_message">You will be removed from this group. You will need a new invite to rejoin.</string>
     <string name="leave_group">Leave group</string>
     <string name="confirm_leave_title_named">Leave %1$s?</string>
-    <string name="confirm_leave_message_named">You won\'t receive new messages from this group.</string>
+    <string name="confirm_leave_message_named">You\'ll be removed from this group and will need a new invitation to rejoin.</string>
     <string name="confirm_leave_sole_admin_title">You\'re the only admin</string>
     <string name="confirm_leave_sole_admin_message">Make another member an admin before leaving %1$s, so the group keeps an admin.</string>
     <string name="confirm_leave_sole_member_title">Leave %1$s?</string>
@@ -554,7 +554,7 @@
     <string name="allow_chat_screenshots">Screen security</string>
     <string name="allow_chat_screenshots_subtitle">Blocks screenshots and hides previews in Recents</string>
     <string name="audit_logs">Audit logs</string>
-    <string name="audit_logs_settings_subtitle">Create and export local group forensic audit files</string>
+    <string name="audit_logs_settings_subtitle">Record and export diagnostic logs for your groups on this device</string>
     <string name="export_audit_logs">Export Diagnostic Logs</string>
     <string name="export_audit_logs_subtitle">Save or share one archive of the diagnostic logs stored on this device</string>
     <string name="export_audit_logs_confirm_title">Export diagnostic logs?</string>
@@ -565,7 +565,7 @@
     <string name="export_audit_logs_save">Save to device</string>
     <string name="export_audit_logs_share">Share</string>
     <string name="delete_audit_logs">Clear Diagnostic Logs</string>
-    <string name="delete_audit_logs_subtitle">Clearing diagnostic logs deletes logs from this device only. It does not delete copies already uploaded to White Noise servers or turn off recording and automatic uploads.</string>
+    <string name="delete_audit_logs_subtitle">Removes logs from this device. Copies already uploaded and your sharing setting stay as they are.</string>
     <string name="device_protection">Device protection</string>
     <string name="incognito_keyboard_detail">Ask your keyboard not to learn from what you type in White Noise. Your keyboard may ignore this request.</string>
     <string name="require_device_authentication">Require device authentication</string>
@@ -595,18 +595,18 @@
     <string name="streaming_debug_subtitle" translatable="false">Show agent-stream and MLS signaling events inline in conversations</string>
     <string name="ai_agents">AI Agents</string>
     <string name="ai_agents_about_title">About AI agents</string>
-    <string name="ai_agents_intro">White Noise works with AI agents. Your agent runs on your own machine or server as a separate Marmot account; you chat with it here like any contact, end-to-end encrypted.</string>
-    <string name="ai_agents_clipboard_disclosure">These are installation prompts. Choose your agent, copy its prompt, and paste it into that agent to connect it to White Noise. The prompt includes your npub (a public key, not a secret) and asks the agent to explain how the connector works before requesting your approval to install it. Only use an agent you run and trust; your private key is never included.</string>
+    <string name="ai_agents_intro">Chat with AI agents, end-to-end encrypted like any other chat. Each agent runs on a computer or server you control, using its own account.</string>
+    <string name="ai_agents_clipboard_disclosure">These are installation prompts. Choose your agent, copy its prompt, and paste it into that agent to connect it to White Noise. The prompt includes your public npub, never your private key, and asks the agent to explain the connector before requesting your approval to install it. Use only an agent you run and trust.</string>
     <string name="ai_agents_connectors_title">Connectors</string>
     <string name="ai_agents_prompt_copied">Prompt copied — paste it into your agent.</string>
     <string name="ai_agents_public_key_unavailable">Your public key is unavailable. Return to Settings and try another profile.</string>
     <string name="ai_agents_setup_title">Set up %1$s</string>
-    <string name="ai_agents_setup_instruction">Copy this prompt into %1$s. It includes your public key and asks for approval before installation.</string>
+    <string name="ai_agents_setup_instruction">Paste this prompt into %1$s. It includes your public npub and leaves out your private key. The agent must ask for your approval before it installs anything. Use this prompt only with an agent you run and trust.</string>
     <string name="ai_agents_copy_prompt">Copy prompt</string>
     <string name="ai_agents_docs_opened">Opening the connector documentation.</string>
     <string name="ai_agents_docs_failed">The connector documentation could not be opened.</string>
     <string name="ai_agents_manual_setup_title">Manual setup</string>
-    <string name="ai_agents_manual_setup_body">After the agent shares its npub, add it as a contact from %1$s and start chatting. See the agent connector docs for full details.</string>
+    <string name="ai_agents_manual_setup_body">Once the agent gives you its npub, add it as a contact from %1$s and start a chat. The connector docs cover the rest.</string>
     <string name="ai_agents_connector_docs_title">Agent connector documentation</string>
     <string name="ai_agents_connector_docs_subtitle">Install scripts, health checks, and troubleshooting</string>
     <string name="agent_connector_hermes_name">Hermes</string>
@@ -763,37 +763,37 @@
     <string name="sign_out_sheet_stays_heading">Stays on this device</string>
     <string name="sign_out_sheet_stays_body">Your groups, message history, and drafts are kept. The identity stays in the device keychain, so you can sign back in from the account picker.</string>
     <string name="sign_out_sheet_changes_heading">What changes</string>
-    <string name="sign_out_sheet_changes_body">Push notifications for this account are turned off, relay key packages are deleted so strangers cannot invite you to new groups while signed out, and in-memory caches are cleared.</string>
+    <string name="sign_out_sheet_changes_body">Notifications for this account stop and temporary app data is cleared. You can also choose to remove your published invitation keys from relays.</string>
     <string name="sign_out_and_wipe_sheet_title">Sign Out &amp; Wipe</string>
     <string name="sign_out_and_wipe_sheet_intro">This permanently removes this account from this device.</string>
     <string name="sign_out_and_wipe_sheet_destroyed_heading">What gets destroyed</string>
-    <string name="sign_out_and_wipe_sheet_destroyed_db">The local message database and MLS group state for this account.</string>
-    <string name="sign_out_and_wipe_sheet_destroyed_keychain">The identity\'s keychain entry on this device.</string>
-    <string name="sign_out_and_wipe_sheet_destroyed_relays">Outstanding key packages published for this account on relays.</string>
-    <string name="sign_out_and_wipe_sheet_fresh_start">Signing back in with the same key keeps your identity, but past groups, messages, and media cannot be recovered on this device. You will need to be re-invited to any groups.</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_db">Messages and group encryption data for this account.</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_keychain">The sign-in key stored on this device.</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_relays">Invitation keys published on relays, which let others add you to groups.</string>
+    <string name="sign_out_and_wipe_sheet_fresh_start">You can sign in again with the same key, but past groups, messages, and media can’t be recovered on this device. You’ll need new invitations to rejoin groups.</string>
     <string name="sign_out_and_wipe_confirm_title">Wipe this account?</string>
-    <string name="sign_out_and_wipe_confirm_body">This cannot be undone from this device. The local database, MLS state, keychain entry, and relay key packages for this account will be removed.</string>
+    <string name="sign_out_and_wipe_confirm_body">This permanently deletes this account’s messages and group encryption data. Its sign-in key is removed from this device, and its published invitation keys are removed from relays.</string>
     <!-- Type-to-confirm gate for the destructive wipe (#348). The keyword is matched
          case-insensitively; keep it short and unambiguous when translating. -->
     <string name="sign_out_and_wipe_confirm_keyword" translatable="false">WIPE</string>
     <string name="sign_out_and_wipe_confirm_instruction">Type %1$s to confirm.</string>
     <string name="sign_out_and_wipe_confirm_field_label">Confirmation</string>
     <!-- Delete-key-packages toggle in the Sign Out sheet (#349). Default ON. -->
-    <string name="sign_out_delete_key_packages_label">Delete key packages from relays</string>
-    <string name="sign_out_delete_key_packages_help">Stops strangers from inviting you to new groups while you are signed out.</string>
-    <string name="toast_signed_out_relay_cleanup_incomplete">Signed out locally, but relay KeyPackage cleanup did not fully finish.</string>
+    <string name="sign_out_delete_key_packages_label">Remove invitation keys from relays</string>
+    <string name="sign_out_delete_key_packages_help">Stops new group invitations for this account while you’re signed out.</string>
+    <string name="toast_signed_out_relay_cleanup_incomplete">Signed out. Some invitation keys may still be on relays.</string>
     <string name="toast_couldnt_sign_out">Couldn\'t sign out. The account is still active on this device.</string>
     <!-- Staged progress + outcome UI for the destructive Sign Out & Wipe (#350). -->
     <string name="wipe_progress_title">Signing out &amp; wiping…</string>
     <string name="wipe_stage_leaving_groups">Leaving groups…</string>
-    <string name="wipe_stage_deleting_key_packages">Deleting key packages…</string>
+    <string name="wipe_stage_deleting_key_packages">Removing invitation keys…</string>
     <string name="wipe_stage_wiping_local_data">Wiping local data…</string>
     <plurals name="wipe_finished_with_issues">
         <item quantity="one">Wipe finished with %1$d issue</item>
         <item quantity="other">Wipe finished with %1$d issues</item>
     </plurals>
     <string name="wipe_outcome_groups_left">Left %1$d groups</string>
-    <string name="wipe_outcome_key_packages_deleted">Deleted %1$d key packages</string>
+    <string name="wipe_outcome_key_packages_deleted">Removed %1$d invitation keys</string>
     <string name="wipe_outcome_local_wipe_done">Local data wiped</string>
     <string name="wipe_outcome_local_wipe_incomplete">Local data wipe incomplete</string>
     <string name="export_nsec">Export Private Key</string>
@@ -988,7 +988,7 @@
     <string name="toast_background_connection_disabled">Background connection disabled</string>
     <string name="toast_couldnt_start_chat">Couldn\'t start chat</string>
     <string name="toast_profile_published">Profile published</string>
-    <string name="toast_profile_published_detail">Your kind:0 metadata is live on %1$d relays.</string>
+    <string name="toast_profile_published_detail">Your profile is now on %1$d relays.</string>
     <string name="toast_couldnt_publish_profile">Couldn\'t publish profile</string>
     <string name="toast_send_failed">Send failed</string>
     <string name="toast_send_connection_failed">Couldn’t reach the relay. Check your connection and try again.</string>
@@ -1068,8 +1068,8 @@
     <string name="onboarding_recover_setup_title">Recover sign-in setup?</string>
     <string name="onboarding_recover_setup_for">Recover sign-in setup for %1$s</string>
     <string name="onboarding_recover_setup_confirm">Recover setup</string>
-    <string name="onboarding_recover_setup_explanation">Recovery signs this profile out and replaces its unreadable setup checkpoint. Only the latest recovery evidence is retained, and earlier relay publications are not undone. You will need the private key to begin a new sign-in. This action does not approve any publication.</string>
-    <string name="onboarding_recover_setup_success">Setup recovered. Enter this profile’s private key to begin a new sign-in.</string>
+    <string name="onboarding_recover_setup_explanation">This signs the profile out and clears the setup that didn’t finish. You’ll need its private key to sign in again. Anything already published to relays stays there, and nothing new is published.</string>
+    <string name="onboarding_recover_setup_success">Setup cleared. Sign in again with this profile’s private key.</string>
     <string name="onboarding_recover_setup_failed">Couldn’t recover setup. Try again.</string>
     <string name="group_recovery_automatic_failed">Unable to restore group synchronization.</string>
     <string name="group_recovery_pending_reinvites">Some invitations are being retried automatically.</string>
@@ -1078,7 +1078,7 @@
     <string name="group_recovery_check_failed">Couldn’t check group recovery. Try again.</string>
     <string name="group_rejoin_title">Rejoin group?</string>
     <string name="group_rejoin_invited_by">Invited by %1$s\n%2$s</string>
-    <string name="group_rejoin_replaces_state">Rejoining replaces this device’s current group state with the invited copy. Your saved message history is kept.</string>
+    <string name="group_rejoin_replaces_state">Rejoining replaces this device’s encryption data for the group. Your message history stays.</string>
     <string name="group_rejoin_trust_warning">Only rejoin if you trust this invitation. A newer group version alone does not make it trustworthy.</string>
     <string name="group_rejoin_confirm">Rejoin group</string>
     <string name="group_rejoin_decline">Decline invitation</string>
@@ -1367,7 +1367,7 @@
     <string name="media_quality_high_subtitle">About 1.5 MB per photo — quality over data cost</string>
     <string name="media_quality_original">Original</string>
     <string name="media_quality_original_subtitle">Full resolution — largest files</string>
-    <string name="media_quality_footer">Location and device metadata (EXIF GPS, make and model) are always removed from photos, even on Original. Videos and picked audio files are sent as-is; the audio bitrate applies to recorded voice notes.</string>
+    <string name="media_quality_footer">Photos always have location and device details removed, even at Original. Videos and imported audio keep their original data. Audio bitrate applies only to voice notes you record.</string>
     <string name="enter_key_behavior_title">Enter key behavior</string>
     <string name="enter_key_behavior_send">Send message</string>
     <string name="enter_key_behavior_newline">New line</string>
@@ -1425,10 +1425,10 @@
     <string name="discard">Discard</string>
     <string name="open_app_settings">Open app settings</string>
     <string name="dictation_disclosure_title">External speech recognition</string>
-    <string name="dictation_disclosure_message">Your installed speech service processes dictated audio and may send it to its provider. White Noise pastes the returned text into your draft by default; automatic sending is available only when you explicitly enable it in Dictation settings.</string>
+    <string name="dictation_disclosure_message">The speech service installed on this device processes what you say and may send the audio to its provider. White Noise keeps the text it returns only until you paste or send it. Sending automatically is off unless you turn it on in Dictation settings.</string>
     <string name="dictation_continue">Continue</string>
     <string name="dictation_settings_title">Dictation</string>
-    <string name="dictation_settings_explainer">White Noise uses an installed speech recognition service. That service owns audio processing; White Noise keeps only the returned text in memory until it is pasted or sent.</string>
+    <string name="dictation_settings_explainer">The speech service installed on this device processes the audio and may send it to its provider. White Noise keeps the text it returns only until you paste or send it.</string>
     <string name="dictation_ostt_recommendation_title">Get Offline Speech to Text</string>
     <string name="dictation_ostt_recommendation_summary">Recommended transcription app for private, on-device dictation. Available from Zapstore, not Google Play.</string>
     <string name="dictation_ostt_recommendation_open_failed">Couldn’t open the Offline Speech to Text page on Zapstore.</string>
@@ -1439,8 +1439,8 @@
     <string name="dictation_result_paste">Paste into draft</string>
     <string name="dictation_result_paste_description">Review or edit the text before sending</string>
     <string name="dictation_result_send">Send message</string>
-    <string name="dictation_result_send_description">Opt in to send only if the original chat and draft are unchanged</string>
-    <string name="dictation_send_safety_note">Send message fails closed: if the original draft, membership, or session changes, White Noise keeps the transcript for review instead of sending it.</string>
+    <string name="dictation_result_send_description">Sends only if the chat and draft haven’t changed</string>
+    <string name="dictation_send_safety_note">If the chat or draft changes before the message sends, the text stays in your draft so you can review it.</string>
     <string name="voice_message_play">Play voice message</string>
     <string name="voice_message_pause">Pause voice message</string>
     <string name="voice_message_speed">Playback speed %1$s</string>
@@ -1519,7 +1519,7 @@
     <string name="disappearing_1_hour">1 hour</string>
     <string name="disappearing_5_minutes">5 minutes</string>
     <string name="disappearing_30_seconds">30 seconds</string>
-    <string name="disappearing_explainer">When enabled, new messages sent and received in this chat will disappear after they have been seen.</string>
+    <string name="disappearing_explainer">Unread messages you receive start their timer when you read them. Other new messages are permanently deleted for everyone after your chosen duration.</string>
     <string name="disappearing_seconds_format">%1$d seconds</string>
     <string name="disappearing_unit_seconds">Seconds</string>
     <string name="disappearing_set">Set</string>
@@ -1579,7 +1579,7 @@
     <string name="sign_in_error_setup_recovery_failed">Recovery didn\'t complete. Tap sign in to try again.</string>
     <string name="sign_in_error_setup_recovery_unexpected_state">Unexpected account state after recovery, so sign-in stopped. Part of the recovery may already have been applied.</string>
     <string name="sign_in_recovery_title">Recover this account?</string>
-    <string name="sign_in_recovery_message">Account setup didn\'t finish, and this device can\'t prove that no key package was published for it. Recovering clears the unfinished setup and signs in again. If a key package was published, it may be left orphaned on relays.</string>
+    <string name="sign_in_recovery_message">Setup didn\'t finish. Recovering clears it and tries signing in again. Invitation keys that were already published may stay on relays.</string>
     <string name="sign_in_recovery_confirm">Recover</string>
     <string name="group_add_members_after_create">You can add members after creating the group.</string>
     <string name="confirm_sole_admin_transfer_then_leave_message">You\'re the only admin. %1$s becomes admin and you leave the group.</string>
@@ -1916,13 +1916,13 @@
     <string name="tts_choose_sentence">Choose sentence to read</string>
     <string name="tts_bar_preparing">Preparing speech…</string>
     <string name="usage_diagnostics_title">Share usage and telemetry</string>
-    <string name="usage_diagnostics_subtitle">Automatically gathers and uploads feature activity and telemetry metrics for every profile on this device.</string>
+    <string name="usage_diagnostics_subtitle">Shares feature use and performance data for every profile on this device.</string>
     <string name="usage_diagnostics_prompt_title">Help Improve White Noise</string>
-    <string name="usage_diagnostics_disclosure">Feature activity and telemetry data include feature usage counts and app performance metrics. Usage data uses temporary session identifiers, and telemetry uses a resettable installation identifier. Neither includes account or group identifiers.</string>
+    <string name="usage_diagnostics_disclosure">Shares how often features are used and how the app performs, for every profile on this device. It includes a temporary session ID and an installation ID you can reset, never account or group IDs.</string>
     <string name="usage_diagnostics_logs_separate">Sanitized technical logs from every profile on this device, shared separately.</string>
-    <string name="usage_diagnostics_renew">Sharing now includes feature usage. Please review this information and make a fresh choice.</string>
+    <string name="usage_diagnostics_renew">Usage sharing now covers feature activity, so review the updated details and make your choice again.</string>
     <string name="usage_diagnostics_status">Usage: %1$s. Telemetry: %2$s.</string>
-    <string name="usage_diagnostics_error">Could not confirm sharing settings. Please retry. No new choice has been confirmed.</string>
+    <string name="usage_diagnostics_error">Couldn’t load or save settings.</string>
     <string name="usage_diagnostics_off">Off</string>
     <string name="usage_diagnostics_permission_needed">Permission needed</string>
     <string name="usage_diagnostics_unconfigured">Not configured</string>
@@ -1991,7 +1991,7 @@
     <string name="signup_create_failed">Identity creation did not finish. Check your connection and try again.</string>
     <string name="signup_photo_failed">Your identity was created, but the photo upload did not finish. Retry uses the same identity.</string>
     <string name="signup_publish_failed">Your identity was created, but profile publication did not finish. Retry uses the same identity.</string>
-    <string name="signup_owner_changed">This sign-up attempt no longer owns the current account. Close this form and use the profile chooser to continue with any created identity.</string>
+    <string name="signup_owner_changed">You switched accounts while signing up. Close this form and pick a profile to continue. Any profile you already created is still there.</string>
     <string name="signup_profile_incomplete_title">Profile changes are incomplete</string>
     <string name="signup_leave_profile_detail">Your identity will be kept. These profile changes may be incomplete; you can edit your profile later.</string>
     <string name="signup_continue_without_profile">Continue without these changes</string>
@@ -2132,21 +2132,21 @@
     <string name="photo_editor_coordinate_value" translatable="false">%1$s: %2$d%%</string>
     <string name="photo_editor_keep_editing">Keep editing</string>
     <string name="photo_editor_quality_low">Low</string>
-    <string name="photo_editor_quality_explanation">Photo location and identifying metadata are removed. Original keeps supported image data; other formats are safely re-encoded. Videos and files keep their original data.</string>
+    <string name="photo_editor_quality_explanation">Photos always have location and device details removed. Original keeps the image data where the format allows; other formats are re-encoded. Videos and files are sent unchanged.</string>
     <string name="photo_editor_original_edited">Edited photos use High quality. The original image is kept for further editing.</string>
     <string name="audit_upload_title">Share group diagnostic logs</string>
-    <string name="audit_upload_subtitle">Automatically gathers and uploads technical logs about groups for every profile on this device.</string>
+    <string name="audit_upload_subtitle">Shares group diagnostic logs for every profile on this device.</string>
     <string name="audit_upload_confirm_title">Share group diagnostic logs with White Noise?</string>
-    <string name="audit_upload_disclosure">When enabled, group diagnostic logs from every profile on this device are recorded locally and automatically uploaded to Goggles, operated by the Internet Privacy Foundation. Previously recorded logs may also be uploaded. Logs can include group and message identifiers, relay addresses, timestamps, pseudonymous account references, installation identifiers, and device model and app version. Message contents and private keys are excluded. These logs are sensitive and are retained for investigating reliability problems. This is separate from usage and telemetry sharing. Turning sharing off stops new recording and prevents new upload batches. A batch already in progress may finish uploading its files. This does not delete logs already stored locally or uploaded. Cancel leaves sharing off.</string>
+    <string name="audit_upload_disclosure">White Noise records group diagnostic logs for every profile on this device and uploads them to Goggles, operated by the Internet Privacy Foundation. Logs already stored here may be uploaded too. Logs can include group and message IDs, relay addresses, timestamps, pseudonymous account references, an installation ID, your device model, and the app version. They never include message contents or private keys. These logs are sensitive, and we use them to investigate reliability problems. They stay separate from usage and telemetry sharing. Turning sharing off stops new recording and new uploads, though an upload already under way may finish. Logs on this device and logs already uploaded stay where they are. Cancel leaves sharing off.</string>
     <string name="audit_upload_confirm">Enable automatic sharing</string>
-    <string name="audit_upload_renew">Group diagnostic log sharing is off until you review the automatic-upload disclosure and make a fresh choice.</string>
-    <string name="diagnostics_group_disclosure">Group diagnostic logs help investigate group reliability and consistency. They include technical identifiers, timestamps, and membership changes, using hashed references instead of member identities. They never contain message contents, profile names, group names, or private keys.</string>
+    <string name="audit_upload_renew">The sharing details have changed. Review them before turning group diagnostic logs back on.</string>
+    <string name="diagnostics_group_disclosure">Group diagnostic logs help investigate reliability problems. They refer to members by hashed references. Each log can carry technical identifiers and timestamped membership changes. They never include message contents, profile names, group names, or private keys.</string>
     <string name="diagnostics_existing_logs">Enabling group diagnostic log sharing may upload logs already stored on this device.</string>
     <string name="diagnostics_retention">Group diagnostic logs are deleted from our servers after 30 days, telemetry after 90 days, and product analytics after 180 days.</string>
-    <string name="diagnostics_disable_disclosure">Turning these off stops new recording and prevents new automatic uploads. An automatic log upload batch already in progress may finish. Turning these off does not delete data already stored on this device or our servers.</string>
+    <string name="diagnostics_disable_disclosure">Turning these off stops new recording and new uploads, though an upload already under way may finish. Logs already on this device or on our servers are not deleted.</string>
     <string name="diagnostics_storage_device">On This Device</string>
     <string name="diagnostics_clear_confirm_title">Clear diagnostic logs?</string>
-    <string name="diagnostics_clear_confirm_body">This permanently removes recorded diagnostic activity for all profiles from this device. Your logging preference won’t change.</string>
+    <string name="diagnostics_clear_confirm_body">This permanently deletes diagnostic logs for every profile from this device. Your sharing settings don’t change.</string>
     <string name="diagnostics_clear_confirm_action">Clear Logs</string>
     <string name="usage_diagnostics_prompt_intro">Help us understand how White Noise is used and make messaging more reliable.</string>
     <string name="donate_open_failed">Couldn’t open the donation page. Try again or return to Settings.</string>

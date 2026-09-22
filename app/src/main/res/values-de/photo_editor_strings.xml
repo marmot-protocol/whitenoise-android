@@ -73,6 +73,6 @@
     <string name="photo_editor_apply">Übernehmen</string>
     <string name="photo_editor_keep_editing">Weiter bearbeiten</string>
     <string name="photo_editor_quality_low">Niedrig</string>
-    <string name="photo_editor_quality_explanation">Standort und identifizierende Metadaten des Fotos werden entfernt. Original behält unterstützte Bilddaten, andere Formate werden sicher neu kodiert. Videos und Dateien behalten ihre ursprünglichen Daten.</string>
+    <string name="photo_editor_quality_explanation">Aus Fotos werden Standort- und Geräteangaben immer entfernt. Original behält die Bilddaten, wenn das Format es zulässt; andere Formate werden neu kodiert. Videos und Dateien werden unverändert gesendet.</string>
     <string name="photo_editor_original_edited">Bearbeitete Fotos verwenden hohe Qualität. Das Originalbild bleibt für weitere Bearbeitungen erhalten.</string>
 </resources>

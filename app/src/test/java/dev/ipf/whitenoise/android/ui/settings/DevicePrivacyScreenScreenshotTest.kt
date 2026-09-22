@@ -17,6 +17,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -253,6 +254,14 @@ class DevicePrivacyScreenScreenshotTest {
                 .boundsInRoot
         val disclosure = composeRule.onNodeWithText("Share group diagnostic logs").fetchSemanticsNode().boundsInRoot
         assertTrue("Choices $disclosure must fit inside $viewport", disclosure.bottom <= viewport.bottom)
+        if (loadFailure) {
+            val context = ApplicationProvider.getApplicationContext<Application>()
+            composeRule
+                .onNodeWithText(context.getString(R.string.retry))
+                .performScrollTo()
+                .assertIsDisplayed()
+            composeRule.onNodeWithText(context.getString(R.string.usage_diagnostics_error)).assertIsDisplayed()
+        }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
 

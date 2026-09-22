@@ -73,6 +73,6 @@
     <string name="photo_editor_apply">Uygula</string>
     <string name="photo_editor_keep_editing">Düzenlemeye devam et</string>
     <string name="photo_editor_quality_low">Düşük</string>
-    <string name="photo_editor_quality_explanation">Fotoğrafın konumu ve tanımlayıcı meta verileri kaldırılır. Orijinal, desteklenen görüntü verilerini korur; diğer biçimler güvenle yeniden kodlanır. Videolar ve dosyalar özgün verilerini korur.</string>
+    <string name="photo_editor_quality_explanation">Fotoğraflardan konum ve cihaz bilgileri her zaman kaldırılır. Orijinal, biçim izin verdiğinde görüntü verilerini korur; diğer biçimler yeniden kodlanır. Videolar ve dosyalar değiştirilmeden gönderilir.</string>
     <string name="photo_editor_original_edited">Düzenlenen fotoğraflar yüksek kaliteyi kullanır. Orijinal görüntü, sonraki düzenlemeler için saklanır.</string>
 </resources>

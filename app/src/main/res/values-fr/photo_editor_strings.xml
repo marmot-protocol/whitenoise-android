@@ -73,6 +73,6 @@
     <string name="photo_editor_apply">Appliquer</string>
     <string name="photo_editor_keep_editing">Continuer les modifications</string>
     <string name="photo_editor_quality_low">Basse</string>
-    <string name="photo_editor_quality_explanation">La localisation et les métadonnées identifiantes de la photo sont supprimées. Original conserve les données d’image prises en charge ; les autres formats sont réencodés en toute sécurité. Les vidéos et fichiers conservent leurs données d’origine.</string>
+    <string name="photo_editor_quality_explanation">La localisation et les détails de l’appareil sont toujours retirés des photos. Original conserve les données d’image lorsque le format le permet ; les autres formats sont réencodés. Les vidéos et fichiers sont envoyés sans modification.</string>
     <string name="photo_editor_original_edited">Les photos modifiées utilisent la qualité haute. L’image d’origine est conservée pour d’autres modifications.</string>
 </resources>

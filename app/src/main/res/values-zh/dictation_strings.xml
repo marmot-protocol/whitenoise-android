@@ -6,7 +6,7 @@
     <string name="notification_channel_dictation">听写</string>
     <string name="notification_channel_dictation_description">控制当前的消息编辑器听写会话</string>
     <string name="dictation_settings_title">听写</string>
-    <string name="dictation_settings_explainer">White Noise 使用已安装的语音识别服务。该服务负责音频处理；White Noise 只在内存中保留返回的文本，直到粘贴或发送。</string>
+    <string name="dictation_settings_explainer">此设备上安装的语音服务会处理音频，并可能将其发送给其提供商。White Noise 只会在你粘贴或发送前保留返回的文本。</string>
     <string name="dictation_ostt_recommendation_title">获取 Offline Speech to Text</string>
     <string name="dictation_ostt_recommendation_summary">推荐用于私密本地听写的转写应用。可从 Zapstore 获取，Google Play 不提供。</string>
     <string name="dictation_ostt_recommendation_open_failed">无法打开 Zapstore 上的 Offline Speech to Text 页面。</string>
@@ -17,6 +17,6 @@
     <string name="dictation_result_paste">粘贴到草稿</string>
     <string name="dictation_result_paste_description">发送前检查或编辑文本</string>
     <string name="dictation_result_send">发送消息</string>
-    <string name="dictation_result_send_description">仅在原聊天和草稿未更改时发送</string>
-    <string name="dictation_send_safety_note">发送消息会安全失败：如果原草稿、成员资格或会话发生变化，White Noise 会保留听写文本供检查，而不会发送。</string>
+    <string name="dictation_result_send_description">仅在聊天和草稿未更改时发送</string>
+    <string name="dictation_send_safety_note">如果消息发送前聊天或草稿发生变化，文本会保留在草稿中，供你检查。</string>
 </resources>
