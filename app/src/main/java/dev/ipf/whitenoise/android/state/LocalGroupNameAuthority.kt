@@ -81,6 +81,7 @@ internal class LocalGroupNameAuthority {
         key(groupIdHex)?.let(commitsByGroup::remove)
     }
 
+    /** The case-folded map key for [groupIdHex], or null when there is no usable id. */
     private fun key(groupIdHex: String): String? =
         groupIdHex
             .trim()

@@ -10839,6 +10839,7 @@ class ConversationController(
      */
     private suspend fun loadOlderPage(anchorMessageIdHex: String? = null): Boolean = loadOlderPageInternal(anchorMessageIdHex) == ConversationPageLoad.ADVANCED
 
+    /** Pages the window newer for [origin]; true only when new rows arrived. */
     private suspend fun loadNewerPage(origin: PagingOrigin = PagingOrigin.EXPLICIT): Boolean {
         val load = loadNewerPageInternal(origin)
         return load == ConversationPageLoad.ADVANCED
