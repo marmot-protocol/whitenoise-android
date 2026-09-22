@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -37,6 +36,7 @@ import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.ReactionParticipant
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.design.BottomAnchoredPopupPositionProvider
 import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
@@ -52,23 +52,6 @@ internal fun filteredReactionParticipants(
     participants: List<ReactionParticipant>,
     selectedEmoji: String?,
 ): List<ReactionParticipant> = selectedEmoji?.let { emoji -> participants.filter { it.emoji == emoji } } ?: participants
-
-/** One reactor row with every emoji that the same sender contributed to the current filter. */
-internal data class ReactionParticipantGroup(
-    val sender: String,
-    val emojis: List<String>,
-)
-
-/** Groups repeated sender entries so the reactor sheet reads as a people list, matching iOS. */
-internal fun groupedReactionParticipants(participants: List<ReactionParticipant>): List<ReactionParticipantGroup> {
-    val grouped = linkedMapOf<String, Pair<String, LinkedHashSet<String>>>()
-    participants.forEach { participant ->
-        val key = participant.sender.lowercase()
-        val entry = grouped.getOrPut(key) { participant.sender to linkedSetOf() }
-        entry.second += participant.emoji
-    }
-    return grouped.values.map { (sender, emojis) -> ReactionParticipantGroup(sender, emojis.toList()) }
-}
 
 /** Counts reactors per emoji and orders the filters by popularity, then emoji. */
 internal fun reactionEmojiCounts(participants: List<ReactionParticipant>): List<Pair<String, Int>> =
@@ -101,6 +84,7 @@ internal fun ReactionDetailsSheet(
     participants: List<ReactionParticipant>,
     appState: WhiteNoiseAppState,
     initialEmoji: String? = null,
+    onRemoveOwnReaction: ((String) -> Unit)?,
     onDismissRequest: () -> Unit,
 ) {
     KeyboardSafePopup(
@@ -112,6 +96,7 @@ internal fun ReactionDetailsSheet(
             participants = participants,
             appState = appState,
             initialEmoji = initialEmoji,
+            onRemoveOwnReaction = onRemoveOwnReaction,
         )
     }
 }
@@ -123,6 +108,7 @@ internal fun ReactionDetailsContent(
     participants: List<ReactionParticipant>,
     appState: WhiteNoiseAppState,
     initialEmoji: String? = null,
+    onRemoveOwnReaction: ((String) -> Unit)?,
 ) {
     var selectedEmoji by
         remember(initialEmoji) {
@@ -136,7 +122,6 @@ internal fun ReactionDetailsContent(
     val emojiCounts = remember(participants) { reactionEmojiCounts(participants) }
     val visibleParticipants =
         remember(participants, selectedEmoji) { filteredReactionParticipants(participants, selectedEmoji) }
-    val participantGroups = remember(visibleParticipants) { groupedReactionParticipants(visibleParticipants) }
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -161,14 +146,20 @@ internal fun ReactionDetailsContent(
                 modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
             ) {
                 items(
-                    participantGroups,
-                    key = { participant -> participant.sender.lowercase() },
+                    visibleParticipants,
+                    key = { participant -> "${participant.sender}:${participant.emoji}:${participant.reactedAt}" },
                 ) { participant ->
                     val isMine = activeAccountId != null && participant.sender.equals(activeAccountId, ignoreCase = true)
                     ReactionParticipantRow(
                         participant = participant,
                         appState = appState,
                         mine = isMine,
+                        onRemove =
+                            if (isMine && onRemoveOwnReaction != null) {
+                                { onRemoveOwnReaction(participant.emoji) }
+                            } else {
+                                null
+                            },
                     )
                 }
             }
@@ -204,67 +195,82 @@ private fun ReactionFilterChips(
     }
 }
 
-/** Native Android identity row; the sheet is informative and owns no reaction mutation. */
+/** Native Android reactor row with the original own-reaction removal and profile actions. */
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming")
 private fun ReactionParticipantRow(
-    participant: ReactionParticipantGroup,
+    participant: ReactionParticipant,
     appState: WhiteNoiseAppState,
     mine: Boolean,
+    onRemove: (() -> Unit)?,
 ) {
     val shortIdentity =
         appState.shortNpub(participant.sender).ifBlank {
             IdentityFormatter.short(participant.sender, prefix = 10, suffix = 8)
         }
     val displayName = appState.displayName(participant.sender).ifBlank { shortIdentity }
-    val subtitle =
-        if (mine) {
-            listOf(stringResource(R.string.you), shortIdentity).filter(String::isNotBlank).joinToString(" · ")
-        } else {
-            shortIdentity
-        }.takeUnless { it == displayName }.orEmpty()
-    ListItem(
-        modifier = Modifier.fillMaxWidth(),
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        content = {
-            Text(
-                text = displayName,
-                style = MaterialTheme.typography.bodyLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        },
-        supportingContent =
-            subtitle.takeIf(String::isNotBlank)?.let {
-                {
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            },
-        leadingContent = {
-            Avatar(
-                title = displayName,
-                seed = participant.sender,
-                size = 48.dp,
-                pictureUrl = appState.avatarUrl(participant.sender),
-            )
-        },
-        trailingContent = {
-            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                participant.emojis.forEach { emoji ->
-                    Text(
-                        text = emoji,
-                        style = MaterialTheme.typography.headlineSmall,
-                    )
-                }
-            }
-        },
+    val headline: @Composable () -> Unit = {
+        Text(
+            text = if (mine) stringResource(R.string.you) else displayName,
+            style = MaterialTheme.typography.bodyLarge,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+    val tapToRemove = stringResource(R.string.reaction_tap_to_remove)
+    val supportingText = if (mine) tapToRemove else shortIdentity.takeUnless { it == displayName }
+    val supporting: (@Composable () -> Unit)? =
+        supportingText?.let { text ->
+            { ReactionParticipantSupportingText(text) }
+        }
+    val leading: @Composable () -> Unit = {
+        Avatar(
+            title = displayName,
+            seed = participant.sender,
+            size = 48.dp,
+            pictureUrl = appState.avatarUrl(participant.sender),
+        )
+    }
+    val trailing: @Composable () -> Unit = {
+        Text(text = participant.emoji, style = MaterialTheme.typography.headlineSmall)
+    }
+    val colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+    if (mine && onRemove != null) {
+        ListItem(
+            onClick = onRemove,
+            modifier = Modifier.fillMaxWidth(),
+            shapes = WhiteNoiseListItemDefaults.shapes(),
+            colors = colors,
+            leadingContent = leading,
+            supportingContent = supporting,
+            trailingContent = trailing,
+            content = headline,
+        )
+    } else {
+        ListItem(
+            onClick = { appState.presentProfile(appState.npub(participant.sender)) },
+            modifier = Modifier.fillMaxWidth(),
+            shapes = WhiteNoiseListItemDefaults.shapes(),
+            colors = colors,
+            leadingContent = leading,
+            supportingContent = supporting,
+            trailingContent = trailing,
+            content = headline,
+        )
+    }
+}
+
+/** Renders secondary reactor context without competing with the display name. */
+@Composable
+@Suppress("FunctionNaming")
+private fun ReactionParticipantSupportingText(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
     )
 }
 

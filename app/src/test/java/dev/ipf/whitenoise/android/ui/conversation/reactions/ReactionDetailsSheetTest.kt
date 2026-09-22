@@ -5,7 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.test.assertHasNoClickAction
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -58,6 +58,7 @@ class ReactionDetailsSheetTest {
                     participants = participants,
                     appState = appState,
                     initialEmoji = "👍",
+                    onRemoveOwnReaction = {},
                 )
             }
         }
@@ -92,38 +93,33 @@ class ReactionDetailsSheetTest {
         assertEquals(null, retainedReactionFilter(null, participants))
     }
 
-    /** The details surface groups a sender's emojis and never turns the identity row into a remove action. */
+    /** An own reactor row retains the explicit tap-to-remove action. */
     @Test
-    fun reactorRowsAreGroupedAndReadOnly() {
+    fun ownReactionRowRetainsTapToRemove() {
         val participants =
             listOf(
                 participant(sender = ACCOUNT_ID, emoji = "👍", reactedAt = 1uL),
-                participant(sender = ACCOUNT_ID, emoji = "🔥", reactedAt = 2uL),
-                participant(sender = OTHER_ACCOUNT_ID, emoji = "👍", reactedAt = 3uL),
+                participant(sender = OTHER_ACCOUNT_ID, emoji = "🔥", reactedAt = 2uL),
             )
-        val grouped = groupedReactionParticipants(participants)
-
-        assertEquals(
-            listOf(
-                ReactionParticipantGroup(ACCOUNT_ID, listOf("👍", "🔥")),
-                ReactionParticipantGroup(OTHER_ACCOUNT_ID, listOf("👍")),
-            ),
-            grouped,
-        )
+        var removedEmoji: String? = null
 
         composeRule.setContent {
             WhiteNoiseTheme {
                 ReactionDetailsContent(
                     participants = participants,
                     appState = appState(),
+                    onRemoveOwnReaction = { removedEmoji = it },
                 )
             }
         }
 
+        val tapToRemove = context.getString(R.string.reaction_tap_to_remove)
         composeRule
-            .onNodeWithText(context.getString(R.string.you), substring = true)
-            .assertHasNoClickAction()
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/reaction_details_read_only_grouped.png")
+            .onNodeWithText(tapToRemove)
+            .assertHasClickAction()
+            .performClick()
+        composeRule.runOnIdle { assertEquals("👍", removedEmoji) }
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/reaction_details_tap_to_remove.png")
     }
 
     /** Builds the minimal application state needed by the reaction-details surface. */
