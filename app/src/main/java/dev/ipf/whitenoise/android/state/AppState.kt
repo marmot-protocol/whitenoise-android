@@ -29,7 +29,6 @@ import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
-import dev.ipf.marmotkit.CreateGroupOptionsFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -1929,17 +1928,6 @@ class WhiteNoiseAppState private constructor(
 
     /** App-wide preference owner, retained across account changes and reset by erased app preferences. */
     internal val quickAccountSwitchingPreference = QuickAccountSwitchingPreference(preferences)
-
-    internal fun defaultDisappearingMessagesSeconds(accountRef: String? = activeAccountRef): Long =
-        defaultDisappearingMessagesPreferences.durationFor(accountRef)
-
-    internal fun setDefaultDisappearingMessagesSeconds(
-        seconds: Long,
-        accountRef: String? = activeAccountRef,
-    ): Boolean {
-        if (accountRef == null || activeAccountRef != accountRef) return false
-        return defaultDisappearingMessagesPreferences.setDuration(accountRef, seconds)
-    }
 
     var languageTag by mutableStateOf(preferences.getString(APP_LANGUAGE_TAG_KEY, null).orEmpty())
         private set
@@ -9065,28 +9053,6 @@ class WhiteNoiseAppState private constructor(
         pendingProfileNpub = null
         pendingProfileMetadata = null
         pendingProfileFromDiscovery = false
-    }
-
-    /**
-     * Create a 1:1 DM group with [npub]. This lower-level variant leaves
-     * failure presentation to the caller so the New Message flow can keep an
-     * inline retry state instead of collapsing everything into a transient toast.
-     */
-    suspend fun createProfileChatGroup(npub: String): String {
-        val account = activeAccountRef ?: throw StartProfileChatNoActiveAccountException()
-        val retentionSeconds = defaultDisappearingMessagesSeconds(account)
-        return marmotIo(MarmotTraceSection.CREATE_GROUP) {
-            createGroupWithOptions(
-                account,
-                "",
-                listOf(npub),
-                CreateGroupOptionsFfi(
-                    description = null,
-                    initialImage = null,
-                    disappearingMessageSecs = retentionSeconds.toULong(),
-                ),
-            )
-        }
     }
 
     private var chatCreateOpenTiming: ChatCreateOpenTiming? = null

@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import android.content.Context
 import android.content.SharedPreferences
+import dev.ipf.marmotkit.CreateGroupOptionsFfi
 import dev.ipf.whitenoise.android.ui.group.disappearingCustomUnits
 import dev.ipf.whitenoise.android.ui.group.disappearingPresetSecs
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -89,3 +90,38 @@ internal fun isValidDisappearingMessageDurationSeconds(seconds: Long): Boolean =
                 seconds % unit.seconds == 0L &&
                 seconds / unit.seconds in 1L..unit.max.toLong()
         }
+
+internal fun WhiteNoiseAppState.defaultDisappearingMessagesSeconds(
+    accountRef: String? = activeAccountRef,
+): Long = defaultDisappearingMessagesPreferences.durationFor(accountRef)
+
+internal fun WhiteNoiseAppState.setDefaultDisappearingMessagesSeconds(
+    seconds: Long,
+    accountRef: String? = activeAccountRef,
+): Boolean {
+    if (accountRef == null || activeAccountRef != accountRef) return false
+    return defaultDisappearingMessagesPreferences.setDuration(accountRef, seconds)
+}
+
+/**
+ * Creates a 1:1 DM group atomically with the active account's current default.
+ * This lower-level variant leaves failure presentation to the caller so the
+ * New Message flow can keep an inline retry state instead of collapsing
+ * everything into a transient toast.
+ */
+internal suspend fun WhiteNoiseAppState.createProfileChatGroup(npub: String): String {
+    val account = activeAccountRef ?: throw StartProfileChatNoActiveAccountException()
+    val retentionSeconds = defaultDisappearingMessagesSeconds(account)
+    return marmotIo(MarmotTraceSection.CREATE_GROUP) {
+        createGroupWithOptions(
+            account,
+            "",
+            listOf(npub),
+            CreateGroupOptionsFfi(
+                description = null,
+                initialImage = null,
+                disappearingMessageSecs = retentionSeconds.toULong(),
+            ),
+        )
+    }
+}
