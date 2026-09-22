@@ -124,20 +124,7 @@ class PerformanceDiagnosticSchemaTest {
             ),
             line.split(' ').map { it.substringBefore('=') },
         )
-        assertEquals(
-            setOf(
-                "push_recovery",
-                "app_start",
-                "chat_open",
-                "chat_list_refresh",
-                "text_send",
-                "media_send",
-                "attachment_fetch",
-                "sync_catch_up",
-                "chat_history_page",
-            ),
-            PerformanceOperation.entries.mapTo(mutableSetOf()) { it.wireName },
-        )
+        assertOperationNames()
         assertTrue(PerformancePhase.entries.all { it.wireName.matches(Regex("[a-z0-9_]+")) })
         assertEquals(
             setOf("pending", "success", "failure", "dropped"),
@@ -153,6 +140,24 @@ class PerformanceDiagnosticSchemaTest {
             PerformanceConnectivity.entries.mapTo(mutableSetOf()) { it.wireName },
         )
         assertTrue(PerformanceAttachmentState.entries.all { it.wireName.matches(Regex("[a-z_]+")) })
+    }
+
+    /** Keeps the diagnostic operation names explicit as new recovery paths are added. */
+    private fun assertOperationNames() {
+        assertEquals(
+            setOf(
+                "push_recovery",
+                "app_start",
+                "chat_open",
+                "chat_list_refresh",
+                "text_send",
+                "media_send",
+                "attachment_fetch",
+                "sync_catch_up",
+                "chat_history_page",
+            ),
+            PerformanceOperation.entries.mapTo(mutableSetOf()) { it.wireName },
+        )
     }
 
     @Test
