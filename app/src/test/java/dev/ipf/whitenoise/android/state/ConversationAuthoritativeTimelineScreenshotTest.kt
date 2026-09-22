@@ -135,6 +135,7 @@ class ConversationAuthoritativeTimelineScreenshotTest {
         composeRule.waitForIdle()
         unconfirmedRow.assertIsDisplayed()
         systemRow.assertIsDisplayed()
+        composeRule.onNodeWithText("Wave hi").assertIsDisplayed()
         appRow.assertIsDisplayed()
         val unconfirmedTop = unconfirmedRow.fetchSemanticsNode().boundsInRoot.top
         val systemTop = systemRow.fetchSemanticsNode().boundsInRoot.top

@@ -142,7 +142,8 @@ class GroupSystemRetentionScreenshotTest {
         composeRule.setContent {
             CompositionLocalProvider(
                 LocalDensity provides Density(1f, if (theme == WaveTheme.LARGE_RTL) 2f else 1f),
-                LocalLayoutDirection provides if (theme == WaveTheme.LARGE_RTL) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                LocalLayoutDirection provides
+                    if (theme == WaveTheme.LARGE_RTL) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
                 WhiteNoiseTheme(darkTheme = theme != WaveTheme.LIGHT, amoled = theme == WaveTheme.AMOLED) {
                     Surface(Modifier.width(360.dp).padding(16.dp).testTag(SCREENSHOT_TAG)) {
@@ -152,7 +153,11 @@ class GroupSystemRetentionScreenshotTest {
                             groupSystem =
                                 addedMemberEvent().copy(
                                     subjectDisplayName =
-                                        if (theme == WaveTheme.LARGE_RTL) "Bob with a very long display name" else "Bob",
+                                        if (theme == WaveTheme.LARGE_RTL) {
+                                            "Bob with a very long display name"
+                                        } else {
+                                            "Bob"
+                                        },
                                 ),
                             onWave = { wavedAt = it },
                         )

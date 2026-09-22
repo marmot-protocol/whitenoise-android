@@ -1280,6 +1280,12 @@ internal fun ConversationScreen(
         }
     }
     val composerGate = conversationControllerComposerGate(controller, notificationOpenRequestId)
+
+    fun canWave(): Boolean =
+        controller.canSendMessages &&
+            controller.editingMessageId == null &&
+            controller.replyingTo == null
+
     val timelineUnderlayEnabled =
         composerGate == ComposerGate.COMPOSER &&
             !selectionMode &&
@@ -3951,18 +3957,10 @@ internal fun ConversationScreen(
                                         onReplyPreviewClick = { navigateToReplyTarget(it) },
                                         composerGate = composerGate,
                                         onWave =
-                                            if (
-                                                composerGate == ComposerGate.COMPOSER &&
-                                                controller.canSendMessages &&
-                                                controller.editingMessageId == null &&
-                                                controller.replyingTo == null
-                                            ) {
+                                            if (composerGate == ComposerGate.COMPOSER && canWave()) {
                                                 { accountIdHex ->
                                                     appState.launchMutation {
-                                                        if (!controller.canSendMessages ||
-                                                            controller.editingMessageId != null ||
-                                                            controller.replyingTo != null
-                                                        ) {
+                                                        if (!canWave()) {
                                                             return@launchMutation
                                                         }
                                                         val npub = appState.npubForDisplay(accountIdHex)

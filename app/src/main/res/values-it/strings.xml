@@ -164,6 +164,7 @@
     <string name="leave">Lascia</string>
     <string name="couldnt_load_conversation">Impossibile caricare la conversazione</string>
     <string name="no_messages_yet">Ancora nessun messaggio</string>
+    <string name="wave_hi">Saluta</string>
     <string name="conversation_empty_disappearing_title">Nessun messaggio da mostrare</string>
     <string name="conversation_empty_disappearing_body">I messaggi effimeri sono attivi. I nuovi messaggi in questa chat scompaiono dopo %1$s.</string>
     <string name="group_empty_only_you_title">Questo gruppo contiene solo te</string>

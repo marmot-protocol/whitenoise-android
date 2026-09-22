@@ -203,7 +203,7 @@
     <ID>FunctionNaming:ConversationRows.kt:@Composable internal fun DaySeparator</ID>
     <ID>FunctionNaming:ConversationRows.kt:@Composable internal fun EmptyGroupConversation</ID>
     <ID>FunctionNaming:ConversationRows.kt:@Composable internal fun UnreadMessagesDivider</ID>
-    <ID>FunctionNaming:ConversationRows.kt:@OptIn(ExperimentalFoundationApi::class) @Composable internal fun GroupSystemRow</ID>
+    <ID>FunctionNaming:GroupSystemRow.kt:@OptIn(ExperimentalFoundationApi::class) @Composable internal fun GroupSystemRow</ID>
     <ID>FunctionNaming:ConversationScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ConversationScreen</ID>
     <ID>FunctionNaming:CopyableValueRow.kt:@Composable internal fun CopyableValueRow</ID>
     <ID>FunctionNaming:DeveloperScreen.kt:@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class) @Composable internal fun DeveloperScreen</ID>
@@ -448,7 +448,7 @@
     <ID>LongMethod:Controllers.kt:ConversationController$suspend fun retryFailedSend</ID>
     <ID>LongMethod:Controllers.kt:ConversationController$suspend fun send</ID>
     <ID>LongMethod:Controllers.kt:internal fun reduceSubscriptionChatListRow: ChatListRowFfi</ID>
-    <ID>LongMethod:ConversationRows.kt:@OptIn(ExperimentalFoundationApi::class) @Composable internal fun GroupSystemRow</ID>
+    <ID>LongMethod:GroupSystemRow.kt:@OptIn(ExperimentalFoundationApi::class) @Composable internal fun GroupSystemRow</ID>
     <ID>LongMethod:ConversationScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ConversationScreen</ID>
     <ID>LongMethod:ConversationTranscriptExportTest.kt:ConversationTranscriptExportTest$@Test fun documentEncodesTimelineMetadataInChronologicalOrder</ID>
     <ID>LongMethod:DevicePrivacyScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun DevicePrivacyScreen</ID>
