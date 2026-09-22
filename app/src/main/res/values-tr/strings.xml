@@ -448,6 +448,10 @@
     <string name="delete_audit_logs">Tanılama Günlüklerini Temizle</string>
     <string name="delete_audit_logs_subtitle">Günlükleri bu cihazdan kaldırır. Daha önce yüklenmiş kopyalar ve paylaşım ayarınız olduğu gibi kalır.</string>
     <string name="device_protection">Cihaz koruması</string>
+    <string name="message_privacy">Mesaj gizliliği</string>
+    <string name="default_disappearing_messages">Varsayılan kaybolan mesajlar</string>
+    <string name="default_disappearing_messages_detail">Bu profil yeni bir sohbet veya grup başlattığında kullanılır. Her konuşma daha sonra değiştirilebilir.</string>
+    <string name="default_disappearing_messages_picker_detail">Bu profilin oluşturduğu sohbet ve gruplardaki yeni mesajların ne kadar kalacağını seçin. Mevcut konuşmalar değişmez.</string>
     <string name="incognito_keyboard_detail">Klavyenizden White Noise\'de yazdıklarınızdan öğrenmemesini isteyin. Klavyeniz bu isteği göz ardı edebilir.</string>
     <string name="require_device_authentication">Cihaz kimlik doğrulamasını zorunlu kıl</string>
     <string name="app_lock_enabled_detail">White Noise\'ye dönerken cihazın ekran kilidini kullanın.</string>
@@ -773,7 +777,6 @@
     <string name="toast_no_audit_logs_to_delete">Temizlenecek tanılama günlüğü yok</string>
     <string name="toast_chat_created">Sohbet oluşturuldu</string>
     <string name="group_create_stage_creating">Grup oluşturuluyor…</string>
-    <string name="group_create_stage_applying_retention">Kaybolan mesajlar uygulanıyor…</string>
     <string name="toast_notification_permission_denied">Bildirim izni reddedildi</string>
     <string name="toast_signed_out">Çıkış yap</string>
     <string name="group_title_invite_from">%1$s tarafından davet</string>
@@ -1351,7 +1354,6 @@
     <string name="vibration_pattern_android_override">%1$s · Android ayarları</string>
     <string name="chat_muted_badge">Sessize alındı</string>
     <string name="collapse_long_messages_subtitle">Bu sohbetteki uzun mesajların önizlemesini gösterir.</string>
-    <string name="toast_disappearing_not_applied">Grup oluşturuldu ancak kaybolan mesajlar açılamadı</string>
     <string name="search_members">Üye ara</string>
     <string name="recent_chats">Son sohbetler</string>
     <string name="onboarding_login">Giriş Yap</string>

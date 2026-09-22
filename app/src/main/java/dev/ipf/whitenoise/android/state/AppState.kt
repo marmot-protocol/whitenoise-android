@@ -29,6 +29,7 @@ import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.CreateGroupOptionsFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -1159,6 +1160,8 @@ class WhiteNoiseAppState private constructor(
 
     private val appContext = context.applicationContext
     private val preferences = preferencesOverride ?: appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+    internal val defaultDisappearingMessagesPreferences =
+        DefaultDisappearingMessagesPreferences(appContext, preferences)
     internal val conversationDictationPreferences = ConversationDictationPreferences(appContext)
     internal val microphoneCaptureCoordinator = MicrophoneCaptureCoordinator()
     private val dictationMicrophoneOwner = Any()
@@ -1925,6 +1928,17 @@ class WhiteNoiseAppState private constructor(
 
     /** App-wide preference owner, retained across account changes and reset by erased app preferences. */
     internal val quickAccountSwitchingPreference = QuickAccountSwitchingPreference(preferences)
+
+    internal fun defaultDisappearingMessagesSeconds(accountRef: String? = activeAccountRef): Long =
+        defaultDisappearingMessagesPreferences.durationFor(accountRef)
+
+    internal fun setDefaultDisappearingMessagesSeconds(
+        seconds: Long,
+        accountRef: String? = activeAccountRef,
+    ): Boolean {
+        if (accountRef == null || activeAccountRef != accountRef) return false
+        return defaultDisappearingMessagesPreferences.setDuration(accountRef, seconds)
+    }
 
     var languageTag by mutableStateOf(preferences.getString(APP_LANGUAGE_TAG_KEY, null).orEmpty())
         private set
@@ -5695,6 +5709,7 @@ class WhiteNoiseAppState private constructor(
                 restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
                 return outcome
             }
+            defaultDisappearingMessagesPreferences.removeAccount(wipedRef)
             composerExpansionStateRetention.removeAccount(wipedRef)
             clearConversationShortcutsForAccount(
                 accountRef = wipedRef,
@@ -9058,7 +9073,19 @@ class WhiteNoiseAppState private constructor(
      */
     suspend fun createProfileChatGroup(npub: String): String {
         val account = activeAccountRef ?: throw StartProfileChatNoActiveAccountException()
-        return marmotIo(MarmotTraceSection.CREATE_GROUP) { createGroup(account, "", listOf(npub), null) }
+        val retentionSeconds = defaultDisappearingMessagesSeconds(account)
+        return marmotIo(MarmotTraceSection.CREATE_GROUP) {
+            createGroupWithOptions(
+                account,
+                "",
+                listOf(npub),
+                CreateGroupOptionsFfi(
+                    description = null,
+                    initialImage = null,
+                    disappearingMessageSecs = retentionSeconds.toULong(),
+                ),
+            )
+        }
     }
 
     private var chatCreateOpenTiming: ChatCreateOpenTiming? = null

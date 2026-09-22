@@ -16,22 +16,31 @@ import org.junit.Test
 /** Exercises the production FFI argument mapping and the fence used around native image/projection awaits. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class NewGroupSubmissionTest {
-    /** Authored description is sent in the same encrypted native group create, never a follow-up update. */
-    @Test fun nativeCreateReceivesDescriptionMembersAndEncryptedImage() =
+    /** Description, image, and retention cross one atomic encrypted group-founding boundary. */
+    @Test fun nativeCreateReceivesDescriptionMembersImageAndRetentionOptions() =
         runTest {
             val bytes = byteArrayOf(1, 2, 3)
             val draft = ImageUploadDraft(bytes, "image/png", "https://example.org/source", "12x12", "hash")
-            val request = NewGroupSubmission("Team 😀", "Private planning", listOf("b".repeat(64)), draft)
+            val request =
+                NewGroupSubmission(
+                    "Team 😀",
+                    "Private planning",
+                    listOf("b".repeat(64)),
+                    draft,
+                    disappearingMessageSecs = 604_800L,
+                )
             var creates = 0
             val result =
-                request.createWith { name, members, description, image ->
+                request.createWith { name, members, options ->
                     creates++
                     assertEquals("Team 😀", name)
                     assertEquals(listOf("b".repeat(64)), members)
-                    assertEquals("Private planning", description)
+                    assertEquals("Private planning", options.description)
+                    val image = options.initialImage
                     assertArrayEquals(bytes, image!!.plaintext)
                     assertNull(image.sourceUrl)
                     assertEquals("image/png", image.mediaType)
+                    assertEquals(604_800uL, options.disappearingMessageSecs)
                     "canonical"
                 }
             assertEquals("canonical", result)
@@ -41,10 +50,11 @@ class NewGroupSubmissionTest {
     /** Empty membership stays a real solo group and a missing image remains absent at the native boundary. */
     @Test fun soloGroupDoesNotInventMemberOrPhoto() =
         runTest {
-            NewGroupSubmission("Notes", null, emptyList(), null).createWith { _, members, description, image ->
+            NewGroupSubmission("Notes", null, emptyList(), null).createWith { _, members, options ->
                 assertTrue(members.isEmpty())
-                assertNull(description)
-                assertNull(image)
+                assertNull(options.description)
+                assertNull(options.initialImage)
+                assertEquals(0uL, options.disappearingMessageSecs)
                 "solo"
             }
         }
@@ -78,17 +88,6 @@ class NewGroupSubmissionTest {
                 attempt.join()
             }
         }
-
-    /** Account navigation does not silently drop the already-accepted group's captured retention policy. */
-    @Test fun acceptedNativePolicyMayFinishAfterUiLeavesButNeverAfterRuntimeTeardown() {
-        var runtimeExists = true
-        val owner = GroupCreationSession(nativeOwner = { runtimeExists }, currentOwner = { false })
-        owner.dispose()
-        owner.ensureNativeCurrent()
-        assertTrue(runCatching { owner.ensureCurrent() }.exceptionOrNull() is CancellationException)
-        runtimeExists = false
-        assertTrue(runCatching { owner.ensureNativeCurrent() }.exceptionOrNull() is CancellationException)
-    }
 
     /** Uses the production suspension fence instead of timing delays or a fake-ready presentation model. */
     private fun lateValue(dispose: Boolean) =

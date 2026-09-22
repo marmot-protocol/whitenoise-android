@@ -571,6 +571,10 @@
     <string name="delete_audit_logs">Clear Diagnostic Logs</string>
     <string name="delete_audit_logs_subtitle">Removes logs from this device. Copies already uploaded and your sharing setting stay as they are.</string>
     <string name="device_protection">Device protection</string>
+    <string name="message_privacy">Message privacy</string>
+    <string name="default_disappearing_messages">Default disappearing messages</string>
+    <string name="default_disappearing_messages_detail">Used when this profile starts a new chat or group. Each conversation can be changed later.</string>
+    <string name="default_disappearing_messages_picker_detail">Choose how long new messages should remain in chats and groups this profile creates. This does not change existing conversations.</string>
     <string name="incognito_keyboard_detail">Ask your keyboard not to learn from what you type in White Noise. Your keyboard may ignore this request.</string>
     <string name="require_device_authentication">Require device authentication</string>
     <string name="app_lock_enabled_detail">Use the device screen lock when returning to White Noise.</string>
@@ -1061,7 +1065,6 @@
     <string name="toast_couldnt_save_audit_logs">Couldn\'t save diagnostic logs</string>
     <string name="toast_chat_created">Chat created</string>
     <string name="group_create_stage_creating">Creating group…</string>
-    <string name="group_create_stage_applying_retention">Applying disappearing messages…</string>
     <string name="toast_notification_permission_denied">Notification permission denied</string>
     <string name="toast_signed_out">Signed out</string>
     <string name="group_title_invite_from">Invite from %1$s</string>
@@ -1563,7 +1566,6 @@
     <string name="vibration_pattern_custom_in_android_settings">Custom in Android settings</string>
     <string name="vibration_pattern_android_override">%1$s · Android settings</string>
     <string name="chat_muted_badge">Muted</string>
-    <string name="toast_disappearing_not_applied">The group was created, but disappearing messages could not be turned on</string>
     <string name="search_members">Search members</string>
     <string name="recent_chats">Recent chats</string>
     <string name="onboarding_login">Sign In</string>

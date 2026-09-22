@@ -67,7 +67,10 @@ private fun NewGroupAccountFlow(
         rememberSaveable(saver = GroupMemberSelectionSaver) {
             mutableStateListOf<RecipientSearch.Candidate>().apply { addAll(initialMembers) }
         }
-    val draft = rememberNewGroupDraft()
+    val draft =
+        rememberNewGroupDraft(
+            initialRetentionSeconds = appState.defaultDisappearingMessagesSeconds(account),
+        )
     var setupOpen by rememberSaveable { mutableStateOf(false) }
     if (setupOpen) {
         NewGroupSetupScreen(

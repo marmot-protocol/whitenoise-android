@@ -2,26 +2,6 @@ package dev.ipf.whitenoise.android.ui.chats.newchat
 
 import dev.ipf.whitenoise.android.R
 
-internal enum class GroupRetentionApplyOutcome {
-    Skipped,
-    Applied,
-    Failed,
-}
-
-/**
- * Returns the post-create success toast, or null when retention failed so the
- * failure toast is not overwritten by the single snackbar slot.
- */
-internal fun groupCreateSuccessToastResId(
-    showCreatedToast: Boolean,
-    retentionOutcome: GroupRetentionApplyOutcome,
-): Int? =
-    when {
-        !showCreatedToast -> null
-        retentionOutcome == GroupRetentionApplyOutcome.Failed -> null
-        else -> R.string.toast_chat_created
-    }
-
 internal data class NewGroupSetupUiState(
     val detailsEditable: Boolean,
     val fabLabelResId: Int,

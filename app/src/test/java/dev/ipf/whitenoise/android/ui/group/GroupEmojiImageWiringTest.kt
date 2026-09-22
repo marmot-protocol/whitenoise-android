@@ -18,7 +18,7 @@ class GroupEmojiImageWiringTest {
         )
         assertTrue(
             "the same draft must be captured into the submission",
-            "captureNewGroupSubmission(draft, members, imageDraft)" in source,
+            "captureNewGroupSubmission(draft, members, imageDraft, submittedRetention)" in source,
         )
         val submission = source("ui/chats/newchat/NewGroupSubmission.kt").readText()
         assertTrue(

@@ -448,6 +448,10 @@
     <string name="delete_audit_logs">Limpar logs de diagnóstico</string>
     <string name="delete_audit_logs_subtitle">Remove os logs deste dispositivo. As cópias já enviadas e sua preferência de compartilhamento não mudam.</string>
     <string name="device_protection">Proteção do dispositivo</string>
+    <string name="message_privacy">Privacidade das mensagens</string>
+    <string name="default_disappearing_messages">Mensagens temporárias predefinidas</string>
+    <string name="default_disappearing_messages_detail">Usado quando este perfil inicia uma nova conversa ou cria um novo grupo. Cada conversa pode ser alterada depois.</string>
+    <string name="default_disappearing_messages_picker_detail">Escolha por quanto tempo as novas mensagens permanecem nas conversas e nos grupos criados por este perfil. Isto não altera conversas existentes.</string>
     <string name="incognito_keyboard_detail">Peça ao teclado para não aprender com o que você digita no White Noise. Seu teclado pode ignorar este pedido.</string>
     <string name="require_device_authentication">Exigir autenticação do dispositivo</string>
     <string name="app_lock_enabled_detail">Use o bloqueio de tela do dispositivo ao voltar ao White Noise.</string>
@@ -773,7 +777,6 @@
     <string name="toast_no_audit_logs_to_delete">Não há logs de diagnóstico para limpar</string>
     <string name="toast_chat_created">Chat criado</string>
     <string name="group_create_stage_creating">A criar grupo…</string>
-    <string name="group_create_stage_applying_retention">A aplicar mensagens temporárias…</string>
     <string name="toast_notification_permission_denied">Permissão de notificação negada</string>
     <string name="toast_signed_out">Sair</string>
     <string name="group_title_invite_from">Convite de %1$s</string>
@@ -1353,7 +1356,6 @@
     <string name="vibration_pattern_android_override">%1$s · Definições do Android</string>
     <string name="chat_muted_badge">Silenciado</string>
     <string name="collapse_long_messages_subtitle">Mostra uma prévia das mensagens longas neste chat.</string>
-    <string name="toast_disappearing_not_applied">O grupo foi criado, mas não foi possível ativar as mensagens temporárias</string>
     <string name="search_members">Pesquisar membros</string>
     <string name="recent_chats">Conversas recentes</string>
     <string name="onboarding_login">Entrar</string>

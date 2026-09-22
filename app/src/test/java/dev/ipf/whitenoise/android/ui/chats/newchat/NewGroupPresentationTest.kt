@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.chats.newchat
 
 import android.content.Context
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -141,6 +142,24 @@ class NewGroupPresentationTest {
             assertNull(current.imageDraft)
             assertTrue(current.imageNeedsReselection)
         }
+    }
+
+    /** A fresh setup draft is seeded once, while restored one-off choices remain authoritative. */
+    @Test fun accountDefaultSeedsFreshDraftWithoutOverwritingRestoredChoice() {
+        val restoration = StateRestorationTester(composeRule)
+        lateinit var current: NewGroupDraft
+        val accountDefault = mutableLongStateOf(604_800L)
+        restoration.setContent {
+            current = rememberNewGroupDraft(initialRetentionSeconds = accountDefault.longValue)
+        }
+        composeRule.runOnIdle {
+            assertEquals(604_800L, current.retentionSecs)
+            current.retentionSecs = 3_600L
+            accountDefault.longValue = 86_400L
+        }
+        composeRule.runOnIdle { assertEquals(3_600L, current.retentionSecs) }
+        restoration.emulateSavedInstanceStateRestore()
+        composeRule.runOnIdle { assertEquals(3_600L, current.retentionSecs) }
     }
 
     /** Large text uses a scrolling form while the primary action retains a full minimum touch target. */

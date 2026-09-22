@@ -65,7 +65,6 @@ import dev.ipf.whitenoise.android.ui.theme.Dimens
 
 internal enum class NewGroupCreateStage {
     Creating,
-    ApplyingRetention,
 }
 
 private enum class NewChatStep { NewMessage, NewGroup }

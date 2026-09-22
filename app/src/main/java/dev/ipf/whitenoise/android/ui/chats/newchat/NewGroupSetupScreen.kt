@@ -52,38 +52,7 @@ internal fun newGroupDetailsEditable(
     imagePreparing: Boolean,
 ): Boolean = retryGroupIdHex == null && !busy && !imagePreparing
 
-/** Applies the staged disappearing-message timer to the new group when one was chosen. */
-private suspend fun applyNewGroupRetentionIfNeeded(
-    appState: WhiteNoiseAppState,
-    account: String,
-    groupIdHex: String,
-    retentionSecs: Long,
-    isRetryLoad: Boolean,
-    onStage: (NewGroupCreateStage?) -> Unit,
-    owner: GroupCreationSession,
-): GroupRetentionApplyOutcome {
-    if (retentionSecs <= 0L || isRetryLoad) return GroupRetentionApplyOutcome.Skipped
-    // Applied post-create because the create commit has no retention parameter;
-    // a failure leaves the group usable with the default (off) window.
-    onStage(NewGroupCreateStage.ApplyingRetention)
-    return runCatchingCancellable {
-        appState.withGroupCommitLock(account, groupIdHex) {
-            owner.ensureNativeCurrent()
-            appState.marmotIo {
-                owner.ensureNativeCurrent()
-                updateMessageRetention(account, groupIdHex, retentionSecs.toULong())
-            }
-        }
-    }.fold(
-        onSuccess = { GroupRetentionApplyOutcome.Applied },
-        onFailure = {
-            if (owner.isCurrent()) appState.present(R.string.toast_disappearing_not_applied, copyable = true)
-            GroupRetentionApplyOutcome.Failed
-        },
-    )
-}
-
-/** Create once or recover the accepted native group ID before applying captured policy and reading its projection. */
+/** Create once with all founding options, or recover the accepted native group ID before reading its projection. */
 @Suppress("LongParameterList") // Native owner, immutable submission and stage/error delivery belong to this operation.
 private suspend fun createOrRecoverNewGroup(
     appState: WhiteNoiseAppState,
@@ -99,10 +68,10 @@ private suspend fun createOrRecoverNewGroup(
             appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_MDK_CREATE_START)
         }
         submission
-            .createWith { name, members, about, image ->
+            .createWith { name, members, options ->
                 appState.marmotIo {
                     owner.ensureCurrent()
-                    createGroupWithInitialImage(account, name, members, about, image)
+                    createGroupWithOptions(account, name, members, options)
                 }
             }.also {
                 if (owner.isCurrent()) {
@@ -128,6 +97,7 @@ private fun captureNewGroupSubmission(
     draft: NewGroupDraft,
     members: List<RecipientSearch.Candidate>,
     image: ImageUploadDraft?,
+    retentionSecs: Long,
 ): NewGroupSubmission {
     val recipients =
         newChatMemberRefs(
@@ -147,6 +117,7 @@ private fun captureNewGroupSubmission(
                 .takeIf { it.isNotEmpty() },
         members = recipients,
         image = image,
+        disappearingMessageSecs = retentionSecs,
     )
 }
 
@@ -154,11 +125,7 @@ private fun captureNewGroupSubmission(
 private suspend fun runNewGroupCreateMutation(
     appState: WhiteNoiseAppState,
     account: String,
-    groupName: String,
-    description: String?,
-    recipients: List<String>,
-    imageDraft: ImageUploadDraft?,
-    retentionSecs: Long,
+    submission: NewGroupSubmission,
     retryLoadGroupIdHex: String?,
     isRetryLoad: Boolean,
     createRequestToken: Long,
@@ -171,41 +138,26 @@ private suspend fun runNewGroupCreateMutation(
     owner: GroupCreationSession,
 ) {
     try {
-        var retentionOutcome = GroupRetentionApplyOutcome.Skipped
         runGroupCreationStages(
             owner = owner,
             createOrRetry = {
                 retryLoadGroupIdHex ?: createOrRecoverNewGroup(
                     appState,
                     account,
-                    NewGroupSubmission(groupName, description, recipients, imageDraft),
+                    submission,
                     onStage,
                     onCreateError,
                     owner,
                 )
             },
-            applyCapturedPolicy = { groupIdHex ->
-                onRetryGroupId(groupIdHex)
-                onStage(null)
-                retentionOutcome =
-                    applyNewGroupRetentionIfNeeded(
-                        appState = appState,
-                        account = account,
-                        groupIdHex = groupIdHex,
-                        retentionSecs = retentionSecs,
-                        isRetryLoad = isRetryLoad,
-                        onStage = onStage,
-                        owner = owner,
-                    )
-            },
             openCurrentChat = { groupIdHex ->
+                onRetryGroupId(groupIdHex)
                 onStage(null)
                 openCreatedGroupAfterCanonicalCreate(
                     appState = appState,
                     accountRef = account,
                     groupIdHex = groupIdHex,
                     showCreatedToast = !isRetryLoad,
-                    retentionOutcome = retentionOutcome,
                     createRequestToken = createRequestToken,
                     onCreateCompletedOpen = onCreateCompletedOpen,
                     onRetryGroupIdCleared = onRetryGroupIdCleared,
@@ -226,21 +178,21 @@ private suspend fun openCreatedGroupAfterCanonicalCreate(
     accountRef: String,
     groupIdHex: String,
     showCreatedToast: Boolean,
-    retentionOutcome: GroupRetentionApplyOutcome,
     createRequestToken: Long,
     onCreateCompletedOpen: (ChatListItem, Long) -> Unit,
     onRetryGroupIdCleared: () -> Unit,
     onAuthoritativeReadFailed: (Throwable) -> Unit,
     owner: GroupCreationSession,
 ) {
-    val successToastResId = groupCreateSuccessToastResId(showCreatedToast, retentionOutcome)
     runCatchingCancellable {
         val item =
             owner.currentValue {
                 loadCreatedGroupForOwner(appState, accountRef, groupIdHex, owner)
             }
         onRetryGroupIdCleared()
-        successToastResId?.let { appState.presentConversationTransient(accountRef, groupIdHex, it) }
+        if (showCreatedToast) {
+            appState.presentConversationTransient(accountRef, groupIdHex, R.string.toast_chat_created)
+        }
         onCreateCompletedOpen(item, createRequestToken)
     }.onFailure {
         if (owner.isCurrent()) appState.abandonGroupCreateTiming(ChatCreateOpenTiming.STAGE_AUTHORITATIVE_READ_FAILED)
@@ -270,8 +222,8 @@ private suspend fun loadCreatedGroupForOwner(
 
 /**
  * Final step of the New Group flow: name the group, preview the invited
- * members, and create. Disappearing messages picked here are applied after
- * the create commit and before this screen opens the resulting chat.
+ * members, and create. Disappearing messages are included in the founding
+ * options so the Welcome and initial group state agree from epoch zero.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -292,7 +244,15 @@ internal fun NewGroupSetupScreen(
             onBack,
             onCreateCompletedOpen,
             onCreateSubmitted,
-            draft ?: rememberNewGroupDraft(initialRetryGroupIdHex),
+            draft ?: rememberNewGroupDraft(
+                initialRetryGroupIdHex = initialRetryGroupIdHex,
+                initialRetentionSeconds =
+                    if (initialRetryGroupIdHex == null) {
+                        appState.defaultDisappearingMessagesSeconds()
+                    } else {
+                        0L
+                    },
+            ),
         )
     }
 }
@@ -312,14 +272,7 @@ private fun NewGroupSetupAccountScreen(
     val runtime = remember { appState.runtimeGeneration }
     val owner =
         remember {
-            GroupCreationSession(
-                nativeOwner = {
-                    appState.runtimeGeneration == runtime &&
-                        !appState.signOutInProgress &&
-                        !appState.wipeInProgress &&
-                        appState.accounts.any { it.label == accountRef && !it.signedOut }
-                },
-            ) {
+            GroupCreationSession {
                 accountRef != null &&
                     appState.activeAccountRef == accountRef &&
                     appState.runtimeGeneration == runtime &&
@@ -388,8 +341,8 @@ private fun NewGroupSetupAccountScreen(
         if (!owner.isCurrent() || !canStartNewGroupCreateAttempt(busy, canCreateNow, retryLoadGroupIdHex)) return
         val account = appState.activeAccountRef ?: return
         val isRetryLoad = retryLoadGroupIdHex != null
-        val submission = captureNewGroupSubmission(draft, members, imageDraft)
         val submittedRetention = retentionSecs
+        val submission = captureNewGroupSubmission(draft, members, imageDraft, submittedRetention)
         busy = true
         createStage = null
         error = null
@@ -403,11 +356,7 @@ private fun NewGroupSetupAccountScreen(
                 runNewGroupCreateMutation(
                     appState = appState,
                     account = account,
-                    groupName = submission.name,
-                    description = submission.description,
-                    recipients = submission.members,
-                    imageDraft = submission.image,
-                    retentionSecs = submittedRetention,
+                    submission = submission,
                     retryLoadGroupIdHex = retryLoadGroupIdHex,
                     isRetryLoad = isRetryLoad,
                     createRequestToken = createRequestToken,
