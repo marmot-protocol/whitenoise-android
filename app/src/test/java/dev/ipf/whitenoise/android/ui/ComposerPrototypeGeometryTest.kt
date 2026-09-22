@@ -156,8 +156,14 @@ class ComposerPrototypeGeometryTest {
             it(layouts)
         }
         assertEquals(2, layouts.single().lineCount)
-        composeRule.onNodeWithContentDescription(app.getString(R.string.composer_resize)).assertDoesNotExist()
         val surface = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).fetchSemanticsNode().boundsInRoot
+        val resize =
+            composeRule
+                .onNodeWithTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG, useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot
+        assertEquals(surface.top, resize.top, 1f)
+        assertEquals(48f, resize.height, 1f)
         assertEquals(104f, surface.height, 1f)
     }
 

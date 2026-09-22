@@ -4,8 +4,8 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
-import androidx.core.content.FileProvider
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.FileProviderStrategyCacheRule
 import dev.ipf.whitenoise.android.state.AttachmentDownloadIntentStore
 import dev.ipf.whitenoise.android.state.AttachmentInstallerHandoffRequest
 import dev.ipf.whitenoise.android.state.AttachmentOpenDestination
@@ -20,6 +20,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -33,12 +34,14 @@ import kotlin.coroutines.cancellation.CancellationException
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class ReceivedApkAttachmentOpenIntegrationTest {
+    @get:Rule
+    val fileProviderStrategyCacheRule = FileProviderStrategyCacheRule()
+
     private val artifacts = mutableListOf<File>()
 
     /** Warms Robolectric's FileProvider roots before tests dispatch from background contexts. */
     @Before
     fun setUp() {
-        clearFileProviderStrategyCache()
         // Robolectric lazily parses FileProvider roots and cannot perform that
         // package-manager lookup from Dispatchers.IO. Android's provider is
         // thread-safe; warm the test shadow on the runner thread first.
@@ -50,7 +53,6 @@ class ReceivedApkAttachmentOpenIntegrationTest {
     @After
     fun tearDown() {
         artifacts.forEach(File::delete)
-        clearFileProviderStrategyCache()
     }
 
     /** Targets unknown-sources permission to White Noise instead of a generic settings screen. */
@@ -463,12 +465,6 @@ class ReceivedApkAttachmentOpenIntegrationTest {
         listOf(File(path), File("../$path"))
             .firstOrNull(File::exists)
             ?: File(path)
-
-    private fun clearFileProviderStrategyCache() {
-        val cacheField = FileProvider::class.java.getDeclaredField("sCache").apply { isAccessible = true }
-        @Suppress("UNCHECKED_CAST")
-        (cacheField.get(null) as MutableMap<String, *>).clear()
-    }
 
     private class RecordingContext(
         base: Context,

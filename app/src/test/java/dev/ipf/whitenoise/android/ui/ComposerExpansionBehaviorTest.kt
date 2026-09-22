@@ -299,9 +299,12 @@ class ComposerExpansionBehaviorTest {
     fun twoLinesKeepTheExistingCompactComposer() {
         render("First line\nSecond line")
 
-        composeRule
-            .onNodeWithContentDescription(app.getString(R.string.composer_resize))
-            .assertDoesNotExist()
+        val surface = pillSurface().fetchSemanticsNode().boundsInRoot
+        val resize = resizeHandle().fetchSemanticsNode().boundsInRoot
+        assertEquals(surface.top, resize.top, 1f)
+        assertEquals(48f, resize.height, 1f)
+        assertEquals(104f, surface.height, 1f)
+        assertResizeHandleToggleLabel(R.string.composer_expand_full_screen)
     }
 
     /** Line thresholds animate monotonically and preserve focus draft and selection. */

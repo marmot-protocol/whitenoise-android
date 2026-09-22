@@ -3,15 +3,13 @@ package dev.ipf.whitenoise.android.state
 import android.content.ClipDescription
 import android.content.Context
 import android.content.Intent
-import androidx.core.content.FileProvider
 import androidx.test.core.app.ApplicationProvider
-import org.junit.After
+import dev.ipf.whitenoise.android.FileProviderStrategyCacheRule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -26,17 +24,8 @@ class AuditLogShareTest {
     @get:Rule
     val temporaryFolder = TemporaryFolder()
 
-    @Before
-    fun clearFileProviderStrategyBeforeTest() = clearFileProviderStrategyCache()
-
-    @After
-    fun clearFileProviderStrategyAfterTest() = clearFileProviderStrategyCache()
-
-    private fun clearFileProviderStrategyCache() {
-        val cacheField = FileProvider::class.java.getDeclaredField("sCache").apply { isAccessible = true }
-        @Suppress("UNCHECKED_CAST")
-        (cacheField.get(null) as MutableMap<String, *>).clear()
-    }
+    @get:Rule
+    val fileProviderStrategyCacheRule = FileProviderStrategyCacheRule()
 
     /** One export yields one archive in private cache holding every confined log, byte for byte. */
     @Test
