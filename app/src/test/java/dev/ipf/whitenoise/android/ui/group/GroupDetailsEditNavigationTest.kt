@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.ui.group
 
 import android.content.Context
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -12,6 +14,7 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -45,6 +48,7 @@ import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
 import dev.ipf.whitenoise.android.state.GroupRosterLoadState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.conversation.rememberConversationSurfaceState
 import dev.ipf.whitenoise.android.ui.profile.PROFILE_ADD_TO_GROUPS_CONTENT_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
@@ -93,6 +97,54 @@ class GroupDetailsEditNavigationTest {
         assertEquals(bounds[1].width, bounds[2].width, 1f)
         assertTrue(bounds[0].right <= bounds[1].left && bounds[1].right <= bounds[2].left)
         composeRule.onNodeWithTag("chat_info.add_people").performScrollTo().assertIsDisplayed()
+    }
+
+    /** The real details and add-members destinations survive Activity saved-state restoration together. */
+    @Test
+    fun addMembersRouteRestoresThroughActualDetailsScreen() {
+        val testGroup = group()
+        val members = listOf(member(SELF_HEX, local = true)) + (1 until 50).map { member("member-$it") }
+        val fixture =
+            controller(
+                group = testGroup,
+                verifiedRoster = true,
+                membersOverride = members,
+            )
+        val restorationTester = StateRestorationTester(composeRule)
+
+        restorationTester.setContent {
+            val surfaceState =
+                rememberConversationSurfaceState(
+                    controllerIdentity = fixture.controller,
+                    accountRef = ACCOUNT_REF,
+                    chatId = testGroup.groupIdHex,
+                    runtimeGeneration = fixture.appState.runtimeGeneration,
+                )
+            WhiteNoiseTheme {
+                if (surfaceState.showDetails.value) {
+                    GroupDetailsScreen(
+                        appState = fixture.appState,
+                        controller = fixture.controller,
+                        onBack = { surfaceState.showDetails.value = false },
+                        onLeft = {},
+                    )
+                } else {
+                    Button(onClick = { surfaceState.showDetails.value = true }) {
+                        Text("Open details")
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Open details").performClick()
+        composeRule.onNodeWithTag("chat_info.add_people").performScrollTo().performClick()
+        composeRule.onNodeWithTag(LARGE_GROUP_INVITE_WARNING_TAG).assertIsDisplayed()
+
+        restorationTester.emulateSavedInstanceStateRestore()
+
+        composeRule.onNodeWithTag("chat_info.add_people").assertDoesNotExist()
+        composeRule.onNodeWithTag(LARGE_GROUP_INVITE_WARNING_TAG).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.add_member)).assertIsDisplayed()
     }
 
     /** Overview search keeps the conversation callback and the native mute picker is directly reachable. */

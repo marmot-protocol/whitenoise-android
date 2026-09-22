@@ -619,9 +619,13 @@ internal fun ConversationScreen(
     val conversationAccountRef = controller.boundAccountRef
     val conversationSelfAccountIdHex = controller.boundAccountIdHex
     val presentationState =
-        surfaceState ?: remember(controller, chat.id, conversationAccountRef, appState.runtimeGeneration) {
-            ConversationSurfaceState()
-        }
+        surfaceState
+            ?: rememberConversationSurfaceState(
+                controllerIdentity = controller,
+                accountRef = conversationAccountRef,
+                chatId = chat.id,
+                runtimeGeneration = appState.runtimeGeneration,
+            )
     // Push the global snackbar host above the conversation composer so
     // a toast (e.g. the post-invite-accept confirmation) doesn't
     // overlap and intercept touches on the message input. Resets to

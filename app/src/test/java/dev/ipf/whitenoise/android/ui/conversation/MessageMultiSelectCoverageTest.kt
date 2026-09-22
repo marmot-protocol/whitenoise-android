@@ -43,11 +43,12 @@ class MessageMultiSelectCoverageTest {
         val controllerIdentity = "controller, $chatRuntimeIdentity"
 
         assertTrue(source.contains("val selectedMessages = presentationState.selectedMessages"))
-        assertTrue(source.contains("surfaceState ?: remember($controllerIdentity) { ConversationSurfaceState() }"))
-        val surfaceOwner =
-            "remember(selectedOrPendingConversationController, appState.runtimeGeneration) { " +
-                "ConversationSurfaceState() }"
-        assertTrue(mainShell.contains(surfaceOwner))
+        assertTrue(source.contains("surfaceState ?: rememberConversationSurfaceState("))
+        assertTrue(source.contains("controllerIdentity = controller"))
+        assertTrue(mainShell.contains("rememberConversationSurfaceState("))
+        assertTrue(mainShell.contains("controllerIdentity = selectedOrPendingConversationController"))
+        assertTrue(mainShell.contains("chatId = controllerChatId"))
+        assertTrue(mainShell.contains("accountRef = conversationAccountRef"))
         assertTrue(mainShell.contains("chatId = openChat.id"))
         assertTrue(mainShell.contains("accountRef = accountRef"))
         assertTrue(mainShell.contains("runtimeGeneration = appState.runtimeGeneration"))

@@ -89,7 +89,8 @@ class BatchDeleteControllerCoverageTest {
         assertTrue(
             "failed selections, retry state, and the submission guard must reset together when their owner changes",
             "val selectedMessages = presentationState.selectedMessages" in conversation &&
-                "surfaceState ?: remember($ownerKeys) { ConversationSurfaceState() }" in conversation &&
+                "surfaceState ?: rememberConversationSurfaceState(" in conversation &&
+                "controllerIdentity = controller" in conversation &&
                 "var batchDeleteRetryState by remember($ownerKeys)" in conversation &&
                 "val batchDeleteSubmissionGuard = remember($ownerKeys)" in conversation,
         )
@@ -113,10 +114,10 @@ class BatchDeleteControllerCoverageTest {
     }
 
     private fun assertConversationSurfaceOwnership(mainShell: String) {
-        val surfaceOwner =
-            "remember(selectedOrPendingConversationController, appState.runtimeGeneration) { " +
-                "ConversationSurfaceState() }"
-        assertTrue(surfaceOwner in mainShell)
+        assertTrue("rememberConversationSurfaceState(" in mainShell)
+        assertTrue("controllerIdentity = selectedOrPendingConversationController" in mainShell)
+        assertTrue("chatId = controllerChatId" in mainShell)
+        assertTrue("accountRef = conversationAccountRef" in mainShell)
         assertTrue("chatId = openChat.id" in mainShell)
         assertTrue("accountRef = accountRef" in mainShell)
         assertTrue("runtimeGeneration = appState.runtimeGeneration" in mainShell)

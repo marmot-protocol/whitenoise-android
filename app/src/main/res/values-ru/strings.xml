@@ -251,6 +251,10 @@
     <string name="members">Участники:</string>
     <string name="add_member">Добавить участников</string>
     <string name="add_member_already_in_group">%1$s уже в этой группе</string>
+    <string name="large_group_invite_warning_title">Большая группа</string>
+    <string name="large_group_invite_warning_message">В группах из 50 и более участников дополнительные приглашения могут доставляться ненадёжно.</string>
+    <string name="large_group_invite_confirm_title">Пригласить в большую группу?</string>
+    <string name="large_group_invite_confirm_message">В группах из 50 и более участников дополнительные приглашения могут доставляться ненадёжно. Вы всё равно можете продолжить.</string>
     <string name="invite_pending">Приглашение ожидает: %1$s</string>
     <string name="latest_group_error">Последняя ошибка группы: %1$s</string>
     <string name="actions">Действия</string>
