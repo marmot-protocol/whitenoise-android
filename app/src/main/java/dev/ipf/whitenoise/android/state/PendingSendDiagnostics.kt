@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import android.os.SystemClock
 import dev.ipf.whitenoise.android.diagnostics.PerformanceConnectivity
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
@@ -13,11 +14,43 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+/** Monotonic clock shared by privacy-bounded send spans. */
+internal fun traceNowMs(): Long = SystemClock.elapsedRealtime()
+
+/** Emits a typed send phase without accepting payload or protocol identifiers. */
+internal fun sendTrace(
+    trace: PerformanceTrace?,
+    phase: PerformancePhase,
+    elapsedMs: Long? = null,
+    durationMs: Long = 0L,
+    result: PerformanceResult = PerformanceResult.SUCCESS,
+    layer: PerformanceLayer = PerformanceLayer.ANDROID,
+    attempt: Int? = null,
+    connectedRelays: Int? = null,
+    totalRelays: Int? = null,
+    count: Int? = null,
+) {
+    if (trace == null) return
+    PerformanceDiagnostics.record(
+        trace = trace,
+        phase = phase,
+        elapsedMs = elapsedMs ?: (traceNowMs() - trace.startedAtMs),
+        durationMs = durationMs,
+        result = result,
+        layer = layer,
+        attempt = attempt,
+        connectedRelays = connectedRelays,
+        totalRelays = totalRelays,
+        count = count,
+    )
+}
+
 /** One privacy-bounded WNPerf event emitted by [PendingSendDiagnosticTracker]. */
 internal data class PendingSendDiagnosticEvent(
     val trace: PerformanceTrace,
     val phase: PerformancePhase,
     val elapsedMs: Long,
+    val durationMs: Long,
     val result: PerformanceResult,
     val layer: PerformanceLayer,
     val attempt: Int?,
@@ -33,14 +66,26 @@ internal fun ConnectivitySignals.toPerformanceConnectivity(): PerformanceConnect
         else -> PerformanceConnectivity.ONLINE_NO_RELAY
     }
 
+/** Creates the process-owned tracker without growing the already capped app-state source. */
+internal fun createPendingSendDiagnosticTracker(
+    scope: CoroutineScope,
+    connectivity: () -> PerformanceConnectivity,
+): PendingSendDiagnosticTracker =
+    PendingSendDiagnosticTracker(
+        scope = scope,
+        nowMs = SystemClock::elapsedRealtime,
+        connectivity = connectivity,
+    )
+
 /**
  * Keeps opt-in send diagnostics alive across conversation-controller replacement.
  *
  * This is short-lived diagnostic lifecycle state, not a protocol cache: keys are
- * local optimistic UUIDs, entries are bounded, and every entry expires with the
- * WNPerf session. No account, group, event id, message body, or relay identity is
- * stored or serialized.
+ * local optimistic UUIDs and canonical aliases are bounded, and every entry
+ * expires with the WNPerf session. No identifier, message body, or relay identity
+ * is serialized.
  */
+@Suppress("TooManyFunctions") // Atomic lifecycle operations keep one lock owner for a bounded in-flight send.
 internal class PendingSendDiagnosticTracker(
     private val scope: CoroutineScope,
     private val nowMs: () -> Long,
@@ -64,6 +109,7 @@ internal class PendingSendDiagnosticTracker(
 
     private val lock = Any()
     private val entries = linkedMapOf<String, Entry>()
+    private val aliases = linkedMapOf<String, String>()
 
     /** Begins bounded 10-second and 60-second checkpoints for an active opt-in trace. */
     fun track(
@@ -83,11 +129,12 @@ internal class PendingSendDiagnosticTracker(
             }
         val evicted =
             synchronized(lock) {
-                val replaced = entries.put(optimisticId, Entry(trace = trace, job = job))?.job
+                val replaced = removeEntryLocked(optimisticId)?.job
+                entries[optimisticId] = Entry(trace = trace, job = job)
                 val overflow =
                     if (entries.size > MAX_TRACKED_SENDS) {
                         val oldestKey = entries.keys.first()
-                        entries.remove(oldestKey)?.job
+                        removeEntryLocked(oldestKey)?.job
                     } else {
                         null
                     }
@@ -104,7 +151,7 @@ internal class PendingSendDiagnosticTracker(
         attempt: Int? = null,
     ) {
         synchronized(lock) {
-            entries[optimisticId]?.let { entry ->
+            entries[resolveKeyLocked(optimisticId)]?.let { entry ->
                 entry.stage = stage
                 if (attempt != null) entry.attempt = attempt
             }
@@ -119,16 +166,32 @@ internal class PendingSendDiagnosticTracker(
         result: PerformanceResult = PerformanceResult.PENDING,
         layer: PerformanceLayer = PerformanceLayer.ANDROID,
         attempt: Int? = null,
+        durationMs: Long = 0L,
     ) {
         val snapshot =
             synchronized(lock) {
-                entries[optimisticId]?.let { entry ->
+                entries[resolveKeyLocked(optimisticId)]?.let { entry ->
                     entry.stage = stage
                     if (attempt != null) entry.attempt = attempt
                     entry.snapshot()
                 }
             } ?: return
-        emit(snapshot, phase, result, layer)
+        emit(snapshot, phase, result, layer, durationMs)
+    }
+
+    /** Lets a later authoritative projection settle the same process-local operation. */
+    fun alias(
+        optimisticId: String,
+        canonicalId: String?,
+    ) {
+        val alias = canonicalId?.takeIf(String::isNotBlank) ?: return
+        synchronized(lock) {
+            val root = resolveKeyLocked(optimisticId)
+            if (root in entries && alias != root) {
+                aliases.entries.removeAll { (_, owner) -> owner == root }
+                aliases[alias] = root
+            }
+        }
     }
 
     /** Records one projection surface without ending the other surface's trace opportunity. */
@@ -140,7 +203,8 @@ internal class PendingSendDiagnosticTracker(
         var completedJob: Job? = null
         val snapshot =
             synchronized(lock) {
-                val entry = entries[optimisticId] ?: return@synchronized null
+                val root = resolveKeyLocked(optimisticId)
+                val entry = entries[root] ?: return@synchronized null
                 val alreadyRecorded =
                     when (phase) {
                         PerformancePhase.TIMELINE_SETTLED -> entry.timelineSettled.also { entry.timelineSettled = true }
@@ -152,7 +216,7 @@ internal class PendingSendDiagnosticTracker(
                 if (alreadyRecorded) return@synchronized null
                 val captured = entry.snapshot()
                 if (entry.timelineSettled && entry.chatListSettled) {
-                    entries.remove(optimisticId)
+                    removeEntryLocked(root)
                     completedJob = entry.job
                 }
                 captured
@@ -168,21 +232,24 @@ internal class PendingSendDiagnosticTracker(
         result: PerformanceResult = PerformanceResult.SUCCESS,
         layer: PerformanceLayer = PerformanceLayer.ANDROID,
     ) {
-        val entry = synchronized(lock) { entries.remove(optimisticId) } ?: return
+        val entry = synchronized(lock) { removeEntryLocked(resolveKeyLocked(optimisticId)) } ?: return
         emit(entry.snapshot(), phase, result, layer)
         entry.job.cancel()
     }
 
     /** Releases a trace when an existing call site already emitted its terminal phase. */
     fun forget(optimisticId: String) {
-        synchronized(lock) { entries.remove(optimisticId) }?.job?.cancel()
+        synchronized(lock) { removeEntryLocked(resolveKeyLocked(optimisticId)) }?.job?.cancel()
     }
 
     /** Cancels every watchdog on account switch/sign-out. */
     fun clear() {
         val jobs =
             synchronized(lock) {
-                entries.values.map(Entry::job).also { entries.clear() }
+                entries.values.map(Entry::job).also {
+                    entries.clear()
+                    aliases.clear()
+                }
             }
         jobs.forEach(Job::cancel)
     }
@@ -193,7 +260,7 @@ internal class PendingSendDiagnosticTracker(
     ) {
         val snapshot =
             synchronized(lock) {
-                entries[optimisticId]
+                entries[resolveKeyLocked(optimisticId)]
                     ?.takeUnless { it.timelineSettled }
                     ?.snapshot()
             } ?: return
@@ -202,6 +269,7 @@ internal class PendingSendDiagnosticTracker(
                 trace = snapshot.trace,
                 phase = phase,
                 elapsedMs = (nowMs() - snapshot.trace.startedAtMs).coerceAtLeast(0L),
+                durationMs = 0L,
                 result = PerformanceResult.PENDING,
                 layer = PerformanceLayer.ANDROID,
                 attempt = snapshot.attempt,
@@ -216,12 +284,14 @@ internal class PendingSendDiagnosticTracker(
         phase: PerformancePhase,
         result: PerformanceResult,
         layer: PerformanceLayer,
+        durationMs: Long = 0L,
     ) {
         record(
             PendingSendDiagnosticEvent(
                 trace = snapshot.trace,
                 phase = phase,
                 elapsedMs = (nowMs() - snapshot.trace.startedAtMs).coerceAtLeast(0L),
+                durationMs = durationMs,
                 result = result,
                 layer = layer,
                 attempt = snapshot.attempt,
@@ -239,8 +309,18 @@ internal class PendingSendDiagnosticTracker(
         job: Job,
     ) {
         synchronized(lock) {
-            if (entries[optimisticId]?.job == job) entries.remove(optimisticId)
+            val root = resolveKeyLocked(optimisticId)
+            if (entries[root]?.job == job) removeEntryLocked(root)
         }
+    }
+
+    /** Resolves an authoritative id without exposing it to the serialized event. */
+    private fun resolveKeyLocked(id: String): String = aliases[id] ?: id
+
+    /** Removes one root and all of its bounded authoritative aliases. */
+    private fun removeEntryLocked(root: String): Entry? {
+        aliases.entries.removeAll { (_, owner) -> owner == root }
+        return entries.remove(root)
     }
 
     internal companion object {
@@ -271,12 +351,24 @@ internal fun PendingSendDiagnosticTracker.recordAcceptedPending(
     )
 }
 
+/** Records the authoritative timeline handoff and leaves chat-list settlement independently observable. */
+internal fun PendingSendDiagnosticTracker.recordEchoReconcile(optimisticId: String) {
+    milestone(
+        optimisticId,
+        PerformancePhase.ECHO_RECONCILE,
+        PerformanceSendStage.WAITING_PROJECTION,
+        result = PerformanceResult.SUCCESS,
+    )
+    surfaceSettled(optimisticId, PerformancePhase.TIMELINE_SETTLED)
+}
+
 /** Routes tracker events through the privacy-reviewed typed WNPerf emitter. */
 private fun recordPendingSendDiagnosticEvent(event: PendingSendDiagnosticEvent) {
     PerformanceDiagnostics.record(
         trace = event.trace,
         phase = event.phase,
         elapsedMs = event.elapsedMs,
+        durationMs = event.durationMs,
         result = event.result,
         layer = event.layer,
         attempt = event.attempt,

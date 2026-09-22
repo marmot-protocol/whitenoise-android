@@ -6981,11 +6981,7 @@ class WhiteNoiseAppState private constructor(
 
     /** Process-owned, bounded send tracing that survives conversation-screen disposal. */
     internal val pendingSendDiagnostics =
-        PendingSendDiagnosticTracker(
-            scope = mutationsScope,
-            nowMs = SystemClock::elapsedRealtime,
-            connectivity = { connectivitySignals.value.toPerformanceConnectivity() },
-        )
+        createPendingSendDiagnosticTracker(mutationsScope) { connectivitySignals.value.toPerformanceConnectivity() }
 
     private fun updateConnectivitySignals(
         hasValidatedInternet: Boolean? = null,

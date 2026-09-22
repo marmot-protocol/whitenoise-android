@@ -22720,7 +22720,7 @@
         ]
       },
       {
-        "surface": "Opt-in pending-send diagnostics retain privacy-bounded 10-second and 60-second checkpoints across controller replacement",
+        "surface": "Opt-in text/media send and attachment-fetch diagnostics retain privacy-bounded checkpoints across controller replacement",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/PendingSendDiagnostics.kt",
         "anchor": "internal class PendingSendDiagnosticTracker(",
         "test_ids": [

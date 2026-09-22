@@ -105,6 +105,21 @@ internal enum class PerformancePhase(
     ECHO_RECONCILE("echo_reconcile"),
     TIMELINE_SETTLED("timeline_settled"),
     CHAT_LIST_SETTLED("chat_list_settled"),
+    MEDIA_UPLOAD_START("media_upload_start"),
+    MEDIA_UPLOAD_RETURN("media_upload_return"),
+    MEDIA_UPLOAD_REUSED("media_upload_reused"),
+    MEDIA_PUBLISH_START("media_publish_start"),
+    MEDIA_PUBLISH_RETURN("media_publish_return"),
+    MEDIA_PUBLISH_COMBINED("media_publish_combined"),
+    ATTACHMENT_REQUESTED("attachment_requested"),
+    ATTACHMENT_MEMORY_LOOKUP("attachment_memory_lookup"),
+    ATTACHMENT_DISK_LOOKUP("attachment_disk_lookup"),
+    ATTACHMENT_ACQUISITION_START("attachment_acquisition_start"),
+    ATTACHMENT_NATIVE_SNAPSHOT("attachment_native_snapshot"),
+    ATTACHMENT_NATIVE_DEMAND("attachment_native_demand"),
+    ATTACHMENT_TRANSFER_UPDATE("attachment_transfer_update"),
+    ATTACHMENT_PLAINTEXT_READY("attachment_plaintext_ready"),
+    ATTACHMENT_FETCH_FAILED("attachment_fetch_failed"),
     EVENTS_DROPPED("events_dropped"),
     PAGE_ANCHOR("page_anchor"),
     PAGE_WINDOW("page_window"),
@@ -151,6 +166,29 @@ internal enum class PerformanceConnectivity(
     OFFLINE("offline"),
     ONLINE_NO_RELAY("online_no_relay"),
     ONLINE_WITH_RELAY("online_with_relay"),
+}
+
+/** Closed native attachment state; no attachment identity is serialized. */
+internal enum class PerformanceAttachmentState(
+    val wireName: String,
+) {
+    NOT_REQUESTED("not_requested"),
+    QUEUED("queued"),
+    DOWNLOADING("downloading"),
+    VERIFYING_CIPHERTEXT("verifying_ciphertext"),
+    DECRYPTING("decrypting"),
+    VERIFYING_PLAINTEXT("verifying_plaintext"),
+    RETRY_SCHEDULED("retry_scheduled"),
+    PAUSED("paused"),
+    READY("ready"),
+    UNAVAILABLE("unavailable"),
+    FAILED("failed"),
+    CANCELLED("cancelled"),
+    REMOVED("removed"),
+    POLICY_BLOCKED("policy_blocked"),
+    PREVIOUSLY_ACQUIRED_UNAVAILABLE("previously_acquired_unavailable"),
+    COMPLETED_UNRETAINED("completed_unretained"),
+    RETRY_EXHAUSTED("retry_exhausted"),
 }
 
 internal class PerformanceTrace internal constructor(
@@ -263,6 +301,7 @@ internal class PerformanceDiagnosticEmitter(
         count: Int? = null,
         sendStage: PerformanceSendStage? = null,
         connectivity: PerformanceConnectivity? = null,
+        attachmentState: PerformanceAttachmentState? = null,
     ) {
         val currentTrace = trace ?: return
         val now = nowMs()
@@ -294,6 +333,7 @@ internal class PerformanceDiagnosticEmitter(
                     count = count,
                     sendStage = sendStage,
                     connectivity = connectivity,
+                    attachmentState = attachmentState,
                 ),
             )
             emittedCount += 1
@@ -314,6 +354,7 @@ internal class PerformanceDiagnosticEmitter(
         count: Int?,
         sendStage: PerformanceSendStage?,
         connectivity: PerformanceConnectivity?,
+        attachmentState: PerformanceAttachmentState?,
     ): String =
         buildString {
             append("schema=2 app_rev=")
@@ -362,6 +403,10 @@ internal class PerformanceDiagnosticEmitter(
                 append(" connectivity=")
                 append(it.wireName)
             }
+            attachmentState?.let {
+                append(" attachment_state=")
+                append(it.wireName)
+            }
         }
 
     /** Closes an active session once its monotonic deadline has elapsed. */
@@ -389,6 +434,7 @@ internal class PerformanceDiagnosticEmitter(
                         count = droppedCount,
                         sendStage = null,
                         connectivity = null,
+                        attachmentState = null,
                     ),
                 )
                 emittedCount += 1
@@ -476,6 +522,7 @@ internal object PerformanceDiagnostics {
         count: Int? = null,
         sendStage: PerformanceSendStage? = null,
         connectivity: PerformanceConnectivity? = null,
+        attachmentState: PerformanceAttachmentState? = null,
     ) {
         emitter.record(
             trace,
@@ -490,6 +537,7 @@ internal object PerformanceDiagnostics {
             count,
             sendStage,
             connectivity,
+            attachmentState,
         )
     }
 

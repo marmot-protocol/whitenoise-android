@@ -41,6 +41,7 @@ class PerformanceDiagnosticSchemaTest {
             count = Int.MAX_VALUE,
             sendStage = PerformanceSendStage.WAITING_PROJECTION,
             connectivity = PerformanceConnectivity.ONLINE_NO_RELAY,
+            attachmentState = PerformanceAttachmentState.VERIFYING_PLAINTEXT,
         )
 
         assertSchemaAllowlists(lines.single())
@@ -80,7 +81,8 @@ class PerformanceDiagnosticSchemaTest {
             "schema=2 app_rev=app1234 mdk_rev=mdk5678 session=p#1 op=text_send phase=ffi_return " +
                 "elapsed_ms=1800000 duration_ms=1800000 result=success layer=ffi " +
                 "attempt=100 relay_connected=0 relay_total=1000000 count=1000000 " +
-                "send_stage=waiting_projection connectivity=online_no_relay",
+                "send_stage=waiting_projection connectivity=online_no_relay " +
+                "attachment_state=verifying_plaintext",
             line,
         )
         assertEquals(
@@ -101,6 +103,7 @@ class PerformanceDiagnosticSchemaTest {
                 "count",
                 "send_stage",
                 "connectivity",
+                "attachment_state",
             ),
             line.split(' ').map { it.substringBefore('=') },
         )
@@ -131,6 +134,7 @@ class PerformanceDiagnosticSchemaTest {
             setOf("offline", "online_no_relay", "online_with_relay"),
             PerformanceConnectivity.entries.mapTo(mutableSetOf()) { it.wireName },
         )
+        assertTrue(PerformanceAttachmentState.entries.all { it.wireName.matches(Regex("[a-z_]+")) })
     }
 
     @Test
