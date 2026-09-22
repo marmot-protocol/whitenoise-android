@@ -228,21 +228,22 @@ fast exit only; it does not measure energy impact.
 Those observations apply to the recorded 2026-09-20 candidate. Device and battery qualification
 was not repeated after the latest 2026-09-22 master rebase, so it is not current-head evidence.
 
-The most recent installed Dev APK was built for arm64 before the latest review fixes, with SHA-256
-`b9844f73af4e3e3eb5a5fbbe96b49f446ddb623d316c3a93f7ced15e4cb5503f`. It reports package
+The current-head Dev APK was built for arm64 from `958e9dc41549587b0591bb07eed8a90ae4c50172`,
+with SHA-256 `297e6ac7a31aaf8307230fab237365719e353211dcb89379662a9c73994a1bd1`. It reports package
 `dev.ipf.whitenoise.android.dev`, version `2026.9.21-dev-debug`, version code 19, and arm64-v8a.
 This exact candidate was installed in place on Pixel `46131FDAS003CG` with `adb install -r -t`.
 The installed APK hash matches the candidate, the signing certificate and native library match
 the prior installation, the original first-install timestamp and three account records remain,
-and a cold launch resumed `MainActivity` without a fatal, migration, database, or startup error
-in the privacy-filtered log check. No app was uninstalled and no app data was cleared. No APK was
-built or installed for the later admission, localization, or token-handoff review revisions.
+and a cold launch resumed `MainActivity` with a live process and no fatal, migration, or startup
+error in the process-scoped log check. Rendered chat content was not inspected. No app was
+uninstalled and no app data was cleared. This startup smoke check does not establish FCM delivery,
+idle recovery, notification latency, or battery impact.
 
 A fresh private pre-install archive is retained at
-`/Users/mubarak/Workspace/marmot-protocol/pixel-fcm-recovery-20260921.X7NSnz`. The data archive
-SHA-256 is `57b346e10e80a2164dd20ece8e59c0dc866e20c60acbd62142116a7d234484cb`;
+`/Users/mubarak/Workspace/marmot-protocol/pixel-fcm-recovery-20260922.rQ0sIy`. The data archive
+SHA-256 is `d26313fc83c21737be85a0ad42ce21d166aa9ce531b3fe3c9cc38c0f7d975f75`;
 the preserved pre-install APK SHA-256 is
-`b40bf86cb4638968c7979408c83e1104f1e803b36b18cd69822ccabb54b26488`.
+`08af57706dfa5ba12dd232d3dc58c5a8cee73e86e173a027babc8459883ea44f`.
 
 ## Unperformed and deferred checks
 
