@@ -1154,7 +1154,7 @@
     <string name="notification_delivery_push_detail">Wake briefly when new activity may be available, then check securely for messages.</string>
     <string name="notification_delivery_local_detail">Keep a persistent connection while notifications are enabled.</string>
     <string name="notification_device_policy">Device status</string>
-    <string name="notification_device_policy_detail">Android permission and battery policy can delay either delivery mode. Status refreshes when you return to this screen.</string>
+    <string name="notification_device_policy_detail">Notification permission controls whether alerts appear. Battery policy may delay background delivery in either mode. Status refreshes when you return to this screen.</string>
     <string name="notification_permission_status">Notification permission</string>
     <string name="notification_permission_allowed">Allowed</string>
     <string name="notification_permission_blocked">Blocked</string>

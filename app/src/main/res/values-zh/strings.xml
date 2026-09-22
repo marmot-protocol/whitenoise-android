@@ -833,7 +833,7 @@
     <string name="notification_delivery_push_detail">可能有新活动时短暂唤醒，然后安全地检查消息。</string>
     <string name="notification_delivery_local_detail">启用通知时保持持续连接。</string>
     <string name="notification_device_policy">设备状态</string>
-    <string name="notification_device_policy_detail">通知权限和电池策略可能会延迟两种送达方式。返回此页面时会刷新状态。</string>
+    <string name="notification_device_policy_detail">通知权限决定提醒是否显示。电池策略可能延迟两种模式下的后台送达。返回此页面时会刷新状态。</string>
     <string name="notification_permission_status">通知权限</string>
     <string name="notification_permission_allowed">已允许</string>
     <string name="notification_permission_blocked">已阻止</string>

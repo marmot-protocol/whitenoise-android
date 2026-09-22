@@ -844,7 +844,7 @@
     <string name="notification_delivery_push_detail">L’app si riattiva brevemente quando potrebbe esserci nuova attività, quindi controlla i messaggi in modo sicuro.</string>
     <string name="notification_delivery_local_detail">Mantiene una connessione persistente mentre le notifiche sono abilitate.</string>
     <string name="notification_device_policy">Stato del dispositivo</string>
-    <string name="notification_device_policy_detail">Le autorizzazioni e i criteri della batteria possono ritardare entrambe le modalità di consegna. Lo stato si aggiorna quando torni a questa schermata.</string>
+    <string name="notification_device_policy_detail">Il permesso per le notifiche determina se gli avvisi vengono mostrati. I criteri della batteria possono ritardare la consegna in background in entrambe le modalità. Lo stato si aggiorna quando torni qui.</string>
     <string name="notification_permission_status">Autorizzazione notifiche</string>
     <string name="notification_permission_allowed">Consentita</string>
     <string name="notification_permission_blocked">Bloccata</string>

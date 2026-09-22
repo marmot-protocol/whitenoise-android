@@ -8361,7 +8361,13 @@ class WhiteNoiseAppState private constructor(
      * Applies one latest-wins delivery choice. Replacement delivery is confirmed before the prior
      * path is disabled, and the existing native/global settings remain the only durable truth.
      */
-    internal suspend fun setNotificationDeliveryMode(mode: NotificationDeliveryMode): Boolean {
+    internal suspend fun setNotificationDeliveryMode(mode: NotificationDeliveryMode): Boolean = applyMode(mode, true)
+
+    /** Applies the transport and enables rendering only for an explicit selection. */
+    private suspend fun applyMode(
+        mode: NotificationDeliveryMode,
+        enableRendering: Boolean,
+    ): Boolean {
         val intentGeneration = notificationDeliveryModeIntent.advance()
         if (mode == NotificationDeliveryMode.Local) nativePushFallback.invalidateAll()
         notificationDeliveryModeBusy = true
@@ -8374,7 +8380,7 @@ class WhiteNoiseAppState private constructor(
                     return@withLock false
                 }
                 val owner = captureNotificationDeliveryModeOwner(intentGeneration) ?: return@withLock false
-                if (!ensureNotificationRenderingEnabled(owner)) return@withLock false
+                if (enableRendering && !ensureNotificationRenderingEnabled(owner)) return@withLock false
                 when (mode) {
                     NotificationDeliveryMode.Fcm -> selectFcmDelivery(owner)
                     NotificationDeliveryMode.Local -> selectPersistentDelivery(owner)
@@ -8592,7 +8598,7 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Repairs legacy dual-on and capability-loss states, and restores rendering after permission returns.
+     * Repairs legacy dual-on and capability-loss states without changing rendering preferences.
      * Capability restoration never changes a settled persistent-delivery choice.
      */
     private suspend fun reconcileNotificationDeliveryMode(): Boolean {
@@ -8608,11 +8614,11 @@ class WhiteNoiseAppState private constructor(
                 } else {
                     NotificationDeliveryMode.Local
                 }
-            setNotificationDeliveryMode(desired)
+            applyMode(desired, enableRendering = false)
         }
     }
 
-    /** Restores rendering for every activation, then reconciles the captured owner without blocking activation. */
+    /** Reconciles the captured owner without changing its rendering preference or blocking activation. */
     @Suppress("ReturnCount") // Permission and owner-invalidated paths terminate before transport reconciliation.
     private suspend fun reconcileNotificationDeliveryModeAfterActivation(
         includeBackgroundAccountModes: Boolean,
@@ -8622,21 +8628,25 @@ class WhiteNoiseAppState private constructor(
         if (!localNotificationPermissionGranted) return pauseNotificationDeliveryReconciliation()
         if (settings == null) return syncNativePushRegistrationIfEnabled()
         val intentGeneration = notificationDeliveryModeIntent.advance()
-        return notificationDeliveryModeMutex.withLock {
-            if (!notificationDeliveryModeIntent.isCurrent(intentGeneration)) return@withLock false
-            val owner = captureNotificationDeliveryModeOwner(intentGeneration) ?: return@withLock false
-            if (!ensureNotificationRenderingEnabled(owner)) return@withLock false
-            if (!ownsNotificationDeliveryMode(owner)) return@withLock false
-            val plan = notificationDeliveryActivationPlan(owner, includeBackgroundAccountModes)
-            if (!ownsNotificationDeliveryMode(owner)) return@withLock false
-            if (plan == null) return@withLock false
-            if (!plan.requiresDeviceWideReconciliation) return@withLock true
-            launchNotificationDeliveryModeReconciliation(
-                owner = owner,
-                mode = plan.mode,
-                applyDeviceWideMode = true,
-            )
-            true
+        var handedOff = false
+        return try {
+            notificationDeliveryModeMutex.withLock {
+                if (!notificationDeliveryModeIntent.isCurrent(intentGeneration)) return@withLock false
+                val owner = captureNotificationDeliveryModeOwner(intentGeneration) ?: return@withLock false
+                val plan = notificationDeliveryActivationPlan(owner, includeBackgroundAccountModes)
+                if (!ownsNotificationDeliveryMode(owner)) return@withLock false
+                if (plan == null) return@withLock false
+                if (!plan.requiresDeviceWideReconciliation) return@withLock true
+                launchNotificationDeliveryModeReconciliation(
+                    owner = owner,
+                    mode = plan.mode,
+                    applyDeviceWideMode = true,
+                )
+                handedOff = true
+                true
+            }
+        } finally {
+            if (!handedOff) finishNotificationDeliveryModeTransaction(intentGeneration)
         }
     }
 
@@ -8647,14 +8657,21 @@ class WhiteNoiseAppState private constructor(
     ): NotificationDeliveryActivationPlan? {
         val settingsByAccount = readNotificationDeliverySettings(owner) ?: return null
         val anyNativeEnabled = settingsByAccount.values.any { it.nativePushEnabled }
-        val mode = resolvedNotificationDeliveryMode(anyNativeEnabled)
+        val mode =
+            resolvedNotificationDeliveryMode(anyNativeEnabled, backgroundConnectionEnabled, nativePushCapability())
         val noTransportConfigured = !backgroundConnectionEnabled && !anyNativeEnabled
         return NotificationDeliveryActivationPlan(
             mode = mode,
             requiresDeviceWideReconciliation =
                 includeBackgroundAccountModes ||
                     noTransportConfigured ||
-                    !notificationDeliveryInvariantMatches(mode, settingsByAccount),
+                    !notificationDeliveryInvariantMatches(
+                        mode,
+                        settingsByAccount,
+                        backgroundConnectionEnabled,
+                        pushWakeServiceOwner != null,
+                        perAccountSyncedFingerprints.keys,
+                    ),
         )
     }
 
@@ -8679,38 +8696,6 @@ class WhiteNoiseAppState private constructor(
             settingsByAccount[account] = settings ?: return null
         }
         return settingsByAccount
-    }
-
-    /** Projects one mode from the retained runtime preference and authoritative native settings. */
-    private fun resolvedNotificationDeliveryMode(anyNativeEnabled: Boolean): NotificationDeliveryMode =
-        when {
-            backgroundConnectionEnabled -> NotificationDeliveryMode.Local
-            anyNativeEnabled && nativePushCapability().isAvailable -> NotificationDeliveryMode.Fcm
-            else -> NotificationDeliveryMode.Local
-        }
-
-    /** Requires complete account alignment plus a live owner or confirmed in-process registrations. */
-    private fun notificationDeliveryInvariantMatches(
-        mode: NotificationDeliveryMode,
-        settingsByAccount: Map<String, NotificationSettingsFfi>,
-    ): Boolean {
-        val accountsMatchMode =
-            when (mode) {
-                NotificationDeliveryMode.Local -> settingsByAccount.values.none { it.nativePushEnabled }
-                NotificationDeliveryMode.Fcm ->
-                    settingsByAccount.values.all { it.nativePushEnabled == it.localNotificationsEnabled }
-            }
-        val runtimeMatchesMode =
-            when (mode) {
-                NotificationDeliveryMode.Local -> backgroundConnectionEnabled && pushWakeServiceOwner != null
-                NotificationDeliveryMode.Fcm ->
-                    !backgroundConnectionEnabled &&
-                        settingsByAccount
-                            .filterValues { it.nativePushEnabled }
-                            .keys
-                            .all(perAccountSyncedFingerprints::containsKey)
-            }
-        return accountsMatchMode && runtimeMatchesMode
     }
 
     /** Reuses safe capability sync for restoration and reserves device-wide cutover for a real account switch. */

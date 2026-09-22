@@ -844,7 +844,7 @@
     <string name="notification_delivery_push_detail">Yeni etkinlik olabileceğinde kısa süreli uyanır, ardından mesajları güvenli şekilde kontrol eder.</string>
     <string name="notification_delivery_local_detail">Bildirimler etkinken kalıcı bir bağlantı sürdürür.</string>
     <string name="notification_device_policy">Cihaz durumu</string>
-    <string name="notification_device_policy_detail">İzin ve pil politikası her iki teslimat modunu da geciktirebilir. Bu ekrana döndüğünüzde durum yenilenir.</string>
+    <string name="notification_device_policy_detail">Bildirim izni, uyarıların görünüp görünmeyeceğini belirler. Pil politikası her iki modda da arka plan teslimatını geciktirebilir. Bu ekrana döndüğünüzde durum yenilenir.</string>
     <string name="notification_permission_status">Bildirim izni</string>
     <string name="notification_permission_allowed">İzin verildi</string>
     <string name="notification_permission_blocked">Engellendi</string>

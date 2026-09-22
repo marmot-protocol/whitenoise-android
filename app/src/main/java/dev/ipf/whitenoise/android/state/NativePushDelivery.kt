@@ -4,6 +4,7 @@ import android.content.Context
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import com.google.firebase.FirebaseApp
+import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.PushPlatformFfi
 import dev.ipf.marmotkit.PushRegistrationShareOutcomeFfi
 import dev.ipf.marmotkit.PushRegistrationShareStatusFfi
@@ -50,6 +51,42 @@ internal data class NotificationDeliveryActivationPlan(
 internal enum class NotificationDeliveryMode {
     Fcm,
     Local,
+}
+
+/** Resolves a device mode from retained runtime ownership and native account settings. */
+internal fun resolvedNotificationDeliveryMode(
+    anyNativeEnabled: Boolean,
+    persistentConnectionEnabled: Boolean,
+    nativePushCapability: NativePushCapability,
+): NotificationDeliveryMode =
+    if (persistentConnectionEnabled || !anyNativeEnabled || !nativePushCapability.isAvailable) {
+        NotificationDeliveryMode.Local
+    } else {
+        NotificationDeliveryMode.Fcm
+    }
+
+/** Checks account preferences and the runtime owner before treating a device mode as settled. */
+internal fun notificationDeliveryInvariantMatches(
+    mode: NotificationDeliveryMode,
+    settingsByAccount: Map<String, NotificationSettingsFfi>,
+    persistentConnectionEnabled: Boolean,
+    persistentServiceOwned: Boolean,
+    syncedAccounts: Set<String>,
+): Boolean {
+    val accountsMatchMode =
+        when (mode) {
+            NotificationDeliveryMode.Local -> settingsByAccount.values.none { it.nativePushEnabled }
+            NotificationDeliveryMode.Fcm ->
+                settingsByAccount.values.all { it.nativePushEnabled == it.localNotificationsEnabled }
+        }
+    val runtimeMatchesMode =
+        when (mode) {
+            NotificationDeliveryMode.Local -> persistentConnectionEnabled && persistentServiceOwned
+            NotificationDeliveryMode.Fcm ->
+                !persistentConnectionEnabled &&
+                    settingsByAccount.filterValues { it.nativePushEnabled }.keys.all(syncedAccounts::contains)
+        }
+    return accountsMatchMode && runtimeMatchesMode
 }
 
 /** Projects one truthful choice from native settings and Android persistent-delivery ownership. */

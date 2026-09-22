@@ -31,6 +31,7 @@ import org.robolectric.annotation.Config
 import java.io.IOException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 @RunWith(RobolectricTestRunner::class)
@@ -244,9 +245,9 @@ class NotificationDeliveryModeRecoveryTest {
             }
         }
 
-    /** Cold foreground migration restores rendering and establishes Local for legacy all-off settings. */
+    /** Cold foreground migration establishes Local without undoing an explicit rendering opt-out. */
     @Test
-    fun coldForegroundRepairsLegacyAllOffState() =
+    fun coldForegroundPreservesLegacyAllOffRendering() =
         runBlocking {
             val platform = RecordingNativePushFallbackPlatform(context)
             val fixture =
@@ -267,14 +268,9 @@ class NotificationDeliveryModeRecoveryTest {
                 fixture.bootstrap()
                 awaitStart(fixture, platform)
                 fixture.acknowledgeNativePushFallbackRuntime(platform.starts.last())
-                fixture.runWithMainLooperPumping {
-                    withTimeout(5_000L) {
-                        while (!fixture.notificationSettings(ACCOUNT_A).localNotificationsEnabled) yield()
-                    }
-                }
-
                 assertTrue(BackgroundConnectionPreferences.isEnabled(context))
-                assertTrue(fixture.notificationSettings(ACCOUNT_A).localNotificationsEnabled)
+                assertFalse(fixture.notificationSettings(ACCOUNT_A).localNotificationsEnabled)
+                assertFalse(fixture.notificationSettings(ACCOUNT_B).localNotificationsEnabled)
                 assertFalse(fixture.notificationSettings(ACCOUNT_A).nativePushEnabled)
                 assertFalse(fixture.notificationSettings(ACCOUNT_B).nativePushEnabled)
             } finally {
@@ -283,9 +279,9 @@ class NotificationDeliveryModeRecoveryTest {
             }
         }
 
-    /** A cold foreground edge before bootstrap cannot consume the later activation-owned repair. */
+    /** A cold foreground edge before bootstrap preserves disabled rendering during activation. */
     @Test
-    fun foregroundBeforeBootstrapStillRepairsRetainedModeRendering() =
+    fun foregroundBeforeBootstrapPreservesRenderingOptOut() =
         runBlocking {
             val platform = RecordingNativePushFallbackPlatform(context)
             val fixture = fixture(platform = platform, nativeEnabled = true)
@@ -297,7 +293,7 @@ class NotificationDeliveryModeRecoveryTest {
 
                 fixture.bootstrap()
 
-                assertTrue(fixture.notificationSettings(ACCOUNT_A).localNotificationsEnabled)
+                assertFalse(fixture.notificationSettings(ACCOUNT_A).localNotificationsEnabled)
                 awaitStart(fixture, platform)
                 fixture.acknowledgeNativePushFallbackRuntime(platform.starts.last())
                 fixture.runWithMainLooperPumping {
@@ -312,9 +308,32 @@ class NotificationDeliveryModeRecoveryTest {
             }
         }
 
-    /** Same-account activation repairs disabled rendering through the production activation entry point. */
+    /** Foreground capability fallback keeps a disabled rendering preference unchanged. */
     @Test
-    fun sameAccountActivationRestoresRendering() =
+    fun foregroundReconciliationPreservesRenderingOptOut() =
+        runBlocking {
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val fixture = fixture(platform = platform, nativeEnabled = true)
+            try {
+                fixture.bootstrap()
+                fixture.replaceNotificationSettings(settings(ACCOUNT_A, localEnabled = false, nativeEnabled = true))
+                fixture.appState.refreshLocalNotificationSettings()
+                fixture.appState.setAppInForeground(true)
+                awaitStart(fixture, platform)
+                fixture.acknowledgeNativePushFallbackRuntime(platform.starts.last())
+
+                assertFalse(fixture.notificationSettings(ACCOUNT_A).localNotificationsEnabled)
+                assertFalse(fixture.notificationSettings(ACCOUNT_A).nativePushEnabled)
+                assertTrue(BackgroundConnectionPreferences.isEnabled(context))
+            } finally {
+                fixture.appState.setAppInForeground(false)
+                fixture.close()
+            }
+        }
+
+    /** Same-account activation does not turn local notifications back on. */
+    @Test
+    fun sameAccountActivationPreservesRenderingOptOut() =
         runBlocking {
             BackgroundConnectionPreferences.setEnabledDurably(context, true)
             val platform = RecordingNativePushFallbackPlatform(context)
@@ -327,7 +346,32 @@ class NotificationDeliveryModeRecoveryTest {
 
                 assertTrue(fixture.runOnMainLooperPumping { fixture.appState.setActiveAccount(ACCOUNT_A) })
 
+                assertFalse(fixture.notificationSettings(ACCOUNT_A).localNotificationsEnabled)
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** Choosing a delivery mode explicitly opts the account back into visible notifications. */
+    @Test
+    fun explicitModeSelectionEnablesRenderingAfterOptOut() =
+        runBlocking {
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val fixture =
+                fixture(
+                    platform = platform,
+                    nativeEnabled = false,
+                    initialLocalEnabled = false,
+                    fcmAvailable = true,
+                )
+            try {
+                fixture.bootstrap()
+                PushTokenStore.create(context).setToken("test-token")
+
+                assertTrue(fixture.appState.setNotificationDeliveryMode(NotificationDeliveryMode.Fcm))
                 assertTrue(fixture.notificationSettings(ACCOUNT_A).localNotificationsEnabled)
+                assertTrue(fixture.notificationSettings(ACCOUNT_A).nativePushEnabled)
+                assertEquals(listOf(ACCOUNT_A), fixture.upsertedPushRegistrations)
             } finally {
                 fixture.close()
             }
@@ -364,9 +408,9 @@ class NotificationDeliveryModeRecoveryTest {
             }
         }
 
-    /** Activation preserves the retained mode while denied, then repairs rendering before regrant convergence. */
+    /** Permission restoration does not override an account's disabled rendering preference. */
     @Test
-    fun activationPermissionRegrantRepairsRenderingBeforeRetainedMode() =
+    fun activationPermissionRegrantPreservesRenderingOptOut() =
         runBlocking {
             val platform = RecordingNativePushFallbackPlatform(context)
             val fixture = fixture(platform = platform, nativeEnabled = false)
@@ -385,7 +429,7 @@ class NotificationDeliveryModeRecoveryTest {
 
                 shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
                 assertTrue(fixture.runOnMainLooperPumping { fixture.appState.setActiveAccount(ACCOUNT_A) })
-                assertTrue(fixture.notificationSettings(ACCOUNT_A).localNotificationsEnabled)
+                assertFalse(fixture.notificationSettings(ACCOUNT_A).localNotificationsEnabled)
                 awaitStart(fixture, platform)
                 fixture.acknowledgeNativePushFallbackRuntime(platform.starts.last())
                 fixture.runWithMainLooperPumping {
@@ -694,9 +738,9 @@ class NotificationDeliveryModeRecoveryTest {
             }
         }
 
-    /** Account activation restores rendering immediately and completes the settled Local mode asynchronously. */
+    /** Account activation preserves disabled rendering while settling Local asynchronously. */
     @Test
-    fun accountActivationRestoresRenderingAndSettledLocalMode() =
+    fun accountActivationPreservesRenderingAndSettlesLocalMode() =
         runBlocking {
             BackgroundConnectionPreferences.setEnabledDurably(context, true)
             val platform = RecordingNativePushFallbackPlatform(context)
@@ -711,7 +755,7 @@ class NotificationDeliveryModeRecoveryTest {
                 fixture.replaceNotificationSettings(settings(ACCOUNT_B, localEnabled = false, nativeEnabled = false))
 
                 assertTrue(fixture.runOnMainLooperPumping { fixture.appState.setActiveAccount(ACCOUNT_B) })
-                assertTrue(fixture.notificationSettings(ACCOUNT_B).localNotificationsEnabled)
+                assertFalse(fixture.notificationSettings(ACCOUNT_B).localNotificationsEnabled)
                 awaitStart(fixture, platform)
                 fixture.acknowledgeNativePushFallbackRuntime(platform.starts.last())
                 fixture.runWithMainLooperPumping {
@@ -788,7 +832,7 @@ class NotificationDeliveryModeRecoveryTest {
                 fixture.rejectNativePushFallbackRuntime(platform.starts.last())
                 fixture.runWithMainLooperPumping { yield() }
 
-                assertTrue(fixture.notificationSettings(ACCOUNT_B).localNotificationsEnabled)
+                assertFalse(fixture.notificationSettings(ACCOUNT_B).localNotificationsEnabled)
                 assertTrue(fixture.notificationSettings(ACCOUNT_B).nativePushEnabled)
             } finally {
                 fixture.close()
@@ -810,7 +854,7 @@ class NotificationDeliveryModeRecoveryTest {
             try {
                 fixture.bootstrap()
                 fixture.replaceNotificationSettings(settings(ACCOUNT_A, nativeEnabled = true))
-                fixture.replaceNotificationSettings(settings(ACCOUNT_B, localEnabled = false, nativeEnabled = false))
+                fixture.replaceNotificationSettings(settings(ACCOUNT_B, localEnabled = true, nativeEnabled = false))
                 PushTokenStore.create(context).setToken("test-token")
 
                 assertTrue(fixture.runOnMainLooperPumping { fixture.appState.setActiveAccount(ACCOUNT_B) })
@@ -833,9 +877,9 @@ class NotificationDeliveryModeRecoveryTest {
             }
         }
 
-    /** Rendering repair is part of the invariant, so its write must precede the activation shortcut decision. */
+    /** Activation keeps the opted-out account disabled while registering another enabled account. */
     @Test
-    fun renderingRepairRecomputesFcmInvariantBeforeActivationShortcut() =
+    fun activationPreservesOptOutUnderSettledFcmMode() =
         runBlocking {
             val platform = RecordingNativePushFallbackPlatform(context)
             val fixture =
@@ -857,18 +901,70 @@ class NotificationDeliveryModeRecoveryTest {
                 assertTrue(fixture.runOnMainLooperPumping { fixture.appState.setActiveAccount(ACCOUNT_A) })
                 fixture.runWithMainLooperPumping {
                     withTimeout(5_000L) {
-                        while (
-                            !fixture.notificationSettings(ACCOUNT_A).nativePushEnabled ||
-                            ACCOUNT_A !in fixture.upsertedPushRegistrations
-                        ) {
-                            yield()
-                        }
+                        while (fixture.appState.notificationDeliveryModeBusy) yield()
                     }
                 }
 
-                assertTrue(fixture.notificationSettings(ACCOUNT_A).localNotificationsEnabled)
+                assertFalse(fixture.notificationSettings(ACCOUNT_A).localNotificationsEnabled)
+                assertFalse(fixture.notificationSettings(ACCOUNT_A).nativePushEnabled)
+                assertFalse(ACCOUNT_A in fixture.upsertedPushRegistrations)
+                assertTrue(ACCOUNT_B in fixture.upsertedPushRegistrations)
                 assertFalse(BackgroundConnectionPreferences.isEnabled(context))
             } finally {
+                fixture.close()
+            }
+        }
+
+    /** A failed activation plan releases the busy flag after superseding a held selection. */
+    @Test
+    fun activationWithoutCutoverReleasesSupersededBusySelector() =
+        runBlocking {
+            val nativeWriteStarted = CountDownLatch(1)
+            val releaseNativeWrite = CountDownLatch(1)
+            val failBackgroundSettingsRead = AtomicBoolean(false)
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val fixture =
+                fixture(
+                    platform = platform,
+                    nativeEnabled = false,
+                    accounts = listOf(account(ACCOUNT_A), account(ACCOUNT_B)),
+                    fcmAvailable = true,
+                    onSetNative = { accountRef, enabled ->
+                        if (enabled) {
+                            nativeWriteStarted.countDown()
+                            check(releaseNativeWrite.await(10, TimeUnit.SECONDS))
+                        }
+                        settings(accountRef, nativeEnabled = false)
+                    },
+                    onNotificationSettings = { accountRef ->
+                        if (accountRef == ACCOUNT_B && failBackgroundSettingsRead.get()) {
+                            throw IOException("background account settings unavailable")
+                        }
+                        settings(accountRef, nativeEnabled = false)
+                    },
+                )
+            try {
+                fixture.bootstrap()
+                PushTokenStore.create(context).setToken("test-token")
+
+                val selection = async { fixture.appState.setNotificationDeliveryMode(NotificationDeliveryMode.Fcm) }
+                withTimeout(2_000L) { while (nativeWriteStarted.count > 0L) yield() }
+                failBackgroundSettingsRead.set(true)
+                val selectionGeneration = notificationDeliveryModeGeneration(fixture.appState)
+                val activation =
+                    async { fixture.runOnMainLooperPumping { fixture.appState.setActiveAccount(ACCOUNT_A) } }
+                withTimeout(5_000L) {
+                    while (notificationDeliveryModeGeneration(fixture.appState) == selectionGeneration) yield()
+                }
+                releaseNativeWrite.countDown()
+
+                assertFalse(fixture.runWithMainLooperPumping { selection.await() })
+                assertTrue(fixture.runWithMainLooperPumping { activation.await() })
+                assertFalse(fixture.appState.notificationDeliveryModeBusy)
+                assertFalse(fixture.notificationSettings(ACCOUNT_A).nativePushEnabled)
+                assertFalse(BackgroundConnectionPreferences.isEnabled(context))
+            } finally {
+                releaseNativeWrite.countDown()
                 fixture.close()
             }
         }
@@ -1116,6 +1212,7 @@ class NotificationDeliveryModeRecoveryTest {
         fcmAvailable: Boolean = false,
         onSetNative: ((String, Boolean) -> NotificationSettingsFfi)? = null,
         onClear: ((String) -> PushRegistrationShareOutcomeFfi)? = null,
+        onNotificationSettings: ((String) -> NotificationSettingsFfi)? = null,
     ) = NotificationBootstrapTestFixture(
         context = context,
         accounts = accounts,
@@ -1124,6 +1221,7 @@ class NotificationDeliveryModeRecoveryTest {
         onUpsertPushRegistration = onUpsert,
         onSetNativePushEnabled = onSetNative,
         onClearPushRegistration = onClear,
+        onNotificationSettings = onNotificationSettings,
         pushServerConfigProvider = { CONFIG },
         nativePushCapabilityResolver = {
             if (fcmAvailable) NativePushCapability.Available else NativePushCapability.MissingPushServerConfiguration
@@ -1155,6 +1253,13 @@ class NotificationDeliveryModeRecoveryTest {
             .apply { isAccessible = true }
             .invoke(appState, state)
     }
+
+    /** Reads the delivery intent generation so the race test waits for actual supersession. */
+    private fun notificationDeliveryModeGeneration(appState: WhiteNoiseAppState): Long =
+        WhiteNoiseAppState::class.java.getDeclaredField("notificationDeliveryModeIntent").let { field ->
+            field.isAccessible = true
+            (field.get(appState) as StalenessGuard).capture()
+        }
 
     private fun account(ref: String) = AccountSummaryFfi(ref, "$ref-id", true, false, false, true)
 

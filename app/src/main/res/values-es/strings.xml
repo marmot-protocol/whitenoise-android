@@ -844,7 +844,7 @@
     <string name="notification_delivery_push_detail">Se activa brevemente cuando puede haber actividad nueva y comprueba los mensajes de forma segura.</string>
     <string name="notification_delivery_local_detail">Mantiene una conexión persistente mientras las notificaciones están activadas.</string>
     <string name="notification_device_policy">Estado del dispositivo</string>
-    <string name="notification_device_policy_detail">Los permisos y la política de batería pueden retrasar ambos modos de entrega. El estado se actualiza al volver a esta pantalla.</string>
+    <string name="notification_device_policy_detail">El permiso de notificaciones determina si aparecen las alertas. La política de batería puede retrasar la entrega en segundo plano en ambos modos. El estado se actualiza al volver a esta pantalla.</string>
     <string name="notification_permission_status">Permiso de notificaciones</string>
     <string name="notification_permission_allowed">Permitido</string>
     <string name="notification_permission_blocked">Bloqueado</string>

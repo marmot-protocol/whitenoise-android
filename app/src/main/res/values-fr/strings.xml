@@ -844,7 +844,7 @@
     <string name="notification_delivery_push_detail">Se réveille brièvement en cas de nouvelle activité possible, puis recherche les messages de façon sécurisée.</string>
     <string name="notification_delivery_local_detail">Maintient une connexion permanente tant que les notifications sont activées.</string>
     <string name="notification_device_policy">État de l’appareil</string>
-    <string name="notification_device_policy_detail">L’autorisation et la politique de batterie peuvent retarder les deux modes de réception. L’état est actualisé au retour sur cet écran.</string>
+    <string name="notification_device_policy_detail">L’autorisation des notifications détermine si les alertes s’affichent. La politique de batterie peut retarder la réception en arrière-plan dans les deux modes. L’état est actualisé au retour sur cet écran.</string>
     <string name="notification_permission_status">Autorisation des notifications</string>
     <string name="notification_permission_allowed">Autorisée</string>
     <string name="notification_permission_blocked">Bloquée</string>

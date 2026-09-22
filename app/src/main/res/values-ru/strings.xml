@@ -876,7 +876,7 @@
     <string name="notification_delivery_push_detail">Кратковременно пробуждает приложение при возможной новой активности, затем безопасно проверяет сообщения.</string>
     <string name="notification_delivery_local_detail">Поддерживает постоянное соединение, пока уведомления включены.</string>
     <string name="notification_device_policy">Состояние устройства</string>
-    <string name="notification_device_policy_detail">Разрешение и политика батареи могут задерживать оба режима доставки. Состояние обновляется при возврате на этот экран.</string>
+    <string name="notification_device_policy_detail">Разрешение на уведомления определяет, будут ли видны оповещения. Настройки батареи могут задерживать доставку в фоне в обоих режимах. Состояние обновится при возврате на этот экран.</string>
     <string name="notification_permission_status">Разрешение уведомлений</string>
     <string name="notification_permission_allowed">Разрешено</string>
     <string name="notification_permission_blocked">Заблокировано</string>

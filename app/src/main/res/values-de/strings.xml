@@ -844,7 +844,7 @@
     <string name="notification_delivery_push_detail">Wird bei möglicher neuer Aktivität kurz aktiv und prüft dann sicher auf Nachrichten.</string>
     <string name="notification_delivery_local_detail">Hält eine dauerhafte Verbindung, solange Benachrichtigungen aktiviert sind.</string>
     <string name="notification_device_policy">Gerätestatus</string>
-    <string name="notification_device_policy_detail">Berechtigungs- und Akku-Einstellungen können beide Zustellarten verzögern. Der Status wird bei der Rückkehr zu diesem Bildschirm aktualisiert.</string>
+    <string name="notification_device_policy_detail">Die Benachrichtigungsberechtigung bestimmt, ob Hinweise angezeigt werden. Die Akkuoptimierung kann die Zustellung im Hintergrund bei beiden Arten verzögern. Der Status wird bei der Rückkehr aktualisiert.</string>
     <string name="notification_permission_status">Benachrichtigungsberechtigung</string>
     <string name="notification_permission_allowed">Erlaubt</string>
     <string name="notification_permission_blocked">Blockiert</string>
