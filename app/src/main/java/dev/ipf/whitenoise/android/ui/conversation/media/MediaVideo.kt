@@ -203,6 +203,14 @@ internal fun MediaVideoGridTile(
         remember(messageIdHex, attachmentIndex) {
             controller.hasCachedAttachment(messageIdHex, attachmentIndex)
         }
+    // A message still queued for upload has no materialized file to seek in, so
+    // its poster comes from the bytes the retry path already retains (#2732).
+    val retainedPendingVideoBytes =
+        controller
+            .pendingAttachmentsList(messageIdHex)
+            .getOrNull(attachmentIndex)
+            ?.takeIf { mine && it.isPendingVideo }
+            ?.plaintextBytes
     val retainedPlaintextOnEntry =
         mine && controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex) != null
     // Seed the poster from the epoch-independent thumbnail cache (mirrors
@@ -306,6 +314,22 @@ internal fun MediaVideoGridTile(
         },
         dispatchOpen = { dispatchReadyVideo() },
     )
+
+    // The retained upload bytes are read in memory, so the pending bubble paints
+    // the same poster the confirmed one will and the swap is a visual no-op. The
+    // frame is cached under the epoch-independent slot, which is what carries it
+    // across upload retry and into the confirmed bubble (#2732).
+    LaunchedEffect(messageIdHex, attachmentIndex, retainedPendingVideoBytes) {
+        val bytes = retainedPendingVideoBytes ?: return@LaunchedEffect
+        if (posterBitmap != null && tileDurationMs > 0L) return@LaunchedEffect
+        val frame = withContext(Dispatchers.IO) { pendingVideoPosterFrame(bytes, posterBitmap == null) }
+        if (frame.durationMs > 0L) tileDurationMs = frame.durationMs
+        val bitmap = frame.bitmap
+        if (bitmap != null && posterBitmap == null) {
+            controller.cacheThumbnail(messageIdHex, attachmentIndex, bitmap)
+            posterBitmap = bitmap.asImageBitmap()
+        }
+    }
 
     LaunchedEffect(localFile) {
         val f = localFile ?: return@LaunchedEffect
@@ -527,6 +551,14 @@ internal fun MediaVideoBubble(
         remember(pillKey) {
             controller.hasCachedAttachment(messageIdHex, attachmentIndex)
         }
+    // A message still queued for upload has no materialized file to seek in, so
+    // its poster comes from the bytes the retry path already retains (#2732).
+    val retainedPendingVideoBytes =
+        controller
+            .pendingAttachmentsList(messageIdHex)
+            .getOrNull(attachmentIndex)
+            ?.takeIf { mine && it.isPendingVideo }
+            ?.plaintextBytes
     val retainedPlaintextOnEntry =
         mine && controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex) != null
     var loading by remember(pillKey, epoch) { mutableStateOf(false) }
@@ -648,6 +680,22 @@ internal fun MediaVideoBubble(
         },
         dispatchOpen = { dispatchReadyVideo() },
     )
+
+    // The retained upload bytes are read in memory, so the pending bubble paints
+    // the same poster the confirmed one will and the swap is a visual no-op. The
+    // frame is cached under the epoch-independent slot, which is what carries it
+    // across upload retry and into the confirmed bubble (#2732).
+    LaunchedEffect(pillKey, retainedPendingVideoBytes) {
+        val bytes = retainedPendingVideoBytes ?: return@LaunchedEffect
+        if (posterBitmap != null && durationMs > 0L) return@LaunchedEffect
+        val frame = withContext(Dispatchers.IO) { pendingVideoPosterFrame(bytes, posterBitmap == null) }
+        if (frame.durationMs > 0L) durationMs = frame.durationMs
+        val bitmap = frame.bitmap
+        if (bitmap != null && posterBitmap == null) {
+            controller.cacheThumbnail(messageIdHex, attachmentIndex, bitmap)
+            posterBitmap = bitmap.asImageBitmap()
+        }
+    }
 
     LaunchedEffect(localFile) {
         val f = localFile ?: return@LaunchedEffect

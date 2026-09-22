@@ -592,6 +592,62 @@
         ]
       },
       {
+        "surface": "Queued video poster from retained upload bytes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/PendingVideoPosterFrame.kt",
+        "anchor": "fun pendingVideoPosterFrame(",
+        "test_ids": [
+          "MED-007"
+        ]
+      },
+      {
+        "surface": "PendingFilePills",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPending.kt",
+        "anchor": "fun PendingFilePills(",
+        "test_ids": [
+          "MED-007"
+        ]
+      },
+      {
+        "surface": "PendingVideoBadge",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPending.kt",
+        "anchor": "fun PendingVideoBadge(",
+        "test_ids": [
+          "MED-007"
+        ]
+      },
+      {
+        "surface": "PendingVideoFallback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPending.kt",
+        "anchor": "fun PendingVideoFallback(",
+        "test_ids": [
+          "MED-007"
+        ]
+      },
+      {
+        "surface": "PendingVisualAlbum",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPending.kt",
+        "anchor": "fun PendingVisualAlbum(",
+        "test_ids": [
+          "MED-007"
+        ]
+      },
+      {
+        "surface": "PendingVisualBubble",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPending.kt",
+        "anchor": "fun PendingVisualBubble(",
+        "test_ids": [
+          "MED-007"
+        ]
+      },
+      {
+        "surface": "R.string.reply_media_video",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPending.kt",
+        "anchor": "R.string.reply_media_video",
+        "test_ids": [
+          "MED-007"
+        ]
+      },
+      {
         "surface": "Profile banner decode target from the rendered box",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileBannerDecodeTarget.kt",
         "anchor": "fun profileBannerTargetWidthPx(",

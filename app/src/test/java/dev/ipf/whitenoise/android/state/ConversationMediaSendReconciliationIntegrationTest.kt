@@ -128,6 +128,96 @@ class ConversationMediaSendReconciliationIntegrationTest {
             assertEquals(ChatListMessageDeliveryStateFfi.DELIVERED, confirmedPreview?.deliveryState)
         }
 
+    /**
+     * A queued video keeps the bytes its poster is drawn from until the confirmed bubble owns it.
+     *
+     * The optimistic bubble has no materialized file to read a frame out of, so the retained upload
+     * bytes are the only poster source it has. They must survive the whole send — including a failed
+     * upload and its retry — and the confirmed key must be seeded from them before they are released,
+     * so the poster never blinks out at the handover (#2732).
+     */
+    @Test
+    @Suppress("LongMethod") // One send, one failure and one retry belong in a single ordered flow.
+    fun pendingVideoKeepsItsPosterSourceAcrossRetryUntilTheConfirmedBubbleTakesOver() =
+        runTest {
+            val appState = appState()
+            attachedChatsController(appState)
+            val reference = mediaReference()
+            var uploadAttempts = 0
+            lateinit var controller: ConversationController
+            var retainedDuringPublish: List<PendingAttachment> = emptyList()
+            controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    groupRosterReader = { _, _ -> authoritativeRoster() },
+                    mediaUploader = { _, _, _ ->
+                        uploadAttempts += 1
+                        if (uploadAttempts == 1) error("upload interrupted") else uploadResult(reference)
+                    },
+                    mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
+                    mediaPublisher = { _, _, _, _ ->
+                        val optimistic = controller.timeline.single()
+                        retainedDuringPublish = controller.pendingAttachmentsList(optimistic.record.messageIdHex)
+                        applyProjection(
+                            controller,
+                            projectedMediaMessage(
+                                recordedAt = optimistic.record.recordedAt,
+                                reference = reference,
+                            ),
+                        )
+                        acceptedPendingSummary()
+                    },
+                )
+
+            controller.retryMembers()
+            controller.sendAttachments(attachments = listOf(pendingVideo()), caption = null)
+
+            val failedMessage = controller.timeline.single()
+            assertEquals(MessageStatus.Failed, failedMessage.status)
+            assertEquals(
+                "a failed upload must keep the bytes the poster is drawn from",
+                listOf(VIDEO_MEDIA_TYPE),
+                controller.pendingAttachmentsList(failedMessage.record.messageIdHex).map { it.mediaType },
+            )
+
+            controller.retryFailedSend(failedMessage)
+
+            assertEquals(2, uploadAttempts)
+            assertEquals(
+                "the retry must reuse the retained bytes rather than the picker's Uri",
+                listOf(VIDEO_MEDIA_TYPE),
+                retainedDuringPublish.map { it.mediaType },
+            )
+            assertEquals(
+                CONFIRMED_MESSAGE_ID,
+                controller.timeline
+                    .single()
+                    .record.messageIdHex,
+            )
+            assertEquals(
+                "the confirmed bubble must own the poster source before the pending copy is released",
+                VIDEO_BYTES.toList(),
+                appState
+                    .cachedMediaPlaintext(mediaCacheKey(ACCOUNT_REF, GROUP_ID, CONFIRMED_MESSAGE_ID, 0))
+                    ?.toList(),
+            )
+            assertEquals(
+                emptyList<PendingAttachment>(),
+                controller.pendingAttachmentsList(CONFIRMED_MESSAGE_ID),
+            )
+        }
+
+    /** One queued video whose retained bytes stand in for a real clip's poster source. */
+    private fun pendingVideo() =
+        PendingAttachment(
+            plaintextBytes = VIDEO_BYTES,
+            mediaType = VIDEO_MEDIA_TYPE,
+            fileName = "clip.mp4",
+            dim = "1280x720",
+        )
+
     /** Exercises the default production path: no injected uploader or publisher test seam. */
     private fun assertDraftlessMediaUsesTokenBoundNativeAdmission(
         mediaType: String,
@@ -473,5 +563,7 @@ class ConversationMediaSendReconciliationIntegrationTest {
         val ACCOUNT_ID = "a1".repeat(32)
         val GROUP_ID = "b2".repeat(32)
         val CONFIRMED_MESSAGE_ID = "c3".repeat(32)
+        const val VIDEO_MEDIA_TYPE = "video/mp4"
+        val VIDEO_BYTES = byteArrayOf(0, 0, 0, 24, 102, 116, 121, 112, 105, 115, 111, 109)
     }
 }
