@@ -8626,12 +8626,12 @@ class ConversationController(
                 null
             }
         val knownEventIdByEmoji =
-            projectedEventIdByEmoji
-                .toMutableMap()
-                .apply {
-                    unprojectedOwnReactionEventIds[target.lowercase() to emoji]?.let { put(emoji, it) }
-                    authoritativeEventIds?.let { putAll(it) }
-                }
+            knownReactionEventIds(
+                projectedEventIds = projectedEventIdByEmoji,
+                emoji = emoji,
+                unprojectedEventId = unprojectedOwnReactionEventIds[target.lowercase() to emoji],
+                authoritativeEventIds = authoritativeEventIds,
+            )
         val authoritativeOwnEmojis =
             when {
                 authoritativeEventIds != null -> authoritativeEventIds.keys
@@ -8676,18 +8676,8 @@ class ConversationController(
                     .orEmpty()
                     .filter { it.sender.equals(me, ignoreCase = true) }
                     .mapTo(linkedSetOf()) { it.emoji }
-        unprojectedOwnReactionEventIds.keys
-            .asSequence()
-            .filter { (messageId, _) -> messageId.equals(target, ignoreCase = true) }
-            .mapTo(projected) { (_, emoji) -> emoji }
-        return projected
+        return projected.includeUnprojectedReactionEmojis(target, unprojectedOwnReactionEventIds.keys)
     }
-
-    /** Stable map key for the latest optimistic state of one message and emoji. */
-    private fun reactionIntentOverlayId(
-        target: String,
-        emoji: String,
-    ): String = "reaction-intent:${target.length}:$target:$emoji"
 
     /** Drives native state toward the newest intent without blocking later optimistic taps. */
     private suspend fun convergeReactionIntent(
@@ -8725,25 +8715,6 @@ class ConversationController(
         }
     }
 
-    /** Removes one optimistic intent after cancellation, a no-op, or terminal failure. */
-    private fun clearOptimisticReactionIntent(
-        optimisticId: String,
-        target: String,
-    ) {
-        optimisticReactionChanges.remove(optimisticId)
-        recomputeReactions(setOf(target))
-    }
-
-    /** Logs and presents a terminal reaction failure only when no newer tap superseded it. */
-    private fun presentReactionMutationFailure(throwable: Throwable) {
-        if (BuildConfig.DEBUG) {
-            Log.w("DMConversation", "reaction mutation failed", throwable)
-        } else {
-            Log.w("DMConversation", "reaction mutation failed: ${throwable.javaClass.simpleName}")
-        }
-        appState.presentFailure(R.string.toast_reaction_failed, "MESSAGE_REACTION", throwable)
-    }
-
     /** Optimistically adds or removes [emoji], then reconciles the authoritative Marmot mutation. */
     suspend fun toggleReaction(
         emoji: String,
@@ -8768,17 +8739,19 @@ class ConversationController(
             try {
                 convergeReactionIntent(account, target, emoji, key)
             } catch (cancel: CancellationException) {
-                clearOptimisticReactionIntent(optimisticId, target)
+                recomputeReactions(optimisticReactionChanges.clearReactionIntent(optimisticId, target))
                 throw cancel
             }
 
         when (outcome) {
             is ReactionIntentDrainOutcome.Failed -> {
-                clearOptimisticReactionIntent(optimisticId, target)
-                presentReactionMutationFailure(outcome.throwable)
+                recomputeReactions(optimisticReactionChanges.clearReactionIntent(optimisticId, target))
+                appState.presentReactionMutationFailure(outcome.throwable)
             }
             is ReactionIntentDrainOutcome.Settled -> {
-                if (!outcome.mutated) clearOptimisticReactionIntent(optimisticId, target)
+                if (!outcome.mutated) {
+                    recomputeReactions(optimisticReactionChanges.clearReactionIntent(optimisticId, target))
+                }
                 if (outcome.addedReaction) markReactionTargetRead(target)
             }
         }

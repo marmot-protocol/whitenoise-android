@@ -210,6 +210,26 @@ class CanAcceptReactionTest {
             assertEquals(3, reads)
         }
 
+    /** A blank unprojected marker cannot hide the valid event id that projection later supplies. */
+    @Test
+    fun blankUnprojectedMarkerPreservesProjectedReactionEventId() {
+        val projected = mapOf("👍" to "projected-event")
+
+        assertEquals(
+            projected,
+            knownReactionEventIds(projected, "👍", unprojectedEventId = "", authoritativeEventIds = null),
+        )
+        assertEquals(
+            mapOf("👍" to "unprojected-event"),
+            knownReactionEventIds(
+                projected,
+                "👍",
+                unprojectedEventId = "unprojected-event",
+                authoritativeEventIds = null,
+            ),
+        )
+    }
+
     /** A projected reaction event keeps removal scoped to the tapped emoji. */
     @Test
     fun ownReactionRetractionDeletesKnownReactionEvent() {
