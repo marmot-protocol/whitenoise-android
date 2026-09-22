@@ -63,7 +63,7 @@ class KeyPackageDeletionDnsDeadlineTest {
             assertEquals(listOf("wss://online.example"), deletedThrough)
         }
 
-    /** A hostile stalled suffix cannot renew the total budget or discard already verified public sources. */
+    /** Stalled work surrounding a public answer cannot renew the budget or discard that answer. */
     @Test
     fun totalDeadlineRetainsCompletedPublicAnswersAndCancelsOutstandingWork() =
         runBlocking {
@@ -75,7 +75,11 @@ class KeyPackageDeletionDnsDeadlineTest {
             val result =
                 withTimeout(12_000) {
                     deleteKeyPackageThroughSafeSourceRelays(
-                        sourceRelays = listOf("wss://online.example") + stalledRelays(),
+                        sourceRelays =
+                            listOf(
+                                "wss://stalled-prefix.example",
+                                "wss://online.example",
+                            ) + stalledRelays(),
                         classify = ::allowEveryRelay,
                         resolve = { host ->
                             if (host == "online.example") {

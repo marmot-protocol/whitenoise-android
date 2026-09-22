@@ -113,6 +113,8 @@ class StalenessGuardCoverageTest {
                     listOf("ownsNotificationDeliveryMode(owner)", "localNotificationSettings = restored"),
                 "AppState.kt:restorePersistentPreference" to
                     listOf("ownsNotificationDeliveryMode(owner)", "backgroundConnectionEnabled = enabled"),
+                "AppState.kt:finishNotificationDeliveryModeTransaction" to
+                    listOf("notificationDeliveryModeIntent.isCurrent", "notificationDeliveryModeIntent.runIfCurrent"),
                 "NativePushFallbackRuntime.kt:reconcile" to
                     listOf("readNativePushFallbackSettings", "ownerIsCurrent", "ensurePersistentFallback"),
                 "NativePushFallbackRuntime.kt:ensurePersistentFallback" to

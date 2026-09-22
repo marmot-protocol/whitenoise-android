@@ -126,7 +126,9 @@ is responsible for the full current-head gate.
 | Final review-focused primary-variant tests | 114 passed, 0 failures/errors/skips; 11 suites |
 | Latest admission/store regressions | 44 passed, 0 failures/errors/skips; 2 suites |
 | Latest delivery-mode/token-rotation regressions | 101 passed, 0 failures/errors/skips; 4 suites |
-| Previous hosted static-analysis failure | The single reported expression-body formatting violation is corrected; current-head hosted rerun pending |
+| Latest hosted-failure regressions | PASS in both debug variants; 111 tests per variant, 222 total, 0 failures/errors/skips; 6 suites |
+| Latest hosted static-analysis failures | Three changed-line length violations were corrected; current-head hosted rerun pending |
+| Latest hosted unit-test failures | The settlement path is registered as generation-guarded, and the DNS deadline fixture deterministically starts stalled work around its completed public answer; current-head hosted rerun pending |
 | Alternate-variant focused tests | 241 recovery-focused tests plus the 21-test affected ordering class passed separately; 0 failures/errors/skips |
 | Post-rebase CI regression set | PASS; 45 tests in each debug variant, 0 failures/errors/skips |
 | Full alternate variant | PASS; 9,169 tests, 0 failures/errors, 1 skipped; 5m 41s |
@@ -260,7 +262,7 @@ the preserved pre-install APK SHA-256 is
 ## Source and artifacts
 
 The source/test patch relative to the base revision is SHA-256
-`472a9a170a9752a689e010474a6b01823f0bbf974f49b75d6dc757c0f365d921`.
+`79b62e634b7d921ef80a2d10a3df84639bd3900bfeab4f2f522cc582f0f0f497`.
 This hashes `git diff origin/master --binary -- app/src`. The native dependency remains unchanged.
 
 Final qualification APK hashes:
