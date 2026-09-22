@@ -46,7 +46,7 @@ class LargeGroupInviteWarningScreenshotTest {
     fun warningAmoledLargeRtl() {
         composeRule.setContent {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                WhiteNoiseTheme(darkTheme = true, amoled = true, fontScale = 1.6f) {
+                WhiteNoiseTheme(darkTheme = true, amoled = true, fontScale = 2f) {
                     Surface(Modifier.fillMaxSize()) {
                         Box(Modifier.padding(top = 24.dp)) {
                             LargeGroupInviteWarningBanner()
@@ -64,7 +64,7 @@ class LargeGroupInviteWarningScreenshotTest {
     fun confirmationAmoledLargeRtl() {
         composeRule.setContent {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                WhiteNoiseTheme(darkTheme = true, amoled = true, fontScale = 1.6f) {
+                WhiteNoiseTheme(darkTheme = true, amoled = true, fontScale = 2f) {
                     Surface(Modifier.fillMaxSize()) {
                         LargeGroupInviteConfirmationDialog(
                             onContinue = {},
