@@ -4,7 +4,7 @@ set -euo pipefail
 workflow=.github/workflows/android-pr-preview-publish.yml
 build=.github/workflows/android-pr-apk.yml
 gradle=app/build.gradle.kts
-uploader=.github/scripts/upload-pr-apk-to-blossom.sh
+publisher=.github/scripts/publish-pr-apk-to-github-release.sh
 
 reject() {
   local pattern=$1 file=$2
@@ -72,40 +72,48 @@ grep -Fq 'Verify signed previews' "$workflow"
 grep -Fq '.github/scripts/stage-signed-pr-preview-candidates.sh signed candidates signed-check' "$workflow"
 grep -Fq 'PR_PREVIEW_CERT_SHA256: ${{ secrets.PR_PREVIEW_CERT_SHA256 }}' "$workflow"
 reject 'pull_request_target:' "$build"
+grep -Fq 'contents: write' "$workflow"
+grep -Fq 'GH_TOKEN: ${{ github.token }}' "$workflow"
+grep -Fq 'PREVIEW_CHANNEL="$channel"' "$workflow"
+grep -Fq '.github/scripts/publish-pr-apk-to-github-release.sh' "$workflow"
+reject 'BLOSSOM_UPLOAD_NSEC' "$workflow"
 # Both the pre-checkout prepare job and the post-checkout publish job must bind
 # artifact downloads explicitly to this repository. Without --repo, gh fails
 # before checkout with "not a git repository" and no preview links are posted.
 [[ $(grep -Fc 'gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --name pr-preview-stable' "$workflow") -eq 2 ]]
 [[ $(grep -Fc 'gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --name pr-preview-isolated' "$workflow") -eq 2 ]]
 
-# APKs are ZIP containers, so nak's automatic MIME detection labels them as
-# application/zip. Preserve the BUD-11 signer while requiring an explicit
-# BUD-02 APK Content-Type on the upload request.
-grep -Fq 'NOSTR_SECRET_KEY="$BLOSSOM_UPLOAD_NSEC" "$nak_bin" event' "$uploader"
-grep -Fq -- '--tag "x=$apk_sha256"' "$uploader"
-grep -Fq -- '--tag "server=$server_host"' "$uploader"
-grep -Fq -- '--header "Content-Type: $expected_mime"' "$uploader"
-grep -Fq -- '--header "X-SHA-256: $apk_sha256"' "$uploader"
-reject 'blossom upload --server' "$uploader"
+# The public link must be a stable, per-PR APK asset and publication must fail
+# closed if the final browser response regresses to an inline ZIP.
+grep -Fq 'asset_name="whitenoise-pr-${PR_NUMBER}-${PREVIEW_CHANNEL}.apk"' "$publisher"
+grep -Fq 'gh release upload "$release_tag" "$staged_apk"' "$publisher"
+grep -Fq 'application/vnd.android.package-archive' "$publisher"
+grep -Fq 'content-disposition' "$publisher"
+grep -Fq 'filename=${asset_name,,}' "$publisher"
+reject 'application/zip' "$publisher"
 
 # ABI-targeted unsigned builds use intermediates; reject missing or ambiguous APKs.
 selector=$(sed -n '/^          shopt -s nullglob$/,/^          apk=${apks\[0\]}$/p' "$build")
 test -n "$selector"
+# Repeat the cardinality assertion as the final command. Bash suppresses
+# errexit for `[[ ... ]]` in some caller contexts, while the final status is
+# stable whether this fixture is executed directly or from an `if` condition.
+selector_test="$selector"$'\n''[[ ${#apks[@]} -eq 1 ]]'
 fixture=$(mktemp -d)
 trap 'rm -rf "$fixture"' EXIT
 for location in outputs intermediates; do
   directory="$fixture/app/build/$location/apk/previewPlay/release"
   mkdir -p "$directory"
   touch "$directory/app-arm64-v8a-release.apk"
-  (cd "$fixture" && bash -ec "$selector")
+  (cd "$fixture" && bash -ec "$selector_test")
   rm "$directory/app-arm64-v8a-release.apk"
 done
-if (cd "$fixture" && bash -ec "$selector"); then
+if (cd "$fixture" && bash -ec "$selector_test"); then
   echo 'Missing APK unexpectedly accepted' >&2
   exit 1
 fi
 touch "$fixture"/app/build/{outputs,intermediates}/apk/previewPlay/release/app-arm64-v8a-release.apk
-if (cd "$fixture" && bash -ec "$selector"); then
+if (cd "$fixture" && bash -ec "$selector_test"); then
   echo 'Ambiguous APKs unexpectedly accepted' >&2
   exit 1
 fi

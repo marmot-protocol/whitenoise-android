@@ -12,8 +12,8 @@ const {
 const links = {
   prNumber: 2143,
   headSha: 'ba3a01bd3fd43c9c438ec53d4eb203da446fe419',
-  stableUrl: 'https://nostr.download/abc123.apk',
-  isolatedUrl: 'https://nostr.download/def456.apk',
+  stableUrl: 'https://github.com/marmot-protocol/whitenoise-android/releases/download/android-pr-previews/whitenoise-pr-2143-stable.apk',
+  isolatedUrl: 'https://github.com/marmot-protocol/whitenoise-android/releases/download/android-pr-previews/whitenoise-pr-2143-isolated.apk',
 }
 
 test('renders preview links with start/end markers', () => {
@@ -40,7 +40,7 @@ test('replaces an existing preview section in place', () => {
   ].join('\n')
   const updated = replaceSection(prior, renderSection(links))
   assert.doesNotMatch(updated, /old preview block/)
-  assert.match(updated, /abc123\.apk/)
+  assert.match(updated, /whitenoise-pr-2143-stable\.apk/)
 })
 
 test('replaces an unterminated preview section without duplicating its start marker', () => {
