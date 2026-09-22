@@ -1760,6 +1760,7 @@ class WhiteNoiseAppState private constructor(
 
     internal val accountUnreadStore = AccountUnreadStore()
     internal val runtimeMirrors = RuntimeMirrors()
+    internal val freshGroupCreations = FreshGroupCreationRegistry()
 
     val accountUnreadCounts: Map<String, ULong>
         get() = accountUnreadStore.retainedCounts

@@ -1708,6 +1708,15 @@ internal fun MainShell(
     val openGroupFromGroupCreateCompletion: (ChatListItem, Long) -> Unit = { item, requestToken ->
         if (commitGroupCreateCompletionOpen(item.group.groupIdHex, requestToken)) {
             chatListReturnHeadSnap = openGroupFromProfileSheet(chatListReturnHeadSnap)
+            // The conversation cannot otherwise tell a group that was created moments ago from one
+            // that has been around, and the two deserve different answers when an advisory
+            // recovery read fails. `selectedChatJustCreated` stays false: it drives the DM-only
+            // composer focus and subtitle hint, which a group create does not want.
+            appState.freshGroupCreations.record(
+                accountRef = appState.activeAccountRef,
+                groupIdHex = item.group.groupIdHex,
+                runtimeGeneration = appState.runtimeGeneration,
+            )
             selectedChatOpenContext = ConversationOpenContext()
             selectedChatJustCreated = false
             selectedChatOpenedAsDmHint = false

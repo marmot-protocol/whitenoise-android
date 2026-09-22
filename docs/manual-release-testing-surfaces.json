@@ -2381,6 +2381,14 @@
         ]
       },
       {
+        "surface": "Fresh group creation recovery-read policy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/FreshGroupCreation.kt",
+        "anchor": "fun groupRecoveryReadFailureIsPresentable(",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
         "surface": "GroupRejoinInvitationDialog",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
         "anchor": "fun GroupRejoinInvitationDialog(",

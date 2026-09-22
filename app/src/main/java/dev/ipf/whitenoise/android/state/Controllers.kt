@@ -7214,16 +7214,27 @@ class ConversationController(
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (_: Throwable) {
-                groupRecoveryLifetime.runIfCurrent(recoveryEpoch) { groupRecoveryReadFailed = true }
+                // An advisory read that has never succeeded for a group this account just created
+                // is not evidence of anything; see groupRecoveryReadFailureIsPresentable.
+                val presentable =
+                    groupRecoveryReadFailureIsPresentable(groupRecoveryStatus, isFreshlyCreatedGroup(groupIdHex))
+                groupRecoveryLifetime.runIfCurrent(recoveryEpoch) {
+                    if (presentable) groupRecoveryReadFailed = true
+                }
                 return
             }
         groupRecoveryLifetime.runIfCurrent(recoveryEpoch) {
             if (ownsGroupRecoveryGroup(groupIdHex) && status.groupIdHex == groupIdHex) {
                 groupRecoveryStatus = status
                 groupRecoveryReadFailed = false
+                appState.freshGroupCreations.settle(accountRef, groupIdHex, appState.runtimeGeneration)
             }
         }
     }
+
+    /** Whether this conversation is the group whose creation was opened most recently. */
+    private fun isFreshlyCreatedGroup(groupIdHex: String): Boolean =
+        appState.freshGroupCreations.isFresh(conversationAccountRef, groupIdHex, appState.runtimeGeneration)
 
     /** Explicit retry for an advisory recovery-status read failure. */
     suspend fun retryGroupRecoveryStatus() = refreshGroupRecoveryStatus()

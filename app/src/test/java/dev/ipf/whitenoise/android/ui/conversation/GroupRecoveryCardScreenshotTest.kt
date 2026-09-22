@@ -105,6 +105,37 @@ class GroupRecoveryCardScreenshotTest {
         )
     }
 
+    /** A healthy group — the state a successful create lands in — renders no recovery chrome at all. */
+    @Test
+    fun aHealthyGroupShowsNeitherTheFailureCopyNorRetry() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                GroupRecoveryCard(
+                    status =
+                        GroupRecoveryStatusFfi(
+                            groupIdHex = "group",
+                            automaticRecoveryFailed = false,
+                            pendingReinvites = 0u,
+                            failedReinvites = 0u,
+                            rejoinInvitations = emptyList(),
+                        ),
+                    busy = false,
+                    inviterName = { it },
+                    inviterIdentity = { it },
+                    onConfirm = {},
+                    onDecline = {},
+                    readFailed = false,
+                    onRetry = {},
+                    modifier = Modifier.width(360.dp).testTag("group-recovery-card"),
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("group-recovery-card").assertDoesNotExist()
+        composeRule.onNodeWithText("Couldn’t check group recovery. Try again.").assertDoesNotExist()
+        composeRule.onNodeWithText("Retry").assertDoesNotExist()
+    }
+
     /** Dark recovery keeps the native retry action visible within the prototype notice frame. */
     @Test
     fun recoveryRetryDark() = captureRetry(dark = true, amoled = false, largeRtl = false)
