@@ -22786,6 +22786,16 @@
         ]
       },
       {
+        "surface": "Opt-in text/media send and attachment-fetch diagnostics retain privacy-bounded checkpoints across controller replacement",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/PendingSendDiagnostics.kt",
+        "anchor": "internal class PendingSendDiagnosticTracker(",
+        "test_ids": [
+          "CHL-002",
+          "CON-002",
+          "SET-021"
+        ]
+      },
+      {
         "surface": "Conversation replacements deduplicate profile requests and retain completed stream state",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "suspend fun applyTimelinePage(",

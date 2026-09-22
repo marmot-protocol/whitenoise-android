@@ -5390,6 +5390,7 @@ class WhiteNoiseAppState private constructor(
      */
     private fun clearInMemoryMediaCaches() {
         assertMainThread { "clearInMemoryMediaCaches" }
+        pendingSendDiagnostics.clear()
         mediaPlaintextCache.clear()
         mediaThumbnailCache.clear()
         bumpMediaCacheRevision()
@@ -6977,6 +6978,10 @@ class WhiteNoiseAppState private constructor(
      */
     private val connectivitySignalOwner = ConnectivitySignalOwner()
     val connectivitySignals = connectivitySignalOwner.signals
+
+    /** Process-owned, bounded send tracing that survives conversation-screen disposal. */
+    internal val pendingSendDiagnostics =
+        createPendingSendDiagnosticTracker(mutationsScope) { connectivitySignals.value.toPerformanceConnectivity() }
 
     private fun updateConnectivitySignals(
         hasValidatedInternet: Boolean? = null,

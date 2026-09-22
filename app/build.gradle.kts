@@ -296,6 +296,7 @@ android {
         // compile-time false constant. Non-production flavors and debug builds
         // override this below; runtime collection still requires explicit opt-in.
         buildConfigField("boolean", "ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS", "false")
+        buildConfigField("String", "APP_SHORT_SHA", buildShortSha.asBuildConfigString())
         buildConfigField(
             "String",
             "MDK_SHORT_SHA",

@@ -57,6 +57,30 @@ errors. Turn the switch off and repeat an action to confirm no new lines appear.
 White Noise controls future emission only; retention of lines already written to
 Logcat is controlled by Android/GrapheneOS.
 
+### Send and attachment diagnosis
+
+`op=text_send` and `op=media_send` follow one process-local operation from the
+optimistic bubble through native admission and the authoritative timeline and
+chat-list projections. Slow operations emit `pending_checkpoint_10s` and
+`pending_checkpoint_60s` with their current closed send stage. Media sends add
+`media_upload_start`/`media_upload_return`, `media_upload_reused`, and
+`media_publish_start`/`media_publish_return`, so an incomplete pair identifies
+whether upload or publication stopped returning. `media_publish_combined`
+identifies native calls that uploaded and admitted the send atomically.
+Accepted-pending responses are
+reported as durable ownership rather than success, with
+`engine_phase_unavailable` making clear that Android cannot see the deeper MDK
+queue, MLS, storage, transport, or acknowledgement phases.
+
+`op=attachment_fetch` distinguishes explicit taps from automatic fetches and
+records memory and disk probes, acquisition start, native snapshot and demand,
+closed native transfer states, plaintext readiness, cancellation, and failure.
+The schema deliberately excludes attachment IDs, hashes, filenames, URLs,
+content, byte counts, raw errors, and stack traces. Native per-server attempts,
+Blossom byte progress, queue depth, and cryptographic sub-step timings remain
+outside Android's current FFI surface; the final native state and first missing
+phase are the available localization evidence.
+
 ## MDK host timing integration
 
 The 26 bridge stages use the published MarmotKit 0.9.20 `recordHostTiming` API.
