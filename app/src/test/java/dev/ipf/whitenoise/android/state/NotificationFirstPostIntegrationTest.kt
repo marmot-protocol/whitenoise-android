@@ -33,6 +33,7 @@ import dev.ipf.whitenoise.android.notifications.ConversationCardTestHook
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
 import dev.ipf.whitenoise.android.ui.chats.AvatarScreenshotFixtures
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -546,6 +547,7 @@ class NotificationFirstPostIntegrationTest {
                 messageRecords = messageRecords,
                 markdownDocumentFactory = markdownDocumentFactory,
                 notificationFirstPostTimingObserver = events::add,
+                notificationDispatcher = Dispatchers.Unconfined,
             )
         try {
             withNotificationWriteCount { writes ->
