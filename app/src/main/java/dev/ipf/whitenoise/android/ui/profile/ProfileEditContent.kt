@@ -45,6 +45,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -384,10 +385,13 @@ internal fun ProfileBanner(
     onOpen: () -> Unit,
     enabled: Boolean,
 ) {
-    var bitmap by remember(url) { mutableStateOf(AvatarImageLoader.peek(url)) }
-    var loaded by remember(url) { mutableStateOf(bitmap != null) }
-    LaunchedEffect(url) {
-        if (bitmap == null) bitmap = AvatarImageLoader.load(url)
+    // Same bounded banner decode as the other profile-settings banner surface,
+    // so sharpness never depends on which one the tester reached (#2762).
+    val targetWidthPx = profileBannerTargetWidthPx(LocalConfiguration.current.screenWidthDp.dp)
+    var bitmap by remember(url, targetWidthPx) { mutableStateOf(AvatarImageLoader.peekBanner(url, targetWidthPx)) }
+    var loaded by remember(url, targetWidthPx) { mutableStateOf(bitmap != null) }
+    LaunchedEffect(url, targetWidthPx) {
+        if (bitmap == null) bitmap = AvatarImageLoader.loadBanner(url, targetWidthPx)
         loaded = true
     }
     Surface(

@@ -64,6 +64,7 @@ import dev.ipf.whitenoise.android.state.ScriptedConversationTimelineSubscription
 import dev.ipf.whitenoise.android.state.TtsAutoReadPreferences
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.awaitOpenedTimelineSubscriptionsClosed
+import dev.ipf.whitenoise.android.state.shouldPostNotification
 import dev.ipf.whitenoise.android.state.timelineMessageIds
 import dev.ipf.whitenoise.android.state.timelinePage
 import dev.ipf.whitenoise.android.state.timelineRecord
@@ -480,14 +481,8 @@ abstract class NotificationDelayedRosterFixture {
 
     /** Evaluates a new target message against the production suppression policy for the mounted route. */
     private fun WhiteNoiseAppState.shouldPostFreshTargetMessage(): Boolean {
-        val method =
-            WhiteNoiseAppState::class.java
-                .getDeclaredMethod(
-                    "shouldPostNotification",
-                    NotificationUpdateFfi::class.java,
-                    Boolean::class.javaPrimitiveType!!,
-                ).apply { isAccessible = true }
-        return method.invoke(this, delayedRosterFreshTargetUpdate(), false) as Boolean
+        val update = delayedRosterFreshTargetUpdate()
+        return shouldPostNotification(update, engineMuted = false)
     }
 
     /** Builds two account identities and attaches only this fixture's scripted conversation source. */

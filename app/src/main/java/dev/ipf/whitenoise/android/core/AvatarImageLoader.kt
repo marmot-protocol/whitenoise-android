@@ -17,11 +17,22 @@ import java.util.LinkedHashMap
 @Suppress("TooManyFunctions") // Cohesive process-wide avatar cache, fetch, and lifecycle boundary.
 object AvatarImageLoader {
     private const val MAX_AVATAR_BYTES = 2 * 1024 * 1024
-    private const val MAX_AVATAR_DIMENSION = 512
+    private const val MAX_AVATAR_DIMENSION = PROFILE_AVATAR_MAX_DIMENSION
 
-    // Byte-budgeted cache. With ~1MB worst-case decoded avatar and typical
-    // <400KB, this holds dozens of avatars without unbounded memory growth.
-    private const val CACHE_SIZE_BYTES = 16 * 1024 * 1024
+    // A full-width 2:1 banner is stretched across the whole screen, so the
+    // avatar cap would leave it upscaled from 512x256 (#2762). Its decode is
+    // bounded by its own fetch ceiling here, and by the dimension and byte
+    // budgets the shared helpers below apply.
+    private const val MAX_BANNER_BYTES = 4 * 1024 * 1024
+
+    // Byte-budgeted cache, one budget per decode variant. With ~1MB worst-case
+    // decoded avatar and typical <400KB, 16MB holds dozens of avatars without
+    // unbounded memory growth — the size this cache has always been. Banners get
+    // their own 8MB rather than a share of that, because a single banner entry
+    // can be worth eight avatars and a combined LRU would let a run of them
+    // evict the avatar working set by plain recency (#2762).
+    private const val AVATAR_CACHE_SIZE_BYTES = 16 * 1024 * 1024
+    private const val BANNER_CACHE_SIZE_BYTES = 8 * 1024 * 1024
     private const val FAILURE_TTL_MS = 60_000L
     private const val FAILURE_CACHE_MAX_ENTRIES = 512
     private const val FETCH_CONCURRENCY = 4
@@ -32,13 +43,7 @@ object AvatarImageLoader {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val fetchGate = AvatarFetchGate(REGULAR_FETCH_CONCURRENCY, NOTIFICATION_FETCH_CONCURRENCY)
     private val lock = Any()
-    private val cache =
-        object : LruCache<String, ImageBitmap>(CACHE_SIZE_BYTES) {
-            override fun sizeOf(
-                key: String,
-                value: ImageBitmap,
-            ): Int = value.asAndroidBitmap().byteCount.coerceAtLeast(1)
-        }
+    private val cache = PartitionedProfileImageCache(AVATAR_CACHE_SIZE_BYTES, BANNER_CACHE_SIZE_BYTES)
     private val inFlight = mutableMapOf<String, AvatarInFlightRequest>()
 
     // staleness-exempt: captured request-lifetime tokens for bounded queued work, not a counter owner.
@@ -77,10 +82,57 @@ object AvatarImageLoader {
 
     suspend fun load(url: String): ImageBitmap? =
         load(
-            url = url,
+            request = avatarRequest(url),
             expectedGeneration = null,
             fetchLane = AvatarFetchLane.REGULAR,
         )
+
+    /**
+     * Loads [url] for a full-width profile banner, decoded for a box [targetWidthPx] wide.
+     *
+     * The target is bucketed and bounded, and the bucket is part of the cache and in-flight keys, so
+     * a banner request can never be answered by the avatar-sized bitmap of the same URL while two
+     * banner surfaces at comparable widths still share one decode. The bytes come through the same
+     * MarmotKit fetcher as every other profile image.
+     */
+    suspend fun loadBanner(
+        url: String,
+        targetWidthPx: Int,
+    ): ImageBitmap? =
+        load(
+            request = bannerRequest(url, targetWidthPx),
+            expectedGeneration = null,
+            fetchLane = AvatarFetchLane.REGULAR,
+        )
+
+    /** Synchronous banner counterpart to [peek]; an avatar-sized entry never satisfies it. */
+    fun peekBanner(
+        url: String?,
+        targetWidthPx: Int,
+    ): ImageBitmap? {
+        val key = url?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        return synchronized(lock) { cache.get(bannerRequest(key, targetWidthPx).cacheKey) }
+    }
+
+    /** The avatar-variant request for [url], whose cache key stays the bare URL. */
+    private fun avatarRequest(url: String) =
+        ProfileImageRequest(
+            url = url,
+            variant = ProfileImageVariant.AVATAR,
+            maxDimension = MAX_AVATAR_DIMENSION,
+            maxBytes = MAX_AVATAR_BYTES,
+        )
+
+    /** The banner-variant request for [url] at the bucket [targetWidthPx] rounds up into. */
+    private fun bannerRequest(
+        url: String,
+        targetWidthPx: Int,
+    ) = ProfileImageRequest(
+        url = url,
+        variant = ProfileImageVariant.BANNER,
+        maxDimension = profileBannerDecodeDimension(targetWidthPx),
+        maxBytes = MAX_BANNER_BYTES,
+    )
 
     /**
      * Queue an avatar fetch without delaying the caller. Chat/profile projection
@@ -112,7 +164,7 @@ object AvatarImageLoader {
                 // deferred that has not acquired network capacity yet.
                 fetchGate.withPreWarmAdmission {
                     load(
-                        url = key,
+                        request = avatarRequest(key),
                         expectedGeneration = scheduledGeneration,
                         fetchLane = AvatarFetchLane.PREWARM_ADMITTED,
                         waitForDetachedFetch = true,
@@ -131,13 +183,14 @@ object AvatarImageLoader {
     /** Shares one bounded fetch and rejects cache publication after an account-scoped clear. */
     @Suppress("LongMethod") // Request deduplication and generation-safe completion form one atomic lifecycle.
     private suspend fun load(
-        url: String,
+        request: ProfileImageRequest,
         expectedGeneration: Long?,
         fetchLane: AvatarFetchLane,
         waitForDetachedFetch: Boolean = false,
     ): ImageBitmap? {
+        val url = request.cacheKey
         cached(url)?.let { return it }
-        val request =
+        val pending =
             synchronized(lock) {
                 if (expectedGeneration != null && !requestLifetime.isCurrent(expectedGeneration)) {
                     return@synchronized CompletedAvatarRequest(null)
@@ -172,7 +225,7 @@ object AvatarImageLoader {
                                     if (!isCurrentRequest(launchedGeneration, launchedRequest)) {
                                         AvatarImageFetchResult.Unavailable
                                     } else {
-                                        fetch(url)
+                                        fetch(request)
                                     }
                                 }
                             }.getOrElse { AvatarImageFetchResult.Failed }
@@ -217,7 +270,7 @@ object AvatarImageLoader {
                 }
                 PendingAvatarRequest(inFlightRequest)
             }
-        return request.await(waitForDetachedFetch)
+        return pending.await(waitForDetachedFetch)
     }
 
     /**
@@ -245,13 +298,27 @@ object AvatarImageLoader {
         }
     }
 
+    /** Test-only injection of a banner-variant entry, for deterministic first-frame coverage. */
+    internal fun putCachedBanner(
+        url: String,
+        targetWidthPx: Int,
+        image: ImageBitmap,
+    ) {
+        val key = url.trim().takeIf { it.isNotEmpty() } ?: return
+        val cacheKey = bannerRequest(key, targetWidthPx).cacheKey
+        synchronized(lock) {
+            cache.put(cacheKey, image)
+            failureExpiresAt.remove(cacheKey)
+        }
+    }
+
     /** Android-bitmap view of [peek], for non-Compose consumers (notification icons). */
     fun peekBitmap(url: String?): android.graphics.Bitmap? = peek(url)?.asAndroidBitmap()
 
     /** Android-bitmap view of [load], using capacity reserved for notification icons. */
     suspend fun loadBitmap(url: String): android.graphics.Bitmap? =
         load(
-            url = url,
+            request = avatarRequest(url),
             expectedGeneration = null,
             fetchLane = AvatarFetchLane.NOTIFICATION,
         )?.asAndroidBitmap()
@@ -306,10 +373,10 @@ object AvatarImageLoader {
         return if (bytes.size <= maxBytes) AvatarByteFetchResult.Success(bytes) else AvatarByteFetchResult.Failed
     }
 
-    private suspend fun fetch(url: String): AvatarImageFetchResult =
-        when (val result = fetchBytes(url, MAX_AVATAR_BYTES)) {
+    private suspend fun fetch(request: ProfileImageRequest): AvatarImageFetchResult =
+        when (val result = fetchBytes(request.url, request.maxBytes)) {
             is AvatarByteFetchResult.Success ->
-                decode(result.bytes)
+                decode(result.bytes, request.variant, request.maxDimension)
                     ?.asImageBitmap()
                     ?.let(AvatarImageFetchResult::Success)
                     ?: AvatarImageFetchResult.Failed
@@ -335,7 +402,7 @@ object AvatarImageLoader {
         bytes: ByteArray,
         lifetime: Long,
     ): ImageBitmap? {
-        val image = decode(bytes)?.asImageBitmap() ?: return null
+        val image = decode(bytes, ProfileImageVariant.AVATAR, MAX_AVATAR_DIMENSION)?.asImageBitmap() ?: return null
         val published =
             synchronized(lock) {
                 cacheLifetime.isCurrent(lifetime).also { current -> if (current) putCached(key, image) }
@@ -343,17 +410,151 @@ object AvatarImageLoader {
         return image.takeIf { published }
     }
 
-    private fun decode(bytes: ByteArray): android.graphics.Bitmap? {
+    private fun decode(
+        bytes: ByteArray,
+        variant: ProfileImageVariant,
+        maxDimension: Int,
+    ): android.graphics.Bitmap? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        val target = boundedDecodeDimension(bounds.outWidth, bounds.outHeight, maxDimension)
         val options =
             BitmapFactory.Options().apply {
-                inSampleSize = avatarDecodeSampleSize(bounds.outWidth, bounds.outHeight, MAX_AVATAR_DIMENSION)
+                inSampleSize = profileDecodeSampleSize(bounds.outWidth, bounds.outHeight, variant, target)
             }
         val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options) ?: return null
-        return scaleAvatarBitmapToMaxDimension(decoded, MAX_AVATAR_DIMENSION)
+        return scaleAvatarBitmapToMaxDimension(decoded, target)
     }
+}
+
+/** The two decode policies the shared profile-image loader serves (#2762). */
+internal enum class ProfileImageVariant {
+    AVATAR,
+    BANNER,
+}
+
+/**
+ * One profile-image fetch: where the bytes come from, and how large the decode may be.
+ *
+ * [cacheKey] carries the variant and target bucket, so a cached avatar cannot satisfy a banner
+ * request and two banner requests only share a fetch when their decodes would be identical.
+ */
+internal data class ProfileImageRequest(
+    val url: String,
+    val variant: ProfileImageVariant,
+    val maxDimension: Int,
+    val maxBytes: Int,
+) {
+    val cacheKey: String get() = profileImageCacheKey(url, variant, maxDimension)
+}
+
+/** Marks a banner cache key, so the partition an entry belongs to can be read back off its key. */
+private const val BANNER_CACHE_KEY_PREFIX = "banner:"
+
+/** Avatar entries keep the bare URL, so durable seeds and every existing caller are unchanged. */
+internal fun profileImageCacheKey(
+    url: String,
+    variant: ProfileImageVariant,
+    maxDimension: Int,
+): String =
+    when (variant) {
+        ProfileImageVariant.AVATAR -> url
+        ProfileImageVariant.BANNER -> "$BANNER_CACHE_KEY_PREFIX$maxDimension $url"
+    }
+
+/** The variant [cacheKey] was built for; an avatar key is the bare profile-image URL. */
+internal fun profileImageVariantOf(cacheKey: String): ProfileImageVariant =
+    if (cacheKey.startsWith(BANNER_CACHE_KEY_PREFIX)) {
+        ProfileImageVariant.BANNER
+    } else {
+        ProfileImageVariant.AVATAR
+    }
+
+/**
+ * The loader's in-memory cache, split into one byte budget per decode variant.
+ *
+ * Separate keys stop a banner request from being *answered* by an avatar-sized bitmap, but on one
+ * shared LRU they would not stop it from *evicting* one: a banner entry can be worth eight avatars,
+ * so a few of them walking through the cache would push the avatar working set out by ordinary
+ * recency, and #2762 requires the avatar ceiling to stay exactly where it was. Two budgets make
+ * that structural rather than hopeful — a banner entry can only ever evict banner entries. Callers
+ * still see one cache and keep passing the key they already built.
+ */
+internal class PartitionedProfileImageCache(
+    avatarBytes: Int,
+    bannerBytes: Int,
+) {
+    private val avatars = byteBudgetedCache(avatarBytes)
+    private val banners = byteBudgetedCache(bannerBytes)
+
+    /** The image held for [cacheKey], looked up only in the partition its variant owns. */
+    fun get(cacheKey: String): ImageBitmap? = partitionFor(cacheKey).get(cacheKey)
+
+    /** Publishes [image] under [cacheKey], charging it to its own variant's budget. */
+    fun put(
+        cacheKey: String,
+        image: ImageBitmap,
+    ) {
+        partitionFor(cacheKey).put(cacheKey, image)
+    }
+
+    /** Drops every entry of every variant, for account teardown. */
+    fun evictAll() {
+        avatars.evictAll()
+        banners.evictAll()
+    }
+
+    /** Bytes currently charged to [variant]'s budget, so each ceiling can be asserted directly. */
+    fun byteSize(variant: ProfileImageVariant): Int = partition(variant).size()
+
+    private fun partitionFor(cacheKey: String) = partition(profileImageVariantOf(cacheKey))
+
+    private fun partition(variant: ProfileImageVariant) =
+        when (variant) {
+            ProfileImageVariant.AVATAR -> avatars
+            ProfileImageVariant.BANNER -> banners
+        }
+
+    private companion object {
+        /** An LRU bounded by the decoded bytes it holds rather than by entry count. */
+        fun byteBudgetedCache(maxBytes: Int) =
+            object : LruCache<String, ImageBitmap>(maxBytes) {
+                override fun sizeOf(
+                    key: String,
+                    value: ImageBitmap,
+                ): Int = value.asAndroidBitmap().byteCount.coerceAtLeast(1)
+            }
+    }
+}
+
+/** Decoded pixels are ARGB_8888, so a target's memory cost is four bytes each. */
+private const val DECODED_BYTES_PER_PIXEL = 4
+
+/** No single decode may exceed this, whatever aspect ratio the source has. */
+internal const val MAX_PROFILE_IMAGE_DECODED_BYTES: Int = 8 * 1024 * 1024
+
+/**
+ * The largest long-edge target at or below [maxDimension] whose decode fits the byte budget.
+ *
+ * The dimension cap alone bounds a 2:1 banner, but a near-square source at the same long edge costs
+ * twice as much, so the budget halves the target until the decode is affordable. For an avatar's
+ * 512px cap the budget never binds, which keeps avatar memory exactly where it was.
+ */
+internal fun boundedDecodeDimension(
+    width: Int,
+    height: Int,
+    maxDimension: Int,
+    maxDecodedBytes: Int = MAX_PROFILE_IMAGE_DECODED_BYTES,
+): Int {
+    var limit = maxDimension
+    while (limit > 1) {
+        val (scaledWidth, scaledHeight) = avatarScaledDimensions(width, height, limit)
+        val decodedBytes = scaledWidth.toLong() * scaledHeight * DECODED_BYTES_PER_PIXEL
+        if (decodedBytes <= maxDecodedBytes) return limit
+        limit /= 2
+    }
+    return 1
 }
 
 internal sealed interface AvatarByteFetchResult {
@@ -509,6 +710,33 @@ internal class AvatarFailureExpiryCache(
     }
 }
 
+/**
+ * Bounded long-edge target for a banner rendered [requestedWidthPx] wide.
+ *
+ * Rounding up to a shared bucket means two surfaces whose measured widths differ by a few pixels
+ * agree on one decode — and therefore one cache entry and one in-flight fetch — instead of racing
+ * two. The floor is the avatar cap, so a banner is never decoded smaller than it already was, and
+ * the ceiling keeps an implausibly wide window from asking for an unbounded bitmap.
+ */
+internal fun profileBannerDecodeDimension(
+    requestedWidthPx: Int,
+    bucketPx: Int = PROFILE_BANNER_TARGET_BUCKET_PX,
+    minimumPx: Int = PROFILE_AVATAR_MAX_DIMENSION,
+    maximumPx: Int = PROFILE_BANNER_MAX_DIMENSION,
+): Int {
+    val buckets = (requestedWidthPx.coerceAtLeast(0) + bucketPx - 1) / bucketPx
+    return (buckets * bucketPx).coerceIn(minimumPx, maximumPx)
+}
+
+/** Mirrors the loader's own avatar cap, so a banner can never be decoded below it. */
+internal const val PROFILE_AVATAR_MAX_DIMENSION: Int = 512
+
+/** Hard upper bound on a banner's decoded long edge, whatever width a window reports. */
+internal const val PROFILE_BANNER_MAX_DIMENSION: Int = 1536
+
+/** Rendered widths round up to this bucket so neighbouring surfaces coalesce onto one decode. */
+internal const val PROFILE_BANNER_TARGET_BUCKET_PX: Int = 256
+
 internal fun avatarDecodeSampleSize(
     width: Int,
     height: Int,
@@ -521,6 +749,53 @@ internal fun avatarDecodeSampleSize(
     }
     return sampleSize
 }
+
+/** A transient decode may exceed the final budget while it is being scaled, but only this far. */
+private const val TRANSIENT_DECODE_BUDGET_MULTIPLIER = 2
+
+/**
+ * Power-of-two sample whose decode still covers [targetDimension] on the long edge.
+ *
+ * [avatarDecodeSampleSize] samples until both edges are at or below its cap, which is right for a
+ * ceiling and wrong for a target: a 4000px source sampled down to 1000px for a 1280px banner is then
+ * upscaled again by the very surface that asked for 1280, which is the blur this avoids. Keeping one
+ * sampling step in hand lets [scaleAvatarBitmapToMaxDimension] land on the target exactly. The
+ * transient decode that step buys is itself bounded, so a very large source steps back down instead.
+ */
+internal fun bannerDecodeSampleSize(
+    width: Int,
+    height: Int,
+    targetDimension: Int,
+    maxTransientBytes: Int = MAX_PROFILE_IMAGE_DECODED_BYTES * TRANSIENT_DECODE_BUDGET_MULTIPLIER,
+): Int {
+    val longEdge = maxOf(width, height)
+    if (longEdge <= 0 || targetDimension <= 0) return 1
+    var sampleSize = 1
+    while (longEdge / (sampleSize * 2) >= targetDimension) sampleSize *= 2
+    while (sampleSize < longEdge && sampledDecodedBytes(width, height, sampleSize) > maxTransientBytes) {
+        sampleSize *= 2
+    }
+    return sampleSize
+}
+
+/** Decoded ARGB cost of [width] x [height] sampled by [sampleSize]. */
+private fun sampledDecodedBytes(
+    width: Int,
+    height: Int,
+    sampleSize: Int,
+): Long = (width / sampleSize).toLong() * (height / sampleSize) * DECODED_BYTES_PER_PIXEL
+
+/** Each variant's sampling policy: an avatar honours a ceiling, a banner covers its target. */
+internal fun profileDecodeSampleSize(
+    width: Int,
+    height: Int,
+    variant: ProfileImageVariant,
+    targetDimension: Int,
+): Int =
+    when (variant) {
+        ProfileImageVariant.AVATAR -> avatarDecodeSampleSize(width, height, targetDimension)
+        ProfileImageVariant.BANNER -> bannerDecodeSampleSize(width, height, targetDimension)
+    }
 
 private sealed interface AvatarRequest {
     suspend fun await(waitForDetachedFetch: Boolean): ImageBitmap?
