@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.common
 
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Keyboard
@@ -35,6 +36,7 @@ internal fun TextEntryEmojiAction(
     modifier: Modifier = Modifier,
     togglesKeyboard: Boolean = false,
     iconSize: Dp = TextEntryEmojiIconSize,
+    iconOffsetY: Dp = 0.dp,
     emojiIcon: Painter? = null,
 ) {
     val showKeyboard = pickerOpen && togglesKeyboard
@@ -78,7 +80,7 @@ internal fun TextEntryEmojiAction(
                 stringResource(
                     if (showKeyboard) R.string.show_keyboard else R.string.open_emoji_picker,
                 ),
-            modifier = Modifier.size(iconSize),
+            modifier = Modifier.size(iconSize).offset(y = iconOffsetY),
         )
     }
 }

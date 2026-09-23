@@ -1928,7 +1928,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/TextEntryEmojiAction.kt",
         "anchor": "fun TextEntryEmojiAction(",
         "test_ids": [
-          "AXY-001"
+          "AXY-001",
+          "CON-019"
         ]
       },
       {
@@ -2779,7 +2780,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerActionDisc.kt",
         "anchor": "fun ComposerActionDisc(",
         "test_ids": [
-          "CON-001"
+          "CON-001",
+          "CON-019"
         ]
       },
       {

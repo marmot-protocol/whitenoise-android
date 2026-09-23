@@ -118,6 +118,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
@@ -652,6 +653,8 @@ internal fun ComposerPill(
         MaterialTheme.typography.bodyLarge.copy(
             color = MaterialTheme.colorScheme.onSurface,
             textDirection = TextDirection.ContentOrLtr,
+            // Edit needs less leading around each line without changing normal drafts or replies.
+            lineHeight = if (compactEditTextSpacing) 20.sp else MaterialTheme.typography.bodyLarge.lineHeight,
         )
     val textMeasurer = rememberTextMeasurer()
     val editingRequested =
@@ -919,7 +922,7 @@ internal fun ComposerPill(
                                             editingProgress.value,
                                         )
                                     },
-                                    top = { if (compactEditTextSpacing) 4.dp else CompactEditorTopInset },
+                                    top = { if (compactEditTextSpacing) 0.dp else CompactEditorTopInset },
                                     end = {
                                         interpolateDp(
                                             compactTrailingReserve,
@@ -1168,6 +1171,7 @@ internal fun ComposerPill(
                                 togglesKeyboard = true,
                                 modifier = Modifier.width(32.dp).height(48.dp),
                                 iconSize = 24.dp,
+                                iconOffsetY = if (compactEditTextSpacing) (-4).dp else 0.dp,
                                 emojiIcon = painterResource(R.drawable.ic_emoji_smileys),
                             )
                         }

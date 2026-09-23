@@ -1497,6 +1497,7 @@ internal fun ComposerBar(
                                 contentColor = actionColors.content,
                                 description = stringResource(R.string.send),
                                 icon = R.drawable.ic_arrow_upward,
+                                visualOffsetY = if (editingMessageId != null) (-4).dp else 0.dp,
                             )
                         }
                     }
