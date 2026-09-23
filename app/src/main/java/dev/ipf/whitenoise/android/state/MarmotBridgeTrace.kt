@@ -14,6 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 internal object MarmotTraceSection {
     const val CREATE_GROUP = "WhiteNoise.marmot.createGroup"
+    const val PREWARM_KEY_PACKAGES = "WhiteNoise.marmot.prewarmGroupMemberKeyPackages"
     const val ACCEPT_GROUP_INVITE = "WhiteNoise.marmot.acceptGroupInvite"
     const val REFRESH_GROUP_ROSTER = "WhiteNoise.marmot.refreshMembers.roster"
     const val INVITE_MEMBERS = "WhiteNoise.marmot.inviteMembers"
@@ -45,6 +46,7 @@ internal object MarmotTraceSection {
     val hostTimingNames =
         mapOf(
             CREATE_GROUP to "app_group_create",
+            PREWARM_KEY_PACKAGES to "app_group_member_key_package_prewarm",
             ACCEPT_GROUP_INVITE to "app_invite_accept",
             REFRESH_GROUP_ROSTER to "app_group_roster",
             INVITE_MEMBERS to "app_members_invite",

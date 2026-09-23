@@ -32,6 +32,7 @@ internal fun rememberRecipientResolution(
     input: String,
     appState: WhiteNoiseAppState,
     retryKey: Int = 0,
+    onStage: (RecipientResolutionStage) -> Unit = {},
 ): RecipientResolution {
     val trimmed = input.trim()
     val accountRef = appState.activeAccountRef
@@ -45,8 +46,10 @@ internal fun rememberRecipientResolution(
         if (trimmed.isEmpty() || isPlainNameQuery(trimmed, appState::accountIdHexForMention)) {
             resolving = false
             resolvedHex = null
+            onStage(RecipientResolutionStage.Cleared)
             return@LaunchedEffect
         }
+        onStage(RecipientResolutionStage.IdentifierStarted)
         resolving = true
         resolvedHex = null
         val hex =
@@ -69,8 +72,19 @@ internal fun rememberRecipientResolution(
             return@LaunchedEffect
         }
         resolvedHex = hex
-        if (hex != null) appState.refreshProfile(hex)
         resolving = false
+        if (hex == null) {
+            onStage(RecipientResolutionStage.Invalid)
+            return@LaunchedEffect
+        }
+        onStage(RecipientResolutionStage.IdentifierResolved)
+        onStage(RecipientResolutionStage.ProfileRefreshStarted)
+        appState.refreshProfile(hex)
+        currentCoroutineContext().ensureActive()
+        val stillOwned = appState.activeAccountRef == accountRef && appState.runtimeGeneration == runtimeGeneration
+        if (stillOwned && !appState.signOutInProgress && !appState.wipeInProgress) {
+            onStage(RecipientResolutionStage.ProfileRefreshFinished)
+        }
     }
 
     val profile = resolvedHex?.let { appState.userProfile(it) }
@@ -89,6 +103,16 @@ internal fun rememberRecipientResolution(
         recipientPreviewState(trimmed.isNotEmpty(), resolving, resolvedHex, hasProfile),
         resolvedHex,
     )
+}
+
+/** Privacy-safe milestones; no query or identity value is recorded. */
+internal enum class RecipientResolutionStage {
+    Cleared,
+    IdentifierStarted,
+    IdentifierResolved,
+    Invalid,
+    ProfileRefreshStarted,
+    ProfileRefreshFinished,
 }
 
 /**
@@ -169,9 +193,9 @@ internal sealed interface RecipientPreviewState {
     data object Empty : RecipientPreviewState
 
     /**
-     * The identifier is being resolved (a NIP-05 `/.well-known` lookup is in
-     * flight, or the resolved key's kind:0 is still being fetched). Show a
-     * spinner + "Resolving…" text.
+     * The identifier itself is being resolved (for example, a NIP-05
+     * `/.well-known` lookup is in flight). Profile enrichment never keeps a
+     * locally decoded npub in this state.
      */
     data object Resolving : RecipientPreviewState
 

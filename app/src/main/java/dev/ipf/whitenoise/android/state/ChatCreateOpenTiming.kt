@@ -23,6 +23,17 @@ internal class ChatCreateOpenTiming private constructor() {
         private const val NANOS_PER_MS = 1_000_000L
 
         const val STAGE_CONFIRM_TAP = "confirm_tap"
+        const val STAGE_IDENTIFIER_INPUT = "identifier_input"
+        const val STAGE_IDENTIFIER_RESOLVED = "identifier_resolved"
+        const val STAGE_IDENTIFIER_INVALID = "identifier_invalid"
+        const val STAGE_RECIPIENT_REPLACED = "recipient_replaced"
+        const val STAGE_RECIPIENT_ROW_READY = "recipient_row_ready"
+        const val STAGE_PROFILE_REFRESH_START = "profile_refresh_start"
+        const val STAGE_PROFILE_REFRESH_RETURN = "profile_refresh_return"
+        const val STAGE_PROFILE_DISPLAYED = "profile_displayed"
+        const val STAGE_KEY_PACKAGE_PREWARM_START = "key_package_prewarm_start"
+        const val STAGE_KEY_PACKAGE_PREWARM_RETURN = "key_package_prewarm_return"
+        const val STAGE_KEY_PACKAGE_PREWARM_FAILED = "key_package_prewarm_failed"
         const val STAGE_EXISTING_DM_LOOKUP_START = "existing_dm_lookup_start"
         const val STAGE_EXISTING_DM_LOOKUP_RETURN = "existing_dm_lookup_return"
         const val STAGE_EXISTING_DM_LOOKUP_FAILED = "existing_dm_lookup_failed"
@@ -37,5 +48,27 @@ internal class ChatCreateOpenTiming private constructor() {
         const val STAGE_CANCELLED = "create_cancelled"
 
         fun begin(): ChatCreateOpenTiming = ChatCreateOpenTiming()
+    }
+}
+
+/** Owns one end-to-end recipient/create/open trace without adding more state to AppState. */
+internal class ChatCreateOpenTimingTracker {
+    private var timing: ChatCreateOpenTiming? = null
+
+    fun begin(
+        stage: String,
+        restart: Boolean,
+    ) {
+        if (restart || timing == null) timing = ChatCreateOpenTiming.begin()
+        timing?.mark(stage)
+    }
+
+    fun mark(stage: String) = timing?.mark(stage)
+
+    fun isActive(): Boolean = timing != null
+
+    fun finish(stage: String) {
+        mark(stage)
+        timing = null
     }
 }

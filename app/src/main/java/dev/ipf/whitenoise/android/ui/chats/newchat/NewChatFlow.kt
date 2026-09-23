@@ -209,6 +209,7 @@ internal suspend fun attemptStartProfileChat(
     }
 }
 
+@Suppress("LongParameterList") // Shared create/open state machine exposes injectable native boundaries.
 internal suspend fun attemptOpenOrStartProfileChat(
     npub: String,
     progressHex: String,
@@ -220,10 +221,13 @@ internal suspend fun attemptOpenOrStartProfileChat(
     displayName: (String) -> String,
     markCreateOpenStage: (String) -> Unit = {},
     abandonCreateOpenTiming: (String) -> Unit = {},
+    directChatLookupAlreadyStarted: Boolean = false,
 ): StartChatAttemptResult {
     val existingChatResult =
         if (retryGroupIdHex == null) {
-            markCreateOpenStage(ChatCreateOpenTiming.STAGE_EXISTING_DM_LOOKUP_START)
+            if (!directChatLookupAlreadyStarted) {
+                markCreateOpenStage(ChatCreateOpenTiming.STAGE_EXISTING_DM_LOOKUP_START)
+            }
             val resolution =
                 try {
                     resolveDirectChat()
@@ -231,7 +235,9 @@ internal suspend fun attemptOpenOrStartProfileChat(
                     abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_CANCELLED)
                     throw cancelled
                 }
-            markCreateOpenStage(ChatCreateOpenTiming.STAGE_EXISTING_DM_LOOKUP_RETURN)
+            if (!directChatLookupAlreadyStarted) {
+                markCreateOpenStage(ChatCreateOpenTiming.STAGE_EXISTING_DM_LOOKUP_RETURN)
+            }
             when {
                 resolution.item != null ->
                     StartChatAttemptResult.Open(item = resolution.item, newlyCreated = false)
@@ -369,6 +375,8 @@ private fun NewMessageAccountScreen(
                 sameOwner && !appState.signOutInProgress && !appState.wipeInProgress
             }
         }
+    val preparationCoordinator = remember(session) { NewMessageRecipientPreparationCoordinator() }
+    var profileTimingKey by remember(session) { mutableStateOf<NewMessageRecipientPreparationKey?>(null) }
     val queryState = rememberTextFieldState()
     var searchRetry by remember { mutableIntStateOf(0) }
     val query = queryState.text.toString()
@@ -379,6 +387,7 @@ private fun NewMessageAccountScreen(
     var startChatError by remember { mutableStateOf<StartChatErrorUiState?>(null) }
     DisposableEffect(session) {
         onDispose {
+            preparationCoordinator.clear()
             session.dispose()
             scannerSession = null
         }
@@ -448,7 +457,26 @@ private fun NewMessageAccountScreen(
             deriveRecipientCandidates(appState, activeHex)
         }
     val identifierQuery = query.isNotBlank() && !isPlainNameQuery(query, appState::accountIdHexForMention)
-    val resolution = rememberRecipientResolution(query, appState, retryKey = searchRetry)
+    val resolution =
+        rememberRecipientResolution(query, appState, retryKey = searchRetry) { stage ->
+            when (stage) {
+                RecipientResolutionStage.Cleared ->
+                    appState.abandonChatCreateOpenTiming(ChatCreateOpenTiming.STAGE_RECIPIENT_REPLACED)
+                RecipientResolutionStage.IdentifierStarted ->
+                    appState.beginChatCreateOpenTiming(
+                        ChatCreateOpenTiming.STAGE_IDENTIFIER_INPUT,
+                        restart = true,
+                    )
+                RecipientResolutionStage.IdentifierResolved ->
+                    appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_IDENTIFIER_RESOLVED)
+                RecipientResolutionStage.Invalid ->
+                    appState.abandonChatCreateOpenTiming(ChatCreateOpenTiming.STAGE_IDENTIFIER_INVALID)
+                RecipientResolutionStage.ProfileRefreshStarted ->
+                    appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_PROFILE_REFRESH_START)
+                RecipientResolutionStage.ProfileRefreshFinished ->
+                    appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_PROFILE_REFRESH_RETURN)
+            }
+        }
     val userSearch by key(query, searchRetry, appState.relationshipRevision) {
         rememberRecipientUserSearchState(query, appState, retryKey = searchRetry)
     }
@@ -469,6 +497,54 @@ private fun NewMessageAccountScreen(
             }
         }
 
+    val resolvedHex = resolution.resolvedHex?.takeUnless { it.equals(activeHex, ignoreCase = true) }
+    val identifierPreparationKey =
+        if (identifierQuery && accountRef != null && resolvedHex != null) {
+            NewMessageRecipientPreparationKey(
+                accountRef = accountRef,
+                runtimeGeneration = runtimeGeneration,
+                query = query,
+                targetReference = appState.npub(resolvedHex),
+                retryKey = searchRetry,
+            )
+        } else {
+            null
+        }
+    LaunchedEffect(identifierPreparationKey) {
+        val key = identifierPreparationKey
+        if (key == null) {
+            preparationCoordinator.clear()
+            profileTimingKey = null
+            return@LaunchedEffect
+        }
+        appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_RECIPIENT_ROW_READY)
+        val preparation =
+            preparationCoordinator.prepare(
+                scope = this,
+                key = key,
+                prewarm = {
+                    session.currentValue {
+                        appState.prewarmNewMessageRecipient(key.accountRef, key.targetReference)
+                    }
+                },
+                lookup = {
+                    session.currentValue {
+                        appState.resolveExistingDirectChat(key.targetReference)
+                    }
+                },
+                markStage = { if (session.isCurrent()) appState.markChatCreateOpenStage(it) },
+            )
+        preparation.awaitCompletion()
+    }
+    val resolvedProfileAvailable = resolvedHex?.let(appState::userProfile) != null
+    LaunchedEffect(identifierPreparationKey, appState.profileRevisionForCompose, resolvedProfileAvailable) {
+        val key = identifierPreparationKey
+        if (key != null && resolvedProfileAvailable && profileTimingKey != key) {
+            profileTimingKey = key
+            appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_PROFILE_DISPLAYED)
+        }
+    }
+
     /** Opens the existing direct chat with the recipient or creates it, tracking progress by hex. */
     @Suppress("LongMethod") // Native attempt callbacks share the same captured recipient and lifetime.
     fun openOrCreateChat(
@@ -484,6 +560,10 @@ private fun NewMessageAccountScreen(
         creatingHex = hexForProgress
         scannerSession = null
         appState.beginChatCreateOpenTiming()
+        val preparedLookup =
+            identifierPreparationKey
+                ?.takeIf { retryGroupIdHex == null && existingDmGroupIdHex == null && it.targetReference == npub }
+                ?.let(preparationCoordinator::current)
         appState.launchMutation {
             try {
                 session.ensureCurrent()
@@ -495,22 +575,23 @@ private fun NewMessageAccountScreen(
                             recipientName = recipientName,
                             retryGroupIdHex = retryGroupIdHex,
                             resolveDirectChat = {
-                                session.currentValue {
-                                    resolveNewMessageDirectChat(
-                                        npub = npub,
-                                        existingDmGroupIdHex = existingDmGroupIdHex,
-                                        provenanceDirectChat = { provenance, target ->
-                                            session.currentValue {
-                                                appState.resolveProvenanceDirectChat(provenance, target)
-                                            }
-                                        },
-                                        existingDirectChat = { target ->
-                                            session.currentValue {
-                                                appState.resolveExistingDirectChat(target, existingDmGroupIdHex)
-                                            }
-                                        },
-                                    )
-                                }
+                                preparedLookup?.let { session.currentValue(it::directChatResolution) }
+                                    ?: session.currentValue {
+                                        resolveNewMessageDirectChat(
+                                            npub = npub,
+                                            existingDmGroupIdHex = existingDmGroupIdHex,
+                                            provenanceDirectChat = { provenance, target ->
+                                                session.currentValue {
+                                                    appState.resolveProvenanceDirectChat(provenance, target)
+                                                }
+                                            },
+                                            existingDirectChat = { target ->
+                                                session.currentValue {
+                                                    appState.resolveExistingDirectChat(target, existingDmGroupIdHex)
+                                                }
+                                            },
+                                        )
+                                    }
                             },
                             createGroup = { target ->
                                 session.currentValue { appState.createProfileChatGroup(target) }
@@ -523,6 +604,7 @@ private fun NewMessageAccountScreen(
                             abandonCreateOpenTiming = {
                                 if (session.isCurrent()) appState.abandonChatCreateOpenTiming(it)
                             },
+                            directChatLookupAlreadyStarted = preparedLookup != null,
                         )
                 ) {
                     is StartChatAttemptResult.Open ->
@@ -548,7 +630,6 @@ private fun NewMessageAccountScreen(
         )
     }
 
-    val resolvedHex = resolution.resolvedHex?.takeUnless { it.equals(activeHex, ignoreCase = true) }
     val displayedCandidates =
         if (identifierQuery) {
             resolvedHex

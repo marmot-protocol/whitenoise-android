@@ -24,6 +24,19 @@ import org.junit.Test
 
 class RecipientResolutionTest {
     @Test
+    fun locallyDecodedRecipientIsActionableBeforeProfileMetadataArrives() {
+        assertEquals(
+            RecipientPreviewState.NoProfile,
+            recipientPreviewState(
+                hasInput = true,
+                resolving = false,
+                resolvedHex = "b".repeat(64),
+                hasProfile = false,
+            ),
+        )
+    }
+
+    @Test
     fun provenanceOpensImplicitDmWhenAuthoritativeRosterMatches() =
         runTest {
             val alice = "a".repeat(64)
