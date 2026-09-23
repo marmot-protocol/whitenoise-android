@@ -35,18 +35,31 @@ local variant is the runner's explicit opt-in before its cold-start measurement.
 
 ### Conversation history pages
 
-`op=chat_history_page` covers one page of older history, the operation behind a
-report that scrolling up is slow. Its phases are, in order:
+`op=chat_history_page` covers one page of history in either direction: older,
+the operation behind a report that scrolling up is slow, and newer, the page that
+brings a saturated window back toward the live tail. Its phases are, in order:
 
 | Phase | Layer | What it measures |
 | --- | --- | --- |
-| `page_anchor` | `ffi` | Reporting the reader's oldest visible row as the window anchor. Absent when the row is not one MDK retains. |
+| `page_anchor` | `ffi` | Reporting the reader's oldest visible row as the window anchor. Older pages only; absent when the row is not one MDK retains. |
 | `page_window` | `ffi` | The window command itself, including any wait for a not-ready window. |
 | `page_apply` | `android` | Folding the returned window into the timeline; `count` is the rows it carried. |
-| `page_complete` | `android` | The whole page. `result=failure` means the engine did not answer — a deadline or an exhausted not-ready budget — and the reader was left a retry row. |
+| `page_complete` | `android` | The whole page. `result=failure` means the engine did not answer — a deadline or an exhausted not-ready budget — and the reader was left a retry row. `result=dropped` means the page was cancelled before it finished, for example by the screen leaving or the subscription being replaced. |
 
 A `page_window` far larger than `page_apply` is the engine taking time to reach
-the request, not the app taking time to render it.
+the request, not the app taking time to render it. A `page_anchor` with no
+`page_complete` after it is a page still waiting on the engine: a cancelled page
+closes as `dropped`, and a page the engine never answers closes as `failure`
+when the window deadline passes.
+
+The same page is also visible in a Perfetto trace as async slices under
+`WhiteNoise.conversation.page.*` — `window`, `prepare` (the off-main-thread row
+preparation) and `apply` (preparation plus the main-thread commit) — together
+with three zero-length event slices the conversation screen emits:
+`edgeStop` when the list comes to rest on its oldest row with more history
+behind it and no page landing, `runwayKept` when a page lands while the reader
+still has rows before the previous edge, and `edgeReached` when the previous
+edge was already on screen. These feed the paging Macrobenchmark below.
 
 To validate a slow journey on a staging device, enable the switch, reproduce one
 operation, then open **App info → View logs** and filter for `WNPerf`. Confirm the
@@ -365,6 +378,43 @@ conversation journey takes the group it opens from `$GROUP_NAME`.
 BENCHMARK_CLASS_FILTER="dev.ipf.whitenoise.android.benchmark.ChatListScrollBenchmark#chatListScrollBaselineProfile" \
   scripts/run-performance-benchmarks.sh
 ```
+
+### Conversation paging journeys
+
+`ConversationPagingBenchmark` measures history paging the way a reader meets it:
+long flings that cross several 50-row page boundaries and the 200-row window
+cap, in both directions, plus the two moments a bounded window is most visible.
+It needs a fixture conversation holding **at least 300 messages**; a debuggable
+build can prepare one from **Settings → Developer Tools → Seed conversation
+fixture**, which sends numbered synthetic messages into a chat you pick — use a
+private test group, since every member receives them. Record that group's exact
+display name as `GROUP_NAME`.
+
+```bash
+BENCHMARK_CLASS_FILTER="dev.ipf.whitenoise.android.benchmark.ConversationPagingBenchmark" \
+  scripts/run-performance-benchmarks.sh "$GROUP_NAME"
+```
+
+| Method | Journey |
+| --- | --- |
+| `deepOlderFling` | Twelve flicks into history without pausing. |
+| `returnFlingAfterDeepHistory` | The same distance back toward the newest row, through the newer-page path. |
+| `jumpToNewestAfterSaturation` | Jump-to-newest once the deep fling has evicted the tail from the bounded window. |
+| `momentumHandoff` | Six flicks 150 ms apart, each landing while the previous fling still coasts. |
+| `olderFlingWhileEngineCatchesUp` | The deep fling started right after a cold process launch, while sync catch-up owns the engine. |
+
+Beyond the scroll metrics below, each method reports the paging slices from the
+[Conversation history pages](#conversation-history-pages) section: `pageCount`
+(boundaries actually crossed — a journey that reports zero did not test paging),
+`pageWindowMs`/`pageWindowMaxMs` (the engine's share), `pagePrepareMs` and
+`pageApplyMs`/`pageApplyMaxMs` (the app's share, preparation and main-thread
+commit), and three counts that should stay at zero for paging to be invisible:
+`edgeStopCount` (the list rested on its oldest row with more history behind it),
+`edgeReachedCount` (a page landed after the reader had already reached the old
+edge) against `runwayKeptCount` (a page landed with rows to spare). CPU and
+memory energy come from the same system-wide rails as the recovery benchmark;
+compare a paging journey against the same fling inside an already-loaded window
+so paging is charged only for what it adds to drawing, and never across devices.
 
 Both scroll benchmarks report frame timing, a `journeyDurationMs` trace section,
 and peak process memory for the measured window: `memoryHeapSizeKb`,

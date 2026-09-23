@@ -596,6 +596,14 @@
     <string name="developer_mode">Developer mode</string>
     <string name="developer_mode_subtitle">Shows diagnostics and MLS internals.</string>
     <string name="developer_testing_only">For development and testing only</string>
+    <string name="developer_seed_fixture">Seed conversation fixture</string>
+    <string name="developer_seed_fixture_subtitle">Send synthetic messages to one chat for paging benchmarks</string>
+    <string name="seed_fixture_title">Seed conversation fixture</string>
+    <string name="seed_fixture_detail">Sends numbered synthetic messages into the chosen chat as real messages from this account. Use a private test group; the other members will receive every one.</string>
+    <string name="seed_fixture_count">Messages to send</string>
+    <string name="seed_fixture_start">Start</string>
+    <string name="seed_fixture_progress">%1$d of %2$d sent · %3$d failed</string>
+    <string name="seed_fixture_no_groups">This account has no chats to seed.</string>
     <string name="developer_testing_only_detail">These tools can expose technical information and change how the app behaves.</string>
     <string name="developer_debugging">Debugging</string>
     <string name="diagnostics">Diagnostics</string>
