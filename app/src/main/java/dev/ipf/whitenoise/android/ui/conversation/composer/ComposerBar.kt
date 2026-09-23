@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imeAnimationTarget
 import androidx.compose.foundation.layout.imePadding
@@ -1079,9 +1080,9 @@ internal fun ComposerBar(
                                         Modifier
                                             .padding(
                                                 start = 8.dp,
-                                                top = 8.dp,
+                                                top = if (editingMessageId != null) 4.dp else 8.dp,
                                                 end = 8.dp,
-                                                bottom = if (editingMessageId != null) 4.dp else 8.dp,
+                                                bottom = if (editingMessageId != null) 0.dp else 8.dp,
                                             ).then(
                                                 if (editingMessageId != null) {
                                                     Modifier.clip(MaterialTheme.shapes.large)
@@ -1096,7 +1097,7 @@ internal fun ComposerBar(
                                                     .fillMaxWidth()
                                                     .clip(MaterialTheme.shapes.large)
                                                     .background(MaterialTheme.colorScheme.surfaceContainer)
-                                                    .padding(horizontal = 10.dp, vertical = 2.dp),
+                                                    .padding(horizontal = 10.dp),
                                                 verticalAlignment = Alignment.CenterVertically,
                                             ) {
                                                 Icon(
@@ -1114,6 +1115,8 @@ internal fun ComposerBar(
                                                 ComposerAccessoryRemoveButton(
                                                     onClick = onCancelEdit,
                                                     description = stringResource(R.string.cancel_edit),
+                                                    // Clear the top resize strip without adding height to the Edit bar.
+                                                    modifier = Modifier.offset(y = 4.dp),
                                                 )
                                             }
                                         } else if (replyingTo != null) {
@@ -1437,6 +1440,7 @@ internal fun ComposerBar(
                                 replyingTo != null ||
                                 dictationActiveInComposer ||
                                 hasPendingAttachments,
+                        compactEditTextSpacing = editingMessageId != null,
                         onMultilineControlsChanged = { composerUsesMultilineControls = it },
                         multilineControlsSuppressed = composerMultilineControlsSuppressed(automaticComposerCeiling),
                         dismissInProgress = composerDismissInProgress,

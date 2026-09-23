@@ -148,6 +148,8 @@ private val CompactEditorBottomInset = 12.dp
 private val ComposerResizeHandleWidth = 32.dp
 private val ComposerResizeHandleThickness = 4.dp
 private val ExpandedEditorBottomInset = 44.dp
+// Edit keeps the separate 48 dp action row; its icons still clear the text with this tighter inset.
+private val EditEditorBottomInset = 40.dp
 
 private const val COMPOSER_ACTION_CENTER_BIAS = 0.5f
 
@@ -411,6 +413,7 @@ internal fun ComposerPill(
     compactMeasurementReservesTrailingAction: Boolean = trailingAction != null,
     compactOuterEndInset: Dp = 0.dp,
     forceEditingLayout: Boolean = false,
+    compactEditTextSpacing: Boolean = false,
     accessoryContent: (@Composable () -> Unit)? = null,
     voiceReviewContent: (@Composable () -> Unit)? = null,
     inputContentVisible: Boolean = true,
@@ -915,9 +918,7 @@ internal fun ComposerPill(
                                             editingProgress.value,
                                         )
                                     },
-                                    top = {
-                                        CompactEditorTopInset
-                                    },
+                                    top = { if (compactEditTextSpacing) 4.dp else CompactEditorTopInset },
                                     end = {
                                         interpolateDp(
                                             compactTrailingReserve,
@@ -928,7 +929,7 @@ internal fun ComposerPill(
                                     bottom = {
                                         interpolateDp(
                                             CompactEditorBottomInset,
-                                            ExpandedEditorBottomInset,
+                                            if (compactEditTextSpacing) EditEditorBottomInset else ExpandedEditorBottomInset,
                                             editingProgress.value,
                                         )
                                     },
