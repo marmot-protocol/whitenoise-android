@@ -55,8 +55,9 @@ class StateSourceSizeCeilingTest {
         // PR #2566 adds 4 lines for lifecycle-local provider discovery.
         // Navigation-resilient dictation adds 30 lines for atomic reply ownership,
         // claim release, and detached dispatch.
-        // PR #2792 adds the covered shared send-phase registry and commit-lock helpers.
-        const val APP_STATE_MAX_LINES = 10402
+        // PR #2792 adds the covered shared send-phase registry and commit-lock helpers;
+        // current base adds one line of fresh-group recovery state. Keep merged size exact.
+        const val APP_STATE_MAX_LINES = 10403
 
         /** Counts physical source lines with the same trailing-newline semantics as `wc -l`. */
         internal fun sourceLineCount(file: File): Int = file.bufferedReader().useLines { lines -> lines.count() }

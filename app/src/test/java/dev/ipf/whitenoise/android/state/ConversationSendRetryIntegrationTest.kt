@@ -820,12 +820,13 @@ class ConversationSendRetryIntegrationTest {
             assertTrue(controller.deleteCapabilityFor(pending).canDeleteAtAll)
             assertEquals(null, appState.draftFor(GROUP_ID))
             assertTrue(controller.deleteMessage(pending, presentFailure = false))
+            val cancellationAtMs = testScheduler.currentTime
             val second = async { controller.send("next") }
-            runCurrent()
-            assertEquals("offline draft", appState.draftFor(GROUP_ID))
-            assertEquals(listOf("offline draft", "next"), published)
             first.await()
             second.await()
+            assertTrue("cancelled retry held text order through backoff", testScheduler.currentTime - cancellationAtMs < SEND_RETRY_BACKOFF_MS)
+            assertEquals("offline draft", appState.draftFor(GROUP_ID))
+            assertEquals(listOf("offline draft", "next"), published)
             assertEquals(1, controller.timeline.size)
             testScheduler.advanceTimeBy(60_000)
             runCurrent()
