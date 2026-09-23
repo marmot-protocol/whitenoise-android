@@ -13,6 +13,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -86,6 +87,42 @@ class NewMessageSessionTest {
             assertTrue(first.directChatResolution().createRequired)
             releasePrewarm.complete(Unit)
             first.awaitCompletion()
+        }
+
+    @Test
+    fun newChatProjectionRevisionDiscardsCompletedNegativeLookup() =
+        runTest {
+            val coordinator = NewMessageRecipientPreparationCoordinator()
+            val key = preparationKey("target")
+            val old = coordinator.prepare(backgroundScope, key, prewarm = {}, lookup = {
+                NewMessageDirectChatResolution(null, true)
+            })
+            runCurrent()
+            val fresh = coordinator.prepare(backgroundScope, key.copy(chatRevision = 1L), prewarm = {}, lookup = {
+                NewMessageDirectChatResolution(item(), false)
+            })
+            runCurrent()
+            assertNotSame(old, fresh)
+            assertEquals("canonical", fresh.directChatResolution().item?.id)
+        }
+
+    @Test
+    fun failedPreparedLookupRetriesAuthoritativeLookupOnTap() =
+        runTest {
+            val preparation = NewMessageRecipientPreparationCoordinator().prepare(
+                backgroundScope,
+                preparationKey("target"),
+                prewarm = {},
+                lookup = { error("transient lookup failure") },
+            )
+            runCurrent()
+            var freshLookups = 0
+            val result = preparedLookupOrFresh(preparation) {
+                freshLookups++
+                NewMessageDirectChatResolution(item(), false)
+            }
+            assertEquals(1, freshLookups)
+            assertEquals("canonical", result.item?.id)
         }
 
     @Test

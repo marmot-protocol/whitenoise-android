@@ -16,6 +16,7 @@ internal data class NewMessageRecipientPreparationKey(
     val query: String,
     val targetReference: String,
     val retryKey: Int,
+    val chatRevision: Long = 0L,
 )
 
 /**
@@ -40,6 +41,13 @@ internal class NewMessageRecipientPreparation internal constructor(
         lookup.cancel()
     }
 }
+
+/** Only a definitive preparation can replace an authoritative tap-time lookup. */
+internal suspend fun preparedLookupOrFresh(
+    preparation: NewMessageRecipientPreparation?,
+    fresh: suspend () -> NewMessageDirectChatResolution,
+): NewMessageDirectChatResolution =
+    preparation?.directChatResolution()?.takeIf { it.item != null || it.createRequired } ?: fresh()
 
 /** Keeps exactly one query/account-scoped preparation and cancels replaced work. */
 internal class NewMessageRecipientPreparationCoordinator {

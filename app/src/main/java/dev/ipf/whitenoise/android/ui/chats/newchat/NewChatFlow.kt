@@ -506,6 +506,7 @@ private fun NewMessageAccountScreen(
                 query = query,
                 targetReference = appState.npub(resolvedHex),
                 retryKey = searchRetry,
+                chatRevision = appState.forwardTargetsRevision,
             )
         } else {
             null
@@ -562,7 +563,10 @@ private fun NewMessageAccountScreen(
         appState.beginChatCreateOpenTiming()
         val preparedLookup =
             identifierPreparationKey
-                ?.takeIf { retryGroupIdHex == null && existingDmGroupIdHex == null && it.targetReference == npub }
+                ?.takeIf {
+                    retryGroupIdHex == null && existingDmGroupIdHex == null &&
+                        it.targetReference == npub && it.chatRevision == appState.forwardTargetsRevision
+                }
                 ?.let(preparationCoordinator::current)
         appState.launchMutation {
             try {
@@ -575,8 +579,10 @@ private fun NewMessageAccountScreen(
                             recipientName = recipientName,
                             retryGroupIdHex = retryGroupIdHex,
                             resolveDirectChat = {
-                                preparedLookup?.let { session.currentValue(it::directChatResolution) }
-                                    ?: session.currentValue {
+                                session.currentValue {
+                                    preparedLookupOrFresh(
+                                        preparedLookup?.takeIf { it.key.chatRevision == appState.forwardTargetsRevision },
+                                    ) {
                                         resolveNewMessageDirectChat(
                                             npub = npub,
                                             existingDmGroupIdHex = existingDmGroupIdHex,
@@ -592,6 +598,7 @@ private fun NewMessageAccountScreen(
                                             },
                                         )
                                     }
+                                }
                             },
                             createGroup = { target ->
                                 session.currentValue { appState.createProfileChatGroup(target) }
