@@ -756,6 +756,76 @@ class ConversationSendRetryIntegrationTest {
         }
 
     @Test
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    fun cancellingOfflineTextRetryRestoresDraftAndUnblocksNextSendWithoutBackoff() =
+        runTest {
+            val appState = appState()
+            appState.setDraft(GROUP_ID, TextFieldValue("offline draft"))
+            val firstFailed = CompletableDeferred<Unit>()
+            val published = mutableListOf<String>()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, text ->
+                        published += text
+                        if (text == "offline draft") {
+                            firstFailed.complete(Unit)
+                            throw MarmotKitException.Publish("connect relay failed")
+                        }
+                        successfulSendSummary()
+                    },
+                )
+            val first = async { appState.sendConversationText(controller, "offline draft") }
+            firstFailed.await()
+            runCurrent()
+            val pending = controller.timeline.single().record
+            assertTrue(controller.deleteCapabilityFor(pending).canDeleteAtAll)
+            assertEquals(null, appState.draftFor(GROUP_ID))
+            assertTrue(controller.deleteMessage(pending, presentFailure = false))
+            val second = async { controller.send("next") }
+            runCurrent()
+            assertEquals("offline draft", appState.draftFor(GROUP_ID))
+            assertEquals(listOf("offline draft", "next"), published)
+            first.await()
+            second.await()
+            assertEquals(1, controller.timeline.size)
+            testScheduler.advanceTimeBy(60_000)
+            runCurrent()
+            assertEquals(listOf("offline draft", "next"), published)
+        }
+
+    @Test
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    fun cancellingOfflineReplyDuringBackoffPreventsLaterAdmission() =
+        runTest {
+            val firstFailed = CompletableDeferred<Unit>()
+            var publishCalls = 0
+            val controller =
+                ConversationController(
+                    appState = appState(),
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        publishCalls += 1
+                        firstFailed.complete(Unit)
+                        throw MarmotKitException.Publish("connect relay failed")
+                    },
+                )
+            controller.replyingTo = timelineAppMessage(REPLY_MESSAGE_ID)
+            val send = async { controller.send("offline reply") }
+            firstFailed.await()
+            runCurrent()
+            assertTrue(controller.deleteMessage(controller.timeline.single().record, presentFailure = false))
+            send.await()
+            testScheduler.advanceTimeBy(60_000)
+            runCurrent()
+            assertEquals(1, publishCalls)
+            assertTrue(controller.timeline.isEmpty())
+        }
+
+    @Test
     fun cancelledSendTombstonesStayBounded() =
         runTest {
             val appState = appState()

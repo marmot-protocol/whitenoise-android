@@ -119,6 +119,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -7816,6 +7817,7 @@ class ConversationController(
                 discardedDuringRetry.remove(optimisticKey)
                 removeCancelledOptimisticSend(optimisticKey, tempId)
                 trimCancelledSendTombstones()
+                onTerminalFailure()
                 return
             }
             if (
@@ -7968,6 +7970,7 @@ class ConversationController(
         appState.withConversationTextSendOrder(account, group.groupIdHex) {
             retryPendingConversationSend(
                 connectivityRecoveryGeneration = appState.validatedConnectivityRecoveryGeneration,
+                cancellationGeneration = optimisticCancellationGeneration,
                 retryableFailure = ::isRetryableTextAdmissionError,
                 onTransientFailure = { attempt, _ -> logSendRetry(trace, clientToken, attempt) },
             ) { attempt ->
@@ -8965,19 +8968,18 @@ class ConversationController(
         publishTimelineFromIndexes()
     }
 
-    /**
-     * Competes with native admission under the same group commit lock. If the
-     * cancellation owns the lock first, the send continuation observes
-     * [OptimisticSendPhase.CANCELLED] immediately before its FFI call. If
-     * admission owns it first, that path records a non-cancellable phase before
-     * releasing the lock and this operation leaves the canonical pending row.
-     */
+    /** Resolves a projected row to its local optimistic send token, if still retained. */
     private fun optimisticSendKey(message: AppMessageRecordFfi): String? {
         val directKey = "msg:${message.messageIdHex}"
         if (directKey in optimisticMessages || directKey in optimisticSendPhases) return directKey
         return optimisticMessages.entries.firstOrNull { (_, item) -> item.record == message }?.key
     }
 
+    /**
+     * Competes with native admission under the group commit lock. Cancelling
+     * before admission removes the optimistic row and wakes its sleeping retry;
+     * once native owns the send, the canonical pending row remains intact.
+     */
     @Suppress("ReturnCount") // Distinct unavailable-account/key exits precede the single lock-arbitrated result.
     private suspend fun cancelOptimisticSendResult(
         message: AppMessageRecordFfi,
@@ -8999,6 +9001,7 @@ class ConversationController(
                 current?.status == MessageStatus.Failed || phase == OptimisticSendPhase.PRE_ACCEPTANCE -> {
                     val retryInFlight = current?.status == MessageStatus.Pending
                     optimisticSendPhases[optimisticKey] = OptimisticSendPhase.CANCELLED
+                    optimisticCancellationGeneration.value += 1
                     if (retryInFlight) discardedDuringRetry.add(optimisticKey)
                     removeCancelledOptimisticSend(optimisticKey, tempId)
                     if (!retryInFlight) trimCancelledSendTombstones()
@@ -9237,6 +9240,9 @@ class ConversationController(
     // record, so a discard during retry doesn't get clobbered by the catch
     // path putting the message back as Failed.
     private val discardedDuringRetry = mutableSetOf<String>()
+
+    /** Wakes the text-order owner so a cancelled retry cannot hold later sends in backoff. */
+    private val optimisticCancellationGeneration = MutableStateFlow(0L)
 
     /**
      * Settles the durable-acceptance callback for [optimisticKey], and retires the send-failure

@@ -45,7 +45,7 @@ class StateSourceSizeCeilingTest {
         // chat-list convergence and notification-open fixes; keep this ratchet exact.
         // PR #2792 adds covered token-bound send admission and cancellation arbitration;
         // exact Play/Zapstore unit tests and Kover run in required CI. Keep this ratchet exact.
-        const val CONTROLLERS_MAX_LINES = 13109
+        const val CONTROLLERS_MAX_LINES = 13115
 
         // Master includes the covered draft lifecycle and host-timing changes. PR #2534
         // adds 38 lines for the async prepared-speech handoff while keeping preparation
