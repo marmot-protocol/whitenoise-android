@@ -31,6 +31,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.time.Duration
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -54,6 +55,7 @@ class AmberActivityCoordinatorTest {
 
     @Before
     fun attachCoordinatorLauncher() {
+        AmberActivityCoordinator.resetForTest()
         launched.set(null)
         launches.clear()
         coordinatorLauncher = CapturingLauncher()
@@ -63,6 +65,7 @@ class AmberActivityCoordinatorTest {
     @After
     fun detachCoordinatorLauncher() {
         AmberActivityCoordinator.detach(coordinatorLauncher)
+        AmberActivityCoordinator.resetForTest()
         Nip55.clearSignerPackage(context)
     }
 
@@ -73,6 +76,52 @@ class AmberActivityCoordinatorTest {
         ) {
             launched.set(input)
             launches.add(input)
+        }
+
+        override fun unregister() = Unit
+
+        override val contract: androidx.activity.result.contract.ActivityResultContract<Intent, *> =
+            ActivityResultContracts.StartActivityForResult()
+    }
+
+    /** Models Amber's cold `onCreate` path until the fake signer is explicitly ready for `onNewIntent`. */
+    private class LifecycleCountingLauncher : androidx.activity.result.ActivityResultLauncher<Intent>() {
+        val launched = ConcurrentLinkedQueue<Intent>()
+        var activityReady = false
+        var onCreateCount = 0
+            private set
+        var onNewIntentCount = 0
+            private set
+
+        override fun launch(
+            input: Intent,
+            options: androidx.core.app.ActivityOptionsCompat?,
+        ) {
+            launched.add(input)
+            if (activityReady) {
+                onNewIntentCount += 1
+            } else {
+                onCreateCount += 1
+            }
+        }
+
+        override fun unregister() = Unit
+
+        override val contract: androidx.activity.result.contract.ActivityResultContract<Intent, *> =
+            ActivityResultContracts.StartActivityForResult()
+    }
+
+    private class SlowLauncher(
+        private val delayMs: Long,
+    ) : androidx.activity.result.ActivityResultLauncher<Intent>() {
+        val launched = ConcurrentLinkedQueue<Intent>()
+
+        override fun launch(
+            input: Intent,
+            options: androidx.core.app.ActivityOptionsCompat?,
+        ) {
+            launched.add(input)
+            Thread.sleep(delayMs)
         }
 
         override fun unregister() = Unit
@@ -98,9 +147,16 @@ class AmberActivityCoordinatorTest {
         timeoutMs: Long = 2_000,
     ): List<Intent> {
         val deadline = System.currentTimeMillis() + timeoutMs
+        var bootstrapWindowAdvanced = false
         while (System.currentTimeMillis() < deadline) {
             shadowOf(Looper.getMainLooper()).idle()
             if (launches.size >= expected) return launches.toList()
+            if (expected > 1 && launches.isNotEmpty() && !bootstrapWindowAdvanced) {
+                shadowOf(Looper.getMainLooper()).idleFor(
+                    Duration.ofMillis(AmberActivityCoordinator.GROUPED_SESSION_BOOTSTRAP_MS + 1),
+                )
+                bootstrapWindowAdvanced = true
+            }
             Thread.sleep(5)
         }
         assertEquals(expected, launches.size)
@@ -634,6 +690,291 @@ class AmberActivityCoordinatorTest {
     }
 
     @Test
+    fun groupedBurstWaitsForColdSignerBeforeMergingEveryRequestExactlyOnce() {
+        AmberActivityCoordinator.detach(coordinatorLauncher)
+        val signer = LifecycleCountingLauncher()
+        coordinatorLauncher = signer
+        AmberActivityCoordinator.attach(coordinatorLauncher)
+
+        val requestIds = List(7) { index -> "cold-burst-$index" }
+        val outcomes = requestIds.associateWith { AtomicReference<AmberActivityCoordinator.Outcome>() }
+        val ready = CountDownLatch(requestIds.size)
+        val start = CountDownLatch(1)
+        val done = CountDownLatch(requestIds.size)
+        requestIds.forEach { requestId ->
+            Thread {
+                ready.countDown()
+                start.await()
+                outcomes.getValue(requestId).set(
+                    AmberActivityCoordinator.awaitApproval(
+                        groupedCryptoIntent(requestId, currentUser = "cold-account"),
+                        timeoutMs = 5_000,
+                        requestId = requestId,
+                        allowGrouping = true,
+                    ),
+                )
+                done.countDown()
+            }.start()
+        }
+
+        assertTrue(ready.await(2, TimeUnit.SECONDS))
+        start.countDown()
+        val admissionDeadline = System.currentTimeMillis() + 2_000
+        while (
+            AmberActivityCoordinator.groupedPendingCountForTest() < requestIds.size &&
+            System.currentTimeMillis() < admissionDeadline
+        ) {
+            shadowOf(Looper.getMainLooper()).idle()
+            Thread.sleep(5)
+        }
+
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(requestIds.size, AmberActivityCoordinator.groupedPendingCountForTest())
+        assertEquals("only the bootstrap request may open a cold signer screen", 1, signer.onCreateCount)
+        assertEquals(1, signer.launched.size)
+
+        signer.activityReady = true
+        shadowOf(Looper.getMainLooper()).idleFor(
+            Duration.ofMillis(AmberActivityCoordinator.GROUPED_SESSION_BOOTSTRAP_MS + 1),
+        )
+        assertEquals(1, signer.onCreateCount)
+        assertEquals(requestIds.size - 1, signer.onNewIntentCount)
+        assertEquals(requestIds.size, signer.launched.size)
+
+        val aggregate =
+            JSONArray().apply {
+                requestIds.forEach { requestId ->
+                    put(JSONObject().put("id", requestId).put("result", "value-$requestId"))
+                }
+            }
+        AmberActivityCoordinator.deliverResult(
+            resultOk = true,
+            data = Intent().putExtra(Nip55.EXTRA_RESULTS, aggregate.toString()),
+        )
+
+        assertTrue(done.await(2, TimeUnit.SECONDS))
+        requestIds.forEach { requestId ->
+            val outcome = outcomes.getValue(requestId).get() as AmberActivityCoordinator.Outcome.Completed
+            assertTrue(outcome.resultOk)
+            assertEquals("value-$requestId", outcome.data?.getStringExtra(Nip55.EXTRA_RESULT))
+        }
+    }
+
+    @Test
+    fun waiterThatExpiresBeforeMergeIsUnavailableAndNeverLaunched() {
+        val bootstrap = AtomicReference<AmberActivityCoordinator.Outcome>()
+        val waiter = AtomicReference<AmberActivityCoordinator.Outcome>()
+        val bootstrapDone = CountDownLatch(1)
+        val waiterDone = CountDownLatch(1)
+
+        Thread {
+            bootstrap.set(
+                AmberActivityCoordinator.awaitApproval(
+                    groupedCryptoIntent("short-grace-bootstrap", currentUser = "short-grace-account"),
+                    timeoutMs = 5_000,
+                    requestId = "short-grace-bootstrap",
+                    allowGrouping = true,
+                ),
+            )
+            bootstrapDone.countDown()
+        }.start()
+        awaitLaunchCount(1)
+
+        Thread {
+            waiter.set(
+                AmberActivityCoordinator.awaitApproval(
+                    groupedCryptoIntent("short-grace-waiter", currentUser = "short-grace-account"),
+                    timeoutMs = 100,
+                    requestId = "short-grace-waiter",
+                    allowGrouping = true,
+                ),
+            )
+            waiterDone.countDown()
+        }.start()
+
+        assertTrue(waiterDone.await(2, TimeUnit.SECONDS))
+        assertEquals(AmberActivityCoordinator.Outcome.AdmissionUnavailable, waiter.get())
+        shadowOf(Looper.getMainLooper()).idleFor(
+            Duration.ofMillis(AmberActivityCoordinator.GROUPED_SESSION_BOOTSTRAP_MS + 1),
+        )
+        assertEquals(1, launches.size)
+
+        AmberActivityCoordinator.deliverResult(resultOk = false, data = null)
+        assertTrue(bootstrapDone.await(2, TimeUnit.SECONDS))
+        assertFalse((bootstrap.get() as AmberActivityCoordinator.Outcome.Completed).resultOk)
+    }
+
+    @Test
+    fun timeoutDuringLaunchIsAmbiguousAndCannotBecomeRetryable() {
+        AmberActivityCoordinator.detach(coordinatorLauncher)
+        val slowLauncher = SlowLauncher(delayMs = 250)
+        coordinatorLauncher = slowLauncher
+        AmberActivityCoordinator.attach(coordinatorLauncher)
+        val outcome = AtomicReference<AmberActivityCoordinator.Outcome>()
+        val done = CountDownLatch(1)
+
+        Thread {
+            outcome.set(
+                AmberActivityCoordinator.awaitApproval(
+                    groupedCryptoIntent("slow-launch", currentUser = "slow-launch-account"),
+                    timeoutMs = 100,
+                    requestId = "slow-launch",
+                    allowGrouping = true,
+                ),
+            )
+            done.countDown()
+        }.start()
+
+        val admissionDeadline = System.currentTimeMillis() + 2_000
+        while (
+            AmberActivityCoordinator.groupedPendingCountForTest() == 0 &&
+            System.currentTimeMillis() < admissionDeadline
+        ) {
+            Thread.sleep(5)
+        }
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertTrue(done.await(2, TimeUnit.SECONDS))
+        assertEquals(1, slowLauncher.launched.size)
+        assertEquals(AmberActivityCoordinator.Outcome.TimedOut, outcome.get())
+    }
+
+    @Test
+    fun sixthSequentialGroupedSessionWaitsInsteadOfOpeningAnotherSignerScreen() {
+        val currentUser = "rate-budget-account"
+        val diagnostics = ConcurrentLinkedQueue<AmberApprovalDiagnostic>()
+        AmberApprovalDiagnostics.observeForTest(diagnostics::add)
+        repeat(AmberActivityCoordinator.MAX_GROUPED_SCREEN_STARTS) { index ->
+            val requestId = "rate-budget-$index"
+            val outcome = AtomicReference<AmberActivityCoordinator.Outcome>()
+            val done = CountDownLatch(1)
+            Thread {
+                outcome.set(
+                    AmberActivityCoordinator.awaitApproval(
+                        groupedCryptoIntent(requestId, currentUser),
+                        timeoutMs = 5_000,
+                        requestId = requestId,
+                        allowGrouping = true,
+                    ),
+                )
+                done.countDown()
+            }.start()
+            awaitLaunchCount(index + 1)
+            AmberActivityCoordinator.deliverResult(
+                resultOk = true,
+                data = Intent().putExtra(Nip55.EXTRA_ID, requestId).putExtra(Nip55.EXTRA_RESULT, "value-$index"),
+            )
+            assertTrue(done.await(2, TimeUnit.SECONDS))
+            assertTrue((outcome.get() as AmberActivityCoordinator.Outcome.Completed).resultOk)
+        }
+
+        val blocked = AtomicReference<AmberActivityCoordinator.Outcome>()
+        val blockedDone = CountDownLatch(1)
+        Thread {
+            blocked.set(
+                AmberActivityCoordinator.awaitApproval(
+                    groupedCryptoIntent("rate-budget-blocked", currentUser),
+                    timeoutMs = 250,
+                    requestId = "rate-budget-blocked",
+                    allowGrouping = true,
+                ),
+            )
+            blockedDone.countDown()
+        }.start()
+
+        assertTrue(blockedDone.await(2, TimeUnit.SECONDS))
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(AmberActivityCoordinator.MAX_GROUPED_SCREEN_STARTS, launches.size)
+        assertEquals(AmberActivityCoordinator.Outcome.AdmissionUnavailable, blocked.get())
+        assertTrue(
+            diagnostics.any {
+                it.sessionState == AmberGroupedSessionState.ADMISSION_WAIT &&
+                    it.terminal == AmberApprovalTerminal.UNAVAILABLE
+            },
+        )
+    }
+
+    @Test
+    fun unavailableLauncherDoesNotConsumeTheScreenStartBudget() {
+        AmberActivityCoordinator.detach(coordinatorLauncher)
+        repeat(AmberActivityCoordinator.MAX_GROUPED_SCREEN_STARTS) { index ->
+            assertEquals(
+                AmberActivityCoordinator.Outcome.NoForegroundActivity,
+                AmberActivityCoordinator.awaitApproval(
+                    groupedCryptoIntent("unavailable-budget-$index", currentUser = "unavailable-budget-account"),
+                    timeoutMs = 200,
+                    requestId = "unavailable-budget-$index",
+                    allowGrouping = true,
+                ),
+            )
+        }
+
+        AmberActivityCoordinator.attach(coordinatorLauncher)
+        val outcome = AtomicReference<AmberActivityCoordinator.Outcome>()
+        val done = CountDownLatch(1)
+        Thread {
+            outcome.set(
+                AmberActivityCoordinator.awaitApproval(
+                    groupedCryptoIntent("unavailable-budget-real", currentUser = "unavailable-budget-account"),
+                    timeoutMs = 5_000,
+                    requestId = "unavailable-budget-real",
+                    allowGrouping = true,
+                ),
+            )
+            done.countDown()
+        }.start()
+
+        awaitLaunchCount(1)
+        AmberActivityCoordinator.deliverResult(
+            resultOk = true,
+            data =
+                Intent()
+                    .putExtra(Nip55.EXTRA_ID, "unavailable-budget-real")
+                    .putExtra(Nip55.EXTRA_RESULT, "value"),
+        )
+        assertTrue(done.await(2, TimeUnit.SECONDS))
+        assertTrue((outcome.get() as AmberActivityCoordinator.Outcome.Completed).resultOk)
+    }
+
+    @Test
+    fun groupedApprovalDiagnosticsContainOnlyCategoricalSessionState() {
+        val diagnostics = ConcurrentLinkedQueue<AmberApprovalDiagnostic>()
+        AmberApprovalDiagnostics.observeForTest(diagnostics::add)
+        val requestId = "private-request-marker"
+        val currentUser = "private-account-marker"
+        val outcome = AtomicReference<AmberActivityCoordinator.Outcome>()
+        val done = CountDownLatch(1)
+        Thread {
+            outcome.set(
+                AmberActivityCoordinator.awaitApproval(
+                    groupedCryptoIntent(requestId, currentUser),
+                    timeoutMs = 5_000,
+                    requestId = requestId,
+                    allowGrouping = true,
+                ),
+            )
+            done.countDown()
+        }.start()
+
+        awaitLaunchCount(1)
+        AmberActivityCoordinator.deliverResult(
+            resultOk = true,
+            data = Intent().putExtra(Nip55.EXTRA_ID, requestId).putExtra(Nip55.EXTRA_RESULT, "private-result-marker"),
+        )
+        assertTrue(done.await(2, TimeUnit.SECONDS))
+        assertTrue((outcome.get() as AmberActivityCoordinator.Outcome.Completed).resultOk)
+
+        assertTrue(diagnostics.isNotEmpty())
+        assertTrue(diagnostics.all { it.operationType == SignerOp.Nip44Encrypt.intentType })
+        assertTrue(diagnostics.any { it.launchCount == 1 && it.terminal == AmberApprovalTerminal.COMPLETED })
+        val rendered = diagnostics.joinToString()
+        assertFalse(rendered.contains(requestId))
+        assertFalse(rendered.contains(currentUser))
+        assertFalse(rendered.contains("private-result-marker"))
+        assertFalse(rendered.contains(Nip55.AMBER_PACKAGE))
+    }
+
+    @Test
     fun groupedResultsAreCorrelatedByIdAcrossReorderingAndMixedDecisions() {
         val approvedId = "grouped-approved"
         val rejectedId = "grouped-rejected"
@@ -798,7 +1139,7 @@ class AmberActivityCoordinatorTest {
         shadowOf(Looper.getMainLooper()).idle()
         assertEquals(Nip55.MAX_GROUPED_APPROVALS, launches.size)
         assertEquals(
-            AmberActivityCoordinator.Outcome.TimedOut,
+            AmberActivityCoordinator.Outcome.AdmissionUnavailable,
             outcomes.last().get(),
         )
 
@@ -972,7 +1313,7 @@ class AmberActivityCoordinatorTest {
         }.start()
 
         assertTrue(groupedDone.await(2, TimeUnit.SECONDS))
-        assertEquals(AmberActivityCoordinator.Outcome.TimedOut, grouped.get())
+        assertEquals(AmberActivityCoordinator.Outcome.AdmissionUnavailable, grouped.get())
         shadowOf(Looper.getMainLooper()).idle()
         assertTrue(launches.isEmpty())
     }
@@ -1011,7 +1352,7 @@ class AmberActivityCoordinatorTest {
         shadowOf(Looper.getMainLooper()).idle()
 
         assertEquals(1, launches.size)
-        assertEquals(AmberActivityCoordinator.Outcome.TimedOut, second.get())
+        assertEquals(AmberActivityCoordinator.Outcome.AdmissionUnavailable, second.get())
         AmberActivityCoordinator.deliverResult(resultOk = false, data = null)
         assertTrue(done.await(2, TimeUnit.SECONDS))
         assertFalse((first.get() as AmberActivityCoordinator.Outcome.Completed).resultOk)

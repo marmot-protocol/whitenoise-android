@@ -30,9 +30,9 @@ import java.util.UUID
  * the engine passes the COUNTERPARTY as `publicKey`; the account's own key is
  * always sent as `current_user`.
  *
- * User cancellation / rejection and prompt timeouts map to
- * [MarmotKitException.ExternalSignerRejected]; the absence of a foreground
- * Activity or a saved signer package maps to
+ * User cancellation / rejection and ambiguous post-launch prompt timeouts map
+ * to [MarmotKitException.ExternalSignerRejected]; pre-launch admission expiry,
+ * the absence of a foreground Activity, or a missing saved signer package maps to
  * [MarmotKitException.ExternalSignerUnavailable]; a malformed signer response
  * maps to [MarmotKitException.Runtime].
  */
@@ -120,6 +120,8 @@ class AmberExternalSigner(
                     unsignedEventJson = content,
                 )
             AmberActivityCoordinator.Outcome.NoForegroundActivity ->
+                throw MarmotKitException.ExternalSignerUnavailable(accountPubkey)
+            AmberActivityCoordinator.Outcome.AdmissionUnavailable ->
                 throw MarmotKitException.ExternalSignerUnavailable(accountPubkey)
             AmberActivityCoordinator.Outcome.TimedOut ->
                 throw MarmotKitException.ExternalSignerRejected()
