@@ -57,10 +57,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
 import java.util.Locale
+import kotlin.coroutines.resume
 
 private const val GIPHY_MAX_BODY_BYTES = 5 * 1024 * 1024
 private const val GIPHY_CONNECT_TIMEOUT_MILLIS = 10_000
@@ -244,18 +246,25 @@ private suspend fun fetchAndDecodeRemoteGiphyMedia(media: RemoteGiphyMedia): Dec
     val request = media.imageRequest() ?: return null
     return giphyFetchSlots.withPermit {
         val bytes =
-            runInterruptible(Dispatchers.IO) {
-                SafeHttpsGet.get(
-                    url = request.url,
-                    maxBodyBytes = GIPHY_MAX_BODY_BYTES,
-                    connectTimeoutMillis = GIPHY_CONNECT_TIMEOUT_MILLIS,
-                    readTimeoutMillis = GIPHY_READ_TIMEOUT_MILLIS,
-                    hostAllowed = { RemoteGiphyMedia.isAllowedMediaUrl(it.toString()) },
-                    contentTypeAllowed = { value ->
-                        val mime = value?.substringBefore(';')?.trim()?.lowercase(Locale.ROOT)
-                        mime == request.mediaType || mime == "application/octet-stream"
-                    },
-                )
+            withContext(Dispatchers.IO) {
+                suspendCancellableCoroutine<ByteArray?> { continuation ->
+                    val result =
+                        SafeHttpsGet.get(
+                            url = request.url,
+                            maxBodyBytes = GIPHY_MAX_BODY_BYTES,
+                            connectTimeoutMillis = GIPHY_CONNECT_TIMEOUT_MILLIS,
+                            readTimeoutMillis = GIPHY_READ_TIMEOUT_MILLIS,
+                            hostAllowed = { RemoteGiphyMedia.isAllowedMediaUrl(it.toString()) },
+                            contentTypeAllowed = { value ->
+                                val mime = value?.substringBefore(';')?.trim()?.lowercase(Locale.ROOT)
+                                mime == request.mediaType || mime == "application/octet-stream"
+                            },
+                            registerCancellation = { cancelRequest ->
+                                continuation.invokeOnCancellation { cancelRequest() }
+                            },
+                        )
+                    continuation.resume(result)
+                }
             } ?: return null
         decodeMessageAttachmentImage(
             bytes = bytes,

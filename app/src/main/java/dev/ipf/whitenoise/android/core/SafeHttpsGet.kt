@@ -13,6 +13,8 @@ import java.net.URL
 import java.nio.channels.SocketChannel
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import javax.net.ssl.HandshakeCompletedListener
 import javax.net.ssl.HostnameVerifier
 import javax.net.ssl.HttpsURLConnection
@@ -35,6 +37,38 @@ internal class SafeHttpsGetDependencies(
     val resolve: (String) -> Array<InetAddress>?,
     val openPinnedConnection: (SafeHttpsPinnedRequest) -> HttpURLConnection?,
 )
+
+/** Tracks and disconnects the request hop active when cancellation arrives. */
+private class ActiveConnectionCancellation(
+    registerCancellation: (onCancelled: () -> Unit) -> Unit,
+) {
+    private val cancelled = AtomicBoolean(false)
+    private val activeConnection = AtomicReference<HttpURLConnection?>(null)
+
+    init {
+        registerCancellation {
+            cancelled.set(true)
+            activeConnection.getAndSet(null)?.disconnect()
+        }
+    }
+
+    /** Whether cancellation has already been requested. */
+    fun isCancelled(): Boolean = cancelled.get()
+
+    /** Publishes a hop atomically, disconnecting it if cancellation won the race. */
+    fun activate(connection: HttpURLConnection): Boolean {
+        activeConnection.set(connection)
+        if (!cancelled.get()) return true
+        activeConnection.compareAndSet(connection, null)
+        connection.disconnect()
+        return false
+    }
+
+    /** Stops tracking a completed hop without clearing a newer connection. */
+    fun clear(connection: HttpURLConnection) {
+        activeConnection.compareAndSet(connection, null)
+    }
+}
 
 /**
  * SSRF-hardened HTTPS GET for Android-owned directory and user-initiated
@@ -103,6 +137,18 @@ object SafeHttpsGet {
             readTimeoutMillis.toLong() * 2L,
         ).coerceAtLeast(1L)
 
+    /** Converts the timeout policy to the monotonic deadline used by each hop. */
+    private fun requestDeadlineNanos(
+        connectTimeoutMillis: Int,
+        readTimeoutMillis: Int,
+    ): Long =
+        System.nanoTime() +
+            TimeUnit.MILLISECONDS.toNanos(requestDeadlineMillis(connectTimeoutMillis, readTimeoutMillis))
+
+    /**
+     * Executes a bounded request and exposes one cancellation callback that
+     * disconnects whichever redirect hop is currently blocking.
+     */
     fun get(
         url: String,
         maxBodyBytes: Int,
@@ -112,6 +158,7 @@ object SafeHttpsGet {
         maxRedirectHops: Int = DEFAULT_MAX_REDIRECT_HOPS,
         hostAllowed: (URL) -> Boolean = { true },
         contentTypeAllowed: (String?) -> Boolean = { true },
+        registerCancellation: (onCancelled: () -> Unit) -> Unit = {},
     ): ByteArray? =
         get(
             url = url,
@@ -122,6 +169,7 @@ object SafeHttpsGet {
             maxRedirectHops = maxRedirectHops,
             hostAllowed = hostAllowed,
             contentTypeAllowed = contentTypeAllowed,
+            registerCancellation = registerCancellation,
             dependencies = defaultDependencies,
         )
 
@@ -139,15 +187,16 @@ object SafeHttpsGet {
         maxRedirectHops: Int = DEFAULT_MAX_REDIRECT_HOPS,
         hostAllowed: (URL) -> Boolean = { true },
         contentTypeAllowed: (String?) -> Boolean = { true },
+        registerCancellation: (onCancelled: () -> Unit) -> Unit = {},
         dependencies: SafeHttpsGetDependencies,
     ): ByteArray? {
+        val cancellation = ActiveConnectionCancellation(registerCancellation)
         val original = runCatching { URL(url) }.getOrNull() ?: return null
-        val requestDeadlineNanos =
-            System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(requestDeadlineMillis(connectTimeoutMillis, readTimeoutMillis))
+        val requestDeadlineNanos = requestDeadlineNanos(connectTimeoutMillis, readTimeoutMillis)
         var currentSpec = url
         var hops = 0
         while (true) {
-            if (deadlineExceeded(requestDeadlineNanos)) return null
+            if (cancellation.isCancelled() || deadlineExceeded(requestDeadlineNanos)) return null
             val parsed = runCatching { URL(currentSpec) }.getOrNull() ?: return null
             if (parsed.protocol?.lowercase(Locale.ROOT) != "https") return null
             val host = parsed.host
@@ -172,10 +221,12 @@ object SafeHttpsGet {
                         requestHeaders = headersForHop(requestHeaders, original = original, current = parsed),
                     ),
                 ) ?: return null
+            if (!cancellation.activate(connection)) return null
             try {
                 connection.readTimeout =
                     timeoutMillisWithinDeadline(readTimeoutMillis, requestDeadlineNanos) ?: return null
                 val code = connection.responseCode
+                if (cancellation.isCancelled()) return null
                 if (deadlineExceeded(requestDeadlineNanos)) return null
                 when {
                     code in 300..399 -> {
@@ -197,6 +248,7 @@ object SafeHttpsGet {
             } catch (_: IOException) {
                 return null
             } finally {
+                cancellation.clear(connection)
                 connection.disconnect()
             }
         }

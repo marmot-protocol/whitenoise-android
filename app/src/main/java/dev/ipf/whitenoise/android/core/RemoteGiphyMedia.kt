@@ -67,7 +67,9 @@ data class RemoteGiphyMedia(
             if (raw == null || raw.length > MAX_WIRE_TEXT_LENGTH) return false
             val newline = raw.indexOf('\n')
             if (newline <= 0) return false
-            return isAllowedGiphyAuthority(raw.substring(0, newline).trim())
+            val tail = raw.substring(newline + 1)
+            val attributionShaped = tail.startsWith(ATTRIBUTION_PREFIX) || ATTRIBUTION_PREFIX.startsWith(tail)
+            return attributionShaped && isAllowedGiphyAuthority(raw.substring(0, newline).trim())
         }
 
         /** Restricts media loads, including redirects, to approved GIPHY CDN URLs and formats. */

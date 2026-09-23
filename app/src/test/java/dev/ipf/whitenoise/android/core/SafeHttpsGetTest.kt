@@ -9,6 +9,7 @@ import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.lang.reflect.Proxy
@@ -18,6 +19,9 @@ import java.net.Socket
 import java.net.SocketAddress
 import java.net.URL
 import java.nio.channels.SocketChannel
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import javax.net.ssl.HandshakeCompletedListener
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SNIHostName
@@ -265,6 +269,35 @@ class SafeHttpsGetTest {
             ),
         )
         assertTrue(failure.disconnected)
+    }
+
+    @Test
+    fun registeredCancellationDisconnectsTheActiveBlockingRequest() {
+        val enteredResponseRead = CountDownLatch(1)
+        val response = BlockingHttpConnection(URL("https://example.test/path"), enteredResponseRead)
+        var cancelRequest: (() -> Unit)? = null
+        val executor = Executors.newSingleThreadExecutor()
+        try {
+            val result =
+                executor.submit<ByteArray?> {
+                    SafeHttpsGet.get(
+                        url = "https://example.test/path",
+                        maxBodyBytes = 32,
+                        connectTimeoutMillis = 1_000,
+                        readTimeoutMillis = 1_000,
+                        registerCancellation = { cancelRequest = it },
+                        dependencies = dependencies(open = { response }),
+                    )
+                }
+
+            assertTrue(enteredResponseRead.await(1, TimeUnit.SECONDS))
+            requireNotNull(cancelRequest).invoke()
+
+            assertNull(result.get(1, TimeUnit.SECONDS))
+            assertTrue(response.disconnected)
+        } finally {
+            executor.shutdownNow()
+        }
     }
 
     @Test
@@ -744,6 +777,30 @@ class SafeHttpsGetTest {
                     return super.read(buffer, offset, length)
                 }
             }
+    }
+
+    private class BlockingHttpConnection(
+        url: URL,
+        private val enteredResponseRead: CountDownLatch,
+    ) : HttpURLConnection(url) {
+        private val disconnectedSignal = CountDownLatch(1)
+
+        @Volatile var disconnected = false
+
+        override fun connect() = Unit
+
+        override fun disconnect() {
+            disconnected = true
+            disconnectedSignal.countDown()
+        }
+
+        override fun usingProxy(): Boolean = false
+
+        override fun getResponseCode(): Int {
+            enteredResponseRead.countDown()
+            disconnectedSignal.await(5, TimeUnit.SECONDS)
+            throw IOException("request cancelled")
+        }
     }
 
     private class FakeSslSocket(

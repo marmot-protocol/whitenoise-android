@@ -42,9 +42,10 @@ class RemoteGiphyMediaTest {
     }
 
     @Test
-    fun previewDetectorHidesPlausibleGiphyEnvelopesEvenWhenBodyIsClipped() {
-        assertTrue(RemoteGiphyMedia.isEnvelopeText(" https://media.giphy.com/x \nclipped"))
-        assertTrue(RemoteGiphyMedia.isEnvelopeText("https://media22.giphy.com/x\nunknown attribution"))
+    fun previewDetectorRequiresPlausibleAttributionEvenWhenBodyIsClipped() {
+        assertTrue(RemoteGiphyMedia.isEnvelopeText(" https://media.giphy.com/x \nvia GIP"))
+        assertTrue(RemoteGiphyMedia.isEnvelopeText("https://media22.giphy.com/x\nvia GIPHY · Alice"))
+        assertFalse(RemoteGiphyMedia.isEnvelopeText("https://media22.giphy.com/x\nunknown attribution"))
         assertFalse(RemoteGiphyMedia.isEnvelopeText("https://example.com/x.gif\nvia GIPHY"))
         assertFalse(RemoteGiphyMedia.isEnvelopeText("https://media.giphy.com/x"))
     }

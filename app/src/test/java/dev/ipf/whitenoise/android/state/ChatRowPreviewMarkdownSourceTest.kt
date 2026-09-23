@@ -31,6 +31,18 @@ class ChatRowPreviewMarkdownSourceTest {
     }
 
     @Test
+    fun giphyEnvelopeReturnsNullSoTheDerivedPreviewWins() {
+        assertNull(
+            chatRowPreviewMarkdownSource(
+                rowWith(
+                    kind = 9uL,
+                    plaintext = "https://media.giphy.com/media/abc/giphy.gif\nvia GIPHY · Alice",
+                ),
+            ),
+        )
+    }
+
+    @Test
     fun legacyNoteRowReturnsNonBlankBody() {
         // Kind-1 legacy notes fall through to projectedPreviewText's verbatim
         // body arm, so their plaintext must still be parsed for markdown.
