@@ -83,7 +83,10 @@ class FocusedMessageImeOverlayTest {
         composeRule.waitForIdle()
 
         val previewBefore = composeRule.onNodeWithTag("message-actions-preview").fetchSemanticsNode().boundsInRoot
-        assertTrue("the message must start inside the short frame", previewBefore.top >= 0f && previewBefore.bottom <= 320f)
+        assertTrue(
+            "the message must start inside the short frame",
+            previewBefore.top >= 0f && previewBefore.bottom <= 320f,
+        )
         composeRule.onNodeWithTag(FOCUSED_ACTION_MENU_SCROLL_TEST_TAG).assertIsDisplayed()
 
         composeRule.onNodeWithText("Action 11").performScrollTo().assertIsDisplayed().performClick()
@@ -91,7 +94,10 @@ class FocusedMessageImeOverlayTest {
 
         val previewAfter = composeRule.onNodeWithTag("message-actions-preview").fetchSemanticsNode().boundsInRoot
         assertEquals("scrolling actions must not move the lifted message", previewBefore.top, previewAfter.top, 0.5f)
-        assertTrue("the lifted message must remain fully visible", previewAfter.top >= 0f && previewAfter.bottom <= 320f)
+        assertTrue(
+            "the lifted message must remain fully visible",
+            previewAfter.top >= 0f && previewAfter.bottom <= 320f,
+        )
         assertEquals("the final action must remain reachable", 1, lastActionClicks)
     }
 }
