@@ -3,6 +3,12 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "Amber grouped-send screen admission and merge budget",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/amber/AmberActivityCoordinator.kt",
+        "anchor": "GROUPED_SESSION_BOOTSTRAP_MS",
+        "test_ids": ["MSG-020"]
+      },
+      {
         "surface": "Send failure caused by a transient relay outage",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/SendFailureNotices.kt",
         "anchor": "R.string.toast_send_connection_failed",
@@ -200,6 +206,14 @@
         ]
       },
       {
+        "surface": "Pre-admission optimistic send cancellation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "private suspend fun cancelOptimisticSendResult(",
+        "test_ids": [
+          "MSG-019"
+        ]
+      },
+      {
         "surface": "Conversation window open exceeded its deadline",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "R.string.error_window_timed_out",
@@ -223,6 +237,14 @@
         "test_ids": [
           "CHL-010",
           "GRP-010"
+        ]
+      },
+      {
+        "surface": "toast couldnt delete pending message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_couldnt_delete_message",
+        "test_ids": [
+          "MSG-019"
         ]
       },
       {
@@ -3925,7 +3947,8 @@
         "test_ids": [
           "CON-006",
           "MED-003",
-          "MED-007"
+          "MED-007",
+          "MSG-019"
         ]
       },
       {
@@ -4322,6 +4345,7 @@
           "MSG-005",
           "MSG-013",
           "MSG-015",
+          "MSG-019",
           "CON-017"
         ]
       },

@@ -45,6 +45,7 @@ class AmberExternalSignerTest {
 
     @Before
     fun setUp() {
+        AmberActivityCoordinator.resetForTest()
         launcher = CapturingLauncher()
         AmberActivityCoordinator.attach(launcher)
         Nip55.saveSignerPackage(context, SIGNER_PACKAGE)
@@ -64,6 +65,7 @@ class AmberExternalSignerTest {
     @After
     fun tearDown() {
         AmberActivityCoordinator.detach(launcher)
+        AmberActivityCoordinator.resetForTest()
         Nip55.clearSignerPackage(context)
         ShadowContentResolver.reset()
     }
@@ -184,6 +186,96 @@ class AmberExternalSignerTest {
         failure.get()?.let { throw it }
         assertEquals(signature, JSONObject(checkNotNull(result.get())).getString("sig"))
         assertEquals(accountPubkey, JSONObject(checkNotNull(result.get())).getString("pubkey"))
+    }
+
+    @Test
+    fun postLaunchTimeoutRemainsARejectedAmbiguousOutcome() {
+        installAmber64()
+        Nip55.saveSignerPackage(context, Nip55.AMBER_PACKAGE)
+        val thrown = AtomicReference<Throwable>()
+        val done = CountDownLatch(1)
+
+        Thread {
+            try {
+                AmberExternalSigner(context, "account-pubkey", approvalTimeoutMs = 200)
+                    .nip44Encrypt("counterparty-pubkey", "plaintext")
+            } catch (error: Throwable) {
+                thrown.set(error)
+            } finally {
+                done.countDown()
+            }
+        }.start()
+
+        awaitSignerLaunch()
+        assertTrue(done.await(2, TimeUnit.SECONDS))
+        assertTrue(thrown.get() is MarmotKitException.ExternalSignerRejected)
+    }
+
+    @Test
+    fun localScreenBudgetExpiryIsUnavailableWithoutLaunchingAgain() {
+        installAmber64()
+        Nip55.saveSignerPackage(context, Nip55.AMBER_PACKAGE)
+        val accountPubkey = "rate-budget-account"
+
+        repeat(AmberActivityCoordinator.MAX_GROUPED_SCREEN_STARTS) { index ->
+            launcher.launched.set(null)
+            val requestId = "external-rate-budget-$index"
+            val outcome = AtomicReference<AmberActivityCoordinator.Outcome>()
+            val done = CountDownLatch(1)
+            Thread {
+                outcome.set(
+                    AmberActivityCoordinator.awaitApproval(
+                        Nip55.buildCryptoIntent(
+                            SignerOp.Nip44Encrypt,
+                            Nip55.AMBER_PACKAGE,
+                            "plaintext",
+                            "counterparty-pubkey",
+                            accountPubkey,
+                            requestId,
+                        ),
+                        timeoutMs = 5_000,
+                        requestId = requestId,
+                        allowGrouping = true,
+                    ),
+                )
+                done.countDown()
+            }.start()
+
+            awaitSignerLaunch()
+            AmberActivityCoordinator.deliverResult(
+                resultOk = true,
+                data = Intent().putExtra(Nip55.EXTRA_ID, requestId).putExtra(Nip55.EXTRA_RESULT, "value-$index"),
+            )
+            assertTrue(done.await(2, TimeUnit.SECONDS))
+            assertTrue((outcome.get() as AmberActivityCoordinator.Outcome.Completed).resultOk)
+        }
+
+        launcher.launched.set(null)
+        val thrown = AtomicReference<Throwable>()
+        val blockedDone = CountDownLatch(1)
+        Thread {
+            try {
+                AmberExternalSigner(context, accountPubkey, approvalTimeoutMs = 200)
+                    .nip44Encrypt("counterparty-pubkey", "plaintext")
+            } catch (error: Throwable) {
+                thrown.set(error)
+            } finally {
+                blockedDone.countDown()
+            }
+        }.start()
+
+        assertTrue(blockedDone.await(2, TimeUnit.SECONDS))
+        assertTrue(thrown.get() is MarmotKitException.ExternalSignerUnavailable)
+        assertNull(launcher.launched.get())
+    }
+
+    private fun awaitSignerLaunch(): Intent {
+        val deadline = System.currentTimeMillis() + 2_000
+        while (launcher.launched.get() == null && System.currentTimeMillis() < deadline) {
+            shadowOf(android.os.Looper.getMainLooper()).idle()
+            Thread.sleep(5)
+        }
+        return checkNotNull(launcher.launched.get())
     }
 
     private fun installAmber64() {
