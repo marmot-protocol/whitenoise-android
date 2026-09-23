@@ -5718,14 +5718,20 @@ class WhiteNoiseAppState private constructor(
                     appStateDebug(it) { "editor purge failed after wipe: ${it.readableMessage()}" }
                 }
             }
-            val refreshedAccounts =
+            val refreshedAccountsResult =
                 runCatchingCancellable {
                     marmotIo(MarmotTraceSection.ACCOUNT_LIST) { listAccounts() }
-                }.getOrDefault(emptyList())
+                }
+            val refreshedAccounts = refreshedAccountsResult.getOrDefault(emptyList())
             accountListLifetime.advance {
                 accounts = refreshedAccounts
                 releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
-                retainMemberMutesForAccounts(refreshedAccounts.map(AccountSummaryFfi::label))
+                // An empty list here can mean "no accounts left" or "the read failed" -- retention
+                // is an allow-list, so only prune member mutes on a genuine successful read. A
+                // transient failure must not wipe every other account's mutes (#2782 follow-up).
+                refreshedAccountsResult.getOrNull()?.let { successfulAccounts ->
+                    retainMemberMutesForAccounts(successfulAccounts.map(AccountSummaryFfi::label))
+                }
             }
             refreshAccountUnreadCounts(refreshedAccounts)
             val next = refreshedAccounts.firstOrNull()?.label
