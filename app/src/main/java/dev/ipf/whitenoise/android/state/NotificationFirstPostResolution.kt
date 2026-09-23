@@ -424,10 +424,13 @@ internal class NotificationFirstPostResolver(
         update: NotificationUpdateFfi,
         localOnly: Boolean,
     ): String? {
+        val recipientAccountIdHex = source.recipientAccountIdHex(update.accountRef)
+        val signedInAccountIds = source.signedInAccountIds()
+        if (recipientAccountIdHex == null || signedInAccountIds.size < 2) return null
         val relevantAccounts =
             relevantSignedInRecipientCount(
-                recipientAccountIdHex = source.recipientAccountIdHex(update.accountRef),
-                signedInAccountIds = source.signedInAccountIds(),
+                recipientAccountIdHex = recipientAccountIdHex,
+                signedInAccountIds = signedInAccountIds,
                 groupMembers = source.groupMembers(update),
             )
         return LocalNotificationFormatter.recipientAccountSubtext(

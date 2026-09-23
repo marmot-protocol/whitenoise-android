@@ -7794,11 +7794,13 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
     ) {
         val target = conversationOpenDismissalTarget(accountRef, groupIdHex) ?: return
-        withContext(notificationCardCancellationDispatcher) {
-            runCatchingCancellable {
-                localNotificationPresenter.dismissConversationMessages(target.accountRef, target.groupIdHex)
-            }.onFailure { appStateDebug { "notification route dismiss failed group=${target.groupIdHex.take(8)}" } }
-        }
+        runCatchingCancellable {
+            localNotificationPresenter.dismissConversationMessages(
+                target.accountRef,
+                target.groupIdHex,
+                dispatcher = notificationCardCancellationDispatcher,
+            )
+        }.onFailure { appStateDebug { "notification route dismiss failed group=${target.groupIdHex.take(8)}" } }
     }
 
     /** Publish Compose ownership immediately, then dismiss existing cards off the main thread. */
@@ -7815,6 +7817,7 @@ class WhiteNoiseAppState private constructor(
                     localNotificationPresenter.dismissConversationMessages(
                         target.accountRef,
                         target.groupIdHex,
+                        dispatcher = notificationCardCancellationDispatcher,
                     ) {
                         activeConversationAccountRef == target.accountRef &&
                             activeConversationGroupIdHex == target.groupIdHex

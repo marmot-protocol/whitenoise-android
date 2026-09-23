@@ -469,6 +469,91 @@ class LocalNotificationReplyRaceTest {
         assertTrue(manager.activeNotifications.isEmpty())
     }
 
+    /** A platform write that overlaps conversation opening cancels itself before releasing the card lock. */
+    @Test
+    fun conversationDismissDuringCompletedWriteMakesShowCancelItsCard() {
+        val conversation = conversationKey()
+        val presenter = LocalNotificationPresenter(context)
+        val showAfterWrite = CountDownLatch(1)
+        val dismissAwaitingLock = CountDownLatch(1)
+        val allowShowToFinish = CountDownLatch(1)
+        val showFinished = CountDownLatch(1)
+        val dismissFinished = CountDownLatch(1)
+        val showResult = AtomicBoolean(true)
+        val showFailure = AtomicReference<Throwable>()
+        val dismissFailure = AtomicReference<Throwable>()
+        ConversationCardPostSynchronizer.testHook =
+            object : ConversationCardTestHook {
+                override fun onBarrier(
+                    op: ConversationCardOp,
+                    barrier: ConversationCardBarrier,
+                    notificationTag: String,
+                    notificationId: Int,
+                ) {
+                    if (
+                        op == ConversationCardOp.SHOW_NOTIFY &&
+                        barrier == ConversationCardBarrier.AFTER_WRITE
+                    ) {
+                        if (notificationTag == conversation.tag && notificationId == conversation.id) {
+                            showAfterWrite.countDown()
+                            check(allowShowToFinish.await(5, TimeUnit.SECONDS))
+                        }
+                    }
+                }
+
+                override fun onAwaitingLock(
+                    op: ConversationCardOp,
+                    notificationTag: String,
+                    notificationId: Int,
+                ) {
+                    if (
+                        op == ConversationCardOp.DISMISS_CANCEL &&
+                        notificationTag == conversation.tag &&
+                        notificationId == conversation.id
+                    ) {
+                        dismissAwaitingLock.countDown()
+                    }
+                }
+            }
+
+        Thread {
+            try {
+                showResult.set(
+                    runBlocking {
+                        presenter.show(
+                            messageUpdate("msg-a", previewText = "new", timestampMs = 1_000L),
+                            shortNpub = { "npub1test" },
+                        )
+                    },
+                )
+            } catch (throwable: Throwable) {
+                showFailure.set(throwable)
+            } finally {
+                showFinished.countDown()
+            }
+        }.start()
+        assertTrue(showAfterWrite.await(5, TimeUnit.SECONDS))
+
+        Thread {
+            try {
+                assertTrue(runBlocking { presenter.dismissConversationMessages(ACCOUNT, GROUP) })
+            } catch (throwable: Throwable) {
+                dismissFailure.set(throwable)
+            } finally {
+                dismissFinished.countDown()
+            }
+        }.start()
+        assertTrue(dismissAwaitingLock.await(5, TimeUnit.SECONDS))
+
+        allowShowToFinish.countDown()
+        assertTrue(showFinished.await(5, TimeUnit.SECONDS))
+        assertTrue(dismissFinished.await(5, TimeUnit.SECONDS))
+        showFailure.get()?.let { throw it }
+        dismissFailure.get()?.let { throw it }
+        assertFalse(showResult.get())
+        assertTrue(manager.activeNotifications.isEmpty())
+    }
+
     @Test
     fun conversationDismissInvalidatesPostThatHasRegisteredButNotReachedTheLock() {
         val conversation = conversationKey()

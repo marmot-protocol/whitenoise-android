@@ -25,20 +25,34 @@ import (
 
 // rehearsalRelay preserves the latest signer response across ZSP reconnect and subscription races.
 type rehearsalRelay struct {
-	mu          sync.Mutex
-	response    *nostr.Event
-	subscribers map[string]func(...any)
+	mu               sync.Mutex
+	response         *nostr.Event
+	nextConnectionID uint64
+	subscribers      map[relaySubscription]func(...any)
+}
+
+type relaySubscription struct {
+	connectionID uint64
+	id           string
 }
 
 // newRehearsalRelay creates an empty loopback relay used only by the offline signer rehearsal.
 func newRehearsalRelay() *rehearsalRelay {
-	return &rehearsalRelay{subscribers: map[string]func(...any){}}
+	return &rehearsalRelay{subscribers: map[relaySubscription]func(...any){}}
+}
+
+// registerConnection reserves an identity so equal subscription IDs on separate sockets remain independent.
+func (r *rehearsalRelay) registerConnection() uint64 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.nextConnectionID++
+	return r.nextConnectionID
 }
 
 // subscribe registers a subscription and replays the latest response when publication won the race.
-func (r *rehearsalRelay) subscribe(id string, send func(...any)) {
+func (r *rehearsalRelay) subscribe(connectionID uint64, id string, send func(...any)) {
 	r.mu.Lock()
-	r.subscribers[id] = send
+	r.subscribers[relaySubscription{connectionID: connectionID, id: id}] = send
 	response := r.response
 	r.mu.Unlock()
 	if response != nil {
@@ -46,10 +60,14 @@ func (r *rehearsalRelay) subscribe(id string, send func(...any)) {
 	}
 }
 
-// unsubscribe removes a relay subscription after its websocket closes.
-func (r *rehearsalRelay) unsubscribe(id string) {
+// unsubscribeConnection removes every subscription owned by a closed websocket.
+func (r *rehearsalRelay) unsubscribeConnection(connectionID uint64) {
 	r.mu.Lock()
-	delete(r.subscribers, id)
+	for subscription := range r.subscribers {
+		if subscription.connectionID == connectionID {
+			delete(r.subscribers, subscription)
+		}
+	}
 	r.mu.Unlock()
 }
 
@@ -57,13 +75,13 @@ func (r *rehearsalRelay) unsubscribe(id string) {
 func (r *rehearsalRelay) publish(response nostr.Event) {
 	r.mu.Lock()
 	r.response = &response
-	subscribers := make(map[string]func(...any), len(r.subscribers))
-	for id, send := range r.subscribers {
-		subscribers[id] = send
+	subscribers := make(map[relaySubscription]func(...any), len(r.subscribers))
+	for subscription, send := range r.subscribers {
+		subscribers[subscription] = send
 	}
 	r.mu.Unlock()
-	for id, send := range subscribers {
-		send("EVENT", id, response)
+	for subscription, send := range subscribers {
+		send("EVENT", subscription.id, response)
 	}
 }
 
@@ -124,8 +142,9 @@ func rehearse() error {
 			return
 		}
 		defer conn.CloseNow()
+		connectionID := relay.registerConnection()
+		defer relay.unsubscribeConnection(connectionID)
 		sub := ""
-		defer func() { relay.unsubscribe(sub) }()
 		var writeMu sync.Mutex
 		send := func(values ...any) {
 			payload, _ := json.Marshal(values)
@@ -147,7 +166,7 @@ func rehearse() error {
 			switch kind {
 			case "REQ":
 				json.Unmarshal(parts[1], &sub)
-				relay.subscribe(sub, send)
+				relay.subscribe(connectionID, sub, send)
 				send("EOSE", sub)
 			case "EVENT":
 				var event nostr.Event

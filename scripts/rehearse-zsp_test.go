@@ -14,7 +14,7 @@ func TestRehearsalRelayReplaysResponsePublishedBeforeSubscription(t *testing.T) 
 	relay.publish(response)
 
 	var frames [][]any
-	relay.subscribe("late-subscription", func(values ...any) {
+	relay.subscribe(relay.registerConnection(), "late-subscription", func(values ...any) {
 		frames = append(frames, values)
 	})
 
@@ -24,5 +24,26 @@ func TestRehearsalRelayReplaysResponsePublishedBeforeSubscription(t *testing.T) 
 	replayed, ok := frames[0][2].(nostr.Event)
 	if !ok || replayed.ID != response.ID {
 		t.Fatalf("cached response payload was not preserved: %#v", frames[0][2])
+	}
+}
+
+// TestRehearsalRelayScopesSubscriptionsToConnections covers equal IDs and multi-subscription cleanup.
+func TestRehearsalRelayScopesSubscriptionsToConnections(t *testing.T) {
+	relay := newRehearsalRelay()
+	firstConnection := relay.registerConnection()
+	secondConnection := relay.registerConnection()
+	var firstFrames, secondFrames [][]any
+	relay.subscribe(firstConnection, "shared", func(values ...any) { firstFrames = append(firstFrames, values) })
+	relay.subscribe(firstConnection, "another", func(values ...any) { firstFrames = append(firstFrames, values) })
+	relay.subscribe(secondConnection, "shared", func(values ...any) { secondFrames = append(secondFrames, values) })
+
+	relay.unsubscribeConnection(firstConnection)
+	relay.publish(nostr.Event{Kind: 24133, ID: strings.Repeat("b", 64)})
+
+	if len(firstFrames) != 0 {
+		t.Fatalf("closed connection retained subscriptions: %#v", firstFrames)
+	}
+	if len(secondFrames) != 1 || secondFrames[0][1] != "shared" {
+		t.Fatalf("equal subscription ID on live connection was lost: %#v", secondFrames)
 	}
 }

@@ -30,6 +30,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -54,6 +55,8 @@ private const val EXTRA_EXPANDED_SINGLE_MESSAGE_TIMESTAMP =
     "dev.ipf.whitenoise.extra.EXPANDED_SINGLE_MESSAGE_TIMESTAMP"
 private const val EXTRA_EXPANDED_SINGLE_MESSAGE_SENDER =
     "dev.ipf.whitenoise.extra.EXPANDED_SINGLE_MESSAGE_SENDER"
+private const val EXTRA_EXPANDED_SINGLE_MESSAGE_GROUP_TITLE =
+    "dev.ipf.whitenoise.extra.EXPANDED_SINGLE_MESSAGE_GROUP_TITLE"
 private const val CONVERSATION_DISMISSAL_MAX_ATTEMPTS = 3
 private const val CONVERSATION_DISMISSAL_RETRY_DELAY_MS = 25L
 
@@ -229,12 +232,13 @@ class LocalNotificationPresenter(
     suspend fun dismissConversationMessages(
         accountRef: String,
         groupIdHex: String,
+        dispatcher: CoroutineDispatcher = Dispatchers.Default,
         shouldContinue: () -> Boolean = { true },
     ): Boolean =
-        withContext(Dispatchers.Default) {
+        withContext(dispatcher) {
             if (accountRef.isBlank() || groupIdHex.isBlank()) return@withContext false
-            val cutoffMs = System.currentTimeMillis()
             ConversationCardPostSynchronizer.markConversationDismissed(ConversationCardScope(accountRef, groupIdHex))
+            val cutoffMs = System.currentTimeMillis()
             var result = dismissConversationMessagesOnce(accountRef, groupIdHex, cutoffMs)
             var attempts = 1
             var retryOwned = shouldContinue()
@@ -252,17 +256,17 @@ class LocalNotificationPresenter(
         }
 
     /**
-     * Bounded cancellation transaction for a conversation that has just become
-     * visible. UI ownership publication uses this directly so a saturated worker
-     * pool cannot leave tray cards behind after the route is already displayed.
+     * Runs one synchronous cancellation pass for callers that already own an
+     * off-main lane. UI route cleanup uses [dismissConversationMessages] so it
+     * can retry on its dedicated dispatcher.
      */
     fun dismissConversationMessagesImmediately(
         accountRef: String,
         groupIdHex: String,
     ): Boolean {
         if (accountRef.isBlank() || groupIdHex.isBlank()) return false
-        val cutoffMs = System.currentTimeMillis()
         ConversationCardPostSynchronizer.markConversationDismissed(ConversationCardScope(accountRef, groupIdHex))
+        val cutoffMs = System.currentTimeMillis()
         val result = dismissConversationMessagesOnce(accountRef, groupIdHex, cutoffMs)
         logConversationDismissal(groupIdHex, attempts = 1, result)
         return true
@@ -848,6 +852,12 @@ class LocalNotificationPresenter(
                                                         EXTRA_EXPANDED_SINGLE_MESSAGE_SENDER,
                                                         messaging.sender.toBundle(),
                                                     )
+                                                    notificationContent.conversationTitle?.let { groupTitle ->
+                                                        putCharSequence(
+                                                            EXTRA_EXPANDED_SINGLE_MESSAGE_GROUP_TITLE,
+                                                            groupTitle,
+                                                        )
+                                                    }
                                                 },
                                             )
                                     } else {
@@ -891,7 +901,12 @@ class LocalNotificationPresenter(
                                             notificationContent.notificationTag,
                                             notificationContent.notificationId,
                                         )
-                                        true
+                                        retainPostedCardUnlessDismissed(
+                                            showToken,
+                                            notificationManager,
+                                            notificationContent.notificationTag,
+                                            notificationContent.notificationId,
+                                        )
                                     } else {
                                         notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
                                         if (carried.isNullOrEmpty()) {
@@ -927,11 +942,16 @@ class LocalNotificationPresenter(
                                                     notificationContent.notificationTag,
                                                     notificationContent.notificationId,
                                                 )
-                                            }
-                                            if (!retrySucceeded) {
+                                                retainPostedCardUnlessDismissed(
+                                                    showToken,
+                                                    notificationManager,
+                                                    notificationContent.notificationTag,
+                                                    notificationContent.notificationId,
+                                                )
+                                            } else {
                                                 notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
+                                                false
                                             }
-                                            retrySucceeded
                                         }
                                     }
                                 }
@@ -978,11 +998,16 @@ class LocalNotificationPresenter(
                                             notificationContent.notificationTag,
                                             notificationContent.notificationId,
                                         )
-                                    }
-                                    if (!succeeded) {
+                                        retainPostedCardUnlessDismissed(
+                                            showToken,
+                                            notificationManager,
+                                            notificationContent.notificationTag,
+                                            notificationContent.notificationId,
+                                        )
+                                    } else {
                                         notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
+                                        false
                                     }
-                                    succeeded
                                 }
                             }
                         }
@@ -1247,8 +1272,18 @@ class LocalNotificationPresenter(
             ?.let { sender ->
                 val builder = NotificationCompat.Builder(context, notification)
                 val existingTitle = notification.extras?.getCharSequence(Notification.EXTRA_TITLE)?.toString()
-                if (existingTitle == sender.name.toString()) {
-                    builder.setContentTitle(senderName)
+                val groupTitle =
+                    notification.extras
+                        ?.getCharSequence(EXTRA_EXPANDED_SINGLE_MESSAGE_GROUP_TITLE)
+                        ?.toString()
+                when {
+                    existingTitle == sender.name.toString() -> builder.setContentTitle(senderName)
+                    groupTitle != null &&
+                        existingTitle ==
+                        context.getString(R.string.notification_sender_in_group, sender.name, groupTitle) ->
+                        builder.setContentTitle(
+                            context.getString(R.string.notification_sender_in_group, senderName, groupTitle),
+                        )
                 }
                 builder
                     .addExtras(
@@ -1296,6 +1331,19 @@ class LocalNotificationPresenter(
             }
             false
         }
+
+    /** Cancels a completed write when its conversation was dismissed during the platform call. */
+    private fun retainPostedCardUnlessDismissed(
+        showToken: ConversationCardShowToken,
+        manager: NotificationManagerCompat,
+        tag: String,
+        id: Int,
+    ): Boolean {
+        if (ConversationCardPostSynchronizer.isShowNotDismissed(showToken)) return true
+        ConversationCardPostedRegistry.clearPosted(tag, id)
+        notificationCanceller(manager, tag, id)
+        return false
+    }
 
     /**
      * Cancels one card under its lock. With [onlyIfLive] the platform cancel is skipped for a card that is

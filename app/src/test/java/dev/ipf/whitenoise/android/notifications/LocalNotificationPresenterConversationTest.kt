@@ -1366,6 +1366,13 @@ class LocalNotificationPresenterConversationTest {
                 1,
                 presenter.refreshContactSenderName("account-a", DEFAULT_NOTIFICATION_SENDER_ID, "Ally"),
             )
+            assertEquals(
+                context.getString(R.string.notification_sender_in_group, "Ally", "General"),
+                manager.activeNotifications
+                    .single()
+                    .notification.extras
+                    .getCharSequence(Notification.EXTRA_TITLE),
+            )
             presenter.show(
                 update(isMention = false, messageIdHex = "next-message"),
                 senderNameOverride = "Ally",

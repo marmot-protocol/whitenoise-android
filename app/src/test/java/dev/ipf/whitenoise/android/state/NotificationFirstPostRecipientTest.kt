@@ -13,11 +13,43 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import java.util.concurrent.atomic.AtomicInteger
 
 /** Recipient subtext never spends the first-draw budget when it cannot be displayed. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class NotificationFirstPostRecipientTest {
+    /** One signed-in identity cannot show recipient subtext and must not read the roster. */
+    @Test
+    fun singleSignedInAccountSkipsRosterRead() =
+        runBlocking {
+            val rosterReads = AtomicInteger()
+            val content =
+                resolve(
+                    signedInAccountIds = setOf("recipient"),
+                    memberIds = listOf("recipient", "peer"),
+                    onGroupMembersRead = { rosterReads.incrementAndGet() },
+                ) { error("single-account recipient label must not be read") }
+            assertNull(content.recipientAccountSubtext)
+            assertEquals(0, rosterReads.get())
+        }
+
+    /** An unknown recipient cannot show subtext and must not read the roster. */
+    @Test
+    fun unknownRecipientSkipsRosterRead() =
+        runBlocking {
+            val rosterReads = AtomicInteger()
+            val content =
+                resolve(
+                    signedInAccountIds = setOf("recipient", "second"),
+                    memberIds = listOf("recipient", "second", "peer"),
+                    recipientAccountId = null,
+                    onGroupMembersRead = { rosterReads.incrementAndGet() },
+                ) { error("unknown recipient label must not be read") }
+            assertNull(content.recipientAccountSubtext)
+            assertEquals(0, rosterReads.get())
+        }
+
     /** A second signed-in identity outside the conversation must not expose recipient subtext. */
     @Test
     fun unrelatedSignedInAccountSkipsRecipientIdentityRead() =
@@ -58,6 +90,8 @@ class NotificationFirstPostRecipientTest {
     private suspend fun resolve(
         signedInAccountIds: Set<String>,
         memberIds: List<String>,
+        recipientAccountId: String? = "recipient",
+        onGroupMembersRead: () -> Unit = {},
         recipient: (String) -> String?,
     ): NotificationFirstPostContent {
         val context = RuntimeEnvironment.getApplication()
@@ -65,7 +99,14 @@ class NotificationFirstPostRecipientTest {
         try {
             return createNotificationContentResolutionServices(
                 context = context,
-                source = ContentReads(signedInAccountIds, memberIds, recipient),
+                source =
+                    ContentReads(
+                        signedInAccountIds,
+                        memberIds,
+                        recipientAccountId,
+                        onGroupMembersRead,
+                        recipient,
+                    ),
             ).firstPost.resolve(fixture.update, localOnly = true)
         } finally {
             fixture.close()
@@ -76,6 +117,8 @@ class NotificationFirstPostRecipientTest {
     private class ContentReads(
         private val signedInIds: Set<String>,
         private val memberIds: List<String>,
+        private val recipientAccountId: String?,
+        private val onGroupMembersRead: () -> Unit,
         private val recipient: (String) -> String?,
     ) : NotificationContentSource {
         override fun contactNickname(
@@ -106,12 +149,16 @@ class NotificationFirstPostRecipientTest {
                 blankLinesBefore = ByteArray(0),
             )
 
-        override fun recipientAccountIdHex(ref: String): String = "recipient"
+        /** Supplies the fixture's recipient lookup result. */
+        override fun recipientAccountIdHex(ref: String): String? = recipientAccountId
 
         override suspend fun timelineRecord(update: NotificationUpdateFfi): TimelineMessageRecordFfi? = null
 
-        override suspend fun groupMembers(update: NotificationUpdateFfi): List<AppGroupMemberRecordFfi> =
-            memberIds.map { AppGroupMemberRecordFfi(memberIdHex = it, account = null, local = false) }
+        /** Records when the production resolver crosses the roster-read boundary. */
+        override suspend fun groupMembers(update: NotificationUpdateFfi): List<AppGroupMemberRecordFfi> {
+            onGroupMembersRead()
+            return memberIds.map { AppGroupMemberRecordFfi(memberIdHex = it, account = null, local = false) }
+        }
 
         override suspend fun mediaKind(update: NotificationUpdateFfi): ReplyMediaKind = ReplyMediaKind.None
 
