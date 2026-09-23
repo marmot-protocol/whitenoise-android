@@ -633,6 +633,24 @@ enum class MessageStatus {
     Streaming,
 }
 
+/**
+ * Ownership boundary for an optimistic outgoing row. Only [PRE_ACCEPTANCE]
+ * may be cancelled locally; every later phase is already owned by MDK or has
+ * an acknowledgement whose ownership cannot be disproved safely.
+ */
+internal enum class OptimisticSendPhase {
+    PRE_ACCEPTANCE,
+    ACCEPTED_PENDING,
+    ACCEPTANCE_UNKNOWN,
+    SETTLED,
+    FAILED,
+    CANCELLED,
+}
+
+private class OptimisticSendCancelledException : Exception("Optimistic send cancelled before admission")
+
+private const val MAX_CANCELLED_SEND_TOMBSTONES = 64
+
 enum class OutgoingMessageIndicator {
     Sending,
     Sent,
@@ -6355,6 +6373,8 @@ class ConversationController(
     internal val authoritativeTimelineOrderByMessageId = linkedMapOf<String, ULong>()
     private val durableStreamDisplayParentByMessageId = mutableMapOf<String, String>()
     private val optimisticMessages = appState.optimisticMessages(conversationAccountRef, initialGroup.groupIdHex)
+    private val optimisticSendPhases =
+        appState.optimisticSendPhases(conversationAccountRef, initialGroup.groupIdHex)
     private val durableAcceptanceCallbacks =
         appState.durableAcceptanceCallbacks(conversationAccountRef, initialGroup.groupIdHex)
     private val initialTimeline =
@@ -6645,8 +6665,20 @@ class ConversationController(
     fun deleteCapabilityFor(
         message: AppMessageRecordFfi,
         alreadyDeleted: Boolean = message.messageIdHex in deletedMessageIds,
-    ): MessageDeleteCapability =
-        messageDeleteCapability(
+        optimisticKeyOverride: String? = null,
+    ): MessageDeleteCapability {
+        val optimisticKey = optimisticKeyOverride ?: optimisticSendKey(message)
+        if (isOptimisticMessageId(message.messageIdHex)) {
+            val optimistic = optimisticKey?.let(optimisticMessages::get)
+            val cancellable =
+                optimistic?.status == MessageStatus.Failed ||
+                    optimisticKey?.let(optimisticSendPhases::get) == OptimisticSendPhase.PRE_ACCEPTANCE
+            return MessageDeleteCapability(
+                canDeleteForMe = false,
+                canDeleteForEveryone = cancellable,
+            )
+        }
+        return messageDeleteCapability(
             isDirectConversation = isDirectConversation,
             mine = isMessageMine(message),
             selfIsAdmin = isSelfAdmin,
@@ -6654,6 +6686,7 @@ class ConversationController(
             remoteDeleteSupported = canSendMessages && message.messageIdHex.isNotBlank(),
             alreadyDeleted = alreadyDeleted,
         )
+    }
 
     fun isMessageMine(message: AppMessageRecordFfi): Boolean = MessageProjector.isMine(message, conversationAccountIdHex)
 
@@ -7203,16 +7236,27 @@ class ConversationController(
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (_: Throwable) {
-                groupRecoveryLifetime.runIfCurrent(recoveryEpoch) { groupRecoveryReadFailed = true }
+                // An advisory read that has never succeeded for a group this account just created
+                // is not evidence of anything; see groupRecoveryReadFailureIsPresentable.
+                val presentable =
+                    groupRecoveryReadFailureIsPresentable(groupRecoveryStatus, isFreshlyCreatedGroup(groupIdHex))
+                groupRecoveryLifetime.runIfCurrent(recoveryEpoch) {
+                    if (presentable) groupRecoveryReadFailed = true
+                }
                 return
             }
         groupRecoveryLifetime.runIfCurrent(recoveryEpoch) {
             if (ownsGroupRecoveryGroup(groupIdHex) && status.groupIdHex == groupIdHex) {
                 groupRecoveryStatus = status
                 groupRecoveryReadFailed = false
+                appState.freshGroupCreations.settle(accountRef, groupIdHex, appState.runtimeGeneration)
             }
         }
     }
+
+    /** Whether this conversation is the group whose creation was opened most recently. */
+    private fun isFreshlyCreatedGroup(groupIdHex: String): Boolean =
+        appState.freshGroupCreations.isFresh(conversationAccountRef, groupIdHex, appState.runtimeGeneration)
 
     /** Explicit retry for an advisory recovery-status read failure. */
     suspend fun retryGroupRecoveryStatus() = refreshGroupRecoveryStatus()
@@ -7657,6 +7701,7 @@ class ConversationController(
                 timelineOrder = optimisticOrder,
                 retentionAtSendSeconds = retentionAtSendSeconds,
             )
+        optimisticSendPhases[optimisticKey] = OptimisticSendPhase.PRE_ACCEPTANCE
         durableAcceptanceCallbacks[optimisticKey] = onDurablyAccepted
         messageById[tempId] = optimistic
         val chatListPreviewReserved =
@@ -7689,31 +7734,35 @@ class ConversationController(
             // never as a raw frame followed by a styled replacement (#2411).
             // An empty/failed parse publishes one stable plaintext fallback only
             // after the attempt completes. The bubble and composer acceptance
-            // remain independent of this hop.
+            // remain independent of parsing, while preview publication joins
+            // cancellation in the group commit lock below.
             val previewApplied =
-                chatListPreviewReserved &&
-                    appState.applyReservedOptimisticSentPreview(
-                        conversationAccountRef,
-                        group.groupIdHex,
-                        ChatListMessagePreviewFfi(
-                            retentionSeconds = null,
-                            retentionExpiresAt = null,
-                            messageIdHex = tempId,
-                            sender = conversationAccountIdHex ?: "",
-                            senderDisplayName = null,
-                            plaintext = trimmed,
-                            contentTokens = publishedRecord.contentTokens,
-                            kind = 9uL,
-                            timelineAt = now,
-                            deleted = false,
-                            // A row we are optimistically publishing carries no deletion evidence.
-                            deletionSource = DeletionSourceFfi.UNKNOWN,
-                            attachmentKind = null,
-                            attachmentCount = 0u,
-                            groupSystem = null,
-                            deliveryState = ChatListMessageDeliveryStateFfi.PENDING,
-                        ),
-                    )
+                appState.withGroupCommitLock(account, group.groupIdHex) {
+                    requireOptimisticSendNotCancelled(optimisticKey)
+                    chatListPreviewReserved &&
+                        appState.applyReservedOptimisticSentPreview(
+                            conversationAccountRef,
+                            group.groupIdHex,
+                            ChatListMessagePreviewFfi(
+                                retentionSeconds = null,
+                                retentionExpiresAt = null,
+                                messageIdHex = tempId,
+                                sender = conversationAccountIdHex ?: "",
+                                senderDisplayName = null,
+                                plaintext = trimmed,
+                                contentTokens = publishedRecord.contentTokens,
+                                kind = 9uL,
+                                timelineAt = now,
+                                deleted = false,
+                                // A row we are optimistically publishing carries no deletion evidence.
+                                deletionSource = DeletionSourceFfi.UNKNOWN,
+                                attachmentKind = null,
+                                attachmentCount = 0u,
+                                groupSystem = null,
+                                deliveryState = ChatListMessageDeliveryStateFfi.PENDING,
+                            ),
+                        )
+                }
             if (previewApplied == false) {
                 // No bound row to bump (pre-first-frame open, brand-new group,
                 // account-pinned window) — the engine echo will still update the
@@ -7730,7 +7779,7 @@ class ConversationController(
             //
             // Each FFI attempt owns the conversation commit lock, but retry
             // backoff does not. Other mutations remain usable while offline.
-            val summary = publishTextWithRetry(replyTarget, account, trimmed, trace, tempId)
+            val summary = publishTextWithRetry(replyTarget, account, trimmed, trace, tempId, optimisticKey)
             completeDurableAcceptance(optimisticKey)
             val reconciliation =
                 reconcileSuccessfulTextSend(
@@ -7773,7 +7822,29 @@ class ConversationController(
                 trace,
                 if (insertedSent) PerformancePhase.SENT_FLIP else PerformancePhase.SEND_COMPLETE,
             )
+            // When we keep the temp bubble for echo reconciliation, leave the
+            // trace entry so `echo-reconcile` can still be logged.
+            if (!reconciliation.awaitingProjection) {
+                appState.pendingSendDiagnostics.forget(tempId)
+            }
+            if (!reconciliation.acceptedPending) {
+                optimisticSendPhases.remove(optimisticKey)
+            }
         } catch (throwable: Throwable) {
+            if (throwable is OptimisticSendCancelledException) {
+                discardedDuringRetry.remove(optimisticKey)
+                removeCancelledOptimisticSend(optimisticKey, tempId)
+                trimCancelledSendTombstones()
+                onTerminalFailure()
+                return
+            }
+            if (
+                throwable is CancellationException &&
+                optimisticSendPhases[optimisticKey] == OptimisticSendPhase.CANCELLED
+            ) {
+                discardedDuringRetry.remove(optimisticKey)
+                trimCancelledSendTombstones()
+            }
             throwable.rethrowIfCancellation()
             if (throwable.isUseAfterEviction()) {
                 // The engine realized our own eviction while replaying to send:
@@ -7787,6 +7858,7 @@ class ConversationController(
                 durableAcceptanceCallbacks.remove(optimisticKey)
                 messageById.remove(tempId)
                 retentionAtSendByMessageId.remove(tempId)
+                optimisticSendPhases.remove(optimisticKey)
                 appState.pendingSendDiagnostics.forget(tempId)
                 publishTimelineFromIndexes()
                 markActiveAccountRemovedFromMembers(account)
@@ -7794,6 +7866,9 @@ class ConversationController(
                 return
             }
             if (isAmbiguousRelayDeliveryError(throwable)) {
+                if (optimisticSendPhases[optimisticKey] == OptimisticSendPhase.PRE_ACCEPTANCE) {
+                    optimisticSendPhases[optimisticKey] = OptimisticSendPhase.ACCEPTANCE_UNKNOWN
+                }
                 // The event may already be on a relay. Preserve both the
                 // optimistic bubble and chat-list preview as Pending, then let
                 // an authoritative projection or MDK convergence settle it.
@@ -7812,6 +7887,10 @@ class ConversationController(
                 publishTimelineFromIndexes()
                 return
             }
+            if (optimisticSendIsMdkOwnedOrUnknown(optimisticKey)) {
+                publishTimelineFromIndexes()
+                return
+            }
             // The bubble stays visible as Failed — the row must agree instead
             // of silently reverting to the prior message.
             failOptimisticChatListPreview(tempId)
@@ -7822,6 +7901,7 @@ class ConversationController(
                 optimistic = publishedRecord,
                 timelineOrder = optimisticOrder,
             )
+            optimisticSendPhases[optimisticKey] = OptimisticSendPhase.FAILED
             suppressProjectedTimelineItems(
                 unpublishedProjectionIdsMatchingMessage(
                     timelineRecords = timelineRecords,
@@ -7896,16 +7976,19 @@ class ConversationController(
      * the authoritative projection reports publication. Native convergence owns
      * accepted delivery; the host never invents another semantic send to retry it.
      */
+    @Suppress("LongMethod") // Retry admission, tracing, and lock ownership form one atomic policy boundary.
     private suspend fun publishTextWithRetry(
         replyTarget: String?,
         account: String,
         trimmed: String,
         trace: PerformanceTrace?,
         clientToken: String,
+        optimisticKey: String,
     ): dev.ipf.marmotkit.SendSummaryFfi =
         appState.withConversationTextSendOrder(account, group.groupIdHex) {
             retryPendingConversationSend(
                 connectivityRecoveryGeneration = appState.validatedConnectivityRecoveryGeneration,
+                cancellationGeneration = optimisticCancellationGeneration,
                 retryableFailure = ::isRetryableTextAdmissionError,
                 onTransientFailure = { attempt, _ -> logSendRetry(trace, clientToken, attempt) },
             ) { attempt ->
@@ -7916,6 +7999,7 @@ class ConversationController(
                 val lockWaitStartMs = trace?.let { traceNowMs() }
                 updatePendingSendStage(clientToken, PerformanceSendStage.WAITING_COMMIT_LOCK, attempt)
                 appState.withGroupCommitLock(account, group.groupIdHex) {
+                    requireOptimisticSendNotCancelled(optimisticKey)
                     val lockHeldAtMs = trace?.let { traceNowMs() }
                     sendTrace(
                         trace,
@@ -7937,6 +8021,7 @@ class ConversationController(
                         val summary =
                             textPublisher?.invoke(replyTarget, account, group.groupIdHex, trimmed)
                                 ?: publishDurableComposerText(account, replyTarget, trimmed, clientToken, attempt > 1)
+                        recordOptimisticSendAcceptance(optimisticKey, summary)
                         sendTrace(
                             trace,
                             PerformancePhase.FFI_RETURN,
@@ -8109,6 +8194,7 @@ class ConversationController(
                 timelineOrder = optimisticOrder,
                 retentionAtSendSeconds = retentionAtSendSeconds,
             )
+        optimisticSendPhases[key] = OptimisticSendPhase.PRE_ACCEPTANCE
         messageById[tempId] = optimistic
         publishTimelineFromIndexes()
         // Media sends bump the chat-list row like text sends do: the
@@ -8194,6 +8280,7 @@ class ConversationController(
                 )
             ) {
                 optimisticMessages.remove(key)
+                optimisticSendPhases.remove(key)
                 durableAcceptanceCallbacks.remove(key)
                 messageById.remove(tempId)
                 retentionAtSendByMessageId.remove(tempId)
@@ -8202,6 +8289,19 @@ class ConversationController(
                 rollbackOptimisticChatListPreview(tempId)
                 diagnostics.forget(tempId)
                 publishTimelineFromIndexes()
+                return
+            }
+            // queueAttachments and uploadQueued are intentionally separate so
+            // a user can cancel the seeded bubble before this continuation is
+            // scheduled. Honour that tombstone before consulting retained
+            // bytes; otherwise their cancellation cleanup looks like an
+            // eviction and resurrects the row as Failed.
+            if (
+                optimisticSendPhases[key] == OptimisticSendPhase.CANCELLED ||
+                discardedDuringRetry.remove(key)
+            ) {
+                removeCancelledOptimisticSend(key, tempId)
+                trimCancelledSendTombstones()
                 return
             }
             val retained =
@@ -8217,6 +8317,7 @@ class ConversationController(
                             timelineOrder = order,
                             retentionAtSendSeconds = retentionAtSendSeconds,
                         )
+                    optimisticSendPhases[key] = OptimisticSendPhase.FAILED
                     activeUploadKeys.remove(key)
                     failOptimisticChatListPreview(tempId)
                     diagnostics.complete(
@@ -8258,14 +8359,18 @@ class ConversationController(
                                     mediaUploader?.invoke(account, group.groupIdHex, request)
                                         ?: appState
                                             .withGroupCommitLock(account, group.groupIdHex) {
-                                                appState.marmotIo(MarmotTraceSection.MEDIA_UPLOAD) {
-                                                    uploadOrAdmitComposerMediaWithToken(
-                                                        account,
-                                                        group.groupIdHex,
-                                                        request,
-                                                        tempId,
-                                                    )
-                                                }
+                                                requireOptimisticSendNotCancelled(key)
+                                                val outcome =
+                                                    appState.marmotIo(MarmotTraceSection.MEDIA_UPLOAD) {
+                                                        uploadOrAdmitComposerMediaWithToken(
+                                                            account,
+                                                            group.groupIdHex,
+                                                            request,
+                                                            tempId,
+                                                        )
+                                                    }
+                                                outcome.acceptance?.let { recordOptimisticSendAcceptance(key, it) }
+                                                outcome
                                             }.also { outcome ->
                                                 outcome.captureForRetry(
                                                     retained,
@@ -8297,6 +8402,7 @@ class ConversationController(
                     rollbackOptimisticChatListPreview(tempId)
                     diagnostics.forget(tempId)
                     publishTimelineFromIndexes()
+                    trimCancelledSendTombstones()
                     return
                 }
                 val summary =
@@ -8305,16 +8411,20 @@ class ConversationController(
                             val startedAtMs = diagnostics.beginMediaPublish(tempId)
                             appState
                                 .withGroupCommitLock(account, group.groupIdHex) {
-                                    mediaPublisher?.invoke(account, group.groupIdHex, references, retained.caption)
-                                        ?: appState.marmotIo(MarmotTraceSection.MEDIA_SEND) {
-                                            sendComposerMedia(
-                                                account,
-                                                group.groupIdHex,
-                                                references,
-                                                retained.caption,
-                                                tempId,
-                                            )
-                                        }
+                                    requireOptimisticSendNotCancelled(key)
+                                    val accepted =
+                                        mediaPublisher?.invoke(account, group.groupIdHex, references, retained.caption)
+                                            ?: appState.marmotIo(MarmotTraceSection.MEDIA_SEND) {
+                                                sendComposerMedia(
+                                                    account,
+                                                    group.groupIdHex,
+                                                    references,
+                                                    retained.caption,
+                                                    tempId,
+                                                )
+                                            }
+                                    recordOptimisticSendAcceptance(key, accepted)
+                                    accepted
                                 }.also { diagnostics.finishMediaPublish(tempId, startedAtMs) }
                         }
                 completeDurableAcceptance(key)
@@ -8342,6 +8452,7 @@ class ConversationController(
                         rollbackOptimisticChatListPreview(tempId)
                         diagnostics.forget(tempId)
                         publishTimelineFromIndexes()
+                        trimCancelledSendTombstones()
                         return
                     }
                     // A single-media projection can beat the FFI return and
@@ -8365,6 +8476,7 @@ class ConversationController(
                         activeUploadKeys.remove(key)
                         diagnostics.recordEchoReconcile(tempId)
                         publishTimelineFromIndexes()
+                        optimisticSendPhases.remove(key)
                         return
                     }
                     retained.acceptedPending = true
@@ -8413,6 +8525,7 @@ class ConversationController(
                         PerformanceResult.DROPPED,
                     )
                     publishTimelineFromIndexes()
+                    trimCancelledSendTombstones()
                     return
                 }
                 // Seed the decrypted-bytes AND decoded-thumbnail caches under the
@@ -8538,10 +8651,23 @@ class ConversationController(
                 if (!handoffHandled && !controllerCleared) {
                     publishTimelineFromIndexes()
                 }
+                optimisticSendPhases.remove(key)
             } catch (throwable: Throwable) {
                 // Coroutine cancellation (e.g. leaving the screen) is not a send
                 // failure — rethrow so it isn't surfaced as a Failed bubble/toast.
-                if (throwable is CancellationException) throw throwable
+                if (throwable is CancellationException) {
+                    if (optimisticSendPhases[key] == OptimisticSendPhase.CANCELLED) {
+                        discardedDuringRetry.remove(key)
+                        trimCancelledSendTombstones()
+                    }
+                    throw throwable
+                }
+                if (throwable is OptimisticSendCancelledException) {
+                    discardedDuringRetry.remove(key)
+                    removeCancelledOptimisticSend(key, tempId)
+                    trimCancelledSendTombstones()
+                    return
+                }
                 if (discardedDuringRetry.remove(key)) {
                     optimisticMessages.remove(key)
                     durableAcceptanceCallbacks.remove(key)
@@ -8551,6 +8677,12 @@ class ConversationController(
                     activeUploadKeys.remove(key)
                     rollbackOptimisticChatListPreview(tempId)
                     publishTimelineFromIndexes()
+                    trimCancelledSendTombstones()
+                    return
+                }
+                if (optimisticSendIsMdkOwnedOrUnknown(key)) {
+                    publishTimelineFromIndexes()
+                    if (BuildConfig.DEBUG) Log.w("DMConversation", "post-acceptance media settlement failed", throwable)
                     return
                 }
                 optimisticMessages[key] =
@@ -8561,6 +8693,7 @@ class ConversationController(
                         timelineOrder = order,
                         retentionAtSendSeconds = retentionAtSendSeconds,
                     )
+                optimisticSendPhases[key] = OptimisticSendPhase.FAILED
                 failOptimisticChatListPreview(tempId)
                 // Failed bubble shown but bytes are retained for a possible
                 // retry — KEEP the key in `activeUploadKeys` so a screen
@@ -8832,6 +8965,111 @@ class ConversationController(
         }
     }
 
+    /**
+     * Removes one optimistic send and all Android-owned presentation state.
+     * The phase entry is deliberately retained while cancellation is in
+     * flight so a late parser/upload/retry continuation cannot enter MDK.
+     */
+    private fun removeCancelledOptimisticSend(
+        optimisticKey: String,
+        tempId: String,
+    ) {
+        optimisticMessages.remove(optimisticKey)
+        durableAcceptanceCallbacks.remove(optimisticKey)
+        messageById.remove(tempId)
+        retentionAtSendByMessageId.remove(tempId)
+        retainedMediaUploads.remove(optimisticKey)
+        activeUploadKeys.remove(optimisticKey)
+        rollbackOptimisticChatListPreview(tempId)
+        appState.pendingSendDiagnostics.forget(tempId)
+        appState.dismissSendFailureNotice(sendFailureAttempt(optimisticKey))
+        publishTimelineFromIndexes()
+    }
+
+    /** Resolves a projected row to its local optimistic send token, if still retained. */
+    private fun optimisticSendKey(message: AppMessageRecordFfi): String? {
+        val directKey = "msg:${message.messageIdHex}"
+        if (directKey in optimisticMessages || directKey in optimisticSendPhases) return directKey
+        return optimisticMessages.entries.firstOrNull { (_, item) -> item.record == message }?.key
+    }
+
+    /**
+     * Competes with native admission under the group commit lock. Cancelling
+     * before admission removes the optimistic row and wakes its sleeping retry;
+     * once native owns the send, the canonical pending row remains intact.
+     */
+    @Suppress("ReturnCount") // Distinct unavailable-account/key exits precede the single lock-arbitrated result.
+    private suspend fun cancelOptimisticSendResult(
+        message: AppMessageRecordFfi,
+        optimisticKeyOverride: String? = null,
+    ): Result<Unit> {
+        val account =
+            conversationAccountRef
+                ?: return Result.failure(IllegalStateException("Conversation account unavailable"))
+        val optimisticKey =
+            optimisticKeyOverride
+                ?: optimisticSendKey(message)
+                ?: return Result.failure(IllegalStateException("Message is no longer locally cancellable"))
+        return appState.withGroupCommitLock(account, group.groupIdHex) {
+            val current = optimisticMessages[optimisticKey]
+            val tempId = current?.record?.messageIdHex ?: message.messageIdHex
+            val phase = optimisticSendPhases[optimisticKey]
+            when {
+                phase == OptimisticSendPhase.CANCELLED -> Result.success(Unit)
+                current?.status == MessageStatus.Failed || phase == OptimisticSendPhase.PRE_ACCEPTANCE -> {
+                    val retryInFlight = current?.status == MessageStatus.Pending
+                    optimisticSendPhases[optimisticKey] = OptimisticSendPhase.CANCELLED
+                    optimisticCancellationGeneration.value += 1
+                    if (retryInFlight) discardedDuringRetry.add(optimisticKey)
+                    removeCancelledOptimisticSend(optimisticKey, tempId)
+                    if (!retryInFlight) trimCancelledSendTombstones()
+                    Result.success(Unit)
+                }
+                else -> Result.failure(IllegalStateException("Message is already owned by MarmotKit"))
+            }
+        }
+    }
+
+    private fun requireOptimisticSendNotCancelled(optimisticKey: String) {
+        if (optimisticSendPhases[optimisticKey] == OptimisticSendPhase.CANCELLED) {
+            throw OptimisticSendCancelledException()
+        }
+    }
+
+    private fun recordOptimisticSendAcceptance(
+        optimisticKey: String,
+        summary: dev.ipf.marmotkit.SendSummaryFfi,
+    ) {
+        optimisticSendPhases[optimisticKey] =
+            if (summary.acceptDisposition == SendAcceptDispositionFfi.ACCEPTED_PENDING) {
+                OptimisticSendPhase.ACCEPTED_PENDING
+            } else {
+                OptimisticSendPhase.SETTLED
+            }
+    }
+
+    private fun optimisticSendIsMdkOwnedOrUnknown(optimisticKey: String): Boolean =
+        when (optimisticSendPhases[optimisticKey]) {
+            OptimisticSendPhase.ACCEPTED_PENDING,
+            OptimisticSendPhase.ACCEPTANCE_UNKNOWN,
+            OptimisticSendPhase.SETTLED,
+            -> true
+            else -> false
+        }
+
+    private fun trimCancelledSendTombstones() {
+        val cancelledKeys =
+            optimisticSendPhases
+                .asSequence()
+                .filter { (key, phase) ->
+                    phase == OptimisticSendPhase.CANCELLED && key !in discardedDuringRetry
+                }.map { (key, _) -> key }
+                .toList()
+        cancelledKeys
+            .take((cancelledKeys.size - MAX_CANCELLED_SEND_TOMBSTONES).coerceAtLeast(0))
+            .forEach(optimisticSendPhases::remove)
+    }
+
     /** Advances the read marker after any accepted add without coupling it to reaction rollback. */
     private suspend fun markReactionTargetRead(target: String) {
         runCatchingCancellable { markReadUpTo(target) }
@@ -8843,16 +9081,29 @@ class ConversationController(
     suspend fun deleteMessage(
         message: AppMessageRecordFfi,
         presentFailure: Boolean = true,
-    ): Boolean = deleteMessageResult(message, presentFailure).isSuccess
+        optimisticKeyOverride: String? = null,
+    ): Boolean = deleteMessageResult(message, presentFailure, optimisticKeyOverride).isSuccess
 
     /** Structured variant used by batch delete so retry diagnostics retain a safe failure category. */
     internal suspend fun deleteMessageResult(
         message: AppMessageRecordFfi,
         presentFailure: Boolean = true,
+        optimisticKeyOverride: String? = null,
     ): Result<Unit> {
         val account = conversationAccountRef
         return when {
             account == null -> Result.failure(IllegalStateException("Conversation account unavailable"))
+            isOptimisticMessageId(message.messageIdHex) -> {
+                val result = cancelOptimisticSendResult(message, optimisticKeyOverride)
+                if (result.isFailure && presentFailure) {
+                    appState.presentFailure(
+                        R.string.toast_couldnt_delete_message,
+                        "MESSAGE_CANCEL",
+                        requireNotNull(result.exceptionOrNull()),
+                    )
+                }
+                result
+            }
             // Same capability model the delete surface renders from; re-checked
             // here so the mutation path stays authoritative even if a stale or
             // forged UI state requests an unauthorized scope. Also makes repeat
@@ -9007,6 +9258,10 @@ class ConversationController(
     // record, so a discard during retry doesn't get clobbered by the catch
     // path putting the message back as Failed.
     private val discardedDuringRetry = mutableSetOf<String>()
+
+    /** Shared wakeup lets a replacement controller release an old controller's retry. */
+    private val optimisticCancellationGeneration =
+        appState.optimisticCancellationGeneration(conversationAccountRef, initialGroup.groupIdHex)
 
     /**
      * Settles the durable-acceptance callback for [optimisticKey], and retires the send-failure
@@ -9515,6 +9770,7 @@ class ConversationController(
                     status = MessageStatus.Pending,
                     timelineOrder = mediaOrder,
                 )
+            optimisticSendPhases[key] = OptimisticSendPhase.PRE_ACCEPTANCE
             // Re-mark this slot as "in flight" — if the previous attempt's
             // Failed branch had drained the bytes via a dispose-time clear,
             // this would still no-op (performMediaUpload bails on missing
@@ -9540,6 +9796,7 @@ class ConversationController(
         val refreshedRecord = current.record.copy()
         val order = retriedTimelineOrder(current.timelineOrder) { nextOptimisticTimelineOrder() }
         discardedDuringRetry.remove(key)
+        optimisticSendPhases[key] = OptimisticSendPhase.PRE_ACCEPTANCE
         optimisticMessages[key] =
             current.copy(
                 record = refreshedRecord,
@@ -9563,6 +9820,7 @@ class ConversationController(
                     activeAccountIdHex,
                 )
             if (committedProjection != null) {
+                optimisticSendPhases[key] = OptimisticSendPhase.ACCEPTED_PENDING
                 preserveOptimisticDisplayPosition(committedProjection.messageIdHex, tempId)
                 appState.withGroupCommitLock(account, group.groupIdHex) {
                     appState.marmotIo { retryGroupConvergence(account, group.groupIdHex) }
@@ -9587,9 +9845,12 @@ class ConversationController(
                     .forEach(::removeProjectedRecord)
                 if (discardedDuringRetry.remove(key)) {
                     publishTimelineFromIndexes()
+                    optimisticSendPhases.remove(key)
+                    trimCancelledSendTombstones()
                     return
                 }
                 publishTimelineFromIndexes()
+                optimisticSendPhases.remove(key)
                 return
             }
             retryTrace = PerformanceDiagnostics.begin(PerformanceOperation.TEXT_SEND)
@@ -9600,7 +9861,7 @@ class ConversationController(
                 elapsedMs = 0L,
                 result = PerformanceResult.PENDING,
             )
-            val summary = publishTextWithRetry(replyTarget, account, text, retryTrace, tempId)
+            val summary = publishTextWithRetry(replyTarget, account, text, retryTrace, tempId, key)
             completeDurableAcceptance(key)
             if (discardedDuringRetry.remove(key)) {
                 // User discarded mid-flight; drop the result entirely.
@@ -9610,6 +9871,7 @@ class ConversationController(
                 rollbackOptimisticChatListPreview(tempId)
                 appState.pendingSendDiagnostics.forget(tempId)
                 publishTimelineFromIndexes()
+                trimCancelledSendTombstones()
                 return
             }
             val reconciliation =
@@ -9643,6 +9905,9 @@ class ConversationController(
                     .forEach(::removeProjectedRecord)
             }
             publishTimelineFromIndexes()
+            if (!reconciliation.acceptedPending) {
+                optimisticSendPhases.remove(key)
+            }
         } catch (throwable: Throwable) {
             handleFailedSendRetryFailure(
                 throwable = throwable,
@@ -9658,6 +9923,7 @@ class ConversationController(
     }
 
     /** Settle a manual text retry without republishing an uncertain delivery. */
+    @Suppress("LongMethod") // Each failure classification owns different cleanup and user-visible recovery state.
     private fun handleFailedSendRetryFailure(
         throwable: Throwable,
         key: String,
@@ -9668,6 +9934,16 @@ class ConversationController(
         account: String,
         retryTrace: PerformanceTrace?,
     ) {
+        if (throwable is OptimisticSendCancelledException) {
+            discardedDuringRetry.remove(key)
+            removeCancelledOptimisticSend(key, tempId)
+            trimCancelledSendTombstones()
+            return
+        }
+        if (throwable is CancellationException && optimisticSendPhases[key] == OptimisticSendPhase.CANCELLED) {
+            discardedDuringRetry.remove(key)
+            trimCancelledSendTombstones()
+        }
         throwable.rethrowIfCancellation()
         if (BuildConfig.DEBUG) Log.w("DMConversation", "retryFailedSend failed", throwable)
         when {
@@ -9680,6 +9956,7 @@ class ConversationController(
                 rollbackOptimisticChatListPreview(tempId)
                 appState.pendingSendDiagnostics.forget(tempId)
                 publishTimelineFromIndexes()
+                trimCancelledSendTombstones()
             }
             throwable.isUseAfterEviction() -> {
                 rollbackOptimisticChatListPreview(tempId)
@@ -9687,11 +9964,15 @@ class ConversationController(
                 durableAcceptanceCallbacks.remove(key)
                 messageById.remove(tempId)
                 retentionAtSendByMessageId.remove(tempId)
+                optimisticSendPhases.remove(key)
                 appState.pendingSendDiagnostics.forget(tempId)
                 publishTimelineFromIndexes()
                 markActiveAccountRemovedFromMembers(account)
             }
             isAmbiguousRelayDeliveryError(throwable) -> {
+                if (optimisticSendPhases[key] == OptimisticSendPhase.PRE_ACCEPTANCE) {
+                    optimisticSendPhases[key] = OptimisticSendPhase.ACCEPTANCE_UNKNOWN
+                }
                 // Publication may already have reached a relay. Keep the
                 // existing row Pending; another high-level send could mint a
                 // duplicate event.
@@ -9704,7 +9985,11 @@ class ConversationController(
                 appState.pendingSendDiagnostics.update(tempId, PerformanceSendStage.DELIVERY_UNCERTAIN)
                 publishTimelineFromIndexes()
             }
+            optimisticSendIsMdkOwnedOrUnknown(key) -> {
+                publishTimelineFromIndexes()
+            }
             else -> {
+                optimisticSendPhases[key] = OptimisticSendPhase.FAILED
                 optimisticMessages[key] =
                     current.copy(
                         record = refreshedRecord,
@@ -9728,12 +10013,11 @@ class ConversationController(
 
     /**
      * Drops a failed outgoing send from the local timeline. Purely client-side
-     * cleanup; the message was never accepted by the relay so there's nothing
-     * to retract. Only tracks the id in [discardedDuringRetry] when status is
-     * Pending (retry in flight); otherwise the set would grow unbounded with
-     * keys no retry coroutine ever consults.
+     * cleanup; the message was never accepted by MarmotKit, so there is
+     * nothing to retract. Cancellation still enters the group commit lock so
+     * a stale failure action cannot race a retry that has already been admitted.
      */
-    fun discardFailedSend(item: TimelineMessage) {
+    suspend fun discardFailedSend(item: TimelineMessage) {
         val key = item.id
         // Discarding a failed edit drops the local overlay, reverting the
         // bubble to its pre-edit body. The original message is untouched —
@@ -9743,33 +10027,16 @@ class ConversationController(
             publishTimelineFromIndexes()
             return
         }
-        // Re-read live state. If the user taps Retry then Discard before the
-        // bubble recomposes, the captured item.status is still Failed while
-        // the live state has moved to Pending — the Failed branch would
-        // no-op past discardedDuringRetry.add, and the in-flight retry would
-        // re-insert the confirmed message on completion. tempId likewise
-        // comes from the live record because retry refreshes messageIdHex.
-        val current = optimisticMessages[key]
-        val status = current?.status ?: item.status
-        val tempId = current?.record?.messageIdHex ?: item.record.messageIdHex
-        when (status) {
-            MessageStatus.Failed -> durableAcceptanceCallbacks.remove(key)
-            MessageStatus.Pending ->
-                if (current != null) {
-                    discardedDuringRetry.add(key)
-                } else {
-                    durableAcceptanceCallbacks.remove(key)
+        val current =
+            optimisticMessages[key]
+                ?: run {
+                    removeCancelledOptimisticSend(key, item.record.messageIdHex)
+                    return
                 }
-            else -> return
-        }
-        rollbackOptimisticChatListPreview(tempId)
-        optimisticMessages.remove(key)
-        messageById.remove(tempId)
-        retentionAtSendByMessageId.remove(tempId)
-        // Free any retained attachment bytes for a discarded media send.
-        retainedMediaUploads.remove(key)
-        activeUploadKeys.remove(key)
-        publishTimelineFromIndexes()
+        cancelOptimisticSendResult(current.record, optimisticKeyOverride = key)
+            .onFailure { failure ->
+                appState.presentFailure(R.string.toast_couldnt_delete_message, "MESSAGE_CANCEL", failure)
+            }
     }
 
     /**
@@ -11632,6 +11899,7 @@ class ConversationController(
             // just uploaded.
             handoffOwnMediaCacheOnReconcile(optimisticKey, record.messageIdHex)
             optimisticMessages.remove(optimisticKey)
+            optimisticSendPhases.remove(optimisticKey)
             messageById.remove(optimisticId)
             if (optimisticId == acceptedPendingTextOptimisticId) {
                 acceptedPendingTextOptimisticIds.remove(record.messageIdHex)

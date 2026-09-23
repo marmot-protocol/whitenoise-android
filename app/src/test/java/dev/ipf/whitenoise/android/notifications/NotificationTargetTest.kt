@@ -1147,36 +1147,35 @@ class NotificationTargetTest {
             assertFalse(shouldDeferNotificationChatListBind(gate, activeAccountRef = "acct-b"))
         }
 
+    /**
+     * The whole decision matrix for a message target: a ready broad snapshot decides the route only
+     * for a target it carries. Absence is never terminal on its own, whatever the request-scoped
+     * preload happens to hold at the time — including nothing at all, which is the state a tap on
+     * the already-active account starts in and the case that produced a false "no longer
+     * available".
+     */
     @Test
-    fun exactPreloadPreventsBroadListAbsenceFromWinningTheRoute() {
-        assertFalse(
-            notificationMessageRouteChatListReady(
-                chatListReady = true,
-                targetPresent = false,
-                preloadState = NotificationMessagePreloadState.Loading,
-            ),
-        )
-        assertFalse(
-            notificationMessageRouteChatListReady(
-                chatListReady = true,
-                targetPresent = false,
-                preloadState = NotificationMessagePreloadState.Ready("target"),
-            ),
-        )
-        assertTrue(
-            notificationMessageRouteChatListReady(
-                chatListReady = true,
-                targetPresent = false,
-                preloadState = NotificationMessagePreloadState.Failed,
-            ),
-        )
-        assertTrue(
-            notificationMessageRouteChatListReady(
-                chatListReady = true,
-                targetPresent = true,
-                preloadState = NotificationMessagePreloadState.Loading,
-            ),
-        )
+    fun broadListAbsenceNeverDecidesAMessageRoute() {
+        assertFalse(notificationMessageRouteChatListReady(chatListReady = true, targetPresent = false))
+        assertTrue(notificationMessageRouteChatListReady(chatListReady = true, targetPresent = true))
+        assertFalse(notificationMessageRouteChatListReady(chatListReady = false, targetPresent = false))
+        assertFalse(notificationMessageRouteChatListReady(chatListReady = false, targetPresent = true))
+    }
+
+    /** An absent target with no request-scoped preload takes the exact per-group read, not a toast. */
+    @Test
+    fun anAbsentTargetWithNoPreloadRoutesToTheExactRead() {
+        val step =
+            resolveNotificationNav(
+                target,
+                knownAccountRefs = setOf("acct-a"),
+                activeAccountRef = "acct-a",
+                chatListReady =
+                    notificationMessageRouteChatListReady(chatListReady = true, targetPresent = false),
+                availableGroupIds = setOf("group-other"),
+                exactPreloadReady = false,
+            )
+        assertEquals(NotificationNavStep.LoadMessageDirectly, step)
     }
 
     @Test

@@ -228,12 +228,23 @@ internal class NotificationGroupSystemTextResolver(
                 GroupSystemEvents.resolve(record)?.let { event ->
                     val diff = GroupSystemEvents.renameDiffNames(event)
                     val actorHex = GroupSystemEvents.actorHex(event, record.sender)
-                    val actorName =
-                        GroupSystemEvents.preferredName(
-                            actorName(update, actorHex, senderName, localOnly),
-                            event.actorDisplayName,
-                        ) ?: context.getString(R.string.group_system_someone)
                     val subjectHex = event.subject
+                    val subjectIsSelf = GroupSystemEvents.isSelf(update.accountIdHex, subjectHex)
+                    // Enrichment used to substitute "Someone" for every unresolved actor, which
+                    // turned the shared formatter's truthful "You were removed" into "Someone
+                    // removed you". The actor stays unnamed where the passive form is the honest
+                    // one, and keeps the old fallback everywhere else.
+                    val actorName =
+                        GroupSystemEvents.actorNameOrSomeone(
+                            event = event,
+                            resolvedActorName =
+                                GroupSystemEvents.preferredName(
+                                    actorName(update, actorHex, senderName, localOnly),
+                                    event.actorDisplayName,
+                                ),
+                            subjectIsSelf = subjectIsSelf,
+                            someone = context.getString(R.string.group_system_someone),
+                        )
                     val subjectName = subjectName(update, subjectHex, localOnly)
                     NotificationSystemText(
                         title = if (diff != null) context.getString(R.string.notification_group_renamed) else null,
@@ -252,7 +263,7 @@ internal class NotificationGroupSystemTextResolver(
                                     subjectName =
                                         GroupSystemEvents.preferredName(subjectName, event.subjectDisplayName),
                                     actorIsSelf = GroupSystemEvents.isSelf(update.accountIdHex, actorHex),
-                                    subjectIsSelf = GroupSystemEvents.isSelf(update.accountIdHex, subjectHex),
+                                    subjectIsSelf = subjectIsSelf,
                                     copy = notificationGroupSystemCopy(context),
                                 )
                             },

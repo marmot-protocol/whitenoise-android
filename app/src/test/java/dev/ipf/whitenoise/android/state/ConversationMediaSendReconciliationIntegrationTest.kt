@@ -36,9 +36,13 @@ import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import dev.ipf.whitenoise.android.core.MessageAttachments
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -48,6 +52,68 @@ import java.lang.reflect.Proxy
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class ConversationMediaSendReconciliationIntegrationTest {
+    @Test
+    fun cancellationBeforeNativeMediaAdmissionSkipsMarmotCall() =
+        assertDraftlessMediaUsesTokenBoundNativeAdmission(
+            mediaType = "image/jpeg",
+            fileName = "photo.jpg",
+            cancelBeforeUpload = true,
+        )
+
+    @Test
+    fun cancellationDuringUploadPreventsMediaPublication() =
+        runTest {
+            val uploadStarted = CompletableDeferred<Unit>()
+            val finishUpload = CompletableDeferred<Unit>()
+            var publishCalls = 0
+            val reference = mediaReference()
+            val controller =
+                ConversationController(
+                    appState = appState(),
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    groupRosterReader = { _, _ -> authoritativeRoster() },
+                    mediaUploader = { _, _, _ ->
+                        uploadStarted.complete(Unit)
+                        finishUpload.await()
+                        uploadResult(reference)
+                    },
+                    mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
+                    mediaPublisher = { _, _, _, _ ->
+                        publishCalls += 1
+                        acceptedPendingSummary()
+                    },
+                )
+            controller.retryMembers()
+
+            val send =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    controller.sendAttachments(
+                        attachments =
+                            listOf(
+                                PendingAttachment(
+                                    plaintextBytes = byteArrayOf(1, 2, 3, 4),
+                                    mediaType = "image/jpeg",
+                                    fileName = "photo.jpg",
+                                ),
+                            ),
+                        caption = "cancel upload",
+                    )
+                }
+            uploadStarted.await()
+            val pending = controller.timeline.single().record
+
+            assertEquals(true, controller.deleteMessage(pending, presentFailure = false))
+            assertEquals(emptyList<TimelineMessage>(), controller.timeline)
+
+            finishUpload.complete(Unit)
+            send.await()
+
+            assertEquals(0, publishCalls)
+            assertEquals(emptyList<TimelineMessage>(), controller.timeline)
+            assertEquals(emptyList<PendingAttachment>(), controller.pendingAttachmentsList(pending.messageIdHex))
+        }
+
     /** Exercises the production voice-note path without an injected publisher or uploader. */
     @Test
     fun draftlessVoiceNoteUsesTokenBoundNativeAdmission() =
@@ -129,9 +195,11 @@ class ConversationMediaSendReconciliationIntegrationTest {
         }
 
     /** Exercises the default production path: no injected uploader or publisher test seam. */
+    @Suppress("LongMethod") // The native proxy and both cancellation/admission outcomes share one fixture.
     private fun assertDraftlessMediaUsesTokenBoundNativeAdmission(
         mediaType: String,
         fileName: String,
+        cancelBeforeUpload: Boolean = false,
     ) = runTest {
         val calls = mutableListOf<String>()
         var uploadedRequest: MediaUploadRequestFfi? = null
@@ -181,10 +249,24 @@ class ConversationMediaSendReconciliationIntegrationTest {
 
         controller.retryMembers()
         assertEquals(true, controller.canSendMessages)
-        controller.sendAttachments(
-            listOf(PendingAttachment(byteArrayOf(1, 2, 3, 4), mediaType, fileName)),
-            caption = null,
-        )
+        val seeded =
+            requireNotNull(
+                controller.queueAttachments(
+                    listOf(PendingAttachment(byteArrayOf(1, 2, 3, 4), mediaType, fileName)),
+                    caption = null,
+                ),
+            )
+        val pending = controller.timeline.single().record
+
+        if (cancelBeforeUpload) {
+            assertTrue(controller.deleteMessage(pending, presentFailure = false))
+            controller.uploadQueued(seeded)
+            assertEquals(0, calls.count { it == "uploadMediaWithClientToken" })
+            assertEquals(emptyList<TimelineMessage>(), controller.timeline)
+            return@runTest
+        }
+
+        controller.uploadQueued(seeded)
 
         assertEquals(1, calls.count { it == "uploadMediaWithClientToken" })
         assertFalse(calls.contains("sendMediaAttachments"))
@@ -192,6 +274,7 @@ class ConversationMediaSendReconciliationIntegrationTest {
         assertEquals(true, uploadedRequest?.send)
         assertEquals(mediaType, uploadedRequest?.attachments?.single()?.mediaType)
         assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+        assertFalse(controller.deleteMessage(pending, presentFailure = false))
     }
 
     private fun attachedChatsController(appState: WhiteNoiseAppState): ChatsController =

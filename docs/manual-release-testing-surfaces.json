@@ -3,6 +3,12 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "Amber grouped-send screen admission and merge budget",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/amber/AmberActivityCoordinator.kt",
+        "anchor": "GROUPED_SESSION_BOOTSTRAP_MS",
+        "test_ids": ["MSG-020"]
+      },
+      {
         "surface": "Send failure caused by a transient relay outage",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/SendFailureNotices.kt",
         "anchor": "R.string.toast_send_connection_failed",
@@ -200,6 +206,14 @@
         ]
       },
       {
+        "surface": "Pre-admission optimistic send cancellation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "private suspend fun cancelOptimisticSendResult(",
+        "test_ids": [
+          "MSG-019"
+        ]
+      },
+      {
         "surface": "Conversation window open exceeded its deadline",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "R.string.error_window_timed_out",
@@ -223,6 +237,14 @@
         "test_ids": [
           "CHL-010",
           "GRP-010"
+        ]
+      },
+      {
+        "surface": "toast couldnt delete pending message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_couldnt_delete_message",
+        "test_ids": [
+          "MSG-019"
         ]
       },
       {
@@ -480,6 +502,15 @@
         "anchor": "fun ShellTransientNoticeLayout(",
         "test_ids": [
           "INT-004",
+          "SET-023"
+        ]
+      },
+      {
+        "surface": "Global transient notice bottom obstruction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "val globalTransientNoticeInsets: WindowInsets",
+        "test_ids": [
+          "PRO-001",
           "SET-023"
         ]
       },
@@ -948,6 +979,14 @@
         "test_ids": [
           "CHL-001",
           "SEC-012"
+        ]
+      },
+      {
+        "surface": "ChatListViewportOwner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListViewportOwner.kt",
+        "anchor": "data class ChatListViewportOwner(",
+        "test_ids": [
+          "NAV-005"
         ]
       },
       {
@@ -2266,6 +2305,14 @@
         ]
       },
       {
+        "surface": "Notification message route broad-snapshot authority",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/InactiveNotificationRouteStage.kt",
+        "anchor": "fun notificationMessageRouteChatListReady(",
+        "test_ids": [
+          "NTF-009"
+        ]
+      },
+      {
         "surface": "ConversationScreen",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "anchor": "fun ConversationScreen(",
@@ -2376,6 +2423,14 @@
         "surface": "GroupRecoveryCard",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
         "anchor": "fun GroupRecoveryCard(",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "Fresh group creation recovery-read policy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/FreshGroupCreation.kt",
+        "anchor": "fun groupRecoveryReadFailureIsPresentable(",
         "test_ids": [
           "GRP-021"
         ]
@@ -3779,7 +3834,8 @@
         "test_ids": [
           "CON-006",
           "MED-003",
-          "MED-007"
+          "MED-007",
+          "MSG-019"
         ]
       },
       {
@@ -3891,6 +3947,14 @@
         "anchor": "fun FocusedReactionTarget(",
         "test_ids": [
           "MSG-004",
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "focusedReactionItemsPerRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "fun focusedReactionItemsPerRow(",
+        "test_ids": [
           "MSG-005"
         ]
       },
@@ -4168,6 +4232,7 @@
           "MSG-005",
           "MSG-013",
           "MSG-015",
+          "MSG-019",
           "CON-017"
         ]
       },
@@ -6278,6 +6343,87 @@
         "test_ids": [
           "PRO-001",
           "PRO-002"
+        ]
+      },
+      {
+        "surface": "IdentityImageCropDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
+        "anchor": "fun IdentityImageCropDialog(",
+        "test_ids": [
+          "PRO-002",
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "IdentityImageCropTopBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
+        "anchor": "fun IdentityImageCropTopBar(",
+        "test_ids": [
+          "PRO-002",
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "IdentityImageCropCanvas",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
+        "anchor": "fun IdentityImageCropCanvas(",
+        "test_ids": [
+          "PRO-002",
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "IdentityImageCropActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
+        "anchor": "fun IdentityImageCropActions(",
+        "test_ids": [
+          "PRO-002",
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "IdentityImageCropFlow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropFlow.kt",
+        "anchor": "fun IdentityImageCropFlow(",
+        "test_ids": [
+          "PRO-002",
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "string:identity_crop_close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "PRO-002",
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "string:identity_crop_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
+        "anchor": "R.string.photo_editor_crop",
+        "test_ids": [
+          "PRO-002",
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "string:identity_crop_done",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
+        "anchor": "R.string.done",
+        "test_ids": [
+          "PRO-002",
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "string:identity_crop_rotate",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
+        "anchor": "R.string.photo_editor_rotate_clockwise",
+        "test_ids": [
+          "PRO-002",
+          "GRP-003"
         ]
       },
       {
@@ -22595,6 +22741,14 @@
         ]
       },
       {
+        "surface": "Dictation platform-error cause mapping",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "fun Int.toConversationDictationFailure(",
+        "test_ids": [
+          "DIC-003"
+        ]
+      },
+      {
         "surface": "Dictation automatic completion observes captured speech and drains the tail",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
         "anchor": "private fun finishAfterCallerAudioSilence(",
@@ -22982,6 +23136,14 @@
         "test_ids": [
           "GRP-017",
           "CHL-002"
+        ]
+      },
+      {
+        "surface": "Removal-of-self actor fallback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/GroupSystemEvents.kt",
+        "anchor": "fun actorNameOrSomeone(",
+        "test_ids": [
+          "GRP-006"
         ]
       },
       {

@@ -24,8 +24,14 @@ class NotificationGroupSystemTextCoverageTest {
         assertTrue(
             "member/admin system notifications should reuse the localized group-system summary path",
             "GroupSystemEvents.summary(" in body &&
-                "subjectIsSelf = GroupSystemEvents.isSelf(update.accountIdHex, subjectHex)" in body &&
+                "val subjectIsSelf = GroupSystemEvents.isSelf(update.accountIdHex, subjectHex)" in body &&
+                "subjectIsSelf = subjectIsSelf," in body &&
                 "copy = notificationGroupSystemCopy(context)" in body,
+        )
+        assertTrue(
+            "an unresolved actor must reach the shared summary unnamed, never pre-replaced with Someone",
+            "GroupSystemEvents.actorNameOrSomeone(" in body &&
+                "?: context.getString(R.string.group_system_someone)" !in body,
         )
     }
 
