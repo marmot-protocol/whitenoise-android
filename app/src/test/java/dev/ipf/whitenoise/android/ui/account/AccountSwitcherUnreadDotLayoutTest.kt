@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.ui.account
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -135,11 +137,14 @@ class AccountSwitcherUnreadDotLayoutTest {
         composeRule.setContent {
             val generation = callbackGeneration.value
             WhiteNoiseTheme {
-                OtherAccountAvatarsRow(
-                    appState = appState,
-                    onSwitchAccount = { accountRef -> switched += "$generation:$accountRef" },
-                    onOpenSwitcher = { opened += generation },
-                )
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    OtherAccountAvatarsRow(
+                        appState = appState,
+                        onSwitchAccount = { accountRef -> switched += "$generation:$accountRef" },
+                        onOpenSwitcher = { opened += generation },
+                        barWidthDp = maxWidth,
+                    )
+                }
             }
         }
         composeRule.runOnIdle { callbackGeneration.value = 1 }

@@ -1,6 +1,9 @@
 package dev.ipf.whitenoise.android.ui.account
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -15,6 +18,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -171,6 +175,26 @@ class QuickSwitchTargetSpacingTest {
         )
     }
 
+    /**
+     * A pane narrower than the window still collapses to the overflow chip — capacity must come
+     * from the bar's own measured width, not [androidx.compose.ui.platform.LocalWindowInfo]'s full
+     * window (#2796 follow-up). The window here is wide enough that every avatar would fit if the
+     * old window-width reading were still in effect; only the 320dp host pane is narrow.
+     */
+    @Test
+    @Config(sdk = [36], qualifiers = "w800dp-h780dp-mdpi")
+    fun narrowHostPaneInAWideWindowStillCollapsesToOverflow() {
+        renderTopBar(testAppState(accountCount = 5), hostWidth = 320.dp)
+        composeRule.onNodeWithTag(otherAccountAvatarTag("account-2"), useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithTag(otherAccountAvatarTag("account-3"), useUnmergedTree = true).assertDoesNotExist()
+        val stack = boundsForTag(OTHER_ACCOUNT_STACK_TAG)
+        val chip = boundsForTag(OTHER_ACCOUNT_OVERFLOW_TAG)
+        assertTrue(
+            "the overflow chip must appear once the host pane, not the window, runs out of room",
+            chip.left >= stack.left,
+        )
+    }
+
     /** Taps at each avatar's centre and both edges, in order, reach only that avatar's account. */
     private fun assertAvatarEdgeTapsRouteToTheirOwnAccount(
         rtl: Boolean,
@@ -206,11 +230,14 @@ class QuickSwitchTargetSpacingTest {
             ) {
                 WhiteNoiseTheme {
                     Box(Modifier.testTag(HARNESS_TAG)) {
-                        OtherAccountAvatarsRow(
-                            appState = remember { appState },
-                            onSwitchAccount = onSwitchAccount,
-                            onOpenSwitcher = onOpenSwitcher,
-                        )
+                        BoxWithConstraints(Modifier.fillMaxWidth()) {
+                            OtherAccountAvatarsRow(
+                                appState = remember { appState },
+                                onSwitchAccount = onSwitchAccount,
+                                onOpenSwitcher = onOpenSwitcher,
+                                barWidthDp = maxWidth,
+                            )
+                        }
                     }
                 }
             }
@@ -218,14 +245,19 @@ class QuickSwitchTargetSpacingTest {
         composeRule.waitForIdle()
     }
 
-    /** Renders the production chat-list header so the stack is measured beside the real top-bar controls. */
+    /**
+     * Renders the production chat-list header so the stack is measured beside the real top-bar
+     * controls. [hostWidth], when given, hosts the bar in a pane narrower than the Robolectric
+     * window itself — simulating a multi-pane layout where the bar is not the full window width.
+     */
     private fun renderTopBar(
         appState: WhiteNoiseAppState,
         fontScale: Float = 1f,
+        hostWidth: Dp? = null,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(fontScale = fontScale) {
-                Box(Modifier.testTag(HARNESS_TAG)) {
+                Box(Modifier.testTag(HARNESS_TAG).let { if (hostWidth != null) it.width(hostWidth) else it }) {
                     ChatListTopBar(
                         appState = remember { appState },
                         searchOpen = false,

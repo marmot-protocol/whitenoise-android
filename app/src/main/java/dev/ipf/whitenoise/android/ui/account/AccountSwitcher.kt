@@ -22,9 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -191,15 +189,17 @@ internal fun OtherAccountAvatarsRow(
     appState: WhiteNoiseAppState,
     onSwitchAccount: (String) -> Unit,
     onOpenSwitcher: () -> Unit,
+    // The top bar's own measured width, not the full window: on a multi-pane layout this bar
+    // can be narrower than the window, and reserving space against the wrong width can crowd
+    // the rest of the bar (#2796 follow-up). Callers measure this with BoxWithConstraints.
+    barWidthDp: Dp,
 ) {
     // Signed-in accounts other than the active one. Empty while a destructive
     // wipe transiently nulls the active account, so no frame can flash the
     // just-wiped (or a still-stale previously-wiped) account (#809).
     val others = otherAccountAvatars(appState.accounts, appState.activeAccount?.label)
     if (others.isEmpty()) return
-    val density = LocalDensity.current
-    val barWidthPx = LocalWindowInfo.current.containerSize.width
-    val slotCapacity = quickSwitchSlotCapacity(with(density) { barWidthPx.toDp() }.value)
+    val slotCapacity = quickSwitchSlotCapacity(barWidthDp.value)
     val shown = others.take(quickSwitchVisibleAvatarCount(slotCapacity, others.size))
     val overflow = others.size - shown.size
     val layoutDirection = LocalLayoutDirection.current

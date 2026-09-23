@@ -23971,9 +23971,25 @@
         ]
       },
       {
+        "surface": "R.string.back",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.back",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
         "surface": "R.string.chat_list_search_clear",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
         "anchor": "R.string.chat_list_search_clear",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
+        "surface": "R.string.chat_list_search_open",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.chat_list_search_open",
         "test_ids": [
           "FIND-001"
         ]
