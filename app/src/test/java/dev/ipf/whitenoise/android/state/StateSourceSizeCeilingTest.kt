@@ -56,10 +56,10 @@ class StateSourceSizeCeilingTest {
         // Navigation-resilient dictation adds 30 lines for atomic reply ownership,
         // claim release, and detached dispatch.
         // PR #2792 adds the covered shared send-phase registry and commit-lock helpers;
-        // current base adds one line of fresh-group recovery state. Replacement-controller
+        // current base contributes two lines of fresh-group recovery state. Replacement-controller
         // retry regression adds a shared per-conversation wakeup registry (+12 lines).
         // Play/Zapstore unit tests and Kover run in required CI; keep merged size exact.
-        const val APP_STATE_MAX_LINES = 10415
+        const val APP_STATE_MAX_LINES = 10416
 
         /** Counts physical source lines with the same trailing-newline semantics as `wc -l`. */
         internal fun sourceLineCount(file: File): Int = file.bufferedReader().useLines { lines -> lines.count() }
