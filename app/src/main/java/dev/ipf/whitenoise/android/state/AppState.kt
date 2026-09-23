@@ -8551,12 +8551,6 @@ class WhiteNoiseAppState private constructor(
 
     fun contactNickname(accountIdHex: String): String? = contactNicknameFor(activeAccountRef, accountIdHex)
 
-    /** Reads a private nickname for the explicitly captured account that owns an asynchronous UI result. */
-    internal fun contactNicknameForAccount(
-        accountRef: String?,
-        accountIdHex: String,
-    ): String? = contactNicknameFor(accountRef, accountIdHex)
-
     fun setContactNickname(
         accountIdHex: String,
         nickname: String,
@@ -8593,7 +8587,8 @@ class WhiteNoiseAppState private constructor(
         return networkDisplayName(accountIdHex)
     }
 
-    private fun contactNicknameFor(
+    /** Reads a private nickname for the explicitly captured account that owns an asynchronous UI result. */
+    internal fun contactNicknameFor(
         accountRef: String?,
         accountIdHex: String,
     ): String? {

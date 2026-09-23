@@ -222,7 +222,7 @@ internal fun rememberRecipientUserSearchState(
             rawState.value.copy(
                 candidates =
                     withLocalRecipientDisplayNames(rawState.value.candidates) { accountIdHex ->
-                        appState.contactNicknameForAccount(activeAccountRef, accountIdHex)
+                        appState.contactNicknameFor(activeAccountRef, accountIdHex)
                     },
             )
         }

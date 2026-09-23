@@ -63,6 +63,13 @@ internal fun Modifier.verticalEdgeFade(
     topFade: Dp,
     bottomFade: Dp,
     bottomInset: Dp = 0.dp,
+): Modifier = verticalEdgeFade(topFade = { topFade }, bottomFade = { bottomFade }, bottomInset = { bottomInset })
+
+/** Applies a vertical edge mask while deferring animated values to the draw phase. */
+internal fun Modifier.verticalEdgeFade(
+    topFade: () -> Dp,
+    bottomFade: () -> Dp,
+    bottomInset: () -> Dp = { 0.dp },
 ): Modifier =
     this
         .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
@@ -71,9 +78,9 @@ internal fun Modifier.verticalEdgeFade(
             val stops =
                 verticalEdgeFadeStops(
                     heightPx = size.height,
-                    topFadePx = topFade.toPx(),
-                    bottomFadePx = bottomFade.toPx(),
-                    bottomInsetPx = bottomInset.toPx(),
+                    topFadePx = topFade().toPx(),
+                    bottomFadePx = bottomFade().toPx(),
+                    bottomInsetPx = bottomInset().toPx(),
                 ) ?: return@drawWithContent
             drawRect(
                 brush = Brush.verticalGradient(colorStops = stops.toTypedArray()),
