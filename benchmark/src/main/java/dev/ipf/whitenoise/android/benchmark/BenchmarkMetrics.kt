@@ -16,6 +16,23 @@ internal const val CREATE_GROUP_TRACE = "benchmark:create-group"
 internal const val ACCEPT_INVITE_TRACE = "benchmark:accept-invite"
 internal const val SCROLL_CONVERSATION_TRACE = "benchmark:scroll-conversation"
 internal const val SCROLL_CHAT_LIST_TRACE = "benchmark:scroll-chat-list"
+internal const val PAGING_DEEP_OLDER_TRACE = "benchmark:paging-deep-older"
+internal const val PAGING_RETURN_NEWER_TRACE = "benchmark:paging-return-newer"
+internal const val PAGING_JUMP_TO_NEWEST_TRACE = "benchmark:paging-jump-to-newest"
+internal const val PAGING_MOMENTUM_TRACE = "benchmark:paging-momentum"
+internal const val PAGING_BUSY_ENGINE_TRACE = "benchmark:paging-busy-engine"
+
+/**
+ * Slices the app emits around one page of conversation history, mirrored from
+ * `ConversationPagingTraceSection` in the app module (the benchmark module does
+ * not depend on app sources).
+ */
+private const val PAGE_WINDOW_TRACE = "WhiteNoise.conversation.page.window"
+private const val PAGE_PREPARE_TRACE = "WhiteNoise.conversation.page.prepare"
+private const val PAGE_APPLY_TRACE = "WhiteNoise.conversation.page.apply"
+private const val PAGE_EDGE_STOP_TRACE = "WhiteNoise.conversation.page.edgeStop"
+private const val PAGE_RUNWAY_KEPT_TRACE = "WhiteNoise.conversation.page.runwayKept"
+private const val PAGE_EDGE_REACHED_TRACE = "WhiteNoise.conversation.page.edgeReached"
 internal const val SECONDARY_ACCOUNT_NOTIFICATION_TRACE = "benchmark:secondary-account-notification"
 internal const val OPEN_CONVERSATION_VISIBLE_TRACE = "benchmark:open-conversation-visible"
 internal const val OPEN_CONVERSATION_SETTLED_TRACE = "benchmark:open-conversation-settled"
@@ -156,6 +173,54 @@ internal fun scrollMetrics(sectionName: String): List<Metric> =
                     MemoryUsageMetric.SubMetric.Gpu,
                 ),
         )
+
+/**
+ * Everything [scrollMetrics] reports, plus what makes history paging visible to
+ * a reader. `pageCount` proves the journey crossed boundaries at all; the window
+ * sum is the engine's share and the apply sum the app's; `edgeStopCount` and
+ * `edgeReachedCount` are the two ways a reader notices a page — resting on the
+ * edge with more history behind it, or having reached the old edge before the
+ * page landed — and both are expected to be zero. CPU and memory energy are
+ * system-wide rails, compared against the same fling inside an already-loaded
+ * window so paging is charged only for what it adds to drawing.
+ */
+@OptIn(ExperimentalMetricApi::class)
+internal fun pagingMetrics(sectionName: String): List<Metric> =
+    scrollMetrics(sectionName) +
+        listOf(
+            pagingSection(PAGE_WINDOW_TRACE, TraceSectionMetric.Mode.Count, "pageCount"),
+            pagingSection(PAGE_WINDOW_TRACE, TraceSectionMetric.Mode.Sum, "pageWindowMs"),
+            pagingSection(PAGE_WINDOW_TRACE, TraceSectionMetric.Mode.Max, "pageWindowMaxMs"),
+            pagingSection(PAGE_PREPARE_TRACE, TraceSectionMetric.Mode.Sum, "pagePrepareMs"),
+            pagingSection(PAGE_APPLY_TRACE, TraceSectionMetric.Mode.Sum, "pageApplyMs"),
+            pagingSection(PAGE_APPLY_TRACE, TraceSectionMetric.Mode.Max, "pageApplyMaxMs"),
+            pagingSection(PAGE_EDGE_STOP_TRACE, TraceSectionMetric.Mode.Count, "edgeStopCount"),
+            pagingSection(PAGE_RUNWAY_KEPT_TRACE, TraceSectionMetric.Mode.Count, "runwayKeptCount"),
+            pagingSection(PAGE_EDGE_REACHED_TRACE, TraceSectionMetric.Mode.Count, "edgeReachedCount"),
+            PowerMetric(
+                type =
+                    PowerMetric.Type.Energy(
+                        mapOf(
+                            PowerCategory.CPU to PowerCategoryDisplayLevel.TOTAL,
+                            PowerCategory.MEMORY to PowerCategoryDisplayLevel.TOTAL,
+                        ),
+                    ),
+            ),
+        )
+
+/** One paging slice aggregated over the measured block, restricted to the app's own process. */
+@OptIn(ExperimentalMetricApi::class)
+private fun pagingSection(
+    sectionName: String,
+    mode: TraceSectionMetric.Mode,
+    label: String,
+): Metric =
+    TraceSectionMetric(
+        sectionName = sectionName,
+        mode = mode,
+        label = label,
+        targetPackageOnly = true,
+    )
 
 @OptIn(ExperimentalMetricApi::class)
 internal fun warmResumeMetrics(): List<Metric> =

@@ -223,6 +223,36 @@ internal class WhiteNoiseJourneys {
         )
     }
 
+    /**
+     * Flings the transcript [count] times, each covering roughly one and a half screens, toward older
+     * history (finger travelling down the screen, revealing the rows above) or back toward the newest
+     * row. [settleMs] is the pause between flings; a short one lands the next fling while the list is
+     * still coasting, which is how a reader flicks through history.
+     */
+    fun flingConversation(
+        count: Int,
+        towardOlder: Boolean,
+        settleMs: Long = FLING_SETTLE_MS,
+    ) {
+        val x = device.displayWidth / 2
+        val nearTop = device.displayHeight * FLING_EDGE_NUMERATOR / FLING_EDGE_DENOMINATOR
+        val nearBottom = device.displayHeight * (FLING_EDGE_DENOMINATOR - FLING_EDGE_NUMERATOR) / FLING_EDGE_DENOMINATOR
+        val (start, end) = if (towardOlder) nearTop to nearBottom else nearBottom to nearTop
+        repeat(count) {
+            check(device.swipe(x, start, x, end, FLING_STEPS)) {
+                "Failed to fling the conversation toward ${if (towardOlder) "older" else "newer"} messages."
+            }
+            if (settleMs > 0) SystemClock.sleep(settleMs)
+        }
+    }
+
+    /** Taps jump-to-newest and waits for it to leave, which is the transcript back on its live tail. */
+    fun jumpToNewest() {
+        waitForVisibleTag(PerformanceTags.JUMP_TO_NEWEST).click()
+        waitForVisibleTagAbsent(PerformanceTags.JUMP_TO_NEWEST, NETWORK_STATE_TIMEOUT_MS)
+        device.waitForIdle()
+    }
+
     fun scrollConversation() {
         val x = device.displayWidth / 2
         val top = device.displayHeight / 4
@@ -750,6 +780,10 @@ internal class WhiteNoiseJourneys {
         const val SELECTOR_POLL_INTERVAL_MS = 50L
         const val CONVERSATION_SCROLL_PASSES = 4
         const val CONVERSATION_SCROLL_STEPS = 20
+        const val FLING_STEPS = 8
+        const val FLING_SETTLE_MS = 900L
+        const val FLING_EDGE_NUMERATOR = 3
+        const val FLING_EDGE_DENOMINATOR = 20
         const val CHAT_LIST_SCROLL_PASSES = 4
         const val CHAT_LIST_SCROLL_STEPS = 20
         const val ANDROID_SETTINGS_PACKAGE = "com.android.settings"
