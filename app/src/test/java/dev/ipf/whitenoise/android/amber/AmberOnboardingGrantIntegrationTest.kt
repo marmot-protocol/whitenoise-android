@@ -48,6 +48,7 @@ class AmberOnboardingGrantIntegrationTest {
 
     @Before
     fun setUp() {
+        AmberActivityCoordinator.resetForTest()
         launcher = CountingLauncher()
         AmberActivityCoordinator.attach(launcher)
         installAmber64()
@@ -62,6 +63,7 @@ class AmberOnboardingGrantIntegrationTest {
     @After
     fun tearDown() {
         AmberActivityCoordinator.detach(launcher)
+        AmberActivityCoordinator.resetForTest()
         Nip55.clearSignerPackage(context)
         ShadowContentResolver.reset()
     }

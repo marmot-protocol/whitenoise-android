@@ -186,6 +186,8 @@
     <string name="profile_unfollow">Remover contato</string>
     <string name="profile_block">Bloquear</string>
     <string name="profile_unblock">Desbloquear</string>
+    <string name="profile_mute_in_group">Silenciar neste grupo</string>
+    <string name="profile_unmute_in_group">Reativar som neste grupo</string>
     <string name="blocked_users">Pessoas bloqueadas</string>
     <string name="blocked_users_empty">Você não bloqueou ninguém.</string>
     <string name="blocked_users_detail">Pessoas bloqueadas não podem enviar mensagens diretas para você. Os grupos em comum continuam funcionando e o histórico permanece neste dispositivo.</string>
@@ -450,7 +452,7 @@
     <string name="device_protection">Proteção do dispositivo</string>
     <string name="message_privacy">Privacidade das mensagens</string>
     <string name="default_disappearing_messages">Mensagens temporárias predefinidas</string>
-    <string name="default_disappearing_messages_detail">Usado quando este perfil inicia uma nova conversa ou cria um novo grupo. Cada conversa pode ser alterada depois.</string>
+    <string name="default_disappearing_messages_detail">Usadas quando este perfil inicia uma nova conversa ou cria um novo grupo. Cada conversa pode ser alterada depois.</string>
     <string name="default_disappearing_messages_picker_detail">Escolha por quanto tempo as novas mensagens permanecem nas conversas e nos grupos criados por este perfil. Isto não altera conversas existentes.</string>
     <string name="incognito_keyboard_detail">Peça ao teclado para não aprender com o que você digita no White Noise. Seu teclado pode ignorar este pedido.</string>
     <string name="require_device_authentication">Exigir autenticação do dispositivo</string>

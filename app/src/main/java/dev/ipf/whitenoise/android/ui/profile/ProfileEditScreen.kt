@@ -39,6 +39,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,6 +50,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -66,10 +68,14 @@ import dev.ipf.whitenoise.android.core.Nip05Resolver
 import dev.ipf.whitenoise.android.core.ProfileFieldValidation
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.media.GroupImageDraftProcessor
+import dev.ipf.whitenoise.android.media.IdentityImageCropShape
+import dev.ipf.whitenoise.android.media.renderIdentityImageDraft
+import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.randomProfilePseudonym
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.IdentityImageCropFlow
 import dev.ipf.whitenoise.android.ui.group.ImagePreviewPresentation
 import dev.ipf.whitenoise.android.ui.group.ImageSearchSheet
 import dev.ipf.whitenoise.android.ui.theme.Dimens
@@ -127,12 +133,18 @@ internal fun ProfileBannerControl(
     isUploading: Boolean,
     isProfileLoaded: Boolean = true,
     showValidationError: Boolean = true,
-    imageLoader: suspend (String) -> ImageBitmap? = { AvatarImageLoader.load(it) },
+    imageLoader: suspend (String, Int) -> ImageBitmap? = AvatarImageLoader::loadBanner,
     onClick: () -> Unit,
 ) {
-    var bannerImage by remember(bannerUrl) { mutableStateOf(AvatarImageLoader.peek(bannerUrl)) }
-    LaunchedEffect(bannerUrl) {
-        if (bannerImage == null && bannerUrl != null) bannerImage = imageLoader(bannerUrl)
+    // A 2:1 banner fills the screen's width, so it is decoded for that box
+    // rather than through the avatar cap it used to share (#2762).
+    val targetWidthPx = profileBannerTargetWidthPx(LocalConfiguration.current.screenWidthDp.dp)
+    var bannerImage by
+        remember(bannerUrl, targetWidthPx) {
+            mutableStateOf(AvatarImageLoader.peekBanner(bannerUrl, targetWidthPx))
+        }
+    LaunchedEffect(bannerUrl, targetWidthPx) {
+        if (bannerImage == null && bannerUrl != null) bannerImage = imageLoader(bannerUrl, targetWidthPx)
     }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -512,6 +524,7 @@ internal fun ProfileEditScreen(
     var showPictureSheet by remember(activeAccountId) { mutableStateOf(false) }
     var showBannerSheet by remember(activeAccountId) { mutableStateOf(false) }
     var fullPictureOpen by remember(activeAccountId) { mutableStateOf(false) }
+    var pendingAvatarCropUri by rememberSaveable(activeAccountId) { mutableStateOf<android.net.Uri?>(null) }
     var fullBannerOpen by remember(activeAccountId) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -817,9 +830,30 @@ internal fun ProfileEditScreen(
         onEditBanner = { showBannerSheet = true },
         onOpenBanner = { fullBannerOpen = true },
         onPickImage = { target, uri ->
-            uploadProfileDraft(target) { GroupImageDraftProcessor.fromContentUri(context.contentResolver, uri) }
+            if (target == ProfileImageTarget.Picture) {
+                pendingAvatarCropUri = uri
+            } else {
+                uploadProfileDraft(target) { GroupImageDraftProcessor.fromContentUri(context.contentResolver, uri) }
+            }
         },
         onRemoveImage = { target -> imageDrafts = imageDrafts.without(target) },
+    )
+
+    IdentityImageCropFlow(
+        uri = pendingAvatarCropUri,
+        shape = IdentityImageCropShape.Circle,
+        onDismiss = { pendingAvatarCropUri = null },
+        onUnreadable = { uri ->
+            uploadProfileDraft(ProfileImageTarget.Picture) {
+                GroupImageDraftProcessor.fromContentUri(context.contentResolver, uri)
+            }
+        },
+        onCropped = { bytes, crop ->
+            pendingAvatarCropUri = null
+            uploadProfileDraft(ProfileImageTarget.Picture) {
+                renderIdentityImageDraft(bytes, crop, MediaQuality.Standard)
+            }
+        },
     )
 
     if (fullPictureOpen && safePictureUrl != null && avatarImageAvailable) {
@@ -886,11 +920,7 @@ internal fun ProfileEditScreen(
                     }
                 }
             },
-            onPickPhoto = { uri ->
-                uploadProfileDraft(target = ProfileImageTarget.Picture) {
-                    GroupImageDraftProcessor.fromContentUri(context.contentResolver, uri)
-                }
-            },
+            onPickPhoto = { uri -> pendingAvatarCropUri = uri },
             onDismiss = { if (!pictureUploading) showPictureSheet = false },
         )
     }

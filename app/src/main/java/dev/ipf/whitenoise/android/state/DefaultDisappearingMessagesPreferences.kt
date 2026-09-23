@@ -22,6 +22,7 @@ internal class DefaultDisappearingMessagesPreferences(
     private val _durations = MutableStateFlow(loadDurations())
     val durations: StateFlow<Map<String, Long>> = _durations.asStateFlow()
 
+    /** Returns Off for an unset account, an absent preference, or an invalid stored value. */
     fun durationFor(
         accountRef: String?,
         snapshot: Map<String, Long> = _durations.value,
@@ -55,6 +56,7 @@ internal class DefaultDisappearingMessagesPreferences(
         }
     }
 
+    /** Loads only account keys with durations accepted by the shared picker. */
     private fun loadDurations(): Map<String, Long> =
         preferences.all
             .mapNotNull { (key, value) ->
@@ -75,6 +77,7 @@ internal class DefaultDisappearingMessagesPreferences(
         internal const val OFF_SECONDS = 0L
         private const val KEY_PREFIX = "default_disappearing_messages:"
 
+        /** Keeps account keys distinct even when one identifier is a prefix of another. */
         internal fun preferenceKey(accountRef: String?): String? {
             val account = accountRef?.trim()?.takeIf(String::isNotEmpty) ?: return null
             return "$KEY_PREFIX${account.length}:$account"
@@ -91,9 +94,11 @@ internal fun isValidDisappearingMessageDurationSeconds(seconds: Long): Boolean =
                 seconds / unit.seconds in 1L..unit.max.toLong()
         }
 
+/** Reads the local founding default for the selected account without changing existing chats. */
 internal fun WhiteNoiseAppState.defaultDisappearingMessagesSeconds(accountRef: String? = activeAccountRef): Long =
     defaultDisappearingMessagesPreferences.durationFor(accountRef)
 
+/** Updates only the active account's founding default; stale account UI writes are rejected. */
 internal fun WhiteNoiseAppState.setDefaultDisappearingMessagesSeconds(
     seconds: Long,
     accountRef: String? = activeAccountRef,

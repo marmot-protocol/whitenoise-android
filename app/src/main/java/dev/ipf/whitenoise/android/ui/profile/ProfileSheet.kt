@@ -16,6 +16,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -52,6 +53,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
@@ -92,14 +94,17 @@ import dev.ipf.whitenoise.android.share.presentOutboundShareFailure
 import dev.ipf.whitenoise.android.state.BlockOutcome
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.MemberMutePreferences
 import dev.ipf.whitenoise.android.state.ProfileGroupPickerLoadState
 import dev.ipf.whitenoise.android.state.ProfileGroupPickerState
 import dev.ipf.whitenoise.android.state.ToastMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.createProfileChatGroup
 import dev.ipf.whitenoise.android.state.isUserBlocked
+import dev.ipf.whitenoise.android.state.memberMutePreferences
 import dev.ipf.whitenoise.android.state.presentationNpubFromReference
 import dev.ipf.whitenoise.android.state.rethrowIfCancellation
+import dev.ipf.whitenoise.android.state.setMemberMutedInGroup
 import dev.ipf.whitenoise.android.state.setUserBlocked
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
@@ -556,6 +561,22 @@ internal fun ProfileSheet(
     // state-layer addable-groups helper still rejects self as a defensive check
     // for the add-to-existing-groups path.
     val targetIsSelf = hex?.let { activeAccountHex?.equals(it, ignoreCase = true) == true } == true
+    // Per-member group mute (#2782). Only a profile opened from inside a group
+    // conversation has a group to scope the preference to, so DMs and every
+    // other entry point leave the key — and therefore the row — null. The
+    // conversation's own account owns the entry, which is the active one except
+    // during a notification-routed early open.
+    val memberMuteGroupIdHex = adminController?.takeUnless { it.isDm }?.group?.groupIdHex
+    val memberMuteAccountRef = adminController?.boundAccountRef ?: appState.activeAccountRef
+    val mutedMemberKeys by appState.memberMutePreferences.state.collectAsState()
+    val memberMuteKey =
+        remember(memberMuteAccountRef, memberMuteGroupIdHex, hex, targetIsSelf) {
+            MemberMutePreferences.memberKeyOrNull(
+                accountRef = memberMuteAccountRef,
+                groupIdHex = memberMuteGroupIdHex,
+                senderIdHex = hex?.takeUnless { targetIsSelf },
+            )
+        }
     // Keyed by account as well as profile: the failure path deliberately keeps the
     // previous value, which would otherwise carry one account's relationship into
     // the next and offer the wrong follow/unfollow.
@@ -793,6 +814,21 @@ internal fun ProfileSheet(
                             blockBusy = false
                         }
                     }
+                }
+            },
+            memberMute =
+                memberMuteKey?.let {
+                    ProfileMemberMuteRowState(muted = it in mutedMemberKeys, enabled = owner.canAct())
+                },
+            onMemberMute = {
+                val key = memberMuteKey
+                if (owner.canAct() && key != null) {
+                    appState.setMemberMutedInGroup(
+                        accountRef = memberMuteAccountRef,
+                        groupIdHex = memberMuteGroupIdHex,
+                        memberIdHex = hex,
+                        muted = key !in mutedMemberKeys,
+                    )
                 }
             },
             onFollow = {
@@ -1035,17 +1071,24 @@ internal data class ProfileBannerLoadState(
     val visible: Boolean get() = image != null || !settled
 }
 
+/**
+ * Banner load state for a surface [targetWidthPx] physical pixels wide.
+ *
+ * The width selects the loader's bounded banner decode, so the image is resolved for the box it
+ * actually fills instead of being upscaled from the avatar cap (#2762).
+ */
 @Composable
 internal fun rememberProfileBannerLoadState(
     bannerUrl: String,
-    peek: (String) -> ImageBitmap? = AvatarImageLoader::peek,
-    load: suspend (String) -> ImageBitmap? = AvatarImageLoader::load,
+    targetWidthPx: Int,
+    peek: (String, Int) -> ImageBitmap? = AvatarImageLoader::peekBanner,
+    load: suspend (String, Int) -> ImageBitmap? = AvatarImageLoader::loadBanner,
 ): ProfileBannerLoadState {
-    var image by remember(bannerUrl) { mutableStateOf(peek(bannerUrl)) }
-    var settled by remember(bannerUrl) { mutableStateOf(image != null) }
-    LaunchedEffect(bannerUrl) {
+    var image by remember(bannerUrl, targetWidthPx) { mutableStateOf(peek(bannerUrl, targetWidthPx)) }
+    var settled by remember(bannerUrl, targetWidthPx) { mutableStateOf(image != null) }
+    LaunchedEffect(bannerUrl, targetWidthPx) {
         if (image == null) {
-            image = load(bannerUrl)
+            image = load(bannerUrl, targetWidthPx)
             settled = true
         }
     }
@@ -1056,10 +1099,13 @@ internal fun rememberProfileBannerLoadState(
 @Suppress("FunctionNaming")
 internal fun ProfileBannerImage(
     bannerUrl: String,
-    peek: (String) -> ImageBitmap? = AvatarImageLoader::peek,
-    load: suspend (String) -> ImageBitmap? = AvatarImageLoader::load,
+    peek: (String, Int) -> ImageBitmap? = AvatarImageLoader::peekBanner,
+    load: suspend (String, Int) -> ImageBitmap? = AvatarImageLoader::loadBanner,
 ) {
-    ProfileBannerImage(rememberProfileBannerLoadState(bannerUrl, peek, load))
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val targetWidthPx = profileBannerTargetWidthPx(maxWidth)
+        ProfileBannerImage(rememberProfileBannerLoadState(bannerUrl, targetWidthPx, peek, load))
+    }
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)

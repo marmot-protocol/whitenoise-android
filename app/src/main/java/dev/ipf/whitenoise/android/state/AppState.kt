@@ -116,7 +116,6 @@ import dev.ipf.whitenoise.android.notifications.ConversationNotificationRouting
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPattern
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPreferences
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
-import dev.ipf.whitenoise.android.notifications.LocalNotificationPolicy
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
 import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.NotificationChannels
@@ -1157,7 +1156,7 @@ class WhiteNoiseAppState private constructor(
         initialActiveAccountRef = activeAccountRef,
     )
 
-    private val appContext = context.applicationContext
+    internal val appContext = context.applicationContext
     private val preferences = preferencesOverride ?: appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
     internal val defaultDisappearingMessagesPreferences =
         DefaultDisappearingMessagesPreferences(appContext, preferences)
@@ -2143,6 +2142,14 @@ class WhiteNoiseAppState private constructor(
     private val acceptedPendingTextOptimisticIdsByConversation =
         mutableMapOf<String, MutableMap<String, String>>()
 
+    // Stable client-key phase for each optimistic send. The controller keeps
+    // this beside the retained optimistic row so a replacement conversation
+    // can still distinguish cancellable pre-acceptance work from an intent
+    // already owned by MDK.
+    private val optimisticSendPhasesByConversation =
+        mutableMapOf<String, MutableMap<String, OptimisticSendPhase>>()
+    private val optimisticCancellationGenerationByConversation = mutableMapOf<String, MutableStateFlow<Long>>()
+
     // Retained-upload bytes survive screen disposal so a user who navigates
     // out of a chat mid-send and returns sees the pending bubble still carry
     // its preview/filename instead of an empty placeholder. Cap (and sizeOf
@@ -2361,7 +2368,7 @@ class WhiteNoiseAppState private constructor(
     private val notificationAvatarCoordinator by lazy {
         NotificationAvatarCoordinator(
             appLocked = { appLockScreenVisible },
-            shouldPost = ::shouldPostNotification,
+            shouldPost = this::shouldPostNotification,
             canPost = localNotificationPresenter::canPostNotifications,
             senderAvatarUrl = { update -> notificationSenderAvatarUrl(update, ::loadUserProfile) },
             groupAvatarUrl = { update ->
@@ -2426,11 +2433,11 @@ class WhiteNoiseAppState private constructor(
         suppression = next
     }
 
-    private val appInForeground: Boolean
+    internal val appInForeground: Boolean
         get() = suppression.inForeground
-    private val activeConversationGroupIdHex: String?
+    internal val activeConversationGroupIdHex: String?
         get() = suppression.activeConversationGroupIdHex
-    private val activeConversationAccountRef: String?
+    internal val activeConversationAccountRef: String?
         get() = suppression.activeConversationAccountRef
 
     /** Whether the exact dictation origin is the unobscured foreground conversation. */
@@ -2806,6 +2813,25 @@ class WhiteNoiseAppState private constructor(
             acceptedPendingTextOptimisticIdsByConversation.getOrPut(key) { mutableMapOf() }
         }
 
+    internal fun optimisticSendPhases(
+        accountRef: String?,
+        groupIdHex: String,
+    ): MutableMap<String, OptimisticSendPhase> =
+        synchronized(conversationStateLock) {
+            val key = retainConversationState(accountRef, groupIdHex)
+            optimisticSendPhasesByConversation.getOrPut(key) { mutableMapOf() }
+        }
+
+    /** Shares retry wakeups across controllers for the same account and conversation. */
+    internal fun optimisticCancellationGeneration(
+        accountRef: String?,
+        groupIdHex: String,
+    ): MutableStateFlow<Long> =
+        synchronized(conversationStateLock) {
+            val key = retainConversationState(accountRef, groupIdHex)
+            optimisticCancellationGenerationByConversation.getOrPut(key) { MutableStateFlow(0L) }
+        }
+
     /** Resolves a delivered chat-list projection to the exact accepted-pending optimistic send. */
     internal fun acceptedPendingTextOptimisticId(
         accountRef: String?,
@@ -2905,6 +2931,8 @@ class WhiteNoiseAppState private constructor(
         optimisticSendPositionPreservesByConversation.remove(staleKey)
         retentionAtSendByConversation.remove(staleKey)
         acceptedPendingTextOptimisticIdsByConversation.remove(staleKey)
+        optimisticSendPhasesByConversation.remove(staleKey)
+        optimisticCancellationGenerationByConversation.remove(staleKey)
         retainedMediaUploadsByConversation.remove(staleKey)
         activeUploadKeysByConversation.remove(staleKey)
         pendingProjectionsAwaitingBridgeByConversation.remove(staleKey)
@@ -5438,6 +5466,9 @@ class WhiteNoiseAppState private constructor(
             retentionAtSendByConversation.clear()
             acceptedPendingTextOptimisticIdsByConversation.values.forEach { it.clear() }
             acceptedPendingTextOptimisticIdsByConversation.clear()
+            optimisticSendPhasesByConversation.values.forEach { it.clear() }
+            optimisticSendPhasesByConversation.clear()
+            optimisticCancellationGenerationByConversation.clear()
         }
         // Cancel any in-flight downloads (their Deferred may hold plaintext or
         // a retained-media outcome) and drop both indexes so the next session
@@ -5708,6 +5739,7 @@ class WhiteNoiseAppState private constructor(
             clearCrossAccountCaches()
             stopTtsForRemovedAccount(wipedRef)
             clearContactPrivateDetailsForAccount(wipedRef)
+            memberMutePreferences.clearAccount(wipedRef)
             wipeDecryptedMediaFromDisk()
             if (!clearHiddenMessagesForAccount(wipedRef)) {
                 appStateDebug { "hidden-message cleanup failed after wipe account=${wipedRef.take(8)}" }
@@ -5721,13 +5753,20 @@ class WhiteNoiseAppState private constructor(
                     appStateDebug(it) { "editor purge failed after wipe: ${it.readableMessage()}" }
                 }
             }
-            val refreshedAccounts =
+            val refreshedAccountsResult =
                 runCatchingCancellable {
                     marmotIo(MarmotTraceSection.ACCOUNT_LIST) { listAccounts() }
-                }.getOrDefault(emptyList())
+                }
+            val refreshedAccounts = refreshedAccountsResult.getOrDefault(emptyList())
             accountListLifetime.advance {
                 accounts = refreshedAccounts
                 releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
+                // An empty list here can mean "no accounts left" or "the read failed" -- retention
+                // is an allow-list, so only prune member mutes on a genuine successful read. A
+                // transient failure must not wipe every other account's mutes (#2782 follow-up).
+                refreshedAccountsResult.getOrNull()?.let { successfulAccounts ->
+                    retainMemberMutesForAccounts(successfulAccounts.map(AccountSummaryFfi::label))
+                }
             }
             refreshAccountUnreadCounts(refreshedAccounts)
             val next = refreshedAccounts.firstOrNull()?.label
@@ -6151,15 +6190,14 @@ class WhiteNoiseAppState private constructor(
     /** Whether the current MDK policy has a confirmed explicit grant. */
     fun isUsageDiagnosticsGranted(): Boolean = diagnostics.granted
 
-    /** Records a finite host event using a ticket captured before asynchronous work starts. */
-    internal fun recordProductObservation(
-        observation: ProductObservation,
-        ticket: Long? = diagnostics.observations.ticket(),
+    internal fun recordProductEvent(
+        event: dev.ipf.marmotkit.ProductEventFfi,
+        ticket: Long?,
     ) {
         val runtime = marmotRuntime?.marmot ?: return
         notificationScope.launch(Dispatchers.IO) {
             runCatchingCancellable {
-                diagnostics.observations.record(ticket) { runtime.recordProductEvent(observation.event()) }
+                diagnostics.observations.record(ticket) { runtime.recordProductEvent(event) }
             }
         }
     }
@@ -9408,20 +9446,6 @@ class WhiteNoiseAppState private constructor(
             }.getOrNull()
                 ?.firstOrNull { it.messageIdHex.equals(messageId, ignoreCase = true) }
         }
-
-    private fun shouldPostNotification(
-        update: NotificationUpdateFfi,
-        engineMuted: Boolean,
-    ): Boolean =
-        LocalNotificationPolicy.shouldPost(
-            update = update,
-            appInForeground = appInForeground,
-            activeConversationGroupIdHex = activeConversationGroupIdHex,
-            activeConversationAccountRef = activeConversationAccountRef,
-            appLockScreenVisible = appLockScreenVisible,
-            conversationNotifyMode = chatMutePreferences::mode,
-            engineMuted = engineMuted,
-        )
 
     private fun isNotificationGenerationPostAllowed(
         update: NotificationUpdateFfi,

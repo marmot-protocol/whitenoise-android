@@ -242,6 +242,8 @@
     <string name="profile_unfollow">Remove Contact</string>
     <string name="profile_block">Block</string>
     <string name="profile_unblock">Unblock</string>
+    <string name="profile_mute_in_group">Mute in this group</string>
+    <string name="profile_unmute_in_group">Unmute in this group</string>
     <string name="blocked_users">Blocked users</string>
     <string name="blocked_users_empty">You haven’t blocked anyone.</string>
     <string name="blocked_users_detail">Blocked people can’t message you directly. Your shared groups keep working, and their history stays on this device.</string>

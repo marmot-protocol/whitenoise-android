@@ -3,12 +3,12 @@ package dev.ipf.whitenoise.android.ui.account
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -110,8 +110,14 @@ private val TOP_BAR_OTHER_ACCOUNT_SIZE = 34.dp
 
 private val TOP_BAR_OTHER_ACCOUNT_RING = 2.dp
 
-// How far each avatar overlaps the previous one to read as a single stacked group.
-private val TOP_BAR_OTHER_ACCOUNT_OVERLAP = 12.dp
+// Each quick-switch target owns a Material-minimum slot. The avatar is centred
+// in it, so the slack between two adjacent circles becomes visible separation
+// instead of the overlap the stack used to draw (#2796).
+private val TOP_BAR_OTHER_ACCOUNT_SLOT_WIDTH = 48.dp
+
+// Top-bar chrome the quick-switch slots may never crowd: the active account
+// button and its gap, the trailing action icons, and a readable title.
+private const val TOP_BAR_QUICK_SWITCH_RESERVED_DP = 208f
 
 private val TOP_BAR_OTHER_ACCOUNT_UNREAD_DOT_SIZE = 10.dp
 
@@ -127,7 +133,14 @@ internal fun otherAccountAvatarTag(accountLabel: String): String = "$OTHER_ACCOU
 
 internal fun otherAccountUnreadDotTag(accountLabel: String): String = OTHER_ACCOUNT_UNREAD_DOT_TAG_PREFIX + accountLabel
 
-@Suppress("ReturnCount")
+/**
+ * The quick-switch target under [positionX], or null outside the stack.
+ *
+ * Every target now occupies one equal-width slot, so the row divides into
+ * [targetCount] non-overlapping slices and each avatar sits wholly inside its
+ * own slice: a tap on an avatar's centre or either edge can only reach that
+ * account. Routing stays parent-owned, as PR #2217 established.
+ */
 internal fun accountStackTargetIndex(
     positionX: Float,
     width: Float,
@@ -135,11 +148,35 @@ internal fun accountStackTargetIndex(
     layoutDirection: LayoutDirection,
 ): Int? {
     if (targetCount <= 0 || width <= 0f || positionX !in 0f..width) return null
-    val avatarSize = TOP_BAR_OTHER_ACCOUNT_SIZE.value
-    val advance = avatarSize - TOP_BAR_OTHER_ACCOUNT_OVERLAP.value
-    val scaledAdvance = advance * (width / (avatarSize + advance * (targetCount - 1)))
-    val visualIndex = (positionX / scaledAdvance).toInt().coerceIn(0, targetCount - 1)
+    val sliceWidth = width / targetCount
+    val visualIndex = (positionX / sliceWidth).toInt().coerceIn(0, targetCount - 1)
     return if (layoutDirection == LayoutDirection.Ltr) visualIndex else targetCount - 1 - visualIndex
+}
+
+/**
+ * Quick-switch slots — avatars plus any overflow chip — that fit beside the
+ * rest of the top bar at [barWidthDp]. Always leaves at least one slot so the
+ * overflow chip can still reach the full switcher on the narrowest window.
+ */
+internal fun quickSwitchSlotCapacity(barWidthDp: Float): Int {
+    val available = barWidthDp - TOP_BAR_QUICK_SWITCH_RESERVED_DP
+    return (available / TOP_BAR_OTHER_ACCOUNT_SLOT_WIDTH.value)
+        .toInt()
+        .coerceIn(1, MAX_TOP_BAR_OTHER_ACCOUNTS + 1)
+}
+
+/**
+ * Avatars rendered before the remaining accounts collapse into the overflow
+ * chip. A bar too narrow for every account gives up quick targets rather than
+ * compressing them, because the chip opens the full switcher instead.
+ */
+internal fun quickSwitchVisibleAvatarCount(
+    slotCapacity: Int,
+    otherAccountCount: Int,
+): Int {
+    val capped = minOf(otherAccountCount, MAX_TOP_BAR_OTHER_ACCOUNTS).coerceAtLeast(0)
+    val everyAccountFits = capped == otherAccountCount && capped <= slotCapacity
+    return if (everyAccountFits) capped else minOf(capped, slotCapacity - 1).coerceAtLeast(0)
 }
 
 // Other signed-in accounts, stacked beside the active-account avatar (#343): tap
@@ -152,13 +189,18 @@ internal fun OtherAccountAvatarsRow(
     appState: WhiteNoiseAppState,
     onSwitchAccount: (String) -> Unit,
     onOpenSwitcher: () -> Unit,
+    // The top bar's own measured width, not the full window: on a multi-pane layout this bar
+    // can be narrower than the window, and reserving space against the wrong width can crowd
+    // the rest of the bar (#2796 follow-up). Callers measure this with BoxWithConstraints.
+    barWidthDp: Dp,
 ) {
     // Signed-in accounts other than the active one. Empty while a destructive
     // wipe transiently nulls the active account, so no frame can flash the
     // just-wiped (or a still-stale previously-wiped) account (#809).
     val others = otherAccountAvatars(appState.accounts, appState.activeAccount?.label)
     if (others.isEmpty()) return
-    val shown = others.take(MAX_TOP_BAR_OTHER_ACCOUNTS)
+    val slotCapacity = quickSwitchSlotCapacity(barWidthDp.value)
+    val shown = others.take(quickSwitchVisibleAvatarCount(slotCapacity, others.size))
     val overflow = others.size - shown.size
     val layoutDirection = LocalLayoutDirection.current
     val currentOnSwitchAccount by rememberUpdatedState(onSwitchAccount)
@@ -231,7 +273,6 @@ internal fun OtherAccountAvatarsRow(
                         }
                 },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(-TOP_BAR_OTHER_ACCOUNT_OVERLAP),
     ) {
         shown.forEach { account ->
             OtherAccountAvatar(
@@ -259,54 +300,60 @@ private fun OtherAccountAvatar(
     showUnreadDot: Boolean,
     unreadDotColor: Color,
 ) {
+    // The Material-width slot is the account's own tap slice; centring the
+    // smaller circle in it leaves visible air on both sides of every neighbour.
     Box(
-        modifier =
-            Modifier
-                .testTag(otherAccountAvatarTag(accountLabel))
-                .size(TOP_BAR_OTHER_ACCOUNT_SIZE),
+        modifier = Modifier.width(TOP_BAR_OTHER_ACCOUNT_SLOT_WIDTH),
+        contentAlignment = Alignment.Center,
     ) {
         Box(
             modifier =
                 Modifier
-                    .matchParentSize()
-                    // Ring in the bar background so stacked avatars read as separate.
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surface),
-            contentAlignment = Alignment.Center,
+                    .testTag(otherAccountAvatarTag(accountLabel))
+                    .size(TOP_BAR_OTHER_ACCOUNT_SIZE),
         ) {
-            Avatar(
-                title = title,
-                seed = seed,
-                size = TOP_BAR_OTHER_ACCOUNT_SIZE - TOP_BAR_OTHER_ACCOUNT_RING * 2,
-                pictureUrl = pictureUrl,
-            )
-        }
-        if (showUnreadDot) {
-            // Bottom-center sits in each avatar's exposed strip between stacked
-            // neighbors so the full marker stays on its owner in LTR and RTL.
             Box(
                 modifier =
                     Modifier
-                        .testTag(otherAccountUnreadDotTag(accountLabel))
-                        .align(Alignment.BottomCenter)
-                        .size(TOP_BAR_OTHER_ACCOUNT_UNREAD_DOT_SIZE)
-                        .border(TOP_BAR_OTHER_ACCOUNT_RING, MaterialTheme.colorScheme.surface, CircleShape)
+                        .matchParentSize()
+                        // Ring in the bar background so each avatar keeps a clean edge.
                         .clip(CircleShape)
-                        .background(unreadDotColor),
-            )
+                        .background(MaterialTheme.colorScheme.surface),
+                contentAlignment = Alignment.Center,
+            ) {
+                Avatar(
+                    title = title,
+                    seed = seed,
+                    size = TOP_BAR_OTHER_ACCOUNT_SIZE - TOP_BAR_OTHER_ACCOUNT_RING * 2,
+                    pictureUrl = pictureUrl,
+                )
+            }
+            if (showUnreadDot) {
+                // Bottom-center keeps the whole marker on its own avatar, and so
+                // inside that account's slice, in both LTR and RTL.
+                Box(
+                    modifier =
+                        Modifier
+                            .testTag(otherAccountUnreadDotTag(accountLabel))
+                            .align(Alignment.BottomCenter)
+                            .size(TOP_BAR_OTHER_ACCOUNT_UNREAD_DOT_SIZE)
+                            .border(TOP_BAR_OTHER_ACCOUNT_RING, MaterialTheme.colorScheme.surface, CircleShape)
+                            .clip(CircleShape)
+                            .background(unreadDotColor),
+                )
+            }
         }
     }
 }
 
+/** Remaining accounts collapse into one chip that owns the same slot width as an avatar. */
 @Composable
 private fun OverflowAccountChip(count: Int) {
     Box(
         modifier =
             Modifier
-                .testTag(OTHER_ACCOUNT_OVERFLOW_TAG)
-                .size(TOP_BAR_OTHER_ACCOUNT_SIZE)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surface),
+                .width(TOP_BAR_OTHER_ACCOUNT_SLOT_WIDTH)
+                .testTag(OTHER_ACCOUNT_OVERFLOW_TAG),
         contentAlignment = Alignment.Center,
     ) {
         Box(

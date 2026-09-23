@@ -870,7 +870,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
             }
             IconButton(
                 enabled = !textSelectionMode,
-                onClick = { controller.discardFailedSend(item) },
+                onClick = { appState.launchMutation { controller.discardFailedSend(item) } },
                 modifier = Modifier.size(24.dp),
             ) {
                 Icon(

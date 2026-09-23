@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -130,134 +131,141 @@ internal fun ChatListTopBar(
     LaunchedEffect(appState.accounts, appState.runtimeGeneration) {
         appState.requestProfiles(appState.accounts.map { it.accountIdHex })
     }
-    TopAppBar(
-        title = {
-            when {
-                searchOpen ->
-                    dev.ipf.whitenoise.android.ui.common.WhiteNoiseCompactSearchField(
-                        value = searchQuery,
-                        clearDescription = stringResource(R.string.chat_list_search_clear),
-                        outlined = true,
-                        onValueChange = onSearchQueryChange,
-                        placeholder = stringResource(R.string.chat_list_search_hint),
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .focusRequester(searchFocusRequester)
-                                .testTag("chats.searchField"),
-                        keyboardOptions =
-                            KeyboardOptions(
-                                capitalization = KeyboardCapitalization.Sentences,
-                                imeAction = ImeAction.Search,
-                            ),
-                        emptyTrailingIcon = {
-                            IconButton(onClick = onMic) {
-                                Icon(
-                                    painter =
-                                        androidx.compose.ui.res
-                                            .painterResource(R.drawable.ic_mic),
-                                    contentDescription = stringResource(R.string.chat_list_search_voice),
-                                )
-                            }
-                        },
-                    )
-                else ->
-                    ChatListInlineConnectivityIndicator(
-                        state = connectivityState,
-                        modifier = Modifier.padding(start = 12.dp),
-                    )
-            }
-        },
-        navigationIcon = {
-            when {
-                searchOpen ->
-                    IconButton(onClick = onSearchClose) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.back),
-                        )
-                    }
-                else -> {
-                    val active = appState.activeAccount
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        AccountAvatarButton(
-                            title =
-                                active?.let { appState.accountDisplayNameCached(it.accountIdHex) }
-                                    ?: stringResource(R.string.app_name),
-                            seed = active?.accountIdHex ?: "whitenoise",
-                            pictureUrl = active?.let { appState.avatarUrl(it.accountIdHex) },
-                            size = 40.dp,
-                            touchTargetSize = 48.dp,
-                            actionDescription =
-                                stringResource(
-                                    if (appState.chatsAvatarOpensSelector()) {
-                                        R.string.switch_profile
-                                    } else {
-                                        R.string.open_settings
-                                    },
+    // Measures the bar's own rendered width rather than the full window, so the quick-switch
+    // capacity reservation stays correct in a multi-pane layout where this top bar is narrower
+    // than the window (#2796 follow-up).
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val topBarWidthDp = maxWidth
+        TopAppBar(
+            title = {
+                when {
+                    searchOpen ->
+                        dev.ipf.whitenoise.android.ui.common.WhiteNoiseCompactSearchField(
+                            value = searchQuery,
+                            clearDescription = stringResource(R.string.chat_list_search_clear),
+                            outlined = true,
+                            onValueChange = onSearchQueryChange,
+                            placeholder = stringResource(R.string.chat_list_search_hint),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .focusRequester(searchFocusRequester)
+                                    .testTag("chats.searchField"),
+                            keyboardOptions =
+                                KeyboardOptions(
+                                    capitalization = KeyboardCapitalization.Sentences,
+                                    imeAction = ImeAction.Search,
                                 ),
-                            onClick = {
-                                if (!appState.signOutInProgress && !appState.wipeInProgress) {
-                                    if (appState.chatsAvatarOpensSelector()) openSelector() else onOpenSettings()
+                            emptyTrailingIcon = {
+                                IconButton(onClick = onMic) {
+                                    Icon(
+                                        painter =
+                                            androidx.compose.ui.res
+                                                .painterResource(R.drawable.ic_mic),
+                                        contentDescription = stringResource(R.string.chat_list_search_voice),
+                                    )
                                 }
                             },
-                            modifier = Modifier.padding(start = 8.dp).testTag("chats.switchProfile"),
-                            // Per-account dot: light only when the active account
-                            // itself has unread, same shared decision the other
-                            // avatars use — not "some other account has unread" (#805).
-                            showUnreadDot = appState.accountShowsUnreadDot(active?.label),
-                            unreadDotColor = accountActionColors(appState, active?.label).container,
                         )
-                        // Quick account switching shows the other signed-in accounts themselves: tap one to
-                        // land on it, long-press for the full selector. Off, the active avatar stands alone.
-                        if (appState.quickSwitchAvatarAccounts().isNotEmpty()) {
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .padding(start = CHAT_LIST_ACCOUNT_AVATAR_GAP)
-                                        .testTag(CHAT_LIST_OTHER_ACCOUNT_AVATARS_TAG),
-                            ) {
-                                OtherAccountAvatarsRow(
-                                    appState = appState,
-                                    onSwitchAccount = ::switchTo,
-                                    onOpenSwitcher = ::openSelector,
-                                )
+                    else ->
+                        ChatListInlineConnectivityIndicator(
+                            state = connectivityState,
+                            modifier = Modifier.padding(start = 12.dp),
+                        )
+                }
+            },
+            navigationIcon = {
+                when {
+                    searchOpen ->
+                        IconButton(onClick = onSearchClose) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.back),
+                            )
+                        }
+                    else -> {
+                        val active = appState.activeAccount
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            AccountAvatarButton(
+                                title =
+                                    active?.let { appState.accountDisplayNameCached(it.accountIdHex) }
+                                        ?: stringResource(R.string.app_name),
+                                seed = active?.accountIdHex ?: "whitenoise",
+                                pictureUrl = active?.let { appState.avatarUrl(it.accountIdHex) },
+                                size = 40.dp,
+                                touchTargetSize = 48.dp,
+                                actionDescription =
+                                    stringResource(
+                                        if (appState.chatsAvatarOpensSelector()) {
+                                            R.string.switch_profile
+                                        } else {
+                                            R.string.open_settings
+                                        },
+                                    ),
+                                onClick = {
+                                    if (!appState.signOutInProgress && !appState.wipeInProgress) {
+                                        if (appState.chatsAvatarOpensSelector()) openSelector() else onOpenSettings()
+                                    }
+                                },
+                                modifier = Modifier.padding(start = 8.dp).testTag("chats.switchProfile"),
+                                // Per-account dot: light only when the active account
+                                // itself has unread, same shared decision the other
+                                // avatars use — not "some other account has unread" (#805).
+                                showUnreadDot = appState.accountShowsUnreadDot(active?.label),
+                                unreadDotColor = accountActionColors(appState, active?.label).container,
+                            )
+                            // Quick account switching shows the other signed-in accounts themselves: tap one to
+                            // land on it, long-press for the full selector. Off, the active avatar stands alone.
+                            if (appState.quickSwitchAvatarAccounts().isNotEmpty()) {
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .padding(start = CHAT_LIST_ACCOUNT_AVATAR_GAP)
+                                            .testTag(CHAT_LIST_OTHER_ACCOUNT_AVATARS_TAG),
+                                ) {
+                                    OtherAccountAvatarsRow(
+                                        appState = appState,
+                                        onSwitchAccount = ::switchTo,
+                                        onOpenSwitcher = ::openSelector,
+                                        barWidthDp = topBarWidthDp,
+                                    )
+                                }
                             }
                         }
                     }
                 }
-            }
-        },
-        actions = {
-            if (searchOpen) {
-                if (onSearchFilterCategory != null) {
-                    ChatListSearchFilterAction(
-                        state = searchFilterState,
-                        onCategory = onSearchFilterCategory,
-                        onClearAll = onClearSearchFilters,
+            },
+            actions = {
+                if (searchOpen) {
+                    if (onSearchFilterCategory != null) {
+                        ChatListSearchFilterAction(
+                            state = searchFilterState,
+                            onCategory = onSearchFilterCategory,
+                            onClearAll = onClearSearchFilters,
+                        )
+                    }
+                } else {
+                    AppUpdateIconButton(
+                        info = updateInfo,
+                        selfUpdateEnabled = selfUpdateEnabled,
+                        onOpenSettings = onOpenSettings,
                     )
+                    IconButton(onClick = onSearchOpen) {
+                        Icon(
+                            painterResource(R.drawable.ic_search),
+                            contentDescription = stringResource(R.string.chat_list_search_open),
+                        )
+                    }
                 }
-            } else {
-                AppUpdateIconButton(
-                    info = updateInfo,
-                    selfUpdateEnabled = selfUpdateEnabled,
-                    onOpenSettings = onOpenSettings,
-                )
-                IconButton(onClick = onSearchOpen) {
-                    Icon(
-                        painterResource(R.drawable.ic_search),
-                        contentDescription = stringResource(R.string.chat_list_search_open),
-                    )
-                }
-            }
-        },
-        scrollBehavior = LocalWhiteNoiseHeaderScroll.current,
-        colors =
-            TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.surface,
-                scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-            ),
-    )
+            },
+            scrollBehavior = LocalWhiteNoiseHeaderScroll.current,
+            colors =
+                TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                ),
+        )
+    }
     if (showSelector) {
         AccountSelectorSheet(
             appState = appState,

@@ -97,11 +97,14 @@ internal fun pendingSendRetryBackoffMs(failedAttempt: Int): Long {
  * lock within one invocation; the retry loop deliberately owns no lock while
  * it waits between attempts. A newer [connectivityRecoveryGeneration]
  * interrupts that wait and resets the backoff so Android does not sleep through
- * restored validated internet.
+ * restored validated internet. A newer [cancellationGeneration] interrupts the
+ * wait without resetting backoff; the next attempt must check its own token
+ * before admission so a cancelled send releases text ordering promptly.
  */
 @Suppress("TooGenericExceptionCaught") // Every non-cancellation gateway failure must be classified before retry.
 internal suspend fun <T> retryPendingConversationSend(
     connectivityRecoveryGeneration: StateFlow<Long>? = null,
+    cancellationGeneration: StateFlow<Long>? = null,
     retryableFailure: (Throwable) -> Boolean = ::isTransientRelaySendError,
     onTransientFailure: suspend (attempt: Int, throwable: Throwable) -> Unit = { _, _ -> },
     sendAttempt: suspend (attempt: Int) -> T,
@@ -110,6 +113,7 @@ internal suspend fun <T> retryPendingConversationSend(
     var backoffAttempt = 1
     while (true) {
         val recoveryGenerationBeforeAttempt = connectivityRecoveryGeneration?.value
+        val cancellationGenerationBeforeAttempt = cancellationGeneration?.value
         try {
             return sendAttempt(attempt)
         } catch (throwable: Throwable) {
@@ -121,6 +125,8 @@ internal suspend fun <T> retryPendingConversationSend(
                     connectivityRecoveryGeneration = connectivityRecoveryGeneration,
                     observedGeneration = recoveryGenerationBeforeAttempt,
                     backoffMs = pendingSendRetryBackoffMs(backoffAttempt),
+                    cancellationGeneration = cancellationGeneration,
+                    observedCancellationGeneration = cancellationGenerationBeforeAttempt,
                 )
             backoffAttempt =
                 when {

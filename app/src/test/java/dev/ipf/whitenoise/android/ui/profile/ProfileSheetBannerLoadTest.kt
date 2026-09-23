@@ -25,7 +25,7 @@ class ProfileSheetBannerLoadTest {
     fun failedBannerLoadStopsSpinningAndDropsTheBanner() {
         composeRule.setContent {
             WhiteNoiseTheme {
-                ProfileBannerImage(BANNER_URL, peek = { null }, load = { null })
+                ProfileBannerImage(BANNER_URL, peek = { _, _ -> null }, load = { _, _ -> null })
             }
         }
 
@@ -37,7 +37,7 @@ class ProfileSheetBannerLoadTest {
     fun bannerShowsProgressWhileTheLoadIsStillRunning() {
         composeRule.setContent {
             WhiteNoiseTheme {
-                ProfileBannerImage(BANNER_URL, peek = { null }, load = { awaitCancellation() })
+                ProfileBannerImage(BANNER_URL, peek = { _, _ -> null }, load = { _, _ -> awaitCancellation() })
             }
         }
 
@@ -49,7 +49,7 @@ class ProfileSheetBannerLoadTest {
     fun theHeaderOverlapSeamReportsAFailedBannerAsAbsent() {
         // The overlap layout reserves space for the banner, so a failed load has
         // to collapse the same way a missing banner does.
-        val seen = bannerVisibility { null }
+        val seen = bannerVisibility { _, _ -> null }
 
         assertTrue("must start visible while the load is in flight", seen.first())
         assertFalse("must collapse once the load has failed", seen.last())
@@ -57,15 +57,15 @@ class ProfileSheetBannerLoadTest {
 
     @Test
     fun aLoadStillRunningKeepsTheHeaderOverlapReserved() {
-        assertTrue(bannerVisibility { awaitCancellation() }.last())
+        assertTrue(bannerVisibility { _, _ -> awaitCancellation() }.last())
     }
 
     /** Every visibility the header saw, in recomposition order. */
-    private fun bannerVisibility(load: suspend (String) -> ImageBitmap?): List<Boolean> {
+    private fun bannerVisibility(load: suspend (String, Int) -> ImageBitmap?): List<Boolean> {
         val seen = mutableListOf<Boolean>()
         composeRule.setContent {
             WhiteNoiseTheme {
-                seen += rememberProfileBannerLoadState(BANNER_URL, peek = { null }, load = load).visible
+                seen += rememberProfileBannerLoadState(BANNER_URL, TARGET_WIDTH_PX, { _, _ -> null }, load).visible
             }
         }
         composeRule.waitForIdle()
@@ -74,5 +74,6 @@ class ProfileSheetBannerLoadTest {
 
     private companion object {
         const val BANNER_URL = "https://example.com/banner.png"
+        const val TARGET_WIDTH_PX = 1080
     }
 }

@@ -202,6 +202,8 @@
     <string name="profile_unfollow">Удалить контакт</string>
     <string name="profile_block">Заблокировать</string>
     <string name="profile_unblock">Разблокировать</string>
+    <string name="profile_mute_in_group">Отключить уведомления от этого участника в группе</string>
+    <string name="profile_unmute_in_group">Включить уведомления от этого участника в группе</string>
     <string name="blocked_users">Заблокированные</string>
     <string name="blocked_users_empty">Вы никого не заблокировали.</string>
     <string name="blocked_users_detail">Заблокированные пользователи не могут писать вам напрямую. Общие группы продолжают работать, а история остаётся на этом устройстве.</string>

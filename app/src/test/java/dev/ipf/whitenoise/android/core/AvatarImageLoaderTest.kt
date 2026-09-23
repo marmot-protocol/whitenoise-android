@@ -1,5 +1,9 @@
 package dev.ipf.whitenoise.android.core
 
+import android.graphics.Bitmap
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -9,6 +13,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -218,7 +223,187 @@ class AvatarImageLoaderTest {
             assertEquals(1, fetchCount)
         }
 
+    /** An avatar entry can never answer a banner request for the same URL (#2762). */
+    @Test
+    fun cachedAvatarNeverSatisfiesABannerRequest() =
+        runBlocking {
+            val fetches = AtomicInteger()
+            val url = "https://profiles.example/variant-banner.png"
+            AvatarImageLoader.attachProfileImageFetcher { _, _ ->
+                fetches.incrementAndGet()
+                Base64.getDecoder().decode(ONE_PIXEL_PNG_BASE64)
+            }
+
+            assertNotNull(AvatarImageLoader.load(url))
+            assertNull("an avatar entry must not be visible to a banner peek", AvatarImageLoader.peekBanner(url, 1080))
+            assertNotNull(AvatarImageLoader.loadBanner(url, 1080))
+
+            assertEquals(2, fetches.get())
+            assertNotNull(AvatarImageLoader.peek(url))
+            assertNotNull(AvatarImageLoader.peekBanner(url, 1080))
+        }
+
+    /** Banner widths that round into one bucket share a decode; different buckets keep their own. */
+    @Test
+    fun compatibleBannerRequestsCoalesceWhileDifferentBucketsDoNot() =
+        runBlocking {
+            val fetches = AtomicInteger()
+            val released = CompletableDeferred<Unit>()
+            val url = "https://profiles.example/coalescing-banner.png"
+            AvatarImageLoader.attachProfileImageFetcher { _, _ ->
+                fetches.incrementAndGet()
+                released.await()
+                Base64.getDecoder().decode(ONE_PIXEL_PNG_BASE64)
+            }
+
+            val compatible =
+                listOf(1030, 1080, 1280).map { width ->
+                    async(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
+                        AvatarImageLoader.loadBanner(url, width)
+                    }
+                }
+            released.complete(Unit)
+            withTimeout(5_000) { compatible.awaitAll() }
+            assertEquals("widths in one bucket must share a single fetch", 1, fetches.get())
+
+            assertNotNull(withTimeout(5_000) { AvatarImageLoader.loadBanner(url, 1400) })
+            assertEquals("a wider bucket needs its own bounded decode", 2, fetches.get())
+        }
+
+    /** Account teardown retires every variant, not just the avatar entries. */
+    @Test
+    fun clearRetiresBannerEntriesAlongsideAvatars() =
+        runBlocking {
+            val url = "https://profiles.example/teardown-banner.png"
+            AvatarImageLoader.attachProfileImageFetcher { _, _ ->
+                Base64.getDecoder().decode(ONE_PIXEL_PNG_BASE64)
+            }
+            assertNotNull(AvatarImageLoader.load(url))
+            assertNotNull(AvatarImageLoader.loadBanner(url, 1080))
+
+            AvatarImageLoader.clear()
+
+            assertNull(AvatarImageLoader.peek(url))
+            assertNull(AvatarImageLoader.peekBanner(url, 1080))
+        }
+
+    /** Only the banner variant carries its target in the cache key, so avatar entries are untouched. */
+    @Test
+    fun profileImageCacheKeysSeparateVariantsAndTargets() {
+        val url = "https://profiles.example/keys.png"
+        assertEquals(url, profileImageCacheKey(url, ProfileImageVariant.AVATAR, 512))
+        assertNotEquals(
+            profileImageCacheKey(url, ProfileImageVariant.AVATAR, 512),
+            profileImageCacheKey(url, ProfileImageVariant.BANNER, 512),
+        )
+        assertNotEquals(
+            profileImageCacheKey(url, ProfileImageVariant.BANNER, 1024),
+            profileImageCacheKey(url, ProfileImageVariant.BANNER, 1280),
+        )
+    }
+
+    /** Requested widths round up into shared buckets, floored at the avatar cap and capped overall. */
+    @Test
+    fun bannerDecodeDimensionBucketsAndBoundsTheRequestedWidth() {
+        assertEquals(512, profileBannerDecodeDimension(0))
+        assertEquals(512, profileBannerDecodeDimension(-100))
+        assertEquals(512, profileBannerDecodeDimension(400))
+        assertEquals(1024, profileBannerDecodeDimension(1024))
+        assertEquals(1280, profileBannerDecodeDimension(1030))
+        assertEquals(1280, profileBannerDecodeDimension(1080))
+        assertEquals(PROFILE_BANNER_MAX_DIMENSION, profileBannerDecodeDimension(4000))
+    }
+
+    /** A wide banner keeps its full target, while a near-square source is cut back to fit the byte budget. */
+    @Test
+    fun boundedDecodeDimensionHonoursTheDecodedByteBudget() {
+        assertEquals(1536, boundedDecodeDimension(width = 4000, height = 2000, maxDimension = 1536))
+        assertEquals(768, boundedDecodeDimension(width = 4000, height = 4000, maxDimension = 1536))
+        assertEquals(512, boundedDecodeDimension(width = 4000, height = 4000, maxDimension = 512))
+    }
+
+    /**
+     * Banner pressure past the whole former budget still cannot evict a cached avatar (#2762).
+     *
+     * The banner entries published here total more than a single combined cache could have held, so
+     * on the shared LRU this replaced the avatar — least recently used of the lot — would have been
+     * the first thing dropped. The oldest banner going missing is what proves the pressure was real
+     * rather than the budget quietly absorbing it.
+     */
+    @Test
+    fun bannerEntriesCannotEvictTheCachedAvatarWorkingSet() {
+        val avatarUrl = "https://profiles.example/pressure-avatar.png"
+        val bannerUrl = "https://profiles.example/pressure-banner.png"
+        AvatarImageLoader.putCached(avatarUrl, solidImage(AVATAR_EDGE_PX, AVATAR_EDGE_PX))
+        val widths = (1..BANNER_PRESSURE_ENTRIES).map { it * PROFILE_BANNER_TARGET_BUCKET_PX }
+
+        widths.forEach { width ->
+            AvatarImageLoader.putCachedBanner(bannerUrl, width, solidImage(BANNER_EDGE_PX, BANNER_EDGE_PX))
+        }
+
+        assertNotNull(
+            "a banner run larger than the whole former cache must not evict an avatar",
+            AvatarImageLoader.peek(avatarUrl),
+        )
+        assertNull(
+            "the oldest banner must have been evicted, or the run applied no pressure at all",
+            AvatarImageLoader.peekBanner(bannerUrl, widths.first()),
+        )
+        assertNotNull(
+            "the newest banner stays cached within the banner budget",
+            AvatarImageLoader.peekBanner(bannerUrl, widths.last()),
+        )
+    }
+
+    /** Each variant is charged only to its own budget, and evicts only its own entries. */
+    @Test
+    fun partitionedCacheHoldsEachVariantToItsOwnBudget() {
+        val entry = solidImage(AVATAR_EDGE_PX, AVATAR_EDGE_PX)
+        val entryBytes = entry.asAndroidBitmap().byteCount
+        val cache = PartitionedProfileImageCache(avatarBytes = entryBytes * 2, bannerBytes = entryBytes)
+        val avatarKey = profileImageCacheKey("https://profiles.example/a.png", ProfileImageVariant.AVATAR, 512)
+        val firstBanner = profileImageCacheKey("https://profiles.example/a.png", ProfileImageVariant.BANNER, 1024)
+        val secondBanner = profileImageCacheKey("https://profiles.example/a.png", ProfileImageVariant.BANNER, 1280)
+
+        cache.put(avatarKey, entry)
+        cache.put(firstBanner, entry)
+        cache.put(secondBanner, entry)
+
+        assertNotNull("the banner budget filling up cannot reach the avatar partition", cache.get(avatarKey))
+        assertNull("a banner evicts only the banner before it", cache.get(firstBanner))
+        assertNotNull(cache.get(secondBanner))
+        assertEquals(entryBytes, cache.byteSize(ProfileImageVariant.AVATAR))
+        assertEquals(entryBytes, cache.byteSize(ProfileImageVariant.BANNER))
+    }
+
+    /** A cache key resolves back to the variant it was built for, which is what picks its partition. */
+    @Test
+    fun cacheKeysResolveBackToTheirVariant() {
+        val url = "https://profiles.example/variant-of.png"
+        assertEquals(
+            ProfileImageVariant.AVATAR,
+            profileImageVariantOf(profileImageCacheKey(url, ProfileImageVariant.AVATAR, 512)),
+        )
+        assertEquals(
+            ProfileImageVariant.BANNER,
+            profileImageVariantOf(profileImageCacheKey(url, ProfileImageVariant.BANNER, 1280)),
+        )
+    }
+
+    /** An opaque ARGB_8888 bitmap of the given size, sized for the cache's byte budgets. */
+    private fun solidImage(
+        width: Int,
+        height: Int,
+    ): ImageBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).asImageBitmap()
+
     private companion object {
+        const val AVATAR_EDGE_PX = 512
+        const val BANNER_EDGE_PX = 1024
+
+        // 4MB each against the 8MB banner budget, and 32MB in total — more than
+        // the 24MB a single combined cache would ever have held.
+        const val BANNER_PRESSURE_ENTRIES = 8
+
         const val ONE_PIXEL_PNG_BASE64 =
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
     }

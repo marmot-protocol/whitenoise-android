@@ -186,6 +186,8 @@
     <string name="profile_unfollow">Eliminar contacto</string>
     <string name="profile_block">Bloquear</string>
     <string name="profile_unblock">Desbloquear</string>
+    <string name="profile_mute_in_group">Silenciar en este grupo</string>
+    <string name="profile_unmute_in_group">Reactivar en este grupo</string>
     <string name="blocked_users">Personas bloqueadas</string>
     <string name="blocked_users_empty">No has bloqueado a nadie.</string>
     <string name="blocked_users_detail">Las personas bloqueadas no pueden escribirte directamente. Los grupos compartidos siguen funcionando y su historial se conserva en este dispositivo.</string>

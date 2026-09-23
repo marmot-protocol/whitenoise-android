@@ -50,6 +50,8 @@ class AmberSignerController(
             is AmberActivityCoordinator.Outcome.Completed -> parsePublicKey(outcome)
             AmberActivityCoordinator.Outcome.NoForegroundActivity ->
                 throw MarmotKitException.ExternalSignerUnavailable("")
+            AmberActivityCoordinator.Outcome.AdmissionUnavailable ->
+                throw MarmotKitException.ExternalSignerUnavailable("")
             AmberActivityCoordinator.Outcome.TimedOut ->
                 throw MarmotKitException.ExternalSignerRejected()
         }
