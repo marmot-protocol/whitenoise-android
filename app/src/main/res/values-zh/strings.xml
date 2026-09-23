@@ -440,6 +440,10 @@
     <string name="delete_audit_logs">清除诊断日志</string>
     <string name="delete_audit_logs_subtitle">从此设备删除日志。已上传的副本和你的分享设置保持不变。</string>
     <string name="device_protection">设备保护</string>
+    <string name="message_privacy">消息隐私</string>
+    <string name="default_disappearing_messages">默认阅后即焚消息</string>
+    <string name="default_disappearing_messages_detail">当此个人资料发起新聊天或创建新群组时使用。之后可以分别更改每个会话。</string>
+    <string name="default_disappearing_messages_picker_detail">选择此个人资料创建的聊天和群组中新消息的保留时间。现有会话不会改变。</string>
     <string name="incognito_keyboard_detail">要求键盘不要学习你在 White Noise 中输入的内容。键盘可能会忽略此请求。</string>
     <string name="require_device_authentication">需要设备身份验证</string>
     <string name="app_lock_enabled_detail">返回 White Noise 时使用设备屏幕锁定。</string>
@@ -765,7 +769,6 @@
     <string name="toast_no_audit_logs_to_delete">没有可清除的诊断日志</string>
     <string name="toast_chat_created">聊天已创建</string>
     <string name="group_create_stage_creating">正在创建群组…</string>
-    <string name="group_create_stage_applying_retention">正在应用阅后即焚…</string>
     <string name="toast_notification_permission_denied">通知权限被拒绝</string>
     <string name="toast_signed_out">退出登录</string>
     <string name="group_title_invite_from">来自 %1$s 的邀请</string>
@@ -1332,7 +1335,6 @@
     <string name="vibration_pattern_android_override">%1$s · Android 设置</string>
     <string name="chat_muted_badge">已静音</string>
     <string name="collapse_long_messages_subtitle">在此聊天中显示长消息的预览。</string>
-    <string name="toast_disappearing_not_applied">群组已创建，但无法开启阅后即焚消息</string>
     <string name="search_members">搜索成员</string>
     <string name="recent_chats">最近聊天</string>
     <string name="onboarding_login">登录</string>

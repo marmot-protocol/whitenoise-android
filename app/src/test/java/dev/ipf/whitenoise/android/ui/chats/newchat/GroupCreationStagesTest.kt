@@ -19,21 +19,19 @@ class GroupCreationStagesTest {
             var currentAccount = "first"
             val owner = GroupCreationSession { currentAccount == "first" }
             var creates = 0
-            var policies = 0
             var opens = 0
             val attempt =
                 async {
                     runGroupCreationStages(owner, {
                         creates++
                         "canonical"
-                    }, { policies++ }, { opens++ })
+                    }, { opens++ })
                 }
             try {
                 currentAccount = "second"
                 runCurrent()
                 assertTrue(runCatching { attempt.await() }.exceptionOrNull() is CancellationException)
                 assertEquals(0, creates)
-                assertEquals(0, policies)
                 assertEquals(0, opens)
             } finally {
                 attempt.cancel()
@@ -41,33 +39,28 @@ class GroupCreationStagesTest {
             }
         }
 
-    /** An accepted native create keeps its captured-account retention commit but cannot open the replacement UI. */
-    @Test fun heldNativeCreateThenAccountSwitchFinishesCapturedPolicyWithoutOpening() =
+    /** Atomic native founding may finish for its captured account but cannot open replacement-account UI. */
+    @Test fun heldNativeCreateThenAccountSwitchDoesNotOpenReplacementUi() =
         runTest {
             val capturedAccount = "first"
             var currentAccount = capturedAccount
-            val owner =
-                GroupCreationSession(
-                    nativeOwner = { true },
-                    currentOwner = { currentAccount == capturedAccount },
-                )
+            val owner = GroupCreationSession { currentAccount == capturedAccount }
             val release = CompletableDeferred<Unit>()
-            val policies = mutableListOf<Pair<String, String>>()
             var creates = 0
             var opens = 0
-            val request = NewGroupSubmission("Team", "Plans", emptyList(), null)
+            val request = NewGroupSubmission("Team", "Plans", emptyList(), null, disappearingMessageSecs = 300L)
             val attempt =
                 async {
                     runGroupCreationStages(
                         owner,
                         createOrRetry = {
-                            request.createWith { _, _, _, _ ->
+                            request.createWith { _, _, options ->
                                 creates++
+                                assertEquals(300uL, options.disappearingMessageSecs)
                                 release.await()
                                 "canonical"
                             }
                         },
-                        applyCapturedPolicy = { policies += capturedAccount to it },
                         openCurrentChat = { opens++ },
                     )
                 }
@@ -77,7 +70,6 @@ class GroupCreationStagesTest {
                 currentAccount = "second"
                 release.complete(Unit)
                 assertTrue(runCatching { attempt.await() }.exceptionOrNull() is CancellationException)
-                assertEquals(listOf(capturedAccount to "canonical"), policies)
                 assertEquals(0, opens)
             } finally {
                 release.complete(Unit)
@@ -86,27 +78,25 @@ class GroupCreationStagesTest {
             }
         }
 
-    /** Replacing the runtime while create is held prevents starting any policy stage in the replacement runtime. */
-    @Test fun runtimeReplacementAfterCreateStopsNativePolicyAndUi() =
+    /** Replacing the runtime while create is held prevents opening in the replacement runtime. */
+    @Test fun runtimeReplacementAfterCreateStopsUi() =
         runTest {
             var runtime = 1
-            val owner = GroupCreationSession(nativeOwner = { runtime == 1 }, currentOwner = { runtime == 1 })
+            val owner = GroupCreationSession { runtime == 1 }
             val release = CompletableDeferred<Unit>()
-            var policies = 0
             var opens = 0
             val attempt =
                 async {
                     runGroupCreationStages(owner, {
                         release.await()
                         "canonical"
-                    }, { policies++ }, { opens++ })
+                    }, { opens++ })
                 }
             try {
                 runCurrent()
                 runtime = 2
                 release.complete(Unit)
                 assertTrue(runCatching { attempt.await() }.exceptionOrNull() is CancellationException)
-                assertEquals(0, policies)
                 assertEquals(0, opens)
             } finally {
                 release.complete(Unit)
@@ -132,7 +122,6 @@ class GroupCreationStagesTest {
                             creates++
                             "canonical"
                         },
-                        applyCapturedPolicy = {},
                         openCurrentChat = {},
                     )
                 }
@@ -149,8 +138,8 @@ class GroupCreationStagesTest {
             }
         }
 
-    /** Handled native failure has no canonical ID, so neither policy nor projection may run. */
-    @Test fun unacceptedFailureCannotEnterPolicyOrOpenStages() =
+    /** Handled native failure has no canonical ID, so projection may not run. */
+    @Test fun unacceptedFailureCannotEnterOpenStage() =
         runTest {
             val stages = mutableListOf<String>()
             runGroupCreationStages(
@@ -159,7 +148,6 @@ class GroupCreationStagesTest {
                     stages += "create"
                     null
                 },
-                applyCapturedPolicy = { stages += "policy" },
                 openCurrentChat = { stages += "open" },
             )
             assertEquals(listOf("create"), stages)

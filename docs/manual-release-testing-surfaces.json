@@ -1573,7 +1573,8 @@
         "anchor": "fun NewGroupSetupAccountScreen(",
         "test_ids": [
           "NCH-002",
-          "ACC-017"
+          "ACC-017",
+          "SET-028"
         ]
       },
       {
@@ -1582,7 +1583,8 @@
         "anchor": "fun NewGroupSetupScreen(",
         "test_ids": [
           "NCH-002",
-          "ACC-017"
+          "ACC-017",
+          "SET-028"
         ]
       },
       {
@@ -5207,7 +5209,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
         "anchor": "fun DisappearingMessagesPickerDialog(",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "SET-028"
         ]
       },
       {
@@ -5215,7 +5218,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
         "anchor": "fun DisappearingPickerChoices(",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "SET-028"
         ]
       },
       {
@@ -7384,7 +7388,8 @@
           "SEC-004",
           "SEC-005",
           "SEC-006",
-          "SEC-007"
+          "SEC-007",
+          "SET-028"
         ]
       },
       {
@@ -10405,15 +10410,6 @@
         ]
       },
       {
-        "surface": "setting:group_create_stage_applying_retention",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupContent.kt",
-        "anchor": "R.string.group_create_stage_applying_retention",
-        "test_ids": [
-          "NCH-002",
-          "ACC-017"
-        ]
-      },
-      {
         "surface": "setting:group_create_stage_creating",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupContent.kt",
         "anchor": "R.string.group_create_stage_creating",
@@ -10504,6 +10500,16 @@
         ]
       },
       {
+        "surface": "setting:toast_chat_created",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt",
+        "anchor": "R.string.toast_chat_created",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "SET-028"
+        ]
+      },
+      {
         "surface": "setting:group_avatar_url",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt",
         "anchor": "R.string.group_avatar_url",
@@ -10525,15 +10531,6 @@
         "surface": "setting:toast_couldnt_prepare_image",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt",
         "anchor": "R.string.toast_couldnt_prepare_image",
-        "test_ids": [
-          "NCH-002",
-          "ACC-017"
-        ]
-      },
-      {
-        "surface": "setting:toast_disappearing_not_applied",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt",
-        "anchor": "R.string.toast_disappearing_not_applied",
         "test_ids": [
           "NCH-002",
           "ACC-017"
@@ -12831,7 +12828,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
         "anchor": "R.string.cancel",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "SET-028"
         ]
       },
       {
@@ -12839,7 +12837,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
         "anchor": "R.string.disappearing_custom",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "SET-028"
         ]
       },
       {
@@ -12847,7 +12846,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
         "anchor": "R.string.disappearing_custom_value",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "SET-028"
         ]
       },
       {
@@ -12863,7 +12863,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
         "anchor": "R.string.disappearing_messages",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "SET-028"
         ]
       },
       {
@@ -12871,7 +12872,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
         "anchor": "R.string.save",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "SET-028"
         ]
       },
       {
@@ -18519,6 +18521,38 @@
           "SEC-005",
           "SEC-006",
           "SEC-007"
+        ]
+      },
+      {
+        "surface": "setting:default_disappearing_messages",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.default_disappearing_messages",
+        "test_ids": [
+          "SET-028"
+        ]
+      },
+      {
+        "surface": "string:default_disappearing_messages_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.default_disappearing_messages_detail",
+        "test_ids": [
+          "SET-028"
+        ]
+      },
+      {
+        "surface": "string:default_disappearing_messages_picker_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.default_disappearing_messages_picker_detail",
+        "test_ids": [
+          "SET-028"
+        ]
+      },
+      {
+        "surface": "string:message_privacy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.message_privacy",
+        "test_ids": [
+          "SET-028"
         ]
       },
       {

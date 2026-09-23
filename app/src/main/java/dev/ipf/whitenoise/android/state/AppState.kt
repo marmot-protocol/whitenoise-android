@@ -1158,6 +1158,8 @@ class WhiteNoiseAppState private constructor(
 
     internal val appContext = context.applicationContext
     private val preferences = preferencesOverride ?: appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+    internal val defaultDisappearingMessagesPreferences =
+        DefaultDisappearingMessagesPreferences(appContext, preferences)
     internal val conversationDictationPreferences = ConversationDictationPreferences(appContext)
     internal val microphoneCaptureCoordinator = MicrophoneCaptureCoordinator()
     private val dictationMicrophoneOwner = Any()
@@ -5735,6 +5737,7 @@ class WhiteNoiseAppState private constructor(
                 restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
                 return outcome
             }
+            defaultDisappearingMessagesPreferences.removeAccount(wipedRef)
             composerExpansionStateRetention.removeAccount(wipedRef)
             clearConversationShortcutsForAccount(
                 accountRef = wipedRef,
@@ -9096,16 +9099,6 @@ class WhiteNoiseAppState private constructor(
         pendingProfileNpub = null
         pendingProfileMetadata = null
         pendingProfileFromDiscovery = false
-    }
-
-    /**
-     * Create a 1:1 DM group with [npub]. This lower-level variant leaves
-     * failure presentation to the caller so the New Message flow can keep an
-     * inline retry state instead of collapsing everything into a transient toast.
-     */
-    suspend fun createProfileChatGroup(npub: String): String {
-        val account = activeAccountRef ?: throw StartProfileChatNoActiveAccountException()
-        return marmotIo(MarmotTraceSection.CREATE_GROUP) { createGroup(account, "", listOf(npub), null) }
     }
 
     private val chatCreateOpenTiming = ChatCreateOpenTimingTracker()
