@@ -626,6 +626,12 @@ android {
             isIncludeAndroidResources = true
         }
     }
+    val instrumentedTestBuildType =
+        providers.gradleProperty("whitenoise.androidTestBuildType").orElse("debug").get()
+    require(instrumentedTestBuildType in buildTypes.names) {
+        "Unknown instrumented-test build type: $instrumentedTestBuildType"
+    }
+    testBuildType = instrumentedTestBuildType
     sourceSets {
         getByName("main") {
             @Suppress("DEPRECATION")
@@ -1109,6 +1115,7 @@ dependencies {
     implementation(libs.androidx.profileinstaller)
     implementation(libs.androidx.tracing)
     implementation(libs.okhttp)
+    implementation(libs.secp256k1.android)
     // One profile is generated from the authenticated dev/zapstore fixture and
     // merged into main for every release consumer. Select that producer
     // configuration explicitly so staging/play/production consumers do not
@@ -1134,7 +1141,9 @@ dependencies {
     testImplementation(libs.roborazzi.junit.rule)
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.androidx.compose.ui.test.junit4)
+    testRuntimeOnly(libs.secp256k1.jvm)
     androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.benchmark.junit4)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
