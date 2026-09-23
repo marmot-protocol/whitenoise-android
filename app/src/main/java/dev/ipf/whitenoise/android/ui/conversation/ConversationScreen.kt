@@ -115,6 +115,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
 import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.ConversationPagingOrigin
+import dev.ipf.whitenoise.android.state.ConversationPagingTraceSection
 import dev.ipf.whitenoise.android.state.ConversationUnreadJumpState
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.MessageAvailability
@@ -132,6 +133,7 @@ import dev.ipf.whitenoise.android.state.loadMessageAvailability
 import dev.ipf.whitenoise.android.state.loadUntilMessageAvailable
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
 import dev.ipf.whitenoise.android.state.markComposerReadyForPresentationTiming
+import dev.ipf.whitenoise.android.state.markPagingEvent
 import dev.ipf.whitenoise.android.state.markWindowVisibleForPresentationTiming
 import dev.ipf.whitenoise.android.state.mediaReferencesFor
 import dev.ipf.whitenoise.android.state.presentFailure
@@ -2581,13 +2583,17 @@ internal fun ConversationScreen(
     // and never disturbs the anchored newest edge — the framework holds the
     // visible rows in the same measure pass with no post-hoc scroll.
     LaunchedEffect(listState, controller) {
+        val edgeStops = PagingEdgeStopTracker()
         snapshotFlow {
             // The reversed list emits the older-loading row, the top error row and the top spacer
             // after the messages, so they hold the highest indexes — exactly the oldest end, and
             // exactly what is on screen when a page is due. Taking the last visible item would pick
             // one of those, resolve no anchor, and page unanchored: the bug this is meant to fix.
-            listState.layoutInfo.visibleItemsInfo.lastOrNull { conversationAnchorMessageId(it.key) != null }
-        }.collect { oldestVisible ->
+            // Scroll rest is part of the key so a stop on the edge is observed, not only the last
+            // row change before it.
+            val visible = listState.layoutInfo.visibleItemsInfo
+            visible.lastOrNull { conversationAnchorMessageId(it.key) != null } to listState.isScrollInProgress
+        }.collect { (oldestVisible, scrolling) ->
             val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
             if (liveRenderedSize == 0) return@collect
             val oldestMessageListIndex =
@@ -2596,6 +2602,14 @@ internal fun ConversationScreen(
                     timelineSize = liveRenderedSize,
                     trailingRowCount = controller.conversationTrailingRowCount(liveRenderedSize),
                 )
+            val edgeStopped =
+                edgeStops.observe(
+                    oldestVisibleIndex = oldestVisible?.index ?: -1,
+                    edgeListIndex = oldestMessageListIndex,
+                    hasMoreBefore = controller.hasMoreBefore,
+                    scrolling = scrolling,
+                )
+            if (edgeStopped) markPagingEvent(ConversationPagingTraceSection.EDGE_STOP)
             val prefetch =
                 shouldPrefetchOlder(
                     anchored = initialTimelineAnchored,
@@ -2609,11 +2623,13 @@ internal fun ConversationScreen(
                     oldestMessageListIndex = oldestMessageListIndex,
                 )
             if (!prefetch) return@collect
+            val edgeMessageId = controller.timeline.firstOrNull { !MessageProjector.isEdit(it.record) }?.id
             // MDK places a replacement relative to the window's anchor, so tell it which row the
             // reader is actually on before paging. Without this an upward page is placed against
             // whatever the read pointer last reported, which only ever moves towards newer
             // messages — the reason scrolling up could move the reading position.
             controller.loadOlder(conversationAnchorMessageId(oldestVisible?.key))
+            recordOlderPageLanding(controller, listState, edgeMessageId, liveRenderedSize)
         }
     }
     // Loading the authoritative unread boundary can shift a capped subscription
