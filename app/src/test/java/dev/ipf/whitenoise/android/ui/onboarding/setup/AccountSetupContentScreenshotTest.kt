@@ -53,6 +53,35 @@ class AccountSetupContentScreenshotTest {
             ),
         )
 
+    /** A profile editor keeps the dice reachable with mirrored layout and large text. */
+    @Test fun profileEditorRtlLarge() =
+        capture(
+            "profile_editor_rtl_large",
+            AccountSetupState(
+                snapshot = setupSnapshot(),
+                editor =
+                    SetupEditor(
+                        3uL,
+                        OnboardingStepFfi.PROFILE,
+                        OnboardingActionFfi.EDIT_PROFILE,
+                        displayName = "Alex",
+                    ),
+            ),
+            rtl = true,
+            fontScale = 2f,
+        )
+
+    /** Native work leaves the profile editor visible with its dice disabled. */
+    @Test fun busyProfileEditor() =
+        capture(
+            "profile_editor_busy",
+            AccountSetupState(
+                snapshot = setupSnapshot(),
+                busy = true,
+                editor = SetupEditor(3uL, OnboardingStepFfi.PROFILE, OnboardingActionFfi.EDIT_PROFILE),
+            ),
+        )
+
     /** Records the inbox-specific publication field without a misleading read/write relay label. */
     @Test fun inboxEditor() =
         capture(
@@ -237,7 +266,7 @@ class AccountSetupContentScreenshotTest {
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
                 WhiteNoiseTheme(darkTheme = dark, fontScale = fontScale) {
-                    AccountSetupContent(state, {}, { _, _, _ -> }, {}, {}, {}, {}, {}, {})
+                    AccountSetupContent(state, {}, { _, _, _ -> }, {}, {}, {}, {}, {}, {}, { "Quiet Otter" })
                 }
             }
         }

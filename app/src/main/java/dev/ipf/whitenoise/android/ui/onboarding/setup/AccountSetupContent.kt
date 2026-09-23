@@ -32,6 +32,7 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 @Composable
 internal fun AccountSetupScreen(
     controller: AccountSetupController,
+    randomName: (String?) -> String,
     onLater: () -> Unit,
 ) {
     val state by controller.state.collectAsStateWithLifecycle()
@@ -48,6 +49,7 @@ internal fun AccountSetupScreen(
         controller::reconnect,
         controller::openChats,
         onLater,
+        randomName,
         controller::toggleDetails,
     )
 }
@@ -65,6 +67,7 @@ internal fun AccountSetupContent(
     onReconnect: () -> Unit,
     onOpenChats: () -> Unit,
     onLater: () -> Unit,
+    randomName: (String?) -> String,
     onToggleDetails: () -> Unit = {},
 ) {
     val currentStep = state.currentStep?.step
@@ -124,7 +127,7 @@ internal fun AccountSetupContent(
             }
         } else {
             when {
-                state.editor != null -> SetupEditorContent(state.editor, checkNotNull(editorFields), state.busy)
+                state.editor != null -> SetupEditorContent(state.editor, checkNotNull(editorFields), state.busy, randomName)
                 state.busy || state.snapshot == null -> SetupProgress(state.snapshot?.ready == true)
                 state.optionalMetadataPending -> {
                     if (!state.error && !state.disconnected && !state.staleDecision) SetupProgress()
@@ -273,5 +276,7 @@ internal val setupEditorActions =
 @Preview
 @Composable
 private fun AccountSetupPreview() {
-    WhiteNoiseTheme { AccountSetupContent(AccountSetupState(busy = true), {}, { _, _, _ -> }, {}, {}, {}, {}, {}, {}) }
+    WhiteNoiseTheme {
+        AccountSetupContent(AccountSetupState(busy = true), {}, { _, _, _ -> }, {}, {}, {}, {}, {}, {}, { "Quiet Otter" })
+    }
 }

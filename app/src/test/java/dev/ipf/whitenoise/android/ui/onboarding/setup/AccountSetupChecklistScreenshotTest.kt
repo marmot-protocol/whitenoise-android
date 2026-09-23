@@ -100,7 +100,7 @@ class AccountSetupChecklistScreenshotTest {
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
                 WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = scale) {
-                    AccountSetupContent(state, {}, { _, _, _ -> }, {}, {}, {}, {}, {}, {})
+                    AccountSetupContent(state, {}, { _, _, _ -> }, {}, {}, {}, {}, {}, {}, { "Quiet Otter" })
                 }
             }
         }

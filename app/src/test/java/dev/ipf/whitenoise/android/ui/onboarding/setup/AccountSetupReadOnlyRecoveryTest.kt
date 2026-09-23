@@ -71,6 +71,7 @@ class AccountSetupReadOnlyRecoveryTest {
                     {},
                     {},
                     {},
+                    { "Quiet Otter" },
                 )
             }
         }
@@ -82,7 +83,7 @@ class AccountSetupReadOnlyRecoveryTest {
     @Test fun nativeStepRoundTripRequiresFreshDetailNavigation() {
         val state = mutableStateOf(AccountSetupState(snapshot = setupSnapshot()))
         composeRule.setContent {
-            WhiteNoiseTheme { AccountSetupContent(state.value, {}, { _, _, _ -> }, {}, {}, {}, {}, {}, {}) }
+            WhiteNoiseTheme { AccountSetupContent(state.value, {}, { _, _, _ -> }, {}, {}, {}, {}, {}, {}, { "Quiet Otter" }) }
         }
         composeRule.onNodeWithTag("setup-step-PROFILE").performScrollTo().performClick()
         composeRule.onNodeWithTag("setup-action-CONTINUE_WITHOUT").assertExists()
@@ -122,7 +123,7 @@ class AccountSetupReadOnlyRecoveryTest {
                     AccountSetupController(SETUP_TEST_ACCOUNT, client, scope, { true }, { opens++ }, {})
                 }
             LaunchedEffect(controller) { controller.reconnect() }
-            WhiteNoiseTheme { AccountSetupScreen(controller) {} }
+            WhiteNoiseTheme { AccountSetupScreen(controller, { "Quiet Otter" }) {} }
         }
         composeRule.waitForIdle()
         return client

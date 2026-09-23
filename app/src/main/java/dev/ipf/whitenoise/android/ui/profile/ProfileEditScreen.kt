@@ -826,7 +826,9 @@ internal fun ProfileEditScreen(
         onEdit = ::beginEditing,
         onSave = ::saveProfile,
         onSuggestName = {
-            fields.name.setTextAndPlaceCursorAtEnd(appState.randomProfilePseudonym(excluding = displayName))
+            fields.name.setTextAndPlaceCursorAtEnd(
+                appState.randomProfilePseudonym(excluding = fields.name.text.toString()),
+            )
         },
         onRestoreName = { fields.name.setTextAndPlaceCursorAtEnd(baselineDraft.displayName) },
         nameDiffersFromSaved = displayName != baselineDraft.displayName,

@@ -33,7 +33,7 @@ class AccountSetupChecklistPresentationTest {
         val snapshot = setupSnapshot(ready = true).copy(cancellationPending = true)
         composeRule.setContent {
             WhiteNoiseTheme {
-                AccountSetupContent(AccountSetupState(snapshot), {}, { _, _, _ -> }, {}, {}, {}, {}, {}, {})
+                AccountSetupContent(AccountSetupState(snapshot), {}, { _, _, _ -> }, {}, {}, {}, {}, {}, {}, { "Quiet Otter" })
             }
         }
         composeRule.onNodeWithTag("setup-open-chats").assertIsNotEnabled()
@@ -43,7 +43,7 @@ class AccountSetupChecklistPresentationTest {
     @Test fun busyRowsDoNotExposeDecisionsAndFreshReadyUpdatesTheButton() {
         val state = mutableStateOf(AccountSetupState(snapshot = setupSnapshot(), busy = true))
         composeRule.setContent {
-            WhiteNoiseTheme { AccountSetupContent(state.value, {}, { _, _, _ -> }, {}, {}, {}, {}, {}, {}) }
+            WhiteNoiseTheme { AccountSetupContent(state.value, {}, { _, _, _ -> }, {}, {}, {}, {}, {}, {}, { "Quiet Otter" }) }
         }
         composeRule.onNodeWithTag("setup-step-PROFILE").assertHasNoClickAction()
         composeRule.onNodeWithTag("setup-open-chats").assertIsNotEnabled()
@@ -59,7 +59,7 @@ class AccountSetupChecklistPresentationTest {
         val snapshot = setupSnapshot(OnboardingStepFfi.KEY_PACKAGE, listOf(OnboardingActionFfi.RECONNECT_SIGNER))
         composeRule.setContent {
             WhiteNoiseTheme(fontScale = 2f) {
-                AccountSetupContent(AccountSetupState(snapshot), { calls++ }, { _, _, _ -> }, {}, {}, {}, {}, {}, {})
+                AccountSetupContent(AccountSetupState(snapshot), { calls++ }, { _, _, _ -> }, {}, {}, {}, {}, {}, {}, { "Quiet Otter" })
             }
         }
         composeRule.onNodeWithTag("setup-step-KEY_PACKAGE").performScrollTo().performClick()
@@ -77,7 +77,7 @@ class AccountSetupChecklistPresentationTest {
                 editor = SetupEditor(3uL, OnboardingStepFfi.PROFILE, OnboardingActionFfi.EDIT_PROFILE),
             )
         composeRule.setContent {
-            WhiteNoiseTheme { AccountSetupContent(state, {}, { _, _, _ -> }, {}, {}, {}, {}, {}, { exits++ }) }
+            WhiteNoiseTheme { AccountSetupContent(state, {}, { _, _, _ -> }, {}, {}, {}, {}, {}, { exits++ }, { "Quiet Otter" }) }
         }
         composeRule.onNodeWithContentDescription("Back").performClick()
         assertEquals(1, exits)
@@ -109,7 +109,7 @@ class AccountSetupChecklistPresentationTest {
                 ),
             )
         composeRule.setContent {
-            WhiteNoiseTheme { AccountSetupContent(state.value, {}, { _, _, _ -> }, {}, {}, {}, {}, {}, {}) }
+            WhiteNoiseTheme { AccountSetupContent(state.value, {}, { _, _, _ -> }, {}, {}, {}, {}, {}, {}, { "Quiet Otter" }) }
         }
         composeRule.onNode(hasSetTextAction() and hasText("Alice")).performTextReplacement("Private draft")
         composeRule.runOnIdle {
