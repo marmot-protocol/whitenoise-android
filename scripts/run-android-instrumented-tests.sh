@@ -12,9 +12,15 @@ event_name="${1:-}"
 smoke_annotation=dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 
 if [[ "$event_name" == "pull_request" ]]; then
-  exec ./gradlew :app:connectedDevZapstoreDebugAndroidTest \
+  ./gradlew :app:connectedDevZapstoreDebugAndroidTest \
     -Pandroid.testInstrumentationRunnerArguments.annotation="$smoke_annotation" \
     -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
+    --no-daemon --stacktrace
+
+  exec ./gradlew :app:connectedDevZapstoreBenchmarkReleaseAndroidTest \
+    -Pwhitenoise.androidTestBuildType=benchmarkRelease \
+    -Pandroid.testInstrumentationRunnerArguments.class=dev.ipf.whitenoise.android.core.nostr.Bip340VerificationBenchmark \
+    -Pandroid.testInstrumentationRunnerArguments.androidx.benchmark.suppressErrors=EMULATOR \
     --no-daemon --stacktrace
 fi
 

@@ -62,7 +62,7 @@ class NostrEventVerifierTest {
     }
 
     @Test
-    fun rejectsMalformedBip340InputsWithoutCallingNativeVerifier() {
+    fun rejectsMalformedBip340Inputs() {
         val publicKey = "F9308A019258C31049344F85F89D5229B531C845836F99B08601F113BCE036F9"
         val message = "00".repeat(32)
         val signature =
