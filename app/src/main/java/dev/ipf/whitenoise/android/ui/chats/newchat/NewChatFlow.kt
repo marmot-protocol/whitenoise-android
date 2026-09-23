@@ -581,7 +581,9 @@ private fun NewMessageAccountScreen(
                             resolveDirectChat = {
                                 session.currentValue {
                                     preparedLookupOrFresh(
-                                        preparedLookup?.takeIf { it.key.chatRevision == appState.forwardTargetsRevision },
+                                        preparedLookup?.takeIf {
+                                            it.key.chatRevision == appState.forwardTargetsRevision
+                                        },
                                     ) {
                                         resolveNewMessageDirectChat(
                                             npub = npub,
