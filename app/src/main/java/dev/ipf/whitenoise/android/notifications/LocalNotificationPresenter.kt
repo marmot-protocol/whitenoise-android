@@ -185,6 +185,7 @@ class LocalNotificationPresenter(
         accountRef: String,
         senderAccountIdHex: String,
         senderName: String,
+        isRefreshCurrent: () -> Boolean = { true },
     ): Int =
         withContext(Dispatchers.Default) {
             if (accountRef.isBlank() || senderAccountIdHex.isBlank() || senderName.isBlank()) return@withContext 0
@@ -206,6 +207,7 @@ class LocalNotificationPresenter(
                         snapshot.id,
                         ConversationCardOp.REFRESH_CONTACT_NAME,
                     ) {
+                        if (!isRefreshCurrent()) return@withLock
                         val live = activeNotification(manager, snapshot.tag, snapshot.id) ?: return@withLock
                         val renamed =
                             renamedSenderNotification(
@@ -1147,6 +1149,7 @@ class LocalNotificationPresenter(
             }
         }
 
+    /** Rewrites one live card with resolved avatars while preserving dismissal ownership. */
     private suspend fun postEnrichedMessagingNotification(
         update: NotificationUpdateFfi,
         content: LocalNotificationContent,
@@ -1196,12 +1199,22 @@ class LocalNotificationPresenter(
             if (!avatarChanged) return@withLock
             val enrichedStyle = enrichedMessagingStyle(active, enrichedSender) ?: return@withLock
             val enriched = buildEnrichedMessagingNotification(active, enrichedStyle)
-            postNotificationSafely(
-                NotificationManagerCompat.from(context),
-                content.notificationTag,
-                content.notificationId,
-                enriched,
-            )
+            val manager = NotificationManagerCompat.from(context)
+            if (
+                postNotificationSafely(
+                    manager,
+                    content.notificationTag,
+                    content.notificationId,
+                    enriched,
+                )
+            ) {
+                retainPostedCardUnlessDismissed(
+                    showToken,
+                    manager,
+                    content.notificationTag,
+                    content.notificationId,
+                )
+            }
         }
     }
 
@@ -1256,7 +1269,6 @@ class LocalNotificationPresenter(
                     .Builder(context, notification)
                     .setStyle(copiedMessagingStyle(style, renamedPerson(matchedPerson, senderName)))
                     .setOnlyAlertOnce(true)
-                    .setSilent(true)
                     .build()
             }
 
@@ -1295,7 +1307,6 @@ class LocalNotificationPresenter(
                             )
                         },
                     ).setOnlyAlertOnce(true)
-                    .setSilent(true)
                     .build()
             }
 

@@ -1330,6 +1330,10 @@ class LocalNotificationPresenterConversationTest {
                 .setStyle(style)
                 .build(),
         )
+        val originalGroup =
+            manager.activeNotifications
+                .single()
+                .notification.group
 
         assertEquals(
             1,
@@ -1338,10 +1342,12 @@ class LocalNotificationPresenterConversationTest {
             },
         )
 
+        val refreshedNotification = manager.activeNotifications.single().notification
+        assertEquals(originalGroup, refreshedNotification.group)
         val messages =
             checkNotNull(
                 NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(
-                    manager.activeNotifications.single().notification,
+                    refreshedNotification,
                 ),
             ).messages
         assertEquals(listOf("Ally", "Ally", "Bob"), messages.map { it.person?.name.toString() })
