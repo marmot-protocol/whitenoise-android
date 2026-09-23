@@ -34,9 +34,9 @@ import kotlin.coroutines.CoroutineContext
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class ConversationTimelineExtendApplyTest {
+    /** A newer replacement invalidates an older EXTEND waiting on the worker lane. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    /** A newer replacement invalidates an older EXTEND waiting on the worker lane. */
     fun newerWindowDiscardsAnOlderSuspendedExtendPreparation() =
         runTest {
             val dispatcher = PausedPreparationDispatcher()
@@ -142,8 +142,8 @@ class ConversationTimelineExtendApplyTest {
             }
         }
 
-    @Test
     /** A 200-row extension prepares off-main and projects only the changed row. */
+    @Test
     fun largeWindowMeasuresPreparationSeparatelyAndCommitsOnlyItsDiff() =
         runBlocking {
             val seed =
@@ -183,8 +183,8 @@ class ConversationTimelineExtendApplyTest {
      * Their rendered item is still re-stamped, because sliding the window does move them — see
      * [extendRestampsKeptRowsSoTheSlidWindowKeepsItsOrder].
      */
-    @Test
     /** Retained messages keep their projected object identity across an extension. */
+    @Test
     fun extendKeepsUnchangedRecordsByIdentity() =
         runBlocking {
             withController(seed = listOf(row(SECOND), row(THIRD))) { controller, _ ->
@@ -206,8 +206,8 @@ class ConversationTimelineExtendApplyTest {
      * The regression this mode could most easily introduce: a kept row skips re-projection, so its
      * ordinal must be re-stamped or the slid window would reorder history.
      */
-    @Test
     /** Retained rows receive the new authoritative ordinals after a window slide. */
+    @Test
     fun extendRestampsKeptRowsSoTheSlidWindowKeepsItsOrder() =
         runBlocking {
             withController(seed = listOf(row(SECOND), row(THIRD))) { controller, _ ->
@@ -222,8 +222,8 @@ class ConversationTimelineExtendApplyTest {
         }
 
     /** Rows the window dropped leave the timeline and every index keyed by their id. */
-    @Test
     /** Rows trimmed by the new bounded window leave the controller indexes. */
+    @Test
     fun extendRemovesRowsTheWindowNoLongerHolds() =
         runBlocking {
             withController(seed = listOf(row(SECOND), row(THIRD))) { controller, _ ->
@@ -300,8 +300,8 @@ class ConversationTimelineExtendApplyTest {
      * pending, before the live update arrives. The row it newly adds must consume that bubble, or
      * the reader sees the same message twice.
      */
-    @Test
     /** A forward page can reconcile a pending local send without a full replacement. */
+    @Test
     fun extendReconcilesAPendingSendANewerPageConfirms() =
         runBlocking {
             withController(seed = listOf(row(SECOND))) { controller, appState ->

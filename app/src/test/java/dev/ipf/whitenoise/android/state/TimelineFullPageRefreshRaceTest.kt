@@ -46,9 +46,9 @@ import kotlin.coroutines.CoroutineContext
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class TimelineFullPageRefreshRaceTest {
+    /** Discarding a stale preparation must leave both live rows and commit callback untouched. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    /** Discarding a stale preparation must leave both live rows and commit callback untouched. */
     fun newerLiveProjectionWinsWhileOlderWindowPreparationIsSuspended() =
         runTest {
             val preparationDispatcher = PausedDispatcher()
@@ -98,8 +98,8 @@ class TimelineFullPageRefreshRaceTest {
         }
     }
 
-    @Test
     /** A stale FFI refresh must preserve a newer stream watcher and its live row. */
+    @Test
     fun staleFullPageRefreshDoesNotDropNewerLiveProjectionOrStreamWatcher() =
         runBlocking {
             val controller = conversationController()

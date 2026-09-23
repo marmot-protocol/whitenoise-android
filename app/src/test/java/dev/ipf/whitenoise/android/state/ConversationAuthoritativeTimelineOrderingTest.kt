@@ -29,9 +29,9 @@ import kotlin.coroutines.CoroutineContext
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class ConversationAuthoritativeTimelineOrderingTest {
+    /** A delayed preparation cannot overwrite the ordering from a later live window. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    /** A delayed preparation cannot overwrite the ordering from a later live window. */
     fun newerAuthoritativeOrderWinsAnOlderSuspendedPreparation() =
         runTest {
             val dispatcher = PausedPreparationDispatcher()

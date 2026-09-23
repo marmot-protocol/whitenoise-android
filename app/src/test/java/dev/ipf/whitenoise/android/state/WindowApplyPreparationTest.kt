@@ -44,8 +44,8 @@ class WindowApplyPreparationTest {
         assertTrue(plan.departedIds.isEmpty())
     }
 
-    @Test
     /** EXTEND keeps hydrated Markdown for retained rows and projects changed rows only. */
+    @Test
     fun extendPreparationCarriesMarkdownAndPlansOnlyChangedRows() {
         val document =
             MarkdownDocumentFfi(
@@ -82,9 +82,9 @@ class WindowApplyPreparationTest {
         assertEquals(setOf(changedId), prepared.touchedIds)
     }
 
+    /** REPLACE prepares its immutable rows on the worker without touching controller state. */
     @Test
     @Suppress("LongMethod") // One 200-row fixture must cover every projection shape in the same pure snapshot.
-    /** REPLACE prepares its immutable rows on the worker without touching controller state. */
     fun replacementPreparationIsPureAndRunsOffTheCallingThread() =
         runBlocking {
             val callingThread = Thread.currentThread().name
