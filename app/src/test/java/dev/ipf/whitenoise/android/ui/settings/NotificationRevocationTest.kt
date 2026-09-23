@@ -3,14 +3,23 @@ package dev.ipf.whitenoise.android.ui.settings
 import android.Manifest
 import android.app.Application
 import android.content.Context
+import androidx.activity.compose.LocalActivityResultRegistryOwner
+import androidx.activity.result.ActivityResultRegistry
+import androidx.activity.result.ActivityResultRegistryOwner
+import androidx.activity.result.contract.ActivityResultContract
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.core.app.ActivityOptionsCompat
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.NotificationSettingsFfi
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.BackgroundConnectionPreferences
 import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.state.NotificationBootstrapTestFixture
@@ -34,6 +43,7 @@ class NotificationRevocationTest {
     @get:Rule
     val composeRule = createComposeRule()
     private val app = ApplicationProvider.getApplicationContext<Application>()
+    private val permissionRegistry = PermissionRegistry()
     private var fixture: NotificationBootstrapTestFixture? = null
 
     /** Start with denied Android permission and no inherited app preferences. */
@@ -101,6 +111,25 @@ class NotificationRevocationTest {
         composeRule.onNodeWithTag("notification-delivery.local").assertIsSelected().assertIsNotEnabled()
     }
 
+    /** A grant through the screen cannot turn an account's disabled notification rendering back on. */
+    @Test
+    fun permissionGrantPreservesRenderingOptOut() {
+        val owner = show(local = false, push = false, background = false)
+
+        composeRule.onNodeWithText(app.getString(R.string.allow_notifications)).performClick()
+        composeRule.runOnIdle {
+            shadowOf(app).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
+            permissionRegistry.deliver(granted = true)
+        }
+        composeRule.waitUntil(5_000) { owner.appState.localNotificationPermissionGranted }
+        composeRule.waitForIdle()
+
+        assertFalse(owner.notificationSettings(ACCOUNT).localNotificationsEnabled)
+        assertFalse(owner.notificationSettings(ACCOUNT).nativePushEnabled)
+        assertTrue(owner.nativePushSettingWrites.isEmpty())
+        composeRule.onNodeWithTag("notification-delivery.local").assertIsSelected()
+    }
+
     /** Persisted fixture state enters the real owner through notificationSettings, not direct UI assignment. */
     private fun show(
         local: Boolean,
@@ -118,7 +147,11 @@ class NotificationRevocationTest {
             )
         fixture = owner
         runBlocking { owner.bootstrap() }
-        composeRule.setContent { WhiteNoiseTheme { NotificationsScreen(owner.appState, onBack = {}) } }
+        composeRule.setContent {
+            CompositionLocalProvider(LocalActivityResultRegistryOwner provides permissionRegistry) {
+                WhiteNoiseTheme { NotificationsScreen(owner.appState, onBack = {}) }
+            }
+        }
         composeRule.waitUntil(5_000) { owner.appState.localNotificationSettings != null }
         assertFalse(owner.appState.localNotificationPermissionGranted)
         return owner
@@ -126,5 +159,25 @@ class NotificationRevocationTest {
 
     private companion object {
         const val ACCOUNT = "notification-revocation"
+    }
+
+    private class PermissionRegistry : ActivityResultRegistry(), ActivityResultRegistryOwner {
+        override val activityResultRegistry: ActivityResultRegistry get() = this
+        private var requestCode: Int? = null
+
+        /** Capture the permission request without opening the Android permission dialog. */
+        override fun <I, O> onLaunch(
+            requestCode: Int,
+            contract: ActivityResultContract<I, O>,
+            input: I,
+            options: ActivityOptionsCompat?,
+        ) {
+            this.requestCode = requestCode
+        }
+
+        /** Deliver the permission result to the screen's registered callback. */
+        fun deliver(granted: Boolean) {
+            assertTrue(dispatchResult(requireNotNull(requestCode), granted))
+        }
     }
 }

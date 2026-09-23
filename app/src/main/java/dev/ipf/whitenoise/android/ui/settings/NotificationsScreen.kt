@@ -56,7 +56,6 @@ internal fun NotificationsScreen(
             if (granted) {
                 appState.launchMutation {
                     appState.refreshLocalNotificationSettings()
-                    appState.setNotificationDeliveryMode(appState.notificationDeliveryMode())
                 }
             } else {
                 appState.present(R.string.toast_notification_permission_denied)
