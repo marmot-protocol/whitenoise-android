@@ -242,6 +242,7 @@ private val FocusedReactionStateLayerSize = 40.dp
 private val FocusedReactionSelectedFillSize = 36.dp
 private val FocusedReactionEmojiSize = 28.dp
 private val FocusedMoreIconSize = 24.dp
+internal const val FOCUSED_ACTION_MENU_SCROLL_TEST_TAG = "focused-action-menu-scroll"
 
 /** Prototype reaction rail, inert real-message preview and grouped command menu; preserves the host IME. */
 @Composable
@@ -316,7 +317,6 @@ internal fun FocusedMessageActions(
                         // Children consume their own taps first, so a tap that reaches the column
                         // landed on empty stack space or its padding and dismisses like the scrim.
                         .pointerInput(Unit) { detectTapGestures { currentOnDismiss() } }
-                        .verticalScroll(rememberScrollState())
                         .padding(horizontal = 16.dp, vertical = FocusedOverlayShadowSafeInset)
                         .semantics {
                             paneTitle = title
@@ -375,7 +375,18 @@ internal fun FocusedMessageActions(
                                 },
                     ) { preview() }
                 }
-                FocusedActionMenu(actions)
+                // When the IME shortens the safe frame, only the actions overflow. Scrolling the
+                // whole stack would move the lifted message and reactions out of sight, even though
+                // the user is still choosing an action for that message.
+                Box(
+                    modifier =
+                        Modifier
+                            .weight(1f, fill = false)
+                            .verticalScroll(rememberScrollState())
+                            .testTag(FOCUSED_ACTION_MENU_SCROLL_TEST_TAG),
+                ) {
+                    FocusedActionMenu(actions)
+                }
             }
         }
     }
