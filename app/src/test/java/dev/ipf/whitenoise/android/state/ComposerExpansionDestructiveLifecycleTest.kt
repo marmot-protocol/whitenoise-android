@@ -506,6 +506,8 @@ class ComposerExpansionDestructiveLifecycleTest {
         runBlocking {
             val fixture = fixture(deleteTransportFailures = 1)
             fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("keep until commit"))
+            // The test blocks Robolectric's main thread during deletion, so finish its queued draft write first.
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300))
             retainExpansion(fixture.appState, GROUP_ID)
             val controller = fixture.seededChatsController()
             try {
@@ -542,6 +544,7 @@ class ComposerExpansionDestructiveLifecycleTest {
         runBlocking {
             val fixture = fixture(failDraftDelete = true)
             fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("remove locally"))
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300))
             retainExpansion(fixture.appState, GROUP_ID)
             val controller = fixture.seededChatsController()
             try {
@@ -561,6 +564,7 @@ class ComposerExpansionDestructiveLifecycleTest {
         runBlocking {
             val fixture = fixture(deleteTransportFailures = IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS)
             fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("still drafting"))
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300))
             val retained = retainExpansion(fixture.appState, GROUP_ID)
             val controller = fixture.seededChatsController()
             try {
