@@ -239,6 +239,33 @@ class RecipientSearchTest {
         assertEquals("Jack", match.searchProfile?.displayName)
     }
 
+    /** A private nickname owns presentation while both public names remain searchable aliases. */
+    @Test
+    fun localNicknameOverridesDirectoryLabelWithoutHidingPublicAliases() {
+        val hex = "a".repeat(64)
+        val directory =
+            candidate(hex, "Public Display").copy(
+                searchProfile = profile(displayName = "Public Display", name = "Public Name"),
+            )
+        val local = withLocalRecipientDisplayNames(listOf(directory)) { "My Friend" }.single()
+
+        assertEquals("My Friend", local.displayName)
+        assertEquals("My Friend", RecipientSearch.browse("friend", listOf(local), null).single().displayName)
+        assertEquals("My Friend", RecipientSearch.browse("public display", listOf(local), null).single().displayName)
+        assertEquals("My Friend", RecipientSearch.browse("public name", listOf(local), null).single().displayName)
+    }
+
+    /** Removing a nickname restores the directory label, and another account's nickname is never inferred. */
+    @Test
+    fun missingAccountScopedNicknamePreservesDirectoryLabel() {
+        val directory = candidate("b".repeat(64), "Public Bob")
+
+        assertEquals(
+            "Public Bob",
+            withLocalRecipientDisplayNames(listOf(directory)) { null }.single().displayName,
+        )
+    }
+
     @Test
     fun engineMatchOnAFieldTheLocalFilterCannotSeeIsKept() {
         // The engine matched this person on their `about` text. Nothing in the
@@ -402,9 +429,10 @@ class RecipientSearchTest {
 
     private fun profile(
         displayName: String,
+        name: String? = null,
         nip05: String? = null,
     ) = UserProfileMetadataFfi(
-        name = null,
+        name = name,
         displayName = displayName,
         about = null,
         picture = null,

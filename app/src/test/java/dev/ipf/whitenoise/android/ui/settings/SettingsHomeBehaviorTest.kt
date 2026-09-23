@@ -35,6 +35,7 @@ class SettingsHomeBehaviorTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val opened = mutableListOf<SettingsDetail>()
     private var shareConnectCount = 0
+    private var editProfilePictureCount = 0
     private var addProfileCount = 0
     private var switchProfileCount = 0
     private var supportChatCount = 0
@@ -96,6 +97,23 @@ class SettingsHomeBehaviorTest {
             assertEquals(1, shareConnectCount)
             assertEquals(1, addProfileCount)
             assertEquals(0, switchProfileCount)
+        }
+    }
+
+    /** The avatar and the rest of the profile row are separate one-destination controls. */
+    @Test
+    fun profileAvatarOpensPictureActionsWithoutOpeningShareConnect() {
+        mount(profileCount = 1)
+        composeRule.onNodeWithTag("settings.active_profile_avatar").assertHasClickAction().performClick()
+        composeRule.runOnIdle {
+            assertEquals(1, editProfilePictureCount)
+            assertEquals(0, shareConnectCount)
+        }
+
+        composeRule.onNodeWithTag("settings.active_profile").performClick()
+        composeRule.runOnIdle {
+            assertEquals(1, editProfilePictureCount)
+            assertEquals(1, shareConnectCount)
         }
     }
 
@@ -197,6 +215,7 @@ class SettingsHomeBehaviorTest {
                     versionName = "2026.9.11",
                     onBack = { backCount++ },
                     onOpenShareConnect = { shareConnectCount++ },
+                    onOpenProfilePictureActions = { editProfilePictureCount++ },
                     onAddProfile = { addProfileCount++ },
                     onSwitchProfile = { switchProfileCount++ },
                     onOpenDetail = { opened += it },
