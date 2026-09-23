@@ -652,6 +652,12 @@ android {
         }
         getByName("androidTest") {
             kotlin.directories.add("src/testSupport/kotlin")
+            if (instrumentedTestBuildType == "benchmarkRelease") {
+                // Existing notification device tests depend on debug-only helpers.
+                kotlin.exclude("**/notifications/NotificationCatchUpAlertDeviceTest.kt")
+                kotlin.exclude("**/notifications/NotificationHapticVisualTimingDeviceTest.kt")
+                kotlin.exclude("**/notifications/NotificationHeadsUpDurationDeviceTest.kt")
+            }
         }
     }
     packaging {

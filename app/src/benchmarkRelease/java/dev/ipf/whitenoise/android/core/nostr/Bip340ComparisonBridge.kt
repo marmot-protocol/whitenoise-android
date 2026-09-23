@@ -10,7 +10,11 @@ object Bip340ComparisonBridge {
 
     fun replacementFullEvent(): Boolean = NostrEventVerifier.verifies(SIGNED_EVENT)
 
-    fun legacyRejectsInvalidSignature(): Boolean = !LegacyBip340BenchmarkVerifier.verify(PUBLIC_KEY, MESSAGE, INVALID_SIGNATURE)
+    fun legacyRejectsInvalidSignature(): Boolean = !LegacyBip340BenchmarkVerifier.verify(
+        PUBLIC_KEY,
+        MESSAGE,
+        INVALID_SIGNATURE,
+    )
 
     fun replacementRejectsInvalidSignature(): Boolean = !BIP340.verify(PUBLIC_KEY, MESSAGE, INVALID_SIGNATURE)
 

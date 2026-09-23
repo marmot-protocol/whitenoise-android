@@ -1,3 +1,5 @@
+@file:Suppress("MagicNumber", "ReturnCount")
+
 package dev.ipf.whitenoise.android.core.nostr
 
 import java.math.BigInteger
