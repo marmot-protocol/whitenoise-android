@@ -49,4 +49,31 @@ class RemoteGiphyMediaDownloadPolicyTest {
             ),
         )
     }
+
+    @Test
+    fun cachedMediaLoadsWhileAutomaticDownloadsArePaused() {
+        assertTrue(
+            shouldLoadRemoteGiphyMedia(
+                automaticDownloadsPaused = true,
+                automaticAllowed = false,
+                manualRequest = false,
+                cachedAvailable = true,
+            ),
+        )
+    }
+
+    @Test
+    fun byteCacheRetainsRecentMediaAndEvictsLeastRecentlyUsedBytes() {
+        val cache = RemoteGiphyByteCache(maxBytes = 5)
+        cache.put("first", byteArrayOf(1, 2, 3))
+        cache.put("second", byteArrayOf(4, 5))
+
+        assertTrue(cache.get("first") != null)
+
+        cache.put("third", byteArrayOf(6))
+
+        assertTrue(cache.get("first") != null)
+        assertTrue(cache.get("second") == null)
+        assertTrue(cache.get("third") != null)
+    }
 }
