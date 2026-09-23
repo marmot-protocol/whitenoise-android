@@ -3,6 +3,18 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "Modifier.chatListEdgeFade",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEdgeFade.kt",
+        "anchor": "fun Modifier.chatListEdgeFade(",
+        "test_ids": ["CHL-002"]
+      },
+      {
+        "surface": "Settings profile avatar picture edit shortcut",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.profile_picture_edit",
+        "test_ids": ["PRO-002"]
+      },
+      {
         "surface": "Amber grouped-send screen admission and merge budget",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/amber/AmberActivityCoordinator.kt",
         "anchor": "GROUPED_SESSION_BOOTSTRAP_MS",

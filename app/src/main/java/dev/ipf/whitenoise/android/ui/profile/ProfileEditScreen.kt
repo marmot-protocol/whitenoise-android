@@ -579,7 +579,7 @@ internal fun ProfileEditScreen(
 
     /** Enters edit mode with a fresh draft. */
     fun beginEditing() {
-        if (busy || !saveState.isLoadedFor(activeAccountId) || !profileContentReady) return
+        if (busy || activeAccountId == null || !profileContentReady) return
         editRevision++
         resetDraft()
         isEditing = true
