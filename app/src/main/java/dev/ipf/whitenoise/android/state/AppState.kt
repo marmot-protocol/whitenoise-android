@@ -1848,8 +1848,8 @@ class WhiteNoiseAppState private constructor(
     var appUnlockError by mutableStateOf<AppText?>(null)
         private set
 
-    var appUnlockPromptRequestId by mutableIntStateOf(0)
-        private set
+    internal val appUnlockSessions = AppUnlockSessionController()
+    internal val appUnlockPromptRequestId: Long get() = appUnlockSessions.latestSessionId
 
     // Populated by the off-main pre-warm (or the first unlock/background
     // write); the getter NEVER reads the Keystore-backed store itself — a
@@ -6037,6 +6037,7 @@ class WhiteNoiseAppState private constructor(
     fun refreshAppLockCredentialAvailability() {
         appLockCredentialAvailable = isAppLockCredentialAvailable(appContext)
         if (!appLockCredentialAvailable) {
+            appUnlockSessions.clear()
             appLockScreenVisible = false
             appUnlockError = null
             resumePendingInviteNotificationIdentityRefreshes()
@@ -6056,6 +6057,7 @@ class WhiteNoiseAppState private constructor(
         if (enabled) {
             requestAppUnlock()
         } else {
+            appUnlockSessions.clear()
             appLockScreenVisible = false
             appUnlockError = null
             resumePendingInviteNotificationIdentityRefreshes()
@@ -6071,8 +6073,7 @@ class WhiteNoiseAppState private constructor(
         refreshAppLockCredentialAvailability()
         if (!requireAppUnlock || !appLockCredentialAvailable) return
         showAppLockScreen()
-        appUnlockError = null
-        appUnlockPromptRequestId += 1
+        if (appUnlockSessions.begin()) appUnlockError = null
     }
 
     private fun showAppLockScreen() {
@@ -6080,7 +6081,7 @@ class WhiteNoiseAppState private constructor(
         stopSpeaking()
     }
 
-    fun markAppUnlockSucceeded(
+    internal fun markAppUnlockSucceeded(
         nowMillis: Long = System.currentTimeMillis(),
         dismissRetainedVisibleConversation: Boolean = true,
     ) {
@@ -6095,23 +6096,23 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    fun markAppUnlockFailed(message: AppText = AppText.Resource(R.string.app_lock_auth_cancelled)) {
+    internal fun markAppUnlockFailed(message: AppText = AppText.Resource(R.string.app_lock_auth_cancelled)) {
         if (!appLockScreenVisible) return
         appUnlockError = message
     }
 
-    // True while a foreground lock decision waits for the off-main unlock
-    // timestamp: the lock scrim shows (UI secured) but the biometric prompt
-    // is deferred until the REAL value decides — a 0L placeholder would read
-    // the grace period as expired and over-prompt on cold starts within it.
+    // True while the foreground lock decision waits for off-main unlock time. The secure scrim remains visible,
+    // and the prompt waits for the real value so the grace period is not falsely treated as expired.
     var appUnlockEvaluationPending by mutableStateOf(false)
         private set
 
     fun maybeShowAppLockForForeground(nowMillis: Long = System.currentTimeMillis()) {
         refreshAppLockCredentialAvailability()
-        // Short-circuit BEFORE any timestamp read so app-lock-disabled users
-        // never pay for it on foreground transitions.
+        // Skip timestamp work when app lock is disabled or the device credential is unavailable.
         if (!requireAppUnlock || !appLockCredentialAvailable) return
+        val promptActive = appUnlockSessions.activeSessionId != null
+        if (promptActive) showAppLockScreen()
+        if (promptActive || appUnlockSessions.consumeForegroundReturn(SystemClock.elapsedRealtime())) return
         val knownLastUnlock = lastAppUnlockAtMillisBacking
         if (knownLastUnlock == null) {
             deferAppLockDecisionUntilTimestampLoads(nowMillis)
@@ -6136,9 +6137,7 @@ class WhiteNoiseAppState private constructor(
             val loaded = withContext(Dispatchers.IO) { AppLockPreferences.readLastUnlockedAtMillis(appContext) }
             if (lastAppUnlockAtMillisBacking == null) lastAppUnlockAtMillisBacking = loaded
             appUnlockEvaluationPending = false
-            // Re-read the clock AFTER the IO hop: deciding with the entry
-            // time could dismiss the lock even though the grace period
-            // expired while the secure store was loading.
+            // Re-read the clock after IO so a grace period that expired during loading cannot dismiss the lock.
             val decisionNowMillis = maxOf(nowMillis, System.currentTimeMillis())
             if (
                 shouldShowAppLock(
@@ -7384,6 +7383,7 @@ class WhiteNoiseAppState private constructor(
                 dismissVisibleConversationNotifications()
             }
         } else {
+            appUnlockSessions.clearForegroundReturn()
             recordAppLockBackgrounded()
             conversationDictation.onAppBackgrounded()
             mutationsScope.launch { draftWriter.flush() }

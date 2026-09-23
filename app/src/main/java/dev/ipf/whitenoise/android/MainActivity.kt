@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.os.SystemClock
+import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
@@ -26,6 +27,8 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ViewModel
 import dev.ipf.whitenoise.android.amber.AmberActivityCoordinator
 import dev.ipf.whitenoise.android.notifications.InboundIntentRouting
 import dev.ipf.whitenoise.android.notifications.NotificationNavigation
@@ -44,6 +47,7 @@ import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.state.ChatScreenshotPreferences
 import dev.ipf.whitenoise.android.state.WarmResumeTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.shouldReattachAppUnlockPrompt
 import dev.ipf.whitenoise.android.ui.WhiteNoiseApp
 import dev.ipf.whitenoise.android.ui.common.releaseSecureFlag
 import dev.ipf.whitenoise.android.ui.common.retainSecureFlag
@@ -52,13 +56,20 @@ import dev.ipf.whitenoise.android.ui.navigation.WarmResumeLifecycleClass
 import dev.ipf.whitenoise.android.ui.navigation.warmResumeActivityLifecycleClass
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import dev.ipf.whitenoise.android.updates.AppUpdateNavigation
+import java.util.concurrent.atomic.AtomicLong
+import javax.crypto.Cipher
 
 class MainActivity : AppCompatActivity() {
     private var inboundProfilePayload by mutableStateOf<String?>(null)
     private var inboundNotificationTarget by mutableStateOf<NotificationTarget?>(null)
     private var inboundNotificationRequestId by mutableLongStateOf(0L)
     private var inboundAppUpdateTap by mutableIntStateOf(0)
-    private var appUnlockPromptActive = false
+    private lateinit var appUnlockPrompt: BiometricPrompt
+    private val appUnlockCryptoGate by lazy(::AppUnlockCryptoGate)
+    private var attachedAppUnlockSessionId: Long? = null
+    private val appUnlockHostId = appUnlockHostIds.incrementAndGet()
+    private val appUnlockPromptHostState: AppUnlockPromptHostState by viewModels()
+    private var attachedAppUnlockHostId: Long? = null
     private var appLockBackgroundSecureFlagRetained = false
     private var recentsPreferenceSecureFlagRetained = false
     private val foregroundConversationDismissal = ForegroundConversationDismissalCoordinator()
@@ -138,6 +149,7 @@ class MainActivity : AppCompatActivity() {
             intent = intent,
             retainPendingShareOnRecreation = savedInstanceState != null,
         )
+        installAppUnlockPrompt()
         enableEdgeToEdge()
         applyPreComposeWindowBackground(appState.themeMode, initialSystemDarkTheme)
         installComposeContent()
@@ -385,6 +397,7 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         WarmResumeTrace.lifecycle(warmResumeTraceToken, "activity-resumed")
         if (::appState.isInitialized) {
+            appState.appUnlockSessions.clearForegroundReturn()
             if (foregroundConversationDismissal.consumeShouldDismissOnResume()) {
                 appState.dismissRetainedVisibleConversationNotifications()
             }
@@ -428,8 +441,37 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun requestAppUnlock() {
-        if (!::appState.isInitialized || !appState.appLockScreenVisible || appUnlockPromptActive) return
-        appUnlockPromptActive = true
+        if (!::appState.isInitialized || !appState.appLockScreenVisible) return
+        val sessionId = appState.appUnlockSessions.activeSessionId
+        // A replacement Activity constructs BiometricPrompt early so AndroidX
+        // reconnects this callback to its retained prompt. Never call
+        // authenticate() a second time for that same logical session.
+        val alreadyAttached =
+            sessionId != null &&
+                attachedAppUnlockSessionId == sessionId &&
+                attachedAppUnlockHostId == appUnlockHostId &&
+                appState.appUnlockSessions.owns(sessionId, appUnlockHostId)
+        if (sessionId == null || alreadyAttached) return
+        if (
+            appState.appUnlockSessions.attachHost(
+                sessionId = sessionId,
+                hostId = appUnlockHostId,
+                replaceExistingHost = false,
+            )
+        ) {
+            launchAppUnlockPrompt(sessionId)
+        }
+    }
+
+    private fun launchAppUnlockPrompt(sessionId: Long) {
+        attachedAppUnlockSessionId = sessionId
+        attachedAppUnlockHostId = appUnlockHostId
+        appUnlockPromptHostState.sessionId = sessionId
+        appUnlockPromptHostState.expectedCipher = null
+        // Bind this callback instance to this exact logical session and host.
+        // AndroidX may rebind its retained prompt to a replacement Activity,
+        // so AppState remains the authority for accepting terminal callbacks.
+        appUnlockPrompt = createAppUnlockPrompt(sessionId = sessionId, hostId = appUnlockHostId)
         val promptInfo =
             BiometricPrompt.PromptInfo
                 .Builder()
@@ -437,39 +479,180 @@ class MainActivity : AppCompatActivity() {
                 .setSubtitle(getString(R.string.app_lock_prompt_subtitle))
                 .setAllowedAuthenticators(APP_LOCK_ALLOWED_AUTHENTICATORS)
                 .build()
-        val prompt =
-            BiometricPrompt(
-                this,
-                ContextCompat.getMainExecutor(this),
-                object : BiometricPrompt.AuthenticationCallback() {
-                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                        appUnlockPromptActive = false
-                        appState.markAppUnlockSucceeded(
-                            dismissRetainedVisibleConversation =
-                                foregroundConversationDismissal.shouldDismissAfterUnlock(),
-                        )
-                        releaseAppLockBackgroundSecureFlag()
-                    }
-
-                    override fun onAuthenticationFailed() {
-                        appState.markAppUnlockFailed(AppText.Resource(R.string.app_lock_auth_failed))
-                    }
-
-                    override fun onAuthenticationError(
-                        errorCode: Int,
-                        errString: CharSequence,
-                    ) {
-                        appUnlockPromptActive = false
-                        appState.markAppUnlockFailed(appLockAuthErrorMessage(errorCode, errString))
-                    }
-                },
-            )
+        traceAppUnlock(sessionId, "prompt-launched")
         runCatching {
-            prompt.authenticate(promptInfo)
+            val cryptoObject = appUnlockCryptoGate.createCryptoObject()
+            appUnlockPromptHostState.expectedCipher = cryptoObject.cipher
+            appUnlockPrompt.authenticate(promptInfo, cryptoObject)
         }.onFailure {
-            appUnlockPromptActive = false
-            appState.markAppUnlockFailed(AppText.Resource(R.string.app_lock_auth_unavailable))
+            if (
+                appState.appUnlockSessions.terminate(
+                    sessionId = sessionId,
+                    hostId = appUnlockHostId,
+                )
+            ) {
+                appUnlockPromptHostState.clear()
+                appState.markAppUnlockFailed(AppText.Resource(R.string.app_lock_auth_unavailable))
+                attachedAppUnlockSessionId = null
+                attachedAppUnlockHostId = null
+                traceAppUnlock(sessionId, "prompt-launch-error")
+            }
         }
+    }
+
+    private fun installAppUnlockPrompt() {
+        // AndroidX reconnects through an Activity-scoped ViewModel. Our paired
+        // ViewModel survives the same configuration-change boundary; a fresh
+        // Activity receives no matching token, so it abandons only the dead
+        // logical session and launches one new prompt under the opaque cover.
+        var abandonedSession = false
+        val reattachedSessionId =
+            appState.appUnlockSessions.activeSessionId?.takeIf { sessionId ->
+                if (
+                    shouldReattachAppUnlockPrompt(
+                        hasActiveSession = true,
+                        hasAttachedHost = appState.appUnlockSessions.hasAttachedHost,
+                        retainedHostSessionMatches = appUnlockPromptHostState.sessionId == sessionId,
+                    ) &&
+                    appState.appUnlockSessions.attachHost(
+                        sessionId = sessionId,
+                        hostId = appUnlockHostId,
+                        replaceExistingHost = true,
+                    )
+                ) {
+                    attachedAppUnlockSessionId = sessionId
+                    attachedAppUnlockHostId = appUnlockHostId
+                    true
+                } else {
+                    appState.appUnlockSessions.clear()
+                    appUnlockPromptHostState.clear()
+                    abandonedSession = true
+                    traceAppUnlock(sessionId, "prompt-not-retained")
+                    false
+                }
+            }
+        appUnlockPrompt =
+            createAppUnlockPrompt(
+                sessionId = reattachedSessionId,
+                hostId = appUnlockHostId.takeIf { reattachedSessionId != null },
+            )
+        reattachedSessionId?.let { sessionId -> traceAppUnlock(sessionId, "prompt-reattached") }
+        if (abandonedSession) {
+            appState.requestAppUnlock()
+            requestAppUnlock()
+        }
+    }
+
+    private fun createAppUnlockPrompt(
+        sessionId: Long?,
+        hostId: Long?,
+    ): BiometricPrompt =
+        BiometricPrompt(
+            this,
+            ContextCompat.getMainExecutor(this),
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    if (sessionId == null || hostId == null) return
+                    if (!appState.appUnlockSessions.owns(sessionId, hostId)) {
+                        traceAppUnlock(sessionId, "stale-success-ignored")
+                    } else {
+                        val expectedCipher = appUnlockPromptHostState.expectedCipher
+                        appUnlockPromptHostState.expectedCipher = null
+                        if (!appUnlockCryptoGate.verify(result, expectedCipher)) {
+                            if (
+                                appState.appUnlockSessions.terminate(
+                                    sessionId = sessionId,
+                                    hostId = hostId,
+                                )
+                            ) {
+                                appUnlockPromptHostState.clear()
+                                appState.markAppUnlockFailed(AppText.Resource(R.string.app_lock_auth_failed))
+                                attachedAppUnlockSessionId = null
+                                attachedAppUnlockHostId = null
+                                traceAppUnlock(sessionId, "prompt-crypto-failed")
+                            }
+                        } else {
+                            val accepted =
+                                appState.appUnlockSessions.complete(
+                                    sessionId = sessionId,
+                                    hostId = hostId,
+                                    foregroundReturnExpiresAtElapsedRealtime =
+                                        foregroundReturnExpiryElapsedRealtime(
+                                            nowElapsedRealtime = SystemClock.elapsedRealtime(),
+                                            hostResumed = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED),
+                                        ),
+                                )
+                            if (accepted) {
+                                appUnlockPromptHostState.clear()
+                                appState.markAppUnlockSucceeded(
+                                    dismissRetainedVisibleConversation =
+                                        foregroundConversationDismissal.shouldDismissAfterUnlock(),
+                                )
+                                attachedAppUnlockSessionId = null
+                                attachedAppUnlockHostId = null
+                                traceAppUnlock(sessionId, "prompt-succeeded")
+                                releaseAppLockBackgroundSecureFlag()
+                            } else {
+                                traceAppUnlock(sessionId, "stale-success-ignored")
+                            }
+                        }
+                    }
+                }
+
+                override fun onAuthenticationFailed() {
+                    sessionId ?: return
+                    hostId ?: return
+                    if (
+                        appState.appUnlockSessions.owns(sessionId, hostId)
+                    ) {
+                        appState.markAppUnlockFailed(AppText.Resource(R.string.app_lock_auth_failed))
+                        traceAppUnlock(sessionId, "prompt-attempt-failed")
+                    }
+                }
+
+                override fun onAuthenticationError(
+                    errorCode: Int,
+                    errString: CharSequence,
+                ) {
+                    sessionId ?: return
+                    hostId ?: return
+                    if (
+                        appState.appUnlockSessions.terminate(
+                            sessionId = sessionId,
+                            hostId = hostId,
+                        )
+                    ) {
+                        appUnlockPromptHostState.clear()
+                        appState.markAppUnlockFailed(appLockAuthErrorMessage(errorCode, errString))
+                        attachedAppUnlockSessionId = null
+                        attachedAppUnlockHostId = null
+                        traceAppUnlock(sessionId, "prompt-terminated")
+                    } else {
+                        traceAppUnlock(sessionId, "stale-error-ignored")
+                    }
+                }
+            },
+        )
+
+    private fun traceAppUnlock(
+        sessionId: Long,
+        event: String,
+    ) {
+        if (!BuildConfig.DEBUG && !BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS) return
+        Log.i(
+            "WNAppUnlock",
+            "activity=$warmResumeTraceToken session=$sessionId event=$event " +
+                "lifecycle_class=${warmResumeLifecycleClass.name.lowercase()}",
+        )
+    }
+
+    private fun foregroundReturnExpiryElapsedRealtime(
+        nowElapsedRealtime: Long,
+        hostResumed: Boolean,
+    ): Long? {
+        if (hostResumed) return null
+        return nowElapsedRealtime.coerceAtMost(Long.MAX_VALUE - APP_UNLOCK_FOREGROUND_HANDOFF_MILLIS) +
+            APP_UNLOCK_FOREGROUND_HANDOFF_MILLIS
     }
 
     private fun appLockAuthErrorMessage(
@@ -635,3 +818,15 @@ internal const val BENCHMARK_RECREATE_ACTIVITY_EXTRA =
     "dev.ipf.whitenoise.android.extra.BENCHMARK_RECREATE_ACTIVITY"
 private const val PRE_COMPOSE_BACKGROUND_LIGHT = 0xFFECEEEE.toInt()
 private const val PRE_COMPOSE_BACKGROUND_DARK = 0xFF0F1112.toInt()
+private val appUnlockHostIds = AtomicLong()
+private const val APP_UNLOCK_FOREGROUND_HANDOFF_MILLIS = 5_000L
+
+internal class AppUnlockPromptHostState : ViewModel() {
+    var sessionId: Long? = null
+    var expectedCipher: Cipher? = null
+
+    fun clear() {
+        sessionId = null
+        expectedCipher = null
+    }
+}
