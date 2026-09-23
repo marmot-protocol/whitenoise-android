@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.state
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 
 /**
@@ -18,6 +20,56 @@ internal suspend fun WhiteNoiseAppState.deleteGroupLocalWithClientCleanup(
     marmotIo { deleteGroupLocal(account, groupIdHex) }
     removeComposerExpansionForGroup(account, groupIdHex)
     dismissConversationNotifications(account, groupIdHex)
+}
+
+/** The chat-list's recoverable local wipe must not change Android-owned state before commit. */
+internal suspend fun WhiteNoiseAppState.deleteChatGroupLocalWithRecovery(
+    account: String,
+    groupIdHex: String,
+    isCurrent: () -> Boolean,
+    onNativeCommitted: () -> Unit,
+) {
+    // Capture encrypted media identifiers while the native group is still present. Unlike the
+    // legacy leave/reset paths, a failed preflight aborts without touching the group or caches.
+    val media = retryIdempotentRuntimeMutation {
+        if (!isCurrent()) throw CancellationException("chat binding changed during local deletion preflight")
+        marmotIo { listMedia(account, groupIdHex, null) }
+    }
+    val cacheKeys =
+        media.map { rec ->
+            mediaCacheKey(account, groupIdHex, rec.messageIdHex, rec.attachmentIndex.toInt())
+        }
+    val tags = media.mapNotNull { it.reference.ciphertextSha256 }.toSet()
+
+    deleteLocalGroupWithRecovery(
+        isCurrent = isCurrent,
+        delete = { marmotIo { deleteGroupLocal(account, groupIdHex) } },
+        isGroupPresent = {
+            // The durable chat-list projection is the same native source that supplied the
+            // row being removed. Unlike groupDetails, this does not depend on a live MLS roster.
+            marmotIo { chatList(account, true) }
+                .any { it.groupIdHex.equals(groupIdHex, ignoreCase = true) }
+        },
+    )
+    onNativeCommitted()
+    // Native success (including an already-committed lost response) is the only point at which
+    // clearing the draft, dictation target, cache, expansion and notifications is safe.
+    withContext(NonCancellable) {
+        conversationDictation.onTargetRemoved(account, groupIdHex)
+        if (cacheKeys.isNotEmpty()) {
+            removeMediaMemoryCacheKeys(cacheKeys, Dispatchers.Main.immediate, ::removeMediaMemoryCacheEntry)
+        }
+        if (cacheKeys.isNotEmpty() || tags.isNotEmpty()) {
+            withContext(Dispatchers.IO) {
+                cacheKeys.forEach { diskMediaCache.remove(it) }
+                if (tags.isNotEmpty()) diskMediaCache.removeByCiphertextTags(tags)
+            }
+        }
+        deleteDraftBeforeGroupRemoval(account, groupIdHex)
+        draftStore.replaceFromAuthoritative(account, groupIdHex, null, null)
+        removeComposerExpansionForGroup(account, groupIdHex)
+        dismissConversationNotifications(account, groupIdHex)
+    }
 }
 
 internal suspend fun WhiteNoiseAppState.evictGroupMediaCaches(

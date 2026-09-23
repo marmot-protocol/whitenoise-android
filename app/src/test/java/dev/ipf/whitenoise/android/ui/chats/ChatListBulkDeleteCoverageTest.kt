@@ -40,8 +40,8 @@ class ChatListBulkDeleteCoverageTest {
         val body = controllersSource().readText().kotlinFunctionBody("deleteGroupLocalFromChatList")
 
         assertTrue(
-            "local chat-list wipe must reuse shared client cleanup",
-            "deleteGroupLocalWithClientCleanup" in body,
+            "local chat-list wipe must use the bounded, reconciled local cleanup",
+            "deleteChatGroupLocalWithRecovery" in body,
         )
         assertFalse(
             "local chat-list wipe must not consult membership or leave the group",
@@ -51,6 +51,8 @@ class ChatListBulkDeleteCoverageTest {
             "local chat-list wipe must optimistically hide and restore the row",
             "removeChatRow" in body && "restoreRemovedChatRow" in body,
         )
+        assertTrue("local wipe must fence account and bind changes", "isActiveBindEpoch(epoch)" in body)
+        assertTrue("local wipe must report only a current terminal failure", "if (isCurrent()) appState.presentFailure" in body)
     }
 
     private fun chatsScreenSource(): File =

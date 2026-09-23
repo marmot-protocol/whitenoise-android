@@ -4336,24 +4336,29 @@ class ChatsController private constructor(
         )
     }
 
-    private fun removeChatRow(groupIdHex: String) {
+    private fun removeChatRow(groupIdHex: String, optimistic: Boolean = false) {
         val rowKey = chatRowKey(groupIdHex)
         val removedRow = chatRowsByGroup.remove(rowKey)
         if (removedRow != null) {
-            selectedPresentationsByGroup = selectedPresentationsByGroup - rowKey
-            selectedPreviewsByGroup = selectedPreviewsByGroup - rowKey
-            selectedActionsByGroup = selectedActionsByGroup - rowKey
             activitySequenceByGroup.remove(rowKey)
             optimisticChatListPreviewByGroup.remove(rowKey)
-            cancelMemberSnapshotRetry(removedRow.groupIdHex)
-            memberFetchRetryBackoffTierByGroup.remove(removedRow.groupIdHex)
-            failedMemberFetches.remove(removedRow.groupIdHex)
-            selfOnlyDirectGraceRetryGroups.remove(removedRow.groupIdHex)
-            presentationMembersByGroup = presentationMembersByGroup - removedRow.groupIdHex
-            localGroupNames.forget(removedRow.groupIdHex)
+            if (!optimistic) finishRemovedChatRowClientState(removedRow.groupIdHex)
             noteMaterializedGroupMembershipChanged()
             scheduleRecompute()
         }
+    }
+
+    private fun finishRemovedChatRowClientState(groupIdHex: String) {
+        val rowKey = chatRowKey(groupIdHex)
+        selectedPresentationsByGroup = selectedPresentationsByGroup - rowKey
+        selectedPreviewsByGroup = selectedPreviewsByGroup - rowKey
+        selectedActionsByGroup = selectedActionsByGroup - rowKey
+        cancelMemberSnapshotRetry(groupIdHex)
+        memberFetchRetryBackoffTierByGroup.remove(groupIdHex)
+        failedMemberFetches.remove(groupIdHex)
+        selfOnlyDirectGraceRetryGroups.remove(groupIdHex)
+        presentationMembersByGroup = presentationMembersByGroup - groupIdHex
+        localGroupNames.forget(groupIdHex)
     }
 
     private fun restoreRemovedChatRow(snapshot: RemovedChatRowSnapshot) {
@@ -4746,15 +4751,29 @@ class ChatsController private constructor(
         notify: Boolean = true,
     ): Boolean {
         val account = accountRef ?: return false
+        val epoch = bindEpoch
+        val isCurrent = { accountRef == account && isActiveBindEpoch(epoch) }
         val removedSnapshot = snapshotChatRowForRemoval(groupIdHex)
-        removeChatRow(groupIdHex)
-        val wipe = runCatching { appState.deleteGroupLocalWithClientCleanup(account, groupIdHex) }
+        removeChatRow(groupIdHex, optimistic = true)
+        var nativeCommitted = false
+        val wipe = runCatching {
+            appState.deleteChatGroupLocalWithRecovery(account, groupIdHex, isCurrent) {
+                nativeCommitted = true
+            }
+        }
         wipe.exceptionOrNull()?.let {
+            if (isCurrent() && !nativeCommitted) removedSnapshot?.let(::restoreRemovedChatRow)
+            if (isCurrent() && nativeCommitted) {
+                removeChatRow(groupIdHex)
+                finishRemovedChatRowClientState(groupIdHex)
+            }
             if (it is CancellationException) throw it
-            removedSnapshot?.let(::restoreRemovedChatRow)
-            appState.presentFailure(R.string.toast_couldnt_delete_chat, "CHAT_LOCAL_DELETE", it)
+            if (isCurrent()) appState.presentFailure(R.string.toast_couldnt_delete_chat, "CHAT_LOCAL_DELETE", it)
             return false
         }
+        if (!isCurrent()) return false
+        removeChatRow(groupIdHex)
+        finishRemovedChatRowClientState(groupIdHex)
         if (notify) {
             appState.presentTransient(R.string.toast_chat_deleted_local)
         }

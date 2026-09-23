@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import android.content.Context
+import android.os.Looper
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -40,6 +41,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.lang.reflect.Proxy
 import java.util.concurrent.atomic.AtomicInteger
@@ -465,6 +467,7 @@ class ComposerExpansionDestructiveLifecycleTest {
                     fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID),
                 )
                 assertTrue(controller.deleteGroupLocalFromChatList(GROUP_ID, notify = false))
+                shadowOf(Looper.getMainLooper()).idle()
 
                 assertEquals(1, fixture.calls.delete.get())
                 assertNull(fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
@@ -496,10 +499,67 @@ class ComposerExpansionDestructiveLifecycleTest {
             }
         }
 
+    @Test
+    fun closedTransportRetriesLocalDeleteAndCleansUpOnce() =
+        runBlocking {
+            val fixture = fixture(deleteTransportFailures = 1)
+            fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("keep until commit"))
+            retainExpansion(fixture.appState, GROUP_ID)
+            val controller = fixture.seededChatsController()
+            try {
+                assertTrue(controller.deleteGroupLocalFromChatList(GROUP_ID, notify = false))
+                shadowOf(Looper.getMainLooper()).idle()
+                assertEquals(2, fixture.calls.delete.get())
+                assertEquals(1, fixture.calls.chatList.get())
+                assertTrue(controller.items.none { it.groupIdHex == GROUP_ID })
+                assertNull(fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+                assertTrue(fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID).isNullOrEmpty())
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    @Test
+    fun committedLocalDeleteWithLostResponseDoesNotRepeatWipe() =
+        runBlocking {
+            val fixture = fixture(deleteTransportFailures = 1, commitBeforeTransportFailure = true)
+            val controller = fixture.seededChatsController()
+            try {
+                assertTrue(controller.deleteGroupLocalFromChatList(GROUP_ID, notify = false))
+                shadowOf(Looper.getMainLooper()).idle()
+                assertEquals(1, fixture.calls.delete.get())
+                assertEquals(1, fixture.calls.chatList.get())
+                assertTrue(controller.items.none { it.groupIdHex == GROUP_ID })
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    @Test
+    fun exhaustedClosedTransportRestoresRowDraftAndGeometry() =
+        runBlocking {
+            val fixture = fixture(deleteTransportFailures = IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS)
+            fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("still drafting"))
+            val retained = retainExpansion(fixture.appState, GROUP_ID)
+            val controller = fixture.seededChatsController()
+            try {
+                assertFalse(controller.deleteGroupLocalFromChatList(GROUP_ID, notify = false))
+                shadowOf(Looper.getMainLooper()).idle()
+                assertEquals(IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS, fixture.calls.delete.get())
+                assertEquals(1, controller.items.count { it.groupIdHex == GROUP_ID })
+                assertEquals("still drafting", fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID))
+                assertEquals(retained, fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+            } finally {
+                controller.onCleared()
+            }
+        }
+
     /** Creates one isolated app/runtime pair with controllable native leave and delete commits. */
     private fun fixture(
         failLeave: Boolean = false,
         failDelete: Boolean = false,
+        deleteTransportFailures: Int = 0,
+        commitBeforeTransportFailure: Boolean = false,
         sendResult: () -> SendSummaryFfi = ::successfulSendSummary,
         attachConversationController: Boolean = true,
     ): LifecycleFixture {
@@ -514,7 +574,7 @@ class ComposerExpansionDestructiveLifecycleTest {
                 messageDraftRepository = draftRepository(),
             )
         val calls = LifecycleCalls()
-        val marmot = lifecycleMarmot(failLeave, failDelete, calls, sendResult)
+        val marmot = lifecycleMarmot(failLeave, failDelete, deleteTransportFailures, commitBeforeTransportFailure, calls, sendResult)
         WhiteNoiseAppState::class.java
             .getDeclaredField("marmotRuntime")
             .apply { isAccessible = true }
@@ -547,10 +607,13 @@ class ComposerExpansionDestructiveLifecycleTest {
     private fun lifecycleMarmot(
         failLeave: Boolean,
         failDelete: Boolean,
+        deleteTransportFailures: Int,
+        commitBeforeTransportFailure: Boolean,
         calls: LifecycleCalls,
         sendResult: () -> SendSummaryFfi,
-    ): MarmotInterface =
-        Proxy.newProxyInstance(
+    ): MarmotInterface {
+        var localGroupPresent = true
+        return Proxy.newProxyInstance(
             MarmotInterface::class.java.classLoader,
             arrayOf(MarmotInterface::class.java),
         ) { proxy, method, arguments ->
@@ -578,6 +641,10 @@ class ComposerExpansionDestructiveLifecycleTest {
                 }
                 "groupMembers" -> members()
                 "listMedia" -> emptyList<Any>()
+                "chatList" -> {
+                    calls.chatList.incrementAndGet()
+                    if (localGroupPresent) listOf(groupRow()) else emptyList<ChatListRowFfi>()
+                }
                 "leaveGroup" -> {
                     calls.leave.incrementAndGet()
                     if (failLeave) {
@@ -592,10 +659,14 @@ class ComposerExpansionDestructiveLifecycleTest {
                     }
                 }
                 "deleteGroupLocal" -> {
-                    calls.delete.incrementAndGet()
+                    val attempt = calls.delete.incrementAndGet()
                     if (failDelete) {
                         suspendFailure(IllegalStateException("delete rejected"))
+                    } else if (attempt <= deleteTransportFailures) {
+                        if (commitBeforeTransportFailure) localGroupPresent = false
+                        suspendFailure(MarmotKitException.TransportClosed())
                     } else {
+                        localGroupPresent = false
                         true
                     }
                 }
@@ -605,6 +676,7 @@ class ComposerExpansionDestructiveLifecycleTest {
                 else -> throw UnsupportedOperationException("Unexpected Marmot call: ${method.name}")
             }
         } as MarmotInterface
+    }
 
     /** Creates a signed-in local account matching the self member returned by the native fixture. */
     private fun account() =
@@ -657,6 +729,7 @@ class ComposerExpansionDestructiveLifecycleTest {
         val send = AtomicInteger()
         val leave = AtomicInteger()
         val delete = AtomicInteger()
+        val chatList = AtomicInteger()
     }
 
     private companion object {
