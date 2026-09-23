@@ -11,6 +11,7 @@ import dev.ipf.whitenoise.android.core.GroupSystemEvents
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
+import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
 import dev.ipf.whitenoise.android.ui.markdownDocumentMentionBech32s
@@ -72,8 +73,10 @@ internal suspend fun resolveNotificationPreviewText(
     raw: String?,
     parseMarkdown: suspend (String) -> MarkdownDocumentFfi,
     mentionDisplayName: suspend (String) -> String?,
+    giphyPreviewText: String = "GIF via GIPHY",
 ): String? =
     raw?.takeIf { it.isNotBlank() }?.let { text ->
+        if (RemoteGiphyMedia.isEnvelopeText(text)) return@let giphyPreviewText
         val document = parseMarkdown(text).takeIf { it.blocks.isNotEmpty() } ?: return@let null
         val mentionNames = mutableMapOf<String, String?>()
         for (bech32 in markdownDocumentMentionBech32s(document)) {
@@ -130,6 +133,7 @@ internal suspend fun notificationSenderAvatarUrl(
 /** Local identity and Markdown reads shared by first-draw and late notification resolution. */
 internal class NotificationIdentityResolver(
     private val source: NotificationContentSource,
+    private val giphyPreviewText: String = "GIF via GIPHY",
 ) {
     /** Reads the best local sender label without starting network hydration. */
     suspend fun senderName(update: NotificationUpdateFfi): String? {
@@ -170,6 +174,7 @@ internal class NotificationIdentityResolver(
             raw = raw,
             parseMarkdown = source::parseMarkdown,
             mentionDisplayName = { mentionDisplayName(it, requestMissingProfiles) },
+            giphyPreviewText = giphyPreviewText,
         )
 
     /** Applies contact, cached/persisted profile, payload-hint, then npub fallback precedence. */
@@ -465,7 +470,7 @@ internal fun createNotificationContentResolutionServices(
     context: Context,
     source: NotificationContentSource,
 ): NotificationContentResolutionServices {
-    val identity = NotificationIdentityResolver(source)
+    val identity = NotificationIdentityResolver(source, context.getString(R.string.giphy_media_preview))
     val systemText = NotificationGroupSystemTextResolver(context, source, identity)
     val conversationTitle = NotificationConversationTitleResolver(context, source, identity)
     return NotificationContentResolutionServices(

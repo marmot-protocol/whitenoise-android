@@ -137,8 +137,15 @@ jobs:
 
       # The Play distribution deliberately omits Zapstore's production-style
       # self-updater. Preview APKs are replaced only from the PR install link.
+      #
+      # android.injected.build.abi is AGP's "deploying from the IDE" signal, so on
+      # its own it stamps android:testOnly="true" into the merged manifest and
+      # Android then refuses every install except ADB — which breaks the preview
+      # link's tap-to-install/update contract. android.injected.testOnly is an
+      # explicit override that wins over the ABI injection, so both the stable and
+      # the isolated channel must pass it.
       - name: Assemble preview candidate
-        run: ./gradlew :app:assemblePreviewPlayRelease -Pandroid.injected.build.abi=arm64-v8a --build-cache --no-daemon --stacktrace --profile -I "$PR_PREVIEW_INIT_SCRIPT"
+        run: ./gradlew :app:assemblePreviewPlayRelease -Pandroid.injected.build.abi=arm64-v8a -Pandroid.injected.testOnly=false --build-cache --no-daemon --stacktrace --profile -I "$PR_PREVIEW_INIT_SCRIPT"
 
       - name: Stage candidate and provenance
         shell: bash

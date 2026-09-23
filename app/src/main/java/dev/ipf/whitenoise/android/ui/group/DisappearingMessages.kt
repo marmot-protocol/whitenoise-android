@@ -55,6 +55,7 @@ internal fun DisappearingMessagesPickerDialog(
     currentSecs: Long,
     onDismiss: () -> Unit,
     onPick: (Long) -> Unit,
+    explainer: String? = null,
 ) {
     var selected by remember(currentSecs) { mutableLongStateOf(currentSecs) }
     var showCustom by remember { mutableStateOf(false) }
@@ -68,6 +69,7 @@ internal fun DisappearingMessagesPickerDialog(
             DisappearingPickerChoices(
                 selected = selected,
                 isCustom = isCustom,
+                explainer = explainer,
                 onSelect = { selected = it },
                 onCustom = { showCustom = true },
             )
@@ -103,6 +105,7 @@ internal fun DisappearingMessagesPickerDialog(
 private fun DisappearingPickerChoices(
     selected: Long,
     isCustom: Boolean,
+    explainer: String?,
     onSelect: (Long) -> Unit,
     onCustom: () -> Unit,
 ) {
@@ -110,7 +113,7 @@ private fun DisappearingPickerChoices(
         Modifier.verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
     ) {
-        Text(stringResource(R.string.disappearing_explainer))
+        Text(explainer ?: stringResource(R.string.disappearing_explainer))
         Column(Modifier.selectableGroup()) {
             disappearingPresetSecs.forEach { secs ->
                 WhiteNoiseDialogChoiceRow(

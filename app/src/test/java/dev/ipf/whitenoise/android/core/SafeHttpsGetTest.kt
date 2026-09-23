@@ -9,6 +9,7 @@ import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.lang.reflect.Proxy
@@ -18,6 +19,9 @@ import java.net.Socket
 import java.net.SocketAddress
 import java.net.URL
 import java.nio.channels.SocketChannel
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import javax.net.ssl.HandshakeCompletedListener
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SNIHostName
@@ -135,7 +139,7 @@ class SafeHttpsGetTest {
     }
 
     @Test
-    fun pinnedAddressLoopObservesRequestDeadlineBetweenConnectAttempts() {
+    fun pinnedAddressLoopObservesCancellationAndDeadlineBetweenConnectAttempts() {
         // Retained intentionally: the injected transport is already connected,
         // so this uniquely pins the deadline check between real IP attempts.
         val source = safeHttpsGetSource().readText()
@@ -148,8 +152,7 @@ class SafeHttpsGetTest {
         )
         assertTrue(
             "pinned-address loop must stop once the request deadline is spent",
-            Regex("""for\s*\(\s*address\s+in\s+addresses\s*\)\s*\{\s*if\s*\(\s*deadlineExceeded\(requestDeadlineNanos\)\s*\)\s*return\s+null""")
-                .containsMatchIn(openPinnedConnection),
+            "request.isCancelled() || deadlineExceeded(request.requestDeadlineNanos)" in openPinnedConnection,
         )
     }
 
@@ -265,6 +268,57 @@ class SafeHttpsGetTest {
             ),
         )
         assertTrue(failure.disconnected)
+    }
+
+    @Test
+    fun registeredCancellationDisconnectsTheActiveBlockingRequest() {
+        val enteredResponseRead = CountDownLatch(1)
+        val response = BlockingHttpConnection(URL("https://example.test/path"), enteredResponseRead)
+        var cancelRequest: (() -> Unit)? = null
+        val executor = Executors.newSingleThreadExecutor()
+        try {
+            val result =
+                executor.submit<ByteArray?> {
+                    SafeHttpsGet.get(
+                        url = "https://example.test/path",
+                        maxBodyBytes = 32,
+                        connectTimeoutMillis = 1_000,
+                        readTimeoutMillis = 1_000,
+                        registerCancellation = { cancelRequest = it },
+                        dependencies = dependencies(open = { response }),
+                    )
+                }
+
+            assertTrue(enteredResponseRead.await(1, TimeUnit.SECONDS))
+            requireNotNull(cancelRequest).invoke()
+
+            assertNull(result.get(1, TimeUnit.SECONDS))
+            assertTrue(response.disconnected)
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
+    @Test
+    fun getRejectsDisallowedContentTypeBeforeReadingBody() {
+        val response =
+            fakeConnection(
+                URL("https://example.test/image"),
+                body = "not an image".toByteArray(),
+                contentType = "text/html; charset=utf-8",
+            )
+
+        assertNull(
+            SafeHttpsGet.get(
+                url = "https://example.test/image",
+                maxBodyBytes = 32,
+                connectTimeoutMillis = 1_000,
+                readTimeoutMillis = 1_000,
+                contentTypeAllowed = { it == "image/gif" },
+                dependencies = dependencies(open = { response }),
+            ),
+        )
+        assertEquals(0, response.inputStreamReads)
     }
 
     @Test
@@ -612,6 +666,7 @@ class SafeHttpsGetTest {
         location: String? = null,
         body: ByteArray = byteArrayOf(),
         declaredLength: Long? = null,
+        contentType: String? = null,
     ): FakeHttpConnection =
         FakeHttpConnection(
             url = url,
@@ -619,6 +674,7 @@ class SafeHttpsGetTest {
             location = location,
             body = body,
             declaredLength = declaredLength ?: body.size.toLong(),
+            contentTypeValue = contentType,
         )
 
     private fun fakeSslSession(): SSLSession =
@@ -688,6 +744,7 @@ class SafeHttpsGetTest {
         private val location: String?,
         private val body: ByteArray,
         private val declaredLength: Long,
+        private val contentTypeValue: String?,
     ) : HttpURLConnection(url) {
         var disconnected = false
         var inputStreamReads = 0
@@ -706,6 +763,8 @@ class SafeHttpsGetTest {
 
         override fun getContentLengthLong(): Long = declaredLength
 
+        override fun getContentType(): String? = contentTypeValue
+
         override fun getInputStream(): InputStream =
             object : ByteArrayInputStream(body) {
                 override fun read(
@@ -717,6 +776,30 @@ class SafeHttpsGetTest {
                     return super.read(buffer, offset, length)
                 }
             }
+    }
+
+    private class BlockingHttpConnection(
+        url: URL,
+        private val enteredResponseRead: CountDownLatch,
+    ) : HttpURLConnection(url) {
+        private val disconnectedSignal = CountDownLatch(1)
+
+        @Volatile var disconnected = false
+
+        override fun connect() = Unit
+
+        override fun disconnect() {
+            disconnected = true
+            disconnectedSignal.countDown()
+        }
+
+        override fun usingProxy(): Boolean = false
+
+        override fun getResponseCode(): Int {
+            enteredResponseRead.countDown()
+            disconnectedSignal.await(5, TimeUnit.SECONDS)
+            throw IOException("request cancelled")
+        }
     }
 
     private class FakeSslSocket(

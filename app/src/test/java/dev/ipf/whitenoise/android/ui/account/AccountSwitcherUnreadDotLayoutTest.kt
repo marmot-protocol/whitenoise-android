@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.ui.account
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,6 +42,7 @@ import dev.ipf.whitenoise.android.ui.chats.ConnectivityBannerState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -58,12 +61,15 @@ class AccountSwitcherUnreadDotLayoutTest {
     private val unreadDescription
         get() = context.getString(R.string.account_unread_indicator)
 
+    /** Three equal 48dp slots slice the stack, and every avatar edge stays inside its own slice. */
     @Test
     fun stackRoutesEveryVisibleSliceToItsAccountInLtrAndRtl() {
-        val width = 78f
-        val ltrExpected = listOf(0, 0, 1, 1, 2, 2)
+        // 3 slots x 48dp. Each 34dp avatar is centred in its slot, so its own
+        // edges (7/41, 55/89, 103/137) sit well inside the slice boundaries.
+        val width = 144f
+        val positions = listOf(0f, 7f, 41f, 47f, 48f, 55f, 89f, 95f, 96f, 103f, 137f, 144f)
+        val ltrExpected = listOf(0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2)
         val rtlExpected = ltrExpected.map { 2 - it }
-        val positions = listOf(1f, 21f, 22f, 43f, 44f, 77f)
 
         assertEquals(
             ltrExpected,
@@ -73,7 +79,36 @@ class AccountSwitcherUnreadDotLayoutTest {
             rtlExpected,
             positions.map { accountStackTargetIndex(it, width, 3, LayoutDirection.Rtl) },
         )
-        assertEquals(1, accountStackTargetIndex(78f, width * 2f, 3, LayoutDirection.Ltr))
+        assertEquals(1, accountStackTargetIndex(150f, width * 2f, 3, LayoutDirection.Ltr))
+    }
+
+    /** Points outside the stack, and empty stacks, dispatch to no account at all. */
+    @Test
+    fun stackRoutesNothingOutsideItsOwnBounds() {
+        assertNull(accountStackTargetIndex(-1f, 144f, 3, LayoutDirection.Ltr))
+        assertNull(accountStackTargetIndex(145f, 144f, 3, LayoutDirection.Ltr))
+        assertNull(accountStackTargetIndex(10f, 144f, 0, LayoutDirection.Ltr))
+        assertNull(accountStackTargetIndex(10f, 0f, 3, LayoutDirection.Ltr))
+    }
+
+    /** A normal phone bar fits three quick targets; a narrow one gives up slots rather than compressing them. */
+    @Test
+    fun slotCapacityFallsBackToFewerTargetsOnNarrowBars() {
+        assertEquals(3, quickSwitchSlotCapacity(360f))
+        assertEquals(4, quickSwitchSlotCapacity(411f))
+        assertEquals(2, quickSwitchSlotCapacity(320f))
+        assertEquals(1, quickSwitchSlotCapacity(200f))
+    }
+
+    /** Accounts beyond the fitting slots collapse into the overflow chip, which keeps a slot of its own. */
+    @Test
+    fun visibleAvatarCountLeavesRoomForTheOverflowChip() {
+        assertEquals(3, quickSwitchVisibleAvatarCount(slotCapacity = 3, otherAccountCount = 3))
+        assertEquals(3, quickSwitchVisibleAvatarCount(slotCapacity = 4, otherAccountCount = 5))
+        assertEquals(2, quickSwitchVisibleAvatarCount(slotCapacity = 3, otherAccountCount = 5))
+        assertEquals(1, quickSwitchVisibleAvatarCount(slotCapacity = 2, otherAccountCount = 3))
+        assertEquals(0, quickSwitchVisibleAvatarCount(slotCapacity = 1, otherAccountCount = 3))
+        assertEquals(0, quickSwitchVisibleAvatarCount(slotCapacity = 3, otherAccountCount = 0))
     }
 
     /** Selector rows receive rapid center taps without neighbor dispatch. */
@@ -102,11 +137,14 @@ class AccountSwitcherUnreadDotLayoutTest {
         composeRule.setContent {
             val generation = callbackGeneration.value
             WhiteNoiseTheme {
-                OtherAccountAvatarsRow(
-                    appState = appState,
-                    onSwitchAccount = { accountRef -> switched += "$generation:$accountRef" },
-                    onOpenSwitcher = { opened += generation },
-                )
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    OtherAccountAvatarsRow(
+                        appState = appState,
+                        onSwitchAccount = { accountRef -> switched += "$generation:$accountRef" },
+                        onOpenSwitcher = { opened += generation },
+                        barWidthDp = maxWidth,
+                    )
+                }
             }
         }
         composeRule.runOnIdle { callbackGeneration.value = 1 }

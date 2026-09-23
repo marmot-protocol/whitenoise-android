@@ -3,6 +3,18 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "Modifier.chatListEdgeFade",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEdgeFade.kt",
+        "anchor": "fun Modifier.chatListEdgeFade(",
+        "test_ids": ["CHL-002"]
+      },
+      {
+        "surface": "Settings profile avatar picture edit shortcut",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.profile_picture_edit",
+        "test_ids": ["PRO-002"]
+      },
+      {
         "surface": "Amber grouped-send screen admission and merge budget",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/amber/AmberActivityCoordinator.kt",
         "anchor": "GROUPED_SESSION_BOOTSTRAP_MS",
@@ -587,6 +599,119 @@
         "anchor": "fun OverflowAccountChip(",
         "test_ids": [
           "ACC-001"
+        ]
+      },
+      {
+        "surface": "Per-member group notification mute preference",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/MemberMutePreferences.kt",
+        "anchor": "class MemberMutePreferences",
+        "test_ids": [
+          "NTF-012"
+        ]
+      },
+      {
+        "surface": "Per-member group mute row state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileMemberMuteRowState.kt",
+        "anchor": "data class ProfileMemberMuteRowState",
+        "test_ids": [
+          "NTF-012"
+        ]
+      },
+      {
+        "surface": "Bounded profile banner decode variant",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/AvatarImageLoader.kt",
+        "anchor": "fun profileBannerDecodeDimension(",
+        "test_ids": [
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "Queued video poster from retained upload bytes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/PendingVideoPosterFrame.kt",
+        "anchor": "fun pendingVideoPosterFrame(",
+        "test_ids": [
+          "MED-007"
+        ]
+      },
+      {
+        "surface": "PendingFilePills",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPending.kt",
+        "anchor": "fun PendingFilePills(",
+        "test_ids": [
+          "MED-007"
+        ]
+      },
+      {
+        "surface": "PendingVideoBadge",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPending.kt",
+        "anchor": "fun PendingVideoBadge(",
+        "test_ids": [
+          "MED-007"
+        ]
+      },
+      {
+        "surface": "PendingVideoFallback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPending.kt",
+        "anchor": "fun PendingVideoFallback(",
+        "test_ids": [
+          "MED-007"
+        ]
+      },
+      {
+        "surface": "PendingVisualAlbum",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPending.kt",
+        "anchor": "fun PendingVisualAlbum(",
+        "test_ids": [
+          "MED-007"
+        ]
+      },
+      {
+        "surface": "PendingVisualBubble",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPending.kt",
+        "anchor": "fun PendingVisualBubble(",
+        "test_ids": [
+          "MED-007"
+        ]
+      },
+      {
+        "surface": "R.string.reply_media_video",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPending.kt",
+        "anchor": "R.string.reply_media_video",
+        "test_ids": [
+          "MED-007"
+        ]
+      },
+      {
+        "surface": "Profile banner decode target from the rendered box",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileBannerDecodeTarget.kt",
+        "anchor": "fun profileBannerTargetWidthPx(",
+        "test_ids": [
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_mute_in_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.profile_mute_in_group",
+        "test_ids": [
+          "NTF-012"
+        ]
+      },
+      {
+        "surface": "R.string.profile_unmute_in_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.profile_unmute_in_group",
+        "test_ids": [
+          "NTF-012"
+        ]
+      },
+      {
+        "surface": "Quick-switch slot capacity and overflow fallback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/AccountSwitcher.kt",
+        "anchor": "fun quickSwitchSlotCapacity(",
+        "test_ids": [
+          "NAV-005",
+          "NAV-006"
         ]
       },
       {
@@ -1460,7 +1585,8 @@
         "anchor": "fun NewGroupSetupAccountScreen(",
         "test_ids": [
           "NCH-002",
-          "ACC-017"
+          "ACC-017",
+          "SET-028"
         ]
       },
       {
@@ -1469,7 +1595,8 @@
         "anchor": "fun NewGroupSetupScreen(",
         "test_ids": [
           "NCH-002",
-          "ACC-017"
+          "ACC-017",
+          "SET-028"
         ]
       },
       {
@@ -3281,6 +3408,22 @@
         ]
       },
       {
+        "surface": "RemoteGiphyMediaBubble",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "fun RemoteGiphyMediaBubble(",
+        "test_ids": [
+          "MED-021"
+        ]
+      },
+      {
+        "surface": "RemoteGiphyMediaCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "fun RemoteGiphyMediaCard(",
+        "test_ids": [
+          "MED-021"
+        ]
+      },
+      {
         "surface": "MediaImageGridTile",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageBubbles.kt",
         "anchor": "fun MediaImageGridTile(",
@@ -5078,7 +5221,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
         "anchor": "fun DisappearingMessagesPickerDialog(",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "SET-028"
         ]
       },
       {
@@ -5086,7 +5230,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
         "anchor": "fun DisappearingPickerChoices(",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "SET-028"
         ]
       },
       {
@@ -7255,7 +7400,8 @@
           "SEC-004",
           "SEC-005",
           "SEC-006",
-          "SEC-007"
+          "SEC-007",
+          "SET-028"
         ]
       },
       {
@@ -8482,6 +8628,42 @@
       }
     ],
     "settings_controls": [
+      {
+        "surface": "notification-first-post:giphy_media_preview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.giphy_media_preview",
+        "test_ids": ["MED-021"]
+      },
+      {
+        "surface": "message-copy:giphy_media_preview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/CopyBundles.kt",
+        "anchor": "R.string.giphy_media_preview",
+        "test_ids": ["MED-021"]
+      },
+      {
+        "surface": "R.string.giphy_media_preview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "R.string.giphy_media_preview",
+        "test_ids": ["MED-021"]
+      },
+      {
+        "surface": "R.string.giphy_attribution",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "R.string.giphy_attribution",
+        "test_ids": ["MED-021"]
+      },
+      {
+        "surface": "R.string.media_tap_to_download",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "R.string.media_tap_to_download",
+        "test_ids": ["MED-021"]
+      },
+      {
+        "surface": "R.string.media_tap_to_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "R.string.media_tap_to_retry",
+        "test_ids": ["MED-021"]
+      },
       {
         "surface": "string:cancel",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/LargeGroupInviteWarning.kt",
@@ -10240,15 +10422,6 @@
         ]
       },
       {
-        "surface": "setting:group_create_stage_applying_retention",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupContent.kt",
-        "anchor": "R.string.group_create_stage_applying_retention",
-        "test_ids": [
-          "NCH-002",
-          "ACC-017"
-        ]
-      },
-      {
         "surface": "setting:group_create_stage_creating",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupContent.kt",
         "anchor": "R.string.group_create_stage_creating",
@@ -10339,6 +10512,16 @@
         ]
       },
       {
+        "surface": "setting:toast_chat_created",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt",
+        "anchor": "R.string.toast_chat_created",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "SET-028"
+        ]
+      },
+      {
         "surface": "setting:group_avatar_url",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt",
         "anchor": "R.string.group_avatar_url",
@@ -10360,15 +10543,6 @@
         "surface": "setting:toast_couldnt_prepare_image",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt",
         "anchor": "R.string.toast_couldnt_prepare_image",
-        "test_ids": [
-          "NCH-002",
-          "ACC-017"
-        ]
-      },
-      {
-        "surface": "setting:toast_disappearing_not_applied",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt",
-        "anchor": "R.string.toast_disappearing_not_applied",
         "test_ids": [
           "NCH-002",
           "ACC-017"
@@ -12666,7 +12840,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
         "anchor": "R.string.cancel",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "SET-028"
         ]
       },
       {
@@ -12674,7 +12849,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
         "anchor": "R.string.disappearing_custom",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "SET-028"
         ]
       },
       {
@@ -12682,7 +12858,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
         "anchor": "R.string.disappearing_custom_value",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "SET-028"
         ]
       },
       {
@@ -12698,7 +12875,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
         "anchor": "R.string.disappearing_messages",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "SET-028"
         ]
       },
       {
@@ -12706,7 +12884,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
         "anchor": "R.string.save",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "SET-028"
         ]
       },
       {
@@ -18357,6 +18536,38 @@
         ]
       },
       {
+        "surface": "setting:default_disappearing_messages",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.default_disappearing_messages",
+        "test_ids": [
+          "SET-028"
+        ]
+      },
+      {
+        "surface": "string:default_disappearing_messages_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.default_disappearing_messages_detail",
+        "test_ids": [
+          "SET-028"
+        ]
+      },
+      {
+        "surface": "string:default_disappearing_messages_picker_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.default_disappearing_messages_picker_detail",
+        "test_ids": [
+          "SET-028"
+        ]
+      },
+      {
+        "surface": "string:message_privacy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.message_privacy",
+        "test_ids": [
+          "SET-028"
+        ]
+      },
+      {
         "surface": "string:diagnostics",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
         "anchor": "R.string.diagnostics",
@@ -22546,6 +22757,22 @@
         ]
       },
       {
+        "surface": "Pasted npub recipient presentation remains usable before optional profile enrichment finishes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/RecipientResolutionPresentation.kt",
+        "anchor": "internal fun resolvedRecipientResolution(",
+        "test_ids": [
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "Pasted npub direct-message preparation keeps recipient display, KeyPackage prewarm, and existing-chat lookup independent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessageRecipientPreparation.kt",
+        "anchor": "internal class NewMessageRecipientPreparationCoordinator",
+        "test_ids": [
+          "NCH-001"
+        ]
+      },
+      {
         "surface": "Viewport-driven forward prefetch stands down after an unanswered page",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationPagingPrefetch.kt",
         "anchor": "internal fun shouldPrefetchNewer(",
@@ -22672,6 +22899,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/MainActivity.kt",
         "anchor": "WhiteNoiseApp",
         "test_ids": [
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
           "SYS-001",
           "SYS-002",
           "SYS-003",
@@ -22683,6 +22913,43 @@
           "SYS-009",
           "SYS-010",
           "SYS-011"
+        ]
+      },
+      {
+        "surface": "Lifecycle-stable app unlock session ownership",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppLockSettings.kt",
+        "anchor": "internal data class AppUnlockSessionState(",
+        "test_ids": [
+          "SEC-002",
+          "SEC-003",
+          "SEC-004"
+        ]
+      },
+      {
+        "surface": "App-lock failed-attempt message from the platform callback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/MainActivity.kt",
+        "anchor": "R.string.app_lock_auth_failed",
+        "test_ids": [
+          "SEC-002",
+          "SEC-004"
+        ]
+      },
+      {
+        "surface": "App-lock prompt-launch unavailable message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/MainActivity.kt",
+        "anchor": "R.string.app_lock_auth_unavailable",
+        "test_ids": [
+          "SEC-002",
+          "SEC-004"
+        ]
+      },
+      {
+        "surface": "App-lock terminal cancellation fallback message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.app_lock_auth_cancelled",
+        "test_ids": [
+          "SEC-002",
+          "SEC-004"
         ]
       },
       {
@@ -23597,9 +23864,9 @@
         ]
       },
       {
-        "surface": "An extended window keeps the rows it still holds rather than rebuilding and re-parsing them",
+        "surface": "Conversation window preparation runs off the main thread while extended windows retain unchanged rows",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/WindowApplyMode.kt",
-        "anchor": "fun ConversationController.planWindowApply(",
+        "anchor": "internal fun prepareWindowApply(",
         "test_ids": [
           "CON-002",
           "CON-003"
@@ -23972,9 +24239,25 @@
         ]
       },
       {
+        "surface": "R.string.back",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.back",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
         "surface": "R.string.chat_list_search_clear",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
         "anchor": "R.string.chat_list_search_clear",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
+        "surface": "R.string.chat_list_search_open",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.chat_list_search_open",
         "test_ids": [
           "FIND-001"
         ]
@@ -26217,6 +26500,15 @@
         "anchor": "fun translated(",
         "test_ids": [
           "MED-006"
+        ]
+      },
+      {
+        "surface": "An interactive account switch seeds the top bar's other-account avatars before publication",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AccountSwitchLocalSnapshot.kt",
+        "anchor": "fun accountSwitchPreloadPlan(",
+        "test_ids": [
+          "NAV-006",
+          "NAV-005"
         ]
       }
     ],

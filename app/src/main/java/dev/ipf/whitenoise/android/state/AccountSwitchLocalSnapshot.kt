@@ -201,6 +201,13 @@ enum class AccountSwitchPreloadPolicy {
 internal data class AccountSwitchPreloadPlan(
     val loadLocalRows: Boolean,
     val includePresentationSeeds: Boolean,
+    /**
+     * Whether the bounded other-account seeds the target top bar renders must be
+     * read before the handoff. The quick selector draws those chips on the very
+     * first target frame, so an interactive switch needs them even though it
+     * deliberately skips the heavier member/direct-peer projections (#2155).
+     */
+    val includeTopBarProfileSeeds: Boolean,
 )
 
 internal fun accountSwitchPreloadPlan(
@@ -220,10 +227,16 @@ internal fun accountSwitchPreloadPlan(
                             )
                     )
             )
+    val includePresentationSeeds =
+        loadLocalRows && preloadPolicy == AccountSwitchPreloadPolicy.FULL_LOCAL_SNAPSHOT
     return AccountSwitchPreloadPlan(
         loadLocalRows = loadLocalRows,
-        includePresentationSeeds =
-            loadLocalRows && preloadPolicy == AccountSwitchPreloadPolicy.FULL_LOCAL_SNAPSHOT,
+        includePresentationSeeds = includePresentationSeeds,
+        // A startup restoration has no previous account to switch away from, so
+        // its top bar is built by the ordinary presentation path instead.
+        includeTopBarProfileSeeds =
+            includePresentationSeeds ||
+                (loadLocalRows && preloadPolicy == AccountSwitchPreloadPolicy.INTERACTIVE_LOCAL_ROWS),
     )
 }
 

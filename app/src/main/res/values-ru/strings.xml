@@ -202,6 +202,8 @@
     <string name="profile_unfollow">Удалить контакт</string>
     <string name="profile_block">Заблокировать</string>
     <string name="profile_unblock">Разблокировать</string>
+    <string name="profile_mute_in_group">Отключить уведомления от этого участника в группе</string>
+    <string name="profile_unmute_in_group">Включить уведомления от этого участника в группе</string>
     <string name="blocked_users">Заблокированные</string>
     <string name="blocked_users_empty">Вы никого не заблокировали.</string>
     <string name="blocked_users_detail">Заблокированные пользователи не могут писать вам напрямую. Общие группы продолжают работать, а история остаётся на этом устройстве.</string>
@@ -332,6 +334,7 @@
     <string name="stream_finished">Поток завершен</string>
     <string name="media_attachment">Медиавложение</string>
     <string name="generic_message">Сообщение</string>
+    <string name="giphy_media_preview">GIF через GIPHY</string>
     <string name="waiting_for_stream">Ожидание потока...</string>
     <string name="stream_failed_format">Ошибка потока: %1$s</string>
     <string name="copy_text">Копировать текст</string>
@@ -478,6 +481,10 @@
     <string name="delete_audit_logs">Очистить диагностические журналы</string>
     <string name="delete_audit_logs_subtitle">Удаляет журналы с этого устройства. Уже загруженные копии и ваша настройка передачи данных остаются без изменений.</string>
     <string name="device_protection">Защита устройства</string>
+    <string name="message_privacy">Конфиденциальность сообщений</string>
+    <string name="default_disappearing_messages">Исчезающие сообщения по умолчанию</string>
+    <string name="default_disappearing_messages_detail">Используется, когда этот профиль начинает новый чат или создаёт группу. Каждую беседу можно изменить позже.</string>
+    <string name="default_disappearing_messages_picker_detail">Выберите, как долго хранить новые сообщения в чатах и группах, созданных этим профилем. Существующие беседы не изменятся.</string>
     <string name="incognito_keyboard_detail">Попросите свою клавиатуру не запоминать то, что вы вводите в White Noise. Ваша клавиатура может игнорировать этот запрос.</string>
     <string name="require_device_authentication">Требовать аутентификацию устройства</string>
     <string name="app_lock_enabled_detail">Используйте блокировку экрана устройства при возврате в White Noise.</string>
@@ -803,7 +810,6 @@
     <string name="toast_no_audit_logs_to_delete">Нет диагностических журналов для очистки</string>
     <string name="toast_chat_created">Чат создан</string>
     <string name="group_create_stage_creating">Создание группы…</string>
-    <string name="group_create_stage_applying_retention">Применение исчезающих сообщений…</string>
     <string name="toast_notification_permission_denied">Разрешение на уведомление отклонено</string>
     <string name="toast_signed_out">Выйти</string>
     <string name="group_title_invite_from">Приглашение от %1$s</string>
@@ -1405,7 +1411,6 @@
     <string name="vibration_pattern_android_override">%1$s · Настройки Android</string>
     <string name="chat_muted_badge">Без звука</string>
     <string name="collapse_long_messages_subtitle">Показывать предварительный просмотр длинных сообщений в этом чате.</string>
-    <string name="toast_disappearing_not_applied">Группа создана, но исчезающие сообщения включить не удалось</string>
     <string name="search_members">Поиск участников</string>
     <string name="recent_chats">Недавние чаты</string>
     <string name="onboarding_login">Войти</string>

@@ -20,6 +20,7 @@ import dev.ipf.whitenoise.android.core.MediaPreviewFallback
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
+import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
 import java.util.Locale
 
 enum class ChatListAvatarSource {
@@ -378,6 +379,8 @@ data class ChatListItem(
             // otherwise leak its raw JSON content into the chat list.
             MessageProjector.isGroupSystemKind(preview.kind) ->
                 GroupSystemEvents.previewText(preview.plaintext, copy.groupSystem, preview.groupSystem)
+            MessageProjector.isChatKind(preview.kind) && RemoteGiphyMedia.isEnvelopeText(preview.plaintext) ->
+                copy.giphyMedia
             preview.plaintext.isNotBlank() -> preview.plaintext
             // The engine's typed attachment projection beats the app-side
             // fallback, which derives from tags and optimistic state.

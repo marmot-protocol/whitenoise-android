@@ -116,7 +116,6 @@ import dev.ipf.whitenoise.android.notifications.ConversationNotificationRouting
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPattern
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPreferences
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
-import dev.ipf.whitenoise.android.notifications.LocalNotificationPolicy
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
 import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.NotificationChannels
@@ -1157,8 +1156,10 @@ class WhiteNoiseAppState private constructor(
         initialActiveAccountRef = activeAccountRef,
     )
 
-    private val appContext = context.applicationContext
+    internal val appContext = context.applicationContext
     private val preferences = preferencesOverride ?: appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+    internal val defaultDisappearingMessagesPreferences =
+        DefaultDisappearingMessagesPreferences(appContext, preferences)
     internal val conversationDictationPreferences = ConversationDictationPreferences(appContext)
     internal val microphoneCaptureCoordinator = MicrophoneCaptureCoordinator()
     private val dictationMicrophoneOwner = Any()
@@ -1849,8 +1850,8 @@ class WhiteNoiseAppState private constructor(
     var appUnlockError by mutableStateOf<AppText?>(null)
         private set
 
-    var appUnlockPromptRequestId by mutableIntStateOf(0)
-        private set
+    internal val appUnlockSessions = AppUnlockSessionController()
+    internal val appUnlockPromptRequestId: Long get() = appUnlockSessions.latestSessionId
 
     // Populated by the off-main pre-warm (or the first unlock/background
     // write); the getter NEVER reads the Keystore-backed store itself — a
@@ -2367,7 +2368,7 @@ class WhiteNoiseAppState private constructor(
     private val notificationAvatarCoordinator by lazy {
         NotificationAvatarCoordinator(
             appLocked = { appLockScreenVisible },
-            shouldPost = ::shouldPostNotification,
+            shouldPost = this::shouldPostNotification,
             canPost = localNotificationPresenter::canPostNotifications,
             senderAvatarUrl = { update -> notificationSenderAvatarUrl(update, ::loadUserProfile) },
             groupAvatarUrl = { update ->
@@ -2432,11 +2433,11 @@ class WhiteNoiseAppState private constructor(
         suppression = next
     }
 
-    private val appInForeground: Boolean
+    internal val appInForeground: Boolean
         get() = suppression.inForeground
-    private val activeConversationGroupIdHex: String?
+    internal val activeConversationGroupIdHex: String?
         get() = suppression.activeConversationGroupIdHex
-    private val activeConversationAccountRef: String?
+    internal val activeConversationAccountRef: String?
         get() = suppression.activeConversationAccountRef
 
     /** Whether the exact dictation origin is the unobscured foreground conversation. */
@@ -5022,7 +5023,7 @@ class WhiteNoiseAppState private constructor(
     private suspend fun loadAccountSwitchLocalSnapshot(
         accountRef: String,
         generation: Long,
-        includePresentationSeeds: Boolean = true,
+        plan: AccountSwitchPreloadPlan,
     ): AccountSwitchLocalSnapshot? =
         try {
             val presentedRows =
@@ -5037,7 +5038,7 @@ class WhiteNoiseAppState private constructor(
                     accountRef = accountRef,
                     generation = generation,
                     rows = rows,
-                    includePresentationSeeds = includePresentationSeeds,
+                    plan = plan,
                 )
             ensureAccountSwitchRequestIsCurrent(generation)
 
@@ -5050,7 +5051,7 @@ class WhiteNoiseAppState private constructor(
                 profiles = presentation.profiles,
                 presentedRows = presentedRows,
             ).also { snapshot ->
-                if (includePresentationSeeds) recordAccountSwitchIdentityState(accountRef, snapshot)
+                if (plan.includePresentationSeeds) recordAccountSwitchIdentityState(accountRef, snapshot)
             }
         } catch (_: AccountSwitchSnapshotSuperseded) {
             null
@@ -5067,16 +5068,28 @@ class WhiteNoiseAppState private constructor(
         accountRef: String,
         generation: Long,
         rows: List<ChatListRowFfi>,
-        includePresentationSeeds: Boolean,
+        plan: AccountSwitchPreloadPlan,
     ): AccountSwitchPresentationSeeds =
         coroutineScope {
             val activeAccountIdHex = accounts.firstOrNull { it.label == accountRef }?.accountIdHex
-            if (!includePresentationSeeds) {
+            // The bounded set the selector/overflow policy will actually render. Both
+            // switch paths read it here, so an interactive switch owes its first frame
+            // exactly the seeds the full-snapshot path already loads (#2155).
+            val topBarProfileIds =
+                if (plan.includeTopBarProfileSeeds) {
+                    accountSwitchProfileSeedIds(emptyList(), accounts, accountRef)
+                } else {
+                    emptyList()
+                }
+            if (!plan.includePresentationSeeds) {
                 recordAccountSwitchPreloadStage(accountRef, "member-derived-local-deferred", rows.size)
-                return@coroutineScope AccountSwitchPresentationSeeds(activeAccountIdHex, emptyList(), emptyList())
+                // Off the main thread, and dropped wholesale if a later switch wins.
+                val topBarProfiles = loadAccountSwitchProfileSeeds(topBarProfileIds)
+                ensureAccountSwitchRequestIsCurrent(generation)
+                recordAccountSwitchPreloadStage(accountRef, "top-bar-profiles-ready", rows.size)
+                return@coroutineScope AccountSwitchPresentationSeeds(activeAccountIdHex, emptyList(), topBarProfiles)
             }
             // Overlap bounded top-bar reads with the identity-critical member page.
-            val topBarProfileIds = accountSwitchProfileSeedIds(emptyList(), accounts, accountRef)
             val topBarProfilesDeferred = async { loadAccountSwitchProfileSeeds(topBarProfileIds) }
             val memberIds = loadAccountSwitchMemberIds(accountRef, rows)
             ensureAccountSwitchRequestIsCurrent(generation)
@@ -5221,11 +5234,7 @@ class WhiteNoiseAppState private constructor(
                 }
             val localSnapshot =
                 if (preloadPlan.loadLocalRows) {
-                    loadAccountSwitchLocalSnapshot(
-                        label,
-                        requestGeneration,
-                        includePresentationSeeds = preloadPlan.includePresentationSeeds,
-                    )
+                    loadAccountSwitchLocalSnapshot(label, requestGeneration, preloadPlan)
                 } else {
                     null
                 }
@@ -5728,6 +5737,7 @@ class WhiteNoiseAppState private constructor(
                 restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
                 return outcome
             }
+            defaultDisappearingMessagesPreferences.removeAccount(wipedRef)
             composerExpansionStateRetention.removeAccount(wipedRef)
             clearConversationShortcutsForAccount(
                 accountRef = wipedRef,
@@ -5737,6 +5747,7 @@ class WhiteNoiseAppState private constructor(
             clearCrossAccountCaches()
             stopTtsForRemovedAccount(wipedRef)
             clearContactPrivateDetailsForAccount(wipedRef)
+            memberMutePreferences.clearAccount(wipedRef)
             wipeDecryptedMediaFromDisk()
             if (!clearHiddenMessagesForAccount(wipedRef)) {
                 appStateDebug { "hidden-message cleanup failed after wipe account=${wipedRef.take(8)}" }
@@ -5750,13 +5761,20 @@ class WhiteNoiseAppState private constructor(
                     appStateDebug(it) { "editor purge failed after wipe: ${it.readableMessage()}" }
                 }
             }
-            val refreshedAccounts =
+            val refreshedAccountsResult =
                 runCatchingCancellable {
                     marmotIo(MarmotTraceSection.ACCOUNT_LIST) { listAccounts() }
-                }.getOrDefault(emptyList())
+                }
+            val refreshedAccounts = refreshedAccountsResult.getOrDefault(emptyList())
             accountListLifetime.advance {
                 accounts = refreshedAccounts
                 releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
+                // An empty list here can mean "no accounts left" or "the read failed" -- retention
+                // is an allow-list, so only prune member mutes on a genuine successful read. A
+                // transient failure must not wipe every other account's mutes (#2782 follow-up).
+                refreshedAccountsResult.getOrNull()?.let { successfulAccounts ->
+                    retainMemberMutesForAccounts(successfulAccounts.map(AccountSummaryFfi::label))
+                }
             }
             refreshAccountUnreadCounts(refreshedAccounts)
             val next = refreshedAccounts.firstOrNull()?.label
@@ -6022,6 +6040,7 @@ class WhiteNoiseAppState private constructor(
     fun refreshAppLockCredentialAvailability() {
         appLockCredentialAvailable = isAppLockCredentialAvailable(appContext)
         if (!appLockCredentialAvailable) {
+            appUnlockSessions.clear()
             appLockScreenVisible = false
             appUnlockError = null
             resumePendingInviteNotificationIdentityRefreshes()
@@ -6041,6 +6060,7 @@ class WhiteNoiseAppState private constructor(
         if (enabled) {
             requestAppUnlock()
         } else {
+            appUnlockSessions.clear()
             appLockScreenVisible = false
             appUnlockError = null
             resumePendingInviteNotificationIdentityRefreshes()
@@ -6056,8 +6076,7 @@ class WhiteNoiseAppState private constructor(
         refreshAppLockCredentialAvailability()
         if (!requireAppUnlock || !appLockCredentialAvailable) return
         showAppLockScreen()
-        appUnlockError = null
-        appUnlockPromptRequestId += 1
+        if (appUnlockSessions.begin()) appUnlockError = null
     }
 
     private fun showAppLockScreen() {
@@ -6065,7 +6084,7 @@ class WhiteNoiseAppState private constructor(
         stopSpeaking()
     }
 
-    fun markAppUnlockSucceeded(
+    internal fun markAppUnlockSucceeded(
         nowMillis: Long = System.currentTimeMillis(),
         dismissRetainedVisibleConversation: Boolean = true,
     ) {
@@ -6080,23 +6099,23 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    fun markAppUnlockFailed(message: AppText = AppText.Resource(R.string.app_lock_auth_cancelled)) {
+    internal fun markAppUnlockFailed(message: AppText = AppText.Resource(R.string.app_lock_auth_cancelled)) {
         if (!appLockScreenVisible) return
         appUnlockError = message
     }
 
-    // True while a foreground lock decision waits for the off-main unlock
-    // timestamp: the lock scrim shows (UI secured) but the biometric prompt
-    // is deferred until the REAL value decides — a 0L placeholder would read
-    // the grace period as expired and over-prompt on cold starts within it.
+    // True while the foreground lock decision waits for off-main unlock time. The secure scrim remains visible,
+    // and the prompt waits for the real value so the grace period is not falsely treated as expired.
     var appUnlockEvaluationPending by mutableStateOf(false)
         private set
 
     fun maybeShowAppLockForForeground(nowMillis: Long = System.currentTimeMillis()) {
         refreshAppLockCredentialAvailability()
-        // Short-circuit BEFORE any timestamp read so app-lock-disabled users
-        // never pay for it on foreground transitions.
+        // Skip timestamp work when app lock is disabled or the device credential is unavailable.
         if (!requireAppUnlock || !appLockCredentialAvailable) return
+        val promptActive = appUnlockSessions.activeSessionId != null
+        if (promptActive) showAppLockScreen()
+        if (promptActive || appUnlockSessions.consumeForegroundReturn(SystemClock.elapsedRealtime())) return
         val knownLastUnlock = lastAppUnlockAtMillisBacking
         if (knownLastUnlock == null) {
             deferAppLockDecisionUntilTimestampLoads(nowMillis)
@@ -6121,9 +6140,7 @@ class WhiteNoiseAppState private constructor(
             val loaded = withContext(Dispatchers.IO) { AppLockPreferences.readLastUnlockedAtMillis(appContext) }
             if (lastAppUnlockAtMillisBacking == null) lastAppUnlockAtMillisBacking = loaded
             appUnlockEvaluationPending = false
-            // Re-read the clock AFTER the IO hop: deciding with the entry
-            // time could dismiss the lock even though the grace period
-            // expired while the secure store was loading.
+            // Re-read the clock after IO so a grace period that expired during loading cannot dismiss the lock.
             val decisionNowMillis = maxOf(nowMillis, System.currentTimeMillis())
             if (
                 shouldShowAppLock(
@@ -6180,15 +6197,14 @@ class WhiteNoiseAppState private constructor(
     /** Whether the current MDK policy has a confirmed explicit grant. */
     fun isUsageDiagnosticsGranted(): Boolean = diagnostics.granted
 
-    /** Records a finite host event using a ticket captured before asynchronous work starts. */
-    internal fun recordProductObservation(
-        observation: ProductObservation,
-        ticket: Long? = diagnostics.observations.ticket(),
+    internal fun recordProductEvent(
+        event: dev.ipf.marmotkit.ProductEventFfi,
+        ticket: Long?,
     ) {
         val runtime = marmotRuntime?.marmot ?: return
         notificationScope.launch(Dispatchers.IO) {
             runCatchingCancellable {
-                diagnostics.observations.record(ticket) { runtime.recordProductEvent(observation.event()) }
+                diagnostics.observations.record(ticket) { runtime.recordProductEvent(event) }
             }
         }
     }
@@ -7370,6 +7386,7 @@ class WhiteNoiseAppState private constructor(
                 dismissVisibleConversationNotifications()
             }
         } else {
+            appUnlockSessions.clearForegroundReturn()
             recordAppLockBackgrounded()
             conversationDictation.onAppBackgrounded()
             mutationsScope.launch { draftWriter.flush() }
@@ -8573,7 +8590,8 @@ class WhiteNoiseAppState private constructor(
         return networkDisplayName(accountIdHex)
     }
 
-    private fun contactNicknameFor(
+    /** Reads a private nickname for the explicitly captured account that owns an asynchronous UI result. */
+    internal fun contactNicknameFor(
         accountRef: String?,
         accountIdHex: String,
     ): String? {
@@ -9084,39 +9102,25 @@ class WhiteNoiseAppState private constructor(
         pendingProfileFromDiscovery = false
     }
 
-    /**
-     * Create a 1:1 DM group with [npub]. This lower-level variant leaves
-     * failure presentation to the caller so the New Message flow can keep an
-     * inline retry state instead of collapsing everything into a transient toast.
-     */
-    suspend fun createProfileChatGroup(npub: String): String {
-        val account = activeAccountRef ?: throw StartProfileChatNoActiveAccountException()
-        return marmotIo(MarmotTraceSection.CREATE_GROUP) { createGroup(account, "", listOf(npub), null) }
-    }
+    private val chatCreateOpenTiming = ChatCreateOpenTimingTracker()
 
-    private var chatCreateOpenTiming: ChatCreateOpenTiming? = null
-
-    fun beginChatCreateOpenTiming() {
-        chatCreateOpenTiming =
-            ChatCreateOpenTiming.begin().also {
-                it.mark(ChatCreateOpenTiming.STAGE_CONFIRM_TAP)
-            }
-    }
+    fun beginChatCreateOpenTiming(
+        stage: String = ChatCreateOpenTiming.STAGE_CONFIRM_TAP,
+        restart: Boolean = false,
+    ) = chatCreateOpenTiming.begin(stage, restart)
 
     fun markChatCreateOpenStage(stage: String) {
-        chatCreateOpenTiming?.mark(stage)
+        chatCreateOpenTiming.mark(stage)
     }
 
-    fun hasActiveChatCreateOpenTiming(): Boolean = chatCreateOpenTiming != null
+    fun hasActiveChatCreateOpenTiming(): Boolean = chatCreateOpenTiming.isActive()
 
     fun completeChatCreateOpenTiming(stage: String) {
-        markChatCreateOpenStage(stage)
-        chatCreateOpenTiming = null
+        chatCreateOpenTiming.finish(stage)
     }
 
     fun abandonChatCreateOpenTiming(stage: String) {
-        markChatCreateOpenStage(stage)
-        chatCreateOpenTiming = null
+        chatCreateOpenTiming.finish(stage)
     }
 
     /**
@@ -9447,20 +9451,6 @@ class WhiteNoiseAppState private constructor(
             }.getOrNull()
                 ?.firstOrNull { it.messageIdHex.equals(messageId, ignoreCase = true) }
         }
-
-    private fun shouldPostNotification(
-        update: NotificationUpdateFfi,
-        engineMuted: Boolean,
-    ): Boolean =
-        LocalNotificationPolicy.shouldPost(
-            update = update,
-            appInForeground = appInForeground,
-            activeConversationGroupIdHex = activeConversationGroupIdHex,
-            activeConversationAccountRef = activeConversationAccountRef,
-            appLockScreenVisible = appLockScreenVisible,
-            conversationNotifyMode = chatMutePreferences::mode,
-            engineMuted = engineMuted,
-        )
 
     private fun isNotificationGenerationPostAllowed(
         update: NotificationUpdateFfi,

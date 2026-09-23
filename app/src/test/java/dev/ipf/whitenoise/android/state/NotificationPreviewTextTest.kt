@@ -172,4 +172,18 @@ class NotificationPreviewTextTest {
             assertNull(blank)
             assertNull(emptyDocument)
         }
+
+    @Test
+    fun previewTextHidesGiphyCdnEnvelopeWithoutParsingMarkdown() =
+        runBlocking {
+            val resolved =
+                resolveNotificationPreviewText(
+                    raw = "https://media.giphy.com/media/abc/giphy.gif\nvia GIPHY",
+                    parseMarkdown = { error("GIPHY envelope must not enter Markdown") },
+                    mentionDisplayName = { error("GIPHY envelope has no mentions") },
+                    giphyPreviewText = "GIF from GIPHY",
+                )
+
+            assertEquals("GIF from GIPHY", resolved)
+        }
 }

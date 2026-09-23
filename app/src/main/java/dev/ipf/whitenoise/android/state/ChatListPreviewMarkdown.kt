@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.core.MessageProjector
+import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
 
 /**
  * The last-message text a chat row should run through the markdown parser,
@@ -14,6 +15,8 @@ import dev.ipf.whitenoise.android.core.MessageProjector
  * Edit (1009), agent-stream-start (1200), and group-system (1210) rows —
  * plus deleted/blank rows — surface derived copy, so their payloads must
  * never be parsed into preview tokens and styled in their place (issue #577).
+ * Recognized GIPHY envelopes likewise surface localized media copy instead of
+ * exposing their transport URL as Markdown.
  * Body kinds beyond plain chat (kind-1 legacy notes, kind-1209 agent-stream
  * finals, and any future body kind) still display their plaintext via
  * `projectedPreviewText`, so they keep markdown/mention/code rendering here.
@@ -23,7 +26,10 @@ import dev.ipf.whitenoise.android.core.MessageProjector
 internal fun chatRowPreviewMarkdownSource(row: ChatListRowFfi): String? {
     val preview = row.lastMessage ?: return null
     return preview.plaintext.takeIf {
-        !preview.deleted && MessageProjector.rendersRawBodyPreview(preview.kind) && it.isNotBlank()
+        !preview.deleted &&
+            MessageProjector.rendersRawBodyPreview(preview.kind) &&
+            !(MessageProjector.isChatKind(preview.kind) && RemoteGiphyMedia.isEnvelopeText(it)) &&
+            it.isNotBlank()
     }
 }
 

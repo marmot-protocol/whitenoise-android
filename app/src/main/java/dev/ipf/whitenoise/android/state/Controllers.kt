@@ -103,6 +103,8 @@ import dev.ipf.whitenoise.android.media.mutationKey
 import dev.ipf.whitenoise.android.media.shouldCommitPrimaryGroupImageMutation
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolution
 import dev.ipf.whitenoise.android.ui.chats.newchat.directChatPreferenceOrder
+import dev.ipf.whitenoise.android.ui.conversation.media.isPendingVideo
+import dev.ipf.whitenoise.android.ui.conversation.media.pendingVideoPosterFrame
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -1060,12 +1062,23 @@ internal suspend fun removeMediaMemoryCacheKeys(
     }
 }
 
-private suspend fun decodeMediaThumbnailOffMain(plaintextBytes: ByteArray) =
+/**
+ * The poster seeded under a just-sent attachment's confirmed key.
+ *
+ * A photo decodes its own bytes. A video has a frame pulled from the same bytes instead, so the
+ * confirmed bubble opens on the poster the optimistic one already showed rather than waiting for
+ * the file to be materialized and read again (#2732).
+ */
+private suspend fun decodeMediaThumbnailOffMain(attachment: PendingAttachment) =
     withContext(Dispatchers.Default) {
-        MediaPipeline.decodeSampledBitmap(
-            plaintextBytes,
-            MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
-        )
+        if (attachment.isPendingVideo) {
+            pendingVideoPosterFrame(attachment.plaintextBytes, extractPoster = true).bitmap
+        } else {
+            MediaPipeline.decodeSampledBitmap(
+                attachment.plaintextBytes,
+                MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
+            )
+        }
     }
 
 internal fun optimisticMessageIdForProjection(
@@ -5974,11 +5987,6 @@ internal typealias MediaPublisher =
 
 internal typealias InviteAcceptor = suspend (String, String) -> AppGroupRecordFfi
 
-private data class RecoveryStampedTimelineWindow(
-    val page: TimelinePageFfi,
-    val recoveryGeneration: Long?,
-)
-
 class ConversationController(
     internal val appState: WhiteNoiseAppState,
     initialGroup: AppGroupRecordFfi,
@@ -6028,6 +6036,9 @@ class ConversationController(
             acceptGroupInvite(account, groupIdHex)
         }
     },
+    private val windowPreparationDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    private val windowApplyNanoTime: () -> Long = System::nanoTime,
+    private val onWindowApplyMeasured: (WindowApplyPerformanceSample) -> Unit = {},
 ) {
     private val liveSubscriptions = appState.conversationLiveSubscriptions()
 
@@ -6197,6 +6208,7 @@ class ConversationController(
     // Invalidated when a timeline page or live subscription batch lands so an
     // in-flight full-page refresh cannot clobber newer state (#1849).
     private val timelineWindowGeneration = StalenessGuard()
+    internal val windowPresentationTiming = appState.conversationWindowPresentationTiming()
 
     // Authoritative local self-leave marker (issue #787). Short-lived lifecycle
     // state (lives only as long as this controller, never persisted —
@@ -6819,6 +6831,7 @@ class ConversationController(
             // error.
             throw cancel
         } catch (throwable: Throwable) {
+            windowPresentationTiming.fail()
             if (throwable.isUseAfterEviction()) {
                 discardInitialTimelineSeedForFailure(preserveOptimisticMessages = false)
                 markActiveAccountRemovedFromMembers(account)
@@ -6865,6 +6878,7 @@ class ConversationController(
         hasPreparedInitialPresentation = true
         initialTimelineSeedActive = false
         publishTimelineFromIndexes()
+        windowPresentationTiming.timelinePublished()
     }
 
     /** Runs MDK's authoritative sweep while any loaded row owns a deadline. */
@@ -7010,6 +7024,10 @@ class ConversationController(
         timelineStream: ConversationTimelineSubscriptionHandle,
     ): List<String> {
         val snapshot = initialTimelineSnapshotRead.await { timelineStream.snapshot() }
+        windowPresentationTiming.begin(
+            receivedAtElapsedMs = SystemClock.elapsedRealtime(),
+            ticket = appState.productObservationTicket(),
+        )
         val recoveryGeneration =
             appState.recoveryDiagnostics.recordTimelineSubscriptionReceived(
                 count = snapshot?.messages?.size ?: 0,
@@ -7145,6 +7163,7 @@ class ConversationController(
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (throwable: Throwable) {
+            windowPresentationTiming.fail()
             if (throwable.isUseAfterEviction()) {
                 discardInitialTimelineSeedForFailure(preserveOptimisticMessages = false)
                 markActiveAccountRemovedFromMembers(account)
@@ -7414,7 +7433,9 @@ class ConversationController(
         synchronized(liveSubscriptionLock) {
             controllerCleared = true
             memberRosterRefreshGeneration.advance()
+            timelineWindowGeneration.advance()
         }
+        windowPresentationTiming.cancel()
         initialTimelineSubscriptionRead.cancel()
         initialTimelineSnapshotRead.cancel()
         controllerScope.cancel()
@@ -7497,6 +7518,8 @@ class ConversationController(
                             RecoveryStampedTimelineWindow(
                                 page = page,
                                 recoveryGeneration = appState.recoveryDiagnostics.recordTimelineSubscriptionReceived(),
+                                receivedAtElapsedMs = SystemClock.elapsedRealtime(),
+                                productObservationTicket = appState.productObservationTicket(),
                             ),
                         )
                     }
@@ -7528,6 +7551,10 @@ class ConversationController(
                     batch += more
                 }
                 val newest = batch.last()
+                windowPresentationTiming.begin(
+                    receivedAtElapsedMs = batch.first().receivedAtElapsedMs,
+                    ticket = batch.first().productObservationTicket,
+                )
                 val streamIdsLaunched =
                     applyTimelinePage(
                         newest.page,
@@ -8546,7 +8573,7 @@ class ConversationController(
                         // Offload the multi-MB ARGB decode to Default; the
                         // main-confined thumbnail-cache put resumes on Main.
                         // Mirrors the receive/render path in WhiteNoiseApp.
-                        val decoded = decodeMediaThumbnailOffMain(attachment.plaintextBytes)
+                        val decoded = decodeMediaThumbnailOffMain(attachment)
                         if (!mediaUploadSessionStillCurrent(account)) return@forEachIndexed
                         if (decoded != null) {
                             appState.cacheMediaThumbnail(confirmedKey, decoded)
@@ -9653,9 +9680,9 @@ class ConversationController(
             // reconcile. The main-confined thumbnail-cache put resumes on Main
             // via launchMutation's Main.immediate scope. Mirrors the
             // receive/render path in WhiteNoiseApp.
-            val plaintextBytes = attachment.plaintextBytes
+            val posterSource = attachment
             appState.launchMutation {
-                val decoded = decodeMediaThumbnailOffMain(plaintextBytes)
+                val decoded = decodeMediaThumbnailOffMain(posterSource)
                 if (decoded != null && mediaUploadSessionStillCurrent(account)) {
                     appState.cacheMediaThumbnail(cacheKey, decoded)
                 }
@@ -11335,51 +11362,69 @@ class ConversationController(
      * and its stream echo can land in either order, so the newest installed replacement is applied together
      * with its own sidecar instead of pairing [page] with a frame from a later revision.
      */
+    @Suppress("LongMethod") // The generation check and one main-thread diff commit must remain atomic.
     internal suspend fun applyTimelinePage(
         page: TimelinePageFfi,
         replaceWindow: Boolean,
         updatePagination: Boolean,
         reconcileNewExtendedRecords: Boolean = false,
+        onCommitted: (() -> Unit)? = null,
     ): List<String> {
-        timelineWindowGeneration.advance()
+        val preparationGeneration = timelineWindowGeneration.advance()
         val installed = timelineSubscription?.latestInstalledWindow()
         val applied = installed?.page ?: page
-        val pageMessages = applied.messages
-        // Settle the Markdown this timeline already parsed, and the rows the window dropped, before
-        // anything clears the indexes they are read from.
-        val plan = planWindowApply(applied, replaceWindow, reconcileNewExtendedRecords)
+        val snapshot =
+            currentWindowApplySnapshot(timelineRecords.values, pendingProjectionsAwaitingBridge.keys)
+        val preparation =
+            prepareWindowApplyOn(
+                dispatcher = windowPreparationDispatcher,
+                nanoTime = windowApplyNanoTime,
+                page = applied,
+                snapshot = snapshot,
+                replaceWindow = replaceWindow,
+                reconcileNewExtendedRecords = reconcileNewExtendedRecords,
+            )
+        val prepared = preparation.value
+        if (!timelineWindowGeneration.isCurrent(preparationGeneration)) return emptyList()
+        assertMainThread { "applyTimelinePage commit" }
+        val commitStartedAt = windowApplyNanoTime()
+        val commitPlan =
+            prepared.planCommit(
+                snapshot,
+                timelineRecords,
+                timelineItemsById.keys,
+                pendingProjectionsAwaitingBridge.keys,
+            )
+        commitPlan.departedIds.forEach(::removeProjectedRecord)
         if (replaceWindow) trimStateForWindowReplacement()
         authoritativeTimelineOrderByMessageId.clear()
-        val profileIds = linkedSetOf<String>()
+        authoritativeTimelineOrderByMessageId.putAll(prepared.authoritativeOrder)
         val streamIds = mutableListOf<String>()
-        val appliedRecords = ArrayList<TimelineMessageRecordFfi>(pageMessages.size)
-        pageMessages.forEachIndexed { index, record ->
-            // Keep MDK's optimistic-head position for pending local projections.
-            // Only terminally invalidated rows without accepted-history evidence
-            // become timestamped overlays; otherwise an old failed send can
-            // displace a newly confirmed bubble at the bottom of the timeline.
-            if (record.usesAuthoritativePageOrder()) {
-                authoritativeTimelineOrderByMessageId[record.messageIdHex] = index.toULong()
-            }
-            val reconciles = plan.reconciles(record.messageIdHex)
-            val carried = plan.carry(record, timelineRecords[record.messageIdHex])
-            appliedRecords.add(carried)
+        val appliedRecords = ArrayList<TimelineMessageRecordFfi>(prepared.rows.size)
+        prepared.rows.forEach { row ->
+            val record = row.record
+            pendingTimelineRemovedMessageIds = pendingTimelineRemovedMessageIds - record.messageIdHex
+            appliedRecords.add(record)
+            val reconcilesOptimistic =
+                row.reconcilesOptimistic || (reconcileNewExtendedRecords && record.messageIdHex !in timelineRecords)
             val actionRecord =
-                upsertProjectedRecord(
-                    carried,
-                    reconcileOptimistic = reconciles,
-                    allowDelayedProjection = reconciles,
-                )
-            profileIds.add(record.sender)
-            record.replyPreview?.let { profileIds.add(it.sender) }
-            record.reactions.userReactions.forEach { profileIds.add(it.sender) }
+                if (record.messageIdHex in commitPlan.projectIds) {
+                    upsertProjectedRecord(
+                        record,
+                        reconcileOptimistic = reconcilesOptimistic,
+                        allowDelayedProjection = reconcilesOptimistic,
+                        preparedAction = row.actionRecord,
+                    )
+                } else {
+                    row.actionRecord
+                }
             actionRecord.takeIf(MessageProjector::isStreamStart)?.let(MessageProjector::streamId)?.let(streamIds::add)
             if (record.deleted) {
                 deletedMessageIds = deletedMessageIds - record.messageIdHex
             }
             retireFinishedStream(actionRecord)
         }
-        appState.requestProfiles(profileIds)
+        appState.requestProfiles(prepared.profileIds)
         applyDurableStreamPositions(durableStreamDisplayPositions(timelineRecords.values.toList()))
         if (updatePagination) {
             hasMoreBefore = applied.hasMoreBefore
@@ -11388,7 +11433,7 @@ class ConversationController(
         // Rows this page kept skip re-projection, so their projected items still carry the ordinal
         // from where the window used to sit. Display sorts on that ordinal, so re-stamp it before
         // publishing or a slid window would reorder history the reader is looking at.
-        if (!plan.replaces) refreshAuthoritativeOrder(applied)
+        if (prepared.mode == WindowApplyMode.EXTEND) refreshAuthoritativeOrder(applied)
         pruneReadAnchorsToWindow()
         pruneConfirmedOptimisticMessages()
         pruneRetentionAtSendToWindow()
@@ -11397,7 +11442,11 @@ class ConversationController(
         installWindowFrame(installed?.frame)
         // A replacement rebuilt every row, so every tally is stale. An extended window only changed
         // the rows it added, altered or dropped.
-        if (plan.replaces) recomputeReactions() else recomputeReactions(plan.touchedIds)
+        if (prepared.mode == WindowApplyMode.REPLACE) {
+            recomputeReactions()
+        } else {
+            recomputeReactions(commitPlan.touchedIds)
+        }
         // A non-replaceWindow page (older-history load once hasLoadedOlderPages
         // is set) skips the replaceWindow trim above, so prune messageById to the
         // current window + optimistic records here too (#373).
@@ -11415,10 +11464,13 @@ class ConversationController(
             records = appliedRecords,
             markInitialPresentationReady = preparingInitialPresentation,
         )
-        return streamIds
-            // Don't relaunch a watcher for a stream whose final record was in
-            // this same page — it was just marked removed. See #25.
-            .filterNot { it in removedStreamIds }
+        windowPresentationTiming.timelinePublished()
+        val streamIdsToLaunch = windowStreamIdsToLaunch(streamIds, removedStreamIds::contains)
+        onWindowApplyMeasured(
+            preparation.performanceSample(prepared, commitPlan.projectIds.size, commitStartedAt, windowApplyNanoTime()),
+        )
+        onCommitted?.invoke()
+        return streamIdsToLaunch
     }
 
     /**
@@ -11726,6 +11778,7 @@ class ConversationController(
         reconcileOptimistic: Boolean = false,
         allowDelayedProjection: Boolean = false,
         displayedProjectedStreamItemIds: Set<String> = emptySet(),
+        preparedAction: AppMessageRecordFfi? = null,
     ): AppMessageRecordFfi {
         pendingTimelineRemovedMessageIds = pendingTimelineRemovedMessageIds - record.messageIdHex
         // Defensive guard against the Rust core re-emitting an identical
@@ -11748,7 +11801,7 @@ class ConversationController(
         val previousItemId = existing?.let(::projectedItemId)
         val stillProjected = previousItemId != null && timelineItemsById.containsKey(previousItemId)
         if (existing != null && stillProjected && timelineRecordsRenderEqual(existing, record)) {
-            return TimelineProjector.toAppMessageRecord(record)
+            return preparedAction ?: TimelineProjector.toAppMessageRecord(record)
         }
         var retentionAtSendSeconds =
             previousItemId?.let { itemId -> timelineItemsById[itemId]?.retentionAtSendSeconds }
@@ -11765,7 +11818,7 @@ class ConversationController(
         // and write the projection with the override already in place. The
         // bridge in `optimisticMessages` covers the bubble in the meantime
         // — same content, same position.
-        val draftAction = TimelineProjector.toAppMessageRecord(record)
+        val draftAction = preparedAction ?: TimelineProjector.toAppMessageRecord(record)
         val projectedIsMediaUpsert = draftAction.tags.any { it.values.firstOrNull() == "imeta" }
         val hasAcceptedPendingTextBridge =
             reconcileOptimistic && record.messageIdHex in acceptedPendingTextOptimisticIds

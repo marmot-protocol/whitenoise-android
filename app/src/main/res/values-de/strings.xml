@@ -186,6 +186,8 @@
     <string name="profile_unfollow">Kontakt entfernen</string>
     <string name="profile_block">Blockieren</string>
     <string name="profile_unblock">Blockierung aufheben</string>
+    <string name="profile_mute_in_group">In dieser Gruppe stummschalten</string>
+    <string name="profile_unmute_in_group">Stummschaltung in dieser Gruppe aufheben</string>
     <string name="blocked_users">Blockierte Personen</string>
     <string name="blocked_users_empty">Du hast niemanden blockiert.</string>
     <string name="blocked_users_detail">Blockierte Personen können dir nicht direkt schreiben. Gemeinsame Gruppen funktionieren weiter, und der Verlauf bleibt auf diesem Gerät.</string>
@@ -316,6 +318,7 @@
     <string name="stream_finished">Stream beendet</string>
     <string name="media_attachment">Medienanhang</string>
     <string name="generic_message">Nachricht</string>
+    <string name="giphy_media_preview">GIF über GIPHY</string>
     <string name="waiting_for_stream">Warte auf Stream...</string>
     <string name="stream_failed_format">Stream fehlgeschlagen: %1$s</string>
     <string name="copy_text">Text kopieren</string>
@@ -448,6 +451,10 @@
     <string name="delete_audit_logs">Diagnoseprotokolle löschen</string>
     <string name="delete_audit_logs_subtitle">Entfernt Protokolle von diesem Gerät. Bereits hochgeladene Kopien und deine Freigabeeinstellung bleiben unverändert.</string>
     <string name="device_protection">Geräteschutz</string>
+    <string name="message_privacy">Nachrichtenschutz</string>
+    <string name="default_disappearing_messages">Standard für verschwindende Nachrichten</string>
+    <string name="default_disappearing_messages_detail">Wird verwendet, wenn dieses Profil einen neuen Chat oder eine neue Gruppe startet. Jede Unterhaltung kann später geändert werden.</string>
+    <string name="default_disappearing_messages_picker_detail">Wähle, wie lange neue Nachrichten in Chats und Gruppen erhalten bleiben, die dieses Profil erstellt. Bestehende Unterhaltungen werden nicht geändert.</string>
     <string name="incognito_keyboard_detail">Bitte deine Tastatur, nicht aus deinen Eingaben in White Noise zu lernen. Deine Tastatur kann diese Bitte ignorieren.</string>
     <string name="require_device_authentication">Geräteauthentifizierung verlangen</string>
     <string name="app_lock_enabled_detail">Beim Zurückkehren zu White Noise die Bildschirmsperre des Geräts verwenden.</string>
@@ -773,7 +780,6 @@
     <string name="toast_no_audit_logs_to_delete">Keine Diagnoseprotokolle zum Löschen vorhanden</string>
     <string name="toast_chat_created">Chat erstellt</string>
     <string name="group_create_stage_creating">Gruppe wird erstellt…</string>
-    <string name="group_create_stage_applying_retention">Verschwindende Nachrichten werden angewendet…</string>
     <string name="toast_notification_permission_denied">Benachrichtigungsberechtigung verweigert</string>
     <string name="toast_signed_out">Abmelden</string>
     <string name="group_title_invite_from">Einladung von %1$s</string>
@@ -1351,7 +1357,6 @@
     <string name="vibration_pattern_android_override">%1$s · Android-Einstellungen</string>
     <string name="chat_muted_badge">Stummgeschaltet</string>
     <string name="collapse_long_messages_subtitle">Zeigt eine Vorschau langer Nachrichten in diesem Chat.</string>
-    <string name="toast_disappearing_not_applied">Die Gruppe wurde erstellt, aber verschwindende Nachrichten konnten nicht aktiviert werden</string>
     <string name="search_members">Mitglieder suchen</string>
     <string name="recent_chats">Letzte Chats</string>
     <string name="onboarding_login">Anmelden</string>

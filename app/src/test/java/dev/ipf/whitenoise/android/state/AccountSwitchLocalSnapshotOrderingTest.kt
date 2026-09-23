@@ -102,7 +102,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val body = setActiveAccountSection()
         val generation = body.indexOf("val requestGeneration = accountSwitchHandoff.beginRequest(label)")
         val preload = body.indexOf("loadAccountSwitchLocalSnapshot(")
-        val preloadCall = body.substring(preload, body.indexOf("\n                    )", startIndex = preload))
+        val preloadCall = body.substring(preload, body.indexOf("\n", startIndex = preload))
         val finalGenerationGuard = body.lastIndexOf("if (!activationAllowed())")
         val guardBody = body.substringAfter("val activationAllowed = {").substringBefore("}")
         assertTrue(
@@ -410,7 +410,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
 
         assertTrue(
             "only ordinary switches may load the broad local snapshot",
-            "includePresentationSeeds = preloadPlan.includePresentationSeeds" in body,
+            "loadAccountSwitchLocalSnapshot(label, requestGeneration, preloadPlan)" in body,
         )
         assertTrue(
             "broad account preload must be inside the policy-controlled branch",
@@ -448,16 +448,20 @@ class AccountSwitchLocalSnapshotOrderingTest {
 
         assertTrue("interactive account switches must still preload SQLite chat rows", interactive.loadLocalRows)
         assertFalse(
-            "interactive account switches must skip member/profile presentation reads before activation",
+            "interactive account switches must skip member/direct-peer presentation reads before activation",
             interactive.includePresentationSeeds,
+        )
+        assertTrue(
+            "interactive account switches must still seed the top bar's own avatars (#2155)",
+            interactive.includeTopBarProfileSeeds,
         )
         assertTrue(
             "setActiveAccount must execute the tested preload plan",
             "if (preloadPlan.loadLocalRows)" in setActiveAccount,
         )
         assertTrue(
-            "setActiveAccount must pass the tested presentation decision to the loader",
-            "includePresentationSeeds = preloadPlan.includePresentationSeeds" in setActiveAccount,
+            "setActiveAccount must hand the tested plan itself to the loader",
+            "loadAccountSwitchLocalSnapshot(label, requestGeneration, preloadPlan)" in setActiveAccount,
         )
         assertTrue(
             "the Settings selector must use the interactive local-row boundary",
@@ -469,8 +473,9 @@ class AccountSwitchLocalSnapshotOrderingTest {
         )
     }
 
+    /** A rejected activation preloads nothing at all, whichever policy asked for it. */
     @Test
-    fun accountSwitchPreloadPlanPinsEveryPolicyBoundary() {
+    fun rejectedActivationPreloadsNothingForAnyPolicy() {
         AccountSwitchPreloadPolicy.entries.forEach { policy ->
             val inactive = accountSwitchPreloadPlan(true, false, policy)
             assertFalse("a rejected activation must not preload rows for $policy", inactive.loadLocalRows)
@@ -478,8 +483,16 @@ class AccountSwitchLocalSnapshotOrderingTest {
                 "a rejected activation must not preload presentation for $policy",
                 inactive.includePresentationSeeds,
             )
+            assertFalse(
+                "a rejected activation must not preload top-bar profiles for $policy",
+                inactive.includeTopBarProfileSeeds,
+            )
         }
+    }
 
+    /** Every policy's row, presentation and top-bar seed decisions are pinned in one place. */
+    @Test
+    fun accountSwitchPreloadPlanPinsEveryPolicyBoundary() {
         val sameInteractive =
             accountSwitchPreloadPlan(
                 switchingAccounts = false,
@@ -488,6 +501,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
             )
         assertFalse(sameInteractive.loadLocalRows)
         assertFalse(sameInteractive.includePresentationSeeds)
+        assertFalse(sameInteractive.includeTopBarProfileSeeds)
 
         val sameFull =
             accountSwitchPreloadPlan(
@@ -497,6 +511,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
             )
         assertFalse(sameFull.loadLocalRows)
         assertFalse(sameFull.includePresentationSeeds)
+        assertFalse(sameFull.includeTopBarProfileSeeds)
 
         val conversationFirst =
             accountSwitchPreloadPlan(
@@ -506,6 +521,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
             )
         assertFalse(conversationFirst.loadLocalRows)
         assertFalse(conversationFirst.includePresentationSeeds)
+        assertFalse(conversationFirst.includeTopBarProfileSeeds)
 
         val startup =
             accountSwitchPreloadPlan(
@@ -515,6 +531,10 @@ class AccountSwitchLocalSnapshotOrderingTest {
             )
         assertTrue(startup.loadLocalRows)
         assertFalse(startup.includePresentationSeeds)
+        assertFalse(
+            "startup restoration has no previous account to switch away from",
+            startup.includeTopBarProfileSeeds,
+        )
 
         val full =
             accountSwitchPreloadPlan(
@@ -524,6 +544,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
             )
         assertTrue(full.loadLocalRows)
         assertTrue(full.includePresentationSeeds)
+        assertTrue(full.includeTopBarProfileSeeds)
     }
 
     /** Selector dismisses at activation boundary instead of awaiting post switch work. */

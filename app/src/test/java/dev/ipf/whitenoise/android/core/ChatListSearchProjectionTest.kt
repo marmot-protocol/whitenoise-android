@@ -98,6 +98,77 @@ class ChatListSearchProjectionTest {
             assertTrue(sections.messages.isEmpty())
         }
 
+    /** Full copied MLS and Nostr identifiers stay in Groups before and after body-search completion. */
+    @Test
+    fun copiedGroupIdentifiersRemainStableGroupResults() {
+        val mlsId = "0123456789abcdef".repeat(4)
+        val nostrId = "fedcba9876543210".repeat(4)
+        val candidates =
+            listOf(
+                candidate("other", "a".repeat(64)),
+                candidate("matched", mlsId, nostrGroupId = nostrId),
+            )
+
+        listOf(mlsId, nostrId, "  ${nostrId.uppercase()}  ").forEach { query ->
+            val immediate = projectChatListSearchCandidates(candidates, rawQuery = query)
+            val afterBodySearch =
+                projectChatListSearchCandidates(
+                    candidates,
+                    rawQuery = query,
+                    bodyMatchGroupIds = setOf("a".repeat(64), mlsId),
+                    messageOnly = true,
+                )
+
+            assertEquals(listOf("matched"), immediate.groups)
+            assertEquals(listOf("matched"), afterBodySearch.groups)
+            assertEquals(listOf("other"), afterBodySearch.messages)
+        }
+    }
+
+    /** Identifier classification wins when the copied id is also visible in a title or message preview. */
+    @Test
+    fun copiedIdentifierWinsOverMatchingTextDuringMessageOnlySearch() {
+        val titleId = "0123456789abcdef".repeat(4)
+        val previewId = "fedcba9876543210".repeat(4)
+        val candidates =
+            listOf(
+                candidate("title", titleId, title = "Group $titleId"),
+                candidate("preview", previewId, preview = "Shared $previewId"),
+            )
+
+        listOf(titleId to "title", previewId to "preview").forEach { (query, expected) ->
+            val sections =
+                projectChatListSearchCandidates(
+                    candidates = candidates,
+                    rawQuery = query,
+                    bodyMatchGroupIds = setOf(titleId, previewId),
+                    messageOnly = true,
+                )
+
+            assertEquals(listOf(expected), sections.groups)
+            assertEquals(listOf(if (expected == "title") "preview" else "title"), sections.messages)
+        }
+    }
+
+    /** Identifier prefixes start at eight hexadecimal characters without turning ordinary hex words into ids. */
+    @Test
+    fun groupIdentifierPrefixUsesTheMinimumBoundary() {
+        val id = "abcdef0123456789".repeat(4)
+        val candidates = listOf(candidate("matched", id))
+
+        assertEquals(
+            listOf("matched"),
+            projectChatListSearchCandidates(candidates, rawQuery = id.take(GROUP_ID_SEARCH_MIN_LENGTH)).groups,
+        )
+        assertTrue(
+            projectChatListSearchCandidates(candidates, rawQuery = id.take(GROUP_ID_SEARCH_MIN_LENGTH - 1))
+                .groups
+                .isEmpty(),
+        )
+        assertTrue(projectChatListSearchCandidates(candidates, rawQuery = "cafe").groups.isEmpty())
+        assertTrue(projectChatListSearchCandidates(candidates, rawQuery = "abcdef0z").groups.isEmpty())
+    }
+
     private fun withDefaultLocale(
         locale: Locale,
         block: () -> Unit,
@@ -134,13 +205,14 @@ class ChatListSearchProjectionTest {
     private fun candidate(
         value: String,
         groupId: String,
+        nostrGroupId: String = groupId,
         title: String = "Unrelated",
         preview: String = "Nothing here",
         description: String = "",
     ) = ChatListSearchCandidate(
         value = value,
         groupIdHex = groupId,
-        nostrGroupIdHex = groupId,
+        nostrGroupIdHex = nostrGroupId,
         displayTitle = title,
         previewText = preview,
         description = description,

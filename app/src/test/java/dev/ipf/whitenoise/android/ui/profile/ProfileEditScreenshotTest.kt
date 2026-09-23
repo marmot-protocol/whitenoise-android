@@ -48,6 +48,14 @@ class ProfileEditScreenshotTest {
     /** Editing reveals the separate image-source controls and pinned Save. */
     @Test fun profileEditingLight() = capture("profile_editing_light", editing = true)
 
+    /** Settings-avatar entry opens the existing picture source menu without committing a draft. */
+    @Test
+    fun profilePictureActionsDirectEntry() =
+        capture(
+            file = "profile_picture_actions_direct_entry",
+            directPictureActions = true,
+        )
+
     /** Edit and Suggest name use light action text against the dark form surfaces. */
     @Test fun profileEditingDark() = capture("profile_editing_dark", editing = true, dark = true)
 
@@ -79,6 +87,11 @@ class ProfileEditScreenshotTest {
     @Config(qualifiers = "en-rUS-w360dp-h780dp-xxhdpi")
     fun profileAmoledXxhdpi() = capture("profile_read_amoled_xxhdpi", dark = true, amoled = true)
 
+    /** A 3x-density banner keeps its 2:1 crop and its own bounded first cached frame (#2762). */
+    @Test
+    @Config(qualifiers = "en-rUS-w360dp-h780dp-xxhdpi")
+    fun profileBannerXxhdpi() = capture("profile_banner_xxhdpi", images = true)
+
     /** Records a single current profile frame; image metadata never triggers a network request. */
     @Suppress("LongMethod") // A single frame installs the full profile presentation fixture.
     private fun capture(
@@ -91,6 +104,7 @@ class ProfileEditScreenshotTest {
         invalid: Boolean = false,
         images: Boolean = false,
         suggest: Boolean = false,
+        directPictureActions: Boolean = false,
     ) {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val account = "0101010101010101010101010101010101010101010101010101010101010101"
@@ -107,13 +121,12 @@ class ProfileEditScreenshotTest {
                         eraseColor(android.graphics.Color.rgb(127, 174, 149))
                     }.asImageBitmap(),
             )
-            AvatarImageLoader.putCached(
+            // Banners are cached under their own decode target now (#2762), so the
+            // first frame is seeded at the width this device actually draws.
+            AvatarImageLoader.putCachedBanner(
                 banner,
-                Bitmap
-                    .createBitmap(240, 120, Bitmap.Config.ARGB_8888)
-                    .apply {
-                        eraseColor(android.graphics.Color.rgb(130, 158, 181))
-                    }.asImageBitmap(),
+                context.resources.displayMetrics.widthPixels,
+                stripedBannerBitmap(context.resources.displayMetrics.widthPixels),
             )
         }
         val cached =
@@ -138,6 +151,7 @@ class ProfileEditScreenshotTest {
                         { true },
                         resolveAddress = { account },
                         resolveLightning = { true },
+                        openPictureActionsOnEntry = directPictureActions,
                     )
                 }
             }
@@ -157,6 +171,26 @@ class ProfileEditScreenshotTest {
         }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$file.png")
     }
+}
+
+/**
+ * A striped 2:1 banner [widthPx] wide.
+ *
+ * Fine vertical detail at the real decode target is what an avatar-sized entry could not carry, so
+ * the recorded frame changes visibly if the banner ever falls back to the 512px cap.
+ */
+private fun stripedBannerBitmap(widthPx: Int): androidx.compose.ui.graphics.ImageBitmap {
+    val width = widthPx.coerceAtLeast(2)
+    val bitmap = Bitmap.createBitmap(width, width / 2, Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(bitmap)
+    canvas.drawColor(android.graphics.Color.rgb(130, 158, 181))
+    val paint = android.graphics.Paint().apply { color = android.graphics.Color.rgb(31, 48, 66) }
+    var x = 0
+    while (x < width) {
+        canvas.drawRect(x.toFloat(), 0f, (x + 8).toFloat(), (width / 2).toFloat(), paint)
+        x += 16
+    }
+    return bitmap.asImageBitmap()
 }
 
 /** An engine that only answers the pseudonym draw, so the suggested name is deterministic in the frame. */

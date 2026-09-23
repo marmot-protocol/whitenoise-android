@@ -45,6 +45,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -95,6 +96,8 @@ internal fun ProfileEditContent(
     hasAccount: Boolean,
     editing: Boolean,
     ready: Boolean,
+    imageActionsReady: Boolean = ready,
+    openPictureActionsOnEntry: Boolean = false,
     busy: Boolean,
     pictureUrl: String?,
     bannerUrl: String?,
@@ -124,6 +127,7 @@ internal fun ProfileEditContent(
     onOpenBanner: () -> Unit,
     onPickImage: (ProfileImageTarget, Uri) -> Unit,
     onRemoveImage: (ProfileImageTarget) -> Unit,
+    onPictureActionsOpened: () -> Unit = {},
 ) {
     SettingsScaffold(
         title = stringResource(R.string.profile),
@@ -173,7 +177,7 @@ internal fun ProfileEditContent(
                     seed,
                     ProfileImageTarget.Banner,
                     bannerPresent,
-                    !busy && !bannerUploading,
+                    imageActionsReady && !busy && !bannerUploading,
                     bannerUploading,
                     onPickImage,
                     onEditBanner,
@@ -211,11 +215,13 @@ internal fun ProfileEditContent(
                     seed,
                     ProfileImageTarget.Picture,
                     picturePresent,
-                    !busy && !pictureUploading,
+                    imageActionsReady && !busy && !pictureUploading,
                     pictureUploading,
                     onPickImage,
                     onEditPicture,
                     onRemoveImage,
+                    expandOnEntry = openPictureActionsOnEntry,
+                    onEntryExpanded = onPictureActionsOpened,
                 )
                 if (!pictureValid) {
                     Text(
@@ -384,10 +390,13 @@ internal fun ProfileBanner(
     onOpen: () -> Unit,
     enabled: Boolean,
 ) {
-    var bitmap by remember(url) { mutableStateOf(AvatarImageLoader.peek(url)) }
-    var loaded by remember(url) { mutableStateOf(bitmap != null) }
-    LaunchedEffect(url) {
-        if (bitmap == null) bitmap = AvatarImageLoader.load(url)
+    // Same bounded banner decode as the other profile-settings banner surface,
+    // so sharpness never depends on which one the tester reached (#2762).
+    val targetWidthPx = profileBannerTargetWidthPx(LocalConfiguration.current.screenWidthDp.dp)
+    var bitmap by remember(url, targetWidthPx) { mutableStateOf(AvatarImageLoader.peekBanner(url, targetWidthPx)) }
+    var loaded by remember(url, targetWidthPx) { mutableStateOf(bitmap != null) }
+    LaunchedEffect(url, targetWidthPx) {
+        if (bitmap == null) bitmap = AvatarImageLoader.loadBanner(url, targetWidthPx)
         loaded = true
     }
     Surface(
@@ -414,7 +423,10 @@ internal fun ProfileBanner(
     }
 }
 
-/** Device selections carry the account identity that opened them; stale activity results never start an upload. */
+/**
+ * Device selections carry the account identity that opened them; stale activity results never start an upload.
+ * A requested entry expansion is acknowledged only after the enabled menu actually opens.
+ */
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList", "CyclomaticComplexMethod")
 @Composable
 internal fun ProfileImageActions(
@@ -426,8 +438,11 @@ internal fun ProfileImageActions(
     onPick: (ProfileImageTarget, Uri) -> Unit,
     onWeb: () -> Unit,
     onRemove: (ProfileImageTarget) -> Unit,
+    expandOnEntry: Boolean = false,
+    onEntryExpanded: () -> Unit = {},
 ) {
     var expanded by remember(owner) { mutableStateOf(false) }
+    var entryExpansionConsumed by remember(owner, target) { mutableStateOf(false) }
     var pickerOwner by remember(owner) { mutableStateOf<String?>(null) }
     var launchFailed by remember(owner) { mutableStateOf(false) }
     val photos =
@@ -443,6 +458,13 @@ internal fun ProfileImageActions(
             if (valid && uri != null) onPick(target, uri)
         }
     val actionTag = if (target == ProfileImageTarget.Banner) "profile.banner_actions" else "profile.photo_actions"
+    LaunchedEffect(expandOnEntry, enabled) {
+        if (expandOnEntry && enabled && !entryExpansionConsumed) {
+            expanded = true
+            entryExpansionConsumed = true
+            onEntryExpanded()
+        }
+    }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box {
             FilledTonalButton(

@@ -20,15 +20,23 @@ import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import dev.ipf.whitenoise.android.core.MessageProjector
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.util.concurrent.ConcurrentLinkedQueue
+import kotlin.coroutines.CoroutineContext
 
 /**
  * Regression for #1849: a full-page [ConversationController.refreshCurrentTimeline]
@@ -38,6 +46,59 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class TimelineFullPageRefreshRaceTest {
+    /** Discarding a stale preparation must leave both live rows and commit callback untouched. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun newerLiveProjectionWinsWhileOlderWindowPreparationIsSuspended() =
+        runTest {
+            val preparationDispatcher = PausedDispatcher()
+            val controller = conversationController(preparationDispatcher)
+            try {
+                var committed = false
+                val staleApply =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        controller.applyTimelinePage(
+                            staleOnlyRefreshPage(),
+                            replaceWindow = true,
+                            updatePagination = true,
+                            onCommitted = { committed = true },
+                        )
+                    }
+
+                assertFalse("window preparation must suspend off the caller", staleApply.isCompleted)
+                applyLiveProjectionDuringRefresh(controller)
+                preparationDispatcher.runPending()
+                advanceUntilIdle()
+
+                assertEquals(emptyList<String>(), staleApply.await())
+                assertFalse("stale preparations must not report a committed page", committed)
+                val timelineIds = controller.timeline.map { it.record.messageIdHex }.toSet()
+                assertTrue(NEW_MESSAGE_ID in timelineIds)
+                assertFalse(OLD_MESSAGE_ID in timelineIds)
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    private class PausedDispatcher : CoroutineDispatcher() {
+        private val pending = ConcurrentLinkedQueue<Runnable>()
+
+        override fun dispatch(
+            context: CoroutineContext,
+            block: Runnable,
+        ) {
+            pending += block
+        }
+
+        /** Resumes the suspended preparation after the live projection has landed. */
+        fun runPending() {
+            while (true) {
+                pending.poll()?.run() ?: return
+            }
+        }
+    }
+
+    /** A stale FFI refresh must preserve a newer stream watcher and its live row. */
     @Test
     fun staleFullPageRefreshDoesNotDropNewerLiveProjectionOrStreamWatcher() =
         runBlocking {
@@ -132,7 +193,8 @@ class TimelineFullPageRefreshRaceTest {
         )
     }
 
-    private fun conversationController(): ConversationController {
+    /** Builds a controller whose preparation dispatcher can be paused at the race boundary. */
+    private fun conversationController(dispatcher: CoroutineDispatcher? = null): ConversationController {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val appState =
             WhiteNoiseAppState(
@@ -153,7 +215,15 @@ class TimelineFullPageRefreshRaceTest {
                     ),
                 activeAccountRef = ACCOUNT_REF,
             )
-        return ConversationController(appState = appState, initialGroup = group())
+        return if (dispatcher == null) {
+            ConversationController(appState = appState, initialGroup = group())
+        } else {
+            ConversationController(
+                appState = appState,
+                initialGroup = group(),
+                windowPreparationDispatcher = dispatcher,
+            )
+        }
     }
 
     private fun group() =

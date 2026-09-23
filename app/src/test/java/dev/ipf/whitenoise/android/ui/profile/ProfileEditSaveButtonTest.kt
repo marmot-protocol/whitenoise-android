@@ -124,6 +124,22 @@ class ProfileEditSaveButtonTest {
         assertEquals(1, backs)
     }
 
+    /** Back consumes a direct picture-menu request even when profile loading has not enabled the menu yet. */
+    @Test
+    fun backBeforePictureActionsAreReadyConsumesDirectEntryRequest() {
+        var consumed = 0
+        show(
+            cached = null,
+            openPictureActionsOnEntry = true,
+            onPictureActionsOpened = { consumed++ },
+        )
+
+        back()
+
+        composeRule.runOnIdle { assertEquals(1, consumed) }
+        composeRule.onNodeWithTag("profile.save").assertDoesNotExist()
+    }
+
     /** Save publishes one captured snapshot, freezes field edits during publication, then returns to read mode. */
     @Test
     fun successfulSaveUsesOneSnapshotAndReturnsToReadMode() {
@@ -311,6 +327,8 @@ class ProfileEditSaveButtonTest {
         load: suspend (String) -> UserProfileMetadataFfi? = { awaitCancellation() },
         publish: suspend (UserProfileMetadataFfi) -> Boolean = { true },
         resolveLightning: suspend (String) -> Boolean = { true },
+        openPictureActionsOnEntry: Boolean = false,
+        onPictureActionsOpened: () -> Unit = {},
     ) {
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -322,6 +340,8 @@ class ProfileEditSaveButtonTest {
                     publish,
                     resolveAddress = { null },
                     resolveLightning = resolveLightning,
+                    openPictureActionsOnEntry = openPictureActionsOnEntry,
+                    onPictureActionsOpened = onPictureActionsOpened,
                 )
             }
         }

@@ -7,6 +7,7 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -33,6 +34,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -379,11 +381,20 @@ internal fun SettingsScreen(
     // hand control to the chats list (mirroring the top-bar back arrow).
     settingsBackHandler(appState.signOutInProgress, detail, onBackToChats, onDetailChange)
 
+    var openProfilePictureActions by
+        rememberSaveable(appState.activeAccountRef) { mutableStateOf(false) }
     if (detail == null) {
         SettingsHomeScreen(
             appState = appState,
             onBackToChats = onBackToChats,
-            onOpenDetail = { onDetailChange(it) },
+            onOpenDetail = {
+                if (it == SettingsDetail.Profile) openProfilePictureActions = false
+                onDetailChange(it)
+            },
+            onOpenProfilePictureActions = {
+                openProfilePictureActions = true
+                onDetailChange(SettingsDetail.Profile)
+            },
             viewport = homeViewport,
             onViewportChange = onHomeViewportChange,
         )
@@ -395,6 +406,12 @@ internal fun SettingsScreen(
         onOpenSupportChat = onOpenSupportChat,
         onOpenDiagnostics = onOpenDiagnostics,
         onDetailChange = onDetailChange,
+        openProfilePictureActionsOnEntry = openProfilePictureActions,
+        onProfilePictureActionsOpened = { openProfilePictureActions = false },
+        onProfileBack = {
+            openProfilePictureActions = false
+            onDetailChange(null)
+        },
     )
 }
 
@@ -407,6 +424,9 @@ private fun SettingsDetailRoute(
     onOpenSupportChat: (ChatListItem) -> Unit,
     onOpenDiagnostics: () -> Unit,
     onDetailChange: (SettingsDetail?) -> Unit,
+    openProfilePictureActionsOnEntry: Boolean,
+    onProfilePictureActionsOpened: () -> Unit,
+    onProfileBack: () -> Unit,
 ) {
     when (detail) {
         SettingsDetail.ShareConnect -> ShareConnectScreen(appState, onBack = { onDetailChange(null) })
@@ -424,7 +444,13 @@ private fun SettingsDetailRoute(
             ChatBubbleColorsScreen(appState, onBack = { onDetailChange(SettingsDetail.Appearance) })
         SettingsDetail.Language -> LanguageScreen(appState, onBack = { onDetailChange(SettingsDetail.Appearance) })
         SettingsDetail.Data -> DataUsageScreen(appState, onBack = { onDetailChange(null) })
-        SettingsDetail.Profile -> ProfileEditScreen(appState, onBack = { onDetailChange(null) })
+        SettingsDetail.Profile ->
+            ProfileEditScreen(
+                appState = appState,
+                onBack = onProfileBack,
+                openPictureActionsOnEntry = openProfilePictureActionsOnEntry,
+                onPictureActionsOpened = onProfilePictureActionsOpened,
+            )
         SettingsDetail.AccountKeys -> AccountKeysScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Relays -> RelaysScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Support ->
@@ -498,6 +524,7 @@ private fun SettingsHomeScreen(
     appState: WhiteNoiseAppState,
     onBackToChats: () -> Unit,
     onOpenDetail: (SettingsDetail) -> Unit,
+    onOpenProfilePictureActions: () -> Unit,
     viewport: SettingsHomeViewport,
     onViewportChange: (SettingsHomeViewport) -> Unit,
 ) {
@@ -540,6 +567,7 @@ private fun SettingsHomeScreen(
         versionName = BuildConfig.VERSION_NAME,
         onBack = { whenIdle(onBackToChats) },
         onOpenShareConnect = { whenIdle { onOpenDetail(SettingsDetail.ShareConnect) } },
+        onOpenProfilePictureActions = { whenIdle(onOpenProfilePictureActions) },
         onAddProfile = { whenIdle { showAddIdentity = true } },
         onSwitchProfile = { whenIdle { showAccountSelector = true } },
         onOpenDetail = { detail -> whenIdle { onOpenDetail(detail) } },
@@ -604,6 +632,7 @@ internal fun SettingsHomeContent(
     versionName: String,
     onBack: () -> Unit,
     onOpenShareConnect: () -> Unit,
+    onOpenProfilePictureActions: () -> Unit = {},
     onAddProfile: () -> Unit,
     onSwitchProfile: () -> Unit,
     onOpenDetail: (SettingsDetail) -> Unit,
@@ -651,6 +680,7 @@ internal fun SettingsHomeContent(
                                     account = it,
                                     profileCount = profileCount,
                                     onOpenShareConnect = onOpenShareConnect,
+                                    onOpenProfilePictureActions = onOpenProfilePictureActions,
                                     onAddProfile = onAddProfile,
                                     onSwitchProfile = onSwitchProfile,
                                 )
@@ -682,12 +712,15 @@ private fun SettingsProfileHeader(
     account: SettingsHomeAccount,
     profileCount: Int,
     onOpenShareConnect: () -> Unit,
+    onOpenProfilePictureActions: () -> Unit,
     onAddProfile: () -> Unit,
     onSwitchProfile: () -> Unit,
 ) {
     Column(Modifier.padding(vertical = WhiteNoiseSpacing.Related).testTag("settings.profile_group")) {
         SettingsGroup {
-            row("profile") { context -> SettingsProfileRow(context, account, onOpenShareConnect) }
+            row("profile") { context ->
+                SettingsProfileRow(context, account, onOpenShareConnect, onOpenProfilePictureActions)
+            }
             if (profileCount == 1) {
                 row("add_profile") { context ->
                     SettingsAction(
@@ -726,8 +759,10 @@ private fun SettingsProfileRow(
     context: SettingsRowContext,
     account: SettingsHomeAccount,
     onClick: () -> Unit,
+    onAvatarClick: () -> Unit,
 ) {
     val shareDescription = stringResource(R.string.settings_open_share_connect_for, account.title)
+    val editPictureDescription = stringResource(R.string.profile_picture_edit)
     Surface(
         color = context.containerColor,
         shape = context.shapes.shape,
@@ -751,12 +786,24 @@ private fun SettingsProfileRow(
                 )
             },
             leadingContent = {
-                Avatar(
-                    title = account.title,
-                    seed = account.seed,
-                    size = SettingsHomeDefaults.ProfileAvatarSize,
-                    pictureUrl = account.pictureUrl,
-                )
+                Box(
+                    modifier =
+                        Modifier
+                            .size(SettingsHomeDefaults.ProfileAvatarSize)
+                            .clickable(role = Role.Button, onClick = onAvatarClick)
+                            .testTag("settings.active_profile_avatar")
+                            .semantics {
+                                contentDescription = editPictureDescription
+                                role = Role.Button
+                            },
+                ) {
+                    Avatar(
+                        title = account.title,
+                        seed = account.seed,
+                        size = SettingsHomeDefaults.ProfileAvatarSize,
+                        pictureUrl = account.pictureUrl,
+                    )
+                }
             },
             trailingContent = { SettingsProfileTrailing() },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -765,7 +812,7 @@ private fun SettingsProfileRow(
                     .fillMaxWidth()
                     .clickable(onClick = onClick)
                     .testTag("settings.active_profile")
-                    .semantics(mergeDescendants = true) {
+                    .semantics {
                         contentDescription = shareDescription
                         role = Role.Button
                     },

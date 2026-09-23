@@ -186,6 +186,8 @@
     <string name="profile_unfollow">Eliminar contacto</string>
     <string name="profile_block">Bloquear</string>
     <string name="profile_unblock">Desbloquear</string>
+    <string name="profile_mute_in_group">Silenciar en este grupo</string>
+    <string name="profile_unmute_in_group">Reactivar en este grupo</string>
     <string name="blocked_users">Personas bloqueadas</string>
     <string name="blocked_users_empty">No has bloqueado a nadie.</string>
     <string name="blocked_users_detail">Las personas bloqueadas no pueden escribirte directamente. Los grupos compartidos siguen funcionando y su historial se conserva en este dispositivo.</string>
@@ -316,6 +318,7 @@
     <string name="stream_finished">Flujo finalizado</string>
     <string name="media_attachment">Archivo multimedia adjunto</string>
     <string name="generic_message">Mensaje</string>
+    <string name="giphy_media_preview">GIF vía GIPHY</string>
     <string name="waiting_for_stream">Esperando el flujo...</string>
     <string name="stream_failed_format">Error en el flujo: %1$s</string>
     <string name="copy_text">Copiar texto</string>
@@ -448,6 +451,10 @@
     <string name="delete_audit_logs">Borrar registros de diagnóstico</string>
     <string name="delete_audit_logs_subtitle">Elimina los registros de este dispositivo. Las copias ya subidas y tu preferencia de compartir no cambian.</string>
     <string name="device_protection">Protección del dispositivo</string>
+    <string name="message_privacy">Privacidad de los mensajes</string>
+    <string name="default_disappearing_messages">Mensajes temporales predeterminados</string>
+    <string name="default_disappearing_messages_detail">Se usa cuando este perfil inicia un chat o grupo nuevo. Cada conversación se puede cambiar después.</string>
+    <string name="default_disappearing_messages_picker_detail">Elige cuánto tiempo deben permanecer los mensajes nuevos en los chats y grupos que cree este perfil. Esto no cambia las conversaciones existentes.</string>
     <string name="incognito_keyboard_detail">Pide a tu teclado que no aprenda de lo que escribes en White Noise. Tu teclado puede ignorar esta solicitud.</string>
     <string name="require_device_authentication">Requerir autenticación del dispositivo</string>
     <string name="app_lock_enabled_detail">Usa el bloqueo de pantalla del dispositivo al volver a White Noise.</string>
@@ -773,7 +780,6 @@
     <string name="toast_no_audit_logs_to_delete">No hay registros de diagnóstico para borrar</string>
     <string name="toast_chat_created">Chat creado</string>
     <string name="group_create_stage_creating">Creando grupo…</string>
-    <string name="group_create_stage_applying_retention">Aplicando mensajes temporales…</string>
     <string name="toast_notification_permission_denied">Permiso de notificación denegado</string>
     <string name="toast_signed_out">Cerrar sesión</string>
     <string name="group_title_invite_from">Invitación de %1$s</string>
@@ -1353,7 +1359,6 @@
     <string name="vibration_pattern_android_override">%1$s · Ajustes de Android</string>
     <string name="chat_muted_badge">Silenciado</string>
     <string name="collapse_long_messages_subtitle">Muestra una vista previa de los mensajes largos en este chat.</string>
-    <string name="toast_disappearing_not_applied">El grupo se creó, pero no se pudieron activar los mensajes temporales</string>
     <string name="search_members">Buscar miembros</string>
     <string name="recent_chats">Chats recientes</string>
     <string name="onboarding_login">Iniciar sesión</string>

@@ -178,6 +178,8 @@
     <string name="profile_unfollow">移除聯絡人</string>
     <string name="profile_block">封鎖</string>
     <string name="profile_unblock">解除封鎖</string>
+    <string name="profile_mute_in_group">在此群組中靜音</string>
+    <string name="profile_unmute_in_group">取消在此群組中的靜音</string>
     <string name="blocked_users">已封鎖的使用者</string>
     <string name="blocked_users_empty">你尚未封鎖任何人。</string>
     <string name="blocked_users_detail">被封鎖的使用者無法直接傳訊息給你。共同的群組仍可正常使用，歷史紀錄會保留在此裝置上。</string>
@@ -308,6 +310,7 @@
     <string name="stream_finished">串流已結束</string>
     <string name="media_attachment">媒體附件</string>
     <string name="generic_message">訊息</string>
+    <string name="giphy_media_preview">來自 GIPHY 的 GIF</string>
     <string name="waiting_for_stream">正在等待串流...</string>
     <string name="stream_failed_format">串流失敗：%1$s</string>
     <string name="copy_text">複製文字</string>
@@ -437,6 +440,10 @@
     <string name="delete_audit_logs">清除診斷日誌</string>
     <string name="delete_audit_logs_subtitle">從此裝置刪除日誌。已上傳的副本和你的分享設定維持不變。</string>
     <string name="device_protection">裝置保護</string>
+    <string name="message_privacy">訊息隱私</string>
+    <string name="default_disappearing_messages">預設閱後即焚訊息</string>
+    <string name="default_disappearing_messages_detail">當此個人檔案開始新聊天或建立新群組時使用。之後可分別更改每個對話。</string>
+    <string name="default_disappearing_messages_picker_detail">選擇此個人檔案建立的聊天和群組中新訊息的保留時間。現有對話不會改變。</string>
     <string name="incognito_keyboard_detail">要求鍵盤不要學習你在 White Noise 中輸入的內容。鍵盤可能會忽略此請求。</string>
     <string name="require_device_authentication">需要裝置身分驗證</string>
     <string name="app_lock_enabled_detail">返回 White Noise 時使用裝置螢幕鎖定。</string>
@@ -762,7 +769,6 @@
     <string name="toast_no_audit_logs_to_delete">沒有可清除的診斷日誌</string>
     <string name="toast_chat_created">聊天已建立</string>
     <string name="group_create_stage_creating">正在建立群組…</string>
-    <string name="group_create_stage_applying_retention">正在套用閱後即焚…</string>
     <string name="toast_notification_permission_denied">通知權限被拒絕</string>
     <string name="toast_signed_out">登出</string>
     <string name="group_title_invite_from">來自 %1$s 的邀請</string>
@@ -1329,7 +1335,6 @@
     <string name="vibration_pattern_android_override">%1$s · Android 設定</string>
     <string name="chat_muted_badge">已靜音</string>
     <string name="collapse_long_messages_subtitle">在此聊天中顯示長訊息的預覽。</string>
-    <string name="toast_disappearing_not_applied">群組已建立，但無法開啟閱後即焚訊息</string>
     <string name="search_members">搜尋成員</string>
     <string name="recent_chats">最近的聊天</string>
     <string name="onboarding_login">登入</string>
