@@ -472,6 +472,15 @@
     <string name="developer_mode">Entwicklermodus</string>
     <string name="developer_mode_subtitle">Zeigt Diagnosen und MLS-Interna an.</string>
     <string name="developer_testing_only">Nur für Entwicklung und Tests</string>
+    <string name="developer_seed_fixture">Unterhaltungs-Fixture befüllen</string>
+    <string name="developer_seed_fixture_subtitle">Synthetische Nachrichten in einen Chat senden, für Paging-Benchmarks</string>
+    <string name="seed_fixture_title">Unterhaltungs-Fixture befüllen</string>
+    <string name="seed_fixture_detail">Sendet nummerierte synthetische Nachrichten als echte Nachrichten dieses Kontos in den gewählten Chat. Verwende eine private Testgruppe; alle anderen Mitglieder erhalten jede einzelne.</string>
+    <string name="seed_fixture_count">Anzahl zu sendender Nachrichten</string>
+    <string name="seed_fixture_start">Starten</string>
+    <string name="seed_fixture_progress">%1$d von %2$d gesendet · %3$d fehlgeschlagen</string>
+    <string name="seed_fixture_no_groups">Dieses Konto hat keine Chats zum Befüllen.</string>
+    <string name="seed_fixture_stopped">Gestoppt · %1$d von %2$d gesendet</string>
     <string name="developer_testing_only_detail">Diese Werkzeuge können technische Informationen offenlegen und das Verhalten der App verändern.</string>
     <string name="developer_debugging">Fehlersuche</string>
     <string name="diagnostics">Diagnose</string>

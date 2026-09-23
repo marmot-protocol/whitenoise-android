@@ -472,6 +472,15 @@
     <string name="developer_mode">Modo desarrollador</string>
     <string name="developer_mode_subtitle">Muestra diagnósticos y elementos internos de MLS.</string>
     <string name="developer_testing_only">Solo para desarrollo y pruebas</string>
+    <string name="developer_seed_fixture">Rellenar conversación de prueba</string>
+    <string name="developer_seed_fixture_subtitle">Enviar mensajes sintéticos a un chat para pruebas de paginación</string>
+    <string name="seed_fixture_title">Rellenar conversación de prueba</string>
+    <string name="seed_fixture_detail">Envía mensajes sintéticos numerados al chat elegido como mensajes reales desde esta cuenta. Usa un grupo de prueba privado; los demás miembros recibirán cada uno de ellos.</string>
+    <string name="seed_fixture_count">Mensajes a enviar</string>
+    <string name="seed_fixture_start">Iniciar</string>
+    <string name="seed_fixture_progress">%1$d de %2$d enviados · %3$d fallidos</string>
+    <string name="seed_fixture_no_groups">Esta cuenta no tiene chats que rellenar.</string>
+    <string name="seed_fixture_stopped">Detenido · %1$d de %2$d enviados</string>
     <string name="developer_testing_only_detail">Estas herramientas pueden exponer información técnica y cambiar el comportamiento de la aplicación.</string>
     <string name="developer_debugging">Depuración</string>
     <string name="diagnostics">Diagnóstico</string>
