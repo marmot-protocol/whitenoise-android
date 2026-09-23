@@ -83,7 +83,20 @@ class AccountSetupReadOnlyRecoveryTest {
     @Test fun nativeStepRoundTripRequiresFreshDetailNavigation() {
         val state = mutableStateOf(AccountSetupState(snapshot = setupSnapshot()))
         composeRule.setContent {
-            WhiteNoiseTheme { AccountSetupContent(state.value, {}, { _, _, _ -> }, {}, {}, {}, {}, {}, {}, { "Quiet Otter" }) }
+            WhiteNoiseTheme {
+                AccountSetupContent(
+                    state.value,
+                    {},
+                    { _, _, _ -> },
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    { "Quiet Otter" },
+                )
+            }
         }
         composeRule.onNodeWithTag("setup-step-PROFILE").performScrollTo().performClick()
         composeRule.onNodeWithTag("setup-action-CONTINUE_WITHOUT").assertExists()

@@ -127,7 +127,13 @@ internal fun AccountSetupContent(
             }
         } else {
             when {
-                state.editor != null -> SetupEditorContent(state.editor, checkNotNull(editorFields), state.busy, randomName)
+                state.editor != null ->
+                    SetupEditorContent(
+                        state.editor,
+                        checkNotNull(editorFields),
+                        state.busy,
+                        randomName,
+                    )
                 state.busy || state.snapshot == null -> SetupProgress(state.snapshot?.ready == true)
                 state.optionalMetadataPending -> {
                     if (!state.error && !state.disconnected && !state.staleDecision) SetupProgress()
@@ -277,6 +283,17 @@ internal val setupEditorActions =
 @Composable
 private fun AccountSetupPreview() {
     WhiteNoiseTheme {
-        AccountSetupContent(AccountSetupState(busy = true), {}, { _, _, _ -> }, {}, {}, {}, {}, {}, {}, { "Quiet Otter" })
+        AccountSetupContent(
+            AccountSetupState(busy = true),
+            {},
+            { _, _, _ -> },
+            {},
+            {},
+            {},
+            {},
+            {},
+            {},
+            { "Quiet Otter" },
+        )
     }
 }
