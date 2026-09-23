@@ -62,6 +62,7 @@ import dev.ipf.whitenoise.android.state.awaitOpenedTimelineSubscriptionsClosed
 import dev.ipf.whitenoise.android.state.conversationTimelineReconnectFixtures
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
 import dev.ipf.whitenoise.android.state.notificationChatListRow
+import dev.ipf.whitenoise.android.state.shouldPostNotification
 import dev.ipf.whitenoise.android.state.timelineMessageIds
 import dev.ipf.whitenoise.android.state.timelinePage
 import dev.ipf.whitenoise.android.state.timelineRecord
@@ -1074,16 +1075,7 @@ abstract class NotificationRouteTimelinePresentationFixture {
     protected fun WhiteNoiseAppState.shouldPostIncomingTargetNotification(
         accountRef: String = TARGET_ACCOUNT,
         accountIdHex: String = TARGET_ACCOUNT_ID,
-    ): Boolean {
-        val method =
-            WhiteNoiseAppState::class.java
-                .getDeclaredMethod(
-                    "shouldPostNotification",
-                    NotificationUpdateFfi::class.java,
-                    Boolean::class.javaPrimitiveType!!,
-                ).apply { isAccessible = true }
-        return method.invoke(this, targetNotificationUpdate(accountRef, accountIdHex), false) as Boolean
-    }
+    ): Boolean = shouldPostNotification(targetNotificationUpdate(accountRef, accountIdHex), engineMuted = false)
 
     /** Creates one ordinary incoming update for the exact notification-routed account and group. */
     private fun targetNotificationUpdate(

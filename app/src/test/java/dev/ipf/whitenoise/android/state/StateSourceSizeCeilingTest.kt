@@ -44,13 +44,13 @@ class StateSourceSizeCeilingTest {
         // same-package files. Raised to the exact post-#2431 size for its covered
         // chat-list convergence and notification-open fixes; keep this ratchet exact.
         // PR #2792 adds covered token-bound send admission and cancellation arbitration;
-        // the current base also adds group-recovery status handling. Exact Play/Zapstore
-        // unit tests and Kover run in required CI. PR #2798 adds 19 net lines for
-        // off-main window application after the current base (13,126 lines).
-        // Its green head covered 4,787 / 6,614 controller lines in Kover.
-        // Commit-time index revalidation adds nine lines while preserving that work;
-        // exact-head CI rechecks coverage. Keep this merged-source ratchet exact.
-        const val CONTROLLERS_MAX_LINES = 13154
+        // the current base also adds group-recovery status handling. The pending-video
+        // poster fix (#2732) adds 13 covered lines for attachment-aware thumbnail
+        // reconciliation on top of that. PR #2798 adds 28 net lines for off-main
+        // window application and commit-time index revalidation. Its prior green
+        // head covered 4,787 / 6,614 controller lines in Kover. Exact-head CI
+        // rechecks coverage. Keep this merged-source ratchet exact.
+        const val CONTROLLERS_MAX_LINES = 13167
 
         // Master includes the covered draft lifecycle and host-timing changes. PR #2534
         // adds 38 lines for the async prepared-speech handoff while keeping preparation
