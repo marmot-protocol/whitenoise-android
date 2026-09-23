@@ -4,6 +4,9 @@ import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.whitenoise.android.state.ChatNotifyMode
 
+/** Whether one local account has silenced one member's messages inside one group (#2782). */
+typealias GroupSenderMutePredicate = (accountRef: String, groupIdHex: String, senderIdHex: String) -> Boolean
+
 object LocalNotificationPolicy {
     fun shouldPost(
         update: NotificationUpdateFfi,
@@ -13,6 +16,7 @@ object LocalNotificationPolicy {
         appLockScreenVisible: Boolean,
         conversationNotifyMode: (accountRef: String, groupIdHex: String) -> ChatNotifyMode = { _, _ -> ChatNotifyMode.ALL },
         engineMuted: Boolean = false,
+        senderMutedInGroup: GroupSenderMutePredicate = { _, _, _ -> false },
     ): Boolean {
         if (appLockScreenVisible) return false
         if (
@@ -40,6 +44,7 @@ object LocalNotificationPolicy {
                 ChatNotifyMode.NONE -> return false
             }
         }
+        if (isSenderMutedForUpdate(update, senderMutedInGroup)) return false
 
         // Suppress only the conversation the user is actively viewing — and only
         // for the account that is viewing it. A group is shared by every local
@@ -51,5 +56,22 @@ object LocalNotificationPolicy {
                 activeConversationAccountRef == update.accountRef &&
                 activeConversationGroupIdHex == update.groupIdHex
         )
+    }
+
+    /**
+     * Whether a per-member group mute silences this update.
+     *
+     * Only message-derived triggers can be sender-muted, so a new message, a mention and a reaction
+     * from that member go quiet while membership and admin events — the safety-critical ones — are
+     * never affected. Two things fail open: a DM has no per-member dimension to mute, and an update
+     * whose sender identity is absent is left alone rather than suppressed on someone else's behalf.
+     */
+    private fun isSenderMutedForUpdate(
+        update: NotificationUpdateFfi,
+        senderMutedInGroup: GroupSenderMutePredicate,
+    ): Boolean {
+        if (update.trigger != NotificationTriggerFfi.NEW_MESSAGE || update.isDm) return false
+        val senderIdHex = update.sender.accountIdHex.trim()
+        return senderIdHex.isNotEmpty() && senderMutedInGroup(update.accountRef, update.groupIdHex, senderIdHex)
     }
 }

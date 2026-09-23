@@ -178,6 +178,8 @@
     <string name="profile_unfollow">移除聯絡人</string>
     <string name="profile_block">封鎖</string>
     <string name="profile_unblock">解除封鎖</string>
+    <string name="profile_mute_in_group">在此群組中靜音</string>
+    <string name="profile_unmute_in_group">取消在此群組中的靜音</string>
     <string name="blocked_users">已封鎖的使用者</string>
     <string name="blocked_users_empty">你尚未封鎖任何人。</string>
     <string name="blocked_users_detail">被封鎖的使用者無法直接傳訊息給你。共同的群組仍可正常使用，歷史紀錄會保留在此裝置上。</string>

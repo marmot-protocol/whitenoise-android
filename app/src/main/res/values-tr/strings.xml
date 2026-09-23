@@ -186,6 +186,8 @@
     <string name="profile_unfollow">Kişiyi kaldır</string>
     <string name="profile_block">Engelle</string>
     <string name="profile_unblock">Engeli kaldır</string>
+    <string name="profile_mute_in_group">Bu grupta sessize al</string>
+    <string name="profile_unmute_in_group">Bu grupta sesi aç</string>
     <string name="blocked_users">Engellenen kişiler</string>
     <string name="blocked_users_empty">Kimseyi engellemediniz.</string>
     <string name="blocked_users_detail">Engellenen kişiler size doğrudan mesaj gönderemez. Ortak gruplarınız çalışmaya devam eder ve geçmiş bu cihazda kalır.</string>

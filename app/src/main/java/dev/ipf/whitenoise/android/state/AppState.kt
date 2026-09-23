@@ -116,7 +116,6 @@ import dev.ipf.whitenoise.android.notifications.ConversationNotificationRouting
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPattern
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPreferences
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
-import dev.ipf.whitenoise.android.notifications.LocalNotificationPolicy
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
 import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.NotificationChannels
@@ -1157,7 +1156,7 @@ class WhiteNoiseAppState private constructor(
         initialActiveAccountRef = activeAccountRef,
     )
 
-    private val appContext = context.applicationContext
+    internal val appContext = context.applicationContext
     private val preferences = preferencesOverride ?: appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
     internal val conversationDictationPreferences = ConversationDictationPreferences(appContext)
     internal val microphoneCaptureCoordinator = MicrophoneCaptureCoordinator()
@@ -2367,7 +2366,7 @@ class WhiteNoiseAppState private constructor(
     private val notificationAvatarCoordinator by lazy {
         NotificationAvatarCoordinator(
             appLocked = { appLockScreenVisible },
-            shouldPost = ::shouldPostNotification,
+            shouldPost = this::shouldPostNotification,
             canPost = localNotificationPresenter::canPostNotifications,
             senderAvatarUrl = { update -> notificationSenderAvatarUrl(update, ::loadUserProfile) },
             groupAvatarUrl = { update ->
@@ -2432,11 +2431,11 @@ class WhiteNoiseAppState private constructor(
         suppression = next
     }
 
-    private val appInForeground: Boolean
+    internal val appInForeground: Boolean
         get() = suppression.inForeground
-    private val activeConversationGroupIdHex: String?
+    internal val activeConversationGroupIdHex: String?
         get() = suppression.activeConversationGroupIdHex
-    private val activeConversationAccountRef: String?
+    internal val activeConversationAccountRef: String?
         get() = suppression.activeConversationAccountRef
 
     /** Whether the exact dictation origin is the unobscured foreground conversation. */
@@ -5737,6 +5736,7 @@ class WhiteNoiseAppState private constructor(
             clearCrossAccountCaches()
             stopTtsForRemovedAccount(wipedRef)
             clearContactPrivateDetailsForAccount(wipedRef)
+            memberMutePreferences.clearAccount(wipedRef)
             wipeDecryptedMediaFromDisk()
             if (!clearHiddenMessagesForAccount(wipedRef)) {
                 appStateDebug { "hidden-message cleanup failed after wipe account=${wipedRef.take(8)}" }
@@ -5750,13 +5750,20 @@ class WhiteNoiseAppState private constructor(
                     appStateDebug(it) { "editor purge failed after wipe: ${it.readableMessage()}" }
                 }
             }
-            val refreshedAccounts =
+            val refreshedAccountsResult =
                 runCatchingCancellable {
                     marmotIo(MarmotTraceSection.ACCOUNT_LIST) { listAccounts() }
-                }.getOrDefault(emptyList())
+                }
+            val refreshedAccounts = refreshedAccountsResult.getOrDefault(emptyList())
             accountListLifetime.advance {
                 accounts = refreshedAccounts
                 releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
+                // An empty list here can mean "no accounts left" or "the read failed" -- retention
+                // is an allow-list, so only prune member mutes on a genuine successful read. A
+                // transient failure must not wipe every other account's mutes (#2782 follow-up).
+                refreshedAccountsResult.getOrNull()?.let { successfulAccounts ->
+                    retainMemberMutesForAccounts(successfulAccounts.map(AccountSummaryFfi::label))
+                }
             }
             refreshAccountUnreadCounts(refreshedAccounts)
             val next = refreshedAccounts.firstOrNull()?.label
@@ -9443,20 +9450,6 @@ class WhiteNoiseAppState private constructor(
             }.getOrNull()
                 ?.firstOrNull { it.messageIdHex.equals(messageId, ignoreCase = true) }
         }
-
-    private fun shouldPostNotification(
-        update: NotificationUpdateFfi,
-        engineMuted: Boolean,
-    ): Boolean =
-        LocalNotificationPolicy.shouldPost(
-            update = update,
-            appInForeground = appInForeground,
-            activeConversationGroupIdHex = activeConversationGroupIdHex,
-            activeConversationAccountRef = activeConversationAccountRef,
-            appLockScreenVisible = appLockScreenVisible,
-            conversationNotifyMode = chatMutePreferences::mode,
-            engineMuted = engineMuted,
-        )
 
     private fun isNotificationGenerationPostAllowed(
         update: NotificationUpdateFfi,
