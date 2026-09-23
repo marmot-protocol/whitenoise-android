@@ -104,6 +104,7 @@ androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profi
 androidx-test-uiautomator = { group = "androidx.test.uiautomator", name = "uiautomator", version.ref = "uiAutomator" }
 androidx-tracing = { group = "androidx.tracing", name = "tracing", version.ref = "tracing" }
 secp256k1-android = { group = "fr.acinq.secp256k1", name = "secp256k1-kmp-jni-android", version.ref = "secp256k1" }
+secp256k1-common = { group = "fr.acinq.secp256k1", name = "secp256k1-kmp-jni-common", version.ref = "secp256k1" }
 secp256k1-jvm = { group = "fr.acinq.secp256k1", name = "secp256k1-kmp-jni-jvm", version.ref = "secp256k1" }
 
 [plugins]
