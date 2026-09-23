@@ -9100,29 +9100,25 @@ class WhiteNoiseAppState private constructor(
         return marmotIo(MarmotTraceSection.CREATE_GROUP) { createGroup(account, "", listOf(npub), null) }
     }
 
-    private var chatCreateOpenTiming: ChatCreateOpenTiming? = null
+    private val chatCreateOpenTiming = ChatCreateOpenTimingTracker()
 
-    fun beginChatCreateOpenTiming() {
-        chatCreateOpenTiming =
-            ChatCreateOpenTiming.begin().also {
-                it.mark(ChatCreateOpenTiming.STAGE_CONFIRM_TAP)
-            }
-    }
+    fun beginChatCreateOpenTiming(
+        stage: String = ChatCreateOpenTiming.STAGE_CONFIRM_TAP,
+        restart: Boolean = false,
+    ) = chatCreateOpenTiming.begin(stage, restart)
 
     fun markChatCreateOpenStage(stage: String) {
-        chatCreateOpenTiming?.mark(stage)
+        chatCreateOpenTiming.mark(stage)
     }
 
-    fun hasActiveChatCreateOpenTiming(): Boolean = chatCreateOpenTiming != null
+    fun hasActiveChatCreateOpenTiming(): Boolean = chatCreateOpenTiming.isActive()
 
     fun completeChatCreateOpenTiming(stage: String) {
-        markChatCreateOpenStage(stage)
-        chatCreateOpenTiming = null
+        chatCreateOpenTiming.finish(stage)
     }
 
     fun abandonChatCreateOpenTiming(stage: String) {
-        markChatCreateOpenStage(stage)
-        chatCreateOpenTiming = null
+        chatCreateOpenTiming.finish(stage)
     }
 
     /**
