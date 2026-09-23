@@ -599,6 +599,7 @@ internal fun ProfileEditScreen(
         showBannerSheet = false
         resetDraft()
         isEditing = false
+        onPictureActionsOpened()
     }
 
     val imageOverlayOpen = fullPictureOpen || fullBannerOpen || showPictureSheet || showBannerSheet
