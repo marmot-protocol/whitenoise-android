@@ -17,117 +17,127 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class LocalGroupDeleteRecoveryTest {
     @Test
-    fun transientClosedTransportRetriesOnlyAfterGroupIsConfirmedPresent() = runTest {
-        val events = mutableListOf<String>()
-        var deletes = 0
-        deleteLocalGroupWithRecovery(
-            isCurrent = { true },
-            delete = {
-                events += "delete"
-                if (++deletes == 1) throw MarmotKitException.TransportClosed()
-            },
-            isGroupPresent = {
-                events += "present"
-                true
-            },
-        )
-        assertEquals(listOf("delete", "present", "delete"), events)
-    }
-
-    @Test
-    fun committedDeleteWithLostResponseDoesNotRepeatMutation() = runTest {
-        var deletes = 0
-        deleteLocalGroupWithRecovery(
-            isCurrent = { true },
-            delete = {
-                deletes += 1
-                throw MarmotKitException.TransportClosed()
-            },
-            isGroupPresent = { false },
-        )
-        assertEquals(1, deletes)
-    }
-
-    @Test
-    fun exhaustedRetryReportsOneFailureWithoutUnboundedDeletes() = runTest {
-        val failure = MarmotKitException.TransportClosed()
-        var deletes = 0
-        val result = runCatching {
+    fun transientClosedTransportRetriesOnlyAfterGroupIsConfirmedPresent() =
+        runTest {
+            val events = mutableListOf<String>()
+            var deletes = 0
             deleteLocalGroupWithRecovery(
                 isCurrent = { true },
                 delete = {
-                    deletes += 1
-                    throw failure
-                },
-                isGroupPresent = { true },
-            )
-        }
-        assertSame(failure, result.exceptionOrNull())
-        assertEquals(IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS, deletes)
-    }
-
-    @Test
-    fun failedReconciliationNeverAuthorizesAnotherWipe() = runTest {
-        var deletes = 0
-        var reads = 0
-        val result = runCatching {
-            deleteLocalGroupWithRecovery(
-                isCurrent = { true },
-                delete = {
-                    deletes += 1
-                    throw MarmotKitException.TransportClosed()
+                    events += "delete"
+                    if (++deletes == 1) throw MarmotKitException.TransportClosed()
                 },
                 isGroupPresent = {
-                    reads += 1
-                    throw MarmotKitException.TransportClosed()
+                    events += "present"
+                    true
                 },
             )
+            assertEquals(listOf("delete", "present", "delete"), events)
         }
-        assertTrue(result.isFailure)
-        assertEquals(1, deletes)
-        assertEquals(IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS, reads)
-    }
 
     @Test
-    fun accountSwitchDuringBackoffPreventsSecondWipe() = runTest {
-        var current = true
-        var deletes = 0
-        val job = async {
-            deleteLocalGroupWithRecovery(
-                isCurrent = { current },
-                delete = {
-                    deletes += 1
-                    throw MarmotKitException.TransportClosed()
-                },
-                isGroupPresent = { true },
-            )
-        }
-        runCurrent()
-        current = false
-        advanceTimeBy(IDEMPOTENT_RUNTIME_MUTATION_RETRY_BACKOFF_MS)
-        runCurrent()
-        assertTrue(job.getCompletionExceptionOrNull() is CancellationException)
-        assertEquals(1, deletes)
-    }
-
-    @Test
-    fun coroutineCancellationDuringBackoffPreventsSecondWipe() = runTest {
-        var deletes = 0
-        val job = async {
+    fun committedDeleteWithLostResponseDoesNotRepeatMutation() =
+        runTest {
+            var deletes = 0
             deleteLocalGroupWithRecovery(
                 isCurrent = { true },
                 delete = {
                     deletes += 1
                     throw MarmotKitException.TransportClosed()
                 },
-                isGroupPresent = { true },
+                isGroupPresent = { false },
             )
+            assertEquals(1, deletes)
         }
-        runCurrent()
-        job.cancel()
-        advanceTimeBy(IDEMPOTENT_RUNTIME_MUTATION_RETRY_BACKOFF_MS)
-        runCurrent()
-        assertFalse(job.isActive)
-        assertEquals(1, deletes)
-    }
+
+    @Test
+    fun exhaustedRetryReportsOneFailureWithoutUnboundedDeletes() =
+        runTest {
+            val failure = MarmotKitException.TransportClosed()
+            var deletes = 0
+            val result =
+                runCatching {
+                    deleteLocalGroupWithRecovery(
+                        isCurrent = { true },
+                        delete = {
+                            deletes += 1
+                            throw failure
+                        },
+                        isGroupPresent = { true },
+                    )
+                }
+            assertSame(failure, result.exceptionOrNull())
+            assertEquals(IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS, deletes)
+        }
+
+    @Test
+    fun failedReconciliationNeverAuthorizesAnotherWipe() =
+        runTest {
+            var deletes = 0
+            var reads = 0
+            val result =
+                runCatching {
+                    deleteLocalGroupWithRecovery(
+                        isCurrent = { true },
+                        delete = {
+                            deletes += 1
+                            throw MarmotKitException.TransportClosed()
+                        },
+                        isGroupPresent = {
+                            reads += 1
+                            throw MarmotKitException.TransportClosed()
+                        },
+                    )
+                }
+            assertTrue(result.isFailure)
+            assertEquals(1, deletes)
+            assertEquals(IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS, reads)
+        }
+
+    @Test
+    fun accountSwitchDuringBackoffPreventsSecondWipe() =
+        runTest {
+            var current = true
+            var deletes = 0
+            val job =
+                async {
+                    deleteLocalGroupWithRecovery(
+                        isCurrent = { current },
+                        delete = {
+                            deletes += 1
+                            throw MarmotKitException.TransportClosed()
+                        },
+                        isGroupPresent = { true },
+                    )
+                }
+            runCurrent()
+            current = false
+            advanceTimeBy(IDEMPOTENT_RUNTIME_MUTATION_RETRY_BACKOFF_MS)
+            runCurrent()
+            assertTrue(job.getCompletionExceptionOrNull() is CancellationException)
+            assertEquals(1, deletes)
+        }
+
+    @Test
+    fun coroutineCancellationDuringBackoffPreventsSecondWipe() =
+        runTest {
+            var deletes = 0
+            val job =
+                async {
+                    deleteLocalGroupWithRecovery(
+                        isCurrent = { true },
+                        delete = {
+                            deletes += 1
+                            throw MarmotKitException.TransportClosed()
+                        },
+                        isGroupPresent = { true },
+                    )
+                }
+            runCurrent()
+            job.cancel()
+            advanceTimeBy(IDEMPOTENT_RUNTIME_MUTATION_RETRY_BACKOFF_MS)
+            runCurrent()
+            assertFalse(job.isActive)
+            assertEquals(1, deletes)
+        }
 }
