@@ -1,13 +1,9 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,12 +12,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -35,12 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -194,11 +181,7 @@ internal fun RemoteGiphyMediaCard(
     onLoad: () -> Unit,
     onLongPress: () -> Unit = {},
 ) {
-    val context = LocalContext.current
-    val clipboard = LocalClipboardManager.current
     val attribution = media.attribution?.let { "via GIPHY · $it" } ?: stringResource(R.string.giphy_attribution)
-    val openLabel = stringResource(R.string.link_confirm_open)
-    val copyLabel = stringResource(R.string.copy)
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = ConversationRichContentShape,
@@ -251,42 +234,17 @@ internal fun RemoteGiphyMediaCard(
                         }
                 }
             }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            Text(
+                text = attribution,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(start = 12.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
-            ) {
-                Text(
-                    text = attribution,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                IconButton(
-                    onClick = {
-                        runCatching {
-                            context.startActivity(
-                                Intent(Intent.ACTION_VIEW, Uri.parse(media.url))
-                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                            )
-                        }
-                    },
-                    modifier = Modifier.semantics { contentDescription = openLabel },
-                ) {
-                    Icon(Icons.Default.OpenInNew, contentDescription = null)
-                }
-                IconButton(
-                    onClick = { clipboard.setText(AnnotatedString(media.url)) },
-                    modifier = Modifier.semantics { contentDescription = copyLabel },
-                ) {
-                    Icon(Icons.Default.ContentCopy, contentDescription = null)
-                }
-            }
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+            )
         }
     }
 }
