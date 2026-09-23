@@ -31,14 +31,6 @@ class ConversationPagingPrefetchTest {
         assertEquals(25, OLDER_PAGE_PREFETCH_ROWS)
     }
 
-    /** A page that lands while the reader still has rows before the old edge kept its runway. */
-    @Test
-    fun runwayIsTheRowsLeftBeforeTheOldEdge() {
-        assertEquals(7, olderPageRunwayRows(oldestVisibleIndex = OLDEST_ROW - 7, edgeListIndex = OLDEST_ROW))
-        assertEquals(0, olderPageRunwayRows(oldestVisibleIndex = OLDEST_ROW, edgeListIndex = OLDEST_ROW))
-        assertEquals(-2, olderPageRunwayRows(oldestVisibleIndex = OLDEST_ROW + 2, edgeListIndex = OLDEST_ROW))
-    }
-
     /** Only a positive runway counts as invisible paging; an edge already on screen was seen. */
     @Test
     fun landingEventSplitsOnWhetherTheEdgeWasVisible() {

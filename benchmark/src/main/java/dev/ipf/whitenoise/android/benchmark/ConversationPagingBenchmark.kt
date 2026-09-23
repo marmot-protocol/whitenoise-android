@@ -98,6 +98,9 @@ class ConversationPagingBenchmark {
                 }
                 journeys.openGroup(groupName)
                 journeys.waitForConversationRouteSettled()
+                // The reopen restores the last reading position, which the previous iteration left
+                // deep in history; every measured journey starts from the live tail.
+                journeys.jumpToNewestIfVisible()
                 prepare()
             },
             measureBlock = {

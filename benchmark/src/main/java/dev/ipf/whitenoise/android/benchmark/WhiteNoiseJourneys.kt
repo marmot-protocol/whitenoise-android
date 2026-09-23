@@ -246,6 +246,14 @@ internal class WhiteNoiseJourneys {
         }
     }
 
+    /**
+     * Returns the transcript to its live tail when the reopen restored an earlier reading position;
+     * a conversation already on its tail shows no jump control and is left alone.
+     */
+    fun jumpToNewestIfVisible() {
+        if (findVisibleTag(PerformanceTags.JUMP_TO_NEWEST) != null) jumpToNewest()
+    }
+
     /** Taps jump-to-newest and waits for it to leave, which is the transcript back on its live tail. */
     fun jumpToNewest() {
         waitForVisibleTag(PerformanceTags.JUMP_TO_NEWEST).click()

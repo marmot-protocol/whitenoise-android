@@ -8674,6 +8674,12 @@
         "test_ids": ["SET-020", "CON-003"]
       },
       {
+        "surface": "ConversationFixtureSeedDialogContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": "fun ConversationFixtureSeedDialogContent(",
+        "test_ids": ["SET-020"]
+      },
+      {
         "surface": "ConversationFixtureTargetList",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
         "anchor": "fun ConversationFixtureTargetList(",

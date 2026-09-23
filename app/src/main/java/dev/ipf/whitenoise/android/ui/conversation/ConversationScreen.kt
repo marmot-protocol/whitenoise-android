@@ -2582,18 +2582,35 @@ internal fun ConversationScreen(
     // list keeps history at its high-index end, so an older page appends there
     // and never disturbs the anchored newest edge — the framework holds the
     // visible rows in the same measure pass with no post-hoc scroll.
+    // Counted in its own collector: the prefetch collector below suspends on the page it requests,
+    // and a reader who reaches the edge while that page is in flight is exactly the stop to count.
     LaunchedEffect(listState, controller) {
         val edgeStops = PagingEdgeStopTracker()
+        snapshotFlow {
+            val visible = listState.layoutInfo.visibleItemsInfo
+            visible.lastOrNull { conversationAnchorMessageId(it.key) != null }?.index to listState.isScrollInProgress
+        }.collect { (oldestVisibleIndex, scrolling) ->
+            val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
+            if (liveRenderedSize == 0) return@collect
+            val edgeListIndex =
+                conversationTimelineListIndex(
+                    timelineIndex = 0,
+                    timelineSize = liveRenderedSize,
+                    trailingRowCount = controller.conversationTrailingRowCount(liveRenderedSize),
+                )
+            if (edgeStops.observe(oldestVisibleIndex ?: -1, edgeListIndex, controller.hasMoreBefore, scrolling)) {
+                markPagingEvent(ConversationPagingTraceSection.EDGE_STOP)
+            }
+        }
+    }
+    LaunchedEffect(listState, controller) {
         snapshotFlow {
             // The reversed list emits the older-loading row, the top error row and the top spacer
             // after the messages, so they hold the highest indexes — exactly the oldest end, and
             // exactly what is on screen when a page is due. Taking the last visible item would pick
             // one of those, resolve no anchor, and page unanchored: the bug this is meant to fix.
-            // Scroll rest is part of the key so a stop on the edge is observed, not only the last
-            // row change before it.
-            val visible = listState.layoutInfo.visibleItemsInfo
-            visible.lastOrNull { conversationAnchorMessageId(it.key) != null } to listState.isScrollInProgress
-        }.collect { (oldestVisible, scrolling) ->
+            listState.layoutInfo.visibleItemsInfo.lastOrNull { conversationAnchorMessageId(it.key) != null }
+        }.collect { oldestVisible ->
             val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
             if (liveRenderedSize == 0) return@collect
             val oldestMessageListIndex =
@@ -2602,14 +2619,6 @@ internal fun ConversationScreen(
                     timelineSize = liveRenderedSize,
                     trailingRowCount = controller.conversationTrailingRowCount(liveRenderedSize),
                 )
-            val edgeStopped =
-                edgeStops.observe(
-                    oldestVisibleIndex = oldestVisible?.index ?: -1,
-                    edgeListIndex = oldestMessageListIndex,
-                    hasMoreBefore = controller.hasMoreBefore,
-                    scrolling = scrolling,
-                )
-            if (edgeStopped) markPagingEvent(ConversationPagingTraceSection.EDGE_STOP)
             val prefetch =
                 shouldPrefetchOlder(
                     anchored = initialTimelineAnchored,
@@ -2629,7 +2638,7 @@ internal fun ConversationScreen(
             // whatever the read pointer last reported, which only ever moves towards newer
             // messages — the reason scrolling up could move the reading position.
             controller.loadOlder(conversationAnchorMessageId(oldestVisible?.key))
-            recordOlderPageLanding(controller, listState, edgeMessageId, liveRenderedSize)
+            recordOlderPageLanding(controller, listState, edgeMessageId)
         }
     }
     // Loading the authoritative unread boundary can shift a capped subscription

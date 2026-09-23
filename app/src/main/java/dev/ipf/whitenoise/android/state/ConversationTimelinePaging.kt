@@ -114,6 +114,7 @@ internal suspend fun ConversationController.loadOlderPageInternal(anchorId: Stri
         trace.recordCompletion(ConversationPageLoad.INACTIVE, startedMs)
         throw cancel
     } catch (throwable: Throwable) {
+        trace.recordCompletion(ConversationPageLoad.FAILED, startedMs)
         reportPageFailure(ConversationSearchPageDirection.OLDER, throwable)
         ConversationPageLoad.FAILED
     } finally {
@@ -157,6 +158,7 @@ internal suspend fun ConversationController.loadNewerPageInternal(origin: Paging
         trace.recordCompletion(ConversationPageLoad.INACTIVE, startedMs)
         throw cancel
     } catch (throwable: Throwable) {
+        trace.recordCompletion(ConversationPageLoad.FAILED, startedMs)
         reportPageFailure(ConversationSearchPageDirection.NEWER, throwable, origin)
         ConversationPageLoad.FAILED
     } finally {

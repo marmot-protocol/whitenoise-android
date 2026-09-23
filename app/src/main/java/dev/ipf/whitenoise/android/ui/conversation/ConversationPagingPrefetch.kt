@@ -70,16 +70,6 @@ internal fun shouldPrefetchNewer(
     return canPage && idle && withinMargin
 }
 
-/**
- * Rows still between the reader's oldest visible row and the row that was the window's edge when the
- * page was asked for. Positive means the page landed before the reader could see the edge; zero or
- * negative means the edge row was already on screen, so the reader saw history arrive.
- */
-internal fun olderPageRunwayRows(
-    oldestVisibleIndex: Int,
-    edgeListIndex: Int,
-): Int = edgeListIndex - oldestVisibleIndex
-
 /** The slice a landed page is counted under, from how much runway the reader still had. */
 internal fun pageLandingEvent(runwayRows: Int): String =
     if (runwayRows > 0) {
@@ -113,40 +103,37 @@ internal class PagingEdgeStopTracker {
 
 /**
  * Counts how a landed older page found the reader: with rows still to go before the row that was the
- * edge when the page was requested, or already on it. Nothing is counted when the window did not grow,
- * so a no-progress or failed page leaves the landing counters alone.
+ * edge when the page was requested, or already on it. Nothing is counted unless rows older than that
+ * edge are now held — the cap keeps the window's size flat once it is full, so size cannot be the
+ * signal — and both rows are resolved by identity in the new timeline, because the layout the list
+ * still reports predates the commit.
  */
 internal fun recordOlderPageLanding(
     controller: ConversationController,
     listState: LazyListState,
     edgeItemKey: String?,
-    renderedSizeBefore: Int,
 ) {
-    val runway = olderPageLandingRunway(controller, listState, edgeItemKey, renderedSizeBefore) ?: return
+    val runway = olderPageLandingRunway(controller, listState, edgeItemKey) ?: return
     markPagingEvent(pageLandingEvent(runway))
 }
 
-/** The runway a landed page left, or null when nothing landed or the layout has no message row to measure from. */
+/** The runway a landed page left, or null when no older rows landed or the visible row is not a message. */
 private fun olderPageLandingRunway(
     controller: ConversationController,
     listState: LazyListState,
     edgeItemKey: String?,
-    renderedSizeBefore: Int,
 ): Int? {
     val rendered = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
     val edgeTimelineIndex = rendered.indexOfFirst { it.id == edgeItemKey }
-    if (edgeItemKey == null || rendered.size <= renderedSizeBefore || edgeTimelineIndex < 0) return null
-    val edgeListIndex =
-        conversationTimelineListIndex(
-            timelineIndex = edgeTimelineIndex,
-            timelineSize = rendered.size,
-            trailingRowCount = controller.conversationTrailingRowCount(rendered.size),
-        )
-    val oldestVisibleIndex =
+    if (edgeItemKey == null || edgeTimelineIndex <= 0) return null
+    val oldestVisibleKey =
         listState.layoutInfo.visibleItemsInfo
             .lastOrNull { conversationAnchorMessageId(it.key) != null }
-            ?.index
-    return oldestVisibleIndex?.let { olderPageRunwayRows(it, edgeListIndex) }
+            ?.key
+    val visibleTimelineIndex = rendered.indexOfFirst { it.id == oldestVisibleKey }
+    // The timeline runs oldest-first, so the rows between the reader and the old edge are the
+    // difference of the two positions; negative once the reader is already past that edge.
+    return if (visibleTimelineIndex < 0) null else visibleTimelineIndex - edgeTimelineIndex
 }
 
 /** Prefix of an ordinary message row's list key. */

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -42,20 +43,39 @@ internal data class ConversationFixtureTarget(
 
 /** The active account's conversations, titled by group name or a short id for a nameless DM. */
 internal fun conversationFixtureTargets(appState: WhiteNoiseAppState): List<ConversationFixtureTarget> =
-    appState.chatListItems.map { item ->
-        val group = item.group
-        ConversationFixtureTarget(
-            groupIdHex = group.groupIdHex,
-            title = group.name.ifBlank { group.groupIdHex.take(SHORT_ID_LENGTH) },
-        )
+    disambiguatedFixtureTargets(appState.chatListItems.map { it.group.groupIdHex to it.group.name })
+
+/**
+ * Titles for the target list: the group name, or the short id when there is none, and the short id
+ * appended whenever two groups share a name — hundreds of real messages must not land in the wrong
+ * one of two identically named chats.
+ */
+internal fun disambiguatedFixtureTargets(groups: List<Pair<String, String>>): List<ConversationFixtureTarget> {
+    val nameCounts = groups.groupingBy { (_, name) -> name }.eachCount()
+    return groups.map { (groupIdHex, name) ->
+        val shortId = groupIdHex.take(SHORT_ID_LENGTH)
+        val title =
+            when {
+                name.isBlank() -> shortId
+                nameCounts.getValue(name) > 1 -> "$name · $shortId"
+                else -> name
+            }
+        ConversationFixtureTarget(groupIdHex = groupIdHex, title = title)
     }
+}
+
+/** The requested count when it is a whole number within 1..[MAX_SEED_COUNT]; null keeps Start disabled. */
+internal fun seedCountOrNull(text: CharSequence): Int? {
+    val count = text.toString().toIntOrNull()
+    return count?.takeIf { it in 1..MAX_SEED_COUNT }
+}
 
 /**
  * Debug-only dialog that sends a chosen number of synthetic messages into one conversation, so a
  * paging benchmark has a fixture deep enough to cross several pages and the bounded window cap.
  * The messages are real sends, which is why the dialog insists on a target being picked explicitly.
  */
-@Suppress("FunctionNaming", "LongMethod")
+@Suppress("FunctionNaming")
 @Composable
 internal fun ConversationFixtureSeedDialog(
     appState: WhiteNoiseAppState,
@@ -68,17 +88,59 @@ internal fun ConversationFixtureSeedDialog(
     var stopped by remember { mutableStateOf(false) }
     var job by remember { mutableStateOf<Job?>(null) }
     val scope = rememberCoroutineScope()
-    val running = job?.isActive == true
-    val requested =
-        count.text
-            .toString()
-            .toIntOrNull()
-            ?.coerceIn(1, MAX_SEED_COUNT)
+    ConversationFixtureSeedDialogContent(
+        targets = targets,
+        selected = selected,
+        count = count,
+        progress = progress,
+        stopped = stopped,
+        running = job?.isActive == true,
+        onSelect = { selected = it },
+        onStart = { target, requested ->
+            stopped = false
+            progress = ConversationFixtureSeedProgress(sent = 0, failed = 0, total = requested)
+            job =
+                scope.launch {
+                    try {
+                        appState.seedConversationFixture(target, requested) { progress = it }
+                    } catch (cancelled: CancellationException) {
+                        // The reader's Cancel, or the engine giving up on a send: either way the
+                        // dialog says where the seed stopped instead of falling silent.
+                        stopped = true
+                        throw cancelled
+                    }
+                }
+        },
+        onDismiss = {
+            job?.cancel()
+            onDismiss()
+        },
+    )
+}
+
+/**
+ * The dialog itself, with every input explicit so it can be rendered and screenshotted without an
+ * app state: the count field, the target list, the progress line and the Start/Cancel/Close pair.
+ */
+@Suppress("FunctionNaming", "LongParameterList", "LongMethod")
+@Composable
+internal fun ConversationFixtureSeedDialogContent(
+    targets: List<ConversationFixtureTarget>,
+    selected: String?,
+    count: TextFieldState,
+    progress: ConversationFixtureSeedProgress?,
+    stopped: Boolean,
+    running: Boolean,
+    onSelect: (String) -> Unit,
+    onStart: (target: String, requested: Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val requested = seedCountOrNull(count.text)
     WhiteNoiseAlertDialog(
         onDismissRequest = { if (!running) onDismiss() },
         title = { Text(stringResource(R.string.seed_fixture_title)) },
         text = {
-            Column(Modifier.verticalScroll(rememberScrollState()).heightIn(max = 420.dp)) {
+            Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
                 Text(stringResource(R.string.seed_fixture_detail), style = MaterialTheme.typography.bodyMedium)
                 WhiteNoiseTextField(
                     state = count,
@@ -89,39 +151,24 @@ internal fun ConversationFixtureSeedDialog(
                 )
                 // Above the target list, which can scroll the bottom of the column out of view.
                 SeedProgressText(progress, stopped)
-                ConversationFixtureTargetList(targets, selected, enabled = !running) { selected = it }
+                ConversationFixtureTargetList(targets, selected, enabled = !running, onSelect)
             }
         },
         confirmButton = {
-            val target = selected
+            // A run that stopped after admitting messages is not restarted from ordinal one behind the
+            // reader's back: closing the dialog is the explicit new-run decision.
+            val restartable = progress == null || (!stopped && !progress.finished) || progress.sent == 0
+            val canStart = !running && selected != null && requested != null && restartable
             TextButton(
-                enabled = !running && target != null && requested != null && progress?.finished != true,
-                onClick = {
-                    if (target == null || requested == null) return@TextButton
-                    stopped = false
-                    progress = ConversationFixtureSeedProgress(sent = 0, failed = 0, total = requested)
-                    job =
-                        scope.launch {
-                            try {
-                                appState.seedConversationFixture(target, requested) { progress = it }
-                            } catch (cancelled: CancellationException) {
-                                // The reader's Cancel, or the engine giving up on a send: either way the
-                                // dialog says where the seed stopped instead of falling silent.
-                                stopped = true
-                                throw cancelled
-                            }
-                        }
-                },
+                enabled = canStart && progress?.finished != true,
+                onClick = { if (selected != null && requested != null) onStart(selected, requested) },
                 modifier = Modifier.testTag("developer.seed_fixture.start"),
             ) {
                 Text(stringResource(R.string.seed_fixture_start))
             }
         },
         dismissButton = {
-            TextButton(onClick = {
-                job?.cancel()
-                onDismiss()
-            }) {
+            TextButton(onClick = onDismiss) {
                 Text(stringResource(if (running) R.string.cancel else R.string.close))
             }
         },
