@@ -6346,6 +6346,87 @@
         ]
       },
       {
+        "surface": "IdentityImageCropDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
+        "anchor": "fun IdentityImageCropDialog(",
+        "test_ids": [
+          "PRO-002",
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "IdentityImageCropTopBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
+        "anchor": "fun IdentityImageCropTopBar(",
+        "test_ids": [
+          "PRO-002",
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "IdentityImageCropCanvas",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
+        "anchor": "fun IdentityImageCropCanvas(",
+        "test_ids": [
+          "PRO-002",
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "IdentityImageCropActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
+        "anchor": "fun IdentityImageCropActions(",
+        "test_ids": [
+          "PRO-002",
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "IdentityImageCropFlow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropFlow.kt",
+        "anchor": "fun IdentityImageCropFlow(",
+        "test_ids": [
+          "PRO-002",
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "string:identity_crop_close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "PRO-002",
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "string:identity_crop_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
+        "anchor": "R.string.photo_editor_crop",
+        "test_ids": [
+          "PRO-002",
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "string:identity_crop_done",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
+        "anchor": "R.string.done",
+        "test_ids": [
+          "PRO-002",
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "string:identity_crop_rotate",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
+        "anchor": "R.string.photo_editor_rotate_clockwise",
+        "test_ids": [
+          "PRO-002",
+          "GRP-003"
+        ]
+      },
+      {
         "surface": "ProfileEditScreen",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
         "anchor": "fun ProfileEditScreen(",
