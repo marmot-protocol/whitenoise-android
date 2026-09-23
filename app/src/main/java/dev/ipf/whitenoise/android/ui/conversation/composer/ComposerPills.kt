@@ -150,8 +150,8 @@ private val ComposerResizeHandleWidth = 32.dp
 private val ComposerResizeHandleThickness = 4.dp
 private val ExpandedEditorBottomInset = 44.dp
 
-// Edit keeps the separate 48 dp action row; its icons still clear the text with this tighter inset.
-private val EditEditorBottomInset = 40.dp
+// Keep the last edited line and caret outside the action row's full touch area.
+private val EditEditorBottomInset = 48.dp
 
 private const val COMPOSER_ACTION_CENTER_BIAS = 0.5f
 
@@ -1175,7 +1175,7 @@ internal fun ComposerPill(
                                 togglesKeyboard = true,
                                 modifier = Modifier.width(32.dp).height(48.dp),
                                 iconSize = 24.dp,
-                                iconOffsetY = if (compactEditTextSpacing) (-4).dp else 0.dp,
+                                iconOffsetY = if (compactEditTextSpacing) (-8).dp else 0.dp,
                                 emojiIcon = painterResource(R.drawable.ic_emoji_smileys),
                             )
                         }

@@ -51,9 +51,14 @@ class ComposerEditScreenshotTest {
                 .onNodeWithContentDescription(context.getString(R.string.send))
                 .fetchSemanticsNode()
                 .boundsInRoot
+        val emoji =
+            composeRule
+                .onNodeWithContentDescription(context.getString(R.string.open_emoji_picker))
+                .fetchSemanticsNode()
+                .boundsInRoot
         assertTrue(
             "Edit text should stay above its separate control row",
-            (editor.top + editor.bottom) / 2 < send.top,
+            editor.bottom <= send.top && editor.bottom <= emoji.top,
         )
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_short_edit_light.png")
     }
