@@ -202,6 +202,52 @@ class IdentityImageCropTest {
         assertEquals(crop, turned)
     }
 
+    /** After a quarter turn, a sideways drag still moves the picture sideways on screen. */
+    @Test
+    fun aSidewaysDragFollowsTheFingerAfterAQuarterTurn() {
+        val size = EditorPixelSize(1000, 1000)
+        val turned = IdentityImageCrop(zoom = 2f, quarterTurnsClockwise = 1)
+
+        val panned = turned.pannedBy(dragXPx = 100f, dragYPx = 0f, viewportPx = VIEWPORT_PX, oriented = size)
+
+        // The picture is drawn turned, so the screen's horizontal axis is the source's vertical one.
+        assertEquals("the untouched axis must not drift", turned.focusX, panned.focusX, TOLERANCE)
+        assertTrue("a sideways drag must move the crop along the turned axis", panned.focusY > turned.focusY)
+    }
+
+    /** Every quarter turn keeps a sideways drag moving the crop, never leaving it inert. */
+    @Test
+    fun everyQuarterTurnKeepsASidewaysDragEffective() {
+        val size = EditorPixelSize(1000, 1000)
+
+        (0 until 4).forEach { turns ->
+            val start = IdentityImageCrop(zoom = 2f, quarterTurnsClockwise = turns)
+            val panned = start.pannedBy(60f, 0f, VIEWPORT_PX, size)
+
+            assertTrue(
+                "a sideways drag must move something at $turns quarter turns",
+                panned.focusX != start.focusX || panned.focusY != start.focusY,
+            )
+        }
+    }
+
+    /** Zooming out after an edge pan leaves no dead zone before the picture moves again. */
+    @Test
+    fun zoomingOutAfterAnEdgePanLeavesNoDeadZone() {
+        val size = EditorPixelSize(1000, 1000)
+        // Pan hard enough to sit at the zoom-4 bound (0.875), which the zoom-2 square cannot show.
+        val atEdge = IdentityImageCrop(zoom = 4f).pannedBy(-VIEWPORT_PX * 3f, 0f, VIEWPORT_PX, size)
+        val zoomedOut = atEdge.zoomedBy(0.5f)
+        val shownBefore = zoomedOut.rectFor(size)
+
+        val nudged = zoomedOut.pannedBy(dragXPx = 10f, dragYPx = 0f, viewportPx = VIEWPORT_PX, oriented = size)
+
+        assertTrue(
+            "a drag back toward the centre must move the crop at once, not after closing a hidden gap",
+            nudged.rectFor(size).left < shownBefore.left,
+        )
+    }
+
     private companion object {
         const val TOLERANCE = 0.0001f
         const val PIXEL_TOLERANCE = 0.5f

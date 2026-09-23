@@ -27,8 +27,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,6 +51,20 @@ import dev.ipf.whitenoise.android.media.IdentityImageCrop
 import dev.ipf.whitenoise.android.media.IdentityImageCropShape
 import dev.ipf.whitenoise.android.media.editor.EditorPixelSize
 import kotlin.math.roundToInt
+
+/** Carries a crop through activity recreation, which otherwise resets the framing mid-choice. */
+private val IdentityImageCropSaver =
+    listSaver<IdentityImageCrop, Any>(
+        save = { listOf(it.focusX, it.focusY, it.zoom, it.quarterTurnsClockwise) },
+        restore = {
+            IdentityImageCrop(
+                focusX = it[0] as Float,
+                focusY = it[1] as Float,
+                zoom = it[2] as Float,
+                quarterTurnsClockwise = it[3] as Int,
+            )
+        },
+    )
 
 /** Sizes and angles the crop surface uses, kept off the call sites detekt reads as magic numbers. */
 private object IdentityImageCropDefaults {
@@ -76,7 +91,12 @@ internal fun IdentityImageCropDialog(
     onDismiss: () -> Unit,
     onConfirm: (IdentityImageCrop) -> Unit,
 ) {
-    var crop by remember(preview) { mutableStateOf(IdentityImageCrop.Centered) }
+    // Keyed on the source's dimensions rather than the preview bitmap: recreating the activity
+    // decodes a new bitmap, so keying on that would discard the crop exactly when it is restored.
+    var crop by
+        rememberSaveable(sourceSize, stateSaver = IdentityImageCropSaver) {
+            mutableStateOf(IdentityImageCrop.Centered)
+        }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxSize()) {
             Column(

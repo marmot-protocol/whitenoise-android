@@ -344,7 +344,7 @@ private fun NewGroupSetupAccountScreen(
     var showEmojiPicker by rememberSaveable { mutableStateOf(false) }
     var imageDraft by draft::imageDraft
     var imagePreparing by remember { mutableStateOf(false) }
-    var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
+    var pendingCropUri by rememberSaveable { mutableStateOf<Uri?>(null) }
     var busy by remember { mutableStateOf(false) }
     var createStage by remember { mutableStateOf<NewGroupCreateStage?>(null) }
     var retryGroupIdHex by draft::retryGroupIdHex

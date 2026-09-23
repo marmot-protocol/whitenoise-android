@@ -91,13 +91,46 @@ internal data class IdentityImageCrop(
     ): IdentityImageCrop {
         if (viewportPx <= 0f || !dragXPx.isFinite() || !dragYPx.isFinite()) return this
         val (halfWidth, halfHeight) = halfExtents(oriented)
-        val movedX = focusX - (dragXPx / viewportPx) * (halfWidth * 2f)
-        val movedY = focusY - (dragYPx / viewportPx) * (halfHeight * 2f)
+        // The picture is shown turned, so a drag along the screen's axes has to be turned back
+        // before it means anything in the source, or a sideways drag would move the crop vertically.
+        val sourceDragX = unturnedX(dragXPx, dragYPx)
+        val sourceDragY = unturnedY(dragXPx, dragYPx)
+        // Zooming out can leave the stored focus outside what the larger square allows. Starting
+        // from where the crop is actually shown keeps the next drag from spending itself closing
+        // that hidden gap while nothing moves.
+        val startX = focusX.coerceIn(halfWidth, 1f - halfWidth)
+        val startY = focusY.coerceIn(halfHeight, 1f - halfHeight)
+        val movedX = startX - (sourceDragX / viewportPx) * (halfWidth * 2f)
+        val movedY = startY - (sourceDragY / viewportPx) * (halfHeight * 2f)
         return copy(
             focusX = movedX.coerceIn(halfWidth, 1f - halfWidth),
             focusY = movedY.coerceIn(halfHeight, 1f - halfHeight),
         )
     }
+
+    /** A screen-space horizontal drag expressed along the source's own horizontal axis. */
+    private fun unturnedX(
+        dragXPx: Float,
+        dragYPx: Float,
+    ): Float =
+        when (quarterTurnsClockwise) {
+            1 -> dragYPx
+            2 -> -dragXPx
+            LAST_QUARTER_TURN -> -dragYPx
+            else -> dragXPx
+        }
+
+    /** A screen-space vertical drag expressed along the source's own vertical axis. */
+    private fun unturnedY(
+        dragXPx: Float,
+        dragYPx: Float,
+    ): Float =
+        when (quarterTurnsClockwise) {
+            1 -> -dragXPx
+            2 -> -dragYPx
+            LAST_QUARTER_TURN -> dragXPx
+            else -> dragYPx
+        }
 
     /** The same crop after a pinch of [factor], held inside the supported zoom range. */
     fun zoomedBy(factor: Float): IdentityImageCrop {
@@ -121,6 +154,9 @@ internal data class IdentityImageCrop(
         /** Keeps a crop from collapsing to nothing on a source with an extreme aspect ratio. */
         private const val MIN_HALF_EXTENT = 0.000_5f
         private const val QUARTER_TURNS = 4
+
+        /** The final turn before a crop is upright again. */
+        private const val LAST_QUARTER_TURN = 3
 
         /** Half of a whole edge: the largest a crop can ever be in either direction. */
         private const val HALF_EXTENT_CEILING = 0.5f

@@ -213,6 +213,12 @@ internal fun GroupEditScreen(
             try {
                 val draft = load()
                 prepared = true
+                // The picker and the crop keep this open long enough for membership, admin rights
+                // or recoverability to change underneath it, so the permission is read again here
+                // rather than trusted from when the picture was chosen.
+                if (!controller.isSelfMember || !controller.isSelfAdmin || controller.group.unrecoverable) {
+                    return@launchMutation
+                }
                 val uploaded =
                     appState.marmotIo {
                         uploadProfileImage(accountRef, draft.plaintext, draft.mediaType, null)
@@ -246,7 +252,7 @@ internal fun GroupEditScreen(
     BackHandler { onBack() }
 
     var photoMenuOpen by remember { mutableStateOf(false) }
-    var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
+    var pendingCropUri by rememberSaveable { mutableStateOf<Uri?>(null) }
     val photoPicker =
         rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
             if (uri != null) pendingCropUri = uri

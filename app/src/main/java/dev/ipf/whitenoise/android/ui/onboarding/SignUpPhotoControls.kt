@@ -22,6 +22,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,7 +62,7 @@ internal fun SignUpPhotoControls(
     var menu by remember(owner) { mutableStateOf(false) }
     var webSession by remember(owner) { mutableStateOf<Long?>(null) }
     var pickerGeneration by remember(owner) { mutableStateOf<Long?>(null) }
-    var pendingCropUri by remember(owner) { mutableStateOf<Uri?>(null) }
+    var pendingCropUri by rememberSaveable(owner) { mutableStateOf<Uri?>(null) }
     var generation by remember(owner) { mutableStateOf(0L) }
     var active by remember(owner) { mutableStateOf(true) }
     var preparing by remember(owner) { mutableStateOf(false) }

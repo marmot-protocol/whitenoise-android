@@ -39,6 +39,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -516,7 +517,7 @@ internal fun ProfileEditScreen(
     var showPictureSheet by remember(activeAccountId) { mutableStateOf(false) }
     var showBannerSheet by remember(activeAccountId) { mutableStateOf(false) }
     var fullPictureOpen by remember(activeAccountId) { mutableStateOf(false) }
-    var pendingAvatarCropUri by remember(activeAccountId) { mutableStateOf<android.net.Uri?>(null) }
+    var pendingAvatarCropUri by rememberSaveable(activeAccountId) { mutableStateOf<android.net.Uri?>(null) }
     var fullBannerOpen by remember(activeAccountId) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
