@@ -14,6 +14,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -127,6 +128,36 @@ class NewMessageSessionTest {
                 }
             assertEquals(1, freshLookups)
             assertEquals("canonical", result.item?.id)
+        }
+
+    @Test
+    fun retryChatRechecksAfterPreparedAndFirstTapLookupsAreUncertain() =
+        runTest {
+            val preparation =
+                NewMessageRecipientPreparationCoordinator().prepare(
+                    backgroundScope,
+                    preparationKey("target"),
+                    prewarm = {},
+                    lookup = { error("transient preparation failure") },
+                )
+            runCurrent()
+            var freshLookups = 0
+            val authoritativeLookup: suspend () -> NewMessageDirectChatResolution = {
+                freshLookups++
+                if (freshLookups == 1) {
+                    NewMessageDirectChatResolution(null, false)
+                } else {
+                    NewMessageDirectChatResolution(item(), false)
+                }
+            }
+
+            val firstTap = preparedLookupOrFresh(preparation, fresh = authoritativeLookup)
+            val retryTap = preparedLookupOrFresh(preparation, fresh = authoritativeLookup)
+
+            assertFalse(firstTap.createRequired)
+            assertNull(firstTap.item)
+            assertEquals("canonical", retryTap.item?.id)
+            assertEquals(2, freshLookups)
         }
 
     @Test
