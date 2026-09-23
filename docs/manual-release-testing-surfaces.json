@@ -26699,6 +26699,14 @@
         ]
       },
       {
+        "surface": "group notification sender title refresh",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "R.string.notification_sender_in_group",
+        "test_ids": [
+          "NTF-019"
+        ]
+      },
+      {
         "surface": "bounded conversation-open notification cancellation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
         "anchor": "suspend fun dismissConversationMessages(",
