@@ -511,7 +511,7 @@ class ComposerExpansionDestructiveLifecycleTest {
                 shadowOf(Looper.getMainLooper()).idle()
                 assertEquals(2, fixture.calls.delete.get())
                 assertEquals(1, fixture.calls.chatList.get())
-                assertTrue(controller.items.none { it.groupIdHex == GROUP_ID })
+                assertTrue(controller.items.none { it.group.groupIdHex == GROUP_ID })
                 assertNull(fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
                 assertTrue(fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID).isNullOrEmpty())
             } finally {
@@ -529,7 +529,7 @@ class ComposerExpansionDestructiveLifecycleTest {
                 shadowOf(Looper.getMainLooper()).idle()
                 assertEquals(1, fixture.calls.delete.get())
                 assertEquals(1, fixture.calls.chatList.get())
-                assertTrue(controller.items.none { it.groupIdHex == GROUP_ID })
+                assertTrue(controller.items.none { it.group.groupIdHex == GROUP_ID })
             } finally {
                 controller.onCleared()
             }
@@ -546,7 +546,7 @@ class ComposerExpansionDestructiveLifecycleTest {
                 assertFalse(controller.deleteGroupLocalFromChatList(GROUP_ID, notify = false))
                 shadowOf(Looper.getMainLooper()).idle()
                 assertEquals(IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS, fixture.calls.delete.get())
-                assertEquals(1, controller.items.count { it.groupIdHex == GROUP_ID })
+                assertEquals(1, controller.items.count { it.group.groupIdHex == GROUP_ID })
                 assertEquals("still drafting", fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID))
                 assertEquals(retained, fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
             } finally {
