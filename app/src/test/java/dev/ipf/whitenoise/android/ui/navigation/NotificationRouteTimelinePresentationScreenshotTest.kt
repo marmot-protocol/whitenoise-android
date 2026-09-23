@@ -291,7 +291,9 @@ class NotificationRouteTimelinePresentationScreenshotTest : NotificationRouteTim
 
             routeGate.releaseRoster.countDown()
             awaitCondition { mountedController.memberRosterState == GroupRosterLoadState.FAILED }
-            composeRule.waitUntil(timeoutMillis = ROUTE_TIMEOUT_MILLIS) {
+            awaitCondition(
+                failureMessage = { "target broad bind did not start: ${routeState(appState, mountedController)}" },
+            ) {
                 routeGate.targetBroadBindStarted.count == 0L
             }
 

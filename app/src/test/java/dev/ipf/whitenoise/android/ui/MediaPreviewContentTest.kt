@@ -85,9 +85,10 @@ class MediaPreviewContentTest {
         val preparingSlotIds = initialSlots.filter { it.uri in preparingMedia }.mapTo(mutableSetOf()) { it.id }
         val qualitiesBySlot =
             initialSlots.mapNotNull { slot -> preparedQualities[slot.uri]?.let { slot.id to it } }.toMap()
+        val imageBytes = decodableImageBytes()
         initialMedia.forEach { stagedUri ->
             shadowOf(app.contentResolver).registerInputStreamSupplier(stagedUri) {
-                ByteArrayInputStream(decodableImageBytes())
+                ByteArrayInputStream(imageBytes)
             }
         }
         composeRule.setContent {
