@@ -318,6 +318,7 @@
     <string name="stream_finished">Stream terminato</string>
     <string name="media_attachment">Allegato multimediale</string>
     <string name="generic_message">Messaggio</string>
+    <string name="giphy_media_preview">GIF tramite GIPHY</string>
     <string name="waiting_for_stream">In attesa dello stream...</string>
     <string name="stream_failed_format">Stream non riuscito: %1$s</string>
     <string name="copy_text">Copia testo</string>

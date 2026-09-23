@@ -64,6 +64,7 @@ data class MessageTextCopy(
     val mediaAlbum: String = "Album",
     val mediaCountedFormat: String = "%1\$s (%2\$d)",
     val message: String,
+    val giphyMedia: String = "GIF via GIPHY",
     val groupSystem: GroupSystemCopy = GroupSystemCopy.Default,
 ) {
     fun reacted(value: String): String = String.format(reactedFormat, value)
@@ -174,6 +175,7 @@ object MessageProjector {
             // body. The conversation row builds the name-resolved summary;
             // this name-free form covers reply previews and copy-text.
             isGroupSystem(message) -> GroupSystemEvents.previewText(message.plaintext, copy.groupSystem)
+            isChatKind(message.kind) && RemoteGiphyMedia.isEnvelopeText(message.plaintext) -> copy.giphyMedia
             isMedia(message) -> mediaBodyText(message, copy)
             else -> message.plaintext
         }
@@ -190,6 +192,7 @@ object MessageProjector {
             isStreamStart(message) -> copy.agentStreamStarted
             isGroupSystem(message) -> GroupSystemEvents.previewText(message.plaintext, copy.groupSystem)
             isStreamFinal(message) -> message.plaintext.ifBlank { copy.streamFinished }
+            isChatKind(message.kind) && RemoteGiphyMedia.isEnvelopeText(message.plaintext) -> copy.giphyMedia
             isMedia(message) -> mediaBodyText(message, copy)
             else -> message.plaintext.ifBlank { copy.message }
         }

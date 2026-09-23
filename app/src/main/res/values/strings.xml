@@ -387,6 +387,8 @@
     <string name="stream_finished">Stream finished</string>
     <string name="media_attachment">Media attachment</string>
     <string name="generic_message">Message</string>
+    <string name="giphy_media_preview">GIF via GIPHY</string>
+    <string name="giphy_attribution" translatable="false">via GIPHY</string>
     <string name="group_system_member_added">%1$s added %2$s</string>
     <string name="group_system_member_added_passive">%1$s was added</string>
     <string name="group_system_member_removed">%1$s removed %2$s</string>
