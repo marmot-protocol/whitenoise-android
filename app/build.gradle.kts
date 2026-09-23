@@ -1163,6 +1163,10 @@ tasks.withType<Test>().configureEach {
     // A failed assertion's message (expected vs actual) must reach the CI log: the reports are not uploaded,
     // so the default short format left only "AssertionError at File.kt:162" to diagnose from.
     testLogging.exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+    // A worker killed by the CI timeout never uploads reports. Keep its last entered test visible in the CI log.
+    if (providers.environmentVariable("CI").orNull == "true") {
+        testLogging.events(org.gradle.api.tasks.testing.logging.TestLogEvent.STARTED)
+    }
 }
 
 tasks.register<Test>("replayAppFuzzSyntheticCorpus") {

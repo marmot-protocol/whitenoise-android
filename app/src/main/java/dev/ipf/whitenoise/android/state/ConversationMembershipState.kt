@@ -15,7 +15,10 @@ import dev.ipf.whitenoise.android.core.GroupProjector
  * states; [SelfMembershipFfi.MEMBER] is the only membership-preserving value.
  */
 internal fun SelfMembershipFfi.isNonMember(): Boolean =
-    this == SelfMembershipFfi.REMOVED || this == SelfMembershipFfi.LEFT
+    when (this) {
+        SelfMembershipFfi.REMOVED, SelfMembershipFfi.LEFT -> true
+        else -> false
+    }
 
 internal data class ConversationMembershipSeed(
     val members: List<AppGroupMemberRecordFfi>,
