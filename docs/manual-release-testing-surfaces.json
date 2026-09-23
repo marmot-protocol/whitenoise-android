@@ -22432,6 +22432,14 @@
     ],
     "source_coverage": [
       {
+        "surface": "Pasted npub recipient presentation remains usable before optional profile enrichment finishes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/RecipientResolutionPresentation.kt",
+        "anchor": "internal fun resolvedRecipientResolution(",
+        "test_ids": [
+          "NCH-001"
+        ]
+      },
+      {
         "surface": "Pasted npub direct-message preparation keeps recipient display, KeyPackage prewarm, and existing-chat lookup independent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessageRecipientPreparation.kt",
         "anchor": "internal class NewMessageRecipientPreparationCoordinator",
