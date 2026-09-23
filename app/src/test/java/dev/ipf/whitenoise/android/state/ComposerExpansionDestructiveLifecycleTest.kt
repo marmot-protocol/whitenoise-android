@@ -44,6 +44,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.lang.reflect.Proxy
+import java.time.Duration
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
@@ -509,7 +510,7 @@ class ComposerExpansionDestructiveLifecycleTest {
             val controller = fixture.seededChatsController()
             try {
                 assertTrue(controller.deleteGroupLocalFromChatList(GROUP_ID, notify = false))
-                shadowOf(Looper.getMainLooper()).idle()
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(20))
                 assertEquals(2, fixture.calls.delete.get())
                 assertEquals(1, fixture.calls.chatList.get())
                 assertTrue(controller.items.none { it.group.groupIdHex == GROUP_ID })
@@ -527,7 +528,7 @@ class ComposerExpansionDestructiveLifecycleTest {
             val controller = fixture.seededChatsController()
             try {
                 assertTrue(controller.deleteGroupLocalFromChatList(GROUP_ID, notify = false))
-                shadowOf(Looper.getMainLooper()).idle()
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(20))
                 assertEquals(1, fixture.calls.delete.get())
                 assertEquals(1, fixture.calls.chatList.get())
                 assertTrue(controller.items.none { it.group.groupIdHex == GROUP_ID })
@@ -545,7 +546,7 @@ class ComposerExpansionDestructiveLifecycleTest {
             val controller = fixture.seededChatsController()
             try {
                 assertTrue(controller.deleteGroupLocalFromChatList(GROUP_ID, notify = false))
-                shadowOf(Looper.getMainLooper()).idle()
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(20))
                 assertEquals(1, fixture.calls.delete.get())
                 assertTrue(controller.items.none { it.group.groupIdHex == GROUP_ID })
                 assertTrue(fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID).isNullOrEmpty())
@@ -564,7 +565,7 @@ class ComposerExpansionDestructiveLifecycleTest {
             val controller = fixture.seededChatsController()
             try {
                 assertFalse(controller.deleteGroupLocalFromChatList(GROUP_ID, notify = false))
-                shadowOf(Looper.getMainLooper()).idle()
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(20))
                 assertEquals(IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS, fixture.calls.delete.get())
                 assertEquals(1, controller.items.count { it.group.groupIdHex == GROUP_ID })
                 assertEquals("still drafting", fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID))

@@ -1165,7 +1165,7 @@ tasks.withType<Test>().configureEach {
     testLogging.exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
     // A worker killed by the CI timeout never uploads reports. Keep its last entered test visible in the CI log.
     if (providers.environmentVariable("CI").orNull == "true") {
-        testLogging.events(org.gradle.api.tasks.testing.logging.TestLogEvent.STARTED)
+        testLogging.events = testLogging.events + org.gradle.api.tasks.testing.logging.TestLogEvent.STARTED
     }
 }
 
