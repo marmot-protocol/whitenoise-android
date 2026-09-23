@@ -96,6 +96,8 @@ internal fun ProfileEditContent(
     hasAccount: Boolean,
     editing: Boolean,
     ready: Boolean,
+    imageActionsReady: Boolean = ready,
+    openPictureActionsOnEntry: Boolean = false,
     busy: Boolean,
     pictureUrl: String?,
     bannerUrl: String?,
@@ -125,6 +127,7 @@ internal fun ProfileEditContent(
     onOpenBanner: () -> Unit,
     onPickImage: (ProfileImageTarget, Uri) -> Unit,
     onRemoveImage: (ProfileImageTarget) -> Unit,
+    onPictureActionsOpened: () -> Unit = {},
 ) {
     SettingsScaffold(
         title = stringResource(R.string.profile),
@@ -174,7 +177,7 @@ internal fun ProfileEditContent(
                     seed,
                     ProfileImageTarget.Banner,
                     bannerPresent,
-                    !busy && !bannerUploading,
+                    imageActionsReady && !busy && !bannerUploading,
                     bannerUploading,
                     onPickImage,
                     onEditBanner,
@@ -212,11 +215,13 @@ internal fun ProfileEditContent(
                     seed,
                     ProfileImageTarget.Picture,
                     picturePresent,
-                    !busy && !pictureUploading,
+                    imageActionsReady && !busy && !pictureUploading,
                     pictureUploading,
                     onPickImage,
                     onEditPicture,
                     onRemoveImage,
+                    expandOnEntry = openPictureActionsOnEntry,
+                    onEntryExpanded = onPictureActionsOpened,
                 )
                 if (!pictureValid) {
                     Text(
@@ -418,7 +423,10 @@ internal fun ProfileBanner(
     }
 }
 
-/** Device selections carry the account identity that opened them; stale activity results never start an upload. */
+/**
+ * Device selections carry the account identity that opened them; stale activity results never start an upload.
+ * A requested entry expansion is acknowledged only after the enabled menu actually opens.
+ */
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList", "CyclomaticComplexMethod")
 @Composable
 internal fun ProfileImageActions(
@@ -430,8 +438,11 @@ internal fun ProfileImageActions(
     onPick: (ProfileImageTarget, Uri) -> Unit,
     onWeb: () -> Unit,
     onRemove: (ProfileImageTarget) -> Unit,
+    expandOnEntry: Boolean = false,
+    onEntryExpanded: () -> Unit = {},
 ) {
     var expanded by remember(owner) { mutableStateOf(false) }
+    var entryExpansionConsumed by remember(owner, target) { mutableStateOf(false) }
     var pickerOwner by remember(owner) { mutableStateOf<String?>(null) }
     var launchFailed by remember(owner) { mutableStateOf(false) }
     val photos =
@@ -447,6 +458,13 @@ internal fun ProfileImageActions(
             if (valid && uri != null) onPick(target, uri)
         }
     val actionTag = if (target == ProfileImageTarget.Banner) "profile.banner_actions" else "profile.photo_actions"
+    LaunchedEffect(expandOnEntry, enabled) {
+        if (expandOnEntry && enabled && !entryExpansionConsumed) {
+            expanded = true
+            entryExpansionConsumed = true
+            onEntryExpanded()
+        }
+    }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box {
             FilledTonalButton(

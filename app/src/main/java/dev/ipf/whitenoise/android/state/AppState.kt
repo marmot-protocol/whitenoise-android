@@ -8590,7 +8590,8 @@ class WhiteNoiseAppState private constructor(
         return networkDisplayName(accountIdHex)
     }
 
-    private fun contactNicknameFor(
+    /** Reads a private nickname for the explicitly captured account that owns an asynchronous UI result. */
+    internal fun contactNicknameFor(
         accountRef: String?,
         accountIdHex: String,
     ): String? {
