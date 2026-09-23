@@ -35,7 +35,11 @@ class NostrEventVerifierTest {
 
         vectors.forEach { fields ->
             assertEquals("malformed vector row", 5, fields.size)
-            val (index, publicKey, message, signature, expected) = fields
+            val index = fields[0]
+            val publicKey = fields[1]
+            val message = fields[2]
+            val signature = fields[3]
+            val expected = fields[4]
             assertEquals(
                 "BIP-340 vector $index",
                 expected == "TRUE",

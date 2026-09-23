@@ -20,7 +20,7 @@ class Bip340VerificationBenchmark {
     @Test
     fun signatureOnlyVerification() {
         assertTrue(BIP340.verify(PUBLIC_KEY, MESSAGE, SIGNATURE))
-        assertFalse(BIP340.verify(PUBLIC_KEY, MESSAGE, "0".repeat(128)))
+        assertFalse(BIP340.verify(PUBLIC_KEY, MESSAGE, "0".repeat(SIGNATURE_HEX_LENGTH)))
         repeat(EXPLICIT_WARMUP_OPERATIONS) { assertTrue(BIP340.verify(PUBLIC_KEY, MESSAGE, SIGNATURE)) }
 
         benchmarkRule.measureRepeated {
@@ -41,6 +41,7 @@ class Bip340VerificationBenchmark {
 
     private companion object {
         private const val EXPLICIT_WARMUP_OPERATIONS = 20
+        private const val SIGNATURE_HEX_LENGTH = 128
         private const val PUBLIC_KEY = "F9308A019258C31049344F85F89D5229B531C845836F99B08601F113BCE036F9"
         private const val MESSAGE = "0000000000000000000000000000000000000000000000000000000000000000"
         private const val SIGNATURE =
