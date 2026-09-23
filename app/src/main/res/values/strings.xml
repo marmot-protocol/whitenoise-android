@@ -604,6 +604,7 @@
     <string name="seed_fixture_start">Start</string>
     <string name="seed_fixture_progress">%1$d of %2$d sent · %3$d failed</string>
     <string name="seed_fixture_no_groups">This account has no chats to seed.</string>
+    <string name="seed_fixture_stopped">Stopped · %1$d of %2$d sent</string>
     <string name="developer_testing_only_detail">These tools can expose technical information and change how the app behaves.</string>
     <string name="developer_debugging">Debugging</string>
     <string name="diagnostics">Diagnostics</string>

@@ -30,6 +30,7 @@ import dev.ipf.whitenoise.android.state.seedConversationFixture
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogChoiceRow
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
@@ -64,6 +65,7 @@ internal fun ConversationFixtureSeedDialog(
     var selected by remember { mutableStateOf<String?>(null) }
     val count = rememberTextFieldState(DEFAULT_SEED_COUNT.toString())
     var progress by remember { mutableStateOf<ConversationFixtureSeedProgress?>(null) }
+    var stopped by remember { mutableStateOf(false) }
     var job by remember { mutableStateOf<Job?>(null) }
     val scope = rememberCoroutineScope()
     val running = job?.isActive == true
@@ -85,8 +87,9 @@ internal fun ConversationFixtureSeedDialog(
                     label = { Text(stringResource(R.string.seed_fixture_count)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 )
+                // Above the target list, which can scroll the bottom of the column out of view.
+                SeedProgressText(progress, stopped)
                 ConversationFixtureTargetList(targets, selected, enabled = !running) { selected = it }
-                SeedProgressText(progress)
             }
         },
         confirmButton = {
@@ -95,9 +98,18 @@ internal fun ConversationFixtureSeedDialog(
                 enabled = !running && target != null && requested != null && progress?.finished != true,
                 onClick = {
                     if (target == null || requested == null) return@TextButton
+                    stopped = false
+                    progress = ConversationFixtureSeedProgress(sent = 0, failed = 0, total = requested)
                     job =
                         scope.launch {
-                            appState.seedConversationFixture(target, requested) { progress = it }
+                            try {
+                                appState.seedConversationFixture(target, requested) { progress = it }
+                            } catch (cancelled: CancellationException) {
+                                // The reader's Cancel, or the engine giving up on a send: either way the
+                                // dialog says where the seed stopped instead of falling silent.
+                                stopped = true
+                                throw cancelled
+                            }
                         }
                 },
                 modifier = Modifier.testTag("developer.seed_fixture.start"),
@@ -139,13 +151,22 @@ private fun ConversationFixtureTargetList(
     }
 }
 
-/** Sent, failed and target counts while a seed runs; nothing before it starts. */
+/** Sent, failed and target counts while a seed runs, or where it stopped; nothing before it starts. */
 @Suppress("FunctionNaming")
 @Composable
-private fun SeedProgressText(progress: ConversationFixtureSeedProgress?) {
+private fun SeedProgressText(
+    progress: ConversationFixtureSeedProgress?,
+    stopped: Boolean,
+) {
     if (progress == null) return
+    val text =
+        if (stopped) {
+            stringResource(R.string.seed_fixture_stopped, progress.sent, progress.total)
+        } else {
+            stringResource(R.string.seed_fixture_progress, progress.sent, progress.total, progress.failed)
+        }
     Text(
-        stringResource(R.string.seed_fixture_progress, progress.sent, progress.total, progress.failed),
+        text,
         style = MaterialTheme.typography.bodyMedium,
         modifier = Modifier.testTag("developer.seed_fixture.progress"),
     )

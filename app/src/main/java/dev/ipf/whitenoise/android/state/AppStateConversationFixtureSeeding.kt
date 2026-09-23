@@ -3,6 +3,7 @@
 package dev.ipf.whitenoise.android.state
 
 import kotlinx.coroutines.CancellationException
+import java.util.UUID
 
 /** How far a synthetic-message seed has got: messages MDK accepted, messages it rejected, and the target. */
 internal data class ConversationFixtureSeedProgress(
@@ -30,10 +31,14 @@ internal fun conversationFixtureMessage(
 }
 
 /**
- * Sends [count] synthetic text messages into [groupIdHex] through MDK, one after another, reporting
+ * Admits [count] synthetic text messages into [groupIdHex] through MDK, one after another, reporting
  * after each so a dialog can show progress. Debug tooling for preparing a paging benchmark fixture:
  * the messages are real, so this belongs in a private test group, never a shared one. A rejected
  * send is counted and the seed continues; cancellation stops it where it is.
+ *
+ * Each message goes through the same client-token admission the composer uses, under the same
+ * per-group locks, so the call returns once MDK owns the send durably rather than after relay
+ * publication — the legacy whole-send call waits on relays and a seed of hundreds would never finish.
  */
 internal suspend fun WhiteNoiseAppState.seedConversationFixture(
     groupIdHex: String,
@@ -44,7 +49,15 @@ internal suspend fun WhiteNoiseAppState.seedConversationFixture(
     val account = activeAccountRef ?: return progress.copy(failed = count).also(onProgress)
     for (index in 1..count) {
         val body = conversationFixtureMessage(index, count)
-        val attempt = runCatching { marmotIo { sendText(account, groupIdHex, body) } }
+        val token = "seed-${UUID.randomUUID()}"
+        val attempt =
+            runCatching {
+                withConversationTextSendOrder(account, groupIdHex) {
+                    withGroupCommitLock(account, groupIdHex) {
+                        marmotIo { sendTextWithClientToken(account, groupIdHex, body, token) }
+                    }
+                }
+            }
         attempt.exceptionOrNull()?.let { if (it is CancellationException) throw it }
         progress =
             if (attempt.isSuccess) {

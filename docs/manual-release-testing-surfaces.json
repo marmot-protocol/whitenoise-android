@@ -6562,6 +6562,12 @@
         ]
       },
       {
+        "surface": "string:seed_fixture_stopped",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": "R.string.seed_fixture_stopped",
+        "test_ids": ["SET-020"]
+      },
+      {
         "surface": "string:identity_crop_title",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
         "anchor": "R.string.photo_editor_crop",
