@@ -651,12 +651,13 @@ android {
             kotlin.directories.add("src/testSupport/kotlin")
         }
         getByName("androidTest") {
-            kotlin.directories.add("src/testSupport/kotlin")
             if (instrumentedTestBuildType == "benchmarkRelease") {
-                // Existing notification device tests depend on debug-only helpers.
-                kotlin.exclude("**/notifications/NotificationCatchUpAlertDeviceTest.kt")
-                kotlin.exclude("**/notifications/NotificationHapticVisualTimingDeviceTest.kt")
-                kotlin.exclude("**/notifications/NotificationHeadsUpDurationDeviceTest.kt")
+                // Compile only the benchmark variant's instrumentation sources.
+                // Shared device tests include helpers present only in debug builds.
+                java.setSrcDirs(emptyList<String>())
+                kotlin.setSrcDirs(emptyList<String>())
+            } else {
+                kotlin.directories.add("src/testSupport/kotlin")
             }
         }
     }
