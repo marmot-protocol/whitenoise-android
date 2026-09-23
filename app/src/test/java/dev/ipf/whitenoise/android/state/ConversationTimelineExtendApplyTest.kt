@@ -183,7 +183,6 @@ class ConversationTimelineExtendApplyTest {
      * Their rendered item is still re-stamped, because sliding the window does move them — see
      * [extendRestampsKeptRowsSoTheSlidWindowKeepsItsOrder].
      */
-    /** Retained messages keep their projected object identity across an extension. */
     @Test
     fun extendKeepsUnchangedRecordsByIdentity() =
         runBlocking {
@@ -206,7 +205,6 @@ class ConversationTimelineExtendApplyTest {
      * The regression this mode could most easily introduce: a kept row skips re-projection, so its
      * ordinal must be re-stamped or the slid window would reorder history.
      */
-    /** Retained rows receive the new authoritative ordinals after a window slide. */
     @Test
     fun extendRestampsKeptRowsSoTheSlidWindowKeepsItsOrder() =
         runBlocking {
@@ -222,7 +220,6 @@ class ConversationTimelineExtendApplyTest {
         }
 
     /** Rows the window dropped leave the timeline and every index keyed by their id. */
-    /** Rows trimmed by the new bounded window leave the controller indexes. */
     @Test
     fun extendRemovesRowsTheWindowNoLongerHolds() =
         runBlocking {
@@ -300,7 +297,6 @@ class ConversationTimelineExtendApplyTest {
      * pending, before the live update arrives. The row it newly adds must consume that bubble, or
      * the reader sees the same message twice.
      */
-    /** A forward page can reconcile a pending local send without a full replacement. */
     @Test
     fun extendReconcilesAPendingSendANewerPageConfirms() =
         runBlocking {
