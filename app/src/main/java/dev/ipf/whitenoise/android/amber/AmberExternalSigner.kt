@@ -135,10 +135,9 @@ class AmberExternalSigner(
                     expectedPackageName = packageName,
                     unsignedEventJson = content,
                 )
-            AmberActivityCoordinator.Outcome.NoForegroundActivity ->
-                throw MarmotKitException.ExternalSignerUnavailable(accountPubkey)
-            AmberActivityCoordinator.Outcome.AdmissionUnavailable ->
-                throw MarmotKitException.ExternalSignerUnavailable(accountPubkey)
+            AmberActivityCoordinator.Outcome.NoForegroundActivity,
+            AmberActivityCoordinator.Outcome.AdmissionUnavailable,
+            -> throw MarmotKitException.ExternalSignerUnavailable(accountPubkey)
             AmberActivityCoordinator.Outcome.TimedOut ->
                 throw MarmotKitException.ExternalSignerRejected()
         }
@@ -189,21 +188,21 @@ class AmberExternalSigner(
         return value
     }
 
-    private fun validateSignerPackageEcho(
-        packageName: String?,
-        expectedPackageName: String,
-    ) {
-        signerPackageEchoMismatchReason(packageName, expectedPackageName)?.let { reason ->
-            throw MarmotKitException.Runtime(reason)
-        }
-    }
-
-    private fun newRequestId(): String = UUID.randomUUID().toString()
-
     companion object {
         const val APPROVAL_TIMEOUT_MS = 120_000L
     }
 }
+
+private fun validateSignerPackageEcho(
+    packageName: String?,
+    expectedPackageName: String,
+) {
+    signerPackageEchoMismatchReason(packageName, expectedPackageName)?.let { reason ->
+        throw MarmotKitException.Runtime(reason)
+    }
+}
+
+private fun newRequestId(): String = UUID.randomUUID().toString()
 
 private fun aggregateSignedEvent(
     data: Intent?,
