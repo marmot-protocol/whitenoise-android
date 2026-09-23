@@ -933,7 +933,11 @@ internal fun ComposerPill(
                                     bottom = {
                                         interpolateDp(
                                             CompactEditorBottomInset,
-                                            if (compactEditTextSpacing) EditEditorBottomInset else ExpandedEditorBottomInset,
+                                            if (compactEditTextSpacing) {
+                                                EditEditorBottomInset
+                                            } else {
+                                                ExpandedEditorBottomInset
+                                            },
                                             editingProgress.value,
                                         )
                                     },

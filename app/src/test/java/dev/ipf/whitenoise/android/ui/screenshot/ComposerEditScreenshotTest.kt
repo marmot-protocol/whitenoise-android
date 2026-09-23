@@ -11,6 +11,7 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -19,8 +20,11 @@ import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MessageTextCopy
+import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
+import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_GESTURE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -66,12 +70,46 @@ class ComposerEditScreenshotTest {
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_wrapping_edit_large_rtl.png")
     }
 
+    @Test
+    fun editingAccessoryIsInsideTheSurfaceAndStillCancels() {
+        var cancelled = 0
+        render(
+            darkTheme = true,
+            width = 320,
+            fontScale = 2f,
+            rtl = true,
+            editText = "Message being edited",
+            onCancelEdit = { cancelled += 1 },
+        )
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val surface = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).fetchSemanticsNode().boundsInRoot
+        val cancel =
+            composeRule
+                .onNodeWithContentDescription(context.getString(R.string.cancel_edit))
+                .fetchSemanticsNode()
+                .boundsInRoot
+        val editor = composeRule.onNode(hasSetTextAction()).fetchSemanticsNode().boundsInRoot
+        val border =
+            composeRule
+                .onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG, useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot
+        assertTrue(cancel.left >= surface.left && cancel.right <= surface.right)
+        assertTrue(cancel.top >= border.bottom)
+        // Only four dp of the field's empty leading overlaps the full-size Cancel target.
+        assertTrue(cancel.bottom <= editor.top + with(composeRule.density) { 4.dp.toPx() })
+        assertTrue(editor.bottom <= surface.bottom)
+        composeRule.onNodeWithContentDescription(context.getString(R.string.cancel_edit)).performClick()
+        assertEquals(1, cancelled)
+    }
+
     private fun render(
         darkTheme: Boolean,
         width: Int,
         fontScale: Float,
         rtl: Boolean,
         editText: String,
+        onCancelEdit: () -> Unit = {},
     ) {
         composeRule.setContent {
             val density = LocalDensity.current
@@ -85,6 +123,7 @@ class ComposerEditScreenshotTest {
                             replyingTo = null,
                             messageTextCopy = MessageTextCopy.Default,
                             onCancelReply = {},
+                            onCancelEdit = onCancelEdit,
                             onSend = { _, _ -> },
                             initialDraft = TextFieldValue(""),
                             editingMessageId = "edited-message",

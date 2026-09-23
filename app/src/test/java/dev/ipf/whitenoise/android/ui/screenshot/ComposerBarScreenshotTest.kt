@@ -24,7 +24,6 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -455,29 +454,8 @@ class ComposerBarScreenshotTest {
         assertEquals(1, cancelled)
     }
 
-    /** The edit accessory shares the surface while retaining its native cancellation callback. */
-    @Test
-    fun editingAccessoryIsInsideTheSurfaceAndStillCancels() {
-        var cancelled = 0
-        render(
-            darkTheme = true,
-            draft = "Preserved draft",
-            width = 320,
-            fontScale = 2f,
-            rtl = true,
-            showEdit = true,
-            onCancelEdit = { cancelled += 1 },
-        )
-        assertAccessoryInsideSurface(R.string.cancel_edit, allowedEditorOverlap = 4.dp)
-        composeRule.onNodeWithContentDescription(app.getString(R.string.cancel_edit)).performClick()
-        assertEquals(1, cancelled)
-    }
-
     /** Checks the real accessory control, editor, and border target occupy one bounded surface. */
-    private fun assertAccessoryInsideSurface(
-        label: Int,
-        allowedEditorOverlap: Dp = 0.dp,
-    ) {
+    private fun assertAccessoryInsideSurface(label: Int) {
         val surface = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).fetchSemanticsNode().boundsInRoot
         val accessory = composeRule.onNodeWithContentDescription(app.getString(label)).fetchSemanticsNode().boundsInRoot
         val editor = composeRule.onNode(hasSetTextAction()).fetchSemanticsNode().boundsInRoot
@@ -487,9 +465,7 @@ class ComposerBarScreenshotTest {
                 .fetchSemanticsNode()
                 .boundsInRoot
         assertTrue(accessory.left >= surface.left && accessory.right <= surface.right)
-        assertTrue(accessory.top >= border.bottom)
-        // Edit uses only four dp of the field's empty top leading for the full-size Cancel target.
-        assertTrue(accessory.bottom <= editor.top + with(composeRule.density) { allowedEditorOverlap.toPx() })
+        assertTrue(accessory.top >= border.bottom && accessory.bottom <= editor.top)
         assertTrue(editor.bottom <= surface.bottom)
         assertTrue(editor.width > 0f && editor.height > 0f)
     }
@@ -518,7 +494,6 @@ class ComposerBarScreenshotTest {
         showEdit: Boolean = false,
         voiceRecordingController: VoiceRecordingController? = null,
         attachmentsEnabled: Boolean = false,
-        onCancelEdit: () -> Unit = {},
     ) {
         val dictation = dictationPreview?.let { createDictationPreview(it, TextFieldValue(draft)) }
         composeRule.setContent {
@@ -542,7 +517,6 @@ class ComposerBarScreenshotTest {
                             onPickFromGallery = {}.takeIf { attachmentsEnabled },
                             onPickDocument = {}.takeIf { attachmentsEnabled },
                             initialDraft = TextFieldValue(draft),
-                            onCancelEdit = onCancelEdit,
                             editingMessageId = "edited-message".takeIf { showEdit },
                             editingInitialText = "Message being edited".takeIf { showEdit },
                             dictationController = dictation,
