@@ -208,6 +208,7 @@ import kotlinx.coroutines.yield
 import java.net.IDN
 import java.net.InetAddress
 import java.net.URI
+import java.util.Collections
 import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
@@ -8418,7 +8419,7 @@ class WhiteNoiseAppState private constructor(
         val config = pushServerConfigProvider() ?: return false
         if (!nativePushCapability(config).isAvailable) return false
         val previousPersistent = backgroundConnectionEnabled
-        val previous = linkedMapOf<String, NotificationSettingsFfi>()
+        val previous = Collections.synchronizedMap(linkedMapOf<String, NotificationSettingsFfi>())
         val persistentStopAttempted = AtomicBoolean(false)
         return try {
             val token = pushTokenStore.lastToken() ?: fetchFcmTokenOrNull() ?: return false
@@ -8464,7 +8465,7 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /** Enables and registers the captured account set under the existing no-overlap native sync lock. */
+    /** Registers at most three accounts together while the native sync lock fences other mutations. */
     private suspend fun enableNativeDeliveryForAccounts(
         owner: NotificationDeliveryModeOwner,
         config: PushServerConfig,
@@ -8472,11 +8473,13 @@ class WhiteNoiseAppState private constructor(
         previous: MutableMap<String, NotificationSettingsFfi>,
     ): Boolean =
         nativePushSyncMutex.withLock {
-            val allAccountsReady =
-                owner.accountRefs.all { account ->
-                    configureNativeDeliveryForAccount(owner, account, config, token, previous)
-                }
-            allAccountsReady && ownsNotificationDeliveryMode(owner)
+            val orderedAccounts = listOf(owner.activeAccountRef) + owner.accountRefs.filterNot { it == owner.activeAccountRef }
+            orderedAccounts.chunked(3).all { batch ->
+                coroutineScope {
+                    batch.map { async { configureNativeDeliveryForAccount(owner, it, config, token, previous) } }
+                        .awaitAll().all { it }
+                } && ownsNotificationDeliveryMode(owner)
+            }
         }
 
     /** Applies one account's authoritative notification preference and confirms its registration. */
@@ -8489,10 +8492,7 @@ class WhiteNoiseAppState private constructor(
         previous: MutableMap<String, NotificationSettingsFfi>,
     ): Boolean {
         if (!ownsNotificationDeliveryMode(owner)) return false
-        val settings =
-            withContext(Dispatchers.IO) {
-                owner.runtime.marmot.notificationSettings(account)
-            }
+        val settings = withContext(Dispatchers.IO) { owner.runtime.marmot.notificationSettings(account) }
         if (!ownsNotificationDeliveryMode(owner)) return false
         previous[account] = settings
         val desiredNative = settings.localNotificationsEnabled

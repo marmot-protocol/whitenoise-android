@@ -553,6 +553,78 @@ class NotificationDeliveryModeRecoveryTest {
             }
         }
 
+    /** Slow per-account registration overlaps only within the fixed batch and never stops Local early. */
+    @Test
+    fun fcmRegistrationIsBoundedAndKeepsLocalUntilEveryAccountIsReady() =
+        runBlocking {
+            BackgroundConnectionPreferences.setEnabledDurably(context, true)
+            val threeStarted = CountDownLatch(3)
+            val release = CountDownLatch(1)
+            val active = AtomicInteger()
+            val maximum = AtomicInteger()
+            val started = AtomicInteger()
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val fixture =
+                fixture(
+                    platform = platform,
+                    nativeEnabled = false,
+                    accounts = listOf(account(ACCOUNT_A), account(ACCOUNT_B), account("account-c"), account("account-d")),
+                    onUpsert = {
+                        started.incrementAndGet()
+                        maximum.accumulateAndGet(active.incrementAndGet()) { current, candidate ->
+                            maxOf(current, candidate)
+                        }
+                        threeStarted.countDown()
+                        check(release.await(10, TimeUnit.SECONDS))
+                        active.decrementAndGet()
+                    },
+                    fcmAvailable = true,
+                )
+            try {
+                fixture.bootstrap()
+                PushTokenStore.create(context).setToken("test-token")
+                val result = async { fixture.appState.setNotificationDeliveryMode(NotificationDeliveryMode.Fcm) }
+                withTimeout(5_000L) { while (threeStarted.count > 0L) yield() }
+
+                assertEquals(3, started.get())
+                assertEquals(3, maximum.get())
+                assertEquals(0, platform.stops.get())
+                assertTrue(BackgroundConnectionPreferences.isEnabled(context))
+
+                release.countDown()
+                assertTrue(fixture.runWithMainLooperPumping { result.await() })
+                assertEquals(4, started.get())
+                assertEquals(3, maximum.get())
+                assertEquals(1, platform.stops.get())
+            } finally {
+                release.countDown()
+                fixture.close()
+            }
+        }
+
+    /** A failed concurrent registration restores changed accounts without dropping Local delivery. */
+    @Test
+    fun concurrentFcmRegistrationFailureKeepsLocalDelivery() =
+        runBlocking {
+            BackgroundConnectionPreferences.setEnabledDurably(context, true)
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val fixture = fcmFixture(platform) { account ->
+                if (account == ACCOUNT_B) error("registration failed")
+            }
+            try {
+                fixture.bootstrap()
+                PushTokenStore.create(context).setToken("test-token")
+
+                assertFalse(fixture.runWithMainLooperPumping { fixture.appState.setNotificationDeliveryMode(NotificationDeliveryMode.Fcm) })
+                assertFalse(fixture.notificationSettings(ACCOUNT_A).nativePushEnabled)
+                assertFalse(fixture.notificationSettings(ACCOUNT_B).nativePushEnabled)
+                assertTrue(BackgroundConnectionPreferences.isEnabled(context))
+                assertEquals(0, platform.stops.get())
+            } finally {
+                fixture.close()
+            }
+        }
+
     /** Reselecting an already-native mode still treats an absent service as a settled success. */
     @Test
     fun fcmReselectionSucceedsWhenPersistentServiceIsAlreadyAbsent() =
