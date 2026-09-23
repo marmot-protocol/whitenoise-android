@@ -89,7 +89,11 @@ class FocusedMessageImeOverlayTest {
         )
         composeRule.onNodeWithTag(FOCUSED_ACTION_MENU_SCROLL_TEST_TAG).assertIsDisplayed()
 
-        composeRule.onNodeWithText("Action 11").performScrollTo().assertIsDisplayed().performClick()
+        composeRule
+            .onNodeWithText("Action 11")
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
         composeRule.waitForIdle()
 
         val previewAfter = composeRule.onNodeWithTag("message-actions-preview").fetchSemanticsNode().boundsInRoot

@@ -28,8 +28,9 @@ class FocusedMessageImeScreenshotTest {
     fun keyboardOpenLight() = capture("focused_overlay_keyboard_open_light", dark = false, fontScale = 1f)
 
     @Test
-    fun keyboardOpenLargeFontDark() =
+    fun keyboardOpenLargeFontDark() {
         capture("focused_overlay_keyboard_open_large_font_dark", dark = true, fontScale = 2f)
+    }
 
     private fun capture(
         name: String,
