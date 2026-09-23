@@ -824,7 +824,10 @@ class ConversationSendRetryIntegrationTest {
             val second = async { controller.send("next") }
             first.await()
             second.await()
-            assertTrue("cancelled retry held text order through backoff", testScheduler.currentTime - cancellationAtMs < SEND_RETRY_BACKOFF_MS)
+            assertTrue(
+                "cancelled retry held text order through backoff",
+                testScheduler.currentTime - cancellationAtMs < SEND_RETRY_BACKOFF_MS,
+            )
             assertEquals("offline draft", appState.draftFor(GROUP_ID))
             assertEquals(listOf("offline draft", "next"), published)
             assertEquals(1, controller.timeline.size)
