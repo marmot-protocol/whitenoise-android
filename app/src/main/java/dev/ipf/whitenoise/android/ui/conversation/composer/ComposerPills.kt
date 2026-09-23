@@ -411,6 +411,7 @@ internal fun ComposerPill(
     compactMeasurementReservesTrailingAction: Boolean = trailingAction != null,
     compactOuterEndInset: Dp = 0.dp,
     forceEditingLayout: Boolean = false,
+    compactSingleLineEdit: Boolean = false,
     accessoryContent: (@Composable () -> Unit)? = null,
     voiceReviewContent: (@Composable () -> Unit)? = null,
     inputContentVisible: Boolean = true,
@@ -658,6 +659,30 @@ internal fun ComposerPill(
             mode = expansionMode,
             dismissInProgress = dismissInProgress,
         )
+    val compactEditStartInset =
+        if (compactSingleLineEdit && !hasAttachmentAction) 40.dp else CompactEditorStartInset
+    // A short edit can share the compact row with its actions. Measure at that row's actual
+    // text width before choosing it; wrapping edits keep the full-width editing layout.
+    val editFitsCompactRow =
+        compactSingleLineEdit &&
+            expansionMode == ComposerExpansionMode.Automatic &&
+            compactMeasurementWidth?.let { measurementWidth ->
+                val compactWidthPx =
+                    with(density) {
+                        (measurementWidth - (compactEditStartInset + compactMeasurementTrailingReserve))
+                            .coerceAtLeast(1.dp)
+                            .roundToPx()
+                    }
+                remember(transformedText.text, composerTextStyle, compactWidthPx, textMeasurer) {
+                    val measuredText =
+                        textMeasurer.measure(
+                            text = transformedText.text,
+                            style = composerTextStyle,
+                            constraints = Constraints(maxWidth = compactWidthPx),
+                        )
+                    measuredText.lineCount == 1
+                }
+            } == true
     val compactDraftMeasurement =
         compactMeasurementWidth?.let { measurementWidth ->
             val editingWidthPx =
@@ -668,16 +693,17 @@ internal fun ComposerPill(
                 }
             val compactWidthPx =
                 with(density) {
-                    (measurementWidth - (CompactEditorStartInset + compactMeasurementTrailingReserve))
+                    (measurementWidth - (compactEditStartInset + compactMeasurementTrailingReserve))
                         .coerceAtLeast(1.dp)
                         .roundToPx()
                 }
-            val startsEditing = editingRequested && !multilineControlsSuppressed
+            val startsEditing = editingRequested && !multilineControlsSuppressed && !editFitsCompactRow
             remember(
                 transformedText.text,
                 composerTextStyle,
                 editingWidthPx,
                 compactWidthPx,
+                compactEditStartInset,
                 startsEditing,
                 multilineControlsSuppressed,
                 textMeasurer,
@@ -755,7 +781,7 @@ internal fun ComposerPill(
     // mode unfolds into the full-width editing row above the native controls.
     val editingLayout =
         !multilineControlsSuppressed &&
-            (editingRequested || expandedLayout)
+            ((editingRequested && !editFitsCompactRow) || expandedLayout)
     val editingProgress =
         animateFloatAsState(
             targetValue = if (editingLayout) 1f else 0f,

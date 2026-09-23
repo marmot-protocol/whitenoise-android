@@ -1077,8 +1077,12 @@ internal fun ComposerBar(
                                         // radius trims the AMOLED reply outline at all four corners. The edit
                                         // row keeps the existing wrapper clip because it uses the same shape.
                                         Modifier
-                                            .padding(8.dp)
-                                            .then(
+                                            .padding(
+                                                start = 8.dp,
+                                                top = 8.dp,
+                                                end = 8.dp,
+                                                bottom = if (editingMessageId != null) 4.dp else 8.dp,
+                                            ).then(
                                                 if (editingMessageId != null) {
                                                     Modifier.clip(MaterialTheme.shapes.large)
                                                 } else {
@@ -1092,7 +1096,7 @@ internal fun ComposerBar(
                                                     .fillMaxWidth()
                                                     .clip(MaterialTheme.shapes.large)
                                                     .background(MaterialTheme.colorScheme.surfaceContainer)
-                                                    .padding(10.dp),
+                                                    .padding(horizontal = 10.dp, vertical = 2.dp),
                                                 verticalAlignment = Alignment.CenterVertically,
                                             ) {
                                                 Icon(
@@ -1433,6 +1437,7 @@ internal fun ComposerBar(
                                 replyingTo != null ||
                                 dictationActiveInComposer ||
                                 hasPendingAttachments,
+                        compactSingleLineEdit = editingMessageId != null,
                         onMultilineControlsChanged = { composerUsesMultilineControls = it },
                         multilineControlsSuppressed = composerMultilineControlsSuppressed(automaticComposerCeiling),
                         dismissInProgress = composerDismissInProgress,
