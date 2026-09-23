@@ -9,6 +9,7 @@ import org.junit.Test
 import java.io.File
 
 /** Regression coverage for the local-ready account-switch boundary. */
+@Suppress("LargeClass") // Source-order assertions share one parser and the same account-switch lifecycle boundary.
 class AccountSwitchLocalSnapshotOrderingTest {
     @Test
     fun profileSeedSetIncludesEveryVisibleOtherAccountAndExcludesOverflow() {
