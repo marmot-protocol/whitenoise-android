@@ -784,6 +784,12 @@ internal class ConversationScrollCoordinator(
             val targetIndex = resolveIndex()?.coerceAtLeast(0) ?: return false
             if (isFar(targetIndex)) {
                 writer.scrollToTail(targetIndex)
+                // The snap suspends, and a page landing meanwhile can add or drop the structural rows
+                // below the newest message, moving its index. Re-read it once and correct with a
+                // second snap; still no animation.
+                ensureCurrent()
+                val settledIndex = resolveIndex()?.coerceAtLeast(0)
+                if (settledIndex != null && settledIndex != targetIndex) writer.scrollToTail(settledIndex)
             } else {
                 writer.animateScrollToTail(targetIndex)
             }
@@ -819,13 +825,16 @@ internal class ConversationScrollCoordinator(
 }
 
 /** Performs the explicit newest-message action without bypassing coordinator ownership. */
-internal suspend fun ConversationScrollCoordinator.jumpToNewest(targetIndex: Int): Boolean =
+internal suspend fun ConversationScrollCoordinator.jumpToNewest(
+    targetIndex: Int,
+    resolveTailIndex: () -> Int? = { targetIndex },
+): Boolean =
     programmaticJump(
         targetMessageId = null,
         reason = ConversationScrollReason.JumpToNewest,
         resultingMode = ConversationScrollMode.FollowingTail,
     ) {
-        animateScrollToTail(targetIndex)
+        animateScrollToTail(targetIndex, resolveTailIndex)
     }
 
 /**
@@ -853,7 +862,7 @@ internal suspend fun ConversationScrollCoordinator.jumpToUnreadOrNewest(
                 if (!tailPrepared) {
                     throw CancellationException("Conversation newest edge was not available")
                 }
-                animateScrollToTail(resolveTailIndex())
+                animateScrollToTail(resolveTailIndex(), resolveTailIndex)
             }
         return if (completed && tailPrepared) {
             ConversationJumpToNewestOutcome.Tail
