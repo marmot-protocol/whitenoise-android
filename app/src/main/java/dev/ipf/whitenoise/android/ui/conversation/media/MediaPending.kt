@@ -323,11 +323,14 @@ private fun PendingGridTile(
         }
         if (attachment.isPendingVideo) {
             PendingVideoBadge(Modifier.align(Alignment.TopStart).padding(6.dp))
-            if (preview == null) {
+            // The overflow tile still needs to say "+N" even for a video whose poster
+            // hasn't decoded yet (or never will) -- the fallback label would otherwise
+            // sit where that count belongs, and hide it permanently on a decode failure.
+            if (preview == null && overflowCount == 0) {
                 PendingVideoFallback(attachment, Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp))
             }
         }
-        if (overflowCount > 0 && preview != null) {
+        if (overflowCount > 0) {
             Box(
                 Modifier.fillMaxSize().background(Color.Black.copy(alpha = PENDING_OVERFLOW_SCRIM_ALPHA)),
                 contentAlignment = Alignment.Center,

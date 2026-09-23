@@ -97,6 +97,18 @@ class PendingVideoPreviewTest {
         composeRule.onAllNodesWithTag(PENDING_VIDEO_BADGE_TAG, useUnmergedTree = true).assertCountEquals(1)
     }
 
+    /**
+     * The overflow chip still reads "+N" on the last visible tile when that tile is a video whose
+     * poster hasn't decoded (or never will) -- a video must not permanently hide the count the way
+     * [PendingVideoFallback] alone would if it kept rendering underneath it.
+     */
+    @Test
+    fun overflowChipStillShowsOnAnUndecodedVideoTile() {
+        render((1..6).map { video("clip-$it.mp4") })
+
+        composeRule.onNodeWithText("+1").assertExists()
+    }
+
     /** A document sent beside visual media stays a file pill under the visual bubble. */
     @Test
     fun documentsBesideVisualMediaStayFilePills() {
