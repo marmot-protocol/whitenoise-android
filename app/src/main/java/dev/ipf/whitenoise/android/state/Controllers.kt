@@ -119,7 +119,6 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -9241,8 +9240,9 @@ class ConversationController(
     // path putting the message back as Failed.
     private val discardedDuringRetry = mutableSetOf<String>()
 
-    /** Wakes the text-order owner so a cancelled retry cannot hold later sends in backoff. */
-    private val optimisticCancellationGeneration = MutableStateFlow(0L)
+    /** Shared wakeup lets a replacement controller release an old controller's retry. */
+    private val optimisticCancellationGeneration =
+        appState.optimisticCancellationGeneration(conversationAccountRef, initialGroup.groupIdHex)
 
     /**
      * Settles the durable-acceptance callback for [optimisticKey], and retires the send-failure

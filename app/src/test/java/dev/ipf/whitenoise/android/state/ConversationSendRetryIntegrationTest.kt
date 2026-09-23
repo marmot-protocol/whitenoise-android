@@ -838,6 +838,50 @@ class ConversationSendRetryIntegrationTest {
 
     @Test
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    fun replacementControllerCancellationWakesOriginalRetryBeforeBackoff() =
+        runTest {
+            val appState = appState()
+            val firstFailed = CompletableDeferred<Unit>()
+            val published = mutableListOf<String>()
+            val original =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, text ->
+                        published += text
+                        firstFailed.complete(Unit)
+                        throw MarmotKitException.Publish("connect relay failed")
+                    },
+                )
+            val first = async { original.send("offline") }
+            firstFailed.await()
+            runCurrent()
+            val replacement =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, text ->
+                        published += text
+                        successfulSendSummary()
+                    },
+                )
+            assertTrue(replacement.deleteMessage(replacement.timeline.single().record, presentFailure = false))
+            val cancellationAtMs = testScheduler.currentTime
+            val second = async { replacement.send("next") }
+            first.await()
+            second.await()
+            assertTrue(
+                "replacement cancellation left original retry sleeping",
+                testScheduler.currentTime - cancellationAtMs < SEND_RETRY_BACKOFF_MS,
+            )
+            assertEquals(listOf("offline", "next"), published)
+            assertEquals(1, replacement.timeline.size)
+        }
+
+    @Test
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     fun cancellingOfflineReplyDuringBackoffPreventsLaterAdmission() =
         runTest {
             val firstFailed = CompletableDeferred<Unit>()

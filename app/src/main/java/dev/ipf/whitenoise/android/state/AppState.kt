@@ -2146,6 +2146,7 @@ class WhiteNoiseAppState private constructor(
     // already owned by MDK.
     private val optimisticSendPhasesByConversation =
         mutableMapOf<String, MutableMap<String, OptimisticSendPhase>>()
+    private val optimisticCancellationGenerationByConversation = mutableMapOf<String, MutableStateFlow<Long>>()
 
     // Retained-upload bytes survive screen disposal so a user who navigates
     // out of a chat mid-send and returns sees the pending bubble still carry
@@ -2819,6 +2820,16 @@ class WhiteNoiseAppState private constructor(
             optimisticSendPhasesByConversation.getOrPut(key) { mutableMapOf() }
         }
 
+    /** Shares retry wakeups across controllers for the same account and conversation. */
+    internal fun optimisticCancellationGeneration(
+        accountRef: String?,
+        groupIdHex: String,
+    ): MutableStateFlow<Long> =
+        synchronized(conversationStateLock) {
+            val key = retainConversationState(accountRef, groupIdHex)
+            optimisticCancellationGenerationByConversation.getOrPut(key) { MutableStateFlow(0L) }
+        }
+
     /** Resolves a delivered chat-list projection to the exact accepted-pending optimistic send. */
     internal fun acceptedPendingTextOptimisticId(
         accountRef: String?,
@@ -2919,6 +2930,7 @@ class WhiteNoiseAppState private constructor(
         retentionAtSendByConversation.remove(staleKey)
         acceptedPendingTextOptimisticIdsByConversation.remove(staleKey)
         optimisticSendPhasesByConversation.remove(staleKey)
+        optimisticCancellationGenerationByConversation.remove(staleKey)
         retainedMediaUploadsByConversation.remove(staleKey)
         activeUploadKeysByConversation.remove(staleKey)
         pendingProjectionsAwaitingBridgeByConversation.remove(staleKey)
@@ -5454,6 +5466,7 @@ class WhiteNoiseAppState private constructor(
             acceptedPendingTextOptimisticIdsByConversation.clear()
             optimisticSendPhasesByConversation.values.forEach { it.clear() }
             optimisticSendPhasesByConversation.clear()
+            optimisticCancellationGenerationByConversation.clear()
         }
         // Cancel any in-flight downloads (their Deferred may hold plaintext or
         // a retained-media outcome) and drop both indexes so the next session
