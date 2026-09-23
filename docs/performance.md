@@ -426,6 +426,19 @@ Read energy from the retained `.perfetto-trace` files when rails were sampled,
 compare a paging journey against the same fling inside an already-loaded window
 so paging is charged only for what it adds to drawing, and never across devices.
 
+Because that merge rule also hides every iteration a missing label touches, read
+the per-iteration numbers from the traces rather than the JSON:
+
+```bash
+PAGING_REPORT_PYTHON=~/.venvs/perfetto/bin/python \
+  scripts/run-paging-trace-report.sh benchmark/build/outputs/manual/<UTC timestamp>/
+```
+
+`scripts/paging_trace_report.py` (needs the `perfetto` Python package) prints one
+row per iteration — pages crossed, window/prepare/apply sums and maxima, the
+three edge counts, Choreographer frame P50/P90/P99/max and the count over 32 ms,
+main-thread running time — followed by per-journey medians.
+
 Both scroll benchmarks report frame timing, a `journeyDurationMs` trace section,
 and peak process memory for the measured window: `memoryHeapSizeKb`,
 `memoryRssAnonKb`, and `memoryGpuKb`. Read the memory values as a budget rather
