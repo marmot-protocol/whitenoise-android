@@ -102,7 +102,8 @@ class KeyPackageDeletionDnsDeadlineTest {
 
             assertEquals(KeyPackageDeletionResult.Deleted, result)
             assertEquals(listOf("wss://online.example"), deletedThrough)
-            assertTrue(started in 1..4)
+            // The total deadline can begin one final lookup at the host-timeout boundary.
+            assertTrue(started in 1..5)
             assertEquals(started, cancelled)
             assertEquals(0, active)
             assertEquals(1, maxActive)

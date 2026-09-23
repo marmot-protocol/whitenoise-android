@@ -161,7 +161,9 @@ class NotificationRevocationTest {
         const val ACCOUNT = "notification-revocation"
     }
 
-    private class PermissionRegistry : ActivityResultRegistry(), ActivityResultRegistryOwner {
+    private class PermissionRegistry :
+        ActivityResultRegistry(),
+        ActivityResultRegistryOwner {
         override val activityResultRegistry: ActivityResultRegistry get() = this
         private var requestCode: Int? = null
 
