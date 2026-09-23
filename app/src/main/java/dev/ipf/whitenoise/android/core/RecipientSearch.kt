@@ -252,3 +252,22 @@ object RecipientSearch {
     private const val MATCHED_FIELD_NPUB_RANK = 4
     private const val MATCHED_FIELD_PUBKEY_RANK = 5
 }
+
+/**
+ * Overlays private, account-scoped nicknames without discarding the public profile aliases used for matching.
+ *
+ * Applying this after every streamed directory publication prevents a late public-profile row from replacing
+ * a newer local label, while [RecipientSearch.browse] can still match the public profile aliases.
+ */
+fun withLocalRecipientDisplayNames(
+    candidates: List<RecipientSearch.Candidate>,
+    localNickname: (String) -> String?,
+): List<RecipientSearch.Candidate> =
+    candidates.map { candidate ->
+        val nickname = ProfileSanitizer.displayName(localNickname(candidate.accountIdHex))
+        if (nickname == null || nickname == candidate.displayName) {
+            candidate
+        } else {
+            candidate.copy(displayName = nickname)
+        }
+    }

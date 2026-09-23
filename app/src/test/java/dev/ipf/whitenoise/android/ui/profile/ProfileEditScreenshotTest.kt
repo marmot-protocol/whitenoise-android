@@ -48,6 +48,14 @@ class ProfileEditScreenshotTest {
     /** Editing reveals the separate image-source controls and pinned Save. */
     @Test fun profileEditingLight() = capture("profile_editing_light", editing = true)
 
+    /** Settings-avatar entry opens the existing picture source menu without committing a draft. */
+    @Test
+    fun profilePictureActionsDirectEntry() =
+        capture(
+            file = "profile_picture_actions_direct_entry",
+            directPictureActions = true,
+        )
+
     /** Edit and Suggest name use light action text against the dark form surfaces. */
     @Test fun profileEditingDark() = capture("profile_editing_dark", editing = true, dark = true)
 
@@ -96,6 +104,7 @@ class ProfileEditScreenshotTest {
         invalid: Boolean = false,
         images: Boolean = false,
         suggest: Boolean = false,
+        directPictureActions: Boolean = false,
     ) {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val account = "0101010101010101010101010101010101010101010101010101010101010101"
@@ -142,6 +151,7 @@ class ProfileEditScreenshotTest {
                         { true },
                         resolveAddress = { account },
                         resolveLightning = { true },
+                        openPictureActionsOnEntry = directPictureActions,
                     )
                 }
             }

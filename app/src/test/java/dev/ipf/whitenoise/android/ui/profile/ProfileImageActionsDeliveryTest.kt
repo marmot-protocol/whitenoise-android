@@ -60,6 +60,32 @@ class ProfileImageActionsDeliveryTest {
     @Test
     fun filesReturnAfterEditingCanceledIsIgnored() = exercise(Source.Files, Transition.CancelEdit)
 
+    /** A direct Settings entry waits for profile readiness, then expands the existing picture menu once. */
+    @Test
+    fun directEntryExpandsPictureActionsOnlyWhenEnabled() {
+        val enabled = mutableStateOf(false)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ProfileImageActions(
+                    owner = "account-a",
+                    target = ProfileImageTarget.Picture,
+                    hasImage = false,
+                    enabled = enabled.value,
+                    busy = false,
+                    onPick = { _, _ -> },
+                    onWeb = {},
+                    onRemove = {},
+                    expandOnEntry = true,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(context.getString(R.string.profile_choose_photos)).assertDoesNotExist()
+        composeRule.runOnIdle { enabled.value = true }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(context.getString(R.string.profile_choose_photos)).assertExists()
+    }
+
     /** Exercise. */
     private fun exercise(
         source: Source,

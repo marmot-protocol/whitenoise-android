@@ -1698,6 +1698,7 @@ internal fun ChatsScreen(
                                     .fillMaxSize()
                                     .trackWhiteNoiseHeader(chatListState)
                                     .clipToBounds()
+                                    .chatListEdgeFade(chatListState)
                                     .cancelPointersAcrossChatListMotion(chatListInteractionsEnabled)
                                     .onGloballyPositioned { coordinates ->
                                         chatListWindowTop = coordinates.positionInWindow().y

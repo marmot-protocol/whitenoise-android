@@ -96,6 +96,8 @@ internal fun ProfileEditContent(
     hasAccount: Boolean,
     editing: Boolean,
     ready: Boolean,
+    imageActionsReady: Boolean = ready,
+    openPictureActionsOnEntry: Boolean = false,
     busy: Boolean,
     pictureUrl: String?,
     bannerUrl: String?,
@@ -174,7 +176,7 @@ internal fun ProfileEditContent(
                     seed,
                     ProfileImageTarget.Banner,
                     bannerPresent,
-                    !busy && !bannerUploading,
+                    imageActionsReady && !busy && !bannerUploading,
                     bannerUploading,
                     onPickImage,
                     onEditBanner,
@@ -212,11 +214,12 @@ internal fun ProfileEditContent(
                     seed,
                     ProfileImageTarget.Picture,
                     picturePresent,
-                    !busy && !pictureUploading,
+                    imageActionsReady && !busy && !pictureUploading,
                     pictureUploading,
                     onPickImage,
                     onEditPicture,
                     onRemoveImage,
+                    expandOnEntry = openPictureActionsOnEntry,
                 )
                 if (!pictureValid) {
                     Text(
@@ -430,8 +433,10 @@ internal fun ProfileImageActions(
     onPick: (ProfileImageTarget, Uri) -> Unit,
     onWeb: () -> Unit,
     onRemove: (ProfileImageTarget) -> Unit,
+    expandOnEntry: Boolean = false,
 ) {
     var expanded by remember(owner) { mutableStateOf(false) }
+    var entryExpansionConsumed by remember(owner, target) { mutableStateOf(false) }
     var pickerOwner by remember(owner) { mutableStateOf<String?>(null) }
     var launchFailed by remember(owner) { mutableStateOf(false) }
     val photos =
@@ -447,6 +452,12 @@ internal fun ProfileImageActions(
             if (valid && uri != null) onPick(target, uri)
         }
     val actionTag = if (target == ProfileImageTarget.Banner) "profile.banner_actions" else "profile.photo_actions"
+    LaunchedEffect(expandOnEntry, enabled) {
+        if (expandOnEntry && enabled && !entryExpansionConsumed) {
+            expanded = true
+            entryExpansionConsumed = true
+        }
+    }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box {
             FilledTonalButton(
