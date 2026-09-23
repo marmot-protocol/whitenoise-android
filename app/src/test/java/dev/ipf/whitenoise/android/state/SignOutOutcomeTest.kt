@@ -157,6 +157,20 @@ class OtherAccountAvatarsTest {
         assertFalse(account("", externalSigning = true).isSignedInSigningAccount())
     }
 
+    /** Signing identity projection excludes retained signed-out and read-only accounts. */
+    @Test
+    fun signedInSigningAccountIdsExcludeRetainedAndReadOnlyIdentities() {
+        val accounts =
+            listOf(
+                account("local"),
+                account("amber", localSigning = false, externalSigning = true),
+                account("read-only", localSigning = false),
+                account("signed-out", signedOut = true),
+            )
+
+        assertEquals(setOf("hex-local", "hex-amber"), accounts.signedInSigningAccountIds())
+    }
+
     @Test
     fun excludesSignedOutReadOnlyAndBlankLabelAccounts() {
         val others =

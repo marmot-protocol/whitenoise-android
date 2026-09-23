@@ -34,6 +34,12 @@ internal fun AccountSummaryFfi.isSignedInSigningAccount(): Boolean =
         label.isNotBlank() &&
         (localSigning || externalSigning)
 
+/** Returns the stable identities of every locally signed-in signing account. */
+internal fun List<AccountSummaryFfi>.signedInSigningAccountIds(): Set<String> =
+    mapNotNullTo(mutableSetOf()) { account ->
+        account.accountIdHex.takeIf { account.isSignedInSigningAccount() }
+    }
+
 /** Mirror a completed engine sign-out when its follow-up account refresh fails. */
 internal fun reconcileCachedAccountsAfterSignOut(
     accounts: List<AccountSummaryFfi>,

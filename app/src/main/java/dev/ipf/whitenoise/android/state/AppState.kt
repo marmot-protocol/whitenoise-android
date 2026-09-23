@@ -2414,10 +2414,7 @@ class WhiteNoiseAppState private constructor(
                 ::notificationMessageRecord,
             )
 
-        override fun signedInAccountIds(): Set<String> =
-            accounts
-                .filter { it.isSignedInSigningAccount() }
-                .mapTo(mutableSetOf()) { it.accountIdHex }
+        override fun signedInAccountIds(): Set<String> = accounts.signedInSigningAccountIds()
     }
 
     private val notificationAvatarCoordinator by lazy {
