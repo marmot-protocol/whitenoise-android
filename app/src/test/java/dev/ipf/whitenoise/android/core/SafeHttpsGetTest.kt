@@ -139,7 +139,7 @@ class SafeHttpsGetTest {
     }
 
     @Test
-    fun pinnedAddressLoopObservesRequestDeadlineBetweenConnectAttempts() {
+    fun pinnedAddressLoopObservesCancellationAndDeadlineBetweenConnectAttempts() {
         // Retained intentionally: the injected transport is already connected,
         // so this uniquely pins the deadline check between real IP attempts.
         val source = safeHttpsGetSource().readText()
@@ -152,8 +152,7 @@ class SafeHttpsGetTest {
         )
         assertTrue(
             "pinned-address loop must stop once the request deadline is spent",
-            Regex("""for\s*\(\s*address\s+in\s+addresses\s*\)\s*\{\s*if\s*\(\s*deadlineExceeded\(requestDeadlineNanos\)\s*\)\s*return\s+null""")
-                .containsMatchIn(openPinnedConnection),
+            "request.isCancelled() || deadlineExceeded(request.requestDeadlineNanos)" in openPinnedConnection,
         )
     }
 

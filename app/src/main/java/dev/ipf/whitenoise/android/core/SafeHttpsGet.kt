@@ -24,6 +24,7 @@ import javax.net.ssl.SSLSession
 import javax.net.ssl.SSLSocket
 import javax.net.ssl.SSLSocketFactory
 
+/** One DNS-vetted HTTPS hop, including cancellation callbacks used during connection setup. */
 internal class SafeHttpsPinnedRequest(
     val parsed: URL,
     val addresses: Array<InetAddress>,
@@ -31,6 +32,8 @@ internal class SafeHttpsPinnedRequest(
     val connectTimeoutMillis: Int,
     val readTimeoutMillis: Int,
     val requestHeaders: Map<String, String>,
+    val activate: (HttpURLConnection) -> Boolean = { true },
+    val isCancelled: () -> Boolean = { false },
 )
 
 internal class SafeHttpsGetDependencies(
@@ -116,16 +119,7 @@ object SafeHttpsGet {
     private val defaultDependencies =
         SafeHttpsGetDependencies(
             resolve = { host -> InetAddress.getAllByName(host) },
-            openPinnedConnection = { request ->
-                openPinnedConnection(
-                    parsed = request.parsed,
-                    addresses = request.addresses,
-                    requestDeadlineNanos = request.requestDeadlineNanos,
-                    connectTimeoutMillis = request.connectTimeoutMillis,
-                    readTimeoutMillis = request.readTimeoutMillis,
-                    requestHeaders = request.requestHeaders,
-                )
-            },
+            openPinnedConnection = { request -> openPinnedConnection(request) },
         )
 
     internal fun requestDeadlineMillis(
@@ -175,9 +169,10 @@ object SafeHttpsGet {
 
     /**
      * Test seam around DNS and the already-connected pinned transport.
-     * Each policy rejection is intentionally explicit and fail-closed.
+     * Each policy rejection is intentionally explicit, fail-closed, and kept
+     * inline so the ordered security policy remains auditable.
      */
-    @Suppress("CyclomaticComplexMethod", "ReturnCount")
+    @Suppress("CyclomaticComplexMethod", "LongMethod", "ReturnCount")
     internal fun get(
         url: String,
         maxBodyBytes: Int,
@@ -219,6 +214,8 @@ object SafeHttpsGet {
                         connectTimeoutMillis = connectTimeoutMillis,
                         readTimeoutMillis = readTimeoutMillis,
                         requestHeaders = headersForHop(requestHeaders, original = original, current = parsed),
+                        activate = cancellation::activate,
+                        isCancelled = cancellation::isCancelled,
                     ),
                 ) ?: return null
             if (!cancellation.activate(connection)) return null
@@ -280,36 +277,48 @@ object SafeHttpsGet {
         }
 
     /**
-     * Connects pinned to one of the vetted resolved [addresses] so the socket
+     * Connects pinned to one of the vetted addresses in [request] so the socket
      * cannot be re-steered by a second, independently-answered DNS resolution.
      * Tries each address in resolver-preference order — a dual-stack host with
      * one unreachable family still connects, mirroring the platform's own
      * fallback — advancing only on a connect-time failure. Returns the
-     * connected (request-configured) connection, or null when no vetted
-     * address is reachable.
+     * connected (request-configured) connection, or null when cancelled or no
+     * vetted address is reachable. Each terminal condition returns immediately
+     * so a cancelled or expired request cannot advance to another address.
      */
-    private fun openPinnedConnection(
-        parsed: URL,
-        addresses: Array<InetAddress>,
-        requestDeadlineNanos: Long,
-        connectTimeoutMillis: Int,
-        readTimeoutMillis: Int,
-        requestHeaders: Map<String, String>,
+    @Suppress("ReturnCount")
+    internal fun openPinnedConnection(
+        request: SafeHttpsPinnedRequest,
+        connectionFactory: (
+            parsed: URL,
+            address: InetAddress,
+            connectTimeoutMillis: Int,
+            readTimeoutMillis: Int,
+            requestHeaders: Map<String, String>,
+        ) -> HttpURLConnection? = ::pinnedConnection,
     ): HttpURLConnection? {
-        for (address in addresses) {
-            if (deadlineExceeded(requestDeadlineNanos)) return null
+        for (address in request.addresses) {
+            if (request.isCancelled() || deadlineExceeded(request.requestDeadlineNanos)) return null
             val boundedConnectTimeout =
-                timeoutMillisWithinDeadline(connectTimeoutMillis, requestDeadlineNanos) ?: return null
+                timeoutMillisWithinDeadline(request.connectTimeoutMillis, request.requestDeadlineNanos) ?: return null
             val boundedReadTimeout =
-                timeoutMillisWithinDeadline(readTimeoutMillis, requestDeadlineNanos) ?: return null
+                timeoutMillisWithinDeadline(request.readTimeoutMillis, request.requestDeadlineNanos) ?: return null
             val connection =
-                pinnedConnection(parsed, address, boundedConnectTimeout, boundedReadTimeout, requestHeaders)
+                connectionFactory(
+                    request.parsed,
+                    address,
+                    boundedConnectTimeout,
+                    boundedReadTimeout,
+                    request.requestHeaders,
+                )
                     ?: continue
+            if (!request.activate(connection)) return null
             try {
                 connection.connect()
                 return connection
             } catch (_: IOException) {
                 connection.disconnect()
+                if (request.isCancelled()) return null
             }
         }
         return null
