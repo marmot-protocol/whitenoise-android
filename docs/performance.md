@@ -395,6 +395,12 @@ BENCHMARK_CLASS_FILTER="dev.ipf.whitenoise.android.benchmark.ConversationPagingB
   scripts/run-performance-benchmarks.sh "$GROUP_NAME"
 ```
 
+The runner's package-replacement cold-start report is not part of this journey.
+If the release-like launch does not emit both startup milestones within its
+wait — a busy engine after a large seed can push the first local frame past
+it — pass `REQUIRE_STARTUP_MILESTONES=false` to continue with the chat-list
+preflight alone; the paging results do not depend on that report.
+
 | Method | Journey |
 | --- | --- |
 | `deepOlderFling` | Twelve flicks into history without pausing. |

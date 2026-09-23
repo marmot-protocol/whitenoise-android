@@ -376,6 +376,11 @@ if [[ "$startup_markers_ready" != true ]]; then
   if [[ "${BENCHMARK_CLASS_FILTER:-}" == *"$network_recovery_benchmark_class"* &&
     "${BENCHMARK_CLASS_FILTER:-}" != *"StartupBenchmark"* ]]; then
     echo "Startup milestones unavailable; continuing the recovery-only run with the UI fixture preflight." >&2
+  elif [[ "${REQUIRE_STARTUP_MILESTONES:-true}" == "false" &&
+    "${BENCHMARK_CLASS_FILTER:-}" != *"StartupBenchmark"* ]]; then
+    # A journey that never measures startup (paging, scrolling) still needs the authenticated
+    # chat list below, but not the cold-start report; the caller opted out of that gate.
+    echo "Startup milestones unavailable; REQUIRE_STARTUP_MILESTONES=false, continuing with the UI fixture preflight." >&2
   else
     echo "Package-replacement launch did not emit both startup milestones." >&2
     echo "Captured log: $startup_log" >&2
