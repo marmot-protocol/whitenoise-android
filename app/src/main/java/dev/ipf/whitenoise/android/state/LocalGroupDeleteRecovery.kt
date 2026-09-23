@@ -7,8 +7,8 @@ import kotlinx.coroutines.delay
  * A local wipe is idempotent, but a closed worker can lose the response after committing it.
  * Resolve that ambiguity against the native group projection before another mutation. A failed
  * reconciliation never authorizes another delete; the caller can surface one terminal error.
+ * Each branch distinguishes a committed wipe, a safe retry, or a terminal/cancelled mutation.
  */
-// Each branch distinguishes a committed wipe, a safe retry, or a terminal/cancelled mutation.
 @Suppress("TooGenericExceptionCaught", "CyclomaticComplexMethod", "ThrowsCount")
 internal suspend fun deleteLocalGroupWithRecovery(
     isCurrent: () -> Boolean,

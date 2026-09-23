@@ -32,10 +32,11 @@ internal suspend fun WhiteNoiseAppState.deleteChatGroupLocalWithRecovery(
 ) {
     // Capture encrypted media identifiers while the native group is still present. Unlike the
     // legacy leave/reset paths, a failed preflight aborts without touching the group or caches.
-    val media = retryIdempotentRuntimeMutation {
-        if (!isCurrent()) throw CancellationException("chat binding changed during local deletion preflight")
-        marmotIo { listMedia(account, groupIdHex, null) }
-    }
+    val media =
+        retryIdempotentRuntimeMutation {
+            if (!isCurrent()) throw CancellationException("chat binding changed during local deletion preflight")
+            marmotIo { listMedia(account, groupIdHex, null) }
+        }
     val cacheKeys =
         media.map { rec ->
             mediaCacheKey(account, groupIdHex, rec.messageIdHex, rec.attachmentIndex.toInt())

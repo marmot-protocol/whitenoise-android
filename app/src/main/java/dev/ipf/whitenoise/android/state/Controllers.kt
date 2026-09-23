@@ -4354,7 +4354,10 @@ class ChatsController private constructor(
         )
     }
 
-    private fun removeChatRow(groupIdHex: String, optimistic: Boolean = false) {
+    private fun removeChatRow(
+        groupIdHex: String,
+        optimistic: Boolean = false,
+    ) {
         val rowKey = chatRowKey(groupIdHex)
         val removedRow = chatRowsByGroup.remove(rowKey)
         if (removedRow != null) {
@@ -4774,11 +4777,12 @@ class ChatsController private constructor(
         val removedSnapshot = snapshotChatRowForRemoval(groupIdHex)
         removeChatRow(groupIdHex, optimistic = true)
         var nativeCommitted = false
-        val wipe = runCatching {
-            appState.deleteChatGroupLocalWithRecovery(account, groupIdHex, isCurrent) {
-                nativeCommitted = true
+        val wipe =
+            runCatching {
+                appState.deleteChatGroupLocalWithRecovery(account, groupIdHex, isCurrent) {
+                    nativeCommitted = true
+                }
             }
-        }
         wipe.exceptionOrNull()?.let {
             if (isCurrent() && !nativeCommitted) removedSnapshot?.let(::restoreRemovedChatRow)
             if (isCurrent() && nativeCommitted) {
