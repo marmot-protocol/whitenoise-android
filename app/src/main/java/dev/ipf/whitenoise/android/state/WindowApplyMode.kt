@@ -151,8 +151,12 @@ internal suspend fun prepareWindowApplyOn(
 ): TimedPreparedWindowApply =
     withContext(dispatcher) {
         val startedAt = nanoTime()
+        val prepared =
+            tracedPagingSection(ConversationPagingTraceSection.PREPARE) {
+                prepareWindowApply(page, snapshot, replaceWindow, reconcileNewExtendedRecords)
+            }
         TimedPreparedWindowApply(
-            value = prepareWindowApply(page, snapshot, replaceWindow, reconcileNewExtendedRecords),
+            value = prepared,
             durationNanos = (nanoTime() - startedAt).coerceAtLeast(0L),
         )
     }

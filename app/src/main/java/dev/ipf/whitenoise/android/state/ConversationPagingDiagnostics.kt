@@ -31,6 +31,16 @@ internal fun PerformanceTrace?.recordPhase(
     )
 }
 
+/** Runs one window command inside its Perfetto slice and records it as the page's `page_window` phase. */
+internal inline fun timedWindowCommand(
+    trace: PerformanceTrace?,
+    command: () -> TimelinePageOutcome?,
+): TimelinePageOutcome? {
+    val windowStartedMs = SystemClock.elapsedRealtime()
+    return tracedPagingSection(ConversationPagingTraceSection.WINDOW, command)
+        .also { trace.recordPhase(PerformancePhase.PAGE_WINDOW, windowStartedMs, PerformanceLayer.FFI) }
+}
+
 /** Closes a page's trace with what the reader actually got. */
 internal fun PerformanceTrace?.recordCompletion(
     load: ConversationPageLoad,

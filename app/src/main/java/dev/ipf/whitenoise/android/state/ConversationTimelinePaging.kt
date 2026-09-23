@@ -1,15 +1,13 @@
 package dev.ipf.whitenoise.android.state
 
 import android.os.SystemClock
-import android.util.Log
-import dev.ipf.whitenoise.android.R
+import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
 import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import dev.ipf.whitenoise.android.diagnostics.PerformanceTrace
 import dev.ipf.whitenoise.android.state.ConversationWindowUnchangedReason.NOT_READY
-import dev.ipf.whitenoise.android.state.ConversationWindowUnchangedReason.TIMED_OUT
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -86,12 +84,14 @@ internal suspend fun ConversationController.loadOlderPageInternal(anchorId: Stri
             is TimelinePageOutcome.Advanced -> {
                 val appliedAtMs = SystemClock.elapsedRealtime()
                 var committed = false
-                applyTimelinePage(
-                    outcome.page,
-                    replaceWindow = false,
-                    updatePagination = true,
-                    onCommitted = { committed = true },
-                )
+                tracedPagingSection(ConversationPagingTraceSection.APPLY) {
+                    applyTimelinePage(
+                        outcome.page,
+                        replaceWindow = false,
+                        updatePagination = true,
+                        onCommitted = { committed = true },
+                    )
+                }
                 if (!committed) {
                     ConversationPageLoad.INACTIVE
                 } else {
@@ -109,6 +109,9 @@ internal suspend fun ConversationController.loadOlderPageInternal(anchorId: Stri
             }
         }.also { trace.recordCompletion(it, startedMs) }
     } catch (cancel: CancellationException) {
+        // A cancelled page used to leave no trace at all, so a tester could not tell it from one
+        // still waiting on the engine. `INACTIVE` closes it as `dropped`.
+        trace.recordCompletion(ConversationPageLoad.INACTIVE, startedMs)
         throw cancel
     } catch (throwable: Throwable) {
         reportPageFailure(ConversationSearchPageDirection.OLDER, throwable)
@@ -140,35 +143,18 @@ internal suspend fun ConversationController.loadNewerPageInternal(origin: Paging
     // the matching newer-page failure, and only once newer rows have actually arrived.
     if (!automatic) pageError = null
     isLoadingOlder = true
+    val trace = PerformanceDiagnostics.begin(PerformanceOperation.CHAT_HISTORY_PAGE)
+    val startedMs = SystemClock.elapsedRealtime()
     return try {
-        val outcome = pageNewerIfActive(subscription)
+        val outcome = pageNewerIfActive(subscription, trace)
         when (outcome) {
             null -> ConversationPageLoad.INACTIVE
             is TimelinePageOutcome.Unchanged ->
                 unchangedPageLoad(outcome, ConversationSearchPageDirection.NEWER, origin)
-            is TimelinePageOutcome.Advanced -> {
-                var committed = false
-                applyTimelinePage(
-                    outcome.page,
-                    replaceWindow = false,
-                    updatePagination = true,
-                    reconcileNewExtendedRecords = true,
-                    onCommitted = { committed = true },
-                )
-                if (!committed) {
-                    ConversationPageLoad.INACTIVE
-                } else {
-                    clearRecoveredNewerPageFailure()
-                    automaticNewerPaging.reset()
-                    protectedTimelineMessageIds.clear()
-                    if (hasLoadedOlderPages) {
-                        protectedTimelineMessageIds.addAll(timelineRecords.keys)
-                    }
-                    progressPageLoad(priorMessageIds)
-                }
-            }
-        }
+            is TimelinePageOutcome.Advanced -> applyNewerPage(outcome.page, priorMessageIds, trace)
+        }.also { trace.recordCompletion(it, startedMs) }
     } catch (cancel: CancellationException) {
+        trace.recordCompletion(ConversationPageLoad.INACTIVE, startedMs)
         throw cancel
     } catch (throwable: Throwable) {
         reportPageFailure(ConversationSearchPageDirection.NEWER, throwable, origin)
@@ -176,6 +162,38 @@ internal suspend fun ConversationController.loadNewerPageInternal(origin: Paging
     } finally {
         isLoadingOlder = false
     }
+}
+
+/**
+ * Folds a newer page in and settles the state a forward advance clears: the recovered failure, the
+ * automatic-paging budget and the protected-row set. Returns [ConversationPageLoad.INACTIVE] when a
+ * newer generation superseded the commit.
+ */
+private suspend fun ConversationController.applyNewerPage(
+    page: TimelinePageFfi,
+    priorMessageIds: Set<String>,
+    trace: PerformanceTrace?,
+): ConversationPageLoad {
+    val appliedAtMs = SystemClock.elapsedRealtime()
+    var committed = false
+    tracedPagingSection(ConversationPagingTraceSection.APPLY) {
+        applyTimelinePage(
+            page,
+            replaceWindow = false,
+            updatePagination = true,
+            reconcileNewExtendedRecords = true,
+            onCommitted = { committed = true },
+        )
+    }
+    if (!committed) return ConversationPageLoad.INACTIVE
+    clearRecoveredNewerPageFailure()
+    automaticNewerPaging.reset()
+    protectedTimelineMessageIds.clear()
+    if (hasLoadedOlderPages) {
+        protectedTimelineMessageIds.addAll(timelineRecords.keys)
+    }
+    trace.recordPhase(phase = PerformancePhase.PAGE_APPLY, startedMs = appliedAtMs, count = page.messages.size)
+    return progressPageLoad(priorMessageIds)
 }
 
 /**
@@ -201,65 +219,6 @@ private fun ConversationController.progressPageLoad(priorMessageIds: Set<String>
             timelineRecords.keys.any { it !in priorMessageIds }
     return if (advanced) ConversationPageLoad.ADVANCED else ConversationPageLoad.NO_PROGRESS
 }
-
-/**
- * Turns an unchanged window into a page outcome, leaving the reader a retry affordance for the two
- * reasons that are worth telling them about.
- *
- * A deadline and an exhausted retry budget are the engine failing to answer, not the end of history,
- * so they set the same error the throwing path does. Superseded and terminal outcomes mean a newer
- * revision or the reconnect loop already owns the answer, and a banner would only be noise.
- */
-private fun ConversationController.unchangedPageLoad(
-    outcome: TimelinePageOutcome.Unchanged,
-    direction: ConversationSearchPageDirection,
-    origin: ConversationPagingOrigin = ConversationPagingOrigin.EXPLICIT,
-): ConversationPageLoad =
-    when (outcome.reason) {
-        TIMED_OUT -> {
-            reportPageFailure(direction, MarmotWindowDeadline(direction), origin)
-            ConversationPageLoad.TIMED_OUT
-        }
-        NOT_READY -> {
-            reportPageFailure(direction, MarmotWindowNotReady(direction), origin)
-            ConversationPageLoad.NOT_READY
-        }
-        else -> ConversationPageLoad.NO_PROGRESS
-    }
-
-/**
- * Records a page failure so the screen's existing retry affordance appears for this direction.
- *
- * An automatic forward prefetch reports nothing to the reader: its content is opportunistic, so it
- * only counts against the recovery budget and leaves a privacy-safe marker — the operation code and
- * the attempt number, never the engine's message — in the log.
- */
-private fun ConversationController.reportPageFailure(
-    direction: ConversationSearchPageDirection,
-    cause: Throwable,
-    origin: ConversationPagingOrigin = ConversationPagingOrigin.EXPLICIT,
-) {
-    if (origin == ConversationPagingOrigin.AUTOMATIC) {
-        automaticNewerPaging.recordFailure()
-        val attempt = automaticNewerPaging.consecutiveFailures
-        Log.w("DMConversation", "automatic_page_failed operation=${pageOperation(direction)} attempt=$attempt")
-        return
-    }
-    failedPageDirection = direction
-    pageError =
-        privacySafeErrorPresentation(
-            pageOperation(direction),
-            cause,
-            AppText.Resource(R.string.error_loaded_content_kept),
-        )
-}
-
-/** The release-log operation name for a page in this direction. */
-private fun pageOperation(direction: ConversationSearchPageDirection): String =
-    when (direction) {
-        ConversationSearchPageDirection.OLDER -> "CONVERSATION_PAGE_OLDER"
-        ConversationSearchPageDirection.NEWER -> "CONVERSATION_PAGE_NEWER"
-    }
 
 /**
  * Reports the reader's oldest visible row, then pages older from the revision that report returns.
@@ -289,16 +248,21 @@ private suspend fun ConversationController.pageOlderIfActive(
         }
         // Time the window command from here, not from the caller's start: page_window is documented
         // as the engine answering, and anchoring is already its own phase.
-        val windowStartedMs = SystemClock.elapsedRealtime()
-        pageWithNotReadyBudget(handle) { it.paginateBackwards(ConversationTimelinePageLimit) }
-            .also { trace.recordPhase(PerformancePhase.PAGE_WINDOW, windowStartedMs, PerformanceLayer.FFI) }
+        timedWindowCommand(trace) {
+            pageWithNotReadyBudget(handle) { it.paginateBackwards(ConversationTimelinePageLimit) }
+        }
     }
 
 /** Pages newer under the same active-call guard. */
-private suspend fun ConversationController.pageNewerIfActive(handle: PagingHandle): TimelinePageOutcome? =
+private suspend fun ConversationController.pageNewerIfActive(
+    handle: PagingHandle,
+    trace: PerformanceTrace? = null,
+): TimelinePageOutcome? =
     timelineSubscriptionActiveCallMutex.withLock {
         if (!retainsSubscription(handle)) return@withLock null
-        pageWithNotReadyBudget(handle) { it.paginateForwards(ConversationTimelinePageLimit) }
+        timedWindowCommand(trace) {
+            pageWithNotReadyBudget(handle) { it.paginateForwards(ConversationTimelinePageLimit) }
+        }
     }
 
 /**
@@ -331,13 +295,3 @@ private fun ConversationController.retainsSubscription(handle: PagingHandle): Bo
     synchronized(liveSubscriptionLock) {
         !accountTeardownRequested && timelineSubscription === handle
     }
-
-/** The window deadline expressed as a throwable, so it reaches the same release marker as a thrown failure. */
-private class MarmotWindowDeadline(
-    direction: ConversationSearchPageDirection,
-) : Exception("window deadline paging ${direction.name.lowercase()}")
-
-/** A window that stayed not-ready for the whole retry budget. */
-private class MarmotWindowNotReady(
-    direction: ConversationSearchPageDirection,
-) : Exception("window not ready paging ${direction.name.lowercase()}")
