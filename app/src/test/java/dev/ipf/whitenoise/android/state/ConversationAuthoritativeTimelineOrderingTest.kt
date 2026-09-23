@@ -31,6 +31,7 @@ import kotlin.coroutines.CoroutineContext
 class ConversationAuthoritativeTimelineOrderingTest {
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
+    /** A delayed preparation cannot overwrite the ordering from a later live window. */
     fun newerAuthoritativeOrderWinsAnOlderSuspendedPreparation() =
         runTest {
             val dispatcher = PausedPreparationDispatcher()
@@ -498,6 +499,7 @@ class ConversationAuthoritativeTimelineOrderingTest {
             pending += block
         }
 
+        /** Releases queued preparation work at the race point chosen by the test. */
         fun runPending() {
             while (true) pending.poll()?.run() ?: return
         }

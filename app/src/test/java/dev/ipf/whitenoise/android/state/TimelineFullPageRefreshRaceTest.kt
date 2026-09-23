@@ -48,6 +48,7 @@ import kotlin.coroutines.CoroutineContext
 class TimelineFullPageRefreshRaceTest {
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
+    /** Discarding a stale preparation must leave both live rows and commit callback untouched. */
     fun newerLiveProjectionWinsWhileOlderWindowPreparationIsSuspended() =
         runTest {
             val preparationDispatcher = PausedDispatcher()
@@ -89,6 +90,7 @@ class TimelineFullPageRefreshRaceTest {
             pending += block
         }
 
+        /** Resumes the suspended preparation after the live projection has landed. */
         fun runPending() {
             while (true) {
                 pending.poll()?.run() ?: return
@@ -97,6 +99,7 @@ class TimelineFullPageRefreshRaceTest {
     }
 
     @Test
+    /** A stale FFI refresh must preserve a newer stream watcher and its live row. */
     fun staleFullPageRefreshDoesNotDropNewerLiveProjectionOrStreamWatcher() =
         runBlocking {
             val controller = conversationController()
@@ -190,6 +193,7 @@ class TimelineFullPageRefreshRaceTest {
         )
     }
 
+    /** Builds a controller whose preparation dispatcher can be paused at the race boundary. */
     private fun conversationController(dispatcher: CoroutineDispatcher? = null): ConversationController {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val appState =

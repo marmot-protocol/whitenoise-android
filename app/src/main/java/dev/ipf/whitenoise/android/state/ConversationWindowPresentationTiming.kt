@@ -12,6 +12,7 @@ internal data class RecoveryStampedTimelineWindow(
     val productObservationTicket: Long?,
 )
 
+/** Binds presentation observations to the app's consent-gated product recorder. */
 internal fun WhiteNoiseAppState.conversationWindowPresentationTiming() =
     ConversationWindowPresentationTiming(
         nowMs = SystemClock::elapsedRealtime,
@@ -24,6 +25,7 @@ internal fun ConversationController.markWindowVisibleForPresentationTiming() = w
 /** Records the first frame for which this conversation's composer is actually available. */
 internal fun ConversationController.markComposerReadyForPresentationTiming() = windowPresentationTiming.composerReady()
 
+/** Requires authoritative content and a settled visible route before timing the first frame. */
 internal fun conversationWindowCanReportVisible(
     timelinePublished: Boolean,
     transcriptReadyToReveal: Boolean,
@@ -56,6 +58,7 @@ internal data class ConversationPresentationObservation(
     val elapsedMs: Long,
     val outcome: ConversationPresentationOutcome,
 ) {
+    /** Converts a duration into the finite schema accepted by the product recorder. */
     fun event(): ProductEventFfi =
         ProductEventFfi(
             name = stage.eventName,
@@ -93,6 +96,7 @@ internal class ConversationWindowPresentationTiming(
     private var composerObservedBeforeReceipt = false
     private var windowObservedBeforePublication = false
 
+    /** Captures the first native receipt and the consent ticket attached to that receipt. */
     @Synchronized
     fun begin(
         receivedAtElapsedMs: Long,
@@ -105,6 +109,7 @@ internal class ConversationWindowPresentationTiming(
         if (composerObservedBeforeReceipt) settleComposer(ConversationPresentationOutcome.SUCCESS)
     }
 
+    /** Settles publication, then any visible frame observed before publication completed. */
     @Synchronized
     fun timelinePublished() {
         settlePublication(ConversationPresentationOutcome.SUCCESS)
@@ -113,6 +118,7 @@ internal class ConversationWindowPresentationTiming(
         }
     }
 
+    /** Retains an early frame until the authoritative timeline has published successfully. */
     @Synchronized
     fun windowVisible() {
         if (publicationSucceeded) {
@@ -122,6 +128,7 @@ internal class ConversationWindowPresentationTiming(
         }
     }
 
+    /** Records composer readiness even if the composer precedes the first native receipt. */
     @Synchronized
     fun composerReady() {
         if (startedAtElapsedMs == null) {
@@ -131,22 +138,26 @@ internal class ConversationWindowPresentationTiming(
         }
     }
 
+    /** Marks only outstanding stages as failed, preserving any earlier success. */
     @Synchronized
     fun fail() {
         settleOutstanding(ConversationPresentationOutcome.FAILURE)
     }
 
+    /** Marks only outstanding stages as cancelled when the controller closes. */
     @Synchronized
     fun cancel() {
         settleOutstanding(ConversationPresentationOutcome.CANCELLED)
     }
 
+    /** Applies one terminal outcome to each stage that has not already settled. */
     private fun settleOutstanding(outcome: ConversationPresentationOutcome) {
         settlePublication(outcome)
         settleWindow(outcome)
         settleComposer(outcome)
     }
 
+    /** Records the first publication outcome and gates successful visibility on it. */
     private fun settlePublication(outcome: ConversationPresentationOutcome) {
         if (publicationSettled || startedAtElapsedMs == null) return
         publicationSettled = true
@@ -154,18 +165,21 @@ internal class ConversationWindowPresentationTiming(
         emit(ConversationPresentationStage.TIMELINE_PUBLISHED, outcome)
     }
 
+    /** Records the first visible-frame outcome exactly once. */
     private fun settleWindow(outcome: ConversationPresentationOutcome) {
         if (windowSettled || startedAtElapsedMs == null) return
         windowSettled = true
         emit(ConversationPresentationStage.WINDOW_VISIBLE, outcome)
     }
 
+    /** Records the first composer outcome exactly once. */
     private fun settleComposer(outcome: ConversationPresentationOutcome) {
         if (composerSettled || startedAtElapsedMs == null) return
         composerSettled = true
         emit(ConversationPresentationStage.COMPOSER_READY, outcome)
     }
 
+    /** Emits elapsed monotonic time relative to the captured native receipt. */
     private fun emit(
         stage: ConversationPresentationStage,
         outcome: ConversationPresentationOutcome,

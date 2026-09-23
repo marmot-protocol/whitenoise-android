@@ -38,6 +38,7 @@ internal data class WindowApplySnapshot(
     val pendingProjectionIds: Set<String>,
 )
 
+/** Copies mutable record and bridge indexes before suspending on the preparation dispatcher. */
 internal fun currentWindowApplySnapshot(
     heldRecords: Collection<TimelineMessageRecordFfi>,
     pendingProjectionIds: Collection<String>,
@@ -126,6 +127,7 @@ internal data class TimedPreparedWindowApply(
     val durationNanos: Long,
 )
 
+/** Couples the off-main preparation duration with the measured main-thread commit cost. */
 internal fun TimedPreparedWindowApply.performanceSample(
     prepared: PreparedWindowApply,
     committedProjectionCount: Int,
@@ -138,6 +140,7 @@ internal fun TimedPreparedWindowApply.performanceSample(
     mainCommitNanos = (commitFinishedAtNanos - commitStartedAtNanos).coerceAtLeast(0L),
 )
 
+/** Runs pure row preparation on the injected dispatcher and times only that work. */
 internal suspend fun prepareWindowApplyOn(
     dispatcher: CoroutineDispatcher,
     nanoTime: () -> Long,

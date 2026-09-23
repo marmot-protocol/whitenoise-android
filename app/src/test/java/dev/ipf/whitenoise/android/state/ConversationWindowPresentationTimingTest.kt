@@ -6,6 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConversationWindowPresentationTimingTest {
+    /** Publication, visible frame, and composer each retain their own first timestamp. */
     @Test
     fun publicationVisibilityAndComposerAreDistinctAndEmittedOnce() {
         var nowMs = 120L
@@ -51,6 +52,7 @@ class ConversationWindowPresentationTimingTest {
         )
     }
 
+    /** A frame observed before publication is retained until the authoritative content lands. */
     @Test
     fun visibilityRequiresPublicationAndARevealedSettledRoute() {
         val emitted = mutableListOf<ConversationPresentationObservation>()
@@ -78,6 +80,7 @@ class ConversationWindowPresentationTimingTest {
         assertTrue(conversationWindowCanReportVisible(true, true, false, false))
     }
 
+    /** An early frame cannot turn a failed initial load into a successful visibility sample. */
     @Test
     fun earlyVisibilityDoesNotTurnAFailedPublicationIntoSuccess() {
         val emitted = mutableListOf<ConversationPresentationObservation>()
@@ -91,6 +94,7 @@ class ConversationWindowPresentationTimingTest {
         assertTrue(emitted.all { it.outcome == ConversationPresentationOutcome.FAILURE })
     }
 
+    /** Leaving the route cancels only the milestones that are still outstanding. */
     @Test
     fun clearCancelsOnlyMilestonesStillOutstanding() {
         var nowMs = 50L
@@ -129,6 +133,7 @@ class ConversationWindowPresentationTimingTest {
         )
     }
 
+    /** Failure uses one elapsed duration and the closed registry bucket vocabulary. */
     @Test
     fun failureSettlesAllMilestonesAndDurationUsesClosedBuckets() {
         var nowMs = 20L

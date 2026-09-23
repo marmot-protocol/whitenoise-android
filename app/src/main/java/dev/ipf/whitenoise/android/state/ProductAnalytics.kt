@@ -30,6 +30,7 @@ internal enum class ProductObservation(
     fun event(): ProductEventFfi = ProductEventFfi(event, listOf(ProductEventPropertyFfi(property, value)))
 }
 
+/** Sends a finite observation only through the current consent ticket. */
 internal fun WhiteNoiseAppState.recordProductObservation(
     observation: ProductObservation,
     ticket: Long? = diagnostics.observations.ticket(),
@@ -59,6 +60,7 @@ internal val androidProductRegistry: List<ProductEventSchemaFfi> =
             conversationPresentationSchema(ConversationPresentationStage.COMPOSER_READY),
         )
 
+/** Registers bounded duration and outcome properties for one presentation milestone. */
 private fun conversationPresentationSchema(stage: ConversationPresentationStage) =
     ProductEventSchemaFfi(
         name = stage.eventName,
