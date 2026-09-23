@@ -45,6 +45,7 @@ class ProductObservationGateTest {
         assertEquals(
             listOf(
                 "app_android_entry",
+                "app_conversation_timeline_published",
                 "app_conversation_window_visible",
                 "app_conversation_composer_ready",
             ),

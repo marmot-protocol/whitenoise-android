@@ -1,12 +1,13 @@
 package dev.ipf.whitenoise.android.state
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConversationWindowPresentationTimingTest {
     @Test
-    fun emitsInitialVisibilityAndComposerReadyOnceFromNativeReceipt() {
+    fun publicationVisibilityAndComposerAreDistinctAndEmittedOnce() {
         var nowMs = 120L
         val emitted = mutableListOf<Pair<Long?, ConversationPresentationObservation>>()
         val timing =
@@ -17,17 +18,26 @@ class ConversationWindowPresentationTimingTest {
 
         timing.begin(receivedAtElapsedMs = 100L, ticket = 7L)
         timing.timelinePublished()
+        nowMs = 150L
+        timing.windowVisible()
         nowMs = 180L
         timing.composerReady()
         timing.timelinePublished()
+        timing.windowVisible()
         timing.composerReady()
 
         assertEquals(
             listOf(
                 7L to
                     ConversationPresentationObservation(
-                        ConversationPresentationStage.WINDOW_VISIBLE,
+                        ConversationPresentationStage.TIMELINE_PUBLISHED,
                         elapsedMs = 20L,
+                        outcome = ConversationPresentationOutcome.SUCCESS,
+                    ),
+                7L to
+                    ConversationPresentationObservation(
+                        ConversationPresentationStage.WINDOW_VISIBLE,
+                        elapsedMs = 50L,
                         outcome = ConversationPresentationOutcome.SUCCESS,
                     ),
                 7L to
@@ -39,6 +49,34 @@ class ConversationWindowPresentationTimingTest {
             ),
             emitted,
         )
+    }
+
+    @Test
+    fun visibilityRequiresPublicationAndARevealedSettledRoute() {
+        val emitted = mutableListOf<ConversationPresentationObservation>()
+        val timing =
+            ConversationWindowPresentationTiming(
+                nowMs = { 25L },
+                emit = { _, observation -> emitted += observation },
+            )
+        timing.windowVisible()
+        timing.begin(receivedAtElapsedMs = 10L, ticket = null)
+        timing.windowVisible()
+        assertTrue(emitted.isEmpty())
+        timing.timelinePublished()
+        timing.windowVisible()
+        assertEquals(
+            listOf(
+                ConversationPresentationStage.TIMELINE_PUBLISHED,
+                ConversationPresentationStage.WINDOW_VISIBLE,
+            ),
+            emitted.map { it.stage },
+        )
+        assertFalse(conversationWindowCanReportVisible(false, true, false, false))
+        assertFalse(conversationWindowCanReportVisible(true, false, false, false))
+        assertFalse(conversationWindowCanReportVisible(true, true, true, false))
+        assertFalse(conversationWindowCanReportVisible(true, true, false, true))
+        assertTrue(conversationWindowCanReportVisible(true, true, false, false))
     }
 
     @Test
@@ -60,9 +98,14 @@ class ConversationWindowPresentationTimingTest {
         assertEquals(
             listOf(
                 ConversationPresentationObservation(
-                    ConversationPresentationStage.WINDOW_VISIBLE,
+                    ConversationPresentationStage.TIMELINE_PUBLISHED,
                     elapsedMs = 10L,
                     outcome = ConversationPresentationOutcome.SUCCESS,
+                ),
+                ConversationPresentationObservation(
+                    ConversationPresentationStage.WINDOW_VISIBLE,
+                    elapsedMs = 35L,
+                    outcome = ConversationPresentationOutcome.CANCELLED,
                 ),
                 ConversationPresentationObservation(
                     ConversationPresentationStage.COMPOSER_READY,
@@ -75,7 +118,7 @@ class ConversationWindowPresentationTimingTest {
     }
 
     @Test
-    fun failureSettlesBothMilestonesAndDurationUsesClosedBuckets() {
+    fun failureSettlesAllMilestonesAndDurationUsesClosedBuckets() {
         var nowMs = 20L
         val emitted = mutableListOf<ConversationPresentationObservation>()
         val timing =
@@ -88,7 +131,7 @@ class ConversationWindowPresentationTimingTest {
         nowMs = 36L
         timing.fail()
 
-        assertEquals(2, emitted.size)
+        assertEquals(3, emitted.size)
         assertTrue(emitted.all { it.elapsedMs == 26L && it.outcome == ConversationPresentationOutcome.FAILURE })
         assertEquals("le_10ms", productDurationBucket(10L))
         assertEquals("le_25ms", productDurationBucket(11L))
@@ -98,7 +141,13 @@ class ConversationWindowPresentationTimingTest {
             androidProductRegistry
                 .filter { it.name.startsWith("app_conversation_") }
                 .map { it.name }
-                .containsAll(listOf("app_conversation_window_visible", "app_conversation_composer_ready")),
+                .containsAll(
+                    listOf(
+                        "app_conversation_timeline_published",
+                        "app_conversation_window_visible",
+                        "app_conversation_composer_ready",
+                    ),
+                ),
         )
     }
 }

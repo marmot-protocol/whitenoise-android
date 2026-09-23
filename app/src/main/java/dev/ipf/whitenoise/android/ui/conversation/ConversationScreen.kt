@@ -124,6 +124,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.advanceConversationReadAnchor
 import dev.ipf.whitenoise.android.state.attachmentsFor
 import dev.ipf.whitenoise.android.state.chatCreateOpenConversationTimingStage
+import dev.ipf.whitenoise.android.state.conversationWindowCanReportVisible
 import dev.ipf.whitenoise.android.state.countUnreadIncoming
 import dev.ipf.whitenoise.android.state.currentTtsConversationDestination
 import dev.ipf.whitenoise.android.state.hasKnownTranscriptPresentation
@@ -131,6 +132,7 @@ import dev.ipf.whitenoise.android.state.loadMessageAvailability
 import dev.ipf.whitenoise.android.state.loadUntilMessageAvailable
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
 import dev.ipf.whitenoise.android.state.markComposerReadyForPresentationTiming
+import dev.ipf.whitenoise.android.state.markWindowVisibleForPresentationTiming
 import dev.ipf.whitenoise.android.state.mediaReferencesFor
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.reconcileConversationUnreadJump
@@ -926,6 +928,27 @@ internal fun ConversationScreen(
     // Details and their nested routes remain non-owning after the reveal too.
     LaunchedEffect(controller, notificationOpenRequestId, showDetails, transcriptReadyToReveal) {
         onNotificationTimelineVisibilityChanged(!showDetails && transcriptReadyToReveal)
+    }
+
+    // Timeline publication can precede route settlement and the first visible
+    // Compose frame. Record visibility only after the transcript can be shown.
+    LaunchedEffect(
+        controller,
+        controller.hasPublishedAuthoritativeTimeline,
+        transcriptReadyToReveal,
+        routeTransitionInProgress,
+        showDetails,
+    ) {
+        if (
+            !conversationWindowCanReportVisible(
+                timelinePublished = controller.hasPublishedAuthoritativeTimeline,
+                transcriptReadyToReveal = transcriptReadyToReveal,
+                routeTransitionInProgress = routeTransitionInProgress,
+                showingDetails = showDetails,
+            )
+        ) return@LaunchedEffect
+        withFrameNanos { }
+        controller.markWindowVisibleForPresentationTiming()
     }
 
     // First-frame completion waits for the initial anchor and a trustworthy

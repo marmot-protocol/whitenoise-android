@@ -18,8 +18,18 @@ internal fun WhiteNoiseAppState.conversationWindowPresentationTiming() =
         emit = { ticket, observation -> recordProductEvent(observation.event(), ticket) },
     )
 
+/** Records the first shown conversation frame after its authoritative timeline is published. */
+internal fun ConversationController.markWindowVisibleForPresentationTiming() = windowPresentationTiming.windowVisible()
+
 /** Records the first frame for which this conversation's composer is actually available. */
 internal fun ConversationController.markComposerReadyForPresentationTiming() = windowPresentationTiming.composerReady()
+
+internal fun conversationWindowCanReportVisible(
+    timelinePublished: Boolean,
+    transcriptReadyToReveal: Boolean,
+    routeTransitionInProgress: Boolean,
+    showingDetails: Boolean,
+): Boolean = timelinePublished && transcriptReadyToReveal && !routeTransitionInProgress && !showingDetails
 
 /** Captures consent at native receipt so a later permission change cannot admit old timing. */
 internal fun WhiteNoiseAppState.productObservationTicket(): Long? = diagnostics.observations.ticket()
@@ -27,6 +37,7 @@ internal fun WhiteNoiseAppState.productObservationTicket(): Long? = diagnostics.
 internal enum class ConversationPresentationStage(
     val eventName: String,
 ) {
+    TIMELINE_PUBLISHED("app_conversation_timeline_published"),
     WINDOW_VISIBLE("app_conversation_window_visible"),
     COMPOSER_READY("app_conversation_composer_ready"),
 }
@@ -75,6 +86,8 @@ internal class ConversationWindowPresentationTiming(
 ) {
     private var startedAtElapsedMs: Long? = null
     private var ticket: Long? = null
+    private var publicationSettled = false
+    private var publicationSucceeded = false
     private var windowSettled = false
     private var composerSettled = false
     private var composerObservedBeforeReceipt = false
@@ -84,7 +97,7 @@ internal class ConversationWindowPresentationTiming(
         receivedAtElapsedMs: Long,
         ticket: Long?,
     ) {
-        if (startedAtElapsedMs != null || windowSettled || composerSettled) return
+        if (startedAtElapsedMs != null || publicationSettled || windowSettled || composerSettled) return
         startedAtElapsedMs = receivedAtElapsedMs.coerceAtLeast(0L)
         this.ticket = ticket
         if (composerObservedBeforeReceipt) settleComposer(ConversationPresentationOutcome.SUCCESS)
@@ -92,7 +105,12 @@ internal class ConversationWindowPresentationTiming(
 
     @Synchronized
     fun timelinePublished() {
-        settleWindow(ConversationPresentationOutcome.SUCCESS)
+        settlePublication(ConversationPresentationOutcome.SUCCESS)
+    }
+
+    @Synchronized
+    fun windowVisible() {
+        if (publicationSucceeded) settleWindow(ConversationPresentationOutcome.SUCCESS)
     }
 
     @Synchronized
@@ -115,8 +133,16 @@ internal class ConversationWindowPresentationTiming(
     }
 
     private fun settleOutstanding(outcome: ConversationPresentationOutcome) {
+        settlePublication(outcome)
         settleWindow(outcome)
         settleComposer(outcome)
+    }
+
+    private fun settlePublication(outcome: ConversationPresentationOutcome) {
+        if (publicationSettled || startedAtElapsedMs == null) return
+        publicationSettled = true
+        publicationSucceeded = outcome == ConversationPresentationOutcome.SUCCESS
+        emit(ConversationPresentationStage.TIMELINE_PUBLISHED, outcome)
     }
 
     private fun settleWindow(outcome: ConversationPresentationOutcome) {

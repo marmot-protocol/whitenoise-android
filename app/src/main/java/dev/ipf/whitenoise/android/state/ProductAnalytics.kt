@@ -54,6 +54,7 @@ internal val androidProductRegistry: List<ProductEventSchemaFfi> =
                         ),
                     ),
             ),
+            conversationPresentationSchema(ConversationPresentationStage.TIMELINE_PUBLISHED),
             conversationPresentationSchema(ConversationPresentationStage.WINDOW_VISIBLE),
             conversationPresentationSchema(ConversationPresentationStage.COMPOSER_READY),
         )
