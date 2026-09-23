@@ -52,6 +52,7 @@ import kotlin.coroutines.resumeWithException
 /** Verifies retained composer geometry follows real leave and local-delete commit boundaries. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
+@Suppress("LargeClass") // The lifecycle tests share one native proxy and seeded-controller fixture.
 class ComposerExpansionDestructiveLifecycleTest {
     @Test
     fun acceptedDictationSendClearsOnlyItsOriginDraftAndGeometry() =
