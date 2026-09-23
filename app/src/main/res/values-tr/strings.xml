@@ -318,6 +318,7 @@
     <string name="stream_finished">Akış bitti</string>
     <string name="media_attachment">Medya eki</string>
     <string name="generic_message">Mesaj</string>
+    <string name="giphy_media_preview">GIPHY üzerinden GIF</string>
     <string name="waiting_for_stream">Akış bekleniyor...</string>
     <string name="stream_failed_format">Akış başarısız: %1$s</string>
     <string name="copy_text">Metni kopyala</string>

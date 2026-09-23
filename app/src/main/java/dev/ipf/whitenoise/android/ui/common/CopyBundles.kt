@@ -54,6 +54,7 @@ internal fun rememberMessageTextCopy(): MessageTextCopy =
         mediaAlbum = stringResource(R.string.media_album),
         mediaCountedFormat = stringResource(R.string.media_counted_format),
         message = stringResource(R.string.generic_message),
+        giphyMedia = stringResource(R.string.giphy_media_preview),
         groupSystem = rememberGroupSystemCopy(),
     )
 

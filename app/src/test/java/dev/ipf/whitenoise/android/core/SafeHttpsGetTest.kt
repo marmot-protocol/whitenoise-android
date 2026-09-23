@@ -268,6 +268,28 @@ class SafeHttpsGetTest {
     }
 
     @Test
+    fun getRejectsDisallowedContentTypeBeforeReadingBody() {
+        val response =
+            fakeConnection(
+                URL("https://example.test/image"),
+                body = "not an image".toByteArray(),
+                contentType = "text/html; charset=utf-8",
+            )
+
+        assertNull(
+            SafeHttpsGet.get(
+                url = "https://example.test/image",
+                maxBodyBytes = 32,
+                connectTimeoutMillis = 1_000,
+                readTimeoutMillis = 1_000,
+                contentTypeAllowed = { it == "image/gif" },
+                dependencies = dependencies(open = { response }),
+            ),
+        )
+        assertEquals(0, response.inputStreamReads)
+    }
+
+    @Test
     fun getRejectsDeclaredAndActualBodiesOverTheCap() {
         val overDeclared =
             fakeConnection(
@@ -612,6 +634,7 @@ class SafeHttpsGetTest {
         location: String? = null,
         body: ByteArray = byteArrayOf(),
         declaredLength: Long? = null,
+        contentType: String? = null,
     ): FakeHttpConnection =
         FakeHttpConnection(
             url = url,
@@ -619,6 +642,7 @@ class SafeHttpsGetTest {
             location = location,
             body = body,
             declaredLength = declaredLength ?: body.size.toLong(),
+            contentTypeValue = contentType,
         )
 
     private fun fakeSslSession(): SSLSession =
@@ -688,6 +712,7 @@ class SafeHttpsGetTest {
         private val location: String?,
         private val body: ByteArray,
         private val declaredLength: Long,
+        private val contentTypeValue: String?,
     ) : HttpURLConnection(url) {
         var disconnected = false
         var inputStreamReads = 0
@@ -705,6 +730,8 @@ class SafeHttpsGetTest {
         override fun getHeaderField(name: String?): String? = location.takeIf { name.equals("Location", true) }
 
         override fun getContentLengthLong(): Long = declaredLength
+
+        override fun getContentType(): String? = contentTypeValue
 
         override fun getInputStream(): InputStream =
             object : ByteArrayInputStream(body) {

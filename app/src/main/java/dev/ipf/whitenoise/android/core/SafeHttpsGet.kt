@@ -111,6 +111,7 @@ object SafeHttpsGet {
         requestHeaders: Map<String, String> = emptyMap(),
         maxRedirectHops: Int = DEFAULT_MAX_REDIRECT_HOPS,
         hostAllowed: (URL) -> Boolean = { true },
+        contentTypeAllowed: (String?) -> Boolean = { true },
     ): ByteArray? =
         get(
             url = url,
@@ -120,6 +121,7 @@ object SafeHttpsGet {
             requestHeaders = requestHeaders,
             maxRedirectHops = maxRedirectHops,
             hostAllowed = hostAllowed,
+            contentTypeAllowed = contentTypeAllowed,
             dependencies = defaultDependencies,
         )
 
@@ -136,6 +138,7 @@ object SafeHttpsGet {
         requestHeaders: Map<String, String> = emptyMap(),
         maxRedirectHops: Int = DEFAULT_MAX_REDIRECT_HOPS,
         hostAllowed: (URL) -> Boolean = { true },
+        contentTypeAllowed: (String?) -> Boolean = { true },
         dependencies: SafeHttpsGetDependencies,
     ): ByteArray? {
         val original = runCatching { URL(url) }.getOrNull() ?: return null
@@ -186,6 +189,7 @@ object SafeHttpsGet {
                     }
                     code !in 200..299 -> return null
                     else -> {
+                        if (!contentTypeAllowed(connection.contentType)) return null
                         if (connection.contentLengthLong > maxBodyBytes) return null
                         return connection.inputStream.use { readBounded(it, maxBodyBytes, requestDeadlineNanos) }
                     }

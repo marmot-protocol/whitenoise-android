@@ -318,6 +318,7 @@
     <string name="stream_finished">Flux terminé</string>
     <string name="media_attachment">Pièce jointe multimédia</string>
     <string name="generic_message">Message</string>
+    <string name="giphy_media_preview">GIF via GIPHY</string>
     <string name="waiting_for_stream">En attente du flux...</string>
     <string name="stream_failed_format">Échec du flux : %1$s</string>
     <string name="copy_text">Copier le texte</string>

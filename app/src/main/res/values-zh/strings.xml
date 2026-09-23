@@ -310,6 +310,7 @@
     <string name="stream_finished">流已结束</string>
     <string name="media_attachment">媒体附件</string>
     <string name="generic_message">消息</string>
+    <string name="giphy_media_preview">来自 GIPHY 的 GIF</string>
     <string name="waiting_for_stream">正在等待流...</string>
     <string name="stream_failed_format">流失败：%1$s</string>
     <string name="copy_text">复制文本</string>

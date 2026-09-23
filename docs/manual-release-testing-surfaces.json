@@ -3394,6 +3394,22 @@
         ]
       },
       {
+        "surface": "RemoteGiphyMediaBubble",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "fun RemoteGiphyMediaBubble(",
+        "test_ids": [
+          "MED-021"
+        ]
+      },
+      {
+        "surface": "RemoteGiphyMediaCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "fun RemoteGiphyMediaCard(",
+        "test_ids": [
+          "MED-021"
+        ]
+      },
+      {
         "surface": "MediaImageGridTile",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageBubbles.kt",
         "anchor": "fun MediaImageGridTile(",
