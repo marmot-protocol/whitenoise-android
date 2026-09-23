@@ -666,6 +666,7 @@ class NotificationStartupOrderingTest {
             }
         }
 
+    /** A background retry preserves the actionable failure while later receiver recovery keeps a realistic timeout. */
     @Test
     fun backgroundRetryCannotReplaceAnActionableBootstrapFailureWithLoading() =
         runBlocking {
@@ -673,6 +674,7 @@ class NotificationStartupOrderingTest {
                 NotificationBootstrapTestFixture(
                     context = context,
                     initiallyBlockRuntimeStartSynchronously = true,
+                    receiverTimeoutMillis = 5_000L,
                     bootstrapActionableTimeoutMillis = 100L,
                 )
             try {
