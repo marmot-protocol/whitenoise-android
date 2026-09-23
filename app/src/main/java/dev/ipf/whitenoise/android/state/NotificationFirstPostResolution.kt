@@ -419,6 +419,28 @@ internal class NotificationFirstPostResolver(
     private val conversationTitle: NotificationConversationTitleResolver,
     private val source: NotificationContentSource,
 ) {
+    /** Resolves recipient subtext only when this conversation is relevant to multiple signed-in identities. */
+    suspend fun recipientAccountSubtext(
+        update: NotificationUpdateFfi,
+        localOnly: Boolean,
+    ): String? {
+        val relevantAccounts =
+            relevantSignedInRecipientCount(
+                recipientAccountIdHex = source.recipientAccountIdHex(update.accountRef),
+                signedInAccountIds = source.signedInAccountIds(),
+                groupMembers = source.groupMembers(update),
+            )
+        return LocalNotificationFormatter.recipientAccountSubtext(
+            relevantSignedInAccountCount = relevantAccounts,
+            recipientLabel =
+                if (relevantAccounts > 1) {
+                    identity.recipientName(update.accountRef, localOnly)
+                } else {
+                    null
+                },
+        )
+    }
+
     /** Resolves all text/subtext fields without starting remote work when [localOnly]. */
     suspend fun resolve(
         update: NotificationUpdateFfi,
@@ -448,19 +470,13 @@ internal class NotificationFirstPostResolver(
             } else {
                 ReplyMediaKind.None
             }
-        val signedInAccounts = source.signedInAccountCount()
         return NotificationFirstPostContent(
             conversationTitle = system?.title ?: conversationTitle.resolve(update, localOnly),
             senderName = senderName,
             previewText = preview,
             reactedToPreview = reactedTo,
             mediaKind = resolvedMediaKind,
-            recipientAccountSubtext =
-                LocalNotificationFormatter.recipientAccountSubtext(
-                    signedInAccountCount = signedInAccounts,
-                    recipientLabel =
-                        if (signedInAccounts > 1) identity.recipientName(update.accountRef, localOnly) else null,
-                ),
+            recipientAccountSubtext = recipientAccountSubtext(update, localOnly),
         )
     }
 }

@@ -18,25 +18,46 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class NotificationFirstPostRecipientTest {
-    /** Single-account notifications must not query an identity whose label is hidden. */
+    /** A second signed-in identity outside the conversation must not expose recipient subtext. */
     @Test
-    fun singleAccountSkipsRecipientIdentityRead() =
+    fun unrelatedSignedInAccountSkipsRecipientIdentityRead() =
         runBlocking {
-            val content = resolve(accountCount = 1) { error("hidden recipient must not be read") }
+            val content =
+                resolve(
+                    signedInAccountIds = setOf("recipient", "unrelated"),
+                    memberIds = listOf("recipient", "peer"),
+                ) { error("hidden recipient label must not be read") }
             assertNull(content.recipientAccountSubtext)
         }
 
-    /** Multiple signed-in accounts retain the recipient's resolved label. */
+    /** Multiple signed-in identities in the same conversation retain the recipient label. */
     @Test
-    fun multipleAccountsKeepResolvedRecipientSubtext() =
+    fun multipleRelevantAccountsKeepResolvedRecipientSubtext() =
         runBlocking {
-            val content = resolve(accountCount = 2) { "recipient" }
+            val content =
+                resolve(
+                    signedInAccountIds = setOf("recipient", "second"),
+                    memberIds = listOf("recipient", "second", "peer"),
+                ) { "Recipient" }
             assertEquals("Recipient", content.recipientAccountSubtext)
+        }
+
+    /** An unavailable roster fails closed instead of showing account identity based on global count. */
+    @Test
+    fun unavailableRosterOmitsRecipientSubtext() =
+        runBlocking {
+            val content =
+                resolve(
+                    signedInAccountIds = setOf("recipient", "second"),
+                    memberIds = emptyList(),
+                ) { error("inconclusive recipient label must not be read") }
+            assertNull(content.recipientAccountSubtext)
         }
 
     /** Uses the production projection graph with only external data reads replaced. */
     private suspend fun resolve(
-        accountCount: Int,
+        signedInAccountIds: Set<String>,
+        memberIds: List<String>,
         recipient: (String) -> String?,
     ): NotificationFirstPostContent {
         val context = RuntimeEnvironment.getApplication()
@@ -44,7 +65,7 @@ class NotificationFirstPostRecipientTest {
         try {
             return createNotificationContentResolutionServices(
                 context = context,
-                source = ContentReads(accountCount, recipient),
+                source = ContentReads(signedInAccountIds, memberIds, recipient),
             ).firstPost.resolve(fixture.update, localOnly = true)
         } finally {
             fixture.close()
@@ -53,7 +74,8 @@ class NotificationFirstPostRecipientTest {
 
     /** Supplies external reads while keeping the production content projection intact. */
     private class ContentReads(
-        private val accountCount: Int,
+        private val signedInIds: Set<String>,
+        private val memberIds: List<String>,
         private val recipient: (String) -> String?,
     ) : NotificationContentSource {
         override fun contactNickname(
@@ -63,7 +85,7 @@ class NotificationFirstPostRecipientTest {
 
         override suspend fun readDisplayName(accountIdHex: String): String =
             when (accountIdHex) {
-                "recipient" -> "Recipient"
+                "recipient" -> recipient(accountIdHex) ?: "Recipient"
                 else -> "Sender"
             }
 
@@ -84,14 +106,15 @@ class NotificationFirstPostRecipientTest {
                 blankLinesBefore = ByteArray(0),
             )
 
-        override fun recipientAccountIdHex(ref: String): String? = recipient(ref)
+        override fun recipientAccountIdHex(ref: String): String = "recipient"
 
         override suspend fun timelineRecord(update: NotificationUpdateFfi): TimelineMessageRecordFfi? = null
 
-        override suspend fun groupMembers(update: NotificationUpdateFfi): List<AppGroupMemberRecordFfi> = emptyList()
+        override suspend fun groupMembers(update: NotificationUpdateFfi): List<AppGroupMemberRecordFfi> =
+            memberIds.map { AppGroupMemberRecordFfi(memberIdHex = it, account = null, local = false) }
 
         override suspend fun mediaKind(update: NotificationUpdateFfi): ReplyMediaKind = ReplyMediaKind.None
 
-        override fun signedInAccountCount(): Int = accountCount
+        override fun signedInAccountIds(): Set<String> = signedInIds
     }
 }

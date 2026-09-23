@@ -115,7 +115,6 @@ import dev.ipf.whitenoise.android.notifications.ConversationNotificationChannels
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationRouting
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPattern
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPreferences
-import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
 import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.NotificationBatteryPolicy
@@ -2411,7 +2410,10 @@ class WhiteNoiseAppState private constructor(
                 ::notificationMessageRecord,
             )
 
-        override fun signedInAccountCount(): Int = accounts.count { it.isSignedInSigningAccount() }
+        override fun signedInAccountIds(): Set<String> =
+            accounts
+                .filter { it.isSignedInSigningAccount() }
+                .mapTo(mutableSetOf()) { it.accountIdHex }
     }
 
     private val notificationAvatarCoordinator by lazy {
@@ -7793,7 +7795,7 @@ class WhiteNoiseAppState private constructor(
         val target = conversationOpenDismissalTarget(accountRef, groupIdHex) ?: return
         withContext(notificationCardCancellationDispatcher) {
             runCatchingCancellable {
-                localNotificationPresenter.dismissConversationMessagesImmediately(target.accountRef, target.groupIdHex)
+                localNotificationPresenter.dismissConversationMessages(target.accountRef, target.groupIdHex)
             }.onFailure { appStateDebug { "notification route dismiss failed group=${target.groupIdHex.take(8)}" } }
         }
     }
@@ -7809,10 +7811,13 @@ class WhiteNoiseAppState private constructor(
         conversationOpenDismissalTarget(accountRef, groupIdHex)?.let { target ->
             notificationScope.launch(notificationCardCancellationDispatcher) {
                 runCatching {
-                    localNotificationPresenter.dismissConversationMessagesImmediately(
+                    localNotificationPresenter.dismissConversationMessages(
                         target.accountRef,
                         target.groupIdHex,
-                    )
+                    ) {
+                        activeConversationAccountRef == target.accountRef &&
+                            activeConversationGroupIdHex == target.groupIdHex
+                    }
                 }.onFailure {
                     appStateDebug { "notification dismiss failed group=${target.groupIdHex.take(8)}" }
                 }
@@ -9437,6 +9442,7 @@ class WhiteNoiseAppState private constructor(
 
     fun contactNickname(accountIdHex: String): String? = contactNicknameFor(activeAccountRef, accountIdHex)
 
+    /** Stores an account-scoped nickname and silently reconciles active notification sender lines. */
     fun setContactNickname(
         accountIdHex: String,
         nickname: String,
@@ -9448,6 +9454,27 @@ class WhiteNoiseAppState private constructor(
         if (ContactNicknamePreferences.writeNickname(preferences, account, accountIdHex, nickname)) {
             contactNicknameRevision += 1
             bumpProfileAccountRevision(accountIdHex)
+            refreshActiveNotificationsForContact(account, accountIdHex)
+        }
+    }
+
+    /** Silently reconciles already-active sender lines after an account-scoped nickname edit or clear. */
+    private fun refreshActiveNotificationsForContact(
+        accountRef: String,
+        accountIdHex: String,
+    ) {
+        notificationScope.launch {
+            runCatchingCancellable {
+                val senderName =
+                    notificationContentResolution.identity.displayNameForAccount(
+                        accountRef = accountRef,
+                        accountIdHex = accountIdHex,
+                        requestMissingProfile = false,
+                    )
+                localNotificationPresenter.refreshContactSenderName(accountRef, accountIdHex, senderName)
+            }.onFailure {
+                appStateDebug { "notification nickname refresh failed account=${accountRef.take(8)}" }
+            }
         }
     }
 
@@ -10994,13 +11021,9 @@ class WhiteNoiseAppState private constructor(
                     if (redactContent) {
                         null
                     } else {
-                        LocalNotificationFormatter.recipientAccountSubtext(
-                            signedInAccountCount = accounts.count { it.isSignedInSigningAccount() },
-                            recipientLabel =
-                                notificationContentResolution.identity.recipientName(
-                                    update.accountRef,
-                                    localOnly = false,
-                                ),
+                        notificationContentResolution.firstPost.recipientAccountSubtext(
+                            update,
+                            localOnly = false,
                         )
                     },
                 redactContent = redactContent,

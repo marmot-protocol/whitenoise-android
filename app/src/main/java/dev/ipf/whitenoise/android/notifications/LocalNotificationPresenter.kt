@@ -36,6 +36,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -51,6 +54,30 @@ private const val EXTRA_EXPANDED_SINGLE_MESSAGE_TIMESTAMP =
     "dev.ipf.whitenoise.extra.EXPANDED_SINGLE_MESSAGE_TIMESTAMP"
 private const val EXTRA_EXPANDED_SINGLE_MESSAGE_SENDER =
     "dev.ipf.whitenoise.extra.EXPANDED_SINGLE_MESSAGE_SENDER"
+private const val CONVERSATION_DISMISSAL_MAX_ATTEMPTS = 3
+private const val CONVERSATION_DISMISSAL_RETRY_DELAY_MS = 25L
+
+internal enum class ConversationCardDismissalOutcome {
+    ABSENT,
+    CANCELLED,
+    FAILED,
+    RESIDUAL,
+}
+
+/** Per-card diagnostics from one bounded conversation cancellation attempt. */
+internal data class ConversationDismissalResult(
+    val outcomes: Map<NotificationDismissalKey, ConversationCardDismissalOutcome>,
+    val inspectionFailed: Boolean,
+) {
+    /** Whether every pre-existing target card is confirmed absent. */
+    val complete: Boolean
+        get() =
+            !inspectionFailed &&
+                outcomes.values.none {
+                    it == ConversationCardDismissalOutcome.FAILED ||
+                        it == ConversationCardDismissalOutcome.RESIDUAL
+                }
+}
 
 @SuppressLint("MissingPermission")
 private fun postLocalNotification(
@@ -99,6 +126,7 @@ class LocalNotificationPresenter(
     },
     private val postPacer: NotificationPostPacer = NotificationPostPacer.shared,
     private val alertBudget: NotificationAlertBudget = NotificationAlertBudget(),
+    private val dismissalRetryDelay: suspend () -> Unit = { delay(CONVERSATION_DISMISSAL_RETRY_DELAY_MS) },
     // Kept last so callers may still pass it as a trailing lambda.
     private val activeNotificationsProvider: (NotificationManager) -> Array<StatusBarNotification> = { manager ->
         manager.activeNotifications
@@ -146,15 +174,82 @@ class LocalNotificationPresenter(
 
     fun canPostNotifications(): Boolean = notificationPermissionGranted(context)
 
-    // Opening / reading a conversation clears every card for it: the
-    // accumulating message card, separate typed sibling cards, and any pending
-    // group-invite card. Invites are tagged by their opaque notificationKey, not
-    // the per-conversation tag, so they're found by the account + group stamped
-    // into their extras at post time rather than by key.
+    /**
+     * Silently reconciles active sender lines for one account-scoped contact nickname.
+     * Cards are re-read under their normal write lock so dismissed or replaced cards are never resurrected.
+     */
+    suspend fun refreshContactSenderName(
+        accountRef: String,
+        senderAccountIdHex: String,
+        senderName: String,
+    ): Int =
+        withContext(Dispatchers.Default) {
+            if (accountRef.isBlank() || senderAccountIdHex.isBlank() || senderName.isBlank()) return@withContext 0
+            val manager = context.getSystemService(NotificationManager::class.java) ?: return@withContext 0
+            val active =
+                try {
+                    activeNotificationsProvider(manager)
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (_: Throwable) {
+                    return@withContext 0
+                }
+            var refreshed = 0
+            active
+                .filter { LocalNotificationFormatter.deterministicTagBelongsToAccount(it.tag, accountRef) }
+                .forEach { snapshot ->
+                    ConversationCardPostSynchronizer.withLock(
+                        snapshot.tag.orEmpty(),
+                        snapshot.id,
+                        ConversationCardOp.REFRESH_CONTACT_NAME,
+                    ) {
+                        val live = activeNotification(manager, snapshot.tag, snapshot.id) ?: return@withLock
+                        val renamed =
+                            renamedSenderNotification(
+                                live.notification,
+                                senderAccountIdHex,
+                                senderName,
+                            ) ?: return@withLock
+                        if (
+                            postNotificationSafely(
+                                NotificationManagerCompat.from(context),
+                                live.tag.orEmpty(),
+                                live.id,
+                                renamed,
+                            )
+                        ) {
+                            refreshed += 1
+                        }
+                    }
+                }
+            refreshed
+        }
+
+    /** Clears every opening-time card for one conversation with bounded convergence retries. */
     suspend fun dismissConversationMessages(
         accountRef: String,
         groupIdHex: String,
-    ): Boolean = withContext(Dispatchers.Default) { dismissConversationMessagesImmediately(accountRef, groupIdHex) }
+        shouldContinue: () -> Boolean = { true },
+    ): Boolean =
+        withContext(Dispatchers.Default) {
+            if (accountRef.isBlank() || groupIdHex.isBlank()) return@withContext false
+            val cutoffMs = System.currentTimeMillis()
+            ConversationCardPostSynchronizer.markConversationDismissed(ConversationCardScope(accountRef, groupIdHex))
+            var result = dismissConversationMessagesOnce(accountRef, groupIdHex, cutoffMs)
+            var attempts = 1
+            var retryOwned = shouldContinue()
+            while (!result.complete && attempts < CONVERSATION_DISMISSAL_MAX_ATTEMPTS && retryOwned) {
+                dismissalRetryDelay()
+                currentCoroutineContext().ensureActive()
+                retryOwned = shouldContinue()
+                if (retryOwned) {
+                    result = dismissConversationMessagesOnce(accountRef, groupIdHex, cutoffMs)
+                    attempts += 1
+                }
+            }
+            logConversationDismissal(groupIdHex, attempts, result)
+            true
+        }
 
     /**
      * Bounded cancellation transaction for a conversation that has just become
@@ -166,73 +261,163 @@ class LocalNotificationPresenter(
         groupIdHex: String,
     ): Boolean {
         if (accountRef.isBlank() || groupIdHex.isBlank()) return false
-        val manager = NotificationManagerCompat.from(context)
-        val message = LocalNotificationFormatter.conversationDismissalKey(accountRef, groupIdHex)
-        val reaction = LocalNotificationFormatter.reactionDismissalKey(accountRef, groupIdHex)
-        val mention = LocalNotificationFormatter.mentionDismissalKey(accountRef, groupIdHex)
-        val agentActivity = LocalNotificationFormatter.agentActivityDismissalKey(accountRef, groupIdHex)
-        val groupMembership = LocalNotificationFormatter.groupMembershipDismissalKey(accountRef, groupIdHex)
-        // Android rate-limits cancels of cards that are not on screen exactly like posts, and a visible
-        // conversation dismisses on every update, so only keys with a live card reach the platform. The
-        // dismissal generation still advances for every key so an in-flight post cannot resurrect one.
-        listOf(message, reaction, mention, agentActivity, groupMembership).forEach { key ->
-            cancelSynchronized(manager, key.tag, key.id, onlyIfLive = true)
-        }
-        dismissInvitesForGroup(accountRef, groupIdHex)
-        notificationDebug { "dismissed group=${groupIdHex.take(8)}" }
+        val cutoffMs = System.currentTimeMillis()
+        ConversationCardPostSynchronizer.markConversationDismissed(ConversationCardScope(accountRef, groupIdHex))
+        val result = dismissConversationMessagesOnce(accountRef, groupIdHex, cutoffMs)
+        logConversationDismissal(groupIdHex, attempts = 1, result)
         return true
     }
 
-    // Invite cards carry no per-conversation tag, so match them by the account +
-    // group stamped into their extras and cancel each by its own (tag, id). Both
-    // must match: the same group can exist in more than one local account, so the
-    // group id alone would clear another account's invite for that group.
-    private fun dismissInvitesForGroup(
+    /** Runs one cancellation and verification pass without invalidating genuinely later registrations. */
+    private fun dismissConversationMessagesOnce(
         accountRef: String,
         groupIdHex: String,
-    ) {
-        if (accountRef.isBlank() || groupIdHex.isBlank()) return
-        val manager = context.getSystemService(NotificationManager::class.java) ?: return
-        val active =
-            try {
-                activeNotificationsProvider(manager)
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (_: Throwable) {
-                emptyArray()
-            }
-        val inviteNotifications =
-            active.filter {
-                val extras = it.notification.extras ?: return@filter false
-                shouldDismissInvite(
-                    extraAccountRef = extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF),
-                    extraGroupIdHex = extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID),
-                    accountRef = accountRef,
-                    groupIdHex = groupIdHex,
-                )
-            }
+        cutoffMs: Long,
+    ): ConversationDismissalResult {
+        val platform = context.getSystemService(NotificationManager::class.java)
         val compat = NotificationManagerCompat.from(context)
-        inviteNotifications.forEach {
-            ConversationCardPostSynchronizer.withLock(
-                it.tag.orEmpty(),
-                it.id,
-                ConversationCardOp.DISMISS_CANCEL,
-            ) {
-                val live = activeNotification(manager, it.tag, it.id) ?: return@withLock
-                val extras = live.notification.extras ?: return@withLock
-                if (
-                    shouldDismissInvite(
-                        extraAccountRef = extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF),
-                        extraGroupIdHex = extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID),
-                        accountRef = accountRef,
-                        groupIdHex = groupIdHex,
-                    )
-                ) {
-                    compat.cancel(live.tag, live.id)
-                    live.tag?.takeIf(String::isNotBlank)?.let(tapTokens::remove)
+        val initial = platform?.let(::readActiveNotifications)
+        var inspectionFailed = platform == null
+        val outcomes = linkedMapOf<NotificationDismissalKey, ConversationCardDismissalOutcome>()
+
+        conversationDismissalKeys(accountRef, groupIdHex).forEach { key ->
+            outcomes[key] = dismissDeterministicCard(compat, key, initial, cutoffMs)
+        }
+        initial
+            ?.asSequence()
+            ?.filter { it.postTime <= cutoffMs && it.matchesInvite(accountRef, groupIdHex) }
+            ?.forEach { invite ->
+                val key = NotificationDismissalKey(invite.tag.orEmpty(), invite.id)
+                outcomes[key] = dismissInviteCard(platform, compat, invite, accountRef, groupIdHex, cutoffMs)
+            }
+
+        val remaining = platform?.let(::readActiveNotifications)
+        if (remaining == null) {
+            inspectionFailed = true
+        } else {
+            remaining
+                .asSequence()
+                .filter { it.postTime <= cutoffMs && it.matchesConversationCard(accountRef, groupIdHex) }
+                .forEach {
+                    val key = NotificationDismissalKey(it.tag.orEmpty(), it.id)
+                    if (outcomes[key] != ConversationCardDismissalOutcome.FAILED) {
+                        outcomes[key] = ConversationCardDismissalOutcome.RESIDUAL
+                    }
                 }
+        }
+        return ConversationDismissalResult(outcomes, inspectionFailed)
+    }
+
+    /** Cancels one deterministic card while isolating platform failures from sibling keys. */
+    private fun dismissDeterministicCard(
+        manager: NotificationManagerCompat,
+        key: NotificationDismissalKey,
+        active: Array<StatusBarNotification>?,
+        cutoffMs: Long,
+    ): ConversationCardDismissalOutcome =
+        ConversationCardPostSynchronizer.withLock(key.tag, key.id, ConversationCardOp.DISMISS_CANCEL) {
+            val writtenByApp =
+                ConversationCardPostedRegistry.clearPosted(key.tag, key.id, cutoffMs)
+            val listed = active?.any { it.tag == key.tag && it.id == key.id && it.postTime <= cutoffMs } == true
+            if (active != null && !writtenByApp && !listed) return@withLock ConversationCardDismissalOutcome.ABSENT
+            try {
+                notificationCanceller(manager, key.tag, key.id)
+                ConversationCardDismissalOutcome.CANCELLED
+            } catch (exception: RuntimeException) {
+                notificationDebug {
+                    "dismiss cancel failed tag=${key.tag.take(16)} type=${exception.javaClass.simpleName}"
+                }
+                ConversationCardDismissalOutcome.FAILED
             }
         }
+
+    /** Re-reads an opaque invite under its card lock before cancelling the opening-time generation. */
+    private fun dismissInviteCard(
+        platform: NotificationManager,
+        compat: NotificationManagerCompat,
+        invite: StatusBarNotification,
+        accountRef: String,
+        groupIdHex: String,
+        cutoffMs: Long,
+    ): ConversationCardDismissalOutcome {
+        val tag = invite.tag.orEmpty()
+        return ConversationCardPostSynchronizer.withLock(tag, invite.id, ConversationCardOp.DISMISS_CANCEL) {
+            val live =
+                activeNotification(platform, invite.tag, invite.id)
+                    ?: return@withLock ConversationCardDismissalOutcome.ABSENT
+            if (live.postTime > cutoffMs || !live.matchesInvite(accountRef, groupIdHex)) {
+                return@withLock ConversationCardDismissalOutcome.ABSENT
+            }
+            try {
+                notificationCanceller(compat, tag, live.id)
+                ConversationCardPostedRegistry.clearPosted(tag, live.id)
+                live.tag?.takeIf(String::isNotBlank)?.let(tapTokens::remove)
+                ConversationCardDismissalOutcome.CANCELLED
+            } catch (exception: RuntimeException) {
+                notificationDebug { "invite dismiss failed type=${exception.javaClass.simpleName}" }
+                ConversationCardDismissalOutcome.FAILED
+            }
+        }
+    }
+
+    /** Reads the system tray while preserving coroutine cancellation and converting platform faults to retry state. */
+    private fun readActiveNotifications(manager: NotificationManager): Array<StatusBarNotification>? =
+        try {
+            activeNotificationsProvider(manager)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Throwable) {
+            null
+        }
+
+    /** Produces all deterministic cards owned by one account-scoped conversation. */
+    private fun conversationDismissalKeys(
+        accountRef: String,
+        groupIdHex: String,
+    ): List<NotificationDismissalKey> =
+        listOf(
+            LocalNotificationFormatter.conversationDismissalKey(accountRef, groupIdHex),
+            LocalNotificationFormatter.reactionDismissalKey(accountRef, groupIdHex),
+            LocalNotificationFormatter.mentionDismissalKey(accountRef, groupIdHex),
+            LocalNotificationFormatter.agentActivityDismissalKey(accountRef, groupIdHex),
+            LocalNotificationFormatter.groupMembershipDismissalKey(accountRef, groupIdHex),
+        )
+
+    /** Emits privacy-safe convergence diagnostics without notification text or full identifiers. */
+    private fun logConversationDismissal(
+        groupIdHex: String,
+        attempts: Int,
+        result: ConversationDismissalResult,
+    ) {
+        val failed = result.outcomes.values.count { it == ConversationCardDismissalOutcome.FAILED }
+        val residual = result.outcomes.values.count { it == ConversationCardDismissalOutcome.RESIDUAL }
+        notificationDebug {
+            "dismissed group=${groupIdHex.take(8)} attempts=$attempts failed=$failed " +
+                "residual=$residual inspectionFailed=${result.inspectionFailed}"
+        }
+    }
+
+    /** Whether this platform card is an invite owned by the requested account and group. */
+    private fun StatusBarNotification.matchesInvite(
+        accountRef: String,
+        groupIdHex: String,
+    ): Boolean {
+        val extras = notification.extras ?: return false
+        return shouldDismissInvite(
+            extraAccountRef = extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF),
+            extraGroupIdHex = extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID),
+            accountRef = accountRef,
+            groupIdHex = groupIdHex,
+        )
+    }
+
+    /** Whether this card is any deterministic sibling or opaque invite for the conversation. */
+    private fun StatusBarNotification.matchesConversationCard(
+        accountRef: String,
+        groupIdHex: String,
+    ): Boolean {
+        val deterministic = conversationDismissalKeys(accountRef, groupIdHex).any { it.tag == tag && it.id == id }
+        return deterministic || matchesInvite(accountRef, groupIdHex)
     }
 
     // Replying / marking read owns the acted-on card, so cancel it before taking
@@ -410,6 +595,7 @@ class LocalNotificationPresenter(
                 ConversationCardPostSynchronizer.withRegisteredShow(
                     notificationContent.notificationTag,
                     notificationContent.notificationId,
+                    ConversationCardScope(update.accountRef, update.groupIdHex),
                 ) { showToken ->
                     val showGenerationAllowsPost = {
                         if (replaceCurrentMessage) {
@@ -1004,6 +1190,7 @@ class LocalNotificationPresenter(
             .setStyle(enrichedStyle)
             .build()
 
+    /** Copies an active MessagingStyle while replacing the matching sender's rich Person metadata. */
     private fun enrichedMessagingStyle(
         notification: Notification,
         enrichedSender: Person,
@@ -1011,26 +1198,70 @@ class LocalNotificationPresenter(
         val existing =
             NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification)
                 ?: return null
-        val enriched = NotificationCompat.MessagingStyle(existing.user)
-        enriched.isGroupConversation = existing.isGroupConversation
-        existing.conversationTitle?.let { enriched.conversationTitle = it }
-        existing.messages.forEach { message ->
-            val person =
-                message.person
-                    ?.takeIf { it.key == enrichedSender.key }
-                    ?.let { enrichedSender }
-                    ?: message.person
-            enriched.addMessage(
-                NotificationCompat.MessagingStyle.Message(message.text, message.timestamp, person).also { copy ->
-                    val mimeType = message.dataMimeType
-                    val dataUri = message.dataUri
-                    if (mimeType != null && dataUri != null) copy.setData(mimeType, dataUri)
-                },
-            )
-        }
-        existing.historicMessages.forEach { message -> enriched.addHistoricMessage(message) }
-        return enriched
+        return copiedMessagingStyle(existing, enrichedSender)
     }
+
+    /** Rebuilds an active card only when a stable sender key can be relabeled safely. */
+    private fun renamedSenderNotification(
+        notification: Notification,
+        senderAccountIdHex: String,
+        senderName: String,
+    ): Notification? =
+        if (notification.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true) {
+            null
+        } else {
+            NotificationCompat.MessagingStyle
+                .extractMessagingStyleFromNotification(notification)
+                ?.let { renamedMessagingNotification(notification, it, senderAccountIdHex, senderName) }
+                ?: renamedExpandedSingleNotification(notification, senderAccountIdHex, senderName)
+        }
+
+    /** Rebuilds MessagingStyle history only when at least one stable sender key matches. */
+    private fun renamedMessagingNotification(
+        notification: Notification,
+        style: NotificationCompat.MessagingStyle,
+        senderAccountIdHex: String,
+        senderName: String,
+    ): Notification? =
+        (style.messages + style.historicMessages)
+            .firstNotNullOfOrNull { message -> message.person?.takeIf { it.key == senderAccountIdHex } }
+            ?.let { matchedPerson ->
+                NotificationCompat
+                    .Builder(context, notification)
+                    .setStyle(copiedMessagingStyle(style, renamedPerson(matchedPerson, senderName)))
+                    .setOnlyAlertOnce(true)
+                    .setSilent(true)
+                    .build()
+            }
+
+    /** Rebuilds the single-message bridge while keeping a conversation title distinct from the sender. */
+    private fun renamedExpandedSingleNotification(
+        notification: Notification,
+        senderAccountIdHex: String,
+        senderName: String,
+    ): Notification? =
+        notification.extras
+            ?.getBundle(EXTRA_EXPANDED_SINGLE_MESSAGE_SENDER)
+            ?.let(Person::fromBundle)
+            ?.takeIf { it.key == senderAccountIdHex }
+            ?.let { sender ->
+                val builder = NotificationCompat.Builder(context, notification)
+                val existingTitle = notification.extras?.getCharSequence(Notification.EXTRA_TITLE)?.toString()
+                if (existingTitle == sender.name.toString()) {
+                    builder.setContentTitle(senderName)
+                }
+                builder
+                    .addExtras(
+                        Bundle().apply {
+                            putBundle(
+                                EXTRA_EXPANDED_SINGLE_MESSAGE_SENDER,
+                                renamedPerson(sender, senderName).toBundle(),
+                            )
+                        },
+                    ).setOnlyAlertOnce(true)
+                    .setSilent(true)
+                    .build()
+            }
 
     /**
      * Applies the silent flags at write time when a later alert took the ring while this post was still
@@ -1056,7 +1287,7 @@ class LocalNotificationPresenter(
     ): Boolean =
         try {
             notificationPoster(manager, tag, id, notification)
-            ConversationCardPostSynchronizer.markPosted(tag, id)
+            ConversationCardPostedRegistry.markPosted(tag, id)
             runCatching { onNotificationWritten?.invoke() }
             true
         } catch (exception: RuntimeException) {
@@ -1080,7 +1311,7 @@ class LocalNotificationPresenter(
     ) {
         ConversationCardPostSynchronizer.withLock(tag, id, ConversationCardOp.DISMISS_CANCEL) {
             ConversationCardPostSynchronizer.markDismissed(tag, id)
-            val writtenByApp = ConversationCardPostSynchronizer.clearPosted(tag, id)
+            val writtenByApp = ConversationCardPostedRegistry.clearPosted(tag, id)
             if (!onlyIfLive || writtenByApp || cardIsLive(tag, id)) notificationCanceller(manager, tag, id)
         }
     }
@@ -1110,7 +1341,7 @@ class LocalNotificationPresenter(
         ConversationCardPostSynchronizer.withLock(tag, id, ConversationCardOp.DISMISS_CANCEL) {
             val live = activeNotification(manager, tag, id) ?: return@withLock
             if (live.postTime <= sinceMs) {
-                ConversationCardPostSynchronizer.clearPosted(tag, id)
+                ConversationCardPostedRegistry.clearPosted(tag, id)
                 compat.cancel(tag, id)
             }
         }
@@ -1249,7 +1480,7 @@ class LocalNotificationPresenter(
                 notificationId,
             )
             if (shouldCancelRepliedConversationCard(actedMessageIdHex, liveCardMessageIdHex)) {
-                ConversationCardPostSynchronizer.clearPosted(notificationTag, notificationId)
+                ConversationCardPostedRegistry.clearPosted(notificationTag, notificationId)
                 NotificationManagerCompat.from(context).cancel(notificationTag, notificationId)
                 notificationDebug { "cancelled tag=${notificationTag.take(16)} id=$notificationId" }
             }
@@ -1387,10 +1618,10 @@ class LocalNotificationPresenter(
             }.getOrDefault(false)
         }
 
-    // Accumulate every message from a conversation into one card. Android keys a
-    // notification by (tag, id); reusing the per-conversation tag updates the
-    // existing card, and MessagingStyle appends the new line to the previous
-    // ones it carried — so five messages read as one entry, not five alerts.
+    /**
+     * Accumulates one conversation under a stable card while normalizing carried lines for the current sender.
+     * Attachment data, timestamps, other senders, and the bounded history order remain unchanged.
+     */
     private fun messagingStyle(
         content: LocalNotificationContent,
         conversationTitleOverride: String?,
@@ -1411,16 +1642,11 @@ class LocalNotificationPresenter(
             ?.let { capNotificationHistory(it, historyCap) }
             ?.forEach { message ->
                 style.addMessage(
-                    NotificationCompat.MessagingStyle
-                        .Message(
-                            boundedNotificationMessageText(message.text ?: ""),
-                            message.timestamp,
-                            message.person,
-                        ).also { bounded ->
-                            val mimeType = message.dataMimeType
-                            val dataUri = message.dataUri
-                            if (mimeType != null && dataUri != null) bounded.setData(mimeType, dataUri)
-                        },
+                    copiedMessage(
+                        message = message,
+                        replacement = sender.takeIf { replacement -> message.person?.key == replacement.key },
+                        boundedText = true,
+                    ),
                 )
             }
         style.isGroupConversation = content.isGroupConversation

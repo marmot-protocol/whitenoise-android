@@ -6,6 +6,7 @@ import dev.ipf.whitenoise.android.state.StalenessGuard
 internal enum class ConversationCardOp {
     SHOW_NOTIFY,
     SHOW_ENRICH,
+    REFRESH_CONTACT_NAME,
     DISMISS_CANCEL,
     MARK_REPLY_HANDLED,
     MARK_REPLY_FAILED,
@@ -22,8 +23,15 @@ internal enum class ConversationCardBarrier {
 internal data class ConversationCardShowToken(
     val notificationTag: String,
     val notificationId: Int,
+    val conversationScope: ConversationCardScope,
     val dismissalGeneration: Long,
     val showGeneration: Long,
+)
+
+/** Account and conversation identity used to invalidate opaque in-flight cards. */
+internal data class ConversationCardScope(
+    val accountRef: String,
+    val groupIdHex: String,
 )
 
 @VisibleForTesting
@@ -59,7 +67,6 @@ internal interface ConversationCardTestHook {
 // Striped locks avoid unbounded per-conversation state.
 internal object ConversationCardPostSynchronizer {
     private const val STRIPE_COUNT = 64
-    private const val POSTED_CARD_CAPACITY = 256
     private val stripes = Array(STRIPE_COUNT) { Any() }
 
     // This registry contains only currently preparing posts and their bounded
@@ -67,13 +74,6 @@ internal object ConversationCardPostSynchronizer {
     // so dismissal ordering adds no durable cache.
     private val inFlightShowsLock = Any()
     private val inFlightShows = mutableMapOf<ConversationCardKey, InFlightShowState>()
-
-    // Cards this process has written and not yet cancelled. The platform lists a
-    // card only after its own handler has run, so a dismissal that follows a
-    // write closely cannot rely on that snapshot. Bounded: an evicted key falls
-    // back to the platform snapshot, which is the pre-existing behaviour.
-    private val postedCardsLock = Any()
-    private val postedCards = LinkedHashSet<ConversationCardKey>()
 
     @VisibleForTesting
     @Volatile
@@ -83,6 +83,7 @@ internal object ConversationCardPostSynchronizer {
     suspend fun <T> withRegisteredShow(
         notificationTag: String,
         notificationId: Int,
+        conversationScope: ConversationCardScope,
         block: suspend (ConversationCardShowToken) -> T,
     ): T {
         val key = ConversationCardKey(notificationTag, notificationId)
@@ -90,9 +91,11 @@ internal object ConversationCardPostSynchronizer {
             synchronized(inFlightShowsLock) {
                 val state = inFlightShows.getOrPut(key) { InFlightShowState() }
                 state.activeShows += 1
+                state.activeScopes[conversationScope] = state.activeScopes.getOrDefault(conversationScope, 0) + 1
                 ConversationCardShowToken(
                     notificationTag = notificationTag,
                     notificationId = notificationId,
+                    conversationScope = conversationScope,
                     dismissalGeneration = state.dismissals.capture(),
                     showGeneration = state.shows.advance(),
                 )
@@ -116,6 +119,8 @@ internal object ConversationCardPostSynchronizer {
                 false
             } else {
                 state.activeShows += 1
+                state.activeScopes[token.conversationScope] =
+                    state.activeScopes.getOrDefault(token.conversationScope, 0) + 1
                 true
             }
         }
@@ -126,6 +131,12 @@ internal object ConversationCardPostSynchronizer {
         synchronized(inFlightShowsLock) {
             val state = inFlightShows[key] ?: return
             state.activeShows -= 1
+            val remainingForScope = state.activeScopes.getOrDefault(token.conversationScope, 0) - 1
+            if (remainingForScope > 0) {
+                state.activeScopes[token.conversationScope] = remainingForScope
+            } else {
+                state.activeScopes.remove(token.conversationScope)
+            }
             if (state.activeShows == 0) inFlightShows.remove(key)
         }
     }
@@ -160,26 +171,13 @@ internal object ConversationCardPostSynchronizer {
         }
     }
 
-    /** Records an app-side write of this card so a dismissal cancels it before the platform lists it. */
-    fun markPosted(
-        notificationTag: String,
-        notificationId: Int,
-    ) {
-        val key = ConversationCardKey(notificationTag, notificationId)
-        synchronized(postedCardsLock) {
-            postedCards.remove(key)
-            postedCards += key
-            while (postedCards.size > POSTED_CARD_CAPACITY) postedCards.remove(postedCards.first())
+    /** Invalidates every registered card for one account/conversation, including opaque invite keys. */
+    fun markConversationDismissed(scope: ConversationCardScope) {
+        synchronized(inFlightShowsLock) {
+            inFlightShows.values.forEach { state ->
+                if (state.activeScopes.containsKey(scope)) state.dismissals.advance()
+            }
         }
-    }
-
-    /** Forgets the app-side write of this card and reports whether one was on record. */
-    fun clearPosted(
-        notificationTag: String,
-        notificationId: Int,
-    ): Boolean {
-        val key = ConversationCardKey(notificationTag, notificationId)
-        return synchronized(postedCardsLock) { postedCards.remove(key) }
     }
 
     /** Serializes one conversation-card mutation on its deterministic key stripe. */
@@ -226,7 +224,51 @@ internal object ConversationCardPostSynchronizer {
 
     private data class InFlightShowState(
         var activeShows: Int = 0,
+        val activeScopes: MutableMap<ConversationCardScope, Int> = mutableMapOf(),
         val dismissals: StalenessGuard = StalenessGuard(),
         val shows: StalenessGuard = StalenessGuard(),
+    )
+}
+
+/** Bounded record of app writes that may not be visible in the platform tray snapshot yet. */
+internal object ConversationCardPostedRegistry {
+    private const val CAPACITY = 256
+    private val lock = Any()
+    private val postedCards = linkedMapOf<PostedConversationCardKey, Long>()
+
+    /** Records an app-side write so an immediate dismissal can still find it. */
+    fun markPosted(
+        notificationTag: String,
+        notificationId: Int,
+    ) {
+        val key = PostedConversationCardKey(notificationTag, notificationId)
+        synchronized(lock) {
+            postedCards.remove(key)
+            postedCards[key] = System.currentTimeMillis()
+            while (postedCards.size > CAPACITY) postedCards.remove(postedCards.keys.first())
+        }
+    }
+
+    /** Forgets a write and optionally preserves records newer than [cutoffMs]. */
+    fun clearPosted(
+        notificationTag: String,
+        notificationId: Int,
+        cutoffMs: Long? = null,
+    ): Boolean {
+        val key = PostedConversationCardKey(notificationTag, notificationId)
+        return synchronized(lock) {
+            val writtenAtMs = postedCards[key] ?: return@synchronized false
+            if (cutoffMs == null || writtenAtMs <= cutoffMs) {
+                postedCards.remove(key)
+                true
+            } else {
+                false
+            }
+        }
+    }
+
+    private data class PostedConversationCardKey(
+        val tag: String,
+        val id: Int,
     )
 }

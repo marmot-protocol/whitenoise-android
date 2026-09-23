@@ -435,7 +435,7 @@ class LocalNotificationReplyRaceTest {
         Thread {
             try {
                 runBlocking {
-                    assertTrue(
+                    assertFalse(
                         presenter.show(
                             messageUpdate("msg-a", previewText = "new", timestampMs = 1_000L),
                             shortNpub = { "npub1test" },
@@ -525,6 +525,58 @@ class LocalNotificationReplyRaceTest {
         assertTrue(manager.activeNotifications.isEmpty())
     }
 
+    @Test
+    fun conversationDismissInvalidatesOpaqueInviteRegisteredBeforeTheOpen() {
+        val presenter = LocalNotificationPresenter(context)
+        val invite = groupInviteUpdate()
+        val showRegistered = CountDownLatch(1)
+        val allowShowToContinue = CountDownLatch(1)
+        val showFinished = CountDownLatch(1)
+        val showResult = AtomicBoolean(true)
+        val showFailure = AtomicReference<Throwable>()
+        ConversationCardPostSynchronizer.testHook =
+            object : ConversationCardTestHook {
+                override fun onBarrier(
+                    op: ConversationCardOp,
+                    barrier: ConversationCardBarrier,
+                    notificationTag: String,
+                    notificationId: Int,
+                ) {
+                    if (
+                        op == ConversationCardOp.SHOW_NOTIFY &&
+                        barrier == ConversationCardBarrier.AFTER_REGISTER &&
+                        notificationTag == invite.notificationKey
+                    ) {
+                        showRegistered.countDown()
+                        check(allowShowToContinue.await(5, TimeUnit.SECONDS))
+                    }
+                }
+            }
+
+        Thread {
+            try {
+                showResult.set(
+                    runBlocking {
+                        presenter.show(invite, shortNpub = { "npub1test" })
+                    },
+                )
+            } catch (throwable: Throwable) {
+                showFailure.set(throwable)
+            } finally {
+                showFinished.countDown()
+            }
+        }.start()
+        assertTrue(showRegistered.await(5, TimeUnit.SECONDS))
+
+        assertTrue(runBlocking { presenter.dismissConversationMessages(ACCOUNT, GROUP) })
+        allowShowToContinue.countDown()
+
+        assertTrue(showFinished.await(5, TimeUnit.SECONDS))
+        showFailure.get()?.let { throw it }
+        assertFalse(showResult.get())
+        assertTrue(manager.activeNotifications.isEmpty())
+    }
+
     private fun assertActiveConversationCard(
         conversation: NotificationDismissalKey,
         expectedMessageIdHex: String,
@@ -582,6 +634,28 @@ class LocalNotificationReplyRaceTest {
         timestampMs = timestampMs,
         isFromSelf = false,
     )
+
+    private fun groupInviteUpdate() =
+        NotificationUpdateFfi(
+            notificationKey = "opaque-invite-key",
+            conversationKey = "conversation",
+            trigger = NotificationTriggerFfi.GROUP_INVITE,
+            trafficClass = dev.ipf.marmotkit.NotificationTrafficClassFfi.STANDARD,
+            accountRef = ACCOUNT,
+            accountIdHex = ACCOUNT,
+            groupIdHex = GROUP,
+            groupName = "General",
+            isDm = false,
+            isMention = false,
+            messageIdHex = null,
+            sender = user(displayName = "Alice"),
+            receiver = user(accountIdHex = "self", displayName = "Me"),
+            previewText = null,
+            reactionEmoji = null,
+            reactedToPreview = null,
+            timestampMs = 1_000L,
+            isFromSelf = false,
+        )
 
     private fun messagingNotification(
         messageIdHex: String?,

@@ -6,6 +6,8 @@ import android.content.Context
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.Process
+import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import dev.ipf.whitenoise.android.state.dismissConversationNotificationsOnOpen
@@ -26,6 +28,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -147,6 +150,120 @@ class LocalNotificationDismissalTest {
 
         val remaining = manager.activeNotifications.map { it.tag to it.id }
         assertEquals(listOf(other.tag to other.id), remaining)
+    }
+
+    @Test
+    fun staleFirstSnapshotRetriesUntilTheConversationCardIsAbsent() {
+        val account = "account-stale"
+        val group = "group-stale"
+        val conversation = LocalNotificationFormatter.conversationDismissalKey(account, group)
+        manager.notify(conversation.tag, conversation.id, notification())
+        val reads = AtomicInteger()
+        val presenter =
+            LocalNotificationPresenter(
+                context = context,
+                dismissalRetryDelay = {},
+                activeNotificationsProvider = { notificationManager ->
+                    if (reads.getAndIncrement() == 0) emptyArray() else notificationManager.activeNotifications
+                },
+            )
+
+        assertTrue(runBlocking { presenter.dismissConversationMessages(account, group) })
+
+        assertTrue(reads.get() >= 4)
+        assertTrue(manager.activeNotifications.isEmpty())
+    }
+
+    @Test
+    fun oneCancellationFailureDoesNotBlockSiblingCardsAndIsRetried() {
+        val account = "account-failure"
+        val group = "group-failure"
+        val message = LocalNotificationFormatter.conversationDismissalKey(account, group)
+        val reaction = LocalNotificationFormatter.reactionDismissalKey(account, group)
+        manager.notify(message.tag, message.id, notification())
+        manager.notify(reaction.tag, reaction.id, notification())
+        val failMessageOnce = AtomicBoolean(true)
+        val cancelled = mutableListOf<NotificationDismissalKey>()
+        val presenter =
+            LocalNotificationPresenter(
+                context = context,
+                notificationCanceller = { compat, tag, id ->
+                    if (tag == message.tag && failMessageOnce.compareAndSet(true, false)) {
+                        throw IllegalStateException("first message cancellation failed")
+                    }
+                    cancelled += NotificationDismissalKey(tag, id)
+                    compat.cancel(tag, id)
+                },
+                dismissalRetryDelay = {},
+            )
+
+        assertTrue(runBlocking { presenter.dismissConversationMessages(account, group) })
+
+        assertTrue(cancelled.contains(reaction))
+        assertTrue(cancelled.contains(message))
+        assertTrue(manager.activeNotifications.isEmpty())
+    }
+
+    @Test
+    fun cardPostedAfterConversationOpenBoundarySurvivesVerification() {
+        val account = "account-newer"
+        val group = "group-newer"
+        val conversation = LocalNotificationFormatter.conversationDismissalKey(account, group)
+        val reads = AtomicInteger()
+        val newerCard =
+            StatusBarNotification(
+                context.packageName,
+                context.packageName,
+                conversation.id,
+                conversation.tag,
+                1_000,
+                0,
+                0,
+                notification(),
+                Process.myUserHandle(),
+                Long.MAX_VALUE,
+            )
+        val cancelled = mutableListOf<NotificationDismissalKey>()
+        val presenter =
+            LocalNotificationPresenter(
+                context = context,
+                notificationCanceller = { _, tag, id -> cancelled += NotificationDismissalKey(tag, id) },
+                dismissalRetryDelay = {},
+                activeNotificationsProvider = {
+                    if (reads.getAndIncrement() == 0) emptyArray() else arrayOf(newerCard)
+                },
+            )
+
+        assertTrue(runBlocking { presenter.dismissConversationMessages(account, group) })
+
+        assertEquals(2, reads.get())
+        assertTrue(cancelled.isEmpty())
+    }
+
+    @Test
+    fun navigationOwnershipLossStopsBeforeAConvergenceRetry() {
+        val account = "account-navigation"
+        val group = "group-navigation"
+        val conversation = LocalNotificationFormatter.conversationDismissalKey(account, group)
+        manager.notify(conversation.tag, conversation.id, notification())
+        val reads = AtomicInteger()
+        val presenter =
+            LocalNotificationPresenter(
+                context = context,
+                dismissalRetryDelay = { error("retry must not start after ownership is lost") },
+                activeNotificationsProvider = { notificationManager ->
+                    if (reads.getAndIncrement() == 0) emptyArray() else notificationManager.activeNotifications
+                },
+            )
+
+        assertTrue(
+            runBlocking {
+                presenter.dismissConversationMessages(account, group, shouldContinue = { false })
+            },
+        )
+
+        assertEquals(2, reads.get())
+        assertEquals(listOf(conversation.tag to conversation.id), manager.activeNotifications.map { it.tag to it.id })
     }
 
     @Test
@@ -474,7 +591,7 @@ class LocalNotificationDismissalTest {
                 notificationCanceller = { _, tag, id -> cancelled += tag to id },
                 activeNotificationsProvider = { emptyArray() },
             )
-        ConversationCardPostSynchronizer.markPosted(messageKey.tag, messageKey.id)
+        ConversationCardPostedRegistry.markPosted(messageKey.tag, messageKey.id)
 
         assertTrue(presenter.dismissConversationMessagesImmediately(account, group))
         assertEquals(listOf(messageKey.tag to messageKey.id), cancelled)
