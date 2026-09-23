@@ -26815,6 +26815,12 @@
           "NTF-002",
           "NTF-022"
         ]
+      },
+      {
+        "surface": "Far jump-to-newest lands in one snap instead of animating through history",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScrollCoordinator.kt",
+        "anchor": "suspend fun animateScrollToTail(",
+        "test_ids": ["CON-003"]
       }
     ],
     "notification_content_contracts": [
