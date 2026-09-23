@@ -946,7 +946,9 @@ internal fun ConversationScreen(
                 routeTransitionInProgress = routeTransitionInProgress,
                 showingDetails = showDetails,
             )
-        ) return@LaunchedEffect
+        ) {
+            return@LaunchedEffect
+        }
         withFrameNanos { }
         controller.markWindowVisibleForPresentationTiming()
     }
