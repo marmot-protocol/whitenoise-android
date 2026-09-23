@@ -22,6 +22,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,7 +32,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.GroupImageDraftProcessor
+import dev.ipf.whitenoise.android.media.IdentityImageCropShape
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
+import dev.ipf.whitenoise.android.media.renderIdentityImageDraft
+import dev.ipf.whitenoise.android.state.MediaQuality
+import dev.ipf.whitenoise.android.ui.common.IdentityImageCropFlow
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.group.ImageSearchSheet
@@ -57,6 +62,7 @@ internal fun SignUpPhotoControls(
     var menu by remember(owner) { mutableStateOf(false) }
     var webSession by remember(owner) { mutableStateOf<Long?>(null) }
     var pickerGeneration by remember(owner) { mutableStateOf<Long?>(null) }
+    var pendingCropUri by rememberSaveable(owner) { mutableStateOf<Uri?>(null) }
     var generation by remember(owner) { mutableStateOf(0L) }
     var active by remember(owner) { mutableStateOf(true) }
     var preparing by remember(owner) { mutableStateOf(false) }
@@ -119,9 +125,22 @@ internal fun SignUpPhotoControls(
         pickerGeneration = null
         val ownsPicker = token != null && token == generation && currentEnabled
         if (uri != null && ownsPicker && active) {
-            prepare { prepareUri?.invoke(uri) ?: GroupImageDraftProcessor.fromContentUri(context.contentResolver, uri) }
+            val injected = prepareUri
+            if (injected != null) prepare { injected(uri) } else pendingCropUri = uri
         }
     }
+    IdentityImageCropFlow(
+        uri = pendingCropUri,
+        shape = IdentityImageCropShape.Circle,
+        onDismiss = { pendingCropUri = null },
+        onUnreadable = { picked ->
+            prepare { GroupImageDraftProcessor.fromContentUri(context.contentResolver, picked) }
+        },
+        onCropped = { bytes, crop ->
+            pendingCropUri = null
+            prepare { renderIdentityImageDraft(bytes, crop, MediaQuality.Standard) }
+        },
+    )
     val photos = rememberLauncherForActivityResult(PickVisualMedia(), ::selected)
     val files = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument(), ::selected)
     Column(

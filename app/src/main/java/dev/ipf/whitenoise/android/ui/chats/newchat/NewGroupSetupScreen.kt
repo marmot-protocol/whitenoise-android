@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.chats.newchat
 
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -21,14 +22,18 @@ import androidx.compose.ui.text.input.TextFieldValue
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.media.GroupImageDraftProcessor
+import dev.ipf.whitenoise.android.media.IdentityImageCropShape
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
+import dev.ipf.whitenoise.android.media.renderIdentityImageDraft
 import dev.ipf.whitenoise.android.state.ChatCreateOpenTiming
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.chatListItemFromAuthoritativeGroupDetails
 import dev.ipf.whitenoise.android.state.groupCreateFailureDetail
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.ui.common.IdentityImageCropFlow
 import dev.ipf.whitenoise.android.ui.common.rememberImageUploadPreview
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.conversation.composer.insertEmojiAtSelection
@@ -339,6 +344,7 @@ private fun NewGroupSetupAccountScreen(
     var showEmojiPicker by rememberSaveable { mutableStateOf(false) }
     var imageDraft by draft::imageDraft
     var imagePreparing by remember { mutableStateOf(false) }
+    var pendingCropUri by rememberSaveable { mutableStateOf<Uri?>(null) }
     var busy by remember { mutableStateOf(false) }
     var createStage by remember { mutableStateOf<NewGroupCreateStage?>(null) }
     var retryGroupIdHex by draft::retryGroupIdHex
@@ -473,13 +479,13 @@ private fun NewGroupSetupAccountScreen(
     val photoPicker =
         rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
             if (uri != null && detailsEditableNow()) {
-                prepareImage { GroupImageDraftProcessor.fromContentUri(context.contentResolver, uri) }
+                pendingCropUri = uri
             }
         }
     val filePicker =
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             if (uri != null && detailsEditableNow()) {
-                prepareImage { GroupImageDraftProcessor.fromContentUri(context.contentResolver, uri) }
+                pendingCropUri = uri
             }
         }
     NewGroupSetupContent(
@@ -574,11 +580,7 @@ private fun NewGroupSetupAccountScreen(
                     prepareImage { GroupImageDraftProcessor.fromRemoteUrl(picked) }
                 }
             },
-            onPickPhoto = { uri ->
-                prepareImage {
-                    GroupImageDraftProcessor.fromContentUri(context.contentResolver, uri)
-                }
-            },
+            onPickPhoto = { uri -> pendingCropUri = uri },
             onPickEmoji = {
                 if (!detailsEditableNow()) return@ImageSearchSheet
                 showImagePicker = false
@@ -587,6 +589,18 @@ private fun NewGroupSetupAccountScreen(
             onDismiss = { if (!imagePreparing) showImagePicker = false },
         )
     }
+    IdentityImageCropFlow(
+        uri = pendingCropUri,
+        shape = IdentityImageCropShape.RoundedSquare,
+        onDismiss = { pendingCropUri = null },
+        onUnreadable = { uri ->
+            prepareImage { GroupImageDraftProcessor.fromContentUri(context.contentResolver, uri) }
+        },
+        onCropped = { bytes, crop ->
+            pendingCropUri = null
+            prepareImage { renderIdentityImageDraft(bytes, crop, MediaQuality.Standard) }
+        },
+    )
 
     if (showGroupEmojiImagePicker) {
         GroupEmojiImagePickerSheet(

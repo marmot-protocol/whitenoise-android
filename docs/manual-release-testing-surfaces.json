@@ -598,6 +598,119 @@
         ]
       },
       {
+        "surface": "Per-member group notification mute preference",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/MemberMutePreferences.kt",
+        "anchor": "class MemberMutePreferences",
+        "test_ids": [
+          "NTF-012"
+        ]
+      },
+      {
+        "surface": "Per-member group mute row state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileMemberMuteRowState.kt",
+        "anchor": "data class ProfileMemberMuteRowState",
+        "test_ids": [
+          "NTF-012"
+        ]
+      },
+      {
+        "surface": "Bounded profile banner decode variant",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/AvatarImageLoader.kt",
+        "anchor": "fun profileBannerDecodeDimension(",
+        "test_ids": [
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "Queued video poster from retained upload bytes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/PendingVideoPosterFrame.kt",
+        "anchor": "fun pendingVideoPosterFrame(",
+        "test_ids": [
+          "MED-007"
+        ]
+      },
+      {
+        "surface": "PendingFilePills",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPending.kt",
+        "anchor": "fun PendingFilePills(",
+        "test_ids": [
+          "MED-007"
+        ]
+      },
+      {
+        "surface": "PendingVideoBadge",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPending.kt",
+        "anchor": "fun PendingVideoBadge(",
+        "test_ids": [
+          "MED-007"
+        ]
+      },
+      {
+        "surface": "PendingVideoFallback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPending.kt",
+        "anchor": "fun PendingVideoFallback(",
+        "test_ids": [
+          "MED-007"
+        ]
+      },
+      {
+        "surface": "PendingVisualAlbum",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPending.kt",
+        "anchor": "fun PendingVisualAlbum(",
+        "test_ids": [
+          "MED-007"
+        ]
+      },
+      {
+        "surface": "PendingVisualBubble",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPending.kt",
+        "anchor": "fun PendingVisualBubble(",
+        "test_ids": [
+          "MED-007"
+        ]
+      },
+      {
+        "surface": "R.string.reply_media_video",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPending.kt",
+        "anchor": "R.string.reply_media_video",
+        "test_ids": [
+          "MED-007"
+        ]
+      },
+      {
+        "surface": "Profile banner decode target from the rendered box",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileBannerDecodeTarget.kt",
+        "anchor": "fun profileBannerTargetWidthPx(",
+        "test_ids": [
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_mute_in_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.profile_mute_in_group",
+        "test_ids": [
+          "NTF-012"
+        ]
+      },
+      {
+        "surface": "R.string.profile_unmute_in_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.profile_unmute_in_group",
+        "test_ids": [
+          "NTF-012"
+        ]
+      },
+      {
+        "surface": "Quick-switch slot capacity and overflow fallback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/AccountSwitcher.kt",
+        "anchor": "fun quickSwitchSlotCapacity(",
+        "test_ids": [
+          "NAV-005",
+          "NAV-006"
+        ]
+      },
+      {
         "surface": "ProfileSwitcherSheet",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/ProfileSwitcherSheet.kt",
         "anchor": "fun ProfileSwitcherSheet(",
@@ -6351,6 +6464,87 @@
         "test_ids": [
           "PRO-001",
           "PRO-002"
+        ]
+      },
+      {
+        "surface": "IdentityImageCropDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
+        "anchor": "fun IdentityImageCropDialog(",
+        "test_ids": [
+          "PRO-002",
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "IdentityImageCropTopBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
+        "anchor": "fun IdentityImageCropTopBar(",
+        "test_ids": [
+          "PRO-002",
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "IdentityImageCropCanvas",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
+        "anchor": "fun IdentityImageCropCanvas(",
+        "test_ids": [
+          "PRO-002",
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "IdentityImageCropActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
+        "anchor": "fun IdentityImageCropActions(",
+        "test_ids": [
+          "PRO-002",
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "IdentityImageCropFlow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropFlow.kt",
+        "anchor": "fun IdentityImageCropFlow(",
+        "test_ids": [
+          "PRO-002",
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "string:identity_crop_close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "PRO-002",
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "string:identity_crop_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
+        "anchor": "R.string.photo_editor_crop",
+        "test_ids": [
+          "PRO-002",
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "string:identity_crop_done",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
+        "anchor": "R.string.done",
+        "test_ids": [
+          "PRO-002",
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "string:identity_crop_rotate",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
+        "anchor": "R.string.photo_editor_rotate_clockwise",
+        "test_ids": [
+          "PRO-002",
+          "GRP-003"
         ]
       },
       {
@@ -23890,9 +24084,25 @@
         ]
       },
       {
+        "surface": "R.string.back",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.back",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
         "surface": "R.string.chat_list_search_clear",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
         "anchor": "R.string.chat_list_search_clear",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
+        "surface": "R.string.chat_list_search_open",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.chat_list_search_open",
         "test_ids": [
           "FIND-001"
         ]

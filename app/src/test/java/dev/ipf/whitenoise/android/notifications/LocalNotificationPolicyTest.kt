@@ -292,6 +292,107 @@ class LocalNotificationPolicyTest {
         }
     }
 
+    /** A muted member's ordinary message, mention and reaction all go quiet in that one group. */
+    @Test
+    fun mutedMemberMessagesMentionsAndReactionsAreSuppressedInThatGroup() {
+        assertFalse(postsWithMutedMember(update(groupIdHex = "muted-member-group", accountRef = "account-a")))
+        assertFalse(
+            postsWithMutedMember(
+                update(groupIdHex = "muted-member-group", accountRef = "account-a", isMention = true),
+            ),
+        )
+        assertFalse(
+            postsWithMutedMember(
+                update(groupIdHex = "muted-member-group", accountRef = "account-a", reactionEmoji = "👍"),
+            ),
+        )
+    }
+
+    /** Muting a member is scoped to one group, so the same person still notifies elsewhere. */
+    @Test
+    fun mutedMemberStillNotifiesInAnotherGroup() {
+        assertTrue(postsWithMutedMember(update(groupIdHex = "other-group", accountRef = "account-a")))
+    }
+
+    /** Muting a member belongs to one local account, so a second account in the same group is unaffected. */
+    @Test
+    fun mutedMemberStillNotifiesAnotherLocalAccountInTheSameGroup() {
+        assertTrue(postsWithMutedMember(update(groupIdHex = "muted-member-group", accountRef = "account-b")))
+    }
+
+    /** Only the muted member goes quiet; every other member of that group still notifies. */
+    @Test
+    fun otherMembersOfTheMutedGroupStillNotify() {
+        assertTrue(
+            postsWithMutedMember(
+                update(
+                    groupIdHex = "muted-member-group",
+                    accountRef = "account-a",
+                    senderIdHex = OTHER_SENDER_ID,
+                ),
+            ),
+        )
+    }
+
+    /** Membership and admin events are safety-critical, so a per-member mute never touches them. */
+    @Test
+    fun mutedMemberDoesNotSuppressMembershipOrAdminEvents() {
+        listOf(
+            NotificationTriggerFfi.REMOVED_FROM_GROUP,
+            NotificationTriggerFfi.MADE_ADMIN,
+            NotificationTriggerFfi.REMOVED_AS_ADMIN,
+            NotificationTriggerFfi.GROUP_INVITE,
+        ).forEach { trigger ->
+            assertTrue(
+                "per-member mute must not suppress $trigger",
+                postsWithMutedMember(
+                    update(groupIdHex = "muted-member-group", accountRef = "account-a", trigger = trigger),
+                ),
+            )
+        }
+    }
+
+    /** An update with no sender identity fails open rather than being silenced on another member's behalf. */
+    @Test
+    fun updateWithoutSenderIdentityFailsOpen() {
+        val mutesEverything: GroupSenderMutePredicate = { _, _, _ -> true }
+        listOf("", "   ").forEach { blankSender ->
+            assertTrue(
+                "a blank sender identity must fail open",
+                postsWithMutedMember(
+                    update(groupIdHex = "muted-member-group", accountRef = "account-a", senderIdHex = blankSender),
+                    senderMutedInGroup = mutesEverything,
+                ),
+            )
+        }
+    }
+
+    /** Direct messages have no per-member dimension, so a stray entry can never silence one. */
+    @Test
+    fun directMessagesAreNeverSuppressedByAPerMemberMute() {
+        val mutesEverything: GroupSenderMutePredicate = { _, _, _ -> true }
+        assertTrue(
+            postsWithMutedMember(
+                update(groupIdHex = "direct-message", accountRef = "account-a", isDm = true),
+                senderMutedInGroup = mutesEverything,
+            ),
+        )
+    }
+
+    /** With no per-member mute configured, the default lookup leaves every message posting. */
+    @Test
+    fun defaultSenderMuteLookupSuppressesNothing() {
+        assertTrue(
+            LocalNotificationPolicy.shouldPost(
+                update(groupIdHex = "muted-member-group", accountRef = "account-a"),
+                appInForeground = false,
+                activeConversationGroupIdHex = null,
+                activeConversationAccountRef = null,
+                appLockScreenVisible = false,
+            ),
+        )
+    }
+
     // End-to-end lifecycle checks (issue #821): drive the suppression state
     // through the reported sequences and assert the post decision, so the policy
     // and the lifecycle transitions are pinned together.
@@ -347,6 +448,8 @@ class LocalNotificationPolicyTest {
         isMention: Boolean = false,
         trigger: NotificationTriggerFfi = NotificationTriggerFfi.NEW_MESSAGE,
         isDm: Boolean = false,
+        senderIdHex: String = DEFAULT_SENDER_ID,
+        reactionEmoji: String? = null,
     ) = NotificationUpdateFfi(
         isMention = isMention,
         notificationKey = "message:$accountRef:message",
@@ -359,21 +462,50 @@ class LocalNotificationPolicyTest {
         groupName = "General",
         isDm = isDm,
         messageIdHex = "message",
-        sender = user(),
+        sender = user(accountIdHex = senderIdHex),
         receiver = user(accountIdHex = accountRef, displayName = "Me"),
         previewText = "Hello",
-        reactionEmoji = null,
+        reactionEmoji = reactionEmoji,
         reactedToPreview = null,
         timestampMs = 1234,
         isFromSelf = false,
     )
 
     private fun user(
-        accountIdHex: String = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        accountIdHex: String = DEFAULT_SENDER_ID,
         displayName: String? = null,
     ) = NotificationUserFfi(
         accountIdHex = accountIdHex,
         displayName = displayName,
         pictureUrl = null,
     )
+
+    /** Silences exactly one account/group/member triple, matching the stored preference's scope. */
+    private fun mutedMember(
+        accountRef: String = "account-a",
+        groupIdHex: String = "muted-member-group",
+        senderIdHex: String = DEFAULT_SENDER_ID,
+    ): GroupSenderMutePredicate =
+        { candidateAccount, candidateGroup, candidateSender ->
+            candidateAccount == accountRef && candidateGroup == groupIdHex && candidateSender == senderIdHex
+        }
+
+    /** Evaluates [update] with a background app and no active conversation, so only mutes can decide. */
+    private fun postsWithMutedMember(
+        update: NotificationUpdateFfi,
+        senderMutedInGroup: GroupSenderMutePredicate = mutedMember(),
+    ): Boolean =
+        LocalNotificationPolicy.shouldPost(
+            update = update,
+            appInForeground = false,
+            activeConversationGroupIdHex = null,
+            activeConversationAccountRef = null,
+            appLockScreenVisible = false,
+            senderMutedInGroup = senderMutedInGroup,
+        )
+
+    private companion object {
+        const val DEFAULT_SENDER_ID = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        const val OTHER_SENDER_ID = "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
+    }
 }

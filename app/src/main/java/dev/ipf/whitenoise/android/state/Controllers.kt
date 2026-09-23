@@ -103,6 +103,8 @@ import dev.ipf.whitenoise.android.media.mutationKey
 import dev.ipf.whitenoise.android.media.shouldCommitPrimaryGroupImageMutation
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolution
 import dev.ipf.whitenoise.android.ui.chats.newchat.directChatPreferenceOrder
+import dev.ipf.whitenoise.android.ui.conversation.media.isPendingVideo
+import dev.ipf.whitenoise.android.ui.conversation.media.pendingVideoPosterFrame
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -1060,12 +1062,23 @@ internal suspend fun removeMediaMemoryCacheKeys(
     }
 }
 
-private suspend fun decodeMediaThumbnailOffMain(plaintextBytes: ByteArray) =
+/**
+ * The poster seeded under a just-sent attachment's confirmed key.
+ *
+ * A photo decodes its own bytes. A video has a frame pulled from the same bytes instead, so the
+ * confirmed bubble opens on the poster the optimistic one already showed rather than waiting for
+ * the file to be materialized and read again (#2732).
+ */
+private suspend fun decodeMediaThumbnailOffMain(attachment: PendingAttachment) =
     withContext(Dispatchers.Default) {
-        MediaPipeline.decodeSampledBitmap(
-            plaintextBytes,
-            MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
-        )
+        if (attachment.isPendingVideo) {
+            pendingVideoPosterFrame(attachment.plaintextBytes, extractPoster = true).bitmap
+        } else {
+            MediaPipeline.decodeSampledBitmap(
+                attachment.plaintextBytes,
+                MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
+            )
+        }
     }
 
 internal fun optimisticMessageIdForProjection(
@@ -8498,7 +8511,7 @@ class ConversationController(
                         // Offload the multi-MB ARGB decode to Default; the
                         // main-confined thumbnail-cache put resumes on Main.
                         // Mirrors the receive/render path in WhiteNoiseApp.
-                        val decoded = decodeMediaThumbnailOffMain(attachment.plaintextBytes)
+                        val decoded = decodeMediaThumbnailOffMain(attachment)
                         if (!mediaUploadSessionStillCurrent(account)) return@forEachIndexed
                         if (decoded != null) {
                             appState.cacheMediaThumbnail(confirmedKey, decoded)
@@ -9605,9 +9618,9 @@ class ConversationController(
             // reconcile. The main-confined thumbnail-cache put resumes on Main
             // via launchMutation's Main.immediate scope. Mirrors the
             // receive/render path in WhiteNoiseApp.
-            val plaintextBytes = attachment.plaintextBytes
+            val posterSource = attachment
             appState.launchMutation {
-                val decoded = decodeMediaThumbnailOffMain(plaintextBytes)
+                val decoded = decodeMediaThumbnailOffMain(posterSource)
                 if (decoded != null && mediaUploadSessionStillCurrent(account)) {
                     appState.cacheMediaThumbnail(cacheKey, decoded)
                 }
