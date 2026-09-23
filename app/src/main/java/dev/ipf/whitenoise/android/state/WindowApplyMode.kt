@@ -43,6 +43,16 @@ internal fun currentWindowApplySnapshot(
     pendingProjectionIds: Collection<String>,
 ) = WindowApplySnapshot(heldRecords.toList(), pendingProjectionIds.toSet())
 
+/** Resolves the display index key off-main so commit validation never projects a record. */
+private fun preparedProjectedItemId(
+    messageIdHex: String,
+    actionRecord: AppMessageRecordFfi,
+): String {
+    val streamId =
+        MessageProjector.streamId(actionRecord).takeIf { MessageProjector.isStreamStart(actionRecord) }
+    return streamId?.let { "stream:$it" } ?: "msg:$messageIdHex"
+}
+
 /** Pure result of interpreting a native window before the main-thread commit. */
 internal data class PreparedWindowRow(
     val record: TimelineMessageRecordFfi,
@@ -187,11 +197,10 @@ internal fun prepareWindowApply(
             val carried = record.withCarriedMarkdownTokens(carriedTokens, heldBefore)
             val current = heldBefore[record.messageIdHex]
             val actionRecord = TimelineProjector.toAppMessageRecord(carried)
-            val streamId = MessageProjector.streamId(actionRecord).takeIf { MessageProjector.isStreamStart(actionRecord) }
             PreparedWindowRow(
                 record = carried,
                 actionRecord = actionRecord,
-                projectedItemId = streamId?.let { "stream:$it" } ?: "msg:${record.messageIdHex}",
+                projectedItemId = preparedProjectedItemId(record.messageIdHex, actionRecord),
                 needsProjection =
                     mode == WindowApplyMode.REPLACE ||
                         current == null ||

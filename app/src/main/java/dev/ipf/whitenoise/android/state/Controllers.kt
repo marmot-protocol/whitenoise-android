@@ -11435,7 +11435,11 @@ class ConversationController(
         installWindowFrame(installed?.frame)
         // A replacement rebuilt every row, so every tally is stale. An extended window only changed
         // the rows it added, altered or dropped.
-        if (prepared.mode == WindowApplyMode.REPLACE) recomputeReactions() else recomputeReactions(commitPlan.touchedIds)
+        if (prepared.mode == WindowApplyMode.REPLACE) {
+            recomputeReactions()
+        } else {
+            recomputeReactions(commitPlan.touchedIds)
+        }
         // A non-replaceWindow page (older-history load once hasLoadedOlderPages
         // is set) skips the replaceWindow trim above, so prune messageById to the
         // current window + optimistic records here too (#373).
