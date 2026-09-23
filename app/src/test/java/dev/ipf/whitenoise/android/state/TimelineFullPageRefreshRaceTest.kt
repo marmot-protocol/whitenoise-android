@@ -53,12 +53,14 @@ class TimelineFullPageRefreshRaceTest {
             val preparationDispatcher = PausedDispatcher()
             val controller = conversationController(preparationDispatcher)
             try {
+                var committed = false
                 val staleApply =
                     async(start = CoroutineStart.UNDISPATCHED) {
                         controller.applyTimelinePage(
                             staleOnlyRefreshPage(),
                             replaceWindow = true,
                             updatePagination = true,
+                            onCommitted = { committed = true },
                         )
                     }
 
@@ -68,6 +70,7 @@ class TimelineFullPageRefreshRaceTest {
                 advanceUntilIdle()
 
                 assertEquals(emptyList<String>(), staleApply.await())
+                assertFalse("stale preparations must not report a committed page", committed)
                 val timelineIds = controller.timeline.map { it.record.messageIdHex }.toSet()
                 assertTrue(NEW_MESSAGE_ID in timelineIds)
                 assertFalse(OLD_MESSAGE_ID in timelineIds)

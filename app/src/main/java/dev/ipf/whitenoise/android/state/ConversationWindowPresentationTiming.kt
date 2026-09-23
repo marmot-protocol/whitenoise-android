@@ -91,6 +91,7 @@ internal class ConversationWindowPresentationTiming(
     private var windowSettled = false
     private var composerSettled = false
     private var composerObservedBeforeReceipt = false
+    private var windowObservedBeforePublication = false
 
     @Synchronized
     fun begin(
@@ -107,11 +108,18 @@ internal class ConversationWindowPresentationTiming(
     @Synchronized
     fun timelinePublished() {
         settlePublication(ConversationPresentationOutcome.SUCCESS)
+        if (publicationSucceeded && windowObservedBeforePublication) {
+            settleWindow(ConversationPresentationOutcome.SUCCESS)
+        }
     }
 
     @Synchronized
     fun windowVisible() {
-        if (publicationSucceeded) settleWindow(ConversationPresentationOutcome.SUCCESS)
+        if (publicationSucceeded) {
+            settleWindow(ConversationPresentationOutcome.SUCCESS)
+        } else {
+            windowObservedBeforePublication = true
+        }
     }
 
     @Synchronized

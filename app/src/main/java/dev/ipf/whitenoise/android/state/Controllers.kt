@@ -6878,6 +6878,7 @@ class ConversationController(
         hasPreparedInitialPresentation = true
         initialTimelineSeedActive = false
         publishTimelineFromIndexes()
+        windowPresentationTiming.timelinePublished()
     }
 
     /** Runs MDK's authoritative sweep while any loaded row owns a deadline. */
@@ -7023,6 +7024,10 @@ class ConversationController(
         timelineStream: ConversationTimelineSubscriptionHandle,
     ): List<String> {
         val snapshot = initialTimelineSnapshotRead.await { timelineStream.snapshot() }
+        windowPresentationTiming.begin(
+            receivedAtElapsedMs = SystemClock.elapsedRealtime(),
+            ticket = appState.productObservationTicket(),
+        )
         val recoveryGeneration =
             appState.recoveryDiagnostics.recordTimelineSubscriptionReceived(
                 count = snapshot?.messages?.size ?: 0,
@@ -7158,6 +7163,7 @@ class ConversationController(
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (throwable: Throwable) {
+            windowPresentationTiming.fail()
             if (throwable.isUseAfterEviction()) {
                 discardInitialTimelineSeedForFailure(preserveOptimisticMessages = false)
                 markActiveAccountRemovedFromMembers(account)
@@ -11362,6 +11368,7 @@ class ConversationController(
         replaceWindow: Boolean,
         updatePagination: Boolean,
         reconcileNewExtendedRecords: Boolean = false,
+        onCommitted: (() -> Unit)? = null,
     ): List<String> {
         val preparationGeneration = timelineWindowGeneration.advance()
         val installed = timelineSubscription?.latestInstalledWindow()
@@ -11462,6 +11469,7 @@ class ConversationController(
         onWindowApplyMeasured(
             preparation.performanceSample(prepared, commitPlan.projectIds.size, commitStartedAt, windowApplyNanoTime()),
         )
+        onCommitted?.invoke()
         return streamIdsToLaunch
     }
 

@@ -64,7 +64,6 @@ class ConversationWindowPresentationTimingTest {
         timing.windowVisible()
         assertTrue(emitted.isEmpty())
         timing.timelinePublished()
-        timing.windowVisible()
         assertEquals(
             listOf(
                 ConversationPresentationStage.TIMELINE_PUBLISHED,
@@ -77,6 +76,19 @@ class ConversationWindowPresentationTimingTest {
         assertFalse(conversationWindowCanReportVisible(true, true, true, false))
         assertFalse(conversationWindowCanReportVisible(true, true, false, true))
         assertTrue(conversationWindowCanReportVisible(true, true, false, false))
+    }
+
+    @Test
+    fun earlyVisibilityDoesNotTurnAFailedPublicationIntoSuccess() {
+        val emitted = mutableListOf<ConversationPresentationObservation>()
+        val timing = ConversationWindowPresentationTiming(nowMs = { 25L }, emit = { _, value -> emitted += value })
+        timing.begin(receivedAtElapsedMs = 10L, ticket = null)
+        timing.windowVisible()
+        timing.fail()
+        timing.timelinePublished()
+
+        assertEquals(3, emitted.size)
+        assertTrue(emitted.all { it.outcome == ConversationPresentationOutcome.FAILURE })
     }
 
     @Test
