@@ -29,8 +29,8 @@ was 80% before and after; thermal status was 0 before and after.
 
 | Operation | Legacy median | libsecp256k1 median | Legacy ops/s | libsecp256k1 ops/s |
 | --- | ---: | ---: | ---: | ---: |
-| Signature only | 233.373 ms | 0.213 ms | 4.28 | 4,693 |
-| Canonical full event | 234.544 ms | 0.325 ms | 4.26 | 3,081 |
+| Signature only | 233.361 ms | 0.212 ms | 4.29 | 4,712 |
+| Canonical full event | 234.934 ms | 0.306 ms | 4.26 | 3,266 |
 
 These are measurements of the two verifier paths, not end-to-end message or
 card rendering latency. They do not reproduce the earlier unaccompanied
