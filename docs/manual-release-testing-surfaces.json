@@ -26354,6 +26354,15 @@
         "test_ids": [
           "MED-006"
         ]
+      },
+      {
+        "surface": "An interactive account switch seeds the top bar's other-account avatars before publication",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AccountSwitchLocalSnapshot.kt",
+        "anchor": "fun accountSwitchPreloadPlan(",
+        "test_ids": [
+          "NAV-006",
+          "NAV-005"
+        ]
       }
     ],
     "notification_content_contracts": [
