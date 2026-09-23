@@ -72,6 +72,13 @@ private const val GIPHY_READ_TIMEOUT_MILLIS = 15_000
 private val giphyFetchSlots = Semaphore(6)
 private val giphyPlaybackSlots = Semaphore(6)
 
+/** Lets an explicit load bypass automatic-download policy while still pausing unrequested work. */
+internal fun shouldLoadRemoteGiphyMedia(
+    automaticDownloadsPaused: Boolean,
+    automaticAllowed: Boolean,
+    manualRequest: Boolean,
+): Boolean = manualRequest || (!automaticDownloadsPaused && automaticAllowed)
+
 /** Loads and renders one iOS-originated GIPHY envelope through Android's media policy. */
 @Composable
 @Suppress("FunctionNaming")
@@ -87,7 +94,13 @@ internal fun RemoteGiphyMediaBubble(
     var playbackGranted by remember(media.url) { mutableStateOf(false) }
     val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
     val automaticAllowed = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image)
-    val shouldLoad = !automaticDownloadsPaused && (automaticAllowed || manualRequest)
+    val shouldLoad =
+        shouldLoadRemoteGiphyMedia(
+            automaticDownloadsPaused = automaticDownloadsPaused,
+            automaticAllowed = automaticAllowed,
+            manualRequest = manualRequest,
+        )
+    val playbackAllowed = manualRequest || !automaticDownloadsPaused
 
     LaunchedEffect(media.url, shouldLoad, retryToken) {
         if (!shouldLoad || presentation != null) return@LaunchedEffect
@@ -103,8 +116,8 @@ internal fun RemoteGiphyMediaBubble(
         }
     }
 
-    LaunchedEffect(media.url, presentation, automaticDownloadsPaused) {
-        if (presentation == null || automaticDownloadsPaused) {
+    LaunchedEffect(media.url, presentation, playbackAllowed) {
+        if (presentation == null || !playbackAllowed) {
             playbackGranted = false
             return@LaunchedEffect
         }
