@@ -1,0 +1,86 @@
+package dev.ipf.whitenoise.android.ui.screenshot
+
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
+import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.core.MessageTextCopy
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+
+/** Pixel baselines for short and wrapping message edits. */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [36], qualifiers = "en-rUS-w360dp-h780dp-mdpi")
+class ComposerEditScreenshotTest {
+    @get:Rule
+    val composeRule = createComposeRule()
+
+    @Test
+    fun composerShortEditLight() {
+        render(darkTheme = false, width = 360, fontScale = 1f, rtl = false, editText = "Short edit")
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_short_edit_light.png")
+    }
+
+    @Test
+    fun composerWrappingEditLargeRtl() {
+        render(
+            darkTheme = true,
+            width = 300,
+            fontScale = 1.6f,
+            rtl = true,
+            editText = "A longer edit that wraps across several lines while the controls remain available.",
+        )
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_wrapping_edit_large_rtl.png")
+    }
+
+    private fun render(
+        darkTheme: Boolean,
+        width: Int,
+        fontScale: Float,
+        rtl: Boolean,
+        editText: String,
+    ) {
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(density.density, fontScale),
+                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
+                WhiteNoiseTheme(darkTheme = darkTheme) {
+                    Surface(modifier = Modifier.width(width.dp).testTag(TAG)) {
+                        ComposerBar(
+                            replyingTo = null,
+                            messageTextCopy = MessageTextCopy.Default,
+                            onCancelReply = {},
+                            onSend = { _, _ -> },
+                            initialDraft = TextFieldValue(""),
+                            editingMessageId = "edited-message",
+                            editingInitialText = editText,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private companion object {
+        const val TAG = "composer-edit-screenshot"
+    }
+}
