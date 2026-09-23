@@ -83,6 +83,64 @@ class ConversationTimelineExtendApplyTest {
             }
         }
 
+    /** An index writer during preparation cannot leave a page row hidden or retain a departed row. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun extendRechecksLiveIndexesAfterSuspendedPreparation() =
+        runTest {
+            val dispatcher = PausedPreparationDispatcher()
+            val measurements = mutableListOf<WindowApplyPerformanceSample>()
+            val scripted =
+                ScriptedConversationLiveSubscriptions(
+                    timelineScripts = emptyList(),
+                    group = conversationTimelineTestGroup(),
+                )
+            val appState = conversationTimelineTestAppState(scripted.subscriptions)
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = conversationTimelineTestGroup(),
+                    initialMemberSnapshot = conversationTimelineMemberSnapshot(),
+                    groupRosterReader = { _, _ -> conversationTimelineGroupRoster() },
+                    windowPreparationDispatcher = dispatcher,
+                    onWindowApplyMeasured = measurements::add,
+                )
+            try {
+                val authoritativePage = page(listOf(row(SECOND), row(THIRD)))
+                val opening =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        controller.applyTimelinePage(authoritativePage, replaceWindow = true, updatePagination = true)
+                    }
+                dispatcher.runPending()
+                advanceUntilIdle()
+                opening.await()
+                assertEquals(listOf(SECOND, THIRD), timelineMessageIds(controller))
+                measurements.clear()
+                val heldSecond = controller.timelineRecords.getValue(SECOND)
+                val extend =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        controller.applyTimelinePage(authoritativePage, replaceWindow = false, updatePagination = true)
+                    }
+                assertFalse(extend.isCompleted)
+
+                controller.removeProjectedRecord(SECOND)
+                controller.timelineRecords[SECOND] = heldSecond
+                controller.timelineRecords[THIRD] = row(THIRD, "changed during preparation")
+                controller.timelineRecords[FIRST] = row(FIRST)
+                dispatcher.runPending()
+                advanceUntilIdle()
+                extend.await()
+
+                assertEquals(listOf(SECOND, THIRD), timelineMessageIds(controller))
+                assertTrue(FIRST !in controller.timelineRecords)
+                assertTrue("msg:$SECOND" in controller.timelineItemsById)
+                assertEquals("body", controller.timelineRecords.getValue(THIRD).plaintext)
+                assertEquals(2, measurements.single().committedProjectionCount)
+            } finally {
+                controller.onCleared()
+            }
+        }
+
     @Test
     fun largeWindowMeasuresPreparationSeparatelyAndCommitsOnlyItsDiff() =
         runBlocking {

@@ -20,6 +20,30 @@ import org.junit.Test
 import java.util.concurrent.Executors
 
 class WindowApplyPreparationTest {
+    /** A deferred media bridge owns an unprojected row until its exact send handoff completes. */
+    @Test
+    fun commitRecheckPreservesPendingProjectionBridge() {
+        val id = "aa".repeat(32)
+        val held = timelineRecord(id, 1uL, "held")
+        val snapshot = WindowApplySnapshot(listOf(held), emptySet())
+        val prepared =
+            prepareWindowApply(
+                page = TimelinePageFfi(listOf(held), hasMoreBefore = false, hasMoreAfter = false),
+                snapshot = snapshot,
+                replaceWindow = false,
+            )
+
+        val plan =
+            prepared.planCommit(
+                snapshot = snapshot,
+                liveRecords = mapOf(id to held),
+                projectedItemIds = emptySet(),
+                pendingProjectionIds = setOf(id),
+            )
+        assertTrue(plan.projectIds.isEmpty())
+        assertTrue(plan.departedIds.isEmpty())
+    }
+
     @Test
     fun extendPreparationCarriesMarkdownAndPlansOnlyChangedRows() {
         val document =

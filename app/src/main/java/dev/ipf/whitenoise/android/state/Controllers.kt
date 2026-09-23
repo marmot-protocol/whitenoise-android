@@ -11368,7 +11368,14 @@ class ConversationController(
         if (!timelineWindowGeneration.isCurrent(preparationGeneration)) return emptyList()
         assertMainThread { "applyTimelinePage commit" }
         val commitStartedAt = windowApplyNanoTime()
-        prepared.departedIds.forEach(::removeProjectedRecord)
+        val commitPlan =
+            prepared.planCommit(
+                snapshot,
+                timelineRecords,
+                timelineItemsById.keys,
+                pendingProjectionsAwaitingBridge.keys,
+            )
+        commitPlan.departedIds.forEach(::removeProjectedRecord)
         if (replaceWindow) trimStateForWindowReplacement()
         authoritativeTimelineOrderByMessageId.clear()
         authoritativeTimelineOrderByMessageId.putAll(prepared.authoritativeOrder)
@@ -11378,12 +11385,14 @@ class ConversationController(
             val record = row.record
             pendingTimelineRemovedMessageIds = pendingTimelineRemovedMessageIds - record.messageIdHex
             appliedRecords.add(record)
+            val reconcilesOptimistic =
+                row.reconcilesOptimistic || (reconcileNewExtendedRecords && record.messageIdHex !in timelineRecords)
             val actionRecord =
-                if (row.needsProjection) {
+                if (record.messageIdHex in commitPlan.projectIds) {
                     upsertProjectedRecord(
                         record,
-                        reconcileOptimistic = row.reconcilesOptimistic,
-                        allowDelayedProjection = row.reconcilesOptimistic,
+                        reconcileOptimistic = reconcilesOptimistic,
+                        allowDelayedProjection = reconcilesOptimistic,
                         preparedAction = row.actionRecord,
                     )
                 } else {
@@ -11413,7 +11422,7 @@ class ConversationController(
         installWindowFrame(installed?.frame)
         // A replacement rebuilt every row, so every tally is stale. An extended window only changed
         // the rows it added, altered or dropped.
-        if (prepared.mode == WindowApplyMode.REPLACE) recomputeReactions() else recomputeReactions(prepared.touchedIds)
+        if (prepared.mode == WindowApplyMode.REPLACE) recomputeReactions() else recomputeReactions(commitPlan.touchedIds)
         // A non-replaceWindow page (older-history load once hasLoadedOlderPages
         // is set) skips the replaceWindow trim above, so prune messageById to the
         // current window + optimistic records here too (#373).
@@ -11434,7 +11443,7 @@ class ConversationController(
         windowPresentationTiming.timelinePublished()
         val streamIdsToLaunch = windowStreamIdsToLaunch(streamIds, removedStreamIds::contains)
         onWindowApplyMeasured(
-            preparation.performanceSample(prepared, commitStartedAt, windowApplyNanoTime()),
+            preparation.performanceSample(prepared, commitPlan.projectIds.size, commitStartedAt, windowApplyNanoTime()),
         )
         return streamIdsToLaunch
     }

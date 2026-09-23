@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
+import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.TimelineProjector
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
@@ -46,9 +47,51 @@ internal fun currentWindowApplySnapshot(
 internal data class PreparedWindowRow(
     val record: TimelineMessageRecordFfi,
     val actionRecord: AppMessageRecordFfi,
+    val projectedItemId: String,
     val needsProjection: Boolean,
     val reconcilesOptimistic: Boolean,
 )
+
+/** Cheap main-thread validation of a diff prepared while other projection writers could run. */
+internal data class WindowApplyCommitPlan(
+    val departedIds: Set<String>,
+    val projectIds: Set<String>,
+) {
+    val touchedIds: Set<String> get() = departedIds + projectIds
+}
+
+/** Rechecks mutable indexes before committing an EXTEND prepared from an earlier snapshot. */
+internal fun PreparedWindowApply.planCommit(
+    snapshot: WindowApplySnapshot,
+    liveRecords: Map<String, TimelineMessageRecordFfi>,
+    projectedItemIds: Set<String>,
+    pendingProjectionIds: Set<String>,
+): WindowApplyCommitPlan {
+    val snapshotById = snapshot.heldRecords.associateBy(TimelineMessageRecordFfi::messageIdHex)
+    val pageIds = rows.mapTo(HashSet(rows.size)) { it.record.messageIdHex }
+    val departedIds =
+        if (mode == WindowApplyMode.EXTEND) {
+            liveRecords.keys.filterTo(HashSet()) { it !in pageIds && it !in pendingProjectionIds }
+        } else {
+            emptySet()
+        }
+    val projectIds =
+        buildSet {
+            rows.forEach { row ->
+                val id = row.record.messageIdHex
+                // The exact send bridge must place deferred media at its final position.
+                if (mode == WindowApplyMode.EXTEND && id in pendingProjectionIds) return@forEach
+                if (
+                    row.needsProjection ||
+                    liveRecords[id] !== snapshotById[id] ||
+                    row.projectedItemId !in projectedItemIds
+                ) {
+                    add(id)
+                }
+            }
+        }
+    return WindowApplyCommitPlan(departedIds, projectIds)
+}
 
 /** Pure result of interpreting a native window before the main-thread commit. */
 internal data class PreparedWindowApply(
@@ -58,7 +101,6 @@ internal data class PreparedWindowApply(
     val authoritativeOrder: Map<String, ULong>,
     val touchedIds: Set<String>,
     val profileIds: Set<String>,
-    val projectionCount: Int,
 )
 
 /** Deterministic work counters plus separately measured preparation and main-commit durations. */
@@ -76,11 +118,12 @@ internal data class TimedPreparedWindowApply(
 
 internal fun TimedPreparedWindowApply.performanceSample(
     prepared: PreparedWindowApply,
+    committedProjectionCount: Int,
     commitStartedAtNanos: Long,
     commitFinishedAtNanos: Long,
 ) = WindowApplyPerformanceSample(
     preparedRowCount = prepared.rows.size,
-    committedProjectionCount = prepared.projectionCount,
+    committedProjectionCount = committedProjectionCount,
     preparationNanos = durationNanos,
     mainCommitNanos = (commitFinishedAtNanos - commitStartedAtNanos).coerceAtLeast(0L),
 )
@@ -143,9 +186,12 @@ internal fun prepareWindowApply(
         page.messages.map { record ->
             val carried = record.withCarriedMarkdownTokens(carriedTokens, heldBefore)
             val current = heldBefore[record.messageIdHex]
+            val actionRecord = TimelineProjector.toAppMessageRecord(carried)
+            val streamId = MessageProjector.streamId(actionRecord).takeIf { MessageProjector.isStreamStart(actionRecord) }
             PreparedWindowRow(
                 record = carried,
-                actionRecord = TimelineProjector.toAppMessageRecord(carried),
+                actionRecord = actionRecord,
+                projectedItemId = streamId?.let { "stream:$it" } ?: "msg:${record.messageIdHex}",
                 needsProjection =
                     mode == WindowApplyMode.REPLACE ||
                         current == null ||
@@ -188,7 +234,6 @@ internal fun prepareWindowApply(
         authoritativeOrder = authoritativeOrder,
         touchedIds = touchedIds,
         profileIds = profileIds,
-        projectionCount = rows.count(PreparedWindowRow::needsProjection),
     )
 }
 
