@@ -5021,7 +5021,7 @@ class WhiteNoiseAppState private constructor(
     private suspend fun loadAccountSwitchLocalSnapshot(
         accountRef: String,
         generation: Long,
-        includePresentationSeeds: Boolean = true,
+        plan: AccountSwitchPreloadPlan,
     ): AccountSwitchLocalSnapshot? =
         try {
             val presentedRows =
@@ -5036,7 +5036,7 @@ class WhiteNoiseAppState private constructor(
                     accountRef = accountRef,
                     generation = generation,
                     rows = rows,
-                    includePresentationSeeds = includePresentationSeeds,
+                    plan = plan,
                 )
             ensureAccountSwitchRequestIsCurrent(generation)
 
@@ -5049,7 +5049,7 @@ class WhiteNoiseAppState private constructor(
                 profiles = presentation.profiles,
                 presentedRows = presentedRows,
             ).also { snapshot ->
-                if (includePresentationSeeds) recordAccountSwitchIdentityState(accountRef, snapshot)
+                if (plan.includePresentationSeeds) recordAccountSwitchIdentityState(accountRef, snapshot)
             }
         } catch (_: AccountSwitchSnapshotSuperseded) {
             null
@@ -5066,16 +5066,28 @@ class WhiteNoiseAppState private constructor(
         accountRef: String,
         generation: Long,
         rows: List<ChatListRowFfi>,
-        includePresentationSeeds: Boolean,
+        plan: AccountSwitchPreloadPlan,
     ): AccountSwitchPresentationSeeds =
         coroutineScope {
             val activeAccountIdHex = accounts.firstOrNull { it.label == accountRef }?.accountIdHex
-            if (!includePresentationSeeds) {
+            // The bounded set the selector/overflow policy will actually render. Both
+            // switch paths read it here, so an interactive switch owes its first frame
+            // exactly the seeds the full-snapshot path already loads (#2155).
+            val topBarProfileIds =
+                if (plan.includeTopBarProfileSeeds) {
+                    accountSwitchProfileSeedIds(emptyList(), accounts, accountRef)
+                } else {
+                    emptyList()
+                }
+            if (!plan.includePresentationSeeds) {
                 recordAccountSwitchPreloadStage(accountRef, "member-derived-local-deferred", rows.size)
-                return@coroutineScope AccountSwitchPresentationSeeds(activeAccountIdHex, emptyList(), emptyList())
+                // Off the main thread, and dropped wholesale if a later switch wins.
+                val topBarProfiles = loadAccountSwitchProfileSeeds(topBarProfileIds)
+                ensureAccountSwitchRequestIsCurrent(generation)
+                recordAccountSwitchPreloadStage(accountRef, "top-bar-profiles-ready", rows.size)
+                return@coroutineScope AccountSwitchPresentationSeeds(activeAccountIdHex, emptyList(), topBarProfiles)
             }
             // Overlap bounded top-bar reads with the identity-critical member page.
-            val topBarProfileIds = accountSwitchProfileSeedIds(emptyList(), accounts, accountRef)
             val topBarProfilesDeferred = async { loadAccountSwitchProfileSeeds(topBarProfileIds) }
             val memberIds = loadAccountSwitchMemberIds(accountRef, rows)
             ensureAccountSwitchRequestIsCurrent(generation)
@@ -5220,11 +5232,7 @@ class WhiteNoiseAppState private constructor(
                 }
             val localSnapshot =
                 if (preloadPlan.loadLocalRows) {
-                    loadAccountSwitchLocalSnapshot(
-                        label,
-                        requestGeneration,
-                        includePresentationSeeds = preloadPlan.includePresentationSeeds,
-                    )
+                    loadAccountSwitchLocalSnapshot(label, requestGeneration, preloadPlan)
                 } else {
                     null
                 }

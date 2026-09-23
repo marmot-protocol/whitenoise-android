@@ -60,8 +60,11 @@ class StateSourceSizeCeilingTest {
         // PR #2792 adds the covered shared send-phase registry and commit-lock helpers;
         // current base contributes two lines of fresh-group recovery state. Replacement-controller
         // retry regression adds a shared per-conversation wakeup registry (+12 lines).
+        // The interactive account-switch avatar seed (#2155) adds 8 covered lines: the
+        // bounded top-bar seed set now feeds both switch paths from one computation, and
+        // the interactive branch loads and fences it before publication.
         // Play/Zapstore unit tests and Kover run in required CI; keep merged size exact.
-        const val APP_STATE_MAX_LINES = 10416
+        const val APP_STATE_MAX_LINES = 10417
 
         /** Counts physical source lines with the same trailing-newline semantics as `wc -l`. */
         internal fun sourceLineCount(file: File): Int = file.bufferedReader().useLines { lines -> lines.count() }
