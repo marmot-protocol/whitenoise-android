@@ -8612,6 +8612,54 @@
     ],
     "settings_controls": [
       {
+        "surface": "notification-first-post:giphy_media_preview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "R.string.giphy_media_preview",
+        "test_ids": ["MED-021"]
+      },
+      {
+        "surface": "message-copy:giphy_media_preview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/CopyBundles.kt",
+        "anchor": "R.string.giphy_media_preview",
+        "test_ids": ["MED-021"]
+      },
+      {
+        "surface": "R.string.giphy_media_preview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "R.string.giphy_media_preview",
+        "test_ids": ["MED-021"]
+      },
+      {
+        "surface": "R.string.giphy_attribution",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "R.string.giphy_attribution",
+        "test_ids": ["MED-021"]
+      },
+      {
+        "surface": "R.string.copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "R.string.copy",
+        "test_ids": ["MED-021"]
+      },
+      {
+        "surface": "R.string.link_confirm_open",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "R.string.link_confirm_open",
+        "test_ids": ["MED-021"]
+      },
+      {
+        "surface": "R.string.media_tap_to_download",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "R.string.media_tap_to_download",
+        "test_ids": ["MED-021"]
+      },
+      {
+        "surface": "R.string.media_tap_to_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "R.string.media_tap_to_retry",
+        "test_ids": ["MED-021"]
+      },
+      {
         "surface": "string:cancel",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/LargeGroupInviteWarning.kt",
         "anchor": "R.string.cancel",
