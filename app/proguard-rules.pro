@@ -23,8 +23,6 @@
 -keepclassmembers class kotlinx.coroutines.** {
     volatile <fields>;
 }
-# secp256k1-kmp 0.16.0 discovers its Android JNI loader by class name.
--keep class fr.acinq.secp256k1.jni.** { *; }
-
-# The temporary comparison entry point is called from a separate benchmark APK.
--keep class dev.ipf.whitenoise.android.core.nostr.Bip340ComparisonBridge { *; }
+# secp256k1-kmp 0.16.0 discovers its Android loader by class name and its JNI
+# implementation exports symbols for the Java class and method names.
+-keep class fr.acinq.secp256k1.** { *; }

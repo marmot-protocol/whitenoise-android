@@ -5,7 +5,7 @@ package dev.ipf.whitenoise.android.core.nostr
 import java.math.BigInteger
 import java.util.Locale
 
-/** Benchmark-only copy of the verifier removed from production by this change. */
+/** Benchmark-only copy of the verifier removed from the production app. */
 internal object LegacyBip340BenchmarkVerifier {
     private val zero = BigInteger.ZERO
     private val one = BigInteger.ONE

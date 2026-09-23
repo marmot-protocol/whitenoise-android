@@ -272,8 +272,6 @@ val buildShortSha =
         ?: System.getenv("GITHUB_SHA")?.take(7)
         ?: System.getenv("GIT_COMMIT")?.take(7)
         ?: "local"
-val instrumentedTestBuildType =
-    providers.gradleProperty("whitenoise.androidTestBuildType").orElse("debug").get()
 
 android {
     namespace = "dev.ipf.whitenoise.android"
@@ -290,15 +288,7 @@ android {
         manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher"
         manifestPlaceholders["appRoundIcon"] = "@mipmap/ic_launcher_round"
 
-        testInstrumentationRunner =
-            if (instrumentedTestBuildType == "benchmarkRelease") {
-                "androidx.benchmark.junit4.AndroidBenchmarkRunner"
-            } else {
-                "androidx.test.runner.AndroidJUnitRunner"
-            }
-        if (instrumentedTestBuildType == "benchmarkRelease") {
-            testInstrumentationRunnerArguments["androidx.benchmark.output.enable"] = "true"
-        }
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "ENABLE_PERFORMANCE_TEST_SELECTORS", "false")
         buildConfigField("boolean", "WHITENOISE_AUDIT_RUNTIME_REQUIRED", "false")
         buildConfigField("String", "WHITENOISE_AUDIT_DATA_MODE", "".asBuildConfigString())
@@ -636,10 +626,6 @@ android {
             isIncludeAndroidResources = true
         }
     }
-    require(instrumentedTestBuildType in buildTypes.names) {
-        "Unknown instrumented-test build type: $instrumentedTestBuildType"
-    }
-    testBuildType = instrumentedTestBuildType
     sourceSets {
         getByName("main") {
             @Suppress("DEPRECATION")
@@ -651,14 +637,7 @@ android {
             kotlin.directories.add("src/testSupport/kotlin")
         }
         getByName("androidTest") {
-            if (instrumentedTestBuildType == "benchmarkRelease") {
-                // Compile only the benchmark variant's instrumentation sources.
-                // Shared device tests include helpers present only in debug builds.
-                java.setSrcDirs(emptyList<String>())
-                kotlin.setSrcDirs(emptyList<String>())
-            } else {
-                kotlin.directories.add("src/testSupport/kotlin")
-            }
+            kotlin.directories.add("src/testSupport/kotlin")
         }
     }
     packaging {
@@ -1158,9 +1137,6 @@ dependencies {
     testImplementation(libs.androidx.compose.ui.test.junit4)
     testRuntimeOnly(libs.secp256k1.jvm)
     androidTestImplementation(platform(libs.androidx.compose.bom))
-    if (instrumentedTestBuildType == "benchmarkRelease") {
-        androidTestImplementation(libs.androidx.benchmark.junit4)
-    }
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
@@ -1202,25 +1178,23 @@ tasks.matching { it.name.startsWith("process") && it.name.endsWith("UnitTestJava
 }
 
 afterEvaluate {
-    if (instrumentedTestBuildType == "debug") {
-        val referenceTest = tasks.named<Test>("testDevZapstoreDebugUnitTest")
-        tasks.named<Test>("replayAppFuzzSyntheticCorpus").configure {
-            val reference = referenceTest.get()
-            testClassesDirs = reference.testClassesDirs
-            classpath = reference.classpath
-            reference.taskDependencies.getDependencies(reference).forEach { dependency ->
-                dependsOn(dependency)
-            }
-            filter {
-                includeTestsMatching("dev.ipf.whitenoise.android.updates.NostrEventVerifierTest")
-                includeTestsMatching("dev.ipf.whitenoise.android.updates.ZapstoreEventsTest")
-                includeTestsMatching("dev.ipf.whitenoise.android.updates.ZapstoreReleaseClientTest")
-                includeTestsMatching("dev.ipf.whitenoise.android.core.ProfileLinkTest")
-                includeTestsMatching("dev.ipf.whitenoise.android.core.RecipientReferenceTest")
-                includeTestsMatching("dev.ipf.whitenoise.android.core.GroupSystemEventsTest")
-                includeTestsMatching("dev.ipf.whitenoise.android.media.MediaReferenceSupportTest")
-                includeTestsMatching("dev.ipf.whitenoise.android.amber.Nip55SignerParsingTest")
-            }
+    val referenceTest = tasks.named<Test>("testDevZapstoreDebugUnitTest")
+    tasks.named<Test>("replayAppFuzzSyntheticCorpus").configure {
+        val reference = referenceTest.get()
+        testClassesDirs = reference.testClassesDirs
+        classpath = reference.classpath
+        reference.taskDependencies.getDependencies(reference).forEach { dependency ->
+            dependsOn(dependency)
+        }
+        filter {
+            includeTestsMatching("dev.ipf.whitenoise.android.updates.NostrEventVerifierTest")
+            includeTestsMatching("dev.ipf.whitenoise.android.updates.ZapstoreEventsTest")
+            includeTestsMatching("dev.ipf.whitenoise.android.updates.ZapstoreReleaseClientTest")
+            includeTestsMatching("dev.ipf.whitenoise.android.core.ProfileLinkTest")
+            includeTestsMatching("dev.ipf.whitenoise.android.core.RecipientReferenceTest")
+            includeTestsMatching("dev.ipf.whitenoise.android.core.GroupSystemEventsTest")
+            includeTestsMatching("dev.ipf.whitenoise.android.media.MediaReferenceSupportTest")
+            includeTestsMatching("dev.ipf.whitenoise.android.amber.Nip55SignerParsingTest")
         }
     }
 }

@@ -1,6 +1,6 @@
 package dev.ipf.whitenoise.android.core.nostr
 
-/** Exposes both implementations to the benchmark APK from the same minified app variant. */
+/** Exposes both implementations to the isolated benchmark test APK. */
 object Bip340ComparisonBridge {
     fun legacySignature(): Boolean = LegacyBip340BenchmarkVerifier.verify(PUBLIC_KEY, MESSAGE, SIGNATURE)
 

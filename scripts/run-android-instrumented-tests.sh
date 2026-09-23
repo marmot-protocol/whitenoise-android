@@ -17,10 +17,8 @@ if [[ "$event_name" == "pull_request" ]]; then
     -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
     --no-daemon --stacktrace
 
-  exec ./gradlew :app:connectedDevZapstoreBenchmarkReleaseAndroidTest \
-    -Pwhitenoise.androidTestBuildType=benchmarkRelease \
-    -Pandroid.testInstrumentationRunnerArguments.class=dev.ipf.whitenoise.android.core.nostr.Bip340VerificationBenchmark \
-    -Pandroid.testInstrumentationRunnerArguments.androidx.benchmark.suppressErrors=EMULATOR \
+  exec ./gradlew :cryptoBenchmark:connectedReleaseAndroidTest \
+    -Pandroid.testInstrumentationRunnerArguments.class=dev.ipf.whitenoise.android.core.nostr.Bip340PhysicalBenchmark \
     --no-daemon --stacktrace
 fi
 

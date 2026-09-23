@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "comparison": "legacy BigInteger verifier versus libsecp256k1 0.6.0 via secp256k1-kmp 0.16.0",
+  "device": "Pixel 6a (physical guarded fixture)",
+  "buildFingerprint": "google/bluejay/bluejay:17/CP2A.260705.006/2026091901:user/release-keys",
+  "abi": "arm64-v8a",
+  "targetApkSha256": "bd0728731caa7fc000964bfa723e82cc10ac467cc5de7688d1f9c6ef890fda79",
+  "testApkSha256": "f4ebf516a146613f5f6687b7ed07c65f33485be7b39bb8aa3b03cee46b6687dc",
+  "warmupOperations": 10,
+  "operationsPerSample": 8,
+  "sampleCount": 20,
+  "before": { "batteryPercent": 80, "thermalStatus": 0 },
+  "after": { "batteryPercent": 80, "thermalStatus": 0 },
+  "results": [
+    {
+      "name": "legacySignature",
+      "timeNs": [233351455,232942230,233394963,233171676,233126388,233574335,232672358,233825632,233543274,233036778,233788391,233197515,233041773,234247645,233772527,233716313,233200536,233212885,234162943,233473790],
+      "medianNs": 233373209,
+      "operationsPerSecond": 4.2849820006545825
+    },
+    {
+      "name": "replacementSignature",
+      "timeNs": [216629,214431,217870,227854,213404,213872,211939,213180,208994,212977,210749,212565,215052,210952,215072,210433,212346,212733,209508,213679],
+      "medianNs": 213078,
+      "operationsPerSecond": 4693.11707449854
+    },
+    {
+      "name": "legacyFullEvent",
+      "timeNs": [234119435,234549250,234562367,234833506,234064321,234292526,234122095,234712809,234051091,234915502,234926829,234239090,234647328,234276799,234591512,234715856,234539657,234302709,234243230,234566630],
+      "medianNs": 234544453,
+      "operationsPerSecond": 4.2635840976379855
+    },
+    {
+      "name": "replacementFullEvent",
+      "timeNs": [325027,326660,326924,319432,327199,325124,322662,338089,322265,319366,324162,326899,318222,325276,321487,328165,325693,323059,322408,324137],
+      "medianNs": 324594,
+      "operationsPerSecond": 3080.7716716883247
+    }
+  ]
+}
