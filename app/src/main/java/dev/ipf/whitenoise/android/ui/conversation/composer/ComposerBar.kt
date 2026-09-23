@@ -1116,7 +1116,7 @@ internal fun ComposerBar(
                                                     onClick = onCancelEdit,
                                                     description = stringResource(R.string.cancel_edit),
                                                     // Clear the top resize strip without adding height to the Edit bar.
-                                                    modifier = Modifier.offset(y = 4.dp),
+                                                    modifier = Modifier.offset(y = 4.dp).size(32.dp),
                                                 )
                                             }
                                         } else if (replyingTo != null) {

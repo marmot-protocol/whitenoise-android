@@ -96,7 +96,7 @@ class ComposerEditScreenshotTest {
                 .boundsInRoot
         assertTrue(cancel.left >= surface.left && cancel.right <= surface.right)
         assertTrue(cancel.top >= border.bottom)
-        // Only four dp of the field's empty leading overlaps the full-size Cancel target.
+        // Only four dp of the field's empty leading overlaps the Cancel target.
         assertTrue(cancel.bottom <= editor.top + with(composeRule.density) { 4.dp.toPx() })
         assertTrue(editor.bottom <= surface.bottom)
         composeRule.onNodeWithContentDescription(context.getString(R.string.cancel_edit)).performClick()
