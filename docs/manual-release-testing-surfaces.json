@@ -223,6 +223,14 @@
         ]
       },
       {
+        "surface": "chat-list local delete transport recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupLocalRemoval.kt",
+        "anchor": "deleteChatGroupLocalWithRecovery",
+        "test_ids": [
+          "CHL-010"
+        ]
+      },
+      {
         "surface": "toast couldnt delete chat",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "R.string.toast_couldnt_delete_chat",
