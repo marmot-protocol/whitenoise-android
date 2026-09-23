@@ -756,6 +756,42 @@ class ConversationSendRetryIntegrationTest {
         }
 
     @Test
+    fun cancellingBeforeAdmissionRestoresCapturedComposerDraft() =
+        runTest {
+            val appState = appState()
+            appState.setDraft(GROUP_ID, TextFieldValue("cancel before admission"))
+            val parseStarted = CompletableDeferred<Unit>()
+            val releaseParse = CompletableDeferred<Unit>()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    markdownParser = {
+                        parseStarted.complete(Unit)
+                        releaseParse.await()
+                        MarkdownDocumentFfi(
+                            truncated = false,
+                            blocks = emptyList(),
+                            blankLinesBefore = ByteArray(0),
+                        )
+                    },
+                    textPublisher = { _, _, _, _ -> successfulSendSummary() },
+                )
+
+            val send = async { appState.sendConversationText(controller, "cancel before admission") }
+            parseStarted.await()
+            assertEquals(null, appState.draftFor(GROUP_ID))
+            assertTrue(controller.deleteMessage(controller.timeline.single().record, presentFailure = false))
+
+            releaseParse.complete(Unit)
+            send.await()
+
+            assertTrue(controller.timeline.isEmpty())
+            assertEquals("cancel before admission", appState.draftFor(GROUP_ID))
+        }
+
+    @Test
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     fun cancellingOfflineTextRetryRestoresDraftAndUnblocksNextSendWithoutBackoff() =
         runTest {

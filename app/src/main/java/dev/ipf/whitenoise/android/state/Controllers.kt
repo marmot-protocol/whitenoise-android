@@ -9011,7 +9011,6 @@ class ConversationController(
             }
         }
     }
-
     private fun requireOptimisticSendNotCancelled(optimisticKey: String) {
         if (optimisticSendPhases[optimisticKey] == OptimisticSendPhase.CANCELLED) {
             throw OptimisticSendCancelledException()
