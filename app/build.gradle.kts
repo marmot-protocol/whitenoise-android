@@ -272,6 +272,8 @@ val buildShortSha =
         ?: System.getenv("GITHUB_SHA")?.take(7)
         ?: System.getenv("GIT_COMMIT")?.take(7)
         ?: "local"
+val instrumentedTestBuildType =
+    providers.gradleProperty("whitenoise.androidTestBuildType").orElse("debug").get()
 
 android {
     namespace = "dev.ipf.whitenoise.android"
@@ -288,7 +290,15 @@ android {
         manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher"
         manifestPlaceholders["appRoundIcon"] = "@mipmap/ic_launcher_round"
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner =
+            if (instrumentedTestBuildType == "benchmarkRelease") {
+                "androidx.benchmark.junit4.AndroidBenchmarkRunner"
+            } else {
+                "androidx.test.runner.AndroidJUnitRunner"
+            }
+        if (instrumentedTestBuildType == "benchmarkRelease") {
+            testInstrumentationRunnerArguments["androidx.benchmark.output.enable"] = "true"
+        }
         buildConfigField("boolean", "ENABLE_PERFORMANCE_TEST_SELECTORS", "false")
         buildConfigField("boolean", "WHITENOISE_AUDIT_RUNTIME_REQUIRED", "false")
         buildConfigField("String", "WHITENOISE_AUDIT_DATA_MODE", "".asBuildConfigString())
@@ -626,8 +636,6 @@ android {
             isIncludeAndroidResources = true
         }
     }
-    val instrumentedTestBuildType =
-        providers.gradleProperty("whitenoise.androidTestBuildType").orElse("debug").get()
     require(instrumentedTestBuildType in buildTypes.names) {
         "Unknown instrumented-test build type: $instrumentedTestBuildType"
     }
@@ -1143,7 +1151,9 @@ dependencies {
     testImplementation(libs.androidx.compose.ui.test.junit4)
     testRuntimeOnly(libs.secp256k1.jvm)
     androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.benchmark.junit4)
+    if (instrumentedTestBuildType == "benchmarkRelease") {
+        androidTestImplementation(libs.androidx.benchmark.junit4)
+    }
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)

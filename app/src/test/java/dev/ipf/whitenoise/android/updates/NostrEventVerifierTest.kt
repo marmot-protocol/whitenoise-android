@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.updates
 
 import dev.ipf.whitenoise.android.core.nostr.BIP340
 import dev.ipf.whitenoise.android.core.nostr.NostrEvent
+import dev.ipf.whitenoise.android.core.nostr.NostrEventVerifier
 import dev.ipf.whitenoise.android.fuzz.FuzzSyntheticCorpusReplay
 import org.json.JSONArray
 import org.json.JSONObject
@@ -27,7 +28,7 @@ class NostrEventVerifierTest {
                     lines
                         .filterNot { it.startsWith('#') }
                         .filter(String::isNotBlank)
-                        .map { line -> line.split(',') }
+                        .map { line -> line.split(',').map(String::trim) }
                         .toList()
                 }
         assertEquals(15, vectors.size)
@@ -65,10 +66,17 @@ class NostrEventVerifierTest {
                 "25F66A4A85EA8B71E482A74F382D2CE5EBEEE8FDB2172F477DF4900D310536C0"
 
         assertFalse(BIP340.verify("zz" + publicKey.drop(2), message, signature))
+        assertFalse(BIP340.verify("", message, signature))
+        assertFalse(BIP340.verify(publicKey.dropLast(1), message, signature))
         assertFalse(BIP340.verify(publicKey.dropLast(2), message, signature))
+        assertFalse(BIP340.verify(publicKey, "", signature))
+        assertFalse(BIP340.verify(publicKey, message.dropLast(1), signature))
         assertFalse(BIP340.verify(publicKey, message + "00", signature))
         assertFalse(BIP340.verify(publicKey, message, "gg".repeat(64)))
+        assertFalse(BIP340.verify(publicKey, message, ""))
+        assertFalse(BIP340.verify(publicKey, message, signature.dropLast(1)))
         assertFalse(BIP340.verify(publicKey, message, signature.dropLast(2)))
+        assertFalse(BIP340.verify(" $publicKey", message, signature))
     }
 
     @Test

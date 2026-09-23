@@ -30,6 +30,7 @@ minified `benchmarkRelease` target:
 Record the `signatureOnlyVerification` and `fullEventVerification` results from
 each run together with the commit, device build fingerprint and ABI. The
 build-type property intentionally selects `benchmarkRelease` for every
-instrumented test in this invocation; the class filter keeps execution scoped
-to this benchmark. The benchmark deliberately does not compare against Quartz
-because White Noise does not pin or ship Quartz.
+instrumented test in this invocation, includes the benchmark-only source set,
+and selects AndroidX's benchmark runner with report output enabled. The class
+filter keeps execution scoped to this benchmark. The benchmark deliberately
+does not compare against Quartz because White Noise does not pin or ship Quartz.

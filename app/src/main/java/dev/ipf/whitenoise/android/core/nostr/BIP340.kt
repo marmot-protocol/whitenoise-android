@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.core.nostr
 
 import fr.acinq.secp256k1.Secp256k1
+import fr.acinq.secp256k1.Secp256k1Exception
 
 /** BIP-340 verification backed by Bitcoin Core's libsecp256k1 implementation. */
 internal object BIP340 {
