@@ -23701,9 +23701,9 @@
         ]
       },
       {
-        "surface": "An extended window keeps the rows it still holds rather than rebuilding and re-parsing them",
+        "surface": "Conversation window preparation runs off the main thread while extended windows retain unchanged rows",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/WindowApplyMode.kt",
-        "anchor": "fun ConversationController.planWindowApply(",
+        "anchor": "internal fun prepareWindowApply(",
         "test_ids": [
           "CON-002",
           "CON-003"

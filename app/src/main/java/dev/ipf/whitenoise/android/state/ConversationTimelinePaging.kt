@@ -84,18 +84,28 @@ internal suspend fun ConversationController.loadOlderPageInternal(anchorId: Stri
             null -> ConversationPageLoad.INACTIVE
             is TimelinePageOutcome.Unchanged -> unchangedPageLoad(outcome, ConversationSearchPageDirection.OLDER)
             is TimelinePageOutcome.Advanced -> {
-                hasLoadedOlderPages = true
-                failedPageDirection = null
                 val appliedAtMs = SystemClock.elapsedRealtime()
-                applyTimelinePage(outcome.page, replaceWindow = false, updatePagination = true)
-                protectedTimelineMessageIds.clear()
-                protectedTimelineMessageIds.addAll(timelineRecords.keys)
-                trace.recordPhase(
-                    phase = PerformancePhase.PAGE_APPLY,
-                    startedMs = appliedAtMs,
-                    count = outcome.page.messages.size,
+                var committed = false
+                applyTimelinePage(
+                    outcome.page,
+                    replaceWindow = false,
+                    updatePagination = true,
+                    onCommitted = { committed = true },
                 )
-                progressPageLoad(priorMessageIds)
+                if (!committed) {
+                    ConversationPageLoad.INACTIVE
+                } else {
+                    hasLoadedOlderPages = true
+                    failedPageDirection = null
+                    protectedTimelineMessageIds.clear()
+                    protectedTimelineMessageIds.addAll(timelineRecords.keys)
+                    trace.recordPhase(
+                        phase = PerformancePhase.PAGE_APPLY,
+                        startedMs = appliedAtMs,
+                        count = outcome.page.messages.size,
+                    )
+                    progressPageLoad(priorMessageIds)
+                }
             }
         }.also { trace.recordCompletion(it, startedMs) }
     } catch (cancel: CancellationException) {
@@ -137,19 +147,25 @@ internal suspend fun ConversationController.loadNewerPageInternal(origin: Paging
             is TimelinePageOutcome.Unchanged ->
                 unchangedPageLoad(outcome, ConversationSearchPageDirection.NEWER, origin)
             is TimelinePageOutcome.Advanced -> {
+                var committed = false
                 applyTimelinePage(
                     outcome.page,
                     replaceWindow = false,
                     updatePagination = true,
                     reconcileNewExtendedRecords = true,
+                    onCommitted = { committed = true },
                 )
-                clearRecoveredNewerPageFailure()
-                automaticNewerPaging.reset()
-                protectedTimelineMessageIds.clear()
-                if (hasLoadedOlderPages) {
-                    protectedTimelineMessageIds.addAll(timelineRecords.keys)
+                if (!committed) {
+                    ConversationPageLoad.INACTIVE
+                } else {
+                    clearRecoveredNewerPageFailure()
+                    automaticNewerPaging.reset()
+                    protectedTimelineMessageIds.clear()
+                    if (hasLoadedOlderPages) {
+                        protectedTimelineMessageIds.addAll(timelineRecords.keys)
+                    }
+                    progressPageLoad(priorMessageIds)
                 }
-                progressPageLoad(priorMessageIds)
             }
         }
     } catch (cancel: CancellationException) {

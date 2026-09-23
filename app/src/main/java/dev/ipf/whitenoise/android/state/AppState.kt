@@ -6187,15 +6187,14 @@ class WhiteNoiseAppState private constructor(
     /** Whether the current MDK policy has a confirmed explicit grant. */
     fun isUsageDiagnosticsGranted(): Boolean = diagnostics.granted
 
-    /** Records a finite host event using a ticket captured before asynchronous work starts. */
-    internal fun recordProductObservation(
-        observation: ProductObservation,
-        ticket: Long? = diagnostics.observations.ticket(),
+    internal fun recordProductEvent(
+        event: dev.ipf.marmotkit.ProductEventFfi,
+        ticket: Long?,
     ) {
         val runtime = marmotRuntime?.marmot ?: return
         notificationScope.launch(Dispatchers.IO) {
             runCatchingCancellable {
-                diagnostics.observations.record(ticket) { runtime.recordProductEvent(observation.event()) }
+                diagnostics.observations.record(ticket) { runtime.recordProductEvent(event) }
             }
         }
     }

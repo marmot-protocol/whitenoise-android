@@ -126,6 +126,8 @@ class StalenessGuardCoverageTest {
                     listOf("accountStillBound", "isActiveBindEpoch(epoch)"),
                 "Controllers.kt:refreshCurrentTimeline" to
                     listOf("timelineWindowGeneration.advance", "timelineWindowGeneration.isCurrent"),
+                "Controllers.kt:applyTimelinePage" to
+                    listOf("timelineWindowGeneration.advance", "timelineWindowGeneration.isCurrent"),
                 "Controllers.kt:beginMemberRosterRefresh" to
                     listOf(
                         "accountTeardownRequested",
