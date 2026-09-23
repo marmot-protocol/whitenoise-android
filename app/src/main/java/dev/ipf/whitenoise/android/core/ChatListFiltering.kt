@@ -113,9 +113,6 @@ private val ChatListSynchronousSearchMatch.priority: Int
 
 @Suppress("ReturnCount") // Ordered guard clauses avoid computing lower-priority matches after a hit.
 private fun <T> ChatListSearchCandidate<T>.synchronousMatch(ciNeedle: String): ChatListSynchronousSearchMatch {
-    if (localeInvariantFold(displayTitle).contains(ciNeedle)) return ChatListSynchronousSearchMatch.TITLE
-    if (localeInvariantFold(previewText).contains(ciNeedle)) return ChatListSynchronousSearchMatch.METADATA
-    if (localeInvariantFold(description).contains(ciNeedle)) return ChatListSynchronousSearchMatch.METADATA
     if (
         looksLikeGroupIdNeedle(ciNeedle) &&
         (
@@ -125,6 +122,9 @@ private fun <T> ChatListSearchCandidate<T>.synchronousMatch(ciNeedle: String): C
     ) {
         return ChatListSynchronousSearchMatch.IDENTIFIER
     }
+    if (localeInvariantFold(displayTitle).contains(ciNeedle)) return ChatListSynchronousSearchMatch.TITLE
+    if (localeInvariantFold(previewText).contains(ciNeedle)) return ChatListSynchronousSearchMatch.METADATA
+    if (localeInvariantFold(description).contains(ciNeedle)) return ChatListSynchronousSearchMatch.METADATA
     return ChatListSynchronousSearchMatch.NONE
 }
 

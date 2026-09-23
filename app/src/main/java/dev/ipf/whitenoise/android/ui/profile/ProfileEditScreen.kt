@@ -473,6 +473,7 @@ internal fun ProfileEditScreen(
     resolveAddress: suspend (String) -> String? = { Nip05Resolver.resolve(it) },
     resolveLightning: suspend (String) -> Boolean = { Lud16Resolver.resolve(it) },
     openPictureActionsOnEntry: Boolean = false,
+    onPictureActionsOpened: () -> Unit = {},
 ) {
     val active = appState.activeAccount
     val activeAccountId = active?.accountIdHex
@@ -840,6 +841,7 @@ internal fun ProfileEditScreen(
             }
         },
         onRemoveImage = { target -> imageDrafts = imageDrafts.without(target) },
+        onPictureActionsOpened = onPictureActionsOpened,
     )
 
     IdentityImageCropFlow(

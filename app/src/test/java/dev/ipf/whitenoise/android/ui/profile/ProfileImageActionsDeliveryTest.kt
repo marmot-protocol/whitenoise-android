@@ -64,19 +64,28 @@ class ProfileImageActionsDeliveryTest {
     @Test
     fun directEntryExpandsPictureActionsOnlyWhenEnabled() {
         val enabled = mutableStateOf(false)
+        val editing = mutableStateOf(true)
+        val expandOnEntry = mutableStateOf(true)
+        var expansionCount = 0
         composeRule.setContent {
             WhiteNoiseTheme {
-                ProfileImageActions(
-                    owner = "account-a",
-                    target = ProfileImageTarget.Picture,
-                    hasImage = false,
-                    enabled = enabled.value,
-                    busy = false,
-                    onPick = { _, _ -> },
-                    onWeb = {},
-                    onRemove = {},
-                    expandOnEntry = true,
-                )
+                if (editing.value) {
+                    ProfileImageActions(
+                        owner = "account-a",
+                        target = ProfileImageTarget.Picture,
+                        hasImage = false,
+                        enabled = enabled.value,
+                        busy = false,
+                        onPick = { _, _ -> },
+                        onWeb = {},
+                        onRemove = {},
+                        expandOnEntry = expandOnEntry.value,
+                        onEntryExpanded = {
+                            expansionCount++
+                            expandOnEntry.value = false
+                        },
+                    )
+                }
             }
         }
 
@@ -84,6 +93,15 @@ class ProfileImageActionsDeliveryTest {
         composeRule.runOnIdle { enabled.value = true }
         composeRule.waitForIdle()
         composeRule.onNodeWithText(context.getString(R.string.profile_choose_photos)).assertExists()
+        composeRule.runOnIdle {
+            assertEquals(1, expansionCount)
+            editing.value = false
+        }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { editing.value = true }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(context.getString(R.string.profile_choose_photos)).assertDoesNotExist()
+        composeRule.runOnIdle { assertEquals(1, expansionCount) }
     }
 
     /** Exercise. */

@@ -407,6 +407,7 @@ internal fun SettingsScreen(
         onOpenDiagnostics = onOpenDiagnostics,
         onDetailChange = onDetailChange,
         openProfilePictureActionsOnEntry = openProfilePictureActions,
+        onProfilePictureActionsOpened = { openProfilePictureActions = false },
         onProfileBack = {
             openProfilePictureActions = false
             onDetailChange(null)
@@ -424,6 +425,7 @@ private fun SettingsDetailRoute(
     onOpenDiagnostics: () -> Unit,
     onDetailChange: (SettingsDetail?) -> Unit,
     openProfilePictureActionsOnEntry: Boolean,
+    onProfilePictureActionsOpened: () -> Unit,
     onProfileBack: () -> Unit,
 ) {
     when (detail) {
@@ -447,6 +449,7 @@ private fun SettingsDetailRoute(
                 appState = appState,
                 onBack = onProfileBack,
                 openPictureActionsOnEntry = openProfilePictureActionsOnEntry,
+                onPictureActionsOpened = onProfilePictureActionsOpened,
             )
         SettingsDetail.AccountKeys -> AccountKeysScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Relays -> RelaysScreen(appState, onBack = { onDetailChange(null) })

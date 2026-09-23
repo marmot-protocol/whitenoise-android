@@ -125,6 +125,31 @@ class ChatListSearchProjectionTest {
         }
     }
 
+    /** Identifier classification wins when the copied id is also visible in a title or message preview. */
+    @Test
+    fun copiedIdentifierWinsOverMatchingTextDuringMessageOnlySearch() {
+        val titleId = "0123456789abcdef".repeat(4)
+        val previewId = "fedcba9876543210".repeat(4)
+        val candidates =
+            listOf(
+                candidate("title", titleId, title = "Group $titleId"),
+                candidate("preview", previewId, preview = "Shared $previewId"),
+            )
+
+        listOf(titleId to "title", previewId to "preview").forEach { (query, expected) ->
+            val sections =
+                projectChatListSearchCandidates(
+                    candidates = candidates,
+                    rawQuery = query,
+                    bodyMatchGroupIds = setOf(titleId, previewId),
+                    messageOnly = true,
+                )
+
+            assertEquals(listOf(expected), sections.groups)
+            assertEquals(listOf(if (expected == "title") "preview" else "title"), sections.messages)
+        }
+    }
+
     /** Identifier prefixes start at eight hexadecimal characters without turning ordinary hex words into ids. */
     @Test
     fun groupIdentifierPrefixUsesTheMinimumBoundary() {

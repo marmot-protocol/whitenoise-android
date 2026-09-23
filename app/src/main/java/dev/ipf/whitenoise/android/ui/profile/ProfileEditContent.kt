@@ -127,6 +127,7 @@ internal fun ProfileEditContent(
     onOpenBanner: () -> Unit,
     onPickImage: (ProfileImageTarget, Uri) -> Unit,
     onRemoveImage: (ProfileImageTarget) -> Unit,
+    onPictureActionsOpened: () -> Unit = {},
 ) {
     SettingsScaffold(
         title = stringResource(R.string.profile),
@@ -220,6 +221,7 @@ internal fun ProfileEditContent(
                     onEditPicture,
                     onRemoveImage,
                     expandOnEntry = openPictureActionsOnEntry,
+                    onEntryExpanded = onPictureActionsOpened,
                 )
                 if (!pictureValid) {
                     Text(
@@ -421,7 +423,10 @@ internal fun ProfileBanner(
     }
 }
 
-/** Device selections carry the account identity that opened them; stale activity results never start an upload. */
+/**
+ * Device selections carry the account identity that opened them; stale activity results never start an upload.
+ * A requested entry expansion is acknowledged only after the enabled menu actually opens.
+ */
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList", "CyclomaticComplexMethod")
 @Composable
 internal fun ProfileImageActions(
@@ -434,6 +439,7 @@ internal fun ProfileImageActions(
     onWeb: () -> Unit,
     onRemove: (ProfileImageTarget) -> Unit,
     expandOnEntry: Boolean = false,
+    onEntryExpanded: () -> Unit = {},
 ) {
     var expanded by remember(owner) { mutableStateOf(false) }
     var entryExpansionConsumed by remember(owner, target) { mutableStateOf(false) }
@@ -456,6 +462,7 @@ internal fun ProfileImageActions(
         if (expandOnEntry && enabled && !entryExpansionConsumed) {
             expanded = true
             entryExpansionConsumed = true
+            onEntryExpanded()
         }
     }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
