@@ -63,7 +63,7 @@ internal suspend fun WhiteNoiseAppState.deleteChatGroupLocalWithRecovery(
         ) {
             runCatching { block() }
                 .onFailure { failure ->
-                    appStateDebug(failure) { "local delete $name cleanup failed group=${groupIdHex.take(8)}" }
+                    appStateDebug(failure) { "local delete $name cleanup failed" }
                 }
         }
 
