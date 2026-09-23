@@ -988,6 +988,7 @@ internal fun operationalNpub(
 ): String = cachedNpub ?: runCatching { encode(accountIdHex) }.getOrNull() ?: accountIdHex
 
 private const val APP_STATE_SCOPE_LOG_TAG = "WhiteNoiseAppState"
+private const val FCM_REGISTRATION_BATCH_SIZE = 3
 private const val FORWARD_BACKGROUND_RETRY_ATTEMPTS = 3
 private const val FORWARD_BACKGROUND_RETRY_DELAY_MS = 1_000L
 private const val FORWARD_TERMINAL_STATUS_DURATION_MS = 2_000L
@@ -8473,12 +8474,17 @@ class WhiteNoiseAppState private constructor(
         previous: MutableMap<String, NotificationSettingsFfi>,
     ): Boolean =
         nativePushSyncMutex.withLock {
-            val orderedAccounts = listOf(owner.activeAccountRef) + owner.accountRefs.filterNot { it == owner.activeAccountRef }
-            orderedAccounts.chunked(3).all { batch ->
-                coroutineScope {
-                    batch.map { async { configureNativeDeliveryForAccount(owner, it, config, token, previous) } }
-                        .awaitAll().all { it }
-                } && ownsNotificationDeliveryMode(owner)
+            val orderedAccounts =
+                listOf(owner.activeAccountRef) + owner.accountRefs.filterNot { it == owner.activeAccountRef }
+            orderedAccounts.chunked(FCM_REGISTRATION_BATCH_SIZE).all { batch ->
+                val ready =
+                    coroutineScope {
+                        batch
+                            .map { async { configureNativeDeliveryForAccount(owner, it, config, token, previous) } }
+                            .awaitAll()
+                            .all { it }
+                    }
+                ready && ownsNotificationDeliveryMode(owner)
             }
         }
 

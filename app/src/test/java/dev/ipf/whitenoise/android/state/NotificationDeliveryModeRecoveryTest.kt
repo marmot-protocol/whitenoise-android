@@ -568,7 +568,8 @@ class NotificationDeliveryModeRecoveryTest {
                 fixture(
                     platform = platform,
                     nativeEnabled = false,
-                    accounts = listOf(account(ACCOUNT_A), account(ACCOUNT_B), account("account-c"), account("account-d")),
+                    accounts =
+                        listOf(account(ACCOUNT_A), account(ACCOUNT_B), account("account-c"), account("account-d")),
                     onUpsert = {
                         started.incrementAndGet()
                         maximum.accumulateAndGet(active.incrementAndGet()) { current, candidate ->
@@ -608,14 +609,19 @@ class NotificationDeliveryModeRecoveryTest {
         runBlocking {
             BackgroundConnectionPreferences.setEnabledDurably(context, true)
             val platform = RecordingNativePushFallbackPlatform(context)
-            val fixture = fcmFixture(platform) { account ->
-                if (account == ACCOUNT_B) error("registration failed")
-            }
+            val fixture =
+                fcmFixture(platform) { account ->
+                    if (account == ACCOUNT_B) error("registration failed")
+                }
             try {
                 fixture.bootstrap()
                 PushTokenStore.create(context).setToken("test-token")
 
-                assertFalse(fixture.runWithMainLooperPumping { fixture.appState.setNotificationDeliveryMode(NotificationDeliveryMode.Fcm) })
+                assertFalse(
+                    fixture.runWithMainLooperPumping {
+                        fixture.appState.setNotificationDeliveryMode(NotificationDeliveryMode.Fcm)
+                    },
+                )
                 assertFalse(fixture.notificationSettings(ACCOUNT_A).nativePushEnabled)
                 assertFalse(fixture.notificationSettings(ACCOUNT_B).nativePushEnabled)
                 assertTrue(BackgroundConnectionPreferences.isEnabled(context))
