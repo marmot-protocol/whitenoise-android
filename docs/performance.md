@@ -418,8 +418,11 @@ Beyond the scroll metrics below, each method reports the paging slices from the
 app's share, preparation and main-thread commit), and three counts that should stay at zero for paging to be invisible:
 `edgeStopCount` (the list rested on its oldest row with more history behind it),
 `edgeReachedCount` (a page landed after the reader had already reached the old
-edge) against `runwayKeptCount` (a page landed with rows to spare). CPU and
-memory energy come from the same system-wide rails as the recovery benchmark;
+edge) against `runwayKeptCount` (a page landed with rows to spare). The paging
+metric set carries no `PowerMetric`: on a Pixel 9 Pro XL the power rails were
+sampled anywhere between 0 and 52 times across identical 13-second journeys, and
+Macrobenchmark drops an iteration with no samples from the results wholesale.
+Read energy from the retained `.perfetto-trace` files when rails were sampled,
 compare a paging journey against the same fling inside an already-loaded window
 so paging is charged only for what it adds to drawing, and never across devices.
 

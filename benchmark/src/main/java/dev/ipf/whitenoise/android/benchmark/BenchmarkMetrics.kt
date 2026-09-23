@@ -182,9 +182,11 @@ internal fun scrollMetrics(sectionName: String): List<Metric> =
  * trace processing of the whole iteration); `edgeStopCount` and
  * `edgeReachedCount` are the two ways a reader notices a page — resting on the
  * edge with more history behind it, or having reached the old edge before the
- * page landed — and both are expected to be zero. CPU and memory energy are
- * system-wide rails, compared against the same fling inside an already-loaded
- * window so paging is charged only for what it adds to drawing.
+ * page landed — and both are expected to be zero. No `PowerMetric`: on the Pixel
+ * 9 Pro XL the power rails sampled anywhere from 0 to 52 times across identical
+ * 13 s journeys, and an iteration with no samples is dropped from the results
+ * wholesale. Energy for a paging journey is read from the recorded trace when
+ * rails were sampled, not gated by this metric set.
  */
 @OptIn(ExperimentalMetricApi::class)
 internal fun pagingMetrics(sectionName: String): List<Metric> =
@@ -197,15 +199,6 @@ internal fun pagingMetrics(sectionName: String): List<Metric> =
             pagingSection(PAGE_EDGE_STOP_TRACE, TraceSectionMetric.Mode.Count, "edgeStopCount"),
             pagingSection(PAGE_RUNWAY_KEPT_TRACE, TraceSectionMetric.Mode.Count, "runwayKeptCount"),
             pagingSection(PAGE_EDGE_REACHED_TRACE, TraceSectionMetric.Mode.Count, "edgeReachedCount"),
-            PowerMetric(
-                type =
-                    PowerMetric.Type.Energy(
-                        mapOf(
-                            PowerCategory.CPU to PowerCategoryDisplayLevel.TOTAL,
-                            PowerCategory.MEMORY to PowerCategoryDisplayLevel.TOTAL,
-                        ),
-                    ),
-            ),
         )
 
 /** One paging slice aggregated over the measured block, restricted to the app's own process. */
