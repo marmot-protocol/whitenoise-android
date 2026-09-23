@@ -7,16 +7,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNode
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -35,6 +41,17 @@ class ComposerEditScreenshotTest {
     @Test
     fun composerShortEditLight() {
         render(darkTheme = false, width = 360, fontScale = 1f, rtl = false, editText = "Short edit")
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val editor = composeRule.onNode(hasSetTextAction()).fetchSemanticsNode().boundsInRoot
+        val send =
+            composeRule
+                .onNodeWithContentDescription(context.getString(R.string.send))
+                .fetchSemanticsNode()
+                .boundsInRoot
+        assertTrue(
+            "Edit text should stay above its separate control row",
+            (editor.top + editor.bottom) / 2 < send.top,
+        )
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_short_edit_light.png")
     }
 

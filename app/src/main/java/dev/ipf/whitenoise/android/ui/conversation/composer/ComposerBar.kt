@@ -1437,7 +1437,6 @@ internal fun ComposerBar(
                                 replyingTo != null ||
                                 dictationActiveInComposer ||
                                 hasPendingAttachments,
-                        compactSingleLineEdit = editingMessageId != null,
                         onMultilineControlsChanged = { composerUsesMultilineControls = it },
                         multilineControlsSuppressed = composerMultilineControlsSuppressed(automaticComposerCeiling),
                         dismissInProgress = composerDismissInProgress,
