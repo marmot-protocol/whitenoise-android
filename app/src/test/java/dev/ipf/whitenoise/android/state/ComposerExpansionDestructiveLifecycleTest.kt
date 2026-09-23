@@ -500,7 +500,7 @@ class ComposerExpansionDestructiveLifecycleTest {
             }
         }
 
-    @Test
+    @Test(timeout = 10_000)
     fun closedTransportRetriesLocalDeleteAndCleansUpOnce() =
         runBlocking {
             val fixture = fixture(deleteTransportFailures = 1)
@@ -520,7 +520,7 @@ class ComposerExpansionDestructiveLifecycleTest {
             }
         }
 
-    @Test
+    @Test(timeout = 10_000)
     fun committedLocalDeleteWithLostResponseDoesNotRepeatWipe() =
         runBlocking {
             val fixture = fixture(deleteTransportFailures = 1, commitBeforeTransportFailure = true)
@@ -536,7 +536,7 @@ class ComposerExpansionDestructiveLifecycleTest {
             }
         }
 
-    @Test
+    @Test(timeout = 10_000)
     fun committedLocalDeleteStillClearsLocalArtifactsWhenNativeDraftCleanupFails() =
         runBlocking {
             val fixture = fixture(failDraftDelete = true)
@@ -555,7 +555,7 @@ class ComposerExpansionDestructiveLifecycleTest {
             }
         }
 
-    @Test
+    @Test(timeout = 10_000)
     fun exhaustedClosedTransportRestoresRowDraftAndGeometry() =
         runBlocking {
             val fixture = fixture(deleteTransportFailures = IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS)

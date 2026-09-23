@@ -14,7 +14,8 @@ import dev.ipf.whitenoise.android.core.GroupProjector
  * [SelfMembershipFfi.LEFT] (voluntary departure). Both are terminal non-member
  * states; [SelfMembershipFfi.MEMBER] is the only membership-preserving value.
  */
-internal fun SelfMembershipFfi.isNonMember(): Boolean = this == SelfMembershipFfi.REMOVED || this == SelfMembershipFfi.LEFT
+internal fun SelfMembershipFfi.isNonMember(): Boolean =
+    this == SelfMembershipFfi.REMOVED || this == SelfMembershipFfi.LEFT
 
 internal data class ConversationMembershipSeed(
     val members: List<AppGroupMemberRecordFfi>,
