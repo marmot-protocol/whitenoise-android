@@ -429,8 +429,10 @@ suspend fun ConversationController.reportVisibleMessage(messageIdHex: String) {
 /** Replaces a bounded history window with its newest page, reporting whether the newest edge is ready. */
 suspend fun ConversationController.returnToLatestWindow(): Boolean {
     val subscription = timelineSubscription ?: return false
-    subscription.returnToLatest()?.let { page ->
-        applyTimelinePage(page, replaceWindow = true, updatePagination = true)
+    tracedPagingSection(ConversationPagingTraceSection.WINDOW) { subscription.returnToLatest() }?.let { page ->
+        tracedPagingSection(ConversationPagingTraceSection.APPLY) {
+            applyTimelinePage(page, replaceWindow = true, updatePagination = true)
+        }
     }
     return !hasMoreAfterTimeline
 }

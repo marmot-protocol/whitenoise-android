@@ -54,7 +54,9 @@ when the window deadline passes.
 
 The same page is also visible in a Perfetto trace as async slices under
 `WhiteNoise.conversation.page.*` — `window`, `prepare` (the off-main-thread row
-preparation) and `apply` (preparation plus the main-thread commit) — together
+preparation) and `apply` (preparation plus the main-thread commit); the
+return-to-latest and exact-message jump commands emit the same `window` and
+`apply` slices, so a jump's window swap is counted alongside pages — together
 with three zero-length event slices the conversation screen emits:
 `edgeStop` when the list comes to rest on its oldest row with more history
 behind it and no page landing, `runwayKept` when a page lands while the reader
