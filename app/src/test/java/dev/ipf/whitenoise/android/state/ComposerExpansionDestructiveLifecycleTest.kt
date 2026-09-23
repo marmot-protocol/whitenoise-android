@@ -737,9 +737,14 @@ class ComposerExpansionDestructiveLifecycleTest {
                         override fun read(
                             accountRef: String,
                             groupIdHex: String,
-                        ): MessageDraftFfi {
-                            return EmptyDraftGateway.save(accountRef, groupIdHex, "persisted draft", null, emptyList())
-                        }
+                        ): MessageDraftFfi =
+                            EmptyDraftGateway.save(
+                                accountRef,
+                                groupIdHex,
+                                "persisted draft",
+                                null,
+                                emptyList(),
+                            )
 
                         override fun delete(
                             accountRef: String,
