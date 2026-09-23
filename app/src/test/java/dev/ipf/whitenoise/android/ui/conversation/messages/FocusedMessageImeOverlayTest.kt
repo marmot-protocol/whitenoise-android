@@ -40,9 +40,18 @@ class FocusedMessageImeOverlayTest {
     fun largeTextAndRtlStillKeepTheMessageVisibleAndLastActionReachable() =
         assertActionsScrollWithoutMovingPreview(fontScale = 2f, layoutDirection = LayoutDirection.Rtl)
 
+    @Test
+    fun tallMediaPreviewLeavesAnActionViewportAndLastActionReachable() =
+        assertActionsScrollWithoutMovingPreview(
+            fontScale = 1f,
+            layoutDirection = LayoutDirection.Ltr,
+            previewHeight = 400,
+        )
+
     private fun assertActionsScrollWithoutMovingPreview(
         fontScale: Float,
         layoutDirection: LayoutDirection,
+        previewHeight: Int = 60,
     ) {
         var lastActionClicks = 0
         composeRule.setContent {
@@ -68,8 +77,9 @@ class FocusedMessageImeOverlayTest {
                         selectedReactions = emptySet(),
                         previewDescription = "Lifted message",
                         previewReady = true,
+                        previewIsMedia = previewHeight > 60,
                         preview = {
-                            Box(Modifier.size(200.dp, 60.dp).background(MaterialTheme.colorScheme.surface)) {
+                            Box(Modifier.size(200.dp, previewHeight.dp).background(MaterialTheme.colorScheme.surface)) {
                                 Text("Lifted message")
                             }
                         },
@@ -88,6 +98,10 @@ class FocusedMessageImeOverlayTest {
             previewBefore.top >= 0f && previewBefore.bottom <= 320f,
         )
         composeRule.onNodeWithTag(FOCUSED_ACTION_MENU_SCROLL_TEST_TAG).assertIsDisplayed()
+        if (previewHeight > 60) {
+            val actionViewport = composeRule.onNodeWithTag(FOCUSED_ACTION_MENU_SCROLL_TEST_TAG).fetchSemanticsNode().boundsInRoot
+            assertTrue("tall media must leave a tappable action viewport", actionViewport.height >= 48f)
+        }
 
         composeRule
             .onNodeWithText("Action 11")

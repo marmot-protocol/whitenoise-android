@@ -1,11 +1,20 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.conversation.messages.FOCUSED_OVERLAY_FRAME_TEST_TAG
+import dev.ipf.whitenoise.android.ui.conversation.messages.FocusedMessageAction
+import dev.ipf.whitenoise.android.ui.conversation.messages.FocusedMessageActions
 import dev.ipf.whitenoise.android.ui.conversation.messages.FocusedTextMessagePreview
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageActionMenu
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubblePresentation
@@ -30,6 +39,40 @@ class FocusedMessageImeScreenshotTest {
     @Test
     fun keyboardOpenLargeFontDark() {
         capture("focused_overlay_keyboard_open_large_font_dark", dark = true, fontScale = 2f)
+    }
+
+    @Test
+    fun tallMediaKeepsActionsVisible() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                FocusedMessageActions(
+                    sourceBounds = IntRect(0, 180, 360, 240),
+                    touchY = 210f,
+                    mine = true,
+                    actions =
+                        List(6) { index ->
+                            FocusedMessageAction("Action $index", null, true, false, {}, {})
+                        },
+                    quickReactions = listOf("👍", "❤️"),
+                    canReact = true,
+                    selectedReactions = emptySet(),
+                    previewDescription = "Tall media",
+                    previewReady = true,
+                    previewIsMedia = true,
+                    preview = {
+                        Box(Modifier.size(200.dp, 400.dp).background(MaterialTheme.colorScheme.primaryContainer)) {
+                            Text("Portrait media")
+                        }
+                    },
+                    onReact = {},
+                    onMoreReactions = {},
+                    onDismiss = {},
+                )
+            }
+        }
+        composeRule
+            .onNodeWithTag(FOCUSED_OVERLAY_FRAME_TEST_TAG)
+            .captureRoboImage("src/test/snapshots/focused_overlay_tall_media_ime.png")
     }
 
     private fun capture(

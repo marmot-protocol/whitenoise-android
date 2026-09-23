@@ -257,6 +257,7 @@ internal fun FocusedMessageActions(
     selectedReactions: Set<String>,
     previewDescription: String,
     previewReady: Boolean,
+    previewIsMedia: Boolean = false,
     preview: (@Composable () -> Unit)?,
     onReact: (String) -> Unit,
     onMoreReactions: () -> Unit,
@@ -292,6 +293,9 @@ internal fun FocusedMessageActions(
             // The lifted bubble reports a window coordinate; the frame below starts under the top
             // inset. The stack would rest a status bar too low without converting between them.
             val topInsetPx = WindowInsets.safeDrawing.getTop(LocalDensity.current)
+            // The rail, inter-item gaps and a tappable scroll viewport need roughly 200dp.
+            // On an ordinary full-height frame, media keeps its original footprint.
+            val previewHeightLimit = (maxHeight - 200.dp).coerceAtLeast(48.dp)
             var stackHeightPx by remember { mutableIntStateOf(0) }
             var previewCenterInStackPx by remember { mutableStateOf<Int?>(null) }
             val travel =
@@ -345,6 +349,9 @@ internal fun FocusedMessageActions(
                             Modifier
                                 // The tag precedes clearAndSetSemantics, which wipes semantics set after it.
                                 .testTag("message-actions-preview")
+                                // Cap media without truncating large-font text previews. The rail
+                                // and actions retain space above an open keyboard.
+                                .then(if (previewIsMedia) Modifier.heightIn(max = previewHeightLimit) else Modifier)
                                 // Where the lifted message sits inside the stack is what the stack is
                                 // placed by, so the message lands on the bubble it was lifted from.
                                 .onPlaced {
