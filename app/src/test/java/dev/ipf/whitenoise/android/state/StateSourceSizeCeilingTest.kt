@@ -43,8 +43,10 @@ class StateSourceSizeCeilingTest {
         // Lowered as `ChatListItem` and then the chat-list sort moved to their own
         // same-package files. Raised to the exact post-#2431 size for its covered
         // chat-list convergence and notification-open fixes; keep this ratchet exact.
-        // PR #2528 wraps existing timing calls to satisfy Detekt; executable behavior is unchanged.
-        const val CONTROLLERS_MAX_LINES = 12888
+        // PR #2792 adds covered token-bound send admission and cancellation arbitration;
+        // the current base also adds group-recovery status handling. Exact Play/Zapstore
+        // unit tests and Kover run in required CI. Keep this merged-source ratchet exact.
+        const val CONTROLLERS_MAX_LINES = 13126
 
         // Master includes the covered draft lifecycle and host-timing changes. PR #2534
         // adds 38 lines for the async prepared-speech handoff while keeping preparation
@@ -53,7 +55,11 @@ class StateSourceSizeCeilingTest {
         // PR #2566 adds 4 lines for lifecycle-local provider discovery.
         // Navigation-resilient dictation adds 30 lines for atomic reply ownership,
         // claim release, and detached dispatch.
-        const val APP_STATE_MAX_LINES = 10384
+        // PR #2792 adds the covered shared send-phase registry and commit-lock helpers;
+        // current base contributes two lines of fresh-group recovery state. Replacement-controller
+        // retry regression adds a shared per-conversation wakeup registry (+12 lines).
+        // Play/Zapstore unit tests and Kover run in required CI; keep merged size exact.
+        const val APP_STATE_MAX_LINES = 10416
 
         /** Counts physical source lines with the same trailing-newline semantics as `wc -l`. */
         internal fun sourceLineCount(file: File): Int = file.bufferedReader().useLines { lines -> lines.count() }
