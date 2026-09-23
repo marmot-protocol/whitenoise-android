@@ -52,7 +52,10 @@ class ChatListBulkDeleteCoverageTest {
             "removeChatRow" in body && "restoreRemovedChatRow" in body,
         )
         assertTrue("local wipe must fence account and bind changes", "isActiveBindEpoch(epoch)" in body)
-        assertTrue("local wipe must report only a current terminal failure", "if (isCurrent()) appState.presentFailure" in body)
+        assertTrue(
+            "local wipe must report only a current terminal failure",
+            "if (isCurrent()) appState.presentFailure" in body,
+        )
     }
 
     private fun chatsScreenSource(): File =

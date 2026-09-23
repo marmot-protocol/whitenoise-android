@@ -8,7 +8,8 @@ import kotlinx.coroutines.delay
  * Resolve that ambiguity against the native group projection before another mutation. A failed
  * reconciliation never authorizes another delete; the caller can surface one terminal error.
  */
-@Suppress("TooGenericExceptionCaught") // Native errors are classified; cancellation is always propagated.
+// Each branch distinguishes a committed wipe, a safe retry, or a terminal/cancelled mutation.
+@Suppress("TooGenericExceptionCaught", "CyclomaticComplexMethod", "ThrowsCount")
 internal suspend fun deleteLocalGroupWithRecovery(
     isCurrent: () -> Boolean,
     delete: suspend () -> Unit,

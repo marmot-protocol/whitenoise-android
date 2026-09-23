@@ -548,7 +548,10 @@ class ComposerExpansionDestructiveLifecycleTest {
                 assertEquals(IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS, fixture.calls.delete.get())
                 assertEquals(1, controller.items.count { it.group.groupIdHex == GROUP_ID })
                 assertEquals("still drafting", fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID))
-                assertEquals(retained, fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+                assertEquals(
+                    retained,
+                    fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID),
+                )
             } finally {
                 controller.onCleared()
             }
@@ -574,7 +577,15 @@ class ComposerExpansionDestructiveLifecycleTest {
                 messageDraftRepository = draftRepository(),
             )
         val calls = LifecycleCalls()
-        val marmot = lifecycleMarmot(failLeave, failDelete, deleteTransportFailures, commitBeforeTransportFailure, calls, sendResult)
+        val marmot =
+            lifecycleMarmot(
+                failLeave,
+                failDelete,
+                deleteTransportFailures,
+                commitBeforeTransportFailure,
+                calls,
+                sendResult,
+            )
         WhiteNoiseAppState::class.java
             .getDeclaredField("marmotRuntime")
             .apply { isAccessible = true }
