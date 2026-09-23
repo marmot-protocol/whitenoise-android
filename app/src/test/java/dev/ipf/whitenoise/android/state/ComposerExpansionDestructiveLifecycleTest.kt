@@ -537,6 +537,25 @@ class ComposerExpansionDestructiveLifecycleTest {
         }
 
     @Test
+    fun committedLocalDeleteStillClearsLocalArtifactsWhenNativeDraftCleanupFails() =
+        runBlocking {
+            val fixture = fixture(failDraftDelete = true)
+            fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("remove locally"))
+            retainExpansion(fixture.appState, GROUP_ID)
+            val controller = fixture.seededChatsController()
+            try {
+                assertTrue(controller.deleteGroupLocalFromChatList(GROUP_ID, notify = false))
+                shadowOf(Looper.getMainLooper()).idle()
+                assertEquals(1, fixture.calls.delete.get())
+                assertTrue(controller.items.none { it.group.groupIdHex == GROUP_ID })
+                assertTrue(fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID).isNullOrEmpty())
+                assertNull(fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    @Test
     fun exhaustedClosedTransportRestoresRowDraftAndGeometry() =
         runBlocking {
             val fixture = fixture(deleteTransportFailures = IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS)
@@ -564,6 +583,7 @@ class ComposerExpansionDestructiveLifecycleTest {
         failDelete: Boolean = false,
         deleteTransportFailures: Int = 0,
         commitBeforeTransportFailure: Boolean = false,
+        failDraftDelete: Boolean = false,
         sendResult: () -> SendSummaryFfi = ::successfulSendSummary,
         attachConversationController: Boolean = true,
     ): LifecycleFixture {
@@ -575,7 +595,7 @@ class ComposerExpansionDestructiveLifecycleTest {
                 accountIdHexResolver = { ACCOUNT_ID },
                 accounts = listOf(account()),
                 activeAccountRef = ACCOUNT_REF,
-                messageDraftRepository = draftRepository(),
+                messageDraftRepository = draftRepository(failDraftDelete),
             )
         val calls = LifecycleCalls()
         val marmot =
@@ -709,9 +729,25 @@ class ComposerExpansionDestructiveLifecycleTest {
         )
 
     /** Wraps an injected repository whose successful draft delete cannot invoke Marmot. */
-    private fun draftRepository() =
+    private fun draftRepository(failDelete: Boolean = false) =
         MessageDraftRepository(
-            gateway = EmptyDraftGateway,
+            gateway =
+                if (failDelete) {
+                    object : MessageDraftGateway by EmptyDraftGateway {
+                        override fun read(
+                            accountRef: String,
+                            groupIdHex: String,
+                        ): MessageDraftFfi =
+                            EmptyDraftGateway.save(accountRef, groupIdHex, "persisted draft", null, emptyList())
+
+                        override fun delete(
+                            accountRef: String,
+                            groupIdHex: String,
+                        ): Unit = throw IllegalStateException("draft deletion rejected")
+                    }
+                } else {
+                    EmptyDraftGateway
+                },
             editorSessions = EditorSessionStore(LifecycleEditorStrings),
             ioDispatcher = Dispatchers.Unconfined,
         )

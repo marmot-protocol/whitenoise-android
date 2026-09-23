@@ -57,26 +57,42 @@ internal suspend fun WhiteNoiseAppState.deleteChatGroupLocalWithRecovery(
     // Native success (including an already-committed lost response) is the only point at which
     // clearing the draft, dictation target, cache, expansion and notifications is safe.
     withContext(NonCancellable) {
-        conversationDictation.onTargetRemoved(account, groupIdHex)
+        suspend fun cleanupStep(
+            name: String,
+            block: suspend () -> Unit,
+        ) {
+            runCatching { block() }
+                .onFailure { failure ->
+                    appStateDebug(failure) { "local delete $name cleanup failed group=${groupIdHex.take(8)}" }
+                }
+        }
+
+        cleanupStep("dictation") { conversationDictation.onTargetRemoved(account, groupIdHex) }
         if (cacheKeys.isNotEmpty()) {
-            removeMediaMemoryCacheKeys(cacheKeys, Dispatchers.Main.immediate, ::removeMediaMemoryCacheEntry)
+            cleanupStep("memory media") {
+                removeMediaMemoryCacheKeys(cacheKeys, Dispatchers.Main.immediate, ::removeMediaMemoryCacheEntry)
+            }
         }
         if (cacheKeys.isNotEmpty() || tags.isNotEmpty()) {
-            withContext(Dispatchers.IO) {
-                cacheKeys.forEach { diskMediaCache.remove(it) }
-                if (tags.isNotEmpty()) diskMediaCache.removeByCiphertextTags(tags)
+            cleanupStep("disk media") {
+                withContext(Dispatchers.IO) {
+                    cacheKeys.forEach { diskMediaCache.remove(it) }
+                    if (tags.isNotEmpty()) diskMediaCache.removeByCiphertextTags(tags)
+                }
             }
         }
-        retryIdempotentRuntimeMutation {
-            when (val deletion = deleteDraftBeforeGroupRemoval(account, groupIdHex)) {
-                is MessageDraftMutationResult.Success -> Unit
-                is MessageDraftMutationResult.Failure -> throw deletion.cause
-                else -> error("unexpected draft deletion result: $deletion")
+        cleanupStep("native draft") {
+            retryIdempotentRuntimeMutation {
+                when (val deletion = deleteDraftBeforeGroupRemoval(account, groupIdHex)) {
+                    is MessageDraftMutationResult.Success -> Unit
+                    is MessageDraftMutationResult.Failure -> throw deletion.cause
+                    else -> error("unexpected draft deletion result: $deletion")
+                }
             }
         }
-        draftStore.replaceFromAuthoritative(account, groupIdHex, null, null)
-        removeComposerExpansionForGroup(account, groupIdHex)
-        dismissConversationNotifications(account, groupIdHex)
+        cleanupStep("local draft") { draftStore.replaceFromAuthoritative(account, groupIdHex, null, null) }
+        cleanupStep("composer expansion") { removeComposerExpansionForGroup(account, groupIdHex) }
+        cleanupStep("notifications") { dismissConversationNotifications(account, groupIdHex) }
     }
 }
 
