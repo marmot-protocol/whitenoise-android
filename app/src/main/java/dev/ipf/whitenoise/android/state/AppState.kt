@@ -2368,6 +2368,10 @@ class WhiteNoiseAppState private constructor(
     private val notificationContentResolution by lazy {
         createNotificationContentResolutionServices(appContext, NotificationContentReads())
     }
+    private val notificationNicknameRefresh by lazy {
+        val identity = notificationContentResolution.identity
+        NotificationNicknameRefreshCoordinator(notificationScope, identity, localNotificationPresenter)
+    }
 
     /** Delegates live notification reads without creating a callback class for each dependency. */
     @Suppress("TooManyFunctions")
@@ -9454,27 +9458,7 @@ class WhiteNoiseAppState private constructor(
         if (ContactNicknamePreferences.writeNickname(preferences, account, accountIdHex, nickname)) {
             contactNicknameRevision += 1
             bumpProfileAccountRevision(accountIdHex)
-            refreshActiveNotificationsForContact(account, accountIdHex)
-        }
-    }
-
-    /** Silently reconciles already-active sender lines after an account-scoped nickname edit or clear. */
-    private fun refreshActiveNotificationsForContact(
-        accountRef: String,
-        accountIdHex: String,
-    ) {
-        notificationScope.launch {
-            runCatchingCancellable {
-                val senderName =
-                    notificationContentResolution.identity.displayNameForAccount(
-                        accountRef = accountRef,
-                        accountIdHex = accountIdHex,
-                        requestMissingProfile = false,
-                    )
-                localNotificationPresenter.refreshContactSenderName(accountRef, accountIdHex, senderName)
-            }.onFailure {
-                appStateDebug { "notification nickname refresh failed account=${accountRef.take(8)}" }
-            }
+            notificationNicknameRefresh.refresh(account, accountIdHex)
         }
     }
 
