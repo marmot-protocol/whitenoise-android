@@ -83,7 +83,8 @@ internal class NewMessageRecipientPreparationCoordinator {
         return NewMessageRecipientPreparation(key, prewarmResult, lookupResult).also { current = it }
     }
 
-    fun current(key: NewMessageRecipientPreparationKey): NewMessageRecipientPreparation? = current?.takeIf { it.key == key }
+    fun current(key: NewMessageRecipientPreparationKey): NewMessageRecipientPreparation? =
+        current?.takeIf { it.key == key }
 
     fun clear() {
         current?.cancel()

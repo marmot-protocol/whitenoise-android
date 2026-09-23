@@ -87,6 +87,15 @@ internal fun rememberRecipientResolution(
         }
     }
 
+    return resolvedRecipientResolution(trimmed, resolving, resolvedHex, appState)
+}
+
+private fun resolvedRecipientResolution(
+    input: String,
+    resolving: Boolean,
+    resolvedHex: String?,
+    appState: WhiteNoiseAppState,
+): RecipientResolution {
     val profile = resolvedHex?.let { appState.userProfile(it) }
     val pictureUrl = resolvedHex?.let { appState.avatarUrl(it) } ?: ProfileSanitizer.protocolImageUrl(profile?.picture)
     val about = ProfileSanitizer.about(profile?.about)
@@ -95,12 +104,10 @@ internal fun rememberRecipientResolution(
         profile != null &&
             (
                 !ProfileSanitizer.displayName(profile.displayName ?: profile.name).isNullOrBlank() ||
-                    about != null ||
-                    pictureUrl != null ||
-                    nip05 != null
+                    about != null || pictureUrl != null || nip05 != null
             )
     return RecipientResolution(
-        recipientPreviewState(trimmed.isNotEmpty(), resolving, resolvedHex, hasProfile),
+        recipientPreviewState(input.isNotEmpty(), resolving, resolvedHex, hasProfile),
         resolvedHex,
     )
 }

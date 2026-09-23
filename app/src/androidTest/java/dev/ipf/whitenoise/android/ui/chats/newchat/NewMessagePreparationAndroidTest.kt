@@ -74,9 +74,7 @@ class NewMessagePreparationAndroidTest {
         composeRule.waitUntil(timeoutMillis = 5_000) {
             profileStarted.isCompleted && prewarmStarted.isCompleted && lookupStarted.isCompleted
         }
-        assertFalse(releaseProfile.isCompleted)
-        assertFalse(releasePrewarm.isCompleted)
-        assertFalse(releaseLookup.isCompleted)
+        assertBlocked(releaseProfile, releasePrewarm, releaseLookup)
         composeRule
             .onNodeWithTag("creation.person.$targetHex")
             .assertIsDisplayed()
@@ -84,8 +82,10 @@ class NewMessagePreparationAndroidTest {
             .performClick()
         composeRule.runOnIdle { assertEquals(1, taps) }
 
-        releaseProfile.complete(Unit)
-        releasePrewarm.complete(Unit)
-        releaseLookup.complete(Unit)
+        releaseAll(releaseProfile, releasePrewarm, releaseLookup)
     }
+
+    private fun assertBlocked(vararg gates: CompletableDeferred<Unit>) = gates.forEach { assertFalse(it.isCompleted) }
+
+    private fun releaseAll(vararg gates: CompletableDeferred<Unit>) = gates.forEach { it.complete(Unit) }
 }
