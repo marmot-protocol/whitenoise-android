@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.media.editor.MessageDraftMutationResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -65,7 +66,13 @@ internal suspend fun WhiteNoiseAppState.deleteChatGroupLocalWithRecovery(
                 if (tags.isNotEmpty()) diskMediaCache.removeByCiphertextTags(tags)
             }
         }
-        deleteDraftBeforeGroupRemoval(account, groupIdHex)
+        retryIdempotentRuntimeMutation {
+            when (val deletion = deleteDraftBeforeGroupRemoval(account, groupIdHex)) {
+                is MessageDraftMutationResult.Success -> Unit
+                is MessageDraftMutationResult.Failure -> throw deletion.cause
+                else -> error("unexpected draft deletion result: $deletion")
+            }
+        }
         draftStore.replaceFromAuthoritative(account, groupIdHex, null, null)
         removeComposerExpansionForGroup(account, groupIdHex)
         dismissConversationNotifications(account, groupIdHex)
