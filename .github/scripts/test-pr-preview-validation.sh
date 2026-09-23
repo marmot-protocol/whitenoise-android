@@ -29,7 +29,15 @@ case "$command" in
     ;;
   version-code) printf '%s\n' "${FAKE_VERSION_CODE:-2000000000}" ;;
   version-name) printf '%s\n' "${FAKE_VERSION_NAME:-2026.8.6-preview-pr${PR_NUMBER}-${HEAD_SHA:0:7}}" ;;
-  print) printf '<application android:extractNativeLibs="%s" />\n' "${FAKE_EXTRACT_NATIVE_LIBS:-true}" ;;
+  print)
+    attributes="android:extractNativeLibs=\"${FAKE_EXTRACT_NATIVE_LIBS:-true}\""
+    # Only the channel named by FAKE_TEST_ONLY_CHANNEL carries the attribute, so a
+    # fixture can prove one channel's manifest is rejected on its own.
+    if [[ "${FAKE_TEST_ONLY_CHANNEL:-}" == "$channel" ]]; then
+      attributes="$attributes android:testOnly=\"${FAKE_TEST_ONLY_VALUE:-true}\""
+    fi
+    printf '<application %s />\n' "$attributes"
+    ;;
   *) exit 64 ;;
 esac
 FAKE_ANALYZER
@@ -90,6 +98,13 @@ expect_rejection 'wrong version code' env PATH="$fake_bin:$PATH" FAKE_VERSION_CO
 expect_rejection 'wrong PR/SHA version name' env PATH="$fake_bin:$PATH" FAKE_VERSION_NAME=wrong "$verifier" "$candidates"
 expect_rejection 'wrong ABI' env PATH="$fake_bin:$PATH" FAKE_ABI=x86_64 "$verifier" "$candidates"
 expect_rejection 'native extraction disabled' env PATH="$fake_bin:$PATH" FAKE_EXTRACT_NATIVE_LIBS=false "$verifier" "$candidates"
+expect_rejection 'test-only stable candidate' env PATH="$fake_bin:$PATH" FAKE_TEST_ONLY_CHANNEL=stable "$verifier" "$candidates"
+expect_rejection 'test-only isolated candidate' env PATH="$fake_bin:$PATH" FAKE_TEST_ONLY_CHANNEL=isolated "$verifier" "$candidates"
+expect_rejection 'unrecognised test-only value' env PATH="$fake_bin:$PATH" FAKE_TEST_ONLY_CHANNEL=stable FAKE_TEST_ONLY_VALUE=0xffffffff "$verifier" "$candidates"
+# An explicit android:testOnly="false" is the normal installable contract; the
+# baseline run above already covers the attribute being absent entirely.
+env PATH="$fake_bin:$PATH" FAKE_TEST_ONLY_CHANNEL=stable FAKE_TEST_ONLY_VALUE=false "$verifier" "$candidates" >/dev/null
+env PATH="$fake_bin:$PATH" FAKE_TEST_ONLY_CHANNEL=isolated FAKE_TEST_ONLY_VALUE=false "$verifier" "$candidates" >/dev/null
 expect_rejection 'uncompressed native library' env PATH="$fake_bin:$PATH" FAKE_NATIVE_COMPRESSION=stor "$verifier" "$candidates"
 expect_rejection 'invalid ZIP' env PATH="$fake_bin:$PATH" FAKE_INVALID_ZIP=true "$verifier" "$candidates"
 
@@ -150,6 +165,10 @@ for channel in stable isolated; do
   [[ "$checksum_path" == "whitenoise-pr-${PR_NUMBER}-${channel}.apk" ]]
 done
 PATH="$fake_bin:$PATH" "$verifier" "$tmp/signed-check" >/dev/null
+# The signed pass repeats the test-only assertion, so a test-only APK cannot
+# reach the release-asset publisher even if it slipped past the candidate pass.
+expect_rejection 'test-only stable signed output' env PATH="$fake_bin:$PATH" FAKE_TEST_ONLY_CHANNEL=stable "$verifier" "$tmp/signed-check"
+expect_rejection 'test-only isolated signed output' env PATH="$fake_bin:$PATH" FAKE_TEST_ONLY_CHANNEL=isolated "$verifier" "$tmp/signed-check"
 rm -rf "$tmp/signed-check"
 rm -rf "$tmp/signed"
 
