@@ -11,8 +11,6 @@ import java.net.URL
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicReference
 
 /** Regression coverage for cancelling DNS-pinned requests during connection setup. */
 class SafeHttpsGetConnectCancellationTest {
@@ -20,25 +18,45 @@ class SafeHttpsGetConnectCancellationTest {
     fun cancellationDuringConnectStopsBeforeTryingAnotherAddress() {
         val enteredConnect = CountDownLatch(1)
         val first = BlockingConnectHttpConnection(URL(TEST_URL), enteredConnect)
-        val cancelled = AtomicBoolean(false)
-        val activeConnection = AtomicReference<HttpURLConnection?>(null)
+        var cancelRequest: (() -> Unit)? = null
         var connectionAttempts = 0
         val executor = Executors.newSingleThreadExecutor()
         try {
             val result =
-                executor.submit<HttpURLConnection?> {
-                    SafeHttpsGet.openPinnedConnection(
-                        request = request(cancelled, activeConnection),
-                        connectionFactory = { _, _, _, _, _ ->
-                            connectionAttempts += 1
-                            if (connectionAttempts == 1) first else error("Cancellation must stop address fallback")
-                        },
+                executor.submit<ByteArray?> {
+                    SafeHttpsGet.get(
+                        url = TEST_URL,
+                        maxBodyBytes = 32,
+                        connectTimeoutMillis = 5_000,
+                        readTimeoutMillis = 5_000,
+                        registerCancellation = { cancelRequest = it },
+                        dependencies =
+                            SafeHttpsGetDependencies(
+                                resolve = {
+                                    arrayOf(
+                                        InetAddress.getByName("8.8.8.8"),
+                                        InetAddress.getByName("1.1.1.1"),
+                                    )
+                                },
+                                openPinnedConnection = { request ->
+                                    SafeHttpsGet.openPinnedConnection(
+                                        request = request,
+                                        connectionFactory = { _, _, _, _, _ ->
+                                            connectionAttempts += 1
+                                            if (connectionAttempts == 1) {
+                                                first
+                                            } else {
+                                                error("Cancellation must stop address fallback")
+                                            }
+                                        },
+                                    )
+                                },
+                            ),
                     )
                 }
 
             assertTrue(enteredConnect.await(1, TimeUnit.SECONDS))
-            cancelled.set(true)
-            activeConnection.getAndSet(null)?.disconnect()
+            requireNotNull(cancelRequest).invoke()
 
             assertNull(result.get(1, TimeUnit.SECONDS))
             assertTrue(first.disconnected)
@@ -46,32 +64,6 @@ class SafeHttpsGetConnectCancellationTest {
         } finally {
             executor.shutdownNow()
         }
-    }
-
-    private fun request(
-        cancelled: AtomicBoolean,
-        activeConnection: AtomicReference<HttpURLConnection?>,
-    ): SafeHttpsPinnedRequest =
-        SafeHttpsPinnedRequest(
-            parsed = URL(TEST_URL),
-            addresses = arrayOf(InetAddress.getByName("8.8.8.8"), InetAddress.getByName("1.1.1.1")),
-            requestDeadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(5),
-            connectTimeoutMillis = 5_000,
-            readTimeoutMillis = 5_000,
-            requestHeaders = emptyMap(),
-            activate = { connection -> activateUnlessCancelled(connection, cancelled, activeConnection) },
-            isCancelled = cancelled::get,
-        )
-
-    private fun activateUnlessCancelled(
-        connection: HttpURLConnection,
-        cancelled: AtomicBoolean,
-        activeConnection: AtomicReference<HttpURLConnection?>,
-    ): Boolean {
-        activeConnection.set(connection)
-        if (!cancelled.get()) return true
-        connection.disconnect()
-        return false
     }
 
     private class BlockingConnectHttpConnection(

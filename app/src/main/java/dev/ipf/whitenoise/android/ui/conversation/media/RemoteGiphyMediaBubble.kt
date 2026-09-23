@@ -115,7 +115,7 @@ internal fun RemoteGiphyMediaBubble(
     var retryToken by remember(media.url) { mutableIntStateOf(0) }
     var playbackGranted by remember(media.url) { mutableStateOf(false) }
     val imageRequest = remember(media.url) { media.imageRequest() }
-    val cachedBytes = remember(imageRequest?.url) { imageRequest?.url?.let(giphyByteCache::get) }
+    val cachedBytes = remember(imageRequest?.url, retryToken) { imageRequest?.url?.let(giphyByteCache::get) }
     val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
     val automaticAllowed = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image)
     val shouldLoad =
