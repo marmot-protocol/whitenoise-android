@@ -46,7 +46,14 @@ class AccountSetupDefaultsTest {
         val options = setupOptions()
         assertEquals(dev.ipf.whitenoise.android.core.MarmotClient.bootstrapRelays, options.defaultRelays)
         assertEquals(
-            options.defaultRelays + listOf("wss://purplepag.es", "wss://relay.vertexlab.io", "wss://nos.lol"),
+            options.defaultRelays +
+                listOf(
+                    "wss://purplepag.es",
+                    "wss://relay.vertexlab.io",
+                    "wss://nos.lol",
+                    "wss://relay.ditto.pub",
+                    "wss://relay.primal.net",
+                ),
             options.discoveryRelays,
         )
     }
