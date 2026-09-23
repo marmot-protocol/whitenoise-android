@@ -103,11 +103,11 @@ class NostrEventVerifierTest {
             NostrEventVerifier.verifies(
                 event.copy(
                     id = event.id.uppercase(Locale.US),
-                    pubkey = event.pubkey.uppercase(Locale.US),
                     sig = event.sig.uppercase(Locale.US),
                 ),
             ),
         )
+        assertFalse(NostrEventVerifier.verifies(event.copy(pubkey = event.pubkey.uppercase(Locale.US))))
         assertFalse(NostrEventVerifier.verifies(event.copy(id = "0".repeat(64))))
         assertFalse(NostrEventVerifier.verifies(event.copy(content = "mutated")))
         assertFalse(NostrEventVerifier.verifies(event.copy(pubkey = "0".repeat(64))))
