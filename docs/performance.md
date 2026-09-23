@@ -412,9 +412,8 @@ preflight alone; the paging results do not depend on that report.
 Beyond the scroll metrics below, each method reports the paging slices from the
 [Conversation history pages](#conversation-history-pages) section: `pageCount`
 (boundaries actually crossed — a journey that reports zero did not test paging),
-`pageWindowMs`/`pageWindowMaxMs` (the engine's share), `pagePrepareMs` and
-`pageApplyMs`/`pageApplyMaxMs` (the app's share, preparation and main-thread
-commit), and three counts that should stay at zero for paging to be invisible:
+`pageWindowMs` (the engine's share), `pagePrepareMs` and `pageApplyMs` (the
+app's share, preparation and main-thread commit), and three counts that should stay at zero for paging to be invisible:
 `edgeStopCount` (the list rested on its oldest row with more history behind it),
 `edgeReachedCount` (a page landed after the reader had already reached the old
 edge) against `runwayKeptCount` (a page landed with rows to spare). CPU and

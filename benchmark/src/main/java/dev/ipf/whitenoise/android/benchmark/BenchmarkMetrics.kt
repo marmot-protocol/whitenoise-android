@@ -177,7 +177,9 @@ internal fun scrollMetrics(sectionName: String): List<Metric> =
 /**
  * Everything [scrollMetrics] reports, plus what makes history paging visible to
  * a reader. `pageCount` proves the journey crossed boundaries at all; the window
- * sum is the engine's share and the apply sum the app's; `edgeStopCount` and
+ * sum is the engine's share and the apply sum the app's (sums and counts only:
+ * a `Max` over a journey that crossed no boundary has no value and fails the
+ * trace processing of the whole iteration); `edgeStopCount` and
  * `edgeReachedCount` are the two ways a reader notices a page — resting on the
  * edge with more history behind it, or having reached the old edge before the
  * page landed — and both are expected to be zero. CPU and memory energy are
@@ -190,10 +192,8 @@ internal fun pagingMetrics(sectionName: String): List<Metric> =
         listOf(
             pagingSection(PAGE_WINDOW_TRACE, TraceSectionMetric.Mode.Count, "pageCount"),
             pagingSection(PAGE_WINDOW_TRACE, TraceSectionMetric.Mode.Sum, "pageWindowMs"),
-            pagingSection(PAGE_WINDOW_TRACE, TraceSectionMetric.Mode.Max, "pageWindowMaxMs"),
             pagingSection(PAGE_PREPARE_TRACE, TraceSectionMetric.Mode.Sum, "pagePrepareMs"),
             pagingSection(PAGE_APPLY_TRACE, TraceSectionMetric.Mode.Sum, "pageApplyMs"),
-            pagingSection(PAGE_APPLY_TRACE, TraceSectionMetric.Mode.Max, "pageApplyMaxMs"),
             pagingSection(PAGE_EDGE_STOP_TRACE, TraceSectionMetric.Mode.Count, "edgeStopCount"),
             pagingSection(PAGE_RUNWAY_KEPT_TRACE, TraceSectionMetric.Mode.Count, "runwayKeptCount"),
             pagingSection(PAGE_EDGE_REACHED_TRACE, TraceSectionMetric.Mode.Count, "edgeReachedCount"),

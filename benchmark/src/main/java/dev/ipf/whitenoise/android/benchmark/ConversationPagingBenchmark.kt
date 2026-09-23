@@ -68,6 +68,11 @@ class ConversationPagingBenchmark {
      * Opens the fixture from the chat list, runs [prepare] unmeasured, then measures [journey]. With
      * [coldProcess] the app process is killed first so the measured block runs against a catching-up
      * engine rather than a settled one.
+     *
+     * A warm iteration opens and closes the conversation once and waits for its controller to be
+     * released before the measured open. The previous iteration ends deep in history with a saturated
+     * 200-row window, and the controller's short exit retention would otherwise hand that window back
+     * to the next open — a fling that starts there crosses no page boundary and measures nothing.
      */
     private fun measurePaging(
         sectionName: String,
@@ -86,6 +91,11 @@ class ConversationPagingBenchmark {
                 pressHome()
                 if (coldProcess) killProcess()
                 journeys.run { resumeToChatList() }
+                if (!coldProcess) {
+                    journeys.openGroup(groupName)
+                    journeys.returnToChatList()
+                    journeys.waitForConversationControllerReleased()
+                }
                 journeys.openGroup(groupName)
                 journeys.waitForConversationRouteSettled()
                 prepare()
