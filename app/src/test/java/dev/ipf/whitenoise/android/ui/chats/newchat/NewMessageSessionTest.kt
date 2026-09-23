@@ -94,13 +94,15 @@ class NewMessageSessionTest {
         runTest {
             val coordinator = NewMessageRecipientPreparationCoordinator()
             val key = preparationKey("target")
-            val old = coordinator.prepare(backgroundScope, key, prewarm = {}, lookup = {
-                NewMessageDirectChatResolution(null, true)
-            })
+            val old =
+                coordinator.prepare(backgroundScope, key, prewarm = {}, lookup = {
+                    NewMessageDirectChatResolution(null, true)
+                })
             runCurrent()
-            val fresh = coordinator.prepare(backgroundScope, key.copy(chatRevision = 1L), prewarm = {}, lookup = {
-                NewMessageDirectChatResolution(item(), false)
-            })
+            val fresh =
+                coordinator.prepare(backgroundScope, key.copy(chatRevision = 1L), prewarm = {}, lookup = {
+                    NewMessageDirectChatResolution(item(), false)
+                })
             runCurrent()
             assertNotSame(old, fresh)
             assertEquals("canonical", fresh.directChatResolution().item?.id)
@@ -109,20 +111,75 @@ class NewMessageSessionTest {
     @Test
     fun failedPreparedLookupRetriesAuthoritativeLookupOnTap() =
         runTest {
-            val preparation = NewMessageRecipientPreparationCoordinator().prepare(
-                backgroundScope,
-                preparationKey("target"),
-                prewarm = {},
-                lookup = { error("transient lookup failure") },
-            )
+            val preparation =
+                NewMessageRecipientPreparationCoordinator().prepare(
+                    backgroundScope,
+                    preparationKey("target"),
+                    prewarm = {},
+                    lookup = { error("transient lookup failure") },
+                )
             runCurrent()
             var freshLookups = 0
-            val result = preparedLookupOrFresh(preparation) {
-                freshLookups++
-                NewMessageDirectChatResolution(item(), false)
-            }
+            val result =
+                preparedLookupOrFresh(preparation) {
+                    freshLookups++
+                    NewMessageDirectChatResolution(item(), false)
+                }
             assertEquals(1, freshLookups)
             assertEquals("canonical", result.item?.id)
+        }
+
+    @Test
+    fun projectionChangesWhilePreparedLookupAwaitsSoTapUsesFreshLookup() =
+        runTest {
+            val release = CompletableDeferred<Unit>()
+            var revision = 0L
+            val preparation =
+                NewMessageRecipientPreparationCoordinator().prepare(
+                    backgroundScope,
+                    preparationKey("target"),
+                    prewarm = {},
+                    lookup = {
+                        release.await()
+                        NewMessageDirectChatResolution(null, true)
+                    },
+                )
+            val attempt =
+                async {
+                    preparedLookupOrFresh(preparation, revisionMatches = { revision == 0L }) {
+                        NewMessageDirectChatResolution(item(), false)
+                    }
+                }
+            runCurrent()
+            revision = 1L
+            release.complete(Unit)
+            assertEquals("canonical", attempt.await().item?.id)
+        }
+
+    @Test
+    fun canceledPreparationRetriesLookupWhileTapRemainsActive() =
+        runTest {
+            val coordinator = NewMessageRecipientPreparationCoordinator()
+            val preparation =
+                coordinator.prepare(
+                    backgroundScope,
+                    preparationKey("target"),
+                    prewarm = {},
+                    lookup = { awaitCancellation() },
+                )
+            var freshLookups = 0
+            val attempt =
+                async {
+                    preparedLookupOrFresh(preparation) {
+                        freshLookups++
+                        NewMessageDirectChatResolution(item(), false)
+                    }
+                }
+            runCurrent()
+            coordinator.clear()
+            runCurrent()
+            assertEquals("canonical", attempt.await().item?.id)
+            assertEquals(1, freshLookups)
         }
 
     @Test

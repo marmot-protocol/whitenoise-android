@@ -4,9 +4,12 @@ import dev.ipf.whitenoise.android.state.ChatCreateOpenTiming
 import dev.ipf.whitenoise.android.state.MarmotTraceSection
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.joinAll
 
 /** Identifies one short-lived recipient preparation within its screen owner. */
@@ -45,9 +48,18 @@ internal class NewMessageRecipientPreparation internal constructor(
 /** Only a definitive preparation can replace an authoritative tap-time lookup. */
 internal suspend fun preparedLookupOrFresh(
     preparation: NewMessageRecipientPreparation?,
+    revisionMatches: () -> Boolean = { true },
     fresh: suspend () -> NewMessageDirectChatResolution,
-): NewMessageDirectChatResolution =
-    preparation?.directChatResolution()?.takeIf { it.item != null || it.createRequired } ?: fresh()
+): NewMessageDirectChatResolution {
+    val resolved =
+        try {
+            preparation?.directChatResolution()
+        } catch (_: CancellationException) {
+            currentCoroutineContext().ensureActive()
+            null
+        }
+    return resolved?.takeIf { revisionMatches() && (it.item != null || it.createRequired) } ?: fresh()
+}
 
 /** Keeps exactly one query/account-scoped preparation and cancels replaced work. */
 internal class NewMessageRecipientPreparationCoordinator {
@@ -91,8 +103,10 @@ internal class NewMessageRecipientPreparationCoordinator {
         return NewMessageRecipientPreparation(key, prewarmResult, lookupResult).also { current = it }
     }
 
-    fun current(key: NewMessageRecipientPreparationKey): NewMessageRecipientPreparation? =
-        current?.takeIf { it.key == key }
+    fun current(key: NewMessageRecipientPreparationKey): NewMessageRecipientPreparation? {
+        val matching = current?.takeIf { it.key == key }
+        return matching
+    }
 
     fun clear() {
         current?.cancel()

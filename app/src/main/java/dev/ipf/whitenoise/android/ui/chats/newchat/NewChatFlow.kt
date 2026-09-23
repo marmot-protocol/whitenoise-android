@@ -561,13 +561,14 @@ private fun NewMessageAccountScreen(
         creatingHex = hexForProgress
         scannerSession = null
         appState.beginChatCreateOpenTiming()
-        val preparedLookup =
-            identifierPreparationKey
-                ?.takeIf {
-                    retryGroupIdHex == null && existingDmGroupIdHex == null &&
-                        it.targetReference == npub && it.chatRevision == appState.forwardTargetsRevision
-                }
-                ?.let(preparationCoordinator::current)
+        val preparationKeyForTap =
+            identifierPreparationKey?.takeIf {
+                retryGroupIdHex == null &&
+                    existingDmGroupIdHex == null &&
+                    it.targetReference == npub &&
+                    it.chatRevision == appState.forwardTargetsRevision
+            }
+        val preparedLookup = preparationKeyForTap?.let(preparationCoordinator::current)
         appState.launchMutation {
             try {
                 session.ensureCurrent()
@@ -581,8 +582,9 @@ private fun NewMessageAccountScreen(
                             resolveDirectChat = {
                                 session.currentValue {
                                     preparedLookupOrFresh(
-                                        preparedLookup?.takeIf {
-                                            it.key.chatRevision == appState.forwardTargetsRevision
+                                        preparedLookup,
+                                        revisionMatches = {
+                                            preparedLookup?.key?.chatRevision == appState.forwardTargetsRevision
                                         },
                                     ) {
                                         resolveNewMessageDirectChat(

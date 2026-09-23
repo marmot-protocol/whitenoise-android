@@ -18,7 +18,9 @@ internal fun resolvedRecipientResolution(
         profile != null &&
             (
                 !ProfileSanitizer.displayName(profile.displayName ?: profile.name).isNullOrBlank() ||
-                    about != null || pictureUrl != null || nip05 != null
+                    about != null ||
+                    pictureUrl != null ||
+                    nip05 != null
             )
     return RecipientResolution(
         recipientPreviewState(input.isNotEmpty(), resolving, resolvedHex, hasProfile),
