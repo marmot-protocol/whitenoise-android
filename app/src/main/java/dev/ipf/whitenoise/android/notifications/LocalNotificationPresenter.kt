@@ -219,6 +219,7 @@ class LocalNotificationPresenter(
                                 live.tag.orEmpty(),
                                 live.id,
                                 renamed,
+                                recordedAtMs = live.postTime,
                             )
                         ) {
                             refreshed += 1
@@ -1319,10 +1320,11 @@ class LocalNotificationPresenter(
         id: Int,
         notification: Notification,
         onNotificationWritten: (() -> Unit)? = null,
+        recordedAtMs: Long? = null,
     ): Boolean =
         try {
             notificationPoster(manager, tag, id, notification)
-            ConversationCardPostedRegistry.markPosted(tag, id)
+            ConversationCardPostedRegistry.markPosted(tag, id, recordedAtMs ?: System.currentTimeMillis())
             runCatching { onNotificationWritten?.invoke() }
             true
         } catch (exception: RuntimeException) {

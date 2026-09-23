@@ -5,6 +5,8 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Bundle
+import android.os.Process
+import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import dev.ipf.marmotkit.NotificationTriggerFfi
@@ -26,6 +28,8 @@ import org.robolectric.annotation.Config
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
 @RunWith(RobolectricTestRunner::class)
@@ -554,6 +558,91 @@ class LocalNotificationReplyRaceTest {
         assertTrue(manager.activeNotifications.isEmpty())
     }
 
+    /** A nickname rewrite keeps the original card age so an overlapping conversation open still cancels it. */
+    @Suppress("LongMethod") // The complete latch ordering is the regression contract for this race.
+    @Test
+    fun conversationDismissOwnsNicknameRewriteThatLandsAfterItsCutoff() {
+        val conversation = conversationKey()
+        manager.notify(conversation.tag, conversation.id, messagingNotification("msg-a", "hello" to 1_000L))
+        val refreshReadyToWrite = CountDownLatch(1)
+        val allowRefreshWrite = CountDownLatch(1)
+        val refreshFinished = CountDownLatch(1)
+        val dismissalReadStarted = CountDownLatch(1)
+        val allowDismissalRead = CountDownLatch(1)
+        val dismissFinished = CountDownLatch(1)
+        val providerCalls = AtomicInteger()
+        val dismissalReadStartedAtMs = AtomicLong()
+        val refreshFailure = AtomicReference<Throwable>()
+        val dismissFailure = AtomicReference<Throwable>()
+        val presenter =
+            LocalNotificationPresenter(
+                context = context,
+                notificationPoster = { _, tag, id, notification ->
+                    refreshReadyToWrite.countDown()
+                    check(allowRefreshWrite.await(5, TimeUnit.SECONDS))
+                    manager.notify(tag, id, notification)
+                },
+                dismissalRetryDelay = {},
+                activeNotificationsProvider = {
+                    when (providerCalls.incrementAndGet()) {
+                        3 -> {
+                            dismissalReadStartedAtMs.set(System.currentTimeMillis())
+                            dismissalReadStarted.countDown()
+                            check(allowDismissalRead.await(5, TimeUnit.SECONDS))
+                            manager.activeNotifications
+                                .map { live ->
+                                    StatusBarNotification(
+                                        context.packageName,
+                                        context.packageName,
+                                        live.id,
+                                        live.tag,
+                                        1_000,
+                                        0,
+                                        0,
+                                        live.notification,
+                                        Process.myUserHandle(),
+                                        Long.MAX_VALUE,
+                                    )
+                                }.toTypedArray()
+                        }
+
+                        else -> manager.activeNotifications
+                    }
+                },
+            )
+
+        Thread {
+            try {
+                assertEquals(1, runBlocking { presenter.refreshContactSenderName(ACCOUNT, SENDER, "Ally") })
+            } catch (throwable: Throwable) {
+                refreshFailure.set(throwable)
+            } finally {
+                refreshFinished.countDown()
+            }
+        }.start()
+        assertTrue(refreshReadyToWrite.await(5, TimeUnit.SECONDS))
+
+        Thread {
+            try {
+                assertTrue(runBlocking { presenter.dismissConversationMessages(ACCOUNT, GROUP) })
+            } catch (throwable: Throwable) {
+                dismissFailure.set(throwable)
+            } finally {
+                dismissFinished.countDown()
+            }
+        }.start()
+        assertTrue(dismissalReadStarted.await(5, TimeUnit.SECONDS))
+        while (System.currentTimeMillis() <= dismissalReadStartedAtMs.get()) Thread.yield()
+        allowRefreshWrite.countDown()
+        assertTrue(refreshFinished.await(5, TimeUnit.SECONDS))
+        allowDismissalRead.countDown()
+        assertTrue(dismissFinished.await(5, TimeUnit.SECONDS))
+        refreshFailure.get()?.let { throw it }
+        dismissFailure.get()?.let { throw it }
+
+        assertTrue(manager.activeNotifications.isEmpty())
+    }
+
     @Test
     fun conversationDismissInvalidatesPostThatHasRegisteredButNotReachedTheLock() {
         val conversation = conversationKey()
@@ -748,7 +837,15 @@ class LocalNotificationReplyRaceTest {
     ): android.app.Notification {
         val style = NotificationCompat.MessagingStyle(Person.Builder().setName("Me").build())
         lines.forEach { (text, timestampMs) ->
-            style.addMessage(text, timestampMs, Person.Builder().setName("Alice").build())
+            style.addMessage(
+                text,
+                timestampMs,
+                Person
+                    .Builder()
+                    .setName("Alice")
+                    .setKey(SENDER)
+                    .build(),
+            )
         }
         return NotificationCompat
             .Builder(context, TEST_CHANNEL)
@@ -766,7 +863,7 @@ class LocalNotificationReplyRaceTest {
     }
 
     private fun user(
-        accountIdHex: String = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        accountIdHex: String = SENDER,
         displayName: String? = null,
     ) = NotificationUserFfi(
         accountIdHex = accountIdHex,
@@ -777,6 +874,7 @@ class LocalNotificationReplyRaceTest {
     private companion object {
         const val ACCOUNT = "account-a"
         const val GROUP = "group-a"
+        const val SENDER = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
         const val TEST_CHANNEL = "reply-race-test"
     }
 }

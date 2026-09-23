@@ -236,15 +236,16 @@ internal object ConversationCardPostedRegistry {
     private val lock = Any()
     private val postedCards = linkedMapOf<PostedConversationCardKey, Long>()
 
-    /** Records an app-side write so an immediate dismissal can still find it. */
+    /** Records an app-side write at its dismissal age so an immediate cleanup can still find it. */
     fun markPosted(
         notificationTag: String,
         notificationId: Int,
+        recordedAtMs: Long = System.currentTimeMillis(),
     ) {
         val key = PostedConversationCardKey(notificationTag, notificationId)
         synchronized(lock) {
             postedCards.remove(key)
-            postedCards[key] = System.currentTimeMillis()
+            postedCards[key] = recordedAtMs
             while (postedCards.size > CAPACITY) postedCards.remove(postedCards.keys.first())
         }
     }
