@@ -148,6 +148,7 @@ private val CompactEditorBottomInset = 12.dp
 private val ComposerResizeHandleWidth = 32.dp
 private val ComposerResizeHandleThickness = 4.dp
 private val ExpandedEditorBottomInset = 44.dp
+
 // Edit keeps the separate 48 dp action row; its icons still clear the text with this tighter inset.
 private val EditEditorBottomInset = 40.dp
 
