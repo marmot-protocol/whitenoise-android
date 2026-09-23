@@ -97,7 +97,8 @@ internal class ConversationWindowPresentationTiming(
         receivedAtElapsedMs: Long,
         ticket: Long?,
     ) {
-        if (startedAtElapsedMs != null || publicationSettled || windowSettled || composerSettled) return
+        if (startedAtElapsedMs != null) return
+        if (publicationSettled || windowSettled || composerSettled) return
         startedAtElapsedMs = receivedAtElapsedMs.coerceAtLeast(0L)
         this.ticket = ticket
         if (composerObservedBeforeReceipt) settleComposer(ConversationPresentationOutcome.SUCCESS)
