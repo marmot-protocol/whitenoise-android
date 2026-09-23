@@ -3,6 +3,12 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "Amber grouped-send screen admission and merge budget",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/amber/AmberActivityCoordinator.kt",
+        "anchor": "GROUPED_SESSION_BOOTSTRAP_MS",
+        "test_ids": ["MSG-020"]
+      },
+      {
         "surface": "Send failure caused by a transient relay outage",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/SendFailureNotices.kt",
         "anchor": "R.string.toast_send_connection_failed",
