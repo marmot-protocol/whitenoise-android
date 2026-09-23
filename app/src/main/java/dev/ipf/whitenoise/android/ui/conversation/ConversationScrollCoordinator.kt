@@ -765,28 +765,27 @@ internal class ConversationScrollCoordinator(
             return true
         }
 
-        /** Animates to the final row and then its measured physical end. */
+        /**
+         * Reaches the newest row: animated when it is already within a few rows, in one snap when it
+         * is not.
+         *
+         * A far tail is the jump out of deep history, usually just after the bounded window was
+         * replaced with its newest rows. Snapping near and animating the last ten rows — what
+         * [animateScrollToItem] does for a reply target — composed and measured every row the
+         * animation passed at several rows per frame, which was the only paging journey a reader could
+         * feel (three consecutive 100 ms frames). The reader asked for the newest message, not a tour
+         * of the rows above it, so a far jump lands in a single write.
+         */
         suspend fun animateScrollToTail(
             index: Int,
             resolveIndex: () -> Int? = { index },
         ): Boolean {
             ensureCurrent()
-            var targetIndex = resolveIndex()?.coerceAtLeast(0)
-            var repositionAttempts = 0
-            while (
-                targetIndex != null &&
-                repositionAttempts < MAX_TARGET_REPOSITION_ATTEMPTS &&
-                prePositionIfFar(targetIndex)
-            ) {
-                repositionAttempts++
-                ensureCurrent()
-                targetIndex = resolveIndex()?.coerceAtLeast(0)
-            }
-            val resolvedTargetIndex = targetIndex ?: return false
-            if (isFar(resolvedTargetIndex)) {
-                writer.scrollToTail(resolvedTargetIndex)
+            val targetIndex = resolveIndex()?.coerceAtLeast(0) ?: return false
+            if (isFar(targetIndex)) {
+                writer.scrollToTail(targetIndex)
             } else {
-                writer.animateScrollToTail(resolvedTargetIndex)
+                writer.animateScrollToTail(targetIndex)
             }
             return true
         }

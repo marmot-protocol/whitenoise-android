@@ -950,8 +950,7 @@ class ConversationScrollCoordinatorTest {
                 assertTrue(jumped)
                 assertEquals(
                     listOf(
-                        ScrollWrite.Snap(78, 0),
-                        ScrollWrite.Animate(88, 0),
+                        ScrollWrite.Snap(88, 0),
                     ),
                     writer.writes,
                 )
@@ -1018,8 +1017,7 @@ class ConversationScrollCoordinatorTest {
                 listOf(
                     ScrollWrite.Snap(30, 0),
                     ScrollWrite.Animate(40, 0),
-                    ScrollWrite.Snap(78, 0),
-                    ScrollWrite.Animate(88, 0),
+                    ScrollWrite.Snap(88, 0),
                 ),
                 writer.writes,
             )
@@ -1107,8 +1105,7 @@ class ConversationScrollCoordinatorTest {
                 assertEquals(ConversationJumpToNewestOutcome.Tail, outcome)
                 assertEquals(
                     listOf(
-                        ScrollWrite.Snap(78, 0),
-                        ScrollWrite.Animate(88, 0),
+                        ScrollWrite.Snap(88, 0),
                     ),
                     writer.writes,
                 )
@@ -1139,8 +1136,7 @@ class ConversationScrollCoordinatorTest {
                 listOf(
                     ScrollWrite.Snap(30, 0),
                     ScrollWrite.Animate(40, 0),
-                    ScrollWrite.Snap(78, 0),
-                    ScrollWrite.Animate(88, 0),
+                    ScrollWrite.Snap(88, 0),
                 ),
                 writer.writes,
             )
