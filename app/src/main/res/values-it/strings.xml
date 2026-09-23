@@ -187,7 +187,7 @@
     <string name="profile_block">Blocca</string>
     <string name="profile_unblock">Sblocca</string>
     <string name="profile_mute_in_group">Silenzia in questo gruppo</string>
-    <string name="profile_unmute_in_group">Riattiva in questo gruppo</string>
+    <string name="profile_unmute_in_group">Riattiva le notifiche in questo gruppo</string>
     <string name="blocked_users">Persone bloccate</string>
     <string name="blocked_users_empty">Non hai bloccato nessuno.</string>
     <string name="blocked_users_detail">Le persone bloccate non possono scriverti direttamente. I gruppi in comune continuano a funzionare e la cronologia resta su questo dispositivo.</string>

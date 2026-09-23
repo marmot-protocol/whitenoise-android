@@ -187,7 +187,7 @@
     <string name="profile_block">Bloquer</string>
     <string name="profile_unblock">Débloquer</string>
     <string name="profile_mute_in_group">Mettre en sourdine dans ce groupe</string>
-    <string name="profile_unmute_in_group">Réactiver dans ce groupe</string>
+    <string name="profile_unmute_in_group">Réactiver les notifications dans ce groupe</string>
     <string name="blocked_users">Personnes bloquées</string>
     <string name="blocked_users_empty">Vous n’avez bloqué personne.</string>
     <string name="blocked_users_detail">Les personnes bloquées ne peuvent pas vous écrire directement. Vos groupes communs continuent de fonctionner et leur historique reste sur cet appareil.</string>
