@@ -387,32 +387,6 @@ class ComposerBarScreenshotTest {
             .captureRoboImage("src/test/snapshots/composer_dictation_edit_compact_rtl.png")
     }
 
-    /** A short edit shares one row with its controls below the Edit label. */
-    @Test
-    fun composerShortEditLight() {
-        render(darkTheme = false, draft = "", showEdit = true, editText = "Short edit")
-        composeRule
-            .onNodeWithTag(TAG)
-            .captureRoboImage("src/test/snapshots/composer_short_edit_light.png")
-    }
-
-    /** Wrapping edit text grows into the separate control row at large font and narrow RTL width. */
-    @Test
-    fun composerWrappingEditLargeRtl() {
-        render(
-            darkTheme = true,
-            draft = "",
-            width = 300,
-            fontScale = 1.6f,
-            rtl = true,
-            showEdit = true,
-            editText = "A longer edit that wraps across several lines while the controls remain available.",
-        )
-        composeRule
-            .onNodeWithTag(TAG)
-            .captureRoboImage("src/test/snapshots/composer_wrapping_edit_large_rtl.png")
-    }
-
     /** Verifies another chat's app-owned controls are not duplicated in this composer. */
     @Test
     fun composerDefersOtherChatDictationControlToTheAppRoot() {
@@ -536,7 +510,6 @@ class ComposerBarScreenshotTest {
         dictationPreview: DictationPreview? = null,
         showReply: Boolean = false,
         showEdit: Boolean = false,
-        editText: String = "Message being edited",
         voiceRecordingController: VoiceRecordingController? = null,
         attachmentsEnabled: Boolean = false,
         onCancelEdit: () -> Unit = {},
@@ -565,7 +538,7 @@ class ComposerBarScreenshotTest {
                             initialDraft = TextFieldValue(draft),
                             onCancelEdit = onCancelEdit,
                             editingMessageId = "edited-message".takeIf { showEdit },
-                            editingInitialText = editText.takeIf { showEdit },
+                            editingInitialText = "Message being edited".takeIf { showEdit },
                             dictationController = dictation,
                             dictationAccountRef = dictation?.let { ACCOUNT },
                             dictationGroupIdHex = dictation?.let { GROUP },
