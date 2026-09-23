@@ -85,17 +85,33 @@ class AmberExternalSigner(
                 SignerOp.SignEvent -> arrayOf(content, "", accountPubkey)
                 else -> arrayOf(content, counterparty.orEmpty(), accountPubkey)
             }
-        when (val row = Nip55.queryViaContentResolver(appContext, op, packageName, args)) {
-            is ContentRowOutcome.Value -> return validateSignerValue(op, row.value)
-            ContentRowOutcome.Rejected -> throw MarmotKitException.ExternalSignerRejected()
-            ContentRowOutcome.Unavailable -> Unit // fall through to the Intent prompt
-        }
+        requestViaContentResolver(op, packageName, args)?.let { return it }
 
         if (!Nip55.contentFitsIntentFallbackBudget(content)) {
             throw MarmotKitException.ExternalSignerUnavailable(accountPubkey)
         }
 
-        // 2) Intent prompt on the foreground Activity; blocks THIS worker thread.
+        return requestViaIntent(op, packageName, content, counterparty)
+    }
+
+    private fun requestViaContentResolver(
+        op: SignerOp,
+        packageName: String,
+        args: Array<String>,
+    ): String? =
+        when (val row = Nip55.queryViaContentResolver(appContext, op, packageName, args)) {
+            is ContentRowOutcome.Value -> validateSignerValue(op, row.value)
+            ContentRowOutcome.Rejected -> throw MarmotKitException.ExternalSignerRejected()
+            ContentRowOutcome.Unavailable -> null
+        }
+
+    // Intent prompt on the foreground Activity; blocks this worker thread.
+    private fun requestViaIntent(
+        op: SignerOp,
+        packageName: String,
+        content: String,
+        counterparty: String?,
+    ): String {
         val requestId = newRequestId()
         val intent =
             when (op) {

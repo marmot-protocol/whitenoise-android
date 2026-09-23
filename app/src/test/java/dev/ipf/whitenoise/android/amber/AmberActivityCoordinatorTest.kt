@@ -741,6 +741,17 @@ class AmberActivityCoordinatorTest {
         assertEquals(requestIds.size - 1, signer.onNewIntentCount)
         assertEquals(requestIds.size, signer.launched.size)
 
+        deliverGroupedResults(requestIds)
+
+        assertTrue(done.await(2, TimeUnit.SECONDS))
+        requestIds.forEach { requestId ->
+            val outcome = outcomes.getValue(requestId).get() as AmberActivityCoordinator.Outcome.Completed
+            assertTrue(outcome.resultOk)
+            assertEquals("value-$requestId", outcome.data?.getStringExtra(Nip55.EXTRA_RESULT))
+        }
+    }
+
+    private fun deliverGroupedResults(requestIds: List<String>) {
         val aggregate =
             JSONArray().apply {
                 requestIds.forEach { requestId ->
@@ -751,13 +762,6 @@ class AmberActivityCoordinatorTest {
             resultOk = true,
             data = Intent().putExtra(Nip55.EXTRA_RESULTS, aggregate.toString()),
         )
-
-        assertTrue(done.await(2, TimeUnit.SECONDS))
-        requestIds.forEach { requestId ->
-            val outcome = outcomes.getValue(requestId).get() as AmberActivityCoordinator.Outcome.Completed
-            assertTrue(outcome.resultOk)
-            assertEquals("value-$requestId", outcome.data?.getStringExtra(Nip55.EXTRA_RESULT))
-        }
     }
 
     @Test

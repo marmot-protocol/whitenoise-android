@@ -113,6 +113,22 @@ object AmberActivityCoordinator {
         var screenStartRecorded = false
     }
 
+    private sealed interface GroupedLaunchAttempt {
+        data class Succeeded(
+            val slot: GroupedPending,
+        ) : GroupedLaunchAttempt
+
+        data object Failed : GroupedLaunchAttempt
+
+        data object Stale : GroupedLaunchAttempt
+    }
+
+    private data class GroupedLaunchUpdate(
+        val launchCount: Int,
+        val screenStartKey: GroupKey?,
+        val scheduleMergeWindow: Boolean,
+    )
+
     fun attach(launcher: ActivityResultLauncher<Intent>) {
         this.launcher = launcher
     }
@@ -233,7 +249,6 @@ object AmberActivityCoordinator {
      * session. Login requests use their request id as an exclusive discriminator
      * because no trustworthy account key exists until the signer answers.
      */
-    @Suppress("ReturnCount") // Each bounded-admission failure is a distinct terminal outcome with scoped cleanup.
     private fun awaitGroupedApproval(
         intent: Intent,
         timeoutMs: Long,
@@ -265,60 +280,88 @@ object AmberActivityCoordinator {
                 return Outcome.AdmissionUnavailable
             }
         }
-        try {
-            if (!deadline.tryAcquire(groupedSlots)) {
-                AmberApprovalDiagnostics.record(
-                    operationType,
-                    AmberGroupedSessionState.ADMISSION_WAIT,
-                    launchCount = 0,
-                    AmberApprovalTerminal.UNAVAILABLE,
-                )
-                return Outcome.AdmissionUnavailable
-            }
-            try {
-                if (launcher == null) {
-                    AmberApprovalDiagnostics.record(
-                        operationType,
-                        AmberGroupedSessionState.BOOTSTRAP,
-                        launchCount = 0,
-                        AmberApprovalTerminal.UNAVAILABLE,
-                    )
-                    return Outcome.NoForegroundActivity
-                }
-                val queue = ArrayBlockingQueue<Delivery>(1)
-                val slot = GroupedPending(queue, signerPackage, intent, operationType, deadline)
-                check(groupedPending.putIfAbsent(requestId, slot) == null) { "duplicate grouped Amber request id" }
-                try {
-                    registerGroupedLaunch(key, requestId, slot)
-                    val delivered = awaitDelivery(queue, deadline)
-                    val outcome =
-                        synchronized(slot) {
-                            slot.acceptsLaunch = false
-                            if (delivered == Outcome.TimedOut && !slot.launchAttempted) {
-                                Outcome.AdmissionUnavailable
-                            } else {
-                                delivered
-                            }
-                        }
-                    AmberApprovalDiagnostics.record(
-                        operationType,
-                        groupedSessionState(slot),
-                        slot.sessionLaunchCount,
-                        outcome.toDiagnosticTerminal(),
-                    )
-                    return outcome
-                } finally {
-                    synchronized(slot) {
-                        slot.acceptsLaunch = false
-                        removeGrouped(requestId, slot)
-                    }
-                }
-            } finally {
-                groupedSlots.release()
-            }
+        return try {
+            awaitAdmittedGroupedApproval(intent, requestId, signerPackage, operationType, key, deadline)
         } finally {
             approvalGate.leaveGrouped()
         }
+    }
+
+    private fun awaitAdmittedGroupedApproval(
+        intent: Intent,
+        requestId: String,
+        signerPackage: String,
+        operationType: String?,
+        key: GroupKey,
+        deadline: Deadline,
+    ): Outcome {
+        if (!deadline.tryAcquire(groupedSlots)) {
+            recordGroupedUnavailable(operationType, AmberGroupedSessionState.ADMISSION_WAIT)
+            return Outcome.AdmissionUnavailable
+        }
+        return try {
+            awaitGroupedSlot(intent, requestId, signerPackage, operationType, key, deadline)
+        } finally {
+            groupedSlots.release()
+        }
+    }
+
+    private fun awaitGroupedSlot(
+        intent: Intent,
+        requestId: String,
+        signerPackage: String,
+        operationType: String?,
+        key: GroupKey,
+        deadline: Deadline,
+    ): Outcome {
+        if (launcher == null) {
+            recordGroupedUnavailable(operationType, AmberGroupedSessionState.BOOTSTRAP)
+            return Outcome.NoForegroundActivity
+        }
+        val queue = ArrayBlockingQueue<Delivery>(1)
+        val slot = GroupedPending(queue, signerPackage, intent, operationType, deadline)
+        check(groupedPending.putIfAbsent(requestId, slot) == null) { "duplicate grouped Amber request id" }
+        return try {
+            registerGroupedLaunch(key, requestId, slot)
+            val outcome = normalizeGroupedOutcome(slot, awaitDelivery(queue, deadline))
+            AmberApprovalDiagnostics.record(
+                operationType,
+                groupedSessionState(slot),
+                slot.sessionLaunchCount,
+                outcome.toDiagnosticTerminal(),
+            )
+            outcome
+        } finally {
+            synchronized(slot) {
+                slot.acceptsLaunch = false
+                removeGrouped(requestId, slot)
+            }
+        }
+    }
+
+    private fun normalizeGroupedOutcome(
+        slot: GroupedPending,
+        delivered: Outcome,
+    ): Outcome =
+        synchronized(slot) {
+            slot.acceptsLaunch = false
+            if (delivered == Outcome.TimedOut && !slot.launchAttempted) {
+                Outcome.AdmissionUnavailable
+            } else {
+                delivered
+            }
+        }
+
+    private fun recordGroupedUnavailable(
+        operationType: String?,
+        state: AmberGroupedSessionState,
+    ) {
+        AmberApprovalDiagnostics.record(
+            operationType,
+            state,
+            launchCount = 0,
+            AmberApprovalTerminal.UNAVAILABLE,
+        )
     }
 
     /** Launch one cold signer screen, then merge the rest only after Amber has had time to establish its task. */
@@ -375,38 +418,83 @@ object AmberActivityCoordinator {
         requestId: String,
         isBootstrap: Boolean,
     ) {
-        val slot = groupedPending[requestId] ?: return
-        val launchSucceeded: Boolean? =
-            synchronized(slot) {
-                if (
-                    !slot.acceptsLaunch ||
-                    slot.deadline.isExpired() ||
-                    slot.sessionToken != sessionToken ||
-                    groupedPending[requestId] !== slot
-                ) {
-                    return@synchronized null
-                }
-                val active = launcher ?: return@synchronized false
-                slot.launchAttempted = true
-                try {
-                    active.launch(slot.intent)
-                    true
-                } catch (_: Exception) {
-                    false
+        when (val attempt = attemptGroupedLaunch(sessionToken, requestId)) {
+            is GroupedLaunchAttempt.Succeeded ->
+                finishGroupedLaunch(sessionToken, requestId, isBootstrap, attempt.slot)
+            GroupedLaunchAttempt.Failed -> failGroupedLaunchSession(sessionToken)
+            GroupedLaunchAttempt.Stale -> Unit
+        }
+    }
+
+    private fun attemptGroupedLaunch(
+        sessionToken: Long,
+        requestId: String,
+    ): GroupedLaunchAttempt {
+        val slot = groupedPending[requestId] ?: return GroupedLaunchAttempt.Stale
+        return synchronized(slot) {
+            if (!isCurrentGroupedLaunch(slot, sessionToken, requestId)) {
+                GroupedLaunchAttempt.Stale
+            } else {
+                val active = launcher
+                if (active == null) {
+                    GroupedLaunchAttempt.Failed
+                } else {
+                    slot.launchAttempted = true
+                    try {
+                        active.launch(slot.intent)
+                        GroupedLaunchAttempt.Succeeded(slot)
+                    } catch (_: Exception) {
+                        GroupedLaunchAttempt.Failed
+                    }
                 }
             }
-        if (launchSucceeded == null) return
-        if (!launchSucceeded) {
-            failGroupedLaunchSession(sessionToken)
-            return
         }
+    }
 
-        var scheduleMergeWindow = false
-        var screenStartKey: GroupKey? = null
-        val launchCount =
-            groupedLaunchLock.withLock {
-                val session = groupedLaunchSession?.takeIf { it.token == sessionToken } ?: return
-                if (requestId !in session.activeRequestIds) return
+    private fun isCurrentGroupedLaunch(
+        slot: GroupedPending,
+        sessionToken: Long,
+        requestId: String,
+    ): Boolean {
+        if (!slot.acceptsLaunch || slot.deadline.isExpired()) return false
+        return slot.sessionToken == sessionToken && groupedPending[requestId] === slot
+    }
+
+    private fun finishGroupedLaunch(
+        sessionToken: Long,
+        requestId: String,
+        isBootstrap: Boolean,
+        slot: GroupedPending,
+    ) {
+        val update = recordGroupedLaunch(sessionToken, requestId, isBootstrap, slot) ?: return
+        update.screenStartKey?.let(approvalGate::recordGroupedScreenStart)
+        AmberApprovalDiagnostics.record(
+            slot.operationType,
+            if (isBootstrap) AmberGroupedSessionState.BOOTSTRAP else AmberGroupedSessionState.MERGE_READY,
+            update.launchCount,
+            AmberApprovalTerminal.PENDING,
+        )
+        if (update.scheduleMergeWindow) {
+            mainHandler.postDelayed(
+                { openGroupedMergeWindow(sessionToken) },
+                GROUPED_SESSION_BOOTSTRAP_MS,
+            )
+        }
+    }
+
+    private fun recordGroupedLaunch(
+        sessionToken: Long,
+        requestId: String,
+        isBootstrap: Boolean,
+        slot: GroupedPending,
+    ): GroupedLaunchUpdate? =
+        groupedLaunchLock.withLock {
+            val session = groupedLaunchSession?.takeIf { it.token == sessionToken }
+            if (session == null || requestId !in session.activeRequestIds) {
+                null
+            } else {
+                var scheduleMergeWindow = false
+                var screenStartKey: GroupKey? = null
                 session.launchCount += 1
                 slot.sessionLaunchCount = session.launchCount
                 if (isBootstrap) {
@@ -420,22 +508,9 @@ object AmberActivityCoordinator {
                         scheduleMergeWindow = true
                     }
                 }
-                session.launchCount
+                GroupedLaunchUpdate(session.launchCount, screenStartKey, scheduleMergeWindow)
             }
-        screenStartKey?.let(approvalGate::recordGroupedScreenStart)
-        AmberApprovalDiagnostics.record(
-            slot.operationType,
-            if (isBootstrap) AmberGroupedSessionState.BOOTSTRAP else AmberGroupedSessionState.MERGE_READY,
-            launchCount,
-            AmberApprovalTerminal.PENDING,
-        )
-        if (scheduleMergeWindow) {
-            mainHandler.postDelayed(
-                { openGroupedMergeWindow(sessionToken) },
-                GROUPED_SESSION_BOOTSTRAP_MS,
-            )
         }
-    }
 
     private fun openGroupedMergeWindow(sessionToken: Long) {
         val waiting =
@@ -710,15 +785,16 @@ object AmberActivityCoordinator {
             val now = System.nanoTime()
             purgeExpiredScreenStarts(now)
             val starts = groupedScreenStarts[key]
-            if (starts == null) {
-                if (groupedScreenStarts.size < MAX_TRACKED_GROUP_KEYS) return 0L
-                val windowNanos = TimeUnit.MILLISECONDS.toNanos(GROUPED_SCREEN_WINDOW_MS)
-                val oldestTrackedStart = groupedScreenStarts.values.minOf { it.first() }
-                return (oldestTrackedStart + windowNanos - now).coerceAtLeast(1L)
-            }
-            if (starts.size < MAX_GROUPED_SCREEN_STARTS) return 0L
             val windowNanos = TimeUnit.MILLISECONDS.toNanos(GROUPED_SCREEN_WINDOW_MS)
-            return (starts.first() + windowNanos - now).coerceAtLeast(1L)
+            return when {
+                starts == null && groupedScreenStarts.size < MAX_TRACKED_GROUP_KEYS -> 0L
+                starts == null -> {
+                    val oldestTrackedStart = groupedScreenStarts.values.minOf { it.first() }
+                    (oldestTrackedStart + windowNanos - now).coerceAtLeast(1L)
+                }
+                starts.size < MAX_GROUPED_SCREEN_STARTS -> 0L
+                else -> (starts.first() + windowNanos - now).coerceAtLeast(1L)
+            }
         }
 
         fun recordGroupedScreenStart(key: GroupKey) {
