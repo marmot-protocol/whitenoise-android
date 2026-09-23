@@ -5,7 +5,9 @@ import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -73,6 +75,25 @@ class LocalNotificationRemovalFormatterTest {
     @Test
     fun selfAuthoredRemovalNotificationIsSuppressed() {
         assertNull(content(update(isFromSelf = true)))
+    }
+
+    /**
+     * No removal notification may render "Someone", whatever the payload or override claims, with
+     * or without a group name. The direct title already says what happened; an invented actor only
+     * takes the truth away from it.
+     */
+    @Test
+    fun noRemovalNotificationEverRendersSomeone() {
+        listOf(
+            content(update(groupName = "Launch")),
+            content(update(groupName = null)),
+            content(update(previewText = "Someone removed you"), previewTextOverride = "Someone removed you"),
+            content(update(previewText = null), previewTextOverride = "   "),
+        ).forEach { content ->
+            assertNotNull(content)
+            assertFalse("Someone" in content?.title.orEmpty())
+            assertFalse("Someone" in content?.body.orEmpty())
+        }
     }
 
     private fun content(

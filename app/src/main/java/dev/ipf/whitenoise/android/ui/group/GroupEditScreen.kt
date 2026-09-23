@@ -40,13 +40,17 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.media.GroupImageDraftProcessor
+import dev.ipf.whitenoise.android.media.IdentityImageCropShape
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
+import dev.ipf.whitenoise.android.media.renderIdentityImageDraft
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.GroupNameEmojiField
 import dev.ipf.whitenoise.android.ui.common.IMAGE_DOCUMENT_MIME_TYPES
+import dev.ipf.whitenoise.android.ui.common.IdentityImageCropFlow
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
@@ -199,7 +203,7 @@ internal fun GroupEditScreen(
     // to Blossom first: the encrypted group image is unreadable to anyone
     // outside the group, so invite previews and QR codes can't render it.
     @Suppress("TooGenericExceptionCaught") // Preparation, upload, and FFI calls have different failure types.
-    fun uploadPublicAvatar(uri: Uri) {
+    fun uploadPublicAvatar(load: suspend () -> ImageUploadDraft) {
         val accountRef = appState.activeAccountRef ?: return
         if (imageSaving || controller.mutationInFlight) return
         imageSaving = true
@@ -207,8 +211,14 @@ internal fun GroupEditScreen(
         appState.launchMutation {
             var prepared = false
             try {
-                val draft = GroupImageDraftProcessor.fromContentUri(context.contentResolver, uri)
+                val draft = load()
                 prepared = true
+                // The picker and the crop keep this open long enough for membership, admin rights
+                // or recoverability to change underneath it, so the permission is read again here
+                // rather than trusted from when the picture was chosen.
+                if (!controller.isSelfMember || !controller.isSelfAdmin || controller.group.unrecoverable) {
+                    return@launchMutation
+                }
                 val uploaded =
                     appState.marmotIo {
                         uploadProfileImage(accountRef, draft.plaintext, draft.mediaType, null)
@@ -242,14 +252,27 @@ internal fun GroupEditScreen(
     BackHandler { onBack() }
 
     var photoMenuOpen by remember { mutableStateOf(false) }
+    var pendingCropUri by rememberSaveable { mutableStateOf<Uri?>(null) }
     val photoPicker =
         rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-            if (uri != null) uploadPublicAvatar(uri)
+            if (uri != null) pendingCropUri = uri
         }
     val filePicker =
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            if (uri != null) uploadPublicAvatar(uri)
+            if (uri != null) pendingCropUri = uri
         }
+    IdentityImageCropFlow(
+        uri = pendingCropUri,
+        shape = IdentityImageCropShape.RoundedSquare,
+        onDismiss = { pendingCropUri = null },
+        onUnreadable = { picked ->
+            uploadPublicAvatar { GroupImageDraftProcessor.fromContentUri(context.contentResolver, picked) }
+        },
+        onCropped = { bytes, crop ->
+            pendingCropUri = null
+            uploadPublicAvatar { renderIdentityImageDraft(bytes, crop, MediaQuality.Standard) }
+        },
+    )
 
     val saveLabel = stringResource(if (saving) R.string.saving_group else R.string.save_group)
     GroupEditScaffold(
@@ -389,7 +412,7 @@ internal fun GroupEditScreen(
                 // Removal clears both the public URL and any encrypted image.
                 if (picked == null) updateImage { null } else setPublicAvatarUrl(picked)
             },
-            onPickPhoto = { uri -> uploadPublicAvatar(uri) },
+            onPickPhoto = { uri -> pendingCropUri = uri },
             onPickEmoji = {
                 showImageSearch = false
                 showGroupEmojiImagePicker = true

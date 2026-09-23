@@ -41,6 +41,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.MessageDeleteCapability
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -83,6 +84,19 @@ class MessageTextSelectionTest {
 
         composeRule.onNodeWithText(string(R.string.select_text)).assertDoesNotExist()
         composeRule.onNodeWithText(string(R.string.copy)).assertIsDisplayed()
+    }
+
+    @Test
+    fun messageActionMenuOffersDeleteOnlyForCancellableOptimisticRows() {
+        val optimistic = MessageDeleteCapability(canDeleteForMe = true, canDeleteForEveryone = false)
+        val acceptedPending = MessageDeleteCapability(canDeleteForMe = false, canDeleteForEveryone = false)
+        val deleteCapability = mutableStateOf(optimistic)
+
+        renderActionMenu(canCopyText = false, canDelete = { deleteCapability.value.canDeleteAtAll })
+        composeRule.onNodeWithText(string(R.string.delete)).assertIsDisplayed()
+
+        composeRule.runOnIdle { deleteCapability.value = acceptedPending }
+        composeRule.onNodeWithText(string(R.string.delete)).assertDoesNotExist()
     }
 
     @Test
@@ -428,6 +442,7 @@ class MessageTextSelectionTest {
     private fun renderActionMenu(
         canCopyText: Boolean,
         canSelectText: Boolean = canCopyText,
+        canDelete: () -> Boolean = { false },
         onSelectText: () -> Unit = {},
     ) {
         composeRule.setContent {
@@ -438,7 +453,7 @@ class MessageTextSelectionTest {
                     anchorWindowYPx = 0f,
                     canReply = false,
                     canReact = false,
-                    canDelete = false,
+                    canDelete = canDelete(),
                     canEdit = false,
                     canForward = false,
                     canSelect = false,

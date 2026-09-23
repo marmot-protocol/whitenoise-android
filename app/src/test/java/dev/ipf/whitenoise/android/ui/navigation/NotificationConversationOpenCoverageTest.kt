@@ -175,10 +175,15 @@ class NotificationConversationOpenCoverageTest {
         val retryReady = source.indexOf("NotificationMessagePreloadState.Ready(outcome.item)", retryDirectLoad)
         val retryBranchEnd = source.indexOf("null ->", startIndex = failedPreload)
         assertTrue("the retry branch must publish its successful result", retryBranchEnd > retryReady)
+        // The retry's own block ends where the spent-retry branch begins. Holding the overlay is
+        // only right while a retry is in flight; once the exact read has answered inconclusively
+        // and its one retry is used up, the overlay comes down and the tap stays pending rather
+        // than the route claiming the conversation is gone (#2580).
+        val spentRetryBranch = source.indexOf("} else {", startIndex = activeRetry)
         val exposesChatListDuringRetry =
             source
                 .indexOf("routingNotification = false", startIndex = failedPreload)
-                .let { it in failedPreload until retryBranchEnd }
+                .let { it in failedPreload until spentRetryBranch }
         val targetFirstEligibility = source.indexOf("val canUseTargetFirst =")
         val signedInPreloadEligibility = source.indexOf("val canPreload =", startIndex = targetFirstEligibility)
         val signedOutGate = source.indexOf("if (canUseTargetFirst) {", startIndex = signedInPreloadEligibility)
@@ -198,6 +203,11 @@ class NotificationConversationOpenCoverageTest {
         assertTrue("a successful retry must publish the exact target", retryReady > retryDirectLoad)
         assertTrue("the ready preload must open the conversation", readyOpen in (readyPreload + 1) until failedPreload)
         assertTrue("the chat list must stay hidden during active retry", !exposesChatListDuringRetry)
+        assertTrue(
+            "a spent retry must release the routing overlay rather than hold it forever",
+            source.indexOf("routingNotification = false", startIndex = spentRetryBranch) in
+                spentRetryBranch until retryBranchEnd,
+        )
     }
 
     @Test

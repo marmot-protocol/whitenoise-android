@@ -3576,7 +3576,7 @@ private class AndroidConversationDictationRecognitionSession(
 
                 /** Defers a terminal platform error until caller-owned audio has closed. */
                 override fun onError(error: Int) {
-                    val mapped = error.toConversationDictationFailure(recognitionService.packageName)
+                    val mapped = error.toConversationDictationFailure()
                     deliverAfterCallerAudioCloses {
                         conversationDictationDiagnostic("event=platform_error code=$error failure=${mapped.name}")
                         listener.onError(mapped)
@@ -3759,40 +3759,35 @@ private fun Bundle?.hasRecognitionText(): Boolean =
         ?.any { it.isNotBlank() } == true
 
 /**
- * Maps unstable Android speech errors without presenting a local model failure as a network error.
- * Offline Voice Input reports ERROR_SERVER when its engine/model is unavailable; opening that
- * provider is the only useful recovery. Other providers retain Android's normal network mapping.
+ * Maps unstable Android speech errors without inventing a cause the error code does not carry.
+ *
+ * ERROR_SERVER used to join the two network codes, so a recognizer that never touches a network —
+ * one whose model is missing, unselected or unloadable — was reported as a service that couldn't
+ * connect. SpeechRecognizer has no code for "the provider has no model", and the app cannot tell an
+ * on-device provider from a hosted one, so ERROR_SERVER claims only what it proves: the provider
+ * could not produce a result. That is the provider's own to fix, and its recovery already opens it.
+ * Only ERROR_NETWORK and ERROR_NETWORK_TIMEOUT still assert a network cause.
  */
-internal fun Int.toConversationDictationFailure(providerPackage: String? = null): ConversationDictationFailure {
-    if (this == SpeechRecognizer.ERROR_SERVER && providerPackage.isOfflineVoiceInputPackage()) {
-        return ConversationDictationFailure.ProviderUnavailable
-    }
-    return when (this) {
+internal fun Int.toConversationDictationFailure(): ConversationDictationFailure =
+    when (this) {
         SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> ConversationDictationFailure.PermissionDenied
         SpeechRecognizer.ERROR_NO_MATCH,
         SpeechRecognizer.ERROR_SPEECH_TIMEOUT,
         -> ConversationDictationFailure.NoSpeech
         SpeechRecognizer.ERROR_NETWORK,
         SpeechRecognizer.ERROR_NETWORK_TIMEOUT,
-        SpeechRecognizer.ERROR_SERVER,
         -> ConversationDictationFailure.Network
         SpeechRecognizer.ERROR_SERVER_DISCONNECTED -> ConversationDictationFailure.ProviderDisconnected
         SpeechRecognizer.ERROR_AUDIO -> ConversationDictationFailure.MicrophoneInUse
         SpeechRecognizer.ERROR_RECOGNIZER_BUSY,
         SpeechRecognizer.ERROR_TOO_MANY_REQUESTS,
         -> ConversationDictationFailure.RecognizerBusy
+        SpeechRecognizer.ERROR_SERVER,
         SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED,
         SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE,
         -> ConversationDictationFailure.ProviderUnavailable
         else -> ConversationDictationFailure.Unknown
     }
-}
-
-@Suppress("MaxLineLength")
-private fun String?.isOfflineVoiceInputPackage(): Boolean = this == OFFLINE_VOICE_INPUT_PACKAGE || this == OFFLINE_VOICE_INPUT_CALLER_FIX_PACKAGE
-
-private const val OFFLINE_VOICE_INPUT_PACKAGE = "dev.notune.transcribe"
-private const val OFFLINE_VOICE_INPUT_CALLER_FIX_PACKAGE = "dev.notune.transcribe.callerfix"
 
 /** Posts a cancellable main-thread watchdog used to bound recognizer state transitions. */
 private fun scheduleConversationDictationTimeout(

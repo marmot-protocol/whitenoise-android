@@ -71,4 +71,4 @@ internal fun advanceConversationReadAnchor(
 }
 
 /** Returns whether [messageId] is the temporary UUID used before send convergence. */
-private fun isOptimisticMessageId(messageId: String): Boolean = OPTIMISTIC_TIMELINE_MESSAGE_ID.matches(messageId)
+internal fun isOptimisticMessageId(messageId: String): Boolean = OPTIMISTIC_TIMELINE_MESSAGE_ID.matches(messageId)
