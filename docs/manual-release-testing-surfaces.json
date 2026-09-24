@@ -4759,6 +4759,14 @@
         ]
       },
       {
+        "surface": "R.string.tts_bar_progress",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/TtsReadAloudHighlight.kt",
+        "anchor": "R.string.tts_bar_progress",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
+      {
         "surface": "Modifier.twoFingerSwipeDown",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/TtsTwoFingerSwipe.kt",
         "anchor": "fun Modifier.twoFingerSwipeDown(",

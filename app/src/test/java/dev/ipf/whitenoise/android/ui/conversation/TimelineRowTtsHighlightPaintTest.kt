@@ -3,11 +3,15 @@ package dev.ipf.whitenoise.android.ui.conversation
 import android.speech.tts.TextToSpeech
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -15,6 +19,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
@@ -43,8 +48,11 @@ import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudHighlightRangeKey
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleColumnTestTag
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleRowTestTag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -254,6 +262,107 @@ class TimelineRowTtsHighlightPaintTest {
             changedPixelCount(idlePixels, speakingPixels) > 0,
         )
     }
+
+    @Test
+    fun productionRowKeepsNaturalBoundsAcrossPreparingSpeakingPausedAndIdle() {
+        val record = speakableRecord(MESSAGE_A, BODY)
+        val entry =
+            runBlocking {
+                projectTtsSpeakableEntry(
+                    message = record,
+                    editedText = null,
+                    senderDisplayName = SENDER_NAME,
+                    parseMarkdown = { plainTextDocument(BODY) },
+                )!!
+            }
+        renderProductionRow(record)
+
+        val idleBefore = productionBounds(MESSAGE_A, BODY)
+        var preparing: ReadAloudBounds? = null
+        val started =
+            runBlocking {
+                appState.ttsController.speakAsync(listOf(entry), Locale.US) {
+                    composeRule.waitForIdle()
+                    assertTrue(appState.ttsController.state.value is TtsState.Preparing)
+                    preparing = productionBounds(MESSAGE_A, BODY)
+                    true
+                }
+            }
+        assertTrue(started)
+        composeRule.waitForIdle()
+        assertTrue(appState.ttsController.state.value is TtsState.Speaking)
+        val speaking = productionBounds(MESSAGE_A, BODY)
+        val progressBounds =
+            composeRule
+                .onNodeWithTag(TTS_PROGRESS_TAG, useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot
+
+        assertTrue(progressBounds.width > 0f)
+        assertTrue(progressBounds.height > 0f)
+        assertEquals(speaking.body, progressBounds)
+
+        appState.ttsController.pause()
+        composeRule.waitForIdle()
+        assertTrue(appState.ttsController.state.value is TtsState.Paused)
+        val paused = productionBounds(MESSAGE_A, BODY)
+
+        appState.ttsController.resume()
+        composeRule.waitForIdle()
+        assertTrue(appState.ttsController.state.value is TtsState.Speaking)
+        val resumed = productionBounds(MESSAGE_A, BODY)
+
+        appState.ttsController.stop()
+        composeRule.waitForIdle()
+        assertTrue(appState.ttsController.state.value is TtsState.Idle)
+        val idleAfter = productionBounds(MESSAGE_A, BODY)
+
+        assertEquals(idleBefore, checkNotNull(preparing))
+        assertEquals(idleBefore, speaking)
+        assertEquals(idleBefore, paused)
+        assertEquals(idleBefore, resumed)
+        assertEquals(idleBefore, idleAfter)
+    }
+
+    /** Renders the production timeline row inside the same bounded lazy viewport used by a conversation. */
+    private fun renderProductionRow(record: AppMessageRecordFfi) {
+        composeRule.setContent {
+            val item = timelineMessage(record)
+            WhiteNoiseTheme {
+                LazyColumn(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(320.dp)
+                        .testTag(TTS_VIEWPORT_TAG),
+                ) {
+                    item(key = item.record.messageIdHex) { row(item) }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+    }
+
+    /** Reads the real row, bubble-column, and rendered body bounds from the unmerged semantics tree. */
+    private fun productionBounds(
+        messageIdHex: String,
+        body: String,
+    ) = ReadAloudBounds(
+        row =
+            composeRule
+                .onNodeWithTag(messageBubbleRowTestTag(messageIdHex), useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot,
+        bubble =
+            composeRule
+                .onNodeWithTag(messageBubbleColumnTestTag(messageIdHex), useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot,
+        body =
+            composeRule
+                .onNodeWithText(body, useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot,
+    )
 
     /**
      * Waits for the asynchronous Markdown projection to expose its highlight
@@ -640,6 +749,12 @@ class TimelineRowTtsHighlightPaintTest {
         }
     }
 
+    private data class ReadAloudBounds(
+        val row: Rect,
+        val bubble: Rect,
+        val body: Rect,
+    )
+
     private companion object {
         const val ACCOUNT_REF = "personal"
         const val SENDER_NAME = "Alice"
@@ -652,6 +767,8 @@ class TimelineRowTtsHighlightPaintTest {
         val MESSAGE_C = "07" + "00".repeat(31)
         val MESSAGE_D = "08" + "00".repeat(31)
         const val LONG_BODY_LINES = 90
+        const val TTS_VIEWPORT_TAG = "tts-natural-height-viewport"
+        const val TTS_PROGRESS_TAG = "tts-read-aloud-progress"
         const val RICH_BODY =
             "# Release notes\n\nImportant **bright** details with `code` and [a link](https://example.com/docs).\n\n- First item.\n\n> A quoted line."
 

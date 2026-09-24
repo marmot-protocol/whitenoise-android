@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
@@ -12,7 +11,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -34,7 +32,6 @@ import dev.ipf.whitenoise.android.ui.legacyTextToSpeakableProjection
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -300,70 +297,6 @@ class MessageBubbleTtsHighlightTest {
     }
 
     @Test
-    fun readAloudProgressKeepsRowBubbleAndBodyBoundsStableAcrossPlaybackStates() {
-        var progress by mutableStateOf<TtsReadAloudProgress?>(null)
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                Box(Modifier.width(320.dp).testTag(TTS_ROW_TAG)) {
-                    Surface(Modifier.width(240.dp).testTag(TTS_BUBBLE_TAG)) {
-                        readAloudMessageSemantics(progress = progress) {
-                            Text(
-                                text = "A naturally sized message bubble.",
-                                modifier = Modifier.padding(12.dp).testTag(TTS_BODY_TAG),
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        val preparingBounds = playbackBounds()
-
-        composeRule.runOnIdle { progress = progress(sentenceIndex = 0) }
-        composeRule.waitForIdle()
-        val speakingBounds = playbackBounds()
-        val progressBounds = composeRule.onNodeWithTag(TTS_PROGRESS_TAG).fetchSemanticsNode().boundsInRoot
-        assertTrue(progressBounds.width > 0f)
-        assertTrue(progressBounds.height > 0f)
-        assertEquals(speakingBounds.bubble, progressBounds)
-
-        composeRule.runOnIdle { progress = progress(sentenceIndex = 1) }
-        composeRule.waitForIdle()
-        val pausedBounds = playbackBounds()
-
-        composeRule.runOnIdle { progress = null }
-        composeRule.waitForIdle()
-        val idleBounds = playbackBounds()
-
-        assertEquals(preparingBounds, speakingBounds)
-        assertEquals(preparingBounds, pausedBounds)
-        assertEquals(preparingBounds, idleBounds)
-    }
-
-    private fun playbackBounds() =
-        PlaybackBounds(
-            row = bounds(TTS_ROW_TAG),
-            bubble = bounds(TTS_BUBBLE_TAG),
-            body = bounds(TTS_BODY_TAG),
-        )
-
-    private fun bounds(tag: String): Rect = composeRule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
-
-    private fun progress(sentenceIndex: Int) =
-        TtsReadAloudProgress(
-            sentenceIndex = sentenceIndex,
-            sentenceCount = 3,
-            messageIndex = 0,
-            messageCount = 2,
-        )
-
-    private data class PlaybackBounds(
-        val row: Rect,
-        val bubble: Rect,
-        val body: Rect,
-    )
-
-    @Test
     fun staleMessageIdDoesNotResolveHighlight() {
         val projection = legacyTextToSpeakableProjection("Hello world.")
         val passage =
@@ -381,13 +314,6 @@ class MessageBubbleTtsHighlightTest {
                 prepared = preparedHighlightSpeech(projection),
             )
         assertNull(resolver?.invoke("plain", "Hello world."))
-    }
-
-    private companion object {
-        const val TTS_ROW_TAG = "tts-natural-height-row"
-        const val TTS_BUBBLE_TAG = "tts-natural-height-bubble"
-        const val TTS_BODY_TAG = "tts-natural-height-body"
-        const val TTS_PROGRESS_TAG = "tts-read-aloud-progress"
     }
 }
 
