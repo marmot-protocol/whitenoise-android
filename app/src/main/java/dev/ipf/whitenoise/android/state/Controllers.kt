@@ -6269,6 +6269,7 @@ class ConversationController(
      */
     private val optimisticEdits = mutableStateMapOf<String, OptimisticEdit>()
     private val pendingMessageEditHandoff: PendingMessageEditHandoff get() = appState.pendingMessageEditHandoff
+
     private fun pendingEditKey(token: String): String = "${conversationAccountRef.orEmpty()}|${group.groupIdHex}|$token"
 
     /** Set when the user has tapped Edit on a kind-9 they sent — the composer
@@ -6285,10 +6286,9 @@ class ConversationController(
     fun cancelMessageEdit() {
         val readyEdit = editingMessageId?.let { pendingMessageEditHandoff.cancel(pendingEditKey(it)) }
         editingMessageId = null
-        readyEdit?.let { edit ->
-            appState.launchMutation { editMessage(edit.targetId, edit.text) }
-        }
+        readyEdit?.let { edit -> appState.launchMutation { editMessage(edit.targetId, edit.text) } }
     }
+
     // Production controllers start their local subscription during
     // construction. Reflect that synchronously so the first composition cannot
     // mistake the not-yet-started coroutine for an authoritative empty chat.
