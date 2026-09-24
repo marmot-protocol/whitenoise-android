@@ -106,7 +106,10 @@ class AppReviewDemoTest {
             demo.start()
             advanceUntilIdle()
 
-            assertEquals(ReviewDemoStatus.Failed(ReviewDemoStage.SendingDemo, ReviewDemoProblem.ReactionUncertain), demo.status)
+            assertEquals(
+                ReviewDemoStatus.Failed(ReviewDemoStage.SendingDemo, ReviewDemoProblem.ReactionUncertain),
+                demo.status,
+            )
             assertEquals(0, backend.reactionCreates)
             assertEquals(original.ref, backend.activeAccountRef)
         }
@@ -121,7 +124,10 @@ class AppReviewDemoTest {
             demo.start()
             advanceUntilIdle()
 
-            assertEquals(ReviewDemoStatus.Failed(ReviewDemoStage.Preparing, ReviewDemoProblem.OriginalMissing), demo.status)
+            assertEquals(
+                ReviewDemoStatus.Failed(ReviewDemoStage.Preparing, ReviewDemoProblem.OriginalMissing),
+                demo.status,
+            )
             assertEquals(0, backend.accountCreates)
             assertEquals(0, backend.groupCreates)
             assertEquals(original.ref, backend.activeAccountRef)
@@ -136,7 +142,10 @@ class AppReviewDemoTest {
             demo.start()
             advanceUntilIdle()
 
-            assertEquals(ReviewDemoStatus.Failed(ReviewDemoStage.AcceptingInvitation, ReviewDemoProblem.DeliveryTimedOut), demo.status)
+            assertEquals(
+                ReviewDemoStatus.Failed(ReviewDemoStage.AcceptingInvitation, ReviewDemoProblem.DeliveryTimedOut),
+                demo.status,
+            )
             assertEquals(original.ref, backend.activeAccountRef)
             assertEquals(2, backend.messages.size)
         }
@@ -150,7 +159,10 @@ class AppReviewDemoTest {
             demo.start()
             advanceUntilIdle()
 
-            assertEquals(ReviewDemoStatus.Failed(ReviewDemoStage.AcceptingInvitation, ReviewDemoProblem.DeliveryTimedOut), demo.status)
+            assertEquals(
+                ReviewDemoStatus.Failed(ReviewDemoStage.AcceptingInvitation, ReviewDemoProblem.DeliveryTimedOut),
+                demo.status,
+            )
             assertEquals(original.ref, backend.activeAccountRef)
             assertEquals(2, backend.messages.size)
         }
@@ -177,7 +189,10 @@ class AppReviewDemoTest {
 
             demo.start()
             advanceUntilIdle()
-            assertEquals(ReviewDemoStatus.Failed(ReviewDemoStage.PublishingProfile, ReviewDemoProblem.OperationFailed), demo.status)
+            assertEquals(
+                ReviewDemoStatus.Failed(ReviewDemoStage.PublishingProfile, ReviewDemoProblem.OperationFailed),
+                demo.status,
+            )
             assertEquals(1, backend.profilePublishes)
 
             demo.start()
@@ -214,7 +229,10 @@ class AppReviewDemoTest {
             demo.start()
             advanceUntilIdle()
 
-            assertEquals(ReviewDemoStatus.Failed(ReviewDemoStage.CreatingAccount, ReviewDemoProblem.OwnerChanged), demo.status)
+            assertEquals(
+                ReviewDemoStatus.Failed(ReviewDemoStage.CreatingAccount, ReviewDemoProblem.OwnerChanged),
+                demo.status,
+            )
             assertEquals(0, backend.groupCreates)
             assertEquals("other", backend.activeAccountRef)
         }
@@ -229,7 +247,10 @@ class AppReviewDemoTest {
             demo.start()
             advanceUntilIdle()
 
-            assertEquals(ReviewDemoStatus.Failed(ReviewDemoStage.Preparing, ReviewDemoProblem.OwnerChanged), demo.status)
+            assertEquals(
+                ReviewDemoStatus.Failed(ReviewDemoStage.Preparing, ReviewDemoProblem.OwnerChanged),
+                demo.status,
+            )
             assertEquals("other", backend.activeAccountRef)
             assertEquals(0, backend.groupCreates)
         }
@@ -246,7 +267,10 @@ class AppReviewDemoTest {
             demo.cancel()
             advanceUntilIdle()
 
-            assertEquals(ReviewDemoStatus.Failed(ReviewDemoStage.CreatingAccount, ReviewDemoProblem.Interrupted), demo.status)
+            assertEquals(
+                ReviewDemoStatus.Failed(ReviewDemoStage.CreatingAccount, ReviewDemoProblem.Interrupted),
+                demo.status,
+            )
             assertTrue(store.hasRecord)
             assertEquals(original.ref, backend.activeAccountRef)
             assertEquals(1, backend.accountCreates)
@@ -261,7 +285,10 @@ class AppReviewDemoTest {
             demo.start()
             advanceUntilIdle()
 
-            assertEquals(ReviewDemoStatus.Failed(ReviewDemoStage.AcceptingInvitation, ReviewDemoProblem.OperationFailed), demo.status)
+            assertEquals(
+                ReviewDemoStatus.Failed(ReviewDemoStage.AcceptingInvitation, ReviewDemoProblem.OperationFailed),
+                demo.status,
+            )
             assertEquals(original.ref, backend.activeAccountRef)
         }
 
@@ -296,7 +323,8 @@ class AppReviewDemoTest {
         first.save(saved)
 
         assertEquals(saved, SecureReviewDemoStore(secureStore()).load())
-        val raw = context.getSharedPreferences("review-demo-test-secure", Context.MODE_PRIVATE).all.values.joinToString()
+        val raw =
+            context.getSharedPreferences("review-demo-test-secure", Context.MODE_PRIVATE).all.values.joinToString()
         assertFalse(raw.contains(saved.originalId))
         assertFalse(raw.contains(saved.demoId!!))
         context.getSharedPreferences("review-demo-test-secure", Context.MODE_PRIVATE)
@@ -482,7 +510,8 @@ class AppReviewDemoTest {
 
         override suspend fun catchUp() {
             if (crossDeliveryEnabled && inviteAccepts > 0) {
-                deliveredMessageIds += messages.filterNot { it.token?.endsWith(":$blockedDeliveryStep") == true }.map { it.id }
+                deliveredMessageIds +=
+                    messages.filterNot { it.token?.endsWith(":$blockedDeliveryStep") == true }.map { it.id }
             }
         }
 

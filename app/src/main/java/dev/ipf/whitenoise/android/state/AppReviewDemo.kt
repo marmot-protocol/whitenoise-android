@@ -58,6 +58,7 @@ internal class SecureReviewDemoStore(
                 true
             }
 
+    @Suppress("CyclomaticComplexMethod", "ThrowsCount") // Validate every field before resuming real side effects.
     override fun load(): ReviewDemoCheckpoint? {
         val encrypted =
             try {
@@ -96,7 +97,10 @@ internal class SecureReviewDemoStore(
                     require(checkpoint.originalRef in initialRefs && initialRefs.none(String::isBlank))
                     require((checkpoint.demoRef == null) == (checkpoint.demoId == null))
                     require(checkpoint.demoId == null || checkpoint.demoId.isHexId())
-                    require(checkpoint.demoId == null || !checkpoint.demoId.equals(checkpoint.originalId, ignoreCase = true))
+                    require(
+                        checkpoint.demoId == null ||
+                            !checkpoint.demoId.equals(checkpoint.originalId, ignoreCase = true),
+                    )
                     require(checkpoint.demoRef == null || checkpoint.demoRef !in initialRefs)
                     require(checkpoint.groupId == null || checkpoint.groupId.isHexGroupId())
                     require(!checkpoint.profilePublished || checkpoint.demoRef != null)
@@ -129,12 +133,16 @@ internal class SecureReviewDemoStore(
         checkpoint.demoId?.let { json.put("demoId", it) }
         checkpoint.groupId?.let { json.put("groupId", it) }
         check(secureStore.replaceAllDurably(mapOf(KEY to json.toString()))) { "demo receipt could not be saved" }
-        check(legacyPreferences?.edit()?.remove(LEGACY_KEY)?.commit() != false) { "old demo receipt could not be cleared" }
+        check(legacyPreferences?.edit()?.remove(LEGACY_KEY)?.commit() != false) {
+            "old demo receipt could not be cleared"
+        }
     }
 
     override fun clear() {
         check(secureStore.clearDurably()) { "demo receipt could not be cleared" }
-        check(legacyPreferences?.edit()?.remove(LEGACY_KEY)?.commit() != false) { "old demo receipt could not be cleared" }
+        check(legacyPreferences?.edit()?.remove(LEGACY_KEY)?.commit() != false) {
+            "old demo receipt could not be cleared"
+        }
     }
 
     private companion object {
@@ -173,6 +181,7 @@ internal data class ReviewDemoMessage(
 )
 
 /** The narrow native boundary keeps coordinator retry and ownership rules testable. */
+@Suppress("TooManyFunctions") // One narrow boundary for the demo's native operations.
 internal interface ReviewDemoBackend {
     val activeAccountRef: String?
     val runtimeGeneration: Int
@@ -290,8 +299,13 @@ internal class ReviewDemoFailure(
 
 private const val JOHNNY_LIKE = "johnny_like"
 private const val ORIGINAL_HEART = "original_heart"
+private const val DELIVERY_ATTEMPTS = 60
+private const val DELIVERY_POLL_MS = 1_000L
+private const val REACTION_RECHECK_ATTEMPTS = 20
+private const val REACTION_RECHECK_MS = 500L
 
 /** Process-owned setup; resumed calls inspect MDK before every native mutation. */
+@Suppress("TooManyFunctions") // The coordinator keeps each recovery stage explicit and testable.
 internal class AppReviewDemo(
     private val backend: ReviewDemoBackend,
     private val store: ReviewDemoStore,
@@ -335,13 +349,15 @@ internal class AppReviewDemo(
 
     private fun initialStatus(): ReviewDemoStatus =
         try {
-            store.load()?.takeIf { it.completed }?.let { ReviewDemoStatus.Ready(it.originalRef, requireNotNull(it.groupId)) }
+            store.load()?.takeIf { it.completed }?.let {
+                ReviewDemoStatus.Ready(it.originalRef, requireNotNull(it.groupId))
+            }
                 ?: ReviewDemoStatus.Idle
         } catch (failure: ReviewDemoFailure) {
             ReviewDemoStatus.Failed(ReviewDemoStage.Preparing, failure.problem)
         }
 
-    @Suppress("TooGenericExceptionCaught")
+    @Suppress("TooGenericExceptionCaught", "CyclomaticComplexMethod", "LongMethod", "ThrowsCount")
     private suspend fun run(onReady: (String, String) -> Unit) {
         var stage = ReviewDemoStage.Preparing
         var expectedActive = backend.activeAccountRef
@@ -364,7 +380,9 @@ internal class AppReviewDemo(
                         backend.activate(ref, ::owned)
                     } catch (failure: Exception) {
                         // Account activation can publish the selection before its post-activation refresh fails.
-                        if (backend.runtimeGeneration == generation && backend.activeAccountRef == ref) expectedActive = ref
+                        if (backend.runtimeGeneration == generation && backend.activeAccountRef == ref) {
+                            expectedActive = ref
+                        }
                         throw failure
                     }
                 if (!activated) throw ReviewDemoFailure(ReviewDemoProblem.OwnerChanged)
@@ -449,8 +467,12 @@ internal class AppReviewDemo(
 
             stage = ReviewDemoStage.SendingOriginal
             status = ReviewDemoStatus.Running(stage)
-            val greeting = ensureMessage(checkpoint, original, groupId, "original_greeting", ORIGINAL_GREETING, null, ::requireOwned)
-            val privacy = ensureMessage(checkpoint, original, groupId, "original_privacy", ORIGINAL_PRIVACY, null, ::requireOwned)
+            val greeting =
+                ensureMessage(
+                    checkpoint, original, groupId, "original_greeting", ORIGINAL_GREETING, null, ::requireOwned,
+                )
+            val privacy =
+                ensureMessage(checkpoint, original, groupId, "original_privacy", ORIGINAL_PRIVACY, null, ::requireOwned)
 
             stage = ReviewDemoStage.AcceptingInvitation
             status = ReviewDemoStatus.Running(stage)
@@ -485,7 +507,8 @@ internal class AppReviewDemo(
                     feature.id,
                     ::requireOwned,
                 )
-            checkpoint = ensureReaction(checkpoint, ORIGINAL_HEART, original, groupId, reply.id, "❤️", ::requireOwned)
+            checkpoint =
+                ensureReaction(checkpoint, ORIGINAL_HEART, original, groupId, reply.id, "❤️", ::requireOwned)
             waitForMessage(demo.ref, groupId, finalReply.id, original.id, ::requireOwned)
             waitForReaction(demo.ref, groupId, reply.id, original.id, "❤️", ::requireOwned)
 
@@ -504,12 +527,10 @@ internal class AppReviewDemo(
             status = ReviewDemoStatus.Failed(stage, ReviewDemoProblem.OperationFailed)
         } finally {
             val restore = originalRef
-            if (restoreAllowed &&
-                restore != null &&
-                backend.activeAccountRef != restore &&
-                backend.activeAccountRef == expectedActive &&
-                backend.runtimeGeneration == generation
-            ) {
+            val originalStillOwned =
+                backend.activeAccountRef == expectedActive && backend.runtimeGeneration == generation
+            val needsRestore = restoreAllowed && backend.activeAccountRef != restore
+            if (originalStillOwned && needsRestore && restore != null) {
                 withContext(NonCancellable) {
                     runCatching { backend.activate(restore, ::owned) }
                 }
@@ -517,13 +538,16 @@ internal class AppReviewDemo(
         }
     }
 
+    @Suppress("CyclomaticComplexMethod", "ReturnCount", "ThrowsCount", "TooGenericExceptionCaught")
     private suspend fun ensureDemoAccount(
         checkpoint: ReviewDemoCheckpoint,
         requireOwned: () -> Unit,
     ): ReviewDemoAccount {
         val current = backend.accounts()
         checkpoint.demoRef?.let { ref ->
-            return current.firstOrNull { it.ref == ref && it.id == checkpoint.demoId && it.localSigning && !it.signedOut }
+            return current.firstOrNull {
+                it.ref == ref && it.id == checkpoint.demoId && it.localSigning && !it.signedOut
+            }
                 ?: throw ReviewDemoFailure(ReviewDemoProblem.DemoMissing)
         }
         val candidates = current.filter { it.ref !in checkpoint.initialAccountRefs && it.localSigning && !it.signedOut }
@@ -535,7 +559,10 @@ internal class AppReviewDemo(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Exception) {
-            val after = backend.accounts().filter { it.ref !in checkpoint.initialAccountRefs && it.localSigning && !it.signedOut }
+            val after =
+                backend.accounts().filter {
+                    it.ref !in checkpoint.initialAccountRefs && it.localSigning && !it.signedOut
+                }
             if (after.size == 1) after.single() else throw failure
         }
     }
@@ -544,10 +571,10 @@ internal class AppReviewDemo(
         ref: String,
         requireOwned: () -> Unit,
     ) {
-        repeat(60) {
+        repeat(DELIVERY_ATTEMPTS) {
             requireOwned()
             if (backend.accountNetworkReady(ref)) return
-            delay(1_000)
+            delay(DELIVERY_POLL_MS)
         }
         throw ReviewDemoFailure(ReviewDemoProblem.AccountSetupTimedOut)
     }
@@ -557,11 +584,11 @@ internal class AppReviewDemo(
         groupId: String,
         requireOwned: () -> Unit,
     ) {
-        repeat(60) {
+        repeat(DELIVERY_ATTEMPTS) {
             requireOwned()
             backend.catchUp()
             if (backend.invitation(ref, groupId) != null) return
-            delay(1_000)
+            delay(DELIVERY_POLL_MS)
         }
         throw ReviewDemoFailure(ReviewDemoProblem.DeliveryTimedOut)
     }
@@ -586,7 +613,7 @@ internal class AppReviewDemo(
             }?.let { return it }
         requireOwned()
         backend.submitMessage(sender.ref, groupId, text, replyTo, token)
-        repeat(60) {
+        repeat(DELIVERY_ATTEMPTS) {
             requireOwned()
             backend.catchUp()
             backend
@@ -597,7 +624,7 @@ internal class AppReviewDemo(
                         it.text == text &&
                         it.replyTo.equals(replyTo, ignoreCase = true)
                 }?.let { return it }
-            delay(1_000)
+            delay(DELIVERY_POLL_MS)
         }
         throw ReviewDemoFailure(ReviewDemoProblem.DeliveryTimedOut)
     }
@@ -609,7 +636,7 @@ internal class AppReviewDemo(
         senderId: String,
         requireOwned: () -> Unit,
     ) {
-        repeat(60) {
+        repeat(DELIVERY_ATTEMPTS) {
             requireOwned()
             backend.catchUp()
             if (backend.timeline(ref, groupId).any {
@@ -618,11 +645,12 @@ internal class AppReviewDemo(
             ) {
                 return
             }
-            delay(1_000)
+            delay(DELIVERY_POLL_MS)
         }
         throw ReviewDemoFailure(ReviewDemoProblem.DeliveryTimedOut)
     }
 
+    @Suppress("ReturnCount") // Early exits prevent replaying an unkeyed reaction.
     private suspend fun ensureReaction(
         checkpoint: ReviewDemoCheckpoint,
         step: String,
@@ -636,11 +664,11 @@ internal class AppReviewDemo(
         if (step in checkpoint.reactionAttempts) {
             // A dropped native reply may already have published. Never replay
             // an unkeyed reaction while its outcome is still uncertain.
-            repeat(20) {
+            repeat(REACTION_RECHECK_ATTEMPTS) {
                 requireOwned()
                 backend.catchUp()
                 if (hasReaction(sender.ref, groupId, targetId, sender.id, emoji)) return checkpoint
-                delay(500)
+                delay(REACTION_RECHECK_MS)
             }
             throw ReviewDemoFailure(ReviewDemoProblem.ReactionUncertain)
         }
@@ -660,11 +688,11 @@ internal class AppReviewDemo(
         emoji: String,
         requireOwned: () -> Unit,
     ) {
-        repeat(60) {
+        repeat(DELIVERY_ATTEMPTS) {
             requireOwned()
             backend.catchUp()
             if (hasReaction(ref, groupId, targetId, senderId, emoji)) return
-            delay(1_000)
+            delay(DELIVERY_POLL_MS)
         }
         throw ReviewDemoFailure(ReviewDemoProblem.DeliveryTimedOut)
     }

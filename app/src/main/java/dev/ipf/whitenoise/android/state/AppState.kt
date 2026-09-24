@@ -11269,26 +11269,6 @@ class WhiteNoiseAppState private constructor(
         private const val DEFAULT_NOTIFICATIONS_ENABLE_ATTEMPTED_KEY = "default_notifications_enable_attempted"
         private const val DISAPPEARING_TOOLTIP_SHOWN_KEY = "disappearing_tooltip_shown"
 
-        // 24 MiB cap on decrypted attachment bytes resident in memory —
-        // roughly ten 1920px JPEGs. Persists across conversation re-entry.
-        private const val MEDIA_PLAINTEXT_CACHE_MAX_BYTES: Long = 24L * 1024L * 1024L
-
-        // Admit ordinary photos while keeping large documents on the file-lease path.
-        private const val MEDIA_PLAINTEXT_CACHE_MAX_ENTRY_BYTES: Long = 8L * 1024L * 1024L
-
-        // ~48 MiB of decoded thumbnails (sampled to <=1280px). Enough to keep
-        // visible bubbles spinner-free; bounded so it can't grow unbounded.
-        private const val MEDIA_THUMBNAIL_CACHE_MAX_BYTES: Long = 48L * 1024L * 1024L
-
-        // ~256 MiB of persistent decrypted media on disk. Big enough to keep
-        // typical chat history through OS cache reaps; OS may still trim
-        // earlier if device-wide cache pressure hits.
-        private const val DISK_MEDIA_CACHE_MAX_BYTES: Long = 256L * 1024L * 1024L
-
-        // Match MDK's current encrypted receive ceiling. L1 remains capped at
-        // 24 MiB so large documents are durable without being retained on the
-        // JVM heap after the active open/download operation finishes.
-        private const val DISK_MEDIA_CACHE_MAX_ENTRY_BYTES: Long = 64L * 1024L * 1024L
         private const val PROFILE_REFRESH_RETRY_COOLDOWN_MILLIS = 60_000L
         private const val PROFILE_PRESENTATION_WARM_FANOUT = 6
         private const val PROFILE_REFRESH_FANOUT = 6

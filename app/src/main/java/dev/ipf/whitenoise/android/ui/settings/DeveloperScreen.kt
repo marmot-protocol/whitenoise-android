@@ -110,7 +110,7 @@ internal fun DeveloperScreen(
  * The list itself. Debugging appears only while developer mode is on; Key Packages never depends on it.
  * [onSeedConversationFixture] is null outside debuggable builds, and its row is then absent.
  */
-@Suppress("FunctionNaming", "LongParameterList", "LongMethod")
+@Suppress("FunctionNaming", "LongParameterList", "LongMethod", "CyclomaticComplexMethod")
 @Composable
 internal fun DeveloperContent(
     developerMode: Boolean,
@@ -131,6 +131,13 @@ internal fun DeveloperContent(
 ) {
     var confirmStart by remember { mutableStateOf(false) }
     var confirmClear by remember { mutableStateOf(false) }
+    val demoActionText = if (demoHasSavedSetup) R.string.review_demo_resume else R.string.review_demo_create
+    val demoConfirmTitle =
+        if (demoHasSavedSetup) R.string.review_demo_resume_confirm_title else R.string.review_demo_confirm_title
+    val demoConfirmBody =
+        if (demoHasSavedSetup) R.string.review_demo_resume_confirm_body else R.string.review_demo_confirm_body
+    val demoConfirmAction =
+        if (demoHasSavedSetup) R.string.review_demo_resume_confirm_action else R.string.review_demo_confirm_action
     SettingsScaffold(title = stringResource(R.string.settings_developer_tools), onBack = onBack) {
         SettingsList {
             item {
@@ -164,14 +171,7 @@ internal fun DeveloperContent(
                             title =
                                 when (demoStatus) {
                                     is ReviewDemoStatus.Ready -> stringResource(R.string.review_demo_open)
-                                    is ReviewDemoStatus.Failed ->
-                                        stringResource(
-                                            if (demoHasSavedSetup) R.string.review_demo_resume else R.string.review_demo_create,
-                                        )
-                                    else ->
-                                        stringResource(
-                                            if (demoHasSavedSetup) R.string.review_demo_resume else R.string.review_demo_create,
-                                        )
+                                    else -> stringResource(demoActionText)
                                 },
                             subtitle =
                                 when (demoStatus) {
@@ -296,16 +296,12 @@ internal fun DeveloperContent(
             onDismissRequest = { confirmStart = false },
             title = {
                 Text(
-                    stringResource(
-                        if (demoHasSavedSetup) R.string.review_demo_resume_confirm_title else R.string.review_demo_confirm_title,
-                    ),
+                    stringResource(demoConfirmTitle),
                 )
             },
             text = {
                 Text(
-                    stringResource(
-                        if (demoHasSavedSetup) R.string.review_demo_resume_confirm_body else R.string.review_demo_confirm_body,
-                    ),
+                    stringResource(demoConfirmBody),
                 )
             },
             confirmButton = {
@@ -317,9 +313,7 @@ internal fun DeveloperContent(
                     modifier = Modifier.testTag("developer.demo.confirm"),
                 ) {
                     Text(
-                        stringResource(
-                            if (demoHasSavedSetup) R.string.review_demo_resume_confirm_action else R.string.review_demo_confirm_action,
-                        ),
+                        stringResource(demoConfirmAction),
                     )
                 }
             },

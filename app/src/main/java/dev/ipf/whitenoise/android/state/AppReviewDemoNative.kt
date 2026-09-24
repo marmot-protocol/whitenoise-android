@@ -8,6 +8,7 @@ import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 
 /** Android's narrow adapter to the same MDK operations used by normal sign-up and conversations. */
+@Suppress("TooManyFunctions") // Each method maps one coordinator operation to an existing MDK call.
 internal class AppReviewDemoNative(
     private val appState: WhiteNoiseAppState,
 ) : ReviewDemoBackend {
@@ -25,9 +26,11 @@ internal class AppReviewDemoNative(
                 !appState.signOutInProgress &&
                 !appState.wipeInProgress
 
-    override suspend fun accounts(): List<ReviewDemoAccount> = appState.marmotIo { listAccounts() }.map { it.forReviewDemo() }
+    override suspend fun accounts(): List<ReviewDemoAccount> =
+        appState.marmotIo { listAccounts() }.map { it.forReviewDemo() }
 
-    override suspend fun createAccount(): ReviewDemoAccount = appState.marmotIo { createIdentityWithBootstrapRelays() }.forReviewDemo()
+    override suspend fun createAccount(): ReviewDemoAccount =
+        appState.marmotIo { createIdentityWithBootstrapRelays() }.forReviewDemo()
 
     override suspend fun qualifyAccount(ref: String) {
         appState.marmotIo { enforceAppOwnedAttachmentAcquisitionPolicy(listOf(ref)) }
@@ -129,7 +132,7 @@ internal class AppReviewDemoNative(
                         beforeMessageId = null,
                         after = null,
                         afterMessageId = null,
-                        limit = 100u,
+                        limit = DEMO_TIMELINE_LIMIT,
                     ),
                 ).messages
             }.asSequence()
@@ -184,6 +187,7 @@ internal class AppReviewDemoNative(
     private fun AccountSummaryFfi.forReviewDemo() = ReviewDemoAccount(label, accountIdHex, localSigning, signedOut)
 
     private companion object {
+        const val DEMO_TIMELINE_LIMIT = 100u
         const val DEMO_NAME = "Johnny Appleseed"
         const val DEMO_ABOUT = "App Review demo profile"
     }

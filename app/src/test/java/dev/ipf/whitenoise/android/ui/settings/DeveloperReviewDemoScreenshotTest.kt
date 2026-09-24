@@ -42,7 +42,10 @@ class DeveloperReviewDemoScreenshotTest {
 
     @Test
     fun recoverableFailure() {
-        render(ReviewDemoStatus.Failed(ReviewDemoStage.VerifyingDelivery, ReviewDemoProblem.DeliveryTimedOut), hasSaved = true)
+        render(
+            ReviewDemoStatus.Failed(ReviewDemoStage.VerifyingDelivery, ReviewDemoProblem.DeliveryTimedOut),
+            hasSaved = true,
+        )
         composeRule.onRoot().captureRoboImage("src/test/snapshots/developer_review_demo_failure.png")
     }
 
