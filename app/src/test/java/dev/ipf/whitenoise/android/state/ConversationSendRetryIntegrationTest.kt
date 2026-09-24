@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.state
 
-import android.os.Looper
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -33,14 +32,18 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
@@ -51,7 +54,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 
 /** Integration boundary for optimistic send state plus the shared relay retry policy (#2016). */
@@ -60,8 +62,10 @@ import org.robolectric.annotation.Config
 @Suppress("LargeClass") // Send, retry, projection, preview, and durable-draft scenarios share one controller fixture.
 class ConversationSendRetryIntegrationTest {
     @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun cancellingReopenedEditorDispatchesTheSubmittedRevisionAfterOriginalConfirms() =
-        runBlocking {
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
             val releaseOriginal = CompletableDeferred<Unit>()
             val publishedEdit = CompletableDeferred<Pair<String, String>>()
             var editCalls = 0
@@ -83,7 +87,8 @@ class ConversationSendRetryIntegrationTest {
 
             try {
                 val original = async(start = CoroutineStart.UNDISPATCHED) { controller.send("original") }
-                val clientToken = controller.timeline.single().record.messageIdHex
+                val optimisticMessage = controller.timeline.single()
+                val clientToken = optimisticMessage.record.messageIdHex
                 controller.beginMessageEdit(clientToken)
                 controller.send("revision A")
                 controller.beginMessageEdit(clientToken)
@@ -94,8 +99,8 @@ class ConversationSendRetryIntegrationTest {
                 assertTrue(appState.pendingMessageEditHandoff.hasSession(handoffKey))
                 controller.cancelMessageEdit()
                 assertFalse(appState.pendingMessageEditHandoff.hasSession(handoffKey))
-                val mainLooper = Looper.getMainLooper()
-                Shadows.shadowOf(mainLooper).idle()
+                assertTrue(controller.canSendMessages)
+                runCurrent()
 
                 assertEquals(
                     CONFIRMED_MESSAGE_ID to "revision A",
@@ -106,6 +111,7 @@ class ConversationSendRetryIntegrationTest {
             } finally {
                 releaseOriginal.complete(Unit)
                 controller.onCleared()
+                Dispatchers.resetMain()
             }
         }
 
