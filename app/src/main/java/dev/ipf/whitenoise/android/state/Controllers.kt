@@ -4197,7 +4197,6 @@ class ChatsController private constructor(
             windows.close()
             return false
         }
-        chatsDebug { "chat list window replacement account=${accountRef.take(8)} rows=${windows.rows.size}" }
         replacePresentedChatRows(windows.rows)
         scheduleRecompute()
         return true
