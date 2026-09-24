@@ -79,13 +79,18 @@ internal fun ConversationUnreadBadge.reconcile(
     val counted = source != Source.NONE && source != Source.UNKNOWN
     val afterAnchor by lazy { countUnreadIncoming(timeline, readAnchorMessageId) }
     val projection = projectionUnread?.coerceAtLeast(0)
-    // A lower bound may not fall below the unread rows still loaded after the anchor.
-    val floor = if (partial && anchorLoaded) afterAnchor else 0
+    // A lower bound may not fall below the unread rows still loaded after the anchor — with nothing
+    // read yet, every loaded received row.
+    val floor = if (partial && (anchorLoaded || readAnchorMessageId == null)) afterAnchor else 0
     return when {
+        // Nothing read yet: every message is unread, loaded or not. The loaded rows are a sure lower
+        // bound and the projection covers the history not loaded, so the higher of the two stands.
+        readAnchorMessageId == null && projection != null ->
+            counted(null, maxOf(projection, afterAnchor, count), projectionUnread, Source.PROJECTION)
         // The rows after the anchor are the unread set. The projection can lag them (it moves a
         // mark-read round trip behind), so the baseline for later arrivals is whichever is higher,
         // or a projection merely catching up would be added again as arrivals.
-        windowReachesTail && (anchorLoaded || readAnchorMessageId == null) ->
+        anchorLoaded && windowReachesTail ->
             counted(readAnchorMessageId, afterAnchor, projection?.let { maxOf(it, afterAnchor) }, Source.LOADED)
         // The reader read past unread rows inside a window that stops short of the tail: the rows
         // between the two anchors are what they read, and nothing else about the set is known.
@@ -115,15 +120,15 @@ internal fun ConversationUnreadBadge.reconcile(
         sameAnchor && counted -> held(anchorMessageId, projectionUnread, floor = floor)
         projection != null -> counted(readAnchorMessageId, projection, projectionUnread, Source.PROJECTION)
         sameAnchor -> this
-        // Nothing read yet and no projection: everything received so far is unread, counted once —
-        // exactly when the window reaches the tail, as far as the window goes otherwise.
+        // Nothing read yet and no projection: every loaded received row is unread, and older pages not
+        // loaded yet may add more, so the number is a lower bound that grows as they land.
         readAnchorMessageId == null ->
             counted(
                 null,
-                afterAnchor,
+                maxOf(afterAnchor, count),
                 null,
                 if (windowReachesTail) Source.LOADED else Source.PARTIAL,
-                partial = !windowReachesTail,
+                partial = true,
             )
         // An anchor that is off screen and was never counted. Counting the loaded rows would call
         // every retained row unread; the badge stays quiet until the anchor or a projection appears.

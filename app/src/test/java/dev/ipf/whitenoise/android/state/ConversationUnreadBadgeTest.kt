@@ -156,43 +156,58 @@ class ConversationUnreadBadgeTest {
     }
 
     /**
-     * Nothing read yet: at the tail every received row is unread; short of it the projection decides,
-     * and without one the rows are counted once, then held.
+     * Nothing read yet: every message is unread, so the number is the higher of the projection and the
+     * loaded received rows; without a projection the loaded rows are a lower bound that grows.
      */
     @Test
-    fun noAnchorUsesTheProjectionOrCountsOnceThenHolds() {
-        val atTail =
+    fun noAnchorTakesTheHigherOfProjectionAndLoadedRows() {
+        val loadedOnly = receivedRange(350, 500)
+
+        val bigBacklog =
             ConversationUnreadBadge().reconcile(
-                receivedRange(0, 150),
+                loadedOnly,
+                null,
+                projectionUnread = 500,
+                windowReachesTail = true,
+            )
+        val laggingProjection =
+            ConversationUnreadBadge().reconcile(
+                loadedOnly,
                 null,
                 projectionUnread = 12,
                 windowReachesTail = true,
             )
-        assertEquals(150, atTail.count)
-        assertEquals(Source.LOADED, atTail.source)
-
-        val projected =
-            ConversationUnreadBadge().reconcile(
-                receivedRange(0, 150),
+        val olderPageLanded =
+            bigBacklog.reconcile(
+                receivedRange(300, 500),
                 null,
-                projectionUnread = 12,
-                windowReachesTail = false,
+                projectionUnread = 500,
+                windowReachesTail = true,
             )
-        assertEquals(12, projected.count)
-        assertEquals(Source.PROJECTION, projected.source)
 
-        // Short of the tail with no projection, the rows are counted once and then held.
+        assertEquals(500, bigBacklog.count)
+        assertEquals(Source.PROJECTION, bigBacklog.source)
+        assertEquals(150, laggingProjection.count)
+        assertEquals(500, olderPageLanded.count)
+
         val counted =
             ConversationUnreadBadge().reconcile(
                 receivedRange(0, 50),
                 null,
                 projectionUnread = null,
-                windowReachesTail = false,
+                windowReachesTail = true,
             )
-        val paged = counted.reconcile(receivedRange(0, 150), null, projectionUnread = null, windowReachesTail = false)
+        val morePages =
+            counted.reconcile(
+                receivedRange(0, 150),
+                null,
+                projectionUnread = null,
+                windowReachesTail = true,
+            )
 
         assertEquals(50, counted.count)
-        assertEquals(50, paged.count)
+        assertEquals(Source.LOADED, counted.source)
+        assertEquals(150, morePages.count)
     }
 
     /** A backward page trims the newest rows but keeps the anchor: the count must not follow the trimmed window. */
@@ -347,9 +362,9 @@ class ConversationUnreadBadgeTest {
         )
     }
 
-    /** Nothing read yet in a window short of the tail counts once and holds, then counts everything at the tail. */
+    /** Nothing read yet in a window short of the tail is a lower bound that grows with every page, either way. */
     @Test
-    fun noAnchorInAPartialWindowHoldsUntilTheTail() {
+    fun noAnchorInAPartialWindowGrowsWithEveryPage() {
         val partial =
             ConversationUnreadBadge().reconcile(
                 receivedRange(0, 50),
@@ -361,8 +376,9 @@ class ConversationUnreadBadgeTest {
         val atTail = paged.reconcile(receivedRange(0, 120), null, projectionUnread = null, windowReachesTail = true)
 
         assertEquals(Source.PARTIAL, partial.source)
-        assertEquals(listOf(50, 50, 120), listOf(partial, paged, atTail).map { it.count })
-        assertEquals(Source.LOADED, atTail.source)
+        assertEquals(listOf(50, 100, 120), listOf(partial, paged, atTail).map { it.count })
+        // Still a growing lower bound: nothing says how much older history is left to load.
+        assertEquals(Source.HELD, atTail.source)
     }
 
     /** A number taken from the projection holds through a later decrease and follows only real growth. */
