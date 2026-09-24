@@ -396,3 +396,9 @@ Keep Compose work cheap. Do not call slow binding, database, or network paths fr
 Use White Noise streams and SQLite-backed projections as the fast path. If Android needs a shape that is expensive to assemble, add or improve the native projection rather than storing a duplicate copy in the Android app.
 
 Close native subscriptions when screens or services stop using them.
+
+## License
+
+Copyright (c) 2024-2026 White Noise developers.
+
+White Noise Android is licensed under the GNU Affero General Public License version 3.0 only (AGPL-3.0-only). See [LICENSE](LICENSE).
