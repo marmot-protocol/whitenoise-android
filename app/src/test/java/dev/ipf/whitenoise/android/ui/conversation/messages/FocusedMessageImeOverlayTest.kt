@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -99,6 +100,22 @@ class FocusedMessageImeOverlayTest {
         assertPreviewWithinFrame(preview, "the bounded text preview must fit the short frame")
         val viewport = composeRule.onNodeWithTag(FOCUSED_ACTION_MENU_SCROLL_TEST_TAG).fetchSemanticsNode().boundsInRoot
         assertTrue("long text must leave a tappable action viewport", viewport.height >= 48f)
+        val excerpt = composeRule.onNodeWithTag("message-actions-excerpt", useUnmergedTree = true)
+        val footer = composeRule.onNodeWithText("12:34", useUnmergedTree = true)
+        excerpt.assertIsDisplayed()
+        footer.assertIsDisplayed()
+        val excerptBounds = excerpt.getUnclippedBoundsInRoot()
+        val footerBounds = footer.getUnclippedBoundsInRoot()
+        with(composeRule.density) {
+            assertTrue(
+                "target excerpt must fit the visible preview",
+                excerptBounds.top.toPx() >= preview.top && excerptBounds.bottom.toPx() <= preview.bottom,
+            )
+            assertTrue(
+                "timestamp must fit the visible preview",
+                footerBounds.top.toPx() >= preview.top && footerBounds.bottom.toPx() <= preview.bottom,
+            )
+        }
         val delete = ApplicationProvider.getApplicationContext<Context>().getString(R.string.delete)
         composeRule
             .onNodeWithText(delete)

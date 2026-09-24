@@ -4,6 +4,7 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
@@ -132,7 +133,7 @@ internal fun FocusedTextMessagePreview(
                 statusContainerColor = colorFromArgb(presentation.backgroundArgb),
             )
         }
-    val content: @Composable () -> Unit = {
+    val content: @Composable (Boolean) -> Unit = { compact ->
         senderName?.let { Text(it, style = MaterialTheme.typography.labelMedium) }
         BubbleFooterLayout(
             footer = footer,
@@ -143,7 +144,7 @@ internal fun FocusedTextMessagePreview(
                 Text(
                     text = excerpt,
                     style = MaterialTheme.typography.bodyLarge,
-                    maxLines = FOCUSED_PREVIEW_TEXT_LINES,
+                    maxLines = if (compact) 1 else FOCUSED_PREVIEW_TEXT_LINES,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.testTag("message-actions-excerpt"),
                     onTextLayout = { layout ->
@@ -161,15 +162,20 @@ internal fun FocusedTextMessagePreview(
         }
     }
     if (media == null) {
-        MessageBubbleFrame(
-            presentation = presentation,
-            highlighted = false,
-            mine = mine,
-            mentionedSelf = mentionedSelf,
-            mentionedYouLabel = mentionedYouLabel,
-        ) {
-            reply?.invoke()
-            content()
+        BoxWithConstraints {
+            // A short IME viewport cannot fit the quoted reply, five lines and footer.
+            // Keep the target excerpt and footer instead of clipping both out of view.
+            val compact = maxHeight < 200.dp
+            MessageBubbleFrame(
+                presentation = presentation,
+                highlighted = false,
+                mine = mine,
+                mentionedSelf = mentionedSelf,
+                mentionedYouLabel = mentionedYouLabel,
+            ) {
+                if (!compact) reply?.invoke()
+                content(compact)
+            }
         }
     } else {
         Column(
@@ -185,7 +191,7 @@ internal fun FocusedTextMessagePreview(
                 mentionedYouLabel = mentionedYouLabel,
                 alignEnd = mine,
                 media = { media() },
-            ) { content() }
+            ) { content(false) }
         }
     }
 }
