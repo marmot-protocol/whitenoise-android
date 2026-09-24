@@ -72,7 +72,6 @@ class FocusedMessageImeOverlayTest {
                     canCopyText = true,
                     canSpeak = true,
                     canSelectText = true,
-                    canSave = true,
                     quickReactionEmojis = listOf("👍", "❤️", "😂", "😮", "😢", "👏"),
                     onDismissRequest = {},
                     onReact = {},
