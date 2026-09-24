@@ -204,7 +204,9 @@ class SharedContentScreensScreenshotTest {
         onOpen: (SharedContentCategory) -> Unit = {},
     ) {
         composeRule.setContent {
-            CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+            CompositionLocalProvider(
+                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
                 WhiteNoiseTheme(darkTheme = false, fontScale = fontScale) {
                     Surface(color = MaterialTheme.colorScheme.surfaceContainerLow) {
                         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
@@ -216,7 +218,8 @@ class SharedContentScreensScreenshotTest {
         }
     }
 
-    private fun emptyTiles(): SharedMediaTiles = buildVisibleSharedMediaTiles(emptyList(), null, emptySet(), emptySet(), 1uL)
+    private fun emptyTiles(): SharedMediaTiles =
+        buildVisibleSharedMediaTiles(emptyList(), null, emptySet(), emptySet(), 1uL)
 
     private fun sampleTile(): SharedMediaTile =
         SharedMediaTile("picture", 0, sampleReference(), false, 1_700_000_000uL, "alice", false)
