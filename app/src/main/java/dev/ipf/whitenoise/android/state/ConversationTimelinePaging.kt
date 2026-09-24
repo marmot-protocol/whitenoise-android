@@ -50,16 +50,6 @@ internal enum class ConversationPageLoad {
     FAILED,
 }
 
-/**
- * Pages the window towards older history.
- *
- * [anchorId] is the oldest row the reader can currently see. MDK places a replacement
- * relative to the window's anchor, so reporting that row first is what keeps the page from landing
- * somewhere else — see `set_visible_anchor` in MDK's window contract. It is ignored when the window
- * no longer retains the row, which is the case for optimistic rows carrying local ids MDK never
- * issued.
- */
-
 /** Whether an older-history page is in flight; the older header shows its spinner for this. */
 internal val ConversationController.isLoadingOlder: Boolean
     get() = pageLoadInFlight == ConversationSearchPageDirection.OLDER
@@ -72,6 +62,15 @@ internal val ConversationController.isLoadingNewer: Boolean
 internal val ConversationController.isLoadingPage: Boolean
     get() = pageLoadInFlight != null
 
+/**
+ * Pages the window towards older history.
+ *
+ * [anchorId] is the oldest row the reader can currently see. MDK places a replacement
+ * relative to the window's anchor, so reporting that row first is what keeps the page from landing
+ * somewhere else — see `set_visible_anchor` in MDK's window contract. It is ignored when the window
+ * no longer retains the row, which is the case for optimistic rows carrying local ids MDK never
+ * issued.
+ */
 @Suppress("TooGenericExceptionCaught", "ReturnCount")
 internal suspend fun ConversationController.loadOlderPageInternal(anchorId: String? = null): ConversationPageLoad {
     if (!hasMoreBefore || isLoadingPage) return ConversationPageLoad.NO_PROGRESS
