@@ -316,9 +316,10 @@ class AppReviewDemoTest {
         val keyGenerator = javax.crypto.KeyGenerator.getInstance("AES")
         keyGenerator.init(256)
         val key = keyGenerator.generateKey()
-        val provider = object : SecureStoreKeyProvider {
-            override fun secretKey(): javax.crypto.SecretKey = key
-        }
+        val provider =
+            object : SecureStoreKeyProvider {
+                override fun secretKey(): javax.crypto.SecretKey = key
+            }
 
         fun secureStore() = KeystoreSecureStore(context, "review-demo-test-secure", provider)
 
@@ -349,9 +350,10 @@ class AppReviewDemoTest {
         val keyGenerator = javax.crypto.KeyGenerator.getInstance("AES")
         keyGenerator.init(256)
         val key = keyGenerator.generateKey()
-        val provider = object : SecureStoreKeyProvider {
-            override fun secretKey(): javax.crypto.SecretKey = key
-        }
+        val provider =
+            object : SecureStoreKeyProvider {
+                override fun secretKey(): javax.crypto.SecretKey = key
+            }
         val encrypted = KeystoreSecureStore(context, "review-demo-migration-secure", provider)
         val saved = checkpoint(demoRef = johnny.ref, demoId = johnny.id, groupId = group)
         SecureReviewDemoStore(encrypted).save(saved)

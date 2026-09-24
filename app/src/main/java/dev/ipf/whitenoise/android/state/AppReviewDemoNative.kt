@@ -27,11 +27,13 @@ internal class AppReviewDemoNative(
                 !appState.wipeInProgress
 
     override suspend fun accounts(): List<ReviewDemoAccount> {
-        return appState.marmotIo { listAccounts() }.map { it.forReviewDemo() }
+        val summaries = appState.marmotIo { listAccounts() }
+        return summaries.map { it.forReviewDemo() }
     }
 
     override suspend fun createAccount(): ReviewDemoAccount {
-        return appState.marmotIo { createIdentityWithBootstrapRelays() }.forReviewDemo()
+        val summary = appState.marmotIo { createIdentityWithBootstrapRelays() }
+        return summary.forReviewDemo()
     }
 
     override suspend fun qualifyAccount(ref: String) {
