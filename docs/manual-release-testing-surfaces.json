@@ -2437,7 +2437,7 @@
       {
         "surface": "Jump-to-newest badge count owner",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
-        "anchor": "unreadBadge.reconcile(",
+        "anchor": "rememberConversationUnreadBadgeCount(",
         "test_ids": ["CON-003"]
       },
       {

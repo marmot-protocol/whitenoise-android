@@ -116,7 +116,6 @@ import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
 import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.ConversationPagingOrigin
 import dev.ipf.whitenoise.android.state.ConversationPagingTraceSection
-import dev.ipf.whitenoise.android.state.ConversationUnreadBadge
 import dev.ipf.whitenoise.android.state.ConversationUnreadJumpState
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.MessageAvailability
@@ -138,7 +137,6 @@ import dev.ipf.whitenoise.android.state.markPagingEvent
 import dev.ipf.whitenoise.android.state.markWindowVisibleForPresentationTiming
 import dev.ipf.whitenoise.android.state.mediaReferencesFor
 import dev.ipf.whitenoise.android.state.presentFailure
-import dev.ipf.whitenoise.android.state.reconcile
 import dev.ipf.whitenoise.android.state.reconcileConversationUnreadJump
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
@@ -1434,47 +1432,22 @@ internal fun ConversationScreen(
     // One owner for the badge's number (#2726): it follows the loaded rows while the read anchor is
     // among them and holds while paging moves the anchor off screen, so a history page can never
     // switch the count between the rows and the projection or count the loaded window itself.
-    var unreadBadge by
-        remember(controller, chat.id, entryUnreadSessionIdentity) {
-            // Seed synchronously when the timeline is already anchored, so the first frame after a
-            // mid-history open carries its number instead of gaining it one frame later.
-            val seed =
-                if (initialTimelineAnchored) {
-                    ConversationUnreadBadge().reconcile(
-                        timeline = controller.timeline,
-                        readAnchorMessageId = readAnchorMessageId,
-                        projectionUnread = projectedUnreadCount.takeIf { entryProjectionAvailable },
-                        windowReachesTail = !controller.hasMoreAfterTimeline,
-                    )
-                } else {
-                    ConversationUnreadBadge()
-                }
-            mutableStateOf(seed)
-        }
-    LaunchedEffect(
-        controller,
-        initialTimelineAnchored,
-        renderedTimeline,
-        readAnchorMessageId,
-        projectedUnreadCount,
-        entryProjectionAvailable,
-        controller.hasMoreAfterTimeline,
-    ) {
-        if (!initialTimelineAnchored) return@LaunchedEffect
-        val next =
-            unreadBadge.reconcile(
-                timeline = controller.timeline,
-                readAnchorMessageId = readAnchorMessageId,
-                projectionUnread = projectedUnreadCount.takeIf { entryProjectionAvailable },
-                windowReachesTail = !controller.hasMoreAfterTimeline,
-            )
-        logUnreadBadgeTransition("DMConversation", unreadBadge, next, controller.timeline.size)
-        unreadBadge = next
-    }
+    val unreadBadgeUi =
+        rememberConversationUnreadBadgeCount(
+            identity = Triple(controller, chat.id, entryUnreadSessionIdentity),
+            anchored = initialTimelineAnchored,
+            timeline = controller.timeline,
+            readAnchorMessageId = readAnchorMessageId,
+            projectionUnread = projectedUnreadCount.takeIf { entryProjectionAvailable },
+            windowReachesTail = !controller.hasMoreAfterTimeline,
+            onTransition = { before, after ->
+                logUnreadBadgeTransition("DMConversation", before, after, controller.timeline.size)
+            },
+        )
     // The first composition after anchoring has not reconciled yet; exposing 0 there would retire the
     // two-stage jump target, so the count and its consumers wait for the first reconciliation.
-    val badgeReconciled = initialTimelineAnchored && unreadBadge.source != ConversationUnreadBadge.Source.NONE
-    val unreadIncomingCount = if (badgeReconciled) unreadBadge.count else 0
+    val badgeReconciled = unreadBadgeUi.reconciled
+    val unreadIncomingCount = unreadBadgeUi.count
     LaunchedEffect(
         controller,
         initialTimelineAnchored,

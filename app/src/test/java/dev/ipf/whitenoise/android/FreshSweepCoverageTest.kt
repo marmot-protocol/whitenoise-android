@@ -88,21 +88,20 @@ class FreshSweepCoverageTest {
     fun conversationUnreadDerivationsRebindToTheVisibleController() {
         val source =
             source("ui/conversation/ConversationScreen.kt")
-                .section("var unreadBadge by", "// Reading the raw IME inset")
+                .section("val unreadBadgeUi =", "// Reading the raw IME inset")
                 .replace(Regex("\\s+"), " ")
 
         // The badge owner is state keyed to the visible controller and chat, and the effect that
         // feeds it re-runs on every input the count depends on (#2726).
-        val badgeRememberInputs =
+        val badgeInputs =
             source
-                .substringAfter("var unreadBadge by remember(")
-                .substringBefore(") { // Seed synchronously")
-        assertTrue("badge owner must follow the visible controller", "controller" in badgeRememberInputs)
-        assertTrue("badge owner must follow the visible chat", "chat.id" in badgeRememberInputs)
-        val badgeEffectInputs =
-            source
-                .substringAfter("LaunchedEffect(")
-                .substringBefore(") { if (!initialTimelineAnchored) return@LaunchedEffect")
+                .substringAfter("rememberConversationUnreadBadgeCount(")
+                .substringBefore(") // The first composition")
+        assertTrue(
+            "badge owner must follow the visible controller",
+            "identity = Triple(controller, chat.id" in badgeInputs,
+        )
+        val badgeEffectInputs = badgeInputs
         assertTrue("badge must re-reconcile for the visible controller", "controller" in badgeEffectInputs)
         assertTrue("read anchor changes must re-reconcile the badge", "readAnchorMessageId" in badgeEffectInputs)
         assertTrue("projected unread changes must re-reconcile the badge", "projectedUnreadCount" in badgeEffectInputs)
@@ -116,7 +115,8 @@ class FreshSweepCoverageTest {
         )
         assertTrue(
             "the badge count shown must wait for the first reconciliation and then be the owner's count",
-            source.contains("val unreadIncomingCount = if (badgeReconciled) unreadBadge.count else 0"),
+            source.contains("val badgeReconciled = unreadBadgeUi.reconciled") &&
+                source.contains("val unreadIncomingCount = unreadBadgeUi.count"),
         )
         assertTrue(
             source.contains(
