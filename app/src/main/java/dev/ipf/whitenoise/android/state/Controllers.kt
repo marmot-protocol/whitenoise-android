@@ -4197,15 +4197,26 @@ class ChatsController private constructor(
         accountRef: String,
         windows: ChatListWindowSet,
     ): Boolean {
-        val rows = windows.rows
-        if (!validateChatListWindowRows(accountRef, windows, rows)) {
-            windows.close()
-            return false
+        val frame = windows.frame()
+        val valid = validateChatListWindowRows(accountRef, windows, frame.rows)
+        return when {
+            windows.closed || chatListWindows !== windows -> {
+                windows.close()
+                false
+            }
+            !windows.isCurrent(frame) -> true
+            !valid -> {
+                windows.close()
+                false
+            }
+            else -> {
+                windows.publishIfCurrent(frame) { rows ->
+                    replacePresentedChatRows(rows)
+                    scheduleRecompute()
+                }
+                !windows.closed
+            }
         }
-        if (windows.closed || chatListWindows !== windows) return false
-        replacePresentedChatRows(rows)
-        scheduleRecompute()
-        return true
     }
 
     // A failed keyed read or a confirmed missing row must abort before replacing the coherent frame.

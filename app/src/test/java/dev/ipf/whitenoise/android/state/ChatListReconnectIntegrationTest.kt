@@ -139,11 +139,17 @@ class ChatListReconnectIntegrationTest {
     /** Closing a set inside a suspending keyed lookup must not publish its rejected rows. */
     @Test
     fun closedWindowDuringValidationKeepsTheLastCoherentFrame() {
-        val pinned = notificationChatListRow().copy(groupIdHex = "aa".repeat(32), pinned = true,
-            pinnedPosition = 0u, conversationKind = ChatConversationKindFfi.DIRECT)
+        val pinned =
+            notificationChatListRow().copy(
+                groupIdHex = "aa".repeat(32),
+                pinned = true,
+                pinnedPosition = 0u,
+                conversationKind = ChatConversationKindFfi.DIRECT,
+            )
         val group = notificationChatListRow().copy(groupIdHex = "bb".repeat(32), pinned = false)
         val subscriptions = DroppedChatSubscriptions(pinned, group)
-        val controller = testChatsController(chatListTestAppState(testRecoveryDiagnostics(), subscriptions.liveSubscriptions))
+        val controller =
+            testChatsController(chatListTestAppState(testRecoveryDiagnostics(), subscriptions.liveSubscriptions))
         val bindScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         bindScope.launch { controller.bind(ConversationTimelineTestIds.ACCOUNT_REF) }
         try {
@@ -154,6 +160,46 @@ class ChatListReconnectIntegrationTest {
             awaitChatListCondition { subscriptions.first.closed }
             assertEquals(setOf(pinned.groupIdHex, group.groupIdHex), controller.items.map { it.id }.toSet())
         } finally {
+            controller.onCleared()
+            subscriptions.closeAll()
+            bindScope.cancel()
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+    }
+
+    /** A second view's newer replacement must not be overwritten by a suspended first-view callback. */
+    @Test
+    fun crossViewReplacementDuringValidationKeepsTheNewestFrame() {
+        val pinned = notificationChatListRow().copy(groupIdHex = "aa".repeat(32), pinned = true)
+        val group = notificationChatListRow().copy(groupIdHex = "bb".repeat(32))
+        val archived = notificationChatListRow().copy(groupIdHex = "cc".repeat(32), archived = true)
+        val subscriptions = DroppedChatSubscriptions(pinned, group)
+        subscriptions.pinnedProjection = null
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        var firstLookup = true
+        subscriptions.suspendBeforeKeyedLookup = {
+            if (firstLookup) {
+                firstLookup = false
+                entered.complete(Unit)
+                release.await()
+            }
+        }
+        val controller = testChatsController(chatListTestAppState(testRecoveryDiagnostics(), subscriptions.liveSubscriptions))
+        val bindScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        bindScope.launch { controller.bind(ConversationTimelineTestIds.ACCOUNT_REF) }
+        try {
+            awaitChatListCondition { subscriptions.first.nextUpdateStarted.isCompleted && controller.items.size == 2 }
+            subscriptions.first.emitRows(listOf(group))
+            awaitChatListCondition { entered.isCompleted }
+            subscriptions.archived.emitRows(listOf(archived))
+            awaitChatListCondition { controller.chatRows.any { it.groupIdHex == archived.groupIdHex } }
+            release.complete(Unit)
+            awaitChatListCondition { controller.chatRows.none { it.groupIdHex == pinned.groupIdHex } }
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(setOf(group.groupIdHex, archived.groupIdHex), controller.chatRows.map { it.groupIdHex }.toSet())
+        } finally {
+            release.complete(Unit)
             controller.onCleared()
             subscriptions.closeAll()
             bindScope.cancel()
@@ -508,12 +554,13 @@ private fun awaitChatListCondition(condition: () -> Boolean) {
 /** Controllable chat-list subscription used by the recovery integration test. */
 private class ScriptedChatListSubscription(
     private val initialRows: List<ChatListRowFfi>,
+    private val view: ChatListViewFfi = ChatListViewFfi.CHATS,
 ) : ChatListWindowHandle {
     constructor(initialRow: ChatListRowFfi) : this(listOf(initialRow))
 
     private val updates = Channel<ChatListWindowSnapshotFfi>(Channel.UNLIMITED)
     private var sequence = 0uL
-    private var current = windowSnapshot(initialRows, sequence)
+    private var current = windowSnapshot(initialRows, sequence, view)
     val nextUpdateStarted = CompletableDeferred<Unit>()
 
     @Volatile var closed = false
@@ -556,7 +603,7 @@ private class ScriptedChatListSubscription(
 
     fun emitRows(rows: List<ChatListRowFfi>) {
         sequence += 1uL
-        check(updates.trySend(windowSnapshot(rows, sequence)).isSuccess)
+        check(updates.trySend(windowSnapshot(rows, sequence, view)).isSuccess)
     }
 
     /** Ends the scripted stream. */
@@ -573,10 +620,13 @@ private class DroppedChatSubscriptions(
 ) {
     val first = ScriptedChatListSubscription(listOf(pinned, group))
     val second = ScriptedChatListSubscription(listOf(pinned, group))
+    val archived = ScriptedChatListSubscription(emptyList(), ChatListViewFfi.ARCHIVED)
     val activeOpenCount = AtomicInteger()
+    private val archivedOpenCount = AtomicInteger()
 
     @Volatile var pinnedProjection: ChatListRowFfi? = pinned
     var beforeKeyedLookup: (() -> Unit)? = null
+    var suspendBeforeKeyedLookup: (suspend () -> Unit)? = null
     private val groupId = group.groupIdHex
     private val pinnedId = pinned.groupIdHex
     private val otherWindows = CopyOnWriteArrayList<TerminatingChatListSubscription>()
@@ -587,6 +637,8 @@ private class DroppedChatSubscriptions(
             openChatListWindow = { _, view ->
                 if (view == ChatListViewFfi.CHATS) {
                     if (activeOpenCount.getAndIncrement() == 0) first else second
+                } else if (view == ChatListViewFfi.ARCHIVED && archivedOpenCount.getAndIncrement() == 0) {
+                    archived
                 } else {
                     TerminatingChatListSubscription(view).also(otherWindows::add)
                 }
@@ -594,6 +646,7 @@ private class DroppedChatSubscriptions(
             openChats = { _, _ -> ScriptedChatsSubscription().also(groupStreams::add) },
             presentedRowByGroup = { _, id ->
                 beforeKeyedLookup?.invoke()
+                suspendBeforeKeyedLookup?.invoke()
                 when (id) {
                     pinnedId -> pinnedProjection?.let(::presentedRow)
                     groupId -> presentedRow(group)
@@ -605,6 +658,7 @@ private class DroppedChatSubscriptions(
     fun closeAll() {
         first.close()
         second.close()
+        archived.close()
         otherWindows.forEach(TerminatingChatListSubscription::close)
         groupStreams.forEach(ScriptedChatsSubscription::close)
     }

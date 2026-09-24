@@ -35,6 +35,12 @@ internal fun requireCompleteChatListWindowRows(complete: Boolean) {
     if (!complete) throw IncompleteChatListReplacement()
 }
 
+/** A merged row snapshot bound to the replacement that produced it. */
+internal data class ChatListFrame(
+    val rows: List<PresentedChatRowFfi>,
+    val revision: Long,
+)
+
 /**
  * One account's bounded live chat-list windows, merged into the single row set [ChatsController] renders.
  *
@@ -49,6 +55,8 @@ internal class ChatListWindowSet private constructor(
 ) {
     private val cursors = initial.mapValues { (_, snapshot) -> ChatListWindowCursor(snapshot) }
     private val installed = initial.toMutableMap()
+    private val frameLock = Any()
+    private var revision = 0L
     private val commands = Mutex()
     private val isClosed = AtomicBoolean(false)
 
@@ -56,7 +64,21 @@ internal class ChatListWindowSet private constructor(
 
     /** Every retained row across the merged views, in view order. */
     val rows: List<PresentedChatRowFfi>
-        get() = CHAT_LIST_WINDOW_VIEWS.flatMap { view -> installed[view]?.rows.orEmpty() }
+        get() = frame().rows
+
+    fun frame(): ChatListFrame = synchronized(frameLock) {
+        ChatListFrame(CHAT_LIST_WINDOW_VIEWS.flatMap { view -> installed[view]?.rows.orEmpty() }, revision)
+    }
+
+    /** Prevents a callback suspended during validation from publishing over a newer view's frame. */
+    fun publishIfCurrent(frame: ChatListFrame, publish: (List<PresentedChatRowFfi>) -> Unit): Boolean =
+        synchronized(frameLock) {
+            if (closed || frame.revision != revision) return@synchronized false
+            publish(frame.rows)
+            true
+        }
+
+    fun isCurrent(frame: ChatListFrame): Boolean = synchronized(frameLock) { !closed && frame.revision == revision }
 
     /** Whether MDK retains rows beyond this view's window that a forward page can load. */
     fun hasMoreAfter(view: ChatListViewFfi): Boolean = installed[view]?.hasMoreAfter == true
@@ -124,7 +146,7 @@ internal class ChatListWindowSet private constructor(
 
     /** Releases every native handle; these windows expose no separate cancel. */
     fun close() {
-        isClosed.set(true)
+        synchronized(frameLock) { isClosed.set(true) }
         handles.values.forEach { handle -> runCatching { handle.close() } }
     }
 
@@ -166,8 +188,13 @@ internal class ChatListWindowSet private constructor(
         view: ChatListViewFfi,
         update: ChatListWindowSnapshotFfi,
     ): Boolean {
-        if (!cursors.getValue(view).accept(update)) return false
-        installed[view] = update
+        val accepted = synchronized(frameLock) {
+            if (!cursors.getValue(view).accept(update)) return@synchronized false
+            installed[view] = update
+            revision++
+            true
+        }
+        if (!accepted) return false
         update.logWindowFrame(view, "replace")
         return true
     }
