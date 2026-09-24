@@ -76,6 +76,23 @@ class PerformanceDiagnosticSchemaTest {
         )
     }
 
+    /** Push correlation is anonymous, bounded and local; a callback burst cannot create an unbounded log. */
+    @Test
+    fun pushRecoveryUsesAnonymousCorrelationAndExistingRetentionCap() {
+        val lines = mutableListOf<String>()
+        val emitter = emitter(lines = lines)
+        emitter.start()
+        val trace = emitter.begin(PerformanceOperation.PUSH_RECOVERY)
+        repeat(300) {
+            emitter.record(trace, PerformancePhase.PUSH_RECEIVED_NORMAL, 0L, count = Int.MAX_VALUE)
+        }
+        emitter.stop()
+        assertEquals(PerformanceDiagnosticEmitter.SESSION_EVENT_LIMIT, lines.size)
+        assertTrue(lines.all { " recovery=r#1 " in it })
+        assertTrue(lines.all { it.length < 256 })
+        assertTrue(lines.none { "token=" in it || "account=" in it || "payload=" in it })
+    }
+
     private fun assertSchemaAllowlists(line: String) {
         assertEquals(
             "schema=2 app_rev=app1234 mdk_rev=mdk5678 session=p#1 op=text_send phase=ffi_return " +
@@ -107,19 +124,7 @@ class PerformanceDiagnosticSchemaTest {
             ),
             line.split(' ').map { it.substringBefore('=') },
         )
-        assertEquals(
-            setOf(
-                "app_start",
-                "chat_open",
-                "chat_list_refresh",
-                "text_send",
-                "media_send",
-                "attachment_fetch",
-                "sync_catch_up",
-                "chat_history_page",
-            ),
-            PerformanceOperation.entries.mapTo(mutableSetOf()) { it.wireName },
-        )
+        assertOperationNames()
         assertTrue(PerformancePhase.entries.all { it.wireName.matches(Regex("[a-z0-9_]+")) })
         assertEquals(
             setOf("pending", "success", "failure", "dropped"),
@@ -135,6 +140,24 @@ class PerformanceDiagnosticSchemaTest {
             PerformanceConnectivity.entries.mapTo(mutableSetOf()) { it.wireName },
         )
         assertTrue(PerformanceAttachmentState.entries.all { it.wireName.matches(Regex("[a-z_]+")) })
+    }
+
+    /** Keeps the diagnostic operation names explicit as new recovery paths are added. */
+    private fun assertOperationNames() {
+        assertEquals(
+            setOf(
+                "push_recovery",
+                "app_start",
+                "chat_open",
+                "chat_list_refresh",
+                "text_send",
+                "media_send",
+                "attachment_fetch",
+                "sync_catch_up",
+                "chat_history_page",
+            ),
+            PerformanceOperation.entries.mapTo(mutableSetOf()) { it.wireName },
+        )
     }
 
     @Test
@@ -201,6 +224,36 @@ class PerformanceDiagnosticSchemaTest {
         assertTrue(lines.last().contains("count=45"))
         assertFalse(stopped.active)
         assertEquals(45, stopped.droppedCount)
+    }
+
+    /** The support snapshot is bounded to the same privacy-reviewed session event cap. */
+    @Test
+    fun supportSnapshotIsBoundedAndContainsOnlySerializedEvents() {
+        val emitter = emitter()
+        emitter.start()
+        val trace = assertNotNullTrace(emitter.begin(PerformanceOperation.PUSH_RECOVERY))
+        repeat(300) {
+            emitter.record(trace, PerformancePhase.PUSH_CANDIDATE, elapsedMs = it.toLong(), count = it)
+        }
+        emitter.stop()
+
+        assertEquals(PerformanceDiagnosticEmitter.SESSION_EVENT_LIMIT, emitter.output.snapshot().size)
+        assertTrue(emitter.output.snapshot().all { it.startsWith("schema=2 ") })
+        assertTrue(emitter.output.snapshot().none { "payload=" in it || "account=" in it || "token=" in it })
+    }
+
+    /** A new explicit session discards the prior support snapshot instead of accumulating history. */
+    @Test
+    fun newSessionClearsThePreviousSupportSnapshot() {
+        val emitter = emitter()
+        emitter.start()
+        val first = assertNotNullTrace(emitter.begin(PerformanceOperation.APP_START))
+        emitter.record(first, PerformancePhase.FIRST_LOCAL_FRAME, elapsedMs = 1L)
+        emitter.stop()
+
+        emitter.start()
+
+        assertTrue(emitter.output.snapshot().isEmpty())
     }
 
     @Test

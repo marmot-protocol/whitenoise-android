@@ -7,9 +7,12 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -20,16 +23,22 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.NativePushCapability
+import dev.ipf.whitenoise.android.notifications.NotificationBatteryPolicy
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
+import dev.ipf.whitenoise.android.notifications.openNotificationBatterySettings
 import dev.ipf.whitenoise.android.notifications.openNotificationChannelSettings
+import dev.ipf.whitenoise.android.state.NotificationDeliveryMode
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /**
- * Notifications as the prototype lays them out: a permission group until Android allows notifications, the Delivery
- * group (local notifications, native push), the background connection with its explainer, and the Android
- * notification categories. Delivery and background writes stay the production mutations.
+ * Presents one delivery policy while retaining Android permission, battery policy, and category controls.
+ * The mode rows project existing runtime settings instead of persisting a second Android-owned mode value.
  */
 @Suppress("FunctionNaming", "LongMethod")
 @Composable
@@ -38,24 +47,43 @@ internal fun NotificationsScreen(
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     var permissionDenied by rememberSaveable { mutableStateOf(false) }
     val permissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             appState.refreshLocalNotificationPermission()
             permissionDenied = !granted
-            if (!granted) appState.present(R.string.toast_notification_permission_denied)
+            if (granted) {
+                appState.launchMutation {
+                    appState.refreshLocalNotificationSettings()
+                }
+            } else {
+                appState.present(R.string.toast_notification_permission_denied)
+            }
         }
 
     LaunchedEffect(appState.activeAccountRef) {
         appState.refreshLocalNotificationPermission()
+        appState.refreshNotificationBatteryPolicy()
         appState.refreshLocalNotificationSettings()
+    }
+
+    DisposableEffect(lifecycleOwner, appState) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    appState.refreshLocalNotificationPermission()
+                    appState.refreshNotificationBatteryPolicy()
+                }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     val permissionGranted = appState.localNotificationPermissionGranted
     val hasAccount = appState.activeAccountRef != null
-    val localEnabled = appState.localNotificationSettings?.localNotificationsEnabled == true
-    val backgroundEnabled = appState.backgroundConnectionEnabled
-    val pushEnabled = appState.localNotificationSettings?.nativePushEnabled == true
+    val capability = appState.nativePushCapability()
+    val selectedMode = appState.notificationDeliveryMode()
 
     SettingsScaffold(title = stringResource(R.string.notifications), onBack = onBack) {
         SettingsList {
@@ -70,65 +98,128 @@ internal fun NotificationsScreen(
             }
             item { SettingsSection(stringResource(R.string.delivery)) }
             item {
-                SettingsGroup {
-                    row("local_notifications") { rowContext ->
-                        SettingsSwitch(
-                            context = rowContext,
-                            title = stringResource(R.string.local_notifications),
-                            subtitle = stringResource(R.string.local_notifications_detail),
-                            checked = localEnabled,
-                            enabled = hasAccount && (permissionGranted || localEnabled),
-                            onCheckedChange = { enabled ->
-                                appState.launchMutation { appState.setLocalNotificationsEnabled(enabled) }
-                            },
-                        )
-                    }
-                    row("native_push") { rowContext ->
-                        NativePushSettingRow(
-                            context = rowContext,
-                            capability = appState.nativePushCapability(),
-                            accountReady = hasAccount && ((permissionGranted && localEnabled) || pushEnabled),
-                            checked = pushEnabled,
-                            onCheckedChange = { enabled ->
-                                appState.launchMutation { appState.setNativePushEnabled(enabled) }
-                            },
-                        )
-                    }
-                }
-            }
-            item {
-                SettingsGroup {
-                    row("background") { rowContext ->
-                        SettingsSwitch(
-                            context = rowContext,
-                            title = stringResource(R.string.keep_connected_in_background),
-                            subtitle = stringResource(R.string.keep_connected_in_background_detail),
-                            checked = backgroundEnabled,
-                            enabled = hasAccount && (permissionGranted || backgroundEnabled),
-                            onCheckedChange = { enabled ->
-                                appState.launchMutation { appState.setBackgroundConnectionEnabled(enabled) }
-                            },
-                        )
-                    }
-                }
-            }
-            item {
-                SettingsExplainer(
-                    stringResource(
-                        if (backgroundEnabled) {
-                            R.string.notification_background_on
-                        } else {
-                            R.string.notification_background_off
-                        },
-                    ),
+                NotificationDeliverySelector(
+                    selectedMode = selectedMode,
+                    capability = capability,
+                    enabled = hasAccount && permissionGranted && !appState.notificationDeliveryModeBusy,
+                    onSelect = { mode -> appState.launchMutation { appState.setNotificationDeliveryMode(mode) } },
                 )
             }
+            if (!capability.isAvailable) {
+                item { SettingsExplainer(stringResource(capability.subtitleResource())) }
+            }
+            item { SettingsSection(stringResource(R.string.notification_device_policy)) }
+            item {
+                NotificationDevicePolicyGroup(
+                    permissionGranted = permissionGranted,
+                    batteryPolicy = appState.notificationBatteryPolicy,
+                    onOpenNotificationSettings = { openAppNotificationSettings(context) },
+                    onOpenBatterySettings = {
+                        if (!openNotificationBatterySettings(context)) {
+                            appState.present(R.string.toast_notification_settings_unavailable)
+                        }
+                    },
+                )
+            }
+            item { SettingsExplainer(stringResource(R.string.notification_device_policy_detail)) }
             item { SettingsSection(stringResource(R.string.notification_categories)) }
             item { GlobalNotificationCategories(onOpenChannel = { openNotificationChannelSettings(context, it) }) }
             item { SettingsExplainer(stringResource(R.string.notification_categories_detail)) }
         }
     }
 }
+
+/** One radio group: local delivery always exists and push delivery exists only when usable. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun NotificationDeliverySelector(
+    selectedMode: NotificationDeliveryMode,
+    capability: NativePushCapability,
+    enabled: Boolean,
+    onSelect: (NotificationDeliveryMode) -> Unit,
+) {
+    SettingsGroup(
+        modifier =
+            Modifier
+                .selectableGroup()
+                .padding(top = WhiteNoiseSpacing.Section)
+                .testTag("notification-delivery.choices"),
+    ) {
+        if (capability.isAvailable) {
+            row("fcm") { rowContext ->
+                SettingsChoice(
+                    context = rowContext,
+                    title = stringResource(R.string.notification_delivery_push),
+                    subtitle = stringResource(R.string.notification_delivery_push_detail),
+                    selected = selectedMode == NotificationDeliveryMode.Fcm,
+                    enabled = enabled,
+                    highlightSelected = false,
+                    modifier = Modifier.testTag("notification-delivery.fcm"),
+                    onClick = { onSelect(NotificationDeliveryMode.Fcm) },
+                )
+            }
+        }
+        row("local") { rowContext ->
+            SettingsChoice(
+                context = rowContext,
+                title = stringResource(R.string.local_notifications),
+                subtitle = stringResource(R.string.notification_delivery_local_detail),
+                selected = selectedMode == NotificationDeliveryMode.Local,
+                enabled = enabled,
+                highlightSelected = false,
+                modifier = Modifier.testTag("notification-delivery.local"),
+                onClick = { onSelect(NotificationDeliveryMode.Local) },
+            )
+        }
+    }
+}
+
+/** Live Android permission and background-policy status with explicit user-requested settings actions. */
+@Suppress("FunctionNaming")
+@Composable
+private fun NotificationDevicePolicyGroup(
+    permissionGranted: Boolean,
+    batteryPolicy: NotificationBatteryPolicy,
+    onOpenNotificationSettings: () -> Unit,
+    onOpenBatterySettings: () -> Unit,
+) {
+    SettingsGroup {
+        row("permission") { context ->
+            SettingsAction(
+                context = context,
+                title = stringResource(R.string.notification_permission_status),
+                subtitle =
+                    stringResource(
+                        if (permissionGranted) {
+                            R.string.notification_permission_allowed
+                        } else {
+                            R.string.notification_permission_blocked
+                        },
+                    ),
+                onClick = onOpenNotificationSettings,
+            )
+        }
+        row("battery") { context ->
+            SettingsAction(
+                context = context,
+                title = stringResource(R.string.notification_battery_policy),
+                subtitle = stringResource(batteryPolicy.subtitleResource()),
+                onClick = onOpenBatterySettings,
+                modifier = Modifier.testTag("notification-battery.settings"),
+            )
+        }
+    }
+}
+
+/** Maps the live platform policy to neutral, localized status copy. */
+@StringRes
+internal fun NotificationBatteryPolicy.subtitleResource(): Int =
+    when (this) {
+        NotificationBatteryPolicy.Optimized -> R.string.notification_battery_optimized
+        NotificationBatteryPolicy.Unrestricted -> R.string.notification_battery_unrestricted
+        NotificationBatteryPolicy.Restricted -> R.string.notification_battery_restricted
+        NotificationBatteryPolicy.Unknown -> R.string.notification_battery_unknown
+    }
 
 /** Until Android allows notifications: a request action, or, once denied, a link into Android's settings. */
 @Suppress("FunctionNaming")
@@ -171,32 +262,6 @@ private fun NotificationPermissionIcon(drawable: Int) {
         painter = painterResource(drawable),
         contentDescription = null,
         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-}
-
-/**
- * Native push reflects the saved policy even when capability disappears. An enabled policy remains revocable;
- * starting delivery still requires capability and caller readiness, with its first unsupported cause explained.
- */
-@Suppress("FunctionNaming")
-@Composable
-internal fun NativePushSettingRow(
-    context: SettingsRowContext,
-    capability: NativePushCapability,
-    accountReady: Boolean,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    SettingsSwitch(
-        context = context,
-        title = stringResource(R.string.native_push_title),
-        subtitle =
-            stringResource(
-                if (capability.isAvailable) R.string.notification_push_detail else capability.subtitleResource(),
-            ),
-        checked = checked,
-        enabled = accountReady && (capability.isAvailable || checked),
-        onCheckedChange = onCheckedChange,
     )
 }
 

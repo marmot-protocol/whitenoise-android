@@ -41,8 +41,11 @@ import dev.ipf.marmotkit.PresentationVersionFfi
 import dev.ipf.marmotkit.PresentedChatListSnapshotFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
 import dev.ipf.marmotkit.ProductRecordResultFfi
+import dev.ipf.marmotkit.PushPlatformFfi
+import dev.ipf.marmotkit.PushRegistrationFfi
 import dev.ipf.marmotkit.PushRegistrationShareOutcomeFfi
 import dev.ipf.marmotkit.PushRegistrationShareStatusFfi
+import dev.ipf.marmotkit.PushRegistrationSyncResultFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
 import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.marmotkit.SendSummaryFfi
@@ -51,7 +54,10 @@ import dev.ipf.marmotkit.UsageDiagnosticsDecisionFfi
 import dev.ipf.marmotkit.UsageDiagnosticsSettingsFfi
 import dev.ipf.marmotkit.UsageDiagnosticsStatusFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
+import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
+import dev.ipf.whitenoise.android.notifications.PushServerConfig
+import dev.ipf.whitenoise.android.notifications.PushTokenStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
@@ -59,9 +65,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.yield
 import org.robolectric.Shadows.shadowOf
 import java.lang.reflect.Proxy
 import java.time.Duration
@@ -73,6 +81,13 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.CoroutineContext
 
+/** Marks a fixture call whose owning test coroutine is already advancing the paused main looper. */
+private object MainLooperPumpingContext : CoroutineContext.Element {
+    object Key : CoroutineContext.Key<MainLooperPumpingContext>
+
+    override val key: CoroutineContext.Key<*> = Key
+}
+
 /** Typed-update fixture that preserves AppState startup, local MDK, and platform posting paths. */
 @Suppress("LargeClass") // Bootstrap scenarios share one process-wide Marmot and notification fixture.
 internal class NotificationBootstrapTestFixture(
@@ -83,6 +98,7 @@ internal class NotificationBootstrapTestFixture(
     initiallyBlockRuntimeStartSynchronously: Boolean = false,
     delayFirstNotificationDispatchAfterRuntimeStart: Boolean = false,
     receiverTimeoutMillis: Long = 100L,
+    pushWakeNowMs: () -> Long = System::currentTimeMillis,
     bootstrapActionableTimeoutMillis: Long = 15_000L,
     notificationUsersHaveDisplayNames: Boolean = true,
     notificationReceiverHasDisplayName: Boolean = notificationUsersHaveDisplayNames,
@@ -114,8 +130,13 @@ internal class NotificationBootstrapTestFixture(
     private val emitStartupNotification: Boolean = true,
     private val onSetNativePushEnabled: ((accountRef: String, enabled: Boolean) -> NotificationSettingsFfi)? = null,
     private val onClearPushRegistration: ((accountRef: String) -> PushRegistrationShareOutcomeFfi)? = null,
+    private val onUpsertPushRegistration: ((accountRef: String) -> Unit)? = null,
     private val onNotificationSettings: ((accountRef: String) -> NotificationSettingsFfi)? = null,
     nativePushFallbackPlatform: NativePushFallbackPlatform = AndroidNativePushFallbackPlatform(context),
+    pushServerConfigProvider: () -> PushServerConfig? = PushServerConfig::current,
+    nativePushCapabilityResolver: (PushServerConfig?) -> NativePushCapability = {
+        NativePushCapability.MissingPushServerConfiguration
+    },
     private val onDisplayName: ((call: Int, accountIdHex: String) -> String?)? = null,
     private val accountIdHexResolver: suspend (String) -> String? = { null },
     private val markdownDocumentFactory: ((String?) -> MarkdownDocumentFfi)? = null,
@@ -125,6 +146,8 @@ internal class NotificationBootstrapTestFixture(
     private val profileImageDownload: ((url: String, maxBytes: ULong) -> ByteArray)? = null,
     notificationFirstPostTimingObserver: ((NotificationFirstPostTimingEvent) -> Unit)? = null,
     notificationDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    pushWakeStorageDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    schedulePushWakeRecovery: () -> Boolean = { true },
 ) {
     private val appContext = context.applicationContext
     private val updates = Channel<NotificationUpdateFfi>(Channel.UNLIMITED)
@@ -167,6 +190,8 @@ internal class NotificationBootstrapTestFixture(
     val senderDisplayNameCalls = AtomicInteger(0)
     val nativePushSettingWrites = CopyOnWriteArrayList<Pair<String, Boolean>>()
     val clearedPushRegistrations = CopyOnWriteArrayList<String>()
+    val upsertedPushRegistrations = CopyOnWriteArrayList<String>()
+    val upsertedPushTokens = CopyOnWriteArrayList<String>()
     val markdownParseCalls = AtomicInteger(0)
     val notificationTimelineCalls = AtomicInteger(0)
     val notificationMessageHistoryCalls = AtomicInteger(0)
@@ -327,6 +352,27 @@ internal class NotificationBootstrapTestFixture(
                     clearedPushRegistrations += accountRef
                     onClearPushRegistration?.invoke(accountRef) ?: completePushRegistrationClear()
                 }
+                "upsertPushRegistration" -> {
+                    val accountRef = arguments?.get(0) as String
+                    upsertedPushRegistrations += accountRef
+                    upsertedPushTokens += arguments[2] as String
+                    onUpsertPushRegistration?.invoke(accountRef)
+                    PushRegistrationSyncResultFfi(
+                        registration =
+                            PushRegistrationFfi(
+                                accountRef,
+                                notificationSettings(accountRef).accountIdHex,
+                                PushPlatformFfi.FCM,
+                                arguments[2] as String,
+                                arguments[3] as String,
+                                arguments[4] as String?,
+                                0L,
+                                0L,
+                                null,
+                            ),
+                        share = completePushRegistrationClear(),
+                    )
+                }
                 "markTimelineMessageRead" -> {
                     markReadCalls.incrementAndGet()
                     onMarkTimelineMessageRead?.invoke() ?: markReadRow
@@ -455,8 +501,13 @@ internal class NotificationBootstrapTestFixture(
             notificationSubscriber = { subscribe() },
             notificationDispatcher = notificationDispatchGate ?: notificationDispatcher,
             notificationReceiverTimeoutMillis = receiverTimeoutMillisState::get,
+            pushWakeNowMs = pushWakeNowMs,
+            pushWakeStorageDispatcher = pushWakeStorageDispatcher,
+            schedulePushWakeRecovery = schedulePushWakeRecovery,
             bootstrapActionableTimeoutMillis = { bootstrapActionableTimeoutMillis },
             nativePushFallbackPlatform = nativePushFallbackPlatform,
+            pushServerConfigProvider = pushServerConfigProvider,
+            nativePushCapabilityResolver = nativePushCapabilityResolver,
             notificationFirstPostTimingObserver = notificationFirstPostTimingObserver,
         )
 
@@ -617,17 +668,47 @@ internal class NotificationBootstrapTestFixture(
     suspend fun awaitPushDrain(timeoutMillis: Long): Boolean =
         runWithMainLooperPumping { appState.ensureNotificationRuntimeStartedAndAwaitPushDrain(timeoutMillis) }
 
+    /** Advances the private network identity through the same generation owner used by production fences. */
+    fun advanceNetworkIdentity() {
+        val field = appState.javaClass.getDeclaredField("connectivitySignalOwner")
+        field.isAccessible = true
+        (field.get(appState) as ConnectivitySignalOwner).noteNetworkIdentityChange()
+    }
+
+    /** Replaces only durable push bookkeeping for storage-race tests. */
+    fun replacePushTokenStore(store: PushTokenStore) {
+        val field = appState.javaClass.getDeclaredField("pushTokenStore")
+        field.isAccessible = true
+        field.set(appState, store)
+    }
+
+    /** Reads the private startup milestone so settlement tests can reject premature readiness publication. */
+    fun startupRelayCatchUpRecorded(): Boolean {
+        val field = appState.javaClass.getDeclaredField("startupRelayCatchUpRecorded")
+        field.isAccessible = true
+        return field.getBoolean(appState)
+    }
+
     /** Delivers an engine update through the real process-owned notification listener. */
     fun emitNotification(notification: NotificationUpdateFfi = update) {
         check(updates.trySend(notification).isSuccess)
     }
 
-    /** Delivers one service-supervisor acknowledgement and waits for its scheduled sync. */
+    /** Delivers one service acknowledgement and waits for its sync or activation-owned mode transition. */
     suspend fun acknowledgeNativePushFallbackRuntime(generation: Long) {
-        runWithMainLooperPumping {
-            withContext(Dispatchers.Main.immediate) {
-                appState.onNativePushFallbackRuntimeStarted(generation)
-            }?.join()
+        val acknowledge =
+            suspend {
+                withContext(Dispatchers.Main.immediate) {
+                    appState.onNativePushFallbackRuntimeStarted(generation)
+                }?.join()
+                withTimeout(5_000L) {
+                    while (appState.notificationDeliveryModeBusy) yield()
+                }
+            }
+        if (currentCoroutineContext()[MainLooperPumpingContext.Key] != null) {
+            acknowledge()
+        } else {
+            runWithMainLooperPumping { acknowledge() }
         }
     }
 
@@ -756,7 +837,23 @@ internal class NotificationBootstrapTestFixture(
      */
     suspend fun <T> runWithMainLooperPumping(block: suspend () -> T): T =
         coroutineScope {
-            val call = async(Dispatchers.Default) { block() }
+            val call = async(Dispatchers.Default + MainLooperPumpingContext) { block() }
+            try {
+                while (!call.isCompleted) {
+                    shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                    delay(1L)
+                }
+                shadowOf(Looper.getMainLooper()).idle()
+                call.await()
+            } finally {
+                call.cancel()
+            }
+        }
+
+    /** Runs a main-owned production call while the test coroutine advances Robolectric's paused main looper. */
+    suspend fun <T> runOnMainLooperPumping(block: suspend () -> T): T =
+        coroutineScope {
+            val call = async(Dispatchers.Main.immediate) { block() }
             try {
                 while (!call.isCompleted) {
                     shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))

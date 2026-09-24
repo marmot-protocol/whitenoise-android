@@ -40,8 +40,10 @@ private const val START_TRIGGER_SYSTEM_WAKE = "system_wake"
 private const val START_TRIGGER_CAPABILITY_FALLBACK = "capability_fallback"
 
 class NotificationStreamForegroundService : Service() {
+    private val pushWakeServiceOwner = Any()
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val runtimeSupervisor = NotificationRuntimeSupervisor()
+    private val pushRuntimeSupervisor = NotificationRuntimeSupervisor(NotificationRuntimeRetryPolicy(maxAttempts = 1))
     private val capabilityFallbackRequests = CapabilityFallbackServiceRequests()
     private var bootstrapJob: Job? = null
     private var pendingNativePushRegistrationSync = false
@@ -175,6 +177,7 @@ class NotificationStreamForegroundService : Service() {
         val stopWhenFinished = initialOneShotRequested || stickyRestartShouldStop
 
         val appState = (application as WhiteNoiseApplication).appState
+        appState.acknowledgePushWakeServiceOwner(pushWakeServiceOwner)
         val recoveryGeneration = appState.notificationRuntimeRecoveryGeneration()
         var action = NotificationRuntimeBootstrapAction.Continue
         var terminalStartId = bootstrapStartId
@@ -198,6 +201,7 @@ class NotificationStreamForegroundService : Service() {
                     attemptedPushWakeGeneration = pushWakeGeneration.takeIf { pushWakePending },
                 )
         }
+        recordPendingPushWakeCatchUpAfterStop()
         if (action == NotificationRuntimeBootstrapAction.Finish) {
             if (shouldStopAfterOneShotForegroundStart(stopWhenFinished, appState.backgroundConnectionEnabled)) {
                 stopSelf(terminalStartId)
@@ -225,6 +229,11 @@ class NotificationStreamForegroundService : Service() {
                         pendingUserOwnedStart = pendingUserOwnedStart,
                     ),
             )
+        if (attemptedPushWakeGeneration != null && outcome is NotificationRuntimeSupervisionOutcome.Exhausted) {
+            recordPendingPushWakeCatchUpAfterStop()
+            if (!appState.backgroundConnectionEnabled && !pendingUserOwnedStart) stopSelf(latestStartId)
+            return NotificationRuntimeBootstrapAction.Finish
+        }
         completedPushWakeGeneration = decision.completedPushWakeGeneration
         pendingUserOwnedStart = decision.pendingUserOwnedStart
         when (outcome) {
@@ -258,14 +267,19 @@ class NotificationStreamForegroundService : Service() {
         return decision.action
     }
 
+    /** Push retries belong to durable work; user-owned bootstrap retains its existing bounded supervisor. */
     private suspend fun superviseRuntimeAttempt(
         appState: WhiteNoiseAppState,
         recoveryGeneration: Long,
         trigger: ForegroundStartTrigger,
     ): NotificationRuntimeSupervisionOutcome =
-        runtimeSupervisor.supervise(
-            recoveryAllowed = { appState.notificationRuntimeRecoveryAllowed(recoveryGeneration) },
+        (if (trigger == ForegroundStartTrigger.PushWake) pushRuntimeSupervisor else runtimeSupervisor).supervise(
+            recoveryAllowed = {
+                appState.notificationRuntimeRecoveryAllowed(recoveryGeneration) &&
+                    (trigger != ForegroundStartTrigger.PushWake || appState.pushWakeRecoveryAllowed())
+            },
             startRuntime = {
+                if (trigger == ForegroundStartTrigger.PushWake) PushWakeDiagnostics.event(PushWakeEvent.ServiceStarted)
                 val wakeLock = acquirePushWakeLockIfNeeded(trigger)
                 val wakeLockTrace = wakeLock?.let { RecoveryTrace.beginPushWakeLock() }
                 val wakeLockTraceTimeout =
@@ -309,13 +323,10 @@ class NotificationStreamForegroundService : Service() {
         pendingNativePushRegistrationSync = false
     }
 
+    /** The callback already persisted the generation; rejection transfers it without inventing another wake. */
     private fun recordPendingPushWakeCatchUpAfterStop() {
-        // The service is stopping, so serviceScope can be cancelled before the
-        // write lands; the application-owned scope survives the teardown.
         val application = application as? WhiteNoiseApplication ?: return
-        application.applicationScope.launch {
-            recordPendingPushWakeCatchUp(applicationContext)
-        }
+        application.applicationScope.launch { PushWakeRecoveryScheduler.schedule(applicationContext) }
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -331,7 +342,11 @@ class NotificationStreamForegroundService : Service() {
 
     override fun onDestroy() {
         application.notifyCapabilityFallbackUnavailable(capabilityFallbackRequests.onRuntimeUnavailable())
+        (application as? WhiteNoiseApplication)
+            ?.initializedAppState()
+            ?.releasePushWakeServiceOwner(pushWakeServiceOwner)
         serviceScope.cancel()
+        recordPendingPushWakeCatchUpAfterStop()
         foregroundServiceDebug { "destroyed" }
         super.onDestroy()
     }
@@ -414,6 +429,9 @@ class NotificationStreamForegroundService : Service() {
                 appContext.stopService(
                     Intent(appContext, NotificationStreamForegroundService::class.java),
                 )
+                // Context.stopService() returning false means there was no matching running
+                // service. The requested stopped state is already satisfied in that case.
+                true
             }.getOrElse {
                 foregroundServiceDebug(it) { "stop rejected" }
                 false
@@ -443,7 +461,7 @@ private suspend fun startNotificationRuntimeForTrigger(
     trigger: ForegroundStartTrigger,
 ) {
     if (trigger == ForegroundStartTrigger.PushWake) {
-        appState.ensureNotificationRuntimeStartedAndAwaitPushDrain()
+        appState.runPushWakeRecoveryAttempt()
     } else {
         appState.ensureNotificationRuntimeStarted()
     }
@@ -586,16 +604,6 @@ private const val PUSH_WAKE_DRAIN_TIMEOUT_MS = 10_000L
 private const val PUSH_WAKE_BOOTSTRAP_BUDGET_MS = 5_000L
 private const val PUSH_WAKE_NATIVE_PUSH_SYNC_BUDGET_MS = 15_000L
 
-private fun recordPendingPushWakeCatchUp(context: Context) {
-    runCatching {
-        PushTokenStore.create(context).recordPendingPushWakeCatchUp()
-    }.onFailure {
-        foregroundServiceDiagnostic(
-            NotificationServiceDiagnostic.CATCH_UP_RECORD_FAILED,
-        )
-    }
-}
-
 internal object BackgroundConnectionNotification {
     internal const val CHANNEL_ID = "whitenoise.background_connection.v1"
 
@@ -672,7 +680,6 @@ private enum class NotificationServiceDiagnostic(
     RETRY_BOUNDARY_CHANGED("retry_boundary_changed"),
     RETRIES_EXHAUSTED("retries_exhausted"),
     ATTEMPT_FAILED("attempt_failed"),
-    CATCH_UP_RECORD_FAILED("catch_up_record_failed"),
 }
 
 private fun foregroundServiceDiagnostic(

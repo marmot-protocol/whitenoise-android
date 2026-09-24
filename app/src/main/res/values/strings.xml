@@ -600,9 +600,11 @@
     <string name="diagnostics">Diagnostics</string>
     <string name="diagnostics_settings_subtitle">Relay health and MLS internals</string>
     <string name="performance_logs">Performance logs</string>
-    <string name="performance_logs_description">Temporarily write privacy-safe timing events to Logcat. Stops after 30 minutes or when White Noise restarts.</string>
+    <string name="performance_logs_description">Temporarily collect privacy-safe timing events on this device. Stops after 30 minutes or when White Noise restarts.</string>
     <string name="performance_logs_active">Active · %1$d min remaining</string>
     <string name="performance_logs_inactive">Inactive</string>
+    <string name="copy_performance_logs">Copy performance logs</string>
+    <string name="copy_performance_logs_detail">Copy the bounded, privacy-safe events from the current or most recent session.</string>
     <string name="streaming_debug" translatable="false">Streaming debug</string>
     <string name="streaming_debug_subtitle" translatable="false">Show agent-stream and MLS signaling events inline in conversations</string>
     <string name="ai_agents">AI Agents</string>
@@ -1148,6 +1150,19 @@
     <string name="notifications_are_off">Notifications are off</string>
     <string name="notifications_are_off_detail">Turn them on in Android Settings to use these options.</string>
     <string name="delivery">Delivery</string>
+    <string name="notification_delivery_push">Push notifications</string>
+    <string name="notification_delivery_push_detail">Wake briefly when new activity may be available, then check securely for messages.</string>
+    <string name="notification_delivery_local_detail">Keep a persistent connection while notifications are enabled.</string>
+    <string name="notification_device_policy">Device status</string>
+    <string name="notification_device_policy_detail">Notification permission controls whether alerts appear. Battery policy may delay background delivery in either mode. Status refreshes when you return to this screen.</string>
+    <string name="notification_permission_status">Notification permission</string>
+    <string name="notification_permission_allowed">Allowed</string>
+    <string name="notification_permission_blocked">Blocked</string>
+    <string name="notification_battery_policy">Battery policy</string>
+    <string name="notification_battery_optimized">Optimized</string>
+    <string name="notification_battery_unrestricted">Unrestricted</string>
+    <string name="notification_battery_restricted">Restricted</string>
+    <string name="notification_battery_unknown">Unavailable</string>
     <string name="local_notifications_detail">Create message notifications on this device. Without native push, delivery may wait until White Noise is active.</string>
     <string name="native_push_title">Native push</string>
     <string name="notification_push_detail">Use a generic wake-up signal to check for new messages in the background. Message details stay on this device.</string>
