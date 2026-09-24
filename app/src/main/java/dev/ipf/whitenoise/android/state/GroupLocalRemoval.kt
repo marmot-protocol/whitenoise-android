@@ -49,7 +49,7 @@ internal suspend fun WhiteNoiseAppState.deleteChatGroupLocalWithRecovery(
         // A synchronous, atomic journal write must precede the destructive native call. If a
         // closed worker loses both its response and the reconciliation reads, restart can replay
         // Android cleanup without ever repeating the native wipe.
-        localGroupDeleteCleanupJournal.stage(pending)
+        withContext(Dispatchers.IO) { localGroupDeleteCleanupJournal.stage(pending) }
         deleteLocalGroupWithRecovery(
             isCurrent = isCurrent,
             delete = { marmotIo { deleteGroupLocal(account, groupIdHex) } },
@@ -58,7 +58,7 @@ internal suspend fun WhiteNoiseAppState.deleteChatGroupLocalWithRecovery(
         onNativeCommitted()
         withContext(NonCancellable) {
             if (finishLocalGroupDeleteCleanup(pending)) {
-                runCatching { localGroupDeleteCleanupJournal.finish(pending) }
+                runCatching { withContext(Dispatchers.IO) { localGroupDeleteCleanupJournal.finish(pending) } }
                     .onFailure { appStateDebug(it) { "local delete cleanup journal finish failed" } }
             }
         }
