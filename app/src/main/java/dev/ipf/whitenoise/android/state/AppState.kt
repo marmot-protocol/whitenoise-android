@@ -1092,6 +1092,9 @@ class WhiteNoiseAppState private constructor(
     /** Process-owned, bounded composer geometry keyed by account and conversation. */
     internal val composerExpansionStateRetention = ComposerExpansionStateRetention()
 
+    /** Bounded in-flight edit handoffs survive conversation-controller replacement. */
+    internal val pendingMessageEditHandoff = PendingMessageEditHandoff()
+
     constructor(context: Context) :
         this(
             context = context,
@@ -5918,6 +5921,7 @@ class WhiteNoiseAppState private constructor(
         // Preserve per-account durable state for later account switching, but
         // synchronously drop plaintext memory and await the decrypted-disk wipe.
         composerExpansionStateRetention.removeAccount(signedOutRef)
+        pendingMessageEditHandoff.removeAccount(signedOutRef)
         conversationDictation.onAccountUnavailable(signedOutRef)
         stopTtsForRemovedAccount(signedOutRef)
         clearInMemoryMediaCaches()
@@ -6010,6 +6014,7 @@ class WhiteNoiseAppState private constructor(
             }
             defaultDisappearingMessagesPreferences.removeAccount(wipedRef)
             composerExpansionStateRetention.removeAccount(wipedRef)
+            pendingMessageEditHandoff.removeAccount(wipedRef)
             clearConversationShortcutsForAccount(
                 accountRef = wipedRef,
                 includeUnscopedLegacy = accounts.none { it.label != wipedRef && it.isSignedInSigningAccount() },

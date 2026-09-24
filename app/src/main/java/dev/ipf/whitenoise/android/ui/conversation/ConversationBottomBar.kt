@@ -237,7 +237,7 @@ internal fun ConversationBottomBar(
                             onSendAttachments = onSendAttachments,
                             editingMessageId = controller.editingMessageId,
                             editingInitialText = editingRecord?.let { controller.displayedText(it) },
-                            onCancelEdit = { controller.editingMessageId = null },
+                            onCancelEdit = controller::cancelMessageEdit,
                             onAfterSend = onAfterSend,
                             onPickFromGallery = onPickFromGallery,
                             onCaptureFromCamera = onCaptureFromCamera,

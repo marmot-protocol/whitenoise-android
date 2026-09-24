@@ -21,6 +21,12 @@
         "test_ids": ["MSG-020"]
       },
       {
+        "surface": "Pending outgoing message edit handoff",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/PendingMessageEditHandoff.kt",
+        "anchor": "internal class PendingMessageEditHandoff",
+        "test_ids": ["MSG-007"]
+      },
+      {
         "surface": "Send failure caused by a transient relay outage",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/SendFailureNotices.kt",
         "anchor": "R.string.toast_send_connection_failed",
