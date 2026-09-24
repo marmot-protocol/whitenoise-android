@@ -118,31 +118,91 @@ class WindowApplyPreparationTest {
         assertEquals(mapOf(newId to AUTHORITATIVE_ORDER_BASE), prepared.authoritativeOrder)
     }
 
-    /** Interior gaps and rows beyond a final edge depart; rows beyond an edge with more history stay. */
+    /** Rows beyond a final edge depart; rows beyond an edge with more history stay; an interior gap replaces. */
     @Test
     fun extendPreparationDepartsOnlyRowsThePageProvesGone() {
         val ids = listOf("aa", "bb", "cc", "dd").map { it.repeat(32) }
         val held = ids.mapIndexed { index, id -> timelineRecord(id, index.toULong(), "row") }
         val heldOrder = ids.withIndex().associate { (index, id) -> id to index.toULong() }
         val snapshot = WindowApplySnapshot(held, emptySet(), heldOrder)
-        val rows = listOf(held[1], held[3])
+        val newerHalf = listOf(held[2], held[3])
 
         val finalOlderEdge =
             prepareWindowApply(
-                page = TimelinePageFfi(rows, hasMoreBefore = false, hasMoreAfter = true),
+                page = TimelinePageFfi(newerHalf, hasMoreBefore = false, hasMoreAfter = true),
                 snapshot = snapshot,
                 replaceWindow = false,
             )
         val moreHistoryBefore =
             prepareWindowApply(
-                page = TimelinePageFfi(rows, hasMoreBefore = true, hasMoreAfter = true),
+                page = TimelinePageFfi(newerHalf, hasMoreBefore = true, hasMoreAfter = true),
+                snapshot = snapshot,
+                replaceWindow = false,
+            )
+        val interiorGap =
+            prepareWindowApply(
+                page = TimelinePageFfi(listOf(held[1], held[3]), hasMoreBefore = true, hasMoreAfter = true),
                 snapshot = snapshot,
                 replaceWindow = false,
             )
 
-        assertEquals(setOf(ids[0], ids[2]), finalOlderEdge.departedIds)
-        assertEquals(setOf(ids[2]), moreHistoryBefore.departedIds)
-        assertTrue(ids[2] in moreHistoryBefore.touchedIds)
+        assertEquals(WindowApplyMode.EXTEND, finalOlderEdge.mode)
+        assertEquals(setOf(ids[0], ids[1]), finalOlderEdge.departedIds)
+        assertTrue(finalOlderEdge.departedIds.all { it in finalOlderEdge.touchedIds })
+        assertEquals(emptySet<String>(), moreHistoryBefore.departedIds)
+        // The row missing between b and d moved d's ordinal, so the shared rows disagree and the page replaces.
+        assertEquals(WindowApplyMode.REPLACE, interiorGap.mode)
+        assertEquals(emptySet<String>(), interiorGap.departedIds)
+    }
+
+    /** A row inserted inside the span moves the rows after it, so the page replaces, not misplaces retained rows. */
+    @Test
+    fun extendPreparationReplacesWhenARowWasInsertedInsideTheSpan() {
+        val ids = listOf("aa", "bb", "cc", "dd", "ee", "ff", "gg").map { it.repeat(32) }
+        val held = ids.mapIndexed { index, id -> timelineRecord(id, index.toULong(), "row") }
+        val heldOrder = ids.withIndex().associate { (index, id) -> id to index.toULong() }
+        val inserted = timelineRecord("99".repeat(32), 1uL, "late arrival")
+        // The window holds A..E, F and G are retained past its newer edge, and X lands between A and B.
+        val rows = listOf(held[0], inserted, held[1], held[2], held[3], held[4])
+
+        val prepared =
+            prepareWindowApply(
+                page = TimelinePageFfi(rows, hasMoreBefore = true, hasMoreAfter = true),
+                snapshot = WindowApplySnapshot(held, emptySet(), heldOrder),
+                replaceWindow = false,
+            )
+
+        assertEquals(WindowApplyMode.REPLACE, prepared.mode)
+        assertTrue(prepared.departedIds.isEmpty())
+        assertEquals(
+            rows.size,
+            prepared.authoritativeOrder.values
+                .toSet()
+                .size,
+        )
+        assertTrue(prepared.authoritativeOrder.values.all { it >= AUTHORITATIVE_ORDER_BASE })
+    }
+
+    /** A new edge row that would take a retained row's ordinal, or shared rows that disagree, means no shift. */
+    @Test
+    fun windowOrderShiftRefusesCollisionsAndDisagreement() {
+        val retained = "aa".repeat(32)
+        val first = "bb".repeat(32)
+        val second = "cc".repeat(32)
+        val fresh = "dd".repeat(32)
+        val heldOrder = mapOf(retained to 4uL, first to 5uL, second to 6uL)
+
+        fun page(vararg ids: String) =
+            TimelinePageFfi(
+                messages = ids.mapIndexed { index, id -> timelineRecord(id, index.toULong(), "row") },
+                hasMoreBefore = true,
+                hasMoreAfter = true,
+            )
+
+        assertEquals(5L, windowOrderShift(page(first, second), heldOrder))
+        assertEquals(4L, windowOrderShift(page(fresh, first, second), mapOf(first to 5uL, second to 6uL)))
+        assertEquals(null, windowOrderShift(page(fresh, first, second), heldOrder))
+        assertEquals(null, windowOrderShift(page(first, fresh, second), heldOrder))
     }
 
     /** The first page row the timeline already orders decides the shift; a page sharing none has no shift. */

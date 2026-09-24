@@ -4,7 +4,9 @@
 Macrobenchmark drops an iteration from its JSON whenever one metric has no value for it, so this
 reads the retained traces directly: journey duration, the `WhiteNoise.conversation.page.*` slices,
 the three reader-visible edge events, Choreographer frame timing inside the journey, the app main
-thread's running time, and how many GPU-memory counter samples the window held.
+thread's running time, and how many GPU-memory counter samples the window held. `wins` counts window
+commands (pages, return-to-latest and exact jumps alike); `kept + reach` counts older page boundaries
+a reader crossed.
 
 Usage:
   paging_trace_report.py <trace.perfetto-trace>      one JSON row on stdout
@@ -34,9 +36,9 @@ JOURNEYS = {
 
 
 def pct(values, p):
-    """Nearest-rank-interpolated percentile `p` (0–1) of `values`; NaN when empty."""
+    """Nearest-rank-interpolated percentile `p` (0–1) of `values`; None when there are none."""
     if not values:
-        return float("nan")
+        return None
     values = sorted(values)
     k = (len(values) - 1) * p
     lo, hi = int(k), min(int(k) + 1, len(values) - 1)
@@ -86,8 +88,11 @@ def analyse(path):
             where p.name like '{PKG}%' and t.tid=p.pid and x.state='Running' and x.ts>={ts} and x.ts<={ts + dur}"""
     )
     gpu = q(f"select count(*) n from counter c join process_counter_track k on c.track_id=k.id where k.name like '%gpu%' and c.{win}")
+    # Every window command emits `page.window` — older and newer pages, but also return-to-latest and
+    # an exact-message jump — so this counts window commands. The older page boundaries a reader actually
+    # crossed are `runway_kept + edge_reached`, which fire only when a landed page grew the window.
     pages = dict(
-        pages=int(sec("window", "count(*)")),
+        windows=int(sec("window", "count(*)")),
         window_sum=sec("window", "sum(dur)/1e6"),
         window_max=sec("window", "max(dur)/1e6"),
         apply_n=int(sec("apply", "count(*)")),
@@ -108,11 +113,16 @@ def analyse(path):
         f_p50=pct(frames, 0.5),
         f_p90=pct(frames, 0.9),
         f_p99=pct(frames, 0.99),
-        f_max=max(frames) if frames else float("nan"),
+        f_max=max(frames) if frames else None,
         jank32=sum(1 for f in frames if f > 32),
         main_running_ms=(running[0].ms or 0) if running else 0,
         gpu_samples=gpu[0].n if gpu else 0,
     )
+
+
+def ms(value, width, decimals=1):
+    """Format one millisecond figure, or a dash of the same width when the trace had no frames."""
+    return f"{value:{width}.{decimals}f}" if value is not None else f"{'-':>{width}}"
 
 
 def main(argv):
@@ -122,7 +132,7 @@ def main(argv):
         rows = [json.loads(line) for line in open(argv[1]) if line.strip()]
         order = list(JOURNEYS)
         rows.sort(key=lambda r: (order.index(r["test"]), r["it"]))
-        hdr = "test                          it  journey  pages  win Σ/max   apply n Σ/max  prep Σ  stop kept reach  frames P50/P90/P99/max  >32  main-run  gpu"
+        hdr = "test                          it  journey  wins   win Σ/max   apply n Σ/max  prep Σ  stop kept reach  frames P50/P90/P99/max  >32  main-run  gpu"
         print(hdr)
         print("-" * len(hdr))
         for r in rows:
@@ -130,10 +140,10 @@ def main(argv):
                 print(f"{r['test']:30s}{r['it']:3d}  (no journey slice)")
                 continue
             print(
-                f"{r['test']:30s}{r['it']:3d} {r['journey_ms']:8.0f} {r['pages']:6d} {r['window_sum']:6.0f}/{r['window_max']:<4.0f} "
+                f"{r['test']:30s}{r['it']:3d} {r['journey_ms']:8.0f} {r['windows']:6d} {r['window_sum']:6.0f}/{r['window_max']:<4.0f} "
                 f"{r['apply_n']:6d} {r['apply_sum']:4.0f}/{r['apply_max']:<4.0f} {r['prepare_sum']:6.0f} "
                 f"{r['edge_stop']:5d}{r['runway_kept']:5d}{r['edge_reached']:6d}  "
-                f"{r['frames']:5d} {r['f_p50']:4.1f}/{r['f_p90']:4.1f}/{r['f_p99']:5.1f}/{r['f_max']:5.1f} {r['jank32']:4d} {r['main_running_ms']:8.0f} {r['gpu_samples']:5d}"
+                f"{r['frames']:5d} {ms(r['f_p50'], 4)}/{ms(r['f_p90'], 4)}/{ms(r['f_p99'], 5)}/{ms(r['f_max'], 5)} {r['jank32']:4d} {r['main_running_ms']:8.0f} {r['gpu_samples']:5d}"
             )
         print()
         for test in order:
@@ -141,11 +151,16 @@ def main(argv):
             if not rs:
                 continue
             med = lambda k: statistics.median(r[k] for r in rs)  # noqa: E731
+            # Frame figures are None for a trace without frames; they leave the medians rather than skew them.
+            framed = lambda k: [r[k] for r in rs if r[k] is not None]  # noqa: E731
+            p99 = framed("f_p99")
+            worst = framed("f_max")
             print(
-                f"{test:30s} n={len(rs):2d} pages med={med('pages'):.0f} windowΣ med={med('window_sum'):.0f}ms "
+                f"{test:30s} n={len(rs):2d} windows med={med('windows'):.0f} windowΣ med={med('window_sum'):.0f}ms "
                 f"applyΣ med={med('apply_sum'):.0f}ms apply max={max(r['apply_max'] for r in rs):.0f}ms "
                 f"edgeStop Σ={sum(r['edge_stop'] for r in rs)} edgeReached Σ={sum(r['edge_reached'] for r in rs)} "
-                f"frame P99 med={med('f_p99'):.1f}ms worst frame={max(r['f_max'] for r in rs):.0f}ms >32ms Σ={sum(r['jank32'] for r in rs)}"
+                f"frame P99 med={ms(statistics.median(p99) if p99 else None, 0)}ms "
+                f"worst frame={ms(max(worst) if worst else None, 0, 0)}ms >32ms Σ={sum(r['jank32'] for r in rs)}"
             )
         return
     print(json.dumps(analyse(argv[0])))

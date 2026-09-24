@@ -176,8 +176,11 @@ internal fun scrollMetrics(sectionName: String): List<Metric> =
 
 /**
  * Everything [scrollMetrics] reports, plus what makes history paging visible to
- * a reader. `pageCount` proves the journey crossed boundaries at all; the window
- * sum is the engine's share and the apply sum the app's (sums and counts only:
+ * a reader. `windowCommandCount` counts every window command the journey issued
+ * — older and newer pages, but also return-to-latest and exact-message jumps,
+ * which emit the same slice — so `runwayKeptCount + edgeReachedCount` is the
+ * count of older page boundaries a reader actually crossed; the window sum is
+ * the engine's share and the apply sum the app's (sums and counts only:
  * a `Max` over a journey that crossed no boundary has no value and fails the
  * trace processing of the whole iteration); `edgeStopCount` and
  * `edgeReachedCount` are the two ways a reader notices a page — resting on the
@@ -192,7 +195,7 @@ internal fun scrollMetrics(sectionName: String): List<Metric> =
 internal fun pagingMetrics(sectionName: String): List<Metric> =
     scrollMetrics(sectionName) +
         listOf(
-            pagingSection(PAGE_WINDOW_TRACE, TraceSectionMetric.Mode.Count, "pageCount"),
+            pagingSection(PAGE_WINDOW_TRACE, TraceSectionMetric.Mode.Count, "windowCommandCount"),
             pagingSection(PAGE_WINDOW_TRACE, TraceSectionMetric.Mode.Sum, "pageWindowMs"),
             pagingSection(PAGE_PREPARE_TRACE, TraceSectionMetric.Mode.Sum, "pagePrepareMs"),
             pagingSection(PAGE_APPLY_TRACE, TraceSectionMetric.Mode.Sum, "pageApplyMs"),

@@ -62,10 +62,12 @@ internal fun ConversationController.pruneRetainedTimelineRows(prepared: Prepared
 }
 
 /**
- * Held rows an extending page proves gone. MDK's window is contiguous, so a held row ordered inside
- * the span of [pageOrder] that the page no longer carries was removed — deleted, or a disappearing
- * message that expired — and so was any held row beyond an edge the page marks final. Rows beyond
- * an edge with more history behind it were merely slid past and stay retained.
+ * Held rows an extending page proves gone: any held row beyond an edge the page marks final, since
+ * MDK's window is contiguous and nothing can lie past a final edge. Rows beyond an edge with more
+ * history behind it were merely slid past and stay retained. A held row ordered inside the span of
+ * [pageOrder] that the page no longer carries would also be gone, but a removal inside the span
+ * moves the rows after it, so `windowOrderShift` already turns such a page into a replacement; the
+ * interior branch here only guarantees an EXTEND never keeps a row inside its span that the page lacks.
  */
 internal fun departedRetainedIds(
     page: TimelinePageFfi,

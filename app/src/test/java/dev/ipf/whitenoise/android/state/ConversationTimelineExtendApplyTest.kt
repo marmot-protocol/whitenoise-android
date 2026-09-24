@@ -235,7 +235,7 @@ class ConversationTimelineExtendApplyTest {
             }
         }
 
-    /** A held row inside the window's span that the page no longer carries was removed, so it leaves. */
+    /** A held row inside the span that the page no longer carries was removed; the page replaces, so it leaves. */
     @Test
     fun extendDropsHeldRowsTheWindowProvesGone() =
         runBlocking {

@@ -289,17 +289,28 @@ private fun ConversationController.timelineItemHoldsMessage(
 
 /**
  * How far the page's ordinals must move to line up with the rows the timeline already holds, or
- * null when the two share no ordered row and the page is a new place in history. The first page
- * row with a held ordinal decides; MDK keeps one order, so any shared row gives the same answer.
+ * null when the page must be applied as a replacement: it shares no ordered row, the shared rows
+ * disagree on the shift (a row was inserted or removed inside the span, so the rows after it
+ * moved), or a new row at an edge would land on an ordinal a row outside the page still holds.
+ * Any of those would stamp page rows over retained rows, so the retained ordinals are only trusted
+ * when every shared row sits exactly where the shift puts it.
  */
 internal fun windowOrderShift(
     page: TimelinePageFfi,
     heldOrder: Map<String, ULong>,
-): Long? =
-    page.messages
-        .withIndex()
-        .firstOrNull { (_, record) -> record.messageIdHex in heldOrder }
-        ?.let { (index, record) -> heldOrder.getValue(record.messageIdHex).toLong() - index.toLong() }
+): Long? {
+    val indexed = page.messages.withIndex()
+    val shared = indexed.filter { (_, record) -> record.messageIdHex in heldOrder }
+    val shift =
+        shared.firstOrNull()?.let { (index, record) -> heldOrder.getValue(record.messageIdHex).toLong() - index }
+            ?: return null
+    val aligned = shared.all { (index, record) -> heldOrder.getValue(record.messageIdHex).toLong() - index == shift }
+    val pageIds = page.messages.mapTo(HashSet(page.messages.size)) { it.messageIdHex }
+    val retainedOrdinals = heldOrder.entries.filter { it.key !in pageIds }.mapTo(HashSet()) { it.value.toLong() }
+    val collides =
+        indexed.any { (index, record) -> record.messageIdHex !in heldOrder && index + shift in retainedOrdinals }
+    return shift.takeIf { aligned && !collides }
+}
 
 /** A page row's ordinal: aligned to the held rows when extending, counted from the base when replacing. */
 internal fun shiftedOrder(

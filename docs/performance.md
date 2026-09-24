@@ -412,9 +412,11 @@ preflight alone; the paging results do not depend on that report.
 | `olderFlingWhileEngineCatchesUp` | The deep fling started right after a cold process launch, while sync catch-up owns the engine. |
 
 Beyond the scroll metrics below, each method reports the paging slices from the
-[Conversation history pages](#conversation-history-pages) section: `pageCount`
-(boundaries actually crossed — a journey that reports zero did not test paging),
-`pageWindowMs` (the engine's share), `pagePrepareMs` and `pageApplyMs` (the
+[Conversation history pages](#conversation-history-pages) section: `windowCommandCount`
+(every window command the journey issued — older and newer pages, but also
+return-to-latest and exact-message jumps, which emit the same slice; the older
+page boundaries a reader crossed are `runwayKeptCount + edgeReachedCount`, and a
+fling journey where both are zero did not test paging), `pageWindowMs` (the engine's share), `pagePrepareMs` and `pageApplyMs` (the
 app's share, preparation and main-thread commit), and three counts that should stay at zero for paging to be invisible:
 `edgeStopCount` (the list rested on its oldest row with more history behind it),
 `edgeReachedCount` (a page landed after the reader had already reached the old

@@ -87,6 +87,8 @@ internal fun ConversationFixtureSeedDialog(
     var progress by remember { mutableStateOf<ConversationFixtureSeedProgress?>(null) }
     var stopped by remember { mutableStateOf(false) }
     var job by remember { mutableStateOf<Job?>(null) }
+    // Compose does not observe `job?.isActive`, so the run's end is written as state of its own.
+    var running by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     ConversationFixtureSeedDialogContent(
         targets = targets,
@@ -94,9 +96,12 @@ internal fun ConversationFixtureSeedDialog(
         count = count,
         progress = progress,
         stopped = stopped,
-        running = job?.isActive == true,
+        running = running,
         onSelect = { selected = it },
-        onStart = { target, requested ->
+        onStart = start@{ target, requested ->
+            // Two taps before the next recomposition must not seed the same chat twice.
+            if (running) return@start
+            running = true
             stopped = false
             progress = ConversationFixtureSeedProgress(sent = 0, failed = 0, total = requested)
             job =
@@ -108,6 +113,8 @@ internal fun ConversationFixtureSeedDialog(
                         // dialog says where the seed stopped instead of falling silent.
                         stopped = true
                         throw cancelled
+                    } finally {
+                        running = false
                     }
                 }
         },
