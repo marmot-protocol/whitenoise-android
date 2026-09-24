@@ -26,11 +26,13 @@ internal class AppReviewDemoNative(
                 !appState.signOutInProgress &&
                 !appState.wipeInProgress
 
-    override suspend fun accounts(): List<ReviewDemoAccount> =
-        appState.marmotIo { listAccounts() }.map { it.forReviewDemo() }
+    override suspend fun accounts(): List<ReviewDemoAccount> {
+        return appState.marmotIo { listAccounts() }.map { it.forReviewDemo() }
+    }
 
-    override suspend fun createAccount(): ReviewDemoAccount =
-        appState.marmotIo { createIdentityWithBootstrapRelays() }.forReviewDemo()
+    override suspend fun createAccount(): ReviewDemoAccount {
+        return appState.marmotIo { createIdentityWithBootstrapRelays() }.forReviewDemo()
+    }
 
     override suspend fun qualifyAccount(ref: String) {
         appState.marmotIo { enforceAppOwnedAttachmentAcquisitionPolicy(listOf(ref)) }

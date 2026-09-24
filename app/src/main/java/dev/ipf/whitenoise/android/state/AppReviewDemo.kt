@@ -469,7 +469,13 @@ internal class AppReviewDemo(
             status = ReviewDemoStatus.Running(stage)
             val greeting =
                 ensureMessage(
-                    checkpoint, original, groupId, "original_greeting", ORIGINAL_GREETING, null, ::requireOwned,
+                    checkpoint,
+                    original,
+                    groupId,
+                    "original_greeting",
+                    ORIGINAL_GREETING,
+                    null,
+                    ::requireOwned,
                 )
             val privacy =
                 ensureMessage(checkpoint, original, groupId, "original_privacy", ORIGINAL_PRIVACY, null, ::requireOwned)
