@@ -51,13 +51,14 @@ internal class LocalGroupDeleteCleanupJournal(
                 name.takeIf { it.endsWith(FILE_SUFFIX) }
             }.distinct()
             .mapNotNull { name ->
-                val result = runCatching {
-                    val decoded = decode(String(AtomicFile(File(directory, name)).readFully(), Charsets.UTF_8))
-                    check(fileName(decoded.account, decoded.groupIdHex) == name) {
-                        "local delete journal identity mismatch"
+                val result =
+                    runCatching {
+                        val decoded = decode(String(AtomicFile(File(directory, name)).readFully(), Charsets.UTF_8))
+                        check(fileName(decoded.account, decoded.groupIdHex) == name) {
+                            "local delete journal identity mismatch"
+                        }
+                        decoded
                     }
-                    decoded
-                }
                 result.onFailure { appStateDebug(it) { "local delete cleanup journal read failed" } }
                 result.getOrNull()
             }
