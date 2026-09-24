@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import android.util.Log
+import dev.ipf.whitenoise.android.state.ConversationUnreadBadge.Source
 
 /**
  * The one owner of the number on the jump-to-newest badge.
@@ -38,64 +39,93 @@ internal data class ConversationUnreadBadge(
 
         /** The anchor is off screen, was never counted, and no projection exists: nothing is known, so 0. */
         UNKNOWN,
+
+        /**
+         * The anchor is loaded but the window stops short of the newest row and nothing better is
+         * known, so the rows after the anchor were counted once — an undercount — and are held.
+         */
+        PARTIAL,
     }
 }
 
 /**
  * Reconciles the badge with the current rows, read anchor and projection. [projectionUnread] is
- * null when the chat has no projection to consult.
+ * null when the chat has no projection to consult. [windowReachesTail] says whether the loaded rows
+ * include the newest message: only then do the rows after the anchor amount to the unread set, since
+ * a backward page can trim the newest rows while keeping the anchor, and counting what is left would
+ * make a page load change the number.
  */
+@Suppress("CyclomaticComplexMethod") // One decision table; splitting it would hide which case wins.
 internal fun ConversationUnreadBadge.reconcile(
     timeline: List<TimelineMessage>,
     readAnchorMessageId: String?,
     projectionUnread: Int?,
+    windowReachesTail: Boolean,
 ): ConversationUnreadBadge {
-    val anchorLoaded =
-        readAnchorMessageId != null && timeline.any { it.record.messageIdHex == readAnchorMessageId }
-    val sameAnchor = anchorMessageId == readAnchorMessageId && source != ConversationUnreadBadge.Source.NONE
-    val countedWhileLoaded =
-        source == ConversationUnreadBadge.Source.LOADED || source == ConversationUnreadBadge.Source.HELD
+    val anchorLoaded = readAnchorMessageId != null && timeline.any { it.record.messageIdHex == readAnchorMessageId }
+    val previousAnchorLoaded = anchorMessageId != null && timeline.any { it.record.messageIdHex == anchorMessageId }
+    val sameAnchor = anchorMessageId == readAnchorMessageId && source != Source.NONE
+    val counted = source == Source.LOADED || source == Source.HELD || source == Source.PARTIAL
+    val afterAnchor = countUnreadIncoming(timeline, readAnchorMessageId)
+    val projection = projectionUnread?.coerceAtLeast(0)
+    val rowsRead = receivedRowsBetween(timeline, anchorMessageId, readAnchorMessageId)
     return when {
-        anchorLoaded ->
-            ConversationUnreadBadge(
-                anchorMessageId = readAnchorMessageId,
-                count = countUnreadIncoming(timeline, readAnchorMessageId),
-                projectionSeen = projectionUnread,
-                source = ConversationUnreadBadge.Source.LOADED,
-            )
-        sameAnchor && countedWhileLoaded ->
-            // Paging moved the anchor off screen. The rows left on screen say nothing new about what
-            // lies after it; only a projection that grew since the last look does, and that is an arrival.
-            copy(
-                count = count + arrivalsSince(projectionUnread),
-                projectionSeen = projectionUnread ?: projectionSeen,
-                source = ConversationUnreadBadge.Source.HELD,
-            )
-        projectionUnread != null ->
-            ConversationUnreadBadge(
-                anchorMessageId = readAnchorMessageId,
-                count = projectionUnread.coerceAtLeast(0),
-                projectionSeen = projectionUnread,
-                source = ConversationUnreadBadge.Source.PROJECTION,
-            )
+        anchorLoaded && windowReachesTail -> counted(readAnchorMessageId, afterAnchor, projectionUnread, Source.LOADED)
+        // The reader read past unread rows inside a window that stops short of the tail: the rows
+        // between the two anchors are what they read, and nothing else about the set is known.
+        anchorLoaded && counted && !sameAnchor && previousAnchorLoaded ->
+            held(readAnchorMessageId, projectionUnread, read = rowsRead)
+        // Opened or landed mid-history: the rows after the anchor stop at the window's edge, so the
+        // durable count stands in rather than a page-local one that every forward page would raise.
+        anchorLoaded && !sameAnchor && projection != null ->
+            counted(readAnchorMessageId, projection, projectionUnread, Source.PROJECTION)
+        anchorLoaded && !sameAnchor -> counted(readAnchorMessageId, afterAnchor, null, Source.PARTIAL)
+        // Paging moved the anchor off screen, or trimmed the tail while keeping it: the rows left on
+        // screen say nothing new; only a projection that grew since the last look does, as an arrival.
+        sameAnchor && counted -> held(anchorMessageId, projectionUnread)
+        projection != null -> counted(readAnchorMessageId, projection, projectionUnread, Source.PROJECTION)
         sameAnchor -> this
+        // Nothing read yet and no projection: everything received so far is unread, counted once —
+        // exactly when the window reaches the tail, as far as the window goes otherwise.
         readAnchorMessageId == null ->
-            // Nothing read yet and no projection: everything received so far is unread, counted once.
-            ConversationUnreadBadge(
-                anchorMessageId = null,
-                count = countUnreadIncoming(timeline, null),
-                projectionSeen = null,
-                source = ConversationUnreadBadge.Source.LOADED,
-            )
-        else ->
-            // An anchor that is off screen and was never counted. Counting the loaded rows would call
-            // every retained row unread; the badge stays quiet until the anchor or a projection appears.
-            ConversationUnreadBadge(
-                anchorMessageId = readAnchorMessageId,
-                count = 0,
-                projectionSeen = null,
-                source = ConversationUnreadBadge.Source.UNKNOWN,
-            )
+            counted(null, afterAnchor, null, if (windowReachesTail) Source.LOADED else Source.PARTIAL)
+        // An anchor that is off screen and was never counted. Counting the loaded rows would call
+        // every retained row unread; the badge stays quiet until the anchor or a projection appears.
+        else -> counted(readAnchorMessageId, 0, null, Source.UNKNOWN)
+    }
+}
+
+/** A badge whose number was just taken from [source]. */
+private fun counted(
+    anchorMessageId: String?,
+    count: Int,
+    projectionSeen: Int?,
+    source: Source,
+) = ConversationUnreadBadge(anchorMessageId, count, projectionSeen, source)
+
+/** The held number, less the [read] rows the reader passed, plus whatever the projection says arrived. */
+private fun ConversationUnreadBadge.held(
+    anchorMessageId: String?,
+    projectionUnread: Int?,
+    read: Int = 0,
+) = copy(
+    anchorMessageId = anchorMessageId,
+    count = (count - read + arrivalsSince(projectionUnread)).coerceAtLeast(0),
+    projectionSeen = projectionUnread ?: projectionSeen,
+    source = Source.HELD,
+)
+
+/** Received, non-derived rows after [fromMessageId] up to and including [toMessageId]; zero when either is missing. */
+private fun receivedRowsBetween(
+    timeline: List<TimelineMessage>,
+    fromMessageId: String?,
+    toMessageId: String?,
+): Int {
+    val from = timeline.indexOfFirst { it.record.messageIdHex == fromMessageId }
+    val to = timeline.indexOfFirst { it.record.messageIdHex == toMessageId }
+    if (from < 0 || to <= from) return 0
+    return timeline.subList(from + 1, to + 1).count {
+        it.record.direction == "received" && !isDerivedStateKind(it.record.kind)
     }
 }
 

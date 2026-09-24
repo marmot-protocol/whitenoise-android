@@ -1443,6 +1443,7 @@ internal fun ConversationScreen(
         readAnchorMessageId,
         projectedUnreadCount,
         entryProjectionAvailable,
+        controller.hasMoreAfterTimeline,
     ) {
         if (!initialTimelineAnchored) return@LaunchedEffect
         val next =
@@ -1450,21 +1451,26 @@ internal fun ConversationScreen(
                 timeline = controller.timeline,
                 readAnchorMessageId = readAnchorMessageId,
                 projectionUnread = projectedUnreadCount.takeIf { entryProjectionAvailable },
+                windowReachesTail = !controller.hasMoreAfterTimeline,
             )
         logUnreadBadgeTransition("DMConversation", unreadBadge, next, controller.timeline.size)
         unreadBadge = next
     }
-    val unreadIncomingCount = if (initialTimelineAnchored) unreadBadge.count else 0
+    // The first composition after anchoring has not reconciled yet; exposing 0 there would retire the
+    // two-stage jump target, so the count and its consumers wait for the first reconciliation.
+    val badgeReconciled = initialTimelineAnchored && unreadBadge.source != ConversationUnreadBadge.Source.NONE
+    val unreadIncomingCount = if (badgeReconciled) unreadBadge.count else 0
     LaunchedEffect(
         controller,
         initialTimelineAnchored,
         renderedTimeline,
         readAnchorMessageId,
+        badgeReconciled,
         unreadIncomingCount,
         nearBottom,
         unreadJumpState,
     ) {
-        if (!initialTimelineAnchored) return@LaunchedEffect
+        if (!badgeReconciled) return@LaunchedEffect
         unreadJumpState =
             reconcileConversationUnreadJump(
                 current = unreadJumpState,

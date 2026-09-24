@@ -111,8 +111,12 @@ class FreshSweepCoverageTest {
             "entryProjectionAvailable" in badgeEffectInputs,
         )
         assertTrue(
-            "the badge count shown must be the owner's count",
-            source.contains("val unreadIncomingCount = if (initialTimelineAnchored) unreadBadge.count else 0"),
+            "the window reaching the tail must re-reconcile the badge",
+            "controller.hasMoreAfterTimeline" in badgeEffectInputs,
+        )
+        assertTrue(
+            "the badge count shown must wait for the first reconciliation and then be the owner's count",
+            source.contains("val unreadIncomingCount = if (badgeReconciled) unreadBadge.count else 0"),
         )
         assertTrue(
             source.contains(
