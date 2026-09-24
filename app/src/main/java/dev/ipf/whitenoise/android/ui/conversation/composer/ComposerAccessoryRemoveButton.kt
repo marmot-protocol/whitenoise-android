@@ -65,7 +65,8 @@ internal fun ComposerAccessoryRemoveButton(
         Box(
             modifier =
                 Modifier
-                    .padding(top = 6.dp, end = 6.dp)
+                    // The Edit target sits below the resize strip; center its painted X on the label.
+                    .padding(top = 2.dp, end = 6.dp)
                     .size(20.dp)
                     .clip(CircleShape)
                     .background(background)

@@ -11,6 +11,7 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
@@ -32,6 +33,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import kotlin.math.abs
 
 /** Pixel baselines for short and wrapping message edits. */
 @RunWith(RobolectricTestRunner::class)
@@ -93,6 +95,16 @@ class ComposerEditScreenshotTest {
                 .onNodeWithContentDescription(context.getString(R.string.cancel_edit))
                 .fetchSemanticsNode()
                 .boundsInRoot
+        val cancelVisual =
+            composeRule
+                .onNodeWithTag("conversation.composer.remove.visual", useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot
+        val editLabel =
+            composeRule
+                .onNodeWithText(context.getString(R.string.editing_message))
+                .fetchSemanticsNode()
+                .boundsInRoot
         val editor = composeRule.onNode(hasSetTextAction()).fetchSemanticsNode().boundsInRoot
         val border =
             composeRule
@@ -101,6 +113,10 @@ class ComposerEditScreenshotTest {
                 .boundsInRoot
         assertTrue(cancel.left >= surface.left && cancel.right <= surface.right)
         assertTrue(cancel.top >= border.bottom)
+        assertTrue(
+            "Cancel X should be vertically centered on the Edit label",
+            abs(cancelVisual.center.y - editLabel.center.y) <= with(composeRule.density) { 1.dp.toPx() },
+        )
         // Only four dp of the field's empty leading overlaps the Cancel target.
         assertTrue(cancel.bottom <= editor.top + with(composeRule.density) { 4.dp.toPx() })
         assertTrue(editor.bottom <= surface.bottom)
