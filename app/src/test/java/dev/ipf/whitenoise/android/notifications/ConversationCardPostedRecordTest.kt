@@ -9,29 +9,29 @@ class ConversationCardPostedRecordTest {
     /** A recorded write is reported once and then forgotten. */
     @Test
     fun recordedWriteIsConsumedByOneClear() {
-        ConversationCardPostSynchronizer.markPosted("record-once", 7)
+        ConversationCardPostedRegistry.markPosted("record-once", 7)
 
-        assertTrue(ConversationCardPostSynchronizer.clearPosted("record-once", 7))
-        assertFalse(ConversationCardPostSynchronizer.clearPosted("record-once", 7))
+        assertTrue(ConversationCardPostedRegistry.clearPosted("record-once", 7))
+        assertFalse(ConversationCardPostedRegistry.clearPosted("record-once", 7))
     }
 
     /** Distinct ids under one tag are separate cards. */
     @Test
     fun recordIsKeyedByTagAndId() {
-        ConversationCardPostSynchronizer.markPosted("record-key", 1)
+        ConversationCardPostedRegistry.markPosted("record-key", 1)
 
-        assertFalse(ConversationCardPostSynchronizer.clearPosted("record-key", 2))
-        assertTrue(ConversationCardPostSynchronizer.clearPosted("record-key", 1))
+        assertFalse(ConversationCardPostedRegistry.clearPosted("record-key", 2))
+        assertTrue(ConversationCardPostedRegistry.clearPosted("record-key", 1))
     }
 
     /** The record stays bounded: the oldest write is evicted first and a re-write counts as fresh. */
     @Test
     fun oldestWriteIsEvictedFirst() {
-        ConversationCardPostSynchronizer.markPosted("record-evict-first", 0)
-        repeat(300) { ConversationCardPostSynchronizer.markPosted("record-evict-filler", it) }
+        ConversationCardPostedRegistry.markPosted("record-evict-first", 0)
+        repeat(300) { ConversationCardPostedRegistry.markPosted("record-evict-filler", it) }
 
-        assertFalse(ConversationCardPostSynchronizer.clearPosted("record-evict-first", 0))
-        assertTrue(ConversationCardPostSynchronizer.clearPosted("record-evict-filler", 299))
-        repeat(299) { ConversationCardPostSynchronizer.clearPosted("record-evict-filler", it) }
+        assertFalse(ConversationCardPostedRegistry.clearPosted("record-evict-first", 0))
+        assertTrue(ConversationCardPostedRegistry.clearPosted("record-evict-filler", 299))
+        repeat(299) { ConversationCardPostedRegistry.clearPosted("record-evict-filler", it) }
     }
 }
