@@ -4119,7 +4119,7 @@ internal fun ConversationScreen(
                                     labelState = stickyDayLabelState,
                                 )
                             }
-                            if (transcriptReadyToReveal && !selectionMode) {
+                            if (transcriptReadyToReveal) {
                                 Column(
                                     modifier =
                                         Modifier
@@ -4134,7 +4134,9 @@ internal fun ConversationScreen(
                                     if (rememberNewerPageIndicatorVisible(controller.isLoadingNewer)) {
                                         ConversationNewerPageIndicator()
                                     }
-                                    if (ttsFollowHandle.showResumeAction) {
+                                    // Selection hides the controls below; the newer-page indicator above stays,
+                                    // since a page can be in flight when selection starts or start during it.
+                                    if (!selectionMode && ttsFollowHandle.showResumeAction) {
                                         TtsResumeFollowButton(
                                             onClick = ttsFollowHandle::resumeFollow,
                                         )
@@ -4142,7 +4144,7 @@ internal fun ConversationScreen(
                                     // Jump-to-mention chip: tap visits the oldest unread
                                     // mention and marks it read, so the count steps down.
                                     val mentionCount = unreadMentionMessageIds.size
-                                    if (mentionCount > 0) {
+                                    if (!selectionMode && mentionCount > 0) {
                                         val jumpToMentionLabel = stringResource(R.string.conversation_jump_to_mention)
                                         Surface(
                                             shape = CircleShape,
@@ -4168,7 +4170,7 @@ internal fun ConversationScreen(
                                             }
                                         }
                                     }
-                                    if (!nearBottom) {
+                                    if (!selectionMode && !nearBottom) {
                                         ConversationJumpToNewestButton(
                                             unreadIncomingCount = unreadIncomingCount,
                                             onClick = {
