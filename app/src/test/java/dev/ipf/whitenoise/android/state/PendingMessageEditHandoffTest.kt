@@ -72,6 +72,25 @@ class PendingMessageEditHandoffTest {
     }
 
     @Test
+    fun cancellingReopenedEditorPublishesEarlierSubmissionAfterOriginalConfirms() {
+        val handoff = PendingMessageEditHandoff()
+        handoff.begin("local-token")
+        assertEquals(
+            PendingMessageEditHandoff.Submission.Deferred,
+            handoff.submit("local-token", "local-token", "revision A"),
+        )
+        handoff.begin("local-token")
+        assertNull(handoff.confirm("local-token", "event-id", ready = true))
+
+        assertEquals(
+            PendingMessageEditHandoff.ReadyEdit("event-id", "revision A"),
+            handoff.cancel("local-token"),
+        )
+        assertFalse(handoff.hasSession("local-token"))
+        assertNull(handoff.confirm("local-token", "event-id", ready = true))
+    }
+
+    @Test
     fun sameTokenInAnotherConversationCannotConsumeTheRevision() {
         val handoff = PendingMessageEditHandoff()
         handoff.begin("account-a|group-a|local-token")

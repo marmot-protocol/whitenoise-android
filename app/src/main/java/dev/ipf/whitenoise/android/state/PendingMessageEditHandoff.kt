@@ -27,6 +27,11 @@ internal class PendingMessageEditHandoff {
         data object Deferred : Submission
     }
 
+    data class ReadyEdit(
+        val targetId: String,
+        val text: String,
+    )
+
     fun submit(
         scopedClientToken: String,
         targetId: String,
@@ -65,10 +70,20 @@ internal class PendingMessageEditHandoff {
         }
     }
 
-    fun cancel(clientToken: String) {
-        val entry = entries[clientToken] ?: return
+    fun cancel(clientToken: String): ReadyEdit? {
+        val entry = entries[clientToken] ?: return null
         entry.editing = false
-        if (entry.queuedText == null) entries.remove(clientToken)
+        val queuedText = entry.queuedText
+        val confirmedId = entry.confirmedId
+        if (queuedText == null) {
+            entries.remove(clientToken)
+            return null
+        }
+        if (entry.ready && confirmedId != null) {
+            entries.remove(clientToken)
+            return ReadyEdit(confirmedId, queuedText)
+        }
+        return null
     }
 
     fun abandon(clientToken: String) {

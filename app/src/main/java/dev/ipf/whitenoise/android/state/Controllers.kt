@@ -6014,6 +6014,9 @@ class ConversationController(
         }
     },
     private val textPublisher: (suspend (String?, String, String, String) -> SendSummaryFfi)? = null,
+    private val messageEditPublisher: suspend (String, String, String, String) -> Unit = { account, groupId, target, text ->
+        appState.marmotIo(MarmotTraceSection.MESSAGE_EDIT) { editMessage(account, groupId, target, text) }
+    },
     private val mediaUploader: MediaUploader? = null,
     private val mediaImetaTagsBuilder: MediaImetaTagsBuilder = { account, groupIdHex, references ->
         appState.marmotIo {
@@ -6266,7 +6269,6 @@ class ConversationController(
      */
     private val optimisticEdits = mutableStateMapOf<String, OptimisticEdit>()
     private val pendingMessageEditHandoff: PendingMessageEditHandoff get() = appState.pendingMessageEditHandoff
-
     private fun pendingEditKey(token: String): String = "${conversationAccountRef.orEmpty()}|${group.groupIdHex}|$token"
 
     /** Set when the user has tapped Edit on a kind-9 they sent — the composer
@@ -6281,10 +6283,12 @@ class ConversationController(
     }
 
     fun cancelMessageEdit() {
-        editingMessageId?.let { pendingMessageEditHandoff.cancel(pendingEditKey(it)) }
+        val readyEdit = editingMessageId?.let { pendingMessageEditHandoff.cancel(pendingEditKey(it)) }
         editingMessageId = null
+        readyEdit?.let { edit ->
+            appState.launchMutation { yield(); editMessage(edit.targetId, edit.text) }
+        }
     }
-
     // Production controllers start their local subscription during
     // construction. Reflect that synchronously so the first composition cannot
     // mistake the not-yet-started coroutine for an authoritative empty chat.
@@ -9253,9 +9257,7 @@ class ConversationController(
         publishTimelineFromIndexes()
         try {
             appState.withGroupCommitLock(account, group.groupIdHex) {
-                appState.marmotIo(MarmotTraceSection.MESSAGE_EDIT) {
-                    editMessage(account, group.groupIdHex, target, trimmed)
-                }
+                messageEditPublisher(account, group.groupIdHex, target, trimmed)
             }
             // Publish accepted: drop the Pending indicator but keep the text
             // overlay so the bubble doesn't flicker back to the old body in the

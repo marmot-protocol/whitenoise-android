@@ -37,6 +37,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -56,6 +57,50 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36], qualifiers = "en")
 @Suppress("LargeClass") // Send, retry, projection, preview, and durable-draft scenarios share one controller fixture.
 class ConversationSendRetryIntegrationTest {
+    @Test
+    fun cancellingReopenedEditorDispatchesTheSubmittedRevisionAfterOriginalConfirms() =
+        runBlocking {
+            val releaseOriginal = CompletableDeferred<Unit>()
+            val publishedEdit = CompletableDeferred<Pair<String, String>>()
+            var editCalls = 0
+            val controller =
+                ConversationController(
+                    appState = appState(),
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        releaseOriginal.await()
+                        successfulSendSummary()
+                    },
+                    messageEditPublisher = { _, _, target, text ->
+                        editCalls += 1
+                        publishedEdit.complete(target to text)
+                    },
+                )
+
+            try {
+                val original = async(start = CoroutineStart.UNDISPATCHED) { controller.send("original") }
+                val clientToken = controller.timeline.single().record.messageIdHex
+                controller.beginMessageEdit(clientToken)
+                controller.send("revision A")
+                controller.beginMessageEdit(clientToken)
+
+                releaseOriginal.complete(Unit)
+                original.await()
+                controller.cancelMessageEdit()
+
+                assertEquals(
+                    CONFIRMED_MESSAGE_ID to "revision A",
+                    withTimeout(5_000) { publishedEdit.await() },
+                )
+                controller.cancelMessageEdit()
+                assertEquals(1, editCalls)
+            } finally {
+                releaseOriginal.complete(Unit)
+                controller.onCleared()
+            }
+        }
+
     /** Exact caller identity settles only its bubble even when text and timestamps are identical. */
     @Test
     fun callerTokenReconcilesIdenticalOptimisticMessagesWithoutHeuristics() =
