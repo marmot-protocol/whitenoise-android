@@ -109,6 +109,7 @@ class NotificationStartupOrderingTest {
                     notificationReceiverHasDisplayName = true,
                     previewText = "**ready on first draw**",
                     accounts = accounts,
+                    groupMemberAccountRefs = setOf("account-b"),
                 )
             try {
                 withNotificationWriteCount { writes ->

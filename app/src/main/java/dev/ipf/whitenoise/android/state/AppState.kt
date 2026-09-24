@@ -115,7 +115,6 @@ import dev.ipf.whitenoise.android.notifications.ConversationNotificationChannels
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationRouting
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPattern
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPreferences
-import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
 import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.NotificationBatteryPolicy
@@ -2365,9 +2364,22 @@ class WhiteNoiseAppState private constructor(
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
     private val notificationFirstPostContentCoordinator =
         NotificationFirstPostContentCoordinator(notificationScope, notificationDispatcher, SystemClock::elapsedRealtime)
-
     private val notificationContentResolution by lazy {
         createNotificationContentResolutionServices(appContext, NotificationContentReads())
+    }
+    private val notificationNicknameRefresh by lazy {
+        NotificationNicknameRefreshCoordinator(
+            notificationScope,
+            notificationContentResolution.identity,
+            localNotificationPresenter,
+        )
+    }
+    private val conversationOpenDismissals by lazy {
+        ConversationOpenNotificationDismissalCoordinator(
+            notificationScope,
+            notificationCardCancellationDispatcher,
+            localNotificationPresenter,
+        )
     }
 
     /** Delegates live notification reads without creating a callback class for each dependency. */
@@ -2411,7 +2423,8 @@ class WhiteNoiseAppState private constructor(
                 ::notificationMessageRecord,
             )
 
-        override fun signedInAccountCount(): Int = accounts.count { it.isSignedInSigningAccount() }
+        /** Projects only identities that can currently sign notification actions. */
+        override fun signedInAccountIds(): Set<String> = accounts.signedInSigningAccountIds()
     }
 
     private val notificationAvatarCoordinator by lazy {
@@ -7751,10 +7764,8 @@ class WhiteNoiseAppState private constructor(
         accountRef: String?,
         groupIdHex: String?,
     ) {
-        // Notification routing can render a conversation under its pinned
-        // account before that account becomes active. Keep suppression and
-        // dismissal tied to the account that owns the visible controller;
-        // closing (null) clears both halves via the transition.
+        conversationOpenDismissals.invalidate()
+        // Keep notification routing suppression and dismissal tied to the pinned conversation owner.
         updateNotificationSuppression(
             suppression.onActiveConversation(groupIdHex, accountRef = if (groupIdHex != null) accountRef else null),
         )
@@ -7791,11 +7802,13 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
     ) {
         val target = conversationOpenDismissalTarget(accountRef, groupIdHex) ?: return
-        withContext(notificationCardCancellationDispatcher) {
-            runCatchingCancellable {
-                localNotificationPresenter.dismissConversationMessagesImmediately(target.accountRef, target.groupIdHex)
-            }.onFailure { appStateDebug { "notification route dismiss failed group=${target.groupIdHex.take(8)}" } }
-        }
+        runCatchingCancellable {
+            localNotificationPresenter.dismissConversationMessages(
+                target.accountRef,
+                target.groupIdHex,
+                dispatcher = notificationCardCancellationDispatcher,
+            )
+        }.onFailure { appStateDebug { "notification route dismiss failed group=${target.groupIdHex.take(8)}" } }
     }
 
     /** Publish Compose ownership immediately, then dismiss existing cards off the main thread. */
@@ -7806,18 +7819,7 @@ class WhiteNoiseAppState private constructor(
         // Publish ownership first so suppression is authoritative for the
         // visible route even if a platform cancellation call fails.
         applyActiveConversationTransition(accountRef, groupIdHex)
-        conversationOpenDismissalTarget(accountRef, groupIdHex)?.let { target ->
-            notificationScope.launch(notificationCardCancellationDispatcher) {
-                runCatching {
-                    localNotificationPresenter.dismissConversationMessagesImmediately(
-                        target.accountRef,
-                        target.groupIdHex,
-                    )
-                }.onFailure {
-                    appStateDebug { "notification dismiss failed group=${target.groupIdHex.take(8)}" }
-                }
-            }
-        }
+        conversationOpenDismissals.dismiss(accountRef, groupIdHex)
         appStateDebug {
             "active conversation=${groupIdHex?.take(8) ?: "<none>"} account=${activeConversationAccountRef?.take(8) ?: "<none>"}"
         }
@@ -9437,6 +9439,7 @@ class WhiteNoiseAppState private constructor(
 
     fun contactNickname(accountIdHex: String): String? = contactNicknameFor(activeAccountRef, accountIdHex)
 
+    /** Stores an account-scoped nickname and silently reconciles active notification sender lines. */
     fun setContactNickname(
         accountIdHex: String,
         nickname: String,
@@ -9448,6 +9451,7 @@ class WhiteNoiseAppState private constructor(
         if (ContactNicknamePreferences.writeNickname(preferences, account, accountIdHex, nickname)) {
             contactNicknameRevision += 1
             bumpProfileAccountRevision(accountIdHex)
+            notificationNicknameRefresh.refresh(account, accountIdHex)
         }
     }
 
@@ -10994,13 +10998,9 @@ class WhiteNoiseAppState private constructor(
                     if (redactContent) {
                         null
                     } else {
-                        LocalNotificationFormatter.recipientAccountSubtext(
-                            signedInAccountCount = accounts.count { it.isSignedInSigningAccount() },
-                            recipientLabel =
-                                notificationContentResolution.identity.recipientName(
-                                    update.accountRef,
-                                    localOnly = false,
-                                ),
+                        notificationContentResolution.firstPost.recipientAccountSubtext(
+                            update,
+                            localOnly = false,
                         )
                     },
                 redactContent = redactContent,
