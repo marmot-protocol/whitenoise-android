@@ -38,10 +38,10 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -94,7 +94,8 @@ class ConversationSendRetryIntegrationTest {
                 assertTrue(appState.pendingMessageEditHandoff.hasSession(handoffKey))
                 controller.cancelMessageEdit()
                 assertFalse(appState.pendingMessageEditHandoff.hasSession(handoffKey))
-                Shadows.shadowOf(Looper.getMainLooper()).idle()
+                val mainLooper = Looper.getMainLooper()
+                Shadows.shadowOf(mainLooper).idle()
 
                 assertEquals(
                     CONFIRMED_MESSAGE_ID to "revision A",
