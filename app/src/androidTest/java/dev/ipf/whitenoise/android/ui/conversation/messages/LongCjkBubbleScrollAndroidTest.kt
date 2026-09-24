@@ -45,51 +45,7 @@ class LongCjkBubbleScrollAndroidTest {
         lateinit var listState: LazyListState
         composeRule.setContent {
             listState = rememberLazyListState()
-            WhiteNoiseTheme {
-                LazyColumn(
-                    state = listState,
-                    reverseLayout = true,
-                    modifier = Modifier.width(320.dp).height(560.dp).testTag(LIST),
-                ) {
-                    items((0 until ROW_COUNT).toList(), key = { "message-$it" }) { index ->
-                        val footer: @Composable () -> Unit = {
-                            MessageInlineFooter(
-                                timeText = "12:45",
-                                color = MaterialTheme.colorScheme.onSurface,
-                                showStatus = false,
-                                status = MessageStatus.Received,
-                                editedLabel = null,
-                                onEditedClick = null,
-                            )
-                        }
-                        if (index == LONG_ROW) {
-                            BubbleCollapsibleFooterLayout(
-                                maxBodyHeight = 960.dp,
-                                readMore = { Text("Read more") },
-                                footer = footer,
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                            ) {
-                                Text(
-                                    text = longCjkMessage,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    modifier = Modifier.testTag("message-$index"),
-                                )
-                            }
-                        } else {
-                            BubbleFooterLayout(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                footer = footer,
-                            ) {
-                                Text(
-                                    text = "相邻消息 $index",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    modifier = Modifier.testTag("message-$index"),
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+            ScrollFixture(listState)
         }
 
         val list = composeRule.onNodeWithTag(LIST)
@@ -116,6 +72,55 @@ class LongCjkBubbleScrollAndroidTest {
         composeRule.runOnIdle {
             assertEquals(ROW_COUNT, listState.layoutInfo.totalItemsCount)
             assertEquals("the final jump lost its message anchor", LONG_ROW, listState.firstVisibleItemIndex)
+        }
+    }
+
+    @Composable
+    private fun ScrollFixture(listState: LazyListState) {
+        WhiteNoiseTheme {
+            LazyColumn(
+                state = listState,
+                reverseLayout = true,
+                modifier = Modifier.width(320.dp).height(560.dp).testTag(LIST),
+            ) {
+                items((0 until ROW_COUNT).toList(), key = { "message-$it" }) { index ->
+                    val footer: @Composable () -> Unit = {
+                        MessageInlineFooter(
+                            timeText = "12:45",
+                            color = MaterialTheme.colorScheme.onSurface,
+                            showStatus = false,
+                            status = MessageStatus.Received,
+                            editedLabel = null,
+                            onEditedClick = null,
+                        )
+                    }
+                    if (index == LONG_ROW) {
+                        BubbleCollapsibleFooterLayout(
+                            maxBodyHeight = 960.dp,
+                            readMore = { Text("Read more") },
+                            footer = footer,
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        ) {
+                            Text(
+                                text = longCjkMessage,
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.testTag("message-$index"),
+                            )
+                        }
+                    } else {
+                        BubbleFooterLayout(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            footer = footer,
+                        ) {
+                            Text(
+                                text = "相邻消息 $index",
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.testTag("message-$index"),
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 
