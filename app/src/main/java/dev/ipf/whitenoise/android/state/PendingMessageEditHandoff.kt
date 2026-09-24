@@ -20,7 +20,9 @@ internal class PendingMessageEditHandoff {
     }
 
     sealed interface Submission {
-        data class Publish(val targetId: String) : Submission
+        data class Publish(
+            val targetId: String,
+        ) : Submission
 
         data object Deferred : Submission
     }

@@ -6265,8 +6265,7 @@ class ConversationController(
      * [optimisticMessages] map: local-first display, reconciled on engine echo.
      */
     private val optimisticEdits = mutableStateMapOf<String, OptimisticEdit>()
-    private val pendingMessageEditHandoff: PendingMessageEditHandoff
-        get() = appState.pendingMessageEditHandoff
+    private val pendingMessageEditHandoff: PendingMessageEditHandoff get() = appState.pendingMessageEditHandoff
 
     private fun pendingEditKey(clientToken: String): String =
         "${conversationAccountRef.orEmpty()}|${group.groupIdHex}|$clientToken"
@@ -9803,8 +9802,8 @@ class ConversationController(
      * so the bubble doesn't visually jump) and transitions Failed -> Pending
      * while the FFI call is in flight. On success it follows the same
      * confirmed-id swap path as [send]; on failure it returns to Failed.
+     * Keep the established original-send retry transaction behind the failed-edit guard.
      */
-    // The original-send retry is one transaction; the failed-edit guard precedes it.
     @Suppress("CyclomaticComplexMethod", "LongMethod", "ReturnCount")
     suspend fun retryFailedSend(item: TimelineMessage) {
         val key = item.id
