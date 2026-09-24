@@ -71,7 +71,8 @@ class StateSourceSizeCeilingTest {
         // Its covered final settlement needs one formatter-required expression-body continuation.
         // Current master also adds pending-send and bounded-window recovery state;
         // Play/Zapstore unit tests and Kover run in required CI; keep merged size exact.
-        const val APP_STATE_MAX_LINES = 11298
+        // The pending-edit handoff adds process-scoped ownership and sign-out cleanup.
+        const val APP_STATE_MAX_LINES = 11303
 
         /** Counts physical source lines with the same trailing-newline semantics as `wc -l`. */
         internal fun sourceLineCount(file: File): Int = file.bufferedReader().useLines { lines -> lines.count() }
