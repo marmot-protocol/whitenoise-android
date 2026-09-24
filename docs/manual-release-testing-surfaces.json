@@ -24965,6 +24965,14 @@
         ]
       },
       {
+        "surface": "Long text and media previews leave a tappable action viewport above the keyboard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "val previewHeightLimit =",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
         "surface": "The long-press actions form a two-column labelled grid, falling back to one readable column",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActionGrid.kt",
         "anchor": "fun FocusedActionMenu(",
