@@ -43,21 +43,23 @@ internal class LocalGroupDeleteCleanupJournal(
     }
 
     fun pending(): List<PendingLocalGroupDeleteCleanup> =
-        directory.listFiles().orEmpty()
+        directory
+            .listFiles()
+            .orEmpty()
             .mapNotNull { file ->
                 val name = file.name.removeSuffix(".bak").removeSuffix(".new")
                 name.takeIf { it.endsWith(FILE_SUFFIX) }
             }.distinct()
             .mapNotNull { name ->
-                runCatching {
+                val result = runCatching {
                     val decoded = decode(String(AtomicFile(File(directory, name)).readFully(), Charsets.UTF_8))
                     check(fileName(decoded.account, decoded.groupIdHex) == name) {
                         "local delete journal identity mismatch"
                     }
                     decoded
                 }
-                    .onFailure { appStateDebug(it) { "local delete cleanup journal read failed" } }
-                    .getOrNull()
+                result.onFailure { appStateDebug(it) { "local delete cleanup journal read failed" } }
+                result.getOrNull()
             }
 
     fun finish(pending: PendingLocalGroupDeleteCleanup) {
@@ -74,10 +76,9 @@ internal class LocalGroupDeleteCleanupJournal(
         account: String,
         groupIdHex: String,
     ): String {
-        val digest =
-            MessageDigest.getInstance("SHA-256")
-                .digest("$account\u0000$groupIdHex".toByteArray(Charsets.UTF_8))
-                .joinToString("") { "%02x".format(it) }
+        val identity = "$account\u0000$groupIdHex".toByteArray(Charsets.UTF_8)
+        val digestBytes = MessageDigest.getInstance("SHA-256").digest(identity)
+        val digest = digestBytes.joinToString("") { "%02x".format(it) }
         return "$digest$FILE_SUFFIX"
     }
 
@@ -93,6 +94,7 @@ internal class LocalGroupDeleteCleanupJournal(
     private fun decode(json: String): PendingLocalGroupDeleteCleanup {
         val value = JSONObject(json)
         require(value.getInt("version") == 1) { "unsupported local delete journal version" }
+
         fun strings(name: String): List<String> =
             value.getJSONArray(name).let { array ->
                 (0 until array.length()).map(array::getString)

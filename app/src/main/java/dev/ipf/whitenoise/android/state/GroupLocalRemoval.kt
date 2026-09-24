@@ -4,8 +4,34 @@ import dev.ipf.whitenoise.android.media.editor.MessageDraftMutationResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+
+private val LOCAL_GROUP_DELETE_RECONCILIATION_DELAYS_MS = listOf(0L, 5_000L, 30_000L)
+
+/** Drops UI-only composer geometry when its owning conversation is explicitly removed. */
+internal fun WhiteNoiseAppState.removeComposerExpansionForGroup(
+    accountRef: String,
+    groupIdHex: String,
+) {
+    composerExpansionStateRetention.removeGroup(accountRef, groupIdHex)
+}
+
+/** Schedule read-only replay after startup, live refresh or an uncertain native response. */
+internal fun WhiteNoiseAppState.schedulePendingLocalGroupDeleteCleanup(retryTransport: Boolean = false) {
+    if (!localGroupDeleteCleanupJournal.hasPending()) return
+    mutationsScope.launch(Dispatchers.IO) {
+        val delays = if (retryTransport) LOCAL_GROUP_DELETE_RECONCILIATION_DELAYS_MS else listOf(0L)
+        for (pauseMillis in delays) {
+            if (pauseMillis > 0) delay(pauseMillis)
+            if (!localGroupDeleteCleanupJournal.hasPending()) break
+            runCatchingCancellable { reconcilePendingLocalGroupDeleteCleanups() }
+                .onFailure { appStateDebug(it) { "local group delete cleanup deferred" } }
+        }
+    }
+}
 
 /**
  * Shared local group wipe used by chat-list Delete and sole-member Leave flows.
@@ -98,6 +124,7 @@ private suspend fun WhiteNoiseAppState.finishLocalGroupDeleteCleanup(pending: Pe
     val account = pending.account
     val groupIdHex = pending.groupIdHex
     var complete = true
+
     suspend fun cleanupStep(
         name: String,
         block: suspend () -> Unit,

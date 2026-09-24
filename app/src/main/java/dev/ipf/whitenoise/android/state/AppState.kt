@@ -219,7 +219,6 @@ import dev.ipf.whitenoise.android.notifications.notificationReplyCommitProbe as 
 
 private const val NATIVE_ATTACHMENT_PERMISSION_RETRY_LIMIT = 3
 private const val NATIVE_ATTACHMENT_PERMISSION_RETRY_DELAY_MILLIS = 500L
-private val LOCAL_GROUP_DELETE_RECONCILIATION_DELAYS_MS = listOf(0L, 5_000L, 30_000L)
 
 internal data class ProfileGroupInviteOutcome(
     val attempted: Int,
@@ -2726,14 +2725,6 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
     ): MessageDraftMutationResult = composerDraftExpansionBridge.deleteBeforeGroupRemoval(accountRef, groupIdHex)
 
-    /** Drops UI-only composer geometry when its owning conversation is explicitly removed. */
-    internal fun removeComposerExpansionForGroup(
-        accountRef: String,
-        groupIdHex: String,
-    ) {
-        composerExpansionStateRetention.removeGroup(accountRef, groupIdHex)
-    }
-
     /** Refreshes draft summaries behind account, request, and local-fingerprint fences. */
     internal fun refreshDraftSummaries(accountRef: String) {
         val refresh = draftSummaryRefreshLifetime.advance()
@@ -4987,19 +4978,6 @@ class WhiteNoiseAppState private constructor(
         val refreshedAccounts = refreshAccountSnapshot()
         schedulePendingLocalGroupDeleteCleanup()
         refreshAccountUnreadCounts(refreshedAccounts)
-    }
-
-    internal fun schedulePendingLocalGroupDeleteCleanup(retryTransport: Boolean = false) {
-        if (!localGroupDeleteCleanupJournal.hasPending()) return
-        mutationsScope.launch(Dispatchers.IO) {
-            val delays = if (retryTransport) LOCAL_GROUP_DELETE_RECONCILIATION_DELAYS_MS else listOf(0L)
-            for (pauseMillis in delays) {
-                if (pauseMillis > 0) delay(pauseMillis)
-                if (!localGroupDeleteCleanupJournal.hasPending()) break
-                runCatchingCancellable { reconcilePendingLocalGroupDeleteCleanups() }
-                    .onFailure { appStateDebug(it) { "local group delete cleanup deferred" } }
-            }
-        }
     }
 
     /** Whether the saved account is blocked on explicit 0.9.20 checkpoint recovery. */
