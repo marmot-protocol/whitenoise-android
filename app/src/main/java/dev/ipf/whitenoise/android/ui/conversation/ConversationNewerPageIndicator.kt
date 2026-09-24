@@ -48,21 +48,28 @@ internal fun rememberNewerPageIndicatorVisible(isLoadingNewer: Boolean): Boolean
 /**
  * A quiet spinner in the transcript's overlay column while a newer page is being fetched — the
  * forward counterpart of the older-history header. It lives beside the jump button rather than in
- * the list, so the bottom edge never moves for it and it can never be mistaken for a row.
+ * the list, so the bottom edge never moves for it and it can never be mistaken for a row. It takes
+ * the jump button's 42 dp footprint around its 34 dp disc, so the two discs line up in the column,
+ * and reads to a screen reader as one element.
  */
 @Suppress("FunctionNaming")
 @Composable
 internal fun ConversationNewerPageIndicator(modifier: Modifier = Modifier) {
     val label = stringResource(R.string.conversation_loading_newer)
-    Surface(
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        shadowElevation = 2.dp,
-        modifier = modifier.size(34.dp).semantics { contentDescription = label },
+    Box(
+        modifier = modifier.size(42.dp).semantics(mergeDescendants = true) { contentDescription = label },
+        contentAlignment = Alignment.Center,
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            shadowElevation = 2.dp,
+            modifier = Modifier.size(34.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+            }
         }
     }
 }

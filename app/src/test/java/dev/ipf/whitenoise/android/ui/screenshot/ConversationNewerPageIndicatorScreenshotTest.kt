@@ -28,7 +28,7 @@ class ConversationNewerPageIndicatorScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    /** The indicator is a 34 dp secondary-container circle with a 16 dp spinner, matching the jump button's chrome. */
+    /** The jump button's 42 dp footprint around a 34 dp secondary-container disc with a 16 dp spinner. */
     @Test
     fun newerPageIndicatorMatchesTheJumpButtonChrome() {
         composeRule.setContent {

@@ -36,7 +36,29 @@ class ConversationForwardPrefetchOriginTest {
 
                 assertEquals(ConversationPageLoad.TIMED_OUT, load)
                 assertNull("an opportunistic page must not report a user-visible failure", controller.pageError)
+                assertFalse("the page in flight must be cleared whichever way it ended", controller.isLoadingPage)
+            }
+        }
+
+    /** A newer page in flight reads as loading newer, not older, and blocks an older page until it clears. */
+    @Test
+    fun aNewerPageInFlightBlocksAnOlderPageAndReadsAsLoadingNewer() =
+        runBlocking {
+            val subscription = subscriptionWith()
+            withController(subscription) { controller ->
+                controller.pageLoadInFlight = ConversationSearchPageDirection.NEWER
+
+                assertTrue(controller.isLoadingNewer)
+                assertTrue(controller.isLoadingPage)
                 assertFalse(controller.isLoadingOlder)
+                assertEquals(ConversationPageLoad.NO_PROGRESS, controller.loadOlderPageInternal())
+                assertEquals("a blocked older page never reaches the engine", 0, subscription.backwardsCallCount)
+
+                controller.pageLoadInFlight = null
+                controller.loadOlderPageInternal()
+
+                assertEquals("the same page goes through once the flag clears", 1, subscription.backwardsCallCount)
+                assertFalse(controller.isLoadingPage)
             }
         }
 
