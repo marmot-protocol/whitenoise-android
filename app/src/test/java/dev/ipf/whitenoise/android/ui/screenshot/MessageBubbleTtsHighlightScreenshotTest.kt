@@ -127,6 +127,10 @@ class MessageBubbleTtsHighlightScreenshotTest {
         capture("message_bubble_tts_plain_outgoing_word_dark")
     }
 
+    /**
+     * Records the visual contract that an active progress announcement shares
+     * the rendered message node and does not add height to its bubble.
+     */
     @Test
     fun activeProgressKeepsNaturalBubbleHeightLight() {
         val text = "A naturally sized message bubble."

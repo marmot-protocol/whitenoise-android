@@ -263,6 +263,11 @@ class TimelineRowTtsHighlightPaintTest {
         )
     }
 
+    /**
+     * Drives the production lazy-row through every read-aloud transport state
+     * and verifies that progress semantics reuse the body bounds without
+     * changing the row, bubble, or rendered-message geometry.
+     */
     @Test
     fun productionRowKeepsNaturalBoundsAcrossPreparingSpeakingPausedAndIdle() {
         val record = speakableRecord(MESSAGE_A, BODY)
@@ -749,6 +754,7 @@ class TimelineRowTtsHighlightPaintTest {
         }
     }
 
+    /** Captures the three production layout boundaries that read-aloud state must leave unchanged. */
     private data class ReadAloudBounds(
         val row: Rect,
         val bubble: Rect,
