@@ -88,22 +88,31 @@ class FreshSweepCoverageTest {
     fun conversationUnreadDerivationsRebindToTheVisibleController() {
         val source =
             source("ui/conversation/ConversationScreen.kt")
-                .section("val unreadIncomingCount by", "// Reading the raw IME inset")
+                .section("var unreadBadge by", "// Reading the raw IME inset")
                 .replace(Regex("\\s+"), " ")
 
-        val unreadRememberInputs =
+        // The badge owner is state keyed to the visible controller and chat, and the effect that
+        // feeds it re-runs on every input the count depends on (#2726).
+        val badgeRememberInputs =
             source
-                .substringAfter("val unreadIncomingCount by remember(")
-                .substringBefore(") { derivedStateOf")
-        assertTrue("unread derivation must follow the visible controller", "controller" in unreadRememberInputs)
-        assertTrue("unread derivation must follow the visible chat", "chat.id" in unreadRememberInputs)
+                .substringAfter("var unreadBadge by remember(")
+                .substringBefore(") { mutableStateOf(ConversationUnreadBadge())")
+        assertTrue("badge owner must follow the visible controller", "controller" in badgeRememberInputs)
+        assertTrue("badge owner must follow the visible chat", "chat.id" in badgeRememberInputs)
+        val badgeEffectInputs =
+            source
+                .substringAfter("LaunchedEffect(")
+                .substringBefore(") { if (!initialTimelineAnchored) return@LaunchedEffect")
+        assertTrue("badge must re-reconcile for the visible controller", "controller" in badgeEffectInputs)
+        assertTrue("read anchor changes must re-reconcile the badge", "readAnchorMessageId" in badgeEffectInputs)
+        assertTrue("projected unread changes must re-reconcile the badge", "projectedUnreadCount" in badgeEffectInputs)
         assertTrue(
-            "projected unread changes must invalidate the derivation",
-            "projectedUnreadCount" in unreadRememberInputs,
+            "projection availability changes must re-reconcile the badge",
+            "entryProjectionAvailable" in badgeEffectInputs,
         )
         assertTrue(
-            "projection availability changes must invalidate the derivation",
-            "entryProjectionAvailable" in unreadRememberInputs,
+            "the badge count shown must be the owner's count",
+            source.contains("val unreadIncomingCount = if (initialTimelineAnchored) unreadBadge.count else 0"),
         )
         assertTrue(
             source.contains(

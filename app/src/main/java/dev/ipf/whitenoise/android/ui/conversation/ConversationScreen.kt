@@ -116,6 +116,7 @@ import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
 import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.ConversationPagingOrigin
 import dev.ipf.whitenoise.android.state.ConversationPagingTraceSection
+import dev.ipf.whitenoise.android.state.ConversationUnreadBadge
 import dev.ipf.whitenoise.android.state.ConversationUnreadJumpState
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.MessageAvailability
@@ -126,17 +127,18 @@ import dev.ipf.whitenoise.android.state.advanceConversationReadAnchor
 import dev.ipf.whitenoise.android.state.attachmentsFor
 import dev.ipf.whitenoise.android.state.chatCreateOpenConversationTimingStage
 import dev.ipf.whitenoise.android.state.conversationWindowCanReportVisible
-import dev.ipf.whitenoise.android.state.countUnreadIncoming
 import dev.ipf.whitenoise.android.state.currentTtsConversationDestination
 import dev.ipf.whitenoise.android.state.hasKnownTranscriptPresentation
 import dev.ipf.whitenoise.android.state.loadMessageAvailability
 import dev.ipf.whitenoise.android.state.loadUntilMessageAvailable
+import dev.ipf.whitenoise.android.state.logUnreadBadgeTransition
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
 import dev.ipf.whitenoise.android.state.markComposerReadyForPresentationTiming
 import dev.ipf.whitenoise.android.state.markPagingEvent
 import dev.ipf.whitenoise.android.state.markWindowVisibleForPresentationTiming
 import dev.ipf.whitenoise.android.state.mediaReferencesFor
 import dev.ipf.whitenoise.android.state.presentFailure
+import dev.ipf.whitenoise.android.state.reconcile
 import dev.ipf.whitenoise.android.state.reconcileConversationUnreadJump
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
@@ -1429,25 +1431,30 @@ internal fun ConversationScreen(
             )
         }
     }
-    val unreadIncomingCount by
-        remember(
-            controller,
-            chat.id,
-            projectedUnreadCount,
-            entryProjectionAvailable,
-        ) {
-            derivedStateOf {
-                if (!initialTimelineAnchored) {
-                    0
-                } else {
-                    countUnreadIncoming(
-                        timeline = controller.timeline,
-                        readAnchorMessageId = readAnchorMessageId,
-                        missingAnchorUnreadCount = projectedUnreadCount.takeIf { entryProjectionAvailable },
-                    )
-                }
-            }
-        }
+    // One owner for the badge's number (#2726): it follows the loaded rows while the read anchor is
+    // among them and holds while paging moves the anchor off screen, so a history page can never
+    // switch the count between the rows and the projection or count the loaded window itself.
+    var unreadBadge by
+        remember(controller, chat.id, entryUnreadSessionIdentity) { mutableStateOf(ConversationUnreadBadge()) }
+    LaunchedEffect(
+        controller,
+        initialTimelineAnchored,
+        renderedTimeline,
+        readAnchorMessageId,
+        projectedUnreadCount,
+        entryProjectionAvailable,
+    ) {
+        if (!initialTimelineAnchored) return@LaunchedEffect
+        val next =
+            unreadBadge.reconcile(
+                timeline = controller.timeline,
+                readAnchorMessageId = readAnchorMessageId,
+                projectionUnread = projectedUnreadCount.takeIf { entryProjectionAvailable },
+            )
+        logUnreadBadgeTransition("DMConversation", unreadBadge, next, controller.timeline.size)
+        unreadBadge = next
+    }
+    val unreadIncomingCount = if (initialTimelineAnchored) unreadBadge.count else 0
     LaunchedEffect(
         controller,
         initialTimelineAnchored,
