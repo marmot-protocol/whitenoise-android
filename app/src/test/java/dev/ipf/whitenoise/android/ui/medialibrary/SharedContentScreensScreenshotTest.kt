@@ -219,13 +219,23 @@ class SharedContentScreensScreenshotTest {
         }
     }
 
-    private fun emptyTiles(): SharedMediaTiles {
-        return buildVisibleSharedMediaTiles(emptyList(), null, emptySet(), emptySet(), 1uL)
-    }
+    private fun emptyTiles(): SharedMediaTiles = buildVisibleSharedMediaTiles(
+        emptyList(),
+        null,
+        emptySet(),
+        emptySet(),
+        1uL,
+    )
 
-    private fun sampleTile(): SharedMediaTile {
-        return SharedMediaTile("picture", 0, sampleReference(), false, 1_700_000_000uL, "alice", false)
-    }
+    private fun sampleTile(): SharedMediaTile = SharedMediaTile(
+        "picture",
+        0,
+        sampleReference(),
+        false,
+        1_700_000_000uL,
+        "alice",
+        false,
+    )
 
     private fun sampleRow(): SharedMediaRow {
         return SharedMediaRow("attachment", 0, sampleReference(), false, 1_700_000_000uL, "alice")
