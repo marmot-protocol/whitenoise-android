@@ -22853,6 +22853,15 @@
     ],
     "source_coverage": [
       {
+        "surface": "libsecp256k1-backed BIP-340 verification gates public event cards and Zapstore release metadata",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/nostr/BIP340.kt",
+        "anchor": "Secp256k1.verifySchnorr(",
+        "test_ids": [
+          "RDR-001",
+          "SYS-008"
+        ]
+      },
+      {
         "surface": "Pasted npub recipient presentation remains usable before optional profile enrichment finishes",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/RecipientResolutionPresentation.kt",
         "anchor": "internal fun resolvedRecipientResolution(",

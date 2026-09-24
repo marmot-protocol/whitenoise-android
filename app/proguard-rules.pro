@@ -23,3 +23,6 @@
 -keepclassmembers class kotlinx.coroutines.** {
     volatile <fields>;
 }
+# secp256k1-kmp 0.16.0 discovers its Android loader by class name and its JNI
+# implementation exports symbols for the Java class and method names.
+-keep class fr.acinq.secp256k1.** { *; }

@@ -31,6 +31,9 @@ on:
       - 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/TtsReadAloudHighlight.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/MediaReferenceSupportFuzzIntegrationTest.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/media/MediaReferenceSupport.kt'
+      - 'cryptoBenchmark/**'
+      - 'settings.gradle.kts'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/core/nostr/BIP340.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/share/ExternalShareDispatchActivity.java'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/share/ExternalShareTestFileProvider.java'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/share/InboundShareTaskReuseDeviceTest.kt'
@@ -115,5 +118,8 @@ jobs:
           path: |
             app/build/reports/androidTests/
             app/build/outputs/androidTest-results/
+            app/build/outputs/connected_android_test_additional_output/
+            cryptoBenchmark/build/reports/androidTests/
+            cryptoBenchmark/build/outputs/androidTest-results/
           if-no-files-found: ignore
           retention-days: 7

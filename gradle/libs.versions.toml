@@ -46,6 +46,7 @@ benchmark = "1.5.0"
 profileInstaller = "1.4.1"
 uiAutomator = "2.4.0"
 tracing = "2.0.2"
+secp256k1 = "0.16.0"
 
 [libraries]
 osmdroid-android = { group = "org.osmdroid", name = "osmdroid-android", version.ref = "osmdroid" }
@@ -101,6 +102,9 @@ androidx-benchmark-macro-junit4 = { group = "androidx.benchmark", name = "benchm
 androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version.ref = "profileInstaller" }
 androidx-test-uiautomator = { group = "androidx.test.uiautomator", name = "uiautomator", version.ref = "uiAutomator" }
 androidx-tracing = { group = "androidx.tracing", name = "tracing", version.ref = "tracing" }
+secp256k1-android = { group = "fr.acinq.secp256k1", name = "secp256k1-kmp-jni-android", version.ref = "secp256k1" }
+secp256k1-common = { group = "fr.acinq.secp256k1", name = "secp256k1-kmp-jni-common", version.ref = "secp256k1" }
+secp256k1-jvm = { group = "fr.acinq.secp256k1", name = "secp256k1-kmp-jni-jvm", version.ref = "secp256k1" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

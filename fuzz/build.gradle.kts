@@ -55,6 +55,8 @@ sourceSets {
 
 dependencies {
     implementation(libs.org.json)
+    implementation(libs.secp256k1.common)
+    runtimeOnly(libs.secp256k1.jvm)
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.jazzer.junit)
 }
