@@ -8,13 +8,6 @@ import dev.ipf.marmotkit.PresentedChatRowFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import java.util.Locale
 
-/** Ends the current window set so the controller's bounded reconnect path obtains a new authoritative frame. */
-internal class IncompleteChatListReplacement : IllegalStateException("incomplete active chat-list replacement")
-
-internal fun requireCompleteChatListWindowRows(complete: Boolean) {
-    if (!complete) throw IncompleteChatListReplacement()
-}
-
 /**
  * Rows worth checking against MDK before a top-of-list replacement removes them.
  * A shifted or paged window may legitimately omit older rows; only rows that

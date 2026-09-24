@@ -3106,7 +3106,9 @@ class ChatsController private constructor(
                                         "chat list window view=$view sequence=${replacement.sequence} " +
                                             "rows=${replacement.rows.size} merged=${chatListStream.rows.size}"
                                     }
-                                    requireCompleteChatListWindowRows(applyChatListWindowRows(accountRef, chatListStream))
+                                    requireCompleteChatListWindowRows(
+                                        applyChatListWindowRows(accountRef, chatListStream),
+                                    )
                                     receivedLiveUpdate = true
                                     connectionOwner.noteLiveUpdate(connectionAttempt)
                                 }
@@ -4201,7 +4203,8 @@ class ChatsController private constructor(
         return true
     }
 
-    @Suppress("ReturnCount") // A failed keyed read or a confirmed missing row must abort before replacing the coherent frame.
+    // A failed keyed read or a confirmed missing row must abort before replacing the coherent frame.
+    @Suppress("ReturnCount")
     private suspend fun validateChatListWindowRows(
         accountRef: String,
         windows: ChatListWindowSet,
@@ -4220,8 +4223,8 @@ class ChatsController private constructor(
             if (authoritative.belongsInActiveChats() && activeWindow?.shouldContain(authoritative) == true) {
                 Log.w(
                     "DMChats",
-                    "CHAT_LIST_INCOMPLETE account=${accountRef.hashCode().toUInt().toString(CHAT_LIST_LOG_HASH_RADIX)} " +
-                        "generation=${activeWindow.subscriptionGeneration.hashCode().toUInt().toString(CHAT_LIST_LOG_HASH_RADIX)} " +
+                    "CHAT_LIST_INCOMPLETE account=${chatListLogHash(accountRef)} " +
+                        "generation=${chatListLogHash(activeWindow.subscriptionGeneration)} " +
                         "sequence=${activeWindow.sequence} previous=${previous.size} incoming=${windows.rows.size}",
                 )
                 return false

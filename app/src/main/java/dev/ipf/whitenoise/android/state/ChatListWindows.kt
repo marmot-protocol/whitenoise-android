@@ -27,6 +27,13 @@ private typealias InitialReplacements = Map<ChatListViewFfi, ChatListWindowSnaps
 /** The MDK chat-list views whose rows the app renders: active chats, archived chats and departed groups. */
 internal val CHAT_LIST_WINDOW_VIEWS = listOf(ChatListViewFfi.CHATS, ChatListViewFfi.ARCHIVED, ChatListViewFfi.LEFT)
 
+/** Ends the current window set so the controller's bounded reconnect path obtains a new authoritative frame. */
+internal class IncompleteChatListReplacement : IllegalStateException("incomplete active chat-list replacement")
+
+internal fun requireCompleteChatListWindowRows(complete: Boolean) {
+    if (!complete) throw IncompleteChatListReplacement()
+}
+
 /**
  * One account's bounded live chat-list windows, merged into the single row set [ChatsController] renders.
  *
@@ -216,10 +223,12 @@ private suspend fun currentCoroutineContextIsActive(): Boolean = kotlinx.corouti
 
 internal const val CHAT_LIST_LOG_HASH_RADIX = 16
 
+internal fun chatListLogHash(value: String): String = value.hashCode().toUInt().toString(CHAT_LIST_LOG_HASH_RADIX)
+
 /** Debug-only numeric window diagnostics; no group IDs, titles, or message content. */
 private fun ChatListWindowSnapshotFfi.logWindowFrame(view: ChatListViewFfi, phase: String) {
     chatsDebug {
-        "chat window $phase view=$view generation=${subscriptionGeneration.hashCode().toUInt().toString(CHAT_LIST_LOG_HASH_RADIX)} " +
+        "chat window $phase view=$view generation=${chatListLogHash(subscriptionGeneration)} " +
             "sequence=$sequence rows=${rows.size} before=$hasMoreBefore after=$hasMoreAfter"
     }
 }
