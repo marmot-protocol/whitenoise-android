@@ -226,7 +226,10 @@ internal const val CHAT_LIST_LOG_HASH_RADIX = 16
 internal fun chatListLogHash(value: String): String = value.hashCode().toUInt().toString(CHAT_LIST_LOG_HASH_RADIX)
 
 /** Debug-only numeric window diagnostics; no group IDs, titles, or message content. */
-private fun ChatListWindowSnapshotFfi.logWindowFrame(view: ChatListViewFfi, phase: String) {
+private fun ChatListWindowSnapshotFfi.logWindowFrame(
+    view: ChatListViewFfi,
+    phase: String,
+) {
     chatsDebug {
         "chat window $phase view=$view generation=${chatListLogHash(subscriptionGeneration)} " +
             "sequence=$sequence rows=${rows.size} before=$hasMoreBefore after=$hasMoreAfter"

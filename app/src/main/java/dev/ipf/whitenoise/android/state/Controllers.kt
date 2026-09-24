@@ -4216,10 +4216,11 @@ class ChatsController private constructor(
         val candidates = missingActiveTopChatRows(previous, windows.rows, activeWindow)
         for (old in candidates) {
             val authoritative =
-                runCatchingCancellable { lookup(accountRef, old.groupIdHex) }.getOrElse { failure ->
-                    Log.w("DMChats", "CHAT_LIST_ROW_CHECK_FAILED reason=${failure.javaClass.simpleName}")
-                    return false
-                }?.row ?: continue
+                runCatchingCancellable { lookup(accountRef, old.groupIdHex) }
+                    .getOrElse { failure ->
+                        Log.w("DMChats", "CHAT_LIST_ROW_CHECK_FAILED reason=${failure.javaClass.simpleName}")
+                        return false
+                    }?.row ?: continue
             if (authoritative.belongsInActiveChats() && activeWindow?.shouldContain(authoritative) == true) {
                 Log.w(
                     "DMChats",
