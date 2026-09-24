@@ -9804,7 +9804,9 @@ class ConversationController(
      * while the FFI call is in flight. On success it follows the same
      * confirmed-id swap path as [send]; on failure it returns to Failed.
      */
+    @Suppress("CyclomaticComplexMethod") // Preserve the covered original-send and failed-edit retry path.
     suspend fun retryFailedSend(item: TimelineMessage) {
+        val key = item.id
         // A failed edit's bubble is the target's projected row (no
         // optimisticMessages entry); its retry re-runs the edit publish rather
         // than re-sending a new message. editMessage flips the overlay back to
@@ -9814,11 +9816,6 @@ class ConversationController(
             editMessage(item.record.messageIdHex, failedEdit.text)
             return
         }
-        retryFailedOriginalSend(item)
-    }
-
-    private suspend fun retryFailedOriginalSend(item: TimelineMessage) {
-        val key = item.id
         // Re-check live state. The captured item.status may be stale if the
         // user double-taps before recomposition: both taps would see Failed
         // on the captured argument and both would queue FFI sends. By reading
