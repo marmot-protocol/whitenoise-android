@@ -53,13 +53,14 @@ class SharedContentScreensScreenshotTest {
         val opened = mutableListOf<SharedContentCategory>()
         val tile = sampleTile()
         val row = sampleRow()
-        val tiles = emptyTiles().copy(
-            visuals = listOf(tile),
-            images = listOf(tile),
-            urls = listOf(MediaInventory.UrlEntry("link", "alice", 1_700_000_000uL, "https://example.org")),
-            files = listOf(row),
-            voice = listOf(row),
-        )
+        val tiles =
+            emptyTiles().copy(
+                visuals = listOf(tile),
+                images = listOf(tile),
+                urls = listOf(MediaInventory.UrlEntry("link", "alice", 1_700_000_000uL, "https://example.org")),
+                files = listOf(row),
+                voice = listOf(row),
+            )
         renderCategories(tiles, onOpen = { opened += it })
         SharedContentCategory.entries.forEach { category ->
             composeRule.onNodeWithTag("shared.category.${category.name}").assertIsDisplayed().performClick()
@@ -218,14 +219,17 @@ class SharedContentScreensScreenshotTest {
         }
     }
 
-    private fun emptyTiles(): SharedMediaTiles =
-        buildVisibleSharedMediaTiles(emptyList(), null, emptySet(), emptySet(), 1uL)
+    private fun emptyTiles(): SharedMediaTiles {
+        return buildVisibleSharedMediaTiles(emptyList(), null, emptySet(), emptySet(), 1uL)
+    }
 
-    private fun sampleTile(): SharedMediaTile =
-        SharedMediaTile("picture", 0, sampleReference(), false, 1_700_000_000uL, "alice", false)
+    private fun sampleTile(): SharedMediaTile {
+        return SharedMediaTile("picture", 0, sampleReference(), false, 1_700_000_000uL, "alice", false)
+    }
 
-    private fun sampleRow(): SharedMediaRow =
-        SharedMediaRow("attachment", 0, sampleReference(), false, 1_700_000_000uL, "alice")
+    private fun sampleRow(): SharedMediaRow {
+        return SharedMediaRow("attachment", 0, sampleReference(), false, 1_700_000_000uL, "alice")
+    }
 
     private fun sampleReference(): MediaAttachmentReferenceFfi =
         MediaAttachmentReferenceFfi(
