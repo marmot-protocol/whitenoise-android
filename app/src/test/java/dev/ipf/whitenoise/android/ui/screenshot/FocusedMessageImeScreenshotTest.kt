@@ -42,6 +42,11 @@ class FocusedMessageImeScreenshotTest {
     }
 
     @Test
+    fun longTextAtLargeFontLeavesActionsVisible() {
+        capture("focused_overlay_keyboard_long_text_large_font_dark", dark = true, fontScale = 2f, longText = true)
+    }
+
+    @Test
     fun tallMediaKeepsActionsVisible() {
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -58,7 +63,6 @@ class FocusedMessageImeScreenshotTest {
                     selectedReactions = emptySet(),
                     previewDescription = "Tall media",
                     previewReady = true,
-                    previewIsMedia = true,
                     preview = {
                         Box(Modifier.size(200.dp, 400.dp).background(MaterialTheme.colorScheme.primaryContainer)) {
                             Text("Portrait media")
@@ -79,6 +83,7 @@ class FocusedMessageImeScreenshotTest {
         name: String,
         dark: Boolean,
         fontScale: Float,
+        longText: Boolean = false,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = dark, fontScale = fontScale) {
@@ -119,11 +124,17 @@ class FocusedMessageImeScreenshotTest {
                         FocusedTextMessagePreview(
                             presentation = messageBubblePresentation(deleted = false, mine = false),
                             mine = false,
-                            text = "A lifted message above the keyboard",
+                            text =
+                                if (longText) {
+                                    (1..8).joinToString(" ") { "A longer message above the keyboard." }
+                                } else {
+                                    "A lifted message above the keyboard"
+                                },
                             document = null,
                             time = "12:34",
                             status = MessageStatus.Received,
                             showStatus = false,
+                            reply = if (longText) ({ Text("Quoted reply with two lines of context") }) else null,
                         )
                     },
                 )

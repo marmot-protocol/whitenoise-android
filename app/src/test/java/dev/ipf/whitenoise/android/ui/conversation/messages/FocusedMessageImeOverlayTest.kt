@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -18,6 +19,9 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -49,6 +53,71 @@ class FocusedMessageImeOverlayTest {
             previewHeight = 400,
         )
 
+    /** The real text preview can fill five 200%-scale lines plus a reply and footer. */
+    @Test
+    fun longTextPreviewAtLargeFontKeepsDeleteReachable() {
+        var deletes = 0
+        composeRule.setContent {
+            WhiteNoiseTheme(fontScale = 2f) {
+                MessageActionMenu(
+                    expanded = true,
+                    anchorBoundsInWindow = IntRect(0, 180, 360, 240),
+                    anchorWindowYPx = 210f,
+                    canReply = true,
+                    canReact = true,
+                    canDelete = true,
+                    canEdit = true,
+                    canForward = true,
+                    canSelect = true,
+                    canCopyText = true,
+                    canSpeak = true,
+                    canSelectText = true,
+                    canSave = true,
+                    quickReactionEmojis = listOf("👍", "❤️", "😂", "😮", "😢", "👏"),
+                    onDismissRequest = {},
+                    onReact = {},
+                    onOpenEmojiPicker = {},
+                    onReply = {},
+                    onEdit = {},
+                    onForward = {},
+                    onSelect = {},
+                    onSelectText = {},
+                    onCopyText = {},
+                    onSpeak = {},
+                    onSave = {},
+                    onInfo = {},
+                    onDelete = { deletes++ },
+                    previewDescription = "Long lifted text message",
+                    preview = {
+                        FocusedTextMessagePreview(
+                            presentation = messageBubblePresentation(deleted = false, mine = false),
+                            mine = false,
+                            text = LONG_TEXT_PREVIEW,
+                            document = null,
+                            time = "12:34",
+                            status = MessageStatus.Received,
+                            showStatus = false,
+                            reply = { Text("Quoted reply with two lines of context") },
+                        )
+                    },
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        val preview = composeRule.onNodeWithTag("message-actions-preview").fetchSemanticsNode().boundsInRoot
+        assertPreviewWithinFrame(preview, "the bounded text preview must fit the short frame")
+        val viewport = composeRule.onNodeWithTag(FOCUSED_ACTION_MENU_SCROLL_TEST_TAG).fetchSemanticsNode().boundsInRoot
+        assertTrue("long text must leave a tappable action viewport", viewport.height >= 48f)
+        val delete = ApplicationProvider.getApplicationContext<Context>().getString(R.string.delete)
+        composeRule
+            .onNodeWithText(delete)
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.runOnIdle { assertEquals(1, deletes) }
+    }
+
     private fun assertActionsScrollWithoutMovingPreview(
         fontScale: Float,
         layoutDirection: LayoutDirection,
@@ -78,7 +147,6 @@ class FocusedMessageImeOverlayTest {
                         selectedReactions = emptySet(),
                         previewDescription = "Lifted message",
                         previewReady = true,
-                        previewIsMedia = previewHeight > 60,
                         preview = {
                             Box(Modifier.size(200.dp, previewHeight.dp).background(MaterialTheme.colorScheme.surface)) {
                                 Text("Lifted message")
@@ -120,5 +188,9 @@ class FocusedMessageImeOverlayTest {
         message: String,
     ) {
         assertTrue(message, bounds.top >= 0f && bounds.bottom <= 320f)
+    }
+
+    private companion object {
+        val LONG_TEXT_PREVIEW = (1..8).joinToString(" ") { "This sentence fills the lifted message preview." }
     }
 }

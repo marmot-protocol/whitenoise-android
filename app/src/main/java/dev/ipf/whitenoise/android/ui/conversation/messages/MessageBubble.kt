@@ -2497,7 +2497,6 @@ internal fun MessageBubble(
                             ""
                         },
                     previewReady = !hasMedia || focusedMediaReady,
-                    previewIsMedia = hasMedia,
                     preview = {
                         val previewRetention =
                             record
