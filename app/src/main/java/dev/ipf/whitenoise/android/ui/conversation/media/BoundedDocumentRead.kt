@@ -21,10 +21,17 @@ internal fun readBoundedDocument(
     open: () -> InputStream?,
 ): BoundedDocumentRead {
     return try {
-        val stream = open() ?: return BoundedDocumentRead.Unreadable
-        val bytes = stream.use { MediaPipeline.readBoundedBytes(it, maxBytes) }
-            ?: return BoundedDocumentRead.TooLarge
-        if (bytes.isEmpty()) BoundedDocumentRead.Empty else BoundedDocumentRead.Success(bytes)
+        val stream = open()
+        if (stream == null) {
+            BoundedDocumentRead.Unreadable
+        } else {
+            val bytes = stream.use { MediaPipeline.readBoundedBytes(it, maxBytes) }
+            when {
+                bytes == null -> BoundedDocumentRead.TooLarge
+                bytes.isEmpty() -> BoundedDocumentRead.Empty
+                else -> BoundedDocumentRead.Success(bytes)
+            }
+        }
     } catch (cancel: CancellationException) {
         throw cancel
     } catch (_: Exception) {
