@@ -490,6 +490,7 @@ private class ScriptedChatListSubscription(
     private var sequence = 0uL
     private var current = windowSnapshot(initialRows, sequence)
     val nextUpdateStarted = CompletableDeferred<Unit>()
+
     @Volatile var closed = false
 
     /** Returns the local projection present before reconnect. */
@@ -548,6 +549,7 @@ private class DroppedChatSubscriptions(
     val first = ScriptedChatListSubscription(listOf(pinned, group))
     val second = ScriptedChatListSubscription(listOf(pinned, group))
     val activeOpenCount = AtomicInteger()
+
     @Volatile var pinnedProjection: ChatListRowFfi? = pinned
     private val groupId = group.groupIdHex
     private val pinnedId = pinned.groupIdHex
