@@ -36,8 +36,10 @@ internal fun rememberConversationUnreadBadgeCount(
     windowReachesTail: Boolean,
     onTransition: (before: ConversationUnreadBadge, after: ConversationUnreadBadge) -> Unit = { _, _ -> },
 ): ConversationUnreadBadgeUiState {
+    // Keyed on `anchored` as well: a chat that anchors after mounting reseeds synchronously, so its
+    // first anchored frame carries the number instead of a 0 that merely means "not yet".
     var badge by
-        remember(identity) {
+        remember(identity, anchored) {
             val seed =
                 if (anchored) {
                     ConversationUnreadBadge()

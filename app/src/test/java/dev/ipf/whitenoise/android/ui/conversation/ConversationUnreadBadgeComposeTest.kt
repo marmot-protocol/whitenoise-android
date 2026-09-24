@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -11,6 +12,7 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -35,6 +37,16 @@ class ConversationUnreadBadgeComposeTest {
         var readAnchor by mutableStateOf<String?>(null)
         var projection by mutableStateOf<Int?>(null)
         var windowReachesTail by mutableStateOf(true)
+        var anchored by mutableStateOf(true)
+
+        /** The count the last composition handed to the button, for assertions about a single composition. */
+        var lastComposedCount: Int? = null
+
+        /** How many times the harness composed, so a test can wait for exactly the next composition. */
+        var compositions = 0
+
+        /** What the owner returned and whether the flag was set, as the last composition saw them. */
+        var lastTrace: String = ""
     }
 
     /** Mounts the real badge owner feeding the real button. */
@@ -44,12 +56,15 @@ class ConversationUnreadBadgeComposeTest {
                 val ui =
                     rememberConversationUnreadBadgeCount(
                         identity = "chat",
-                        anchored = true,
+                        anchored = inputs.anchored,
                         timeline = inputs.timeline,
                         readAnchorMessageId = inputs.readAnchor,
                         projectionUnread = inputs.projection,
                         windowReachesTail = inputs.windowReachesTail,
                     )
+                inputs.lastComposedCount = ui.count
+                inputs.lastTrace = "anchored=${inputs.anchored} ui=$ui"
+                inputs.compositions += 1
                 ConversationJumpToNewestButton(unreadIncomingCount = ui.count, onClick = {})
             }
         }
@@ -193,6 +208,41 @@ class ConversationUnreadBadgeComposeTest {
 
         composeRule.onNodeWithText("5").assertExists()
         composeRule.onNodeWithText("0").assertDoesNotExist()
+    }
+
+    /** A chat that anchors after mounting carries its number on the first anchored frame, not one frame later. */
+    @Test
+    fun anchoringAfterMountSeedsTheCountOnTheFirstAnchoredFrame() {
+        val inputs =
+            Inputs().apply {
+                timeline = rows(0, 200)
+                readAnchor = "r194"
+                projection = 5
+                anchored = false
+            }
+        mount(inputs)
+        composeRule.onNodeWithText("5").assertDoesNotExist()
+        composeRule.mainClock.autoAdvance = false
+
+        val before = inputs.compositions
+        inputs.anchored = true
+        // A write from the test thread reaches the recomposer only once its snapshot is applied; the
+        // recomposition then lands on the next frame the clock hands out. Wait for exactly that one.
+        Snapshot.sendApplyNotifications()
+        var frames = 0
+        while (inputs.compositions == before && frames < 5) {
+            composeRule.mainClock.advanceTimeByFrame()
+            frames++
+        }
+
+        // The very first anchored composition already hands the button its number.
+        assertEquals(
+            "frames=$frames compositions=${inputs.compositions - before} ${inputs.lastTrace}",
+            5,
+            inputs.lastComposedCount,
+        )
+        composeRule.onNodeWithText("0").assertDoesNotExist()
+        assertBadgeThroughFrames("5", previous = null, frames = 2)
     }
 
     /** Received rows `r<from>`..`r<until - 1>`. */
