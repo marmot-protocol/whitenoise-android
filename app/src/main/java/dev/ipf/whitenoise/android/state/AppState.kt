@@ -208,6 +208,7 @@ import dev.ipf.whitenoise.android.notifications.notificationReplyCommitProbe as 
 
 private const val NATIVE_ATTACHMENT_PERMISSION_RETRY_LIMIT = 3
 private const val NATIVE_ATTACHMENT_PERMISSION_RETRY_DELAY_MILLIS = 500L
+private val LOCAL_GROUP_DELETE_RECONCILIATION_DELAYS_MS = listOf(0L, 5_000L, 30_000L)
 
 internal data class ProfileGroupInviteOutcome(
     val attempted: Int,
@@ -1158,6 +1159,9 @@ class WhiteNoiseAppState private constructor(
 
     internal val appContext = context.applicationContext
     private val preferences = preferencesOverride ?: appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+    internal val localGroupDeleteCleanupJournal =
+        LocalGroupDeleteCleanupJournal(appContext.noBackupFilesDir.resolve("local-group-delete-cleanup"))
+    internal val localGroupDeleteCleanupMutex = Mutex()
     internal val conversationDictationPreferences = ConversationDictationPreferences(appContext)
     internal val microphoneCaptureCoordinator = MicrophoneCaptureCoordinator()
     private val dictationMicrophoneOwner = Any()
@@ -4180,6 +4184,7 @@ class WhiteNoiseAppState private constructor(
             }
             startBootstrapRuntime()
             val refreshedAccounts = startupPerformance.stage(PerformancePhase.ACCOUNT_REFRESH, ::refreshAccountSnapshot)
+            schedulePendingLocalGroupDeleteCleanup()
             prepareStartupUnreadRefresh(refreshedAccounts)
             migrateLegacyDrafts()
             migrateLegacyMutePreferences()
@@ -4334,6 +4339,7 @@ class WhiteNoiseAppState private constructor(
 
     private suspend fun resumeCompletedBootstrap(): Boolean {
         if (!bootstrapCompleted) return false
+        schedulePendingLocalGroupDeleteCleanup()
         if (accounts.isNotEmpty() && activeAccountRef != null) phase = AppPhase.Ready
         val receiverReady = awaitNotificationReceiverForStartupWithin(notificationReceiverTimeoutMillis())
         appStateDebug { "bootstrap resumed; notification receiver active=$receiverReady" }
@@ -4730,7 +4736,21 @@ class WhiteNoiseAppState private constructor(
     /** Publishes the newest account snapshot, then refreshes unread state for that accepted set. */
     suspend fun refreshAccounts() {
         val refreshedAccounts = refreshAccountSnapshot()
+        schedulePendingLocalGroupDeleteCleanup()
         refreshAccountUnreadCounts(refreshedAccounts)
+    }
+
+    internal fun schedulePendingLocalGroupDeleteCleanup(retryTransport: Boolean = false) {
+        if (!localGroupDeleteCleanupJournal.hasPending()) return
+        mutationsScope.launch(Dispatchers.IO) {
+            val delays = if (retryTransport) LOCAL_GROUP_DELETE_RECONCILIATION_DELAYS_MS else listOf(0L)
+            for (pauseMillis in delays) {
+                if (pauseMillis > 0) delay(pauseMillis)
+                if (!localGroupDeleteCleanupJournal.hasPending()) break
+                runCatchingCancellable { reconcilePendingLocalGroupDeleteCleanups() }
+                    .onFailure { appStateDebug(it) { "local group delete cleanup deferred" } }
+            }
+        }
     }
 
     /** Whether the saved account is blocked on explicit 0.9.20 checkpoint recovery. */

@@ -4,6 +4,7 @@ import dev.ipf.whitenoise.android.media.editor.MessageDraftMutationResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
@@ -43,57 +44,98 @@ internal suspend fun WhiteNoiseAppState.deleteChatGroupLocalWithRecovery(
         }
     val tags = media.mapNotNull { it.reference.ciphertextSha256 }.toSet()
 
-    deleteLocalGroupWithRecovery(
-        isCurrent = isCurrent,
-        delete = { marmotIo { deleteGroupLocal(account, groupIdHex) } },
-        isGroupPresent = {
-            // The durable chat-list projection is the same native source that supplied the
-            // row being removed. Unlike groupDetails, this does not depend on a live MLS roster.
-            marmotIo { chatList(account, true) }
-                .any { it.groupIdHex.equals(groupIdHex, ignoreCase = true) }
-        },
-    )
-    onNativeCommitted()
-    // Native success (including an already-committed lost response) is the only point at which
-    // clearing the draft, dictation target, cache, expansion and notifications is safe.
-    withContext(NonCancellable) {
-        suspend fun cleanupStep(
-            name: String,
-            block: suspend () -> Unit,
-        ) {
-            runCatching { block() }
-                .onFailure { failure ->
-                    appStateDebug(failure) { "local delete $name cleanup failed" }
-                }
-        }
-
-        cleanupStep("dictation") { conversationDictation.onTargetRemoved(account, groupIdHex) }
-        if (cacheKeys.isNotEmpty()) {
-            cleanupStep("memory media") {
-                removeMediaMemoryCacheKeys(cacheKeys, Dispatchers.Main.immediate, ::removeMediaMemoryCacheEntry)
+    val pending = PendingLocalGroupDeleteCleanup(account, groupIdHex, cacheKeys, tags)
+    localGroupDeleteCleanupMutex.withLock {
+        // A synchronous, atomic journal write must precede the destructive native call. If a
+        // closed worker loses both its response and the reconciliation reads, restart can replay
+        // Android cleanup without ever repeating the native wipe.
+        localGroupDeleteCleanupJournal.stage(pending)
+        deleteLocalGroupWithRecovery(
+            isCurrent = isCurrent,
+            delete = { marmotIo { deleteGroupLocal(account, groupIdHex) } },
+            isGroupPresent = { nativeGroupPresent(account, groupIdHex) },
+        )
+        onNativeCommitted()
+        withContext(NonCancellable) {
+            if (finishLocalGroupDeleteCleanup(pending)) {
+                runCatching { localGroupDeleteCleanupJournal.finish(pending) }
+                    .onFailure { appStateDebug(it) { "local delete cleanup journal finish failed" } }
             }
         }
-        if (cacheKeys.isNotEmpty() || tags.isNotEmpty()) {
-            cleanupStep("disk media") {
-                withContext(Dispatchers.IO) {
-                    cacheKeys.forEach { diskMediaCache.remove(it) }
-                    if (tags.isNotEmpty()) diskMediaCache.removeByCiphertextTags(tags)
-                }
-            }
-        }
-        cleanupStep("native draft") {
-            retryIdempotentRuntimeMutation {
-                when (val deletion = deleteDraftBeforeGroupRemoval(account, groupIdHex)) {
-                    is MessageDraftMutationResult.Success -> Unit
-                    is MessageDraftMutationResult.Failure -> throw deletion.cause
-                    else -> error("unexpected draft deletion result: $deletion")
-                }
-            }
-        }
-        cleanupStep("local draft") { draftStore.replaceFromAuthoritative(account, groupIdHex, null, null) }
-        cleanupStep("composer expansion") { removeComposerExpansionForGroup(account, groupIdHex) }
-        cleanupStep("notifications") { dismissConversationNotifications(account, groupIdHex) }
     }
+}
+
+/** Replayed on startup and live refresh; a present group or failed read never clears client data. */
+internal suspend fun WhiteNoiseAppState.reconcilePendingLocalGroupDeleteCleanups() {
+    localGroupDeleteCleanupMutex.withLock {
+        localGroupDeleteCleanupJournal.pending().forEach { pending ->
+            runCatchingCancellable {
+                reconcilePendingLocalGroupDeleteCleanup(
+                    pending = pending,
+                    accountReady = {
+                        accounts.any { it.label == pending.account && it.isSignedInSigningAccount() }
+                    },
+                    isGroupPresent = { nativeGroupPresent(pending.account, pending.groupIdHex) },
+                    cleanup = { withContext(NonCancellable) { finishLocalGroupDeleteCleanup(it) } },
+                    finish = localGroupDeleteCleanupJournal::finish,
+                )
+            }.onFailure { appStateDebug(it) { "local delete cleanup reconciliation deferred" } }
+        }
+    }
+}
+
+private suspend fun WhiteNoiseAppState.nativeGroupPresent(
+    account: String,
+    groupIdHex: String,
+): Boolean =
+    // The durable chat-list projection is the same native source that supplied the row being
+    // removed. Unlike groupDetails, it does not depend on a live MLS roster.
+    marmotIo { chatList(account, true) }
+        .any { it.groupIdHex.equals(groupIdHex, ignoreCase = true) }
+
+/** Returns false if any cleanup step failed so the durable intent can be retried later. */
+private suspend fun WhiteNoiseAppState.finishLocalGroupDeleteCleanup(pending: PendingLocalGroupDeleteCleanup): Boolean {
+    val account = pending.account
+    val groupIdHex = pending.groupIdHex
+    var complete = true
+    suspend fun cleanupStep(
+        name: String,
+        block: suspend () -> Unit,
+    ) {
+        runCatching { block() }
+            .onFailure { failure ->
+                complete = false
+                appStateDebug(failure) { "local delete $name cleanup failed" }
+            }
+    }
+
+    cleanupStep("dictation") { conversationDictation.onTargetRemoved(account, groupIdHex) }
+    if (pending.mediaCacheKeys.isNotEmpty()) {
+        cleanupStep("memory media") {
+            removeMediaMemoryCacheKeys(pending.mediaCacheKeys, Dispatchers.Main.immediate, ::removeMediaMemoryCacheEntry)
+        }
+    }
+    if (pending.mediaCacheKeys.isNotEmpty() || pending.ciphertextTags.isNotEmpty()) {
+        cleanupStep("disk media") {
+            withContext(Dispatchers.IO) {
+                pending.mediaCacheKeys.forEach { diskMediaCache.remove(it) }
+                if (pending.ciphertextTags.isNotEmpty()) diskMediaCache.removeByCiphertextTags(pending.ciphertextTags)
+            }
+        }
+    }
+    cleanupStep("native draft") {
+        retryIdempotentRuntimeMutation {
+            when (val deletion = deleteDraftBeforeGroupRemoval(account, groupIdHex)) {
+                is MessageDraftMutationResult.Success -> Unit
+                is MessageDraftMutationResult.Failure -> throw deletion.cause
+                else -> error("unexpected draft deletion result: $deletion")
+            }
+        }
+    }
+    cleanupStep("local draft") { draftStore.replaceFromAuthoritative(account, groupIdHex, null, null) }
+    cleanupStep("composer expansion") { removeComposerExpansionForGroup(account, groupIdHex) }
+    cleanupStep("notifications") { dismissConversationNotifications(account, groupIdHex) }
+    return complete
 }
 
 internal suspend fun WhiteNoiseAppState.evictGroupMediaCaches(

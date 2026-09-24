@@ -2990,6 +2990,7 @@ class ChatsController private constructor(
                         }
                     }
                     replacePresentedChatRows(chatListStream.rows)
+                    appState.schedulePendingLocalGroupDeleteCleanup()
                     appState.recordAccountSwitchLocalRowsReady(accountRef, chatRows.size)
                     groupRecordsById =
                         withContext(Dispatchers.IO) {
@@ -3032,6 +3033,7 @@ class ChatsController private constructor(
                                     receivedLiveUpdate = true
                                     connectionOwner.noteLiveUpdate(connectionAttempt)
                                     applyChatListWindowRows(accountRef, chatListStream.rows)
+                                    appState.schedulePendingLocalGroupDeleteCleanup()
                                 }
                             },
                             second = {
@@ -4726,6 +4728,7 @@ class ChatsController private constructor(
                 }
             }
         wipe.exceptionOrNull()?.let {
+            appState.schedulePendingLocalGroupDeleteCleanup(retryTransport = true)
             if (isCurrent() && !nativeCommitted) removedSnapshot?.let(::restoreRemovedChatRow)
             if (isCurrent() && nativeCommitted) {
                 removeChatRow(groupIdHex)
