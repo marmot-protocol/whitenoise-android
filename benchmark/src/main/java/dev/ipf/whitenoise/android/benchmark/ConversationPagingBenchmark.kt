@@ -23,11 +23,15 @@ class ConversationPagingBenchmark {
 
     private val journeys = WhiteNoiseJourneys()
 
-    /** Twelve flicks into history without pausing: the backward half of #2789. */
+    /** How far the deep journeys fling: twelve flicks by default, or `pagingDeepFlings` from the runner. */
+    private val deepFlings: Int
+        get() = BenchmarkConfig.pagingDeepFlings ?: DEEP_FLINGS
+
+    /** Twelve flicks into history without pausing (or `pagingDeepFlings` of them): the backward half of #2789. */
     @Test
     fun deepOlderFling() =
         measurePaging(PAGING_DEEP_OLDER_TRACE) {
-            journeys.flingConversation(DEEP_FLINGS, towardOlder = true)
+            journeys.flingConversation(deepFlings, towardOlder = true)
         }
 
     /** The same distance back toward the newest row, through the newer-page path. */
@@ -35,9 +39,9 @@ class ConversationPagingBenchmark {
     fun returnFlingAfterDeepHistory() =
         measurePaging(
             PAGING_RETURN_NEWER_TRACE,
-            prepare = { journeys.flingConversation(DEEP_FLINGS, towardOlder = true) },
+            prepare = { journeys.flingConversation(deepFlings, towardOlder = true) },
         ) {
-            journeys.flingConversation(DEEP_FLINGS, towardOlder = false)
+            journeys.flingConversation(deepFlings, towardOlder = false)
         }
 
     /** Jump-to-newest once the deep fling has evicted the tail from the bounded window. */
@@ -45,7 +49,7 @@ class ConversationPagingBenchmark {
     fun jumpToNewestAfterSaturation() =
         measurePaging(
             PAGING_JUMP_TO_NEWEST_TRACE,
-            prepare = { journeys.flingConversation(DEEP_FLINGS, towardOlder = true) },
+            prepare = { journeys.flingConversation(deepFlings, towardOlder = true) },
         ) {
             journeys.jumpToNewest()
         }
@@ -61,7 +65,7 @@ class ConversationPagingBenchmark {
     @Test
     fun olderFlingWhileEngineCatchesUp() =
         measurePaging(PAGING_BUSY_ENGINE_TRACE, coldProcess = true, iterations = COLD_ITERATIONS) {
-            journeys.flingConversation(DEEP_FLINGS, towardOlder = true)
+            journeys.flingConversation(deepFlings, towardOlder = true)
         }
 
     /**

@@ -432,6 +432,10 @@ if [[ -n "$group_name" ]]; then
   instrument_command="$instrument_command \
 -e groupName $(quote_device_shell_arg "$group_name")"
 fi
+if [[ -n "${PAGING_DEEP_FLINGS:-}" ]]; then
+  instrument_command="$instrument_command \
+-e pagingDeepFlings $(quote_device_shell_arg "$PAGING_DEEP_FLINGS")"
+fi
 if [[ -n "${CREATED_GROUP_PREFIX:-}" ]]; then
   instrument_command="$instrument_command \
 -e createdGroupPrefix $(quote_device_shell_arg "$CREATED_GROUP_PREFIX")"

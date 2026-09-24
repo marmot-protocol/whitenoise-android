@@ -402,6 +402,10 @@ If the release-like launch does not emit both startup milestones within its
 wait — a busy engine after a large seed can push the first local frame past
 it — pass `REQUIRE_STARTUP_MILESTONES=false` to continue with the chat-list
 preflight alone; the paging results do not depend on that report.
+`PAGING_DEEP_FLINGS=<n>` deepens the three deep journeys beyond their default
+twelve flicks (passed to the benchmark as `pagingDeepFlings`); about forty-five
+flicks on a 1,000-row fixture carry the transcript past the app's 600-row
+retention cap, which is where the main-thread apply cost has to be read.
 
 | Method | Journey |
 | --- | --- |
