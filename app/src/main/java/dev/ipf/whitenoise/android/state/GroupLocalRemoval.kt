@@ -112,7 +112,11 @@ private suspend fun WhiteNoiseAppState.finishLocalGroupDeleteCleanup(pending: Pe
     cleanupStep("dictation") { conversationDictation.onTargetRemoved(account, groupIdHex) }
     if (pending.mediaCacheKeys.isNotEmpty()) {
         cleanupStep("memory media") {
-            removeMediaMemoryCacheKeys(pending.mediaCacheKeys, Dispatchers.Main.immediate, ::removeMediaMemoryCacheEntry)
+            removeMediaMemoryCacheKeys(
+                pending.mediaCacheKeys,
+                Dispatchers.Main.immediate,
+                ::removeMediaMemoryCacheEntry,
+            )
         }
     }
     if (pending.mediaCacheKeys.isNotEmpty() || pending.ciphertextTags.isNotEmpty()) {
