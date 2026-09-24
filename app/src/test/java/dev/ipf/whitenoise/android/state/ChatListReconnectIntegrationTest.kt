@@ -99,6 +99,71 @@ class ChatListReconnectIntegrationTest {
         }
     }
 
+    /** An incomplete live replacement keeps a pinned DM visible until a reopened coherent frame arrives. */
+    @Test
+    fun missingPinnedChatKeepsLastFrameAndReopensTheWindows() {
+        val pinned = notificationChatListRow().copy(groupIdHex = "aa".repeat(32), pinned = true, pinnedPosition = 0u)
+        val group = notificationChatListRow().copy(groupIdHex = "bb".repeat(32), pinned = false)
+        val subscriptions = DroppedChatSubscriptions(pinned, group)
+        val appState = chatListTestAppState(testRecoveryDiagnostics(), subscriptions.liveSubscriptions)
+        val controller = testChatsController(appState)
+        val bindScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        bindScope.launch { controller.bind(ConversationTimelineTestIds.ACCOUNT_REF) }
+        try {
+            awaitChatListCondition {
+                subscriptions.first.nextUpdateStarted.isCompleted && controller.items.size == 2
+            }
+            subscriptions.first.emitRows(listOf(group))
+
+            awaitChatListCondition { subscriptions.first.closed }
+            assertEquals(setOf(pinned.groupIdHex, group.groupIdHex), controller.items.map { it.id }.toSet())
+
+            controller.retryLoad()
+            awaitChatListCondition { subscriptions.second.nextUpdateStarted.isCompleted }
+            assertEquals(setOf(pinned.groupIdHex, group.groupIdHex), controller.items.map { it.id }.toSet())
+            assertEquals(2, subscriptions.activeOpenCount.get())
+        } finally {
+            controller.onCleared()
+            subscriptions.closeAll()
+            bindScope.cancel()
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+    }
+
+    @Test
+    fun authoritativeArchiveLeaveAndDeleteCanRemoveTheChat() {
+        val pinned = notificationChatListRow().copy(groupIdHex = "aa".repeat(32), pinned = true, pinnedPosition = 0u)
+        val group = notificationChatListRow().copy(groupIdHex = "bb".repeat(32), pinned = false)
+        val removedRows =
+            listOf(
+                pinned.copy(archived = true),
+                pinned.copy(selfMembership = dev.ipf.marmotkit.SelfMembershipFfi.LEFT),
+                null,
+            )
+        removedRows.forEach { authoritative ->
+            val subscriptions = DroppedChatSubscriptions(pinned, group)
+            subscriptions.pinnedProjection = authoritative
+            val appState = chatListTestAppState(testRecoveryDiagnostics(), subscriptions.liveSubscriptions)
+            val controller = testChatsController(appState)
+            val bindScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+            bindScope.launch { controller.bind(ConversationTimelineTestIds.ACCOUNT_REF) }
+            try {
+                awaitChatListCondition {
+                    subscriptions.first.nextUpdateStarted.isCompleted && controller.items.size == 2
+                }
+                subscriptions.first.emitRows(listOf(group))
+
+                awaitChatListCondition { controller.items.map { it.id } == listOf(group.groupIdHex) }
+                assertEquals(1, subscriptions.activeOpenCount.get())
+            } finally {
+                controller.onCleared()
+                subscriptions.closeAll()
+                bindScope.cancel()
+                shadowOf(Looper.getMainLooper()).idle()
+            }
+        }
+    }
+
     /** A rejected stale replay cannot regress the row held by a mounted conversation. */
     @Test
     fun staleChatListReplayKeepsAttachedConversationOnTheAcceptedRow() {
@@ -405,12 +470,15 @@ private fun awaitChatListCondition(condition: () -> Boolean) {
 
 /** Controllable chat-list subscription used by the recovery integration test. */
 private class ScriptedChatListSubscription(
-    private val initialRow: ChatListRowFfi,
+    private val initialRows: List<ChatListRowFfi>,
 ) : ChatListWindowHandle {
+    constructor(initialRow: ChatListRowFfi) : this(listOf(initialRow))
+
     private val updates = Channel<ChatListWindowSnapshotFfi>(Channel.UNLIMITED)
     private var sequence = 0uL
-    private var current = windowSnapshot(listOf(initialRow), sequence)
+    private var current = windowSnapshot(initialRows, sequence)
     val nextUpdateStarted = CompletableDeferred<Unit>()
+    @Volatile var closed = false
 
     /** Returns the local projection present before reconnect. */
     override fun snapshot(): ChatListWindowSnapshotFfi = current
@@ -445,13 +513,59 @@ private class ScriptedChatListSubscription(
                 is ChatListSubscriptionUpdateFfi.Snapshot -> update.rows
                 is ChatListSubscriptionUpdateFfi.RemoveRow -> emptyList()
             }
+        emitRows(rows)
+    }
+
+    fun emitRows(rows: List<ChatListRowFfi>) {
         sequence += 1uL
         check(updates.trySend(windowSnapshot(rows, sequence)).isSuccess)
     }
 
     /** Ends the scripted stream. */
     override fun close() {
+        closed = true
         updates.close()
+    }
+}
+
+/** Two successive complete windows with a keyed MDK row that can confirm or disprove a removal. */
+private class DroppedChatSubscriptions(
+    pinned: ChatListRowFfi,
+    group: ChatListRowFfi,
+) {
+    val first = ScriptedChatListSubscription(listOf(pinned, group))
+    val second = ScriptedChatListSubscription(listOf(pinned, group))
+    val activeOpenCount = AtomicInteger()
+    @Volatile var pinnedProjection: ChatListRowFfi? = pinned
+    private val groupId = group.groupIdHex
+    private val pinnedId = pinned.groupIdHex
+    private val otherWindows = CopyOnWriteArrayList<TerminatingChatListSubscription>()
+    private val groupStreams = CopyOnWriteArrayList<ScriptedChatsSubscription>()
+
+    val liveSubscriptions =
+        ChatListLiveSubscriptions(
+            openChatListWindow = { _, view ->
+                if (view == ChatListViewFfi.CHATS) {
+                    if (activeOpenCount.getAndIncrement() == 0) first else second
+                } else {
+                    TerminatingChatListSubscription(view).also(otherWindows::add)
+                }
+            },
+            openChats = { _, _ -> ScriptedChatsSubscription().also(groupStreams::add) },
+            presentedRowByGroup = { _, id ->
+                when (id) {
+                    pinnedId -> pinnedProjection?.let(::presentedRow)
+                    groupId -> presentedRow(group)
+                    else -> null
+                }
+            },
+        )
+
+    fun closeAll() {
+        first.close()
+        second.close()
+        otherWindows.forEach(TerminatingChatListSubscription::close)
+        groupStreams.forEach(ScriptedChatsSubscription::close)
     }
 }
 

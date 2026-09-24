@@ -26,6 +26,7 @@ import dev.ipf.marmotkit.ChatListRowActionsFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
+import dev.ipf.marmotkit.ChatListViewFfi
 import dev.ipf.marmotkit.ChatPinStateFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.DeletionSourceFfi
@@ -3060,6 +3061,9 @@ class ChatsController private constructor(
                             activeChatsSubscription = chatStream
                         }
                     }
+                    if (!validateChatListWindowRows(accountRef, chatListStream)) {
+                        throw IncompleteChatListReplacement()
+                    }
                     replacePresentedChatRows(chatListStream.rows)
                     appState.recordAccountSwitchLocalRowsReady(accountRef, chatRows.size)
                     groupRecordsById =
@@ -3094,15 +3098,21 @@ class ChatsController private constructor(
                     coroutineScope {
                         runUntilFirstLiveSubscriptionEnds(
                             first = {
-                                chatListStream.receive { _, _ ->
+                                chatListStream.receive { view, replacement ->
                                     appState.recoveryDiagnostics
                                         .recordChatListSubscriptionReceived()
                                         ?.let { generation ->
                                             pendingRecoveryProjectionGeneration.publish(generation)
                                         }
+                                    chatsDebug {
+                                        "chat list window view=$view sequence=${replacement.sequence} " +
+                                            "rows=${replacement.rows.size} merged=${chatListStream.rows.size}"
+                                    }
+                                    if (!applyChatListWindowRows(accountRef, chatListStream)) {
+                                        throw IncompleteChatListReplacement()
+                                    }
                                     receivedLiveUpdate = true
                                     connectionOwner.noteLiveUpdate(connectionAttempt)
-                                    applyChatListWindowRows(accountRef, chatListStream.rows)
                                 }
                             },
                             second = {
@@ -4179,15 +4189,48 @@ class ChatsController private constructor(
         }
     }
 
-    /** Applies the merged rows of every open chat-list window after a newer replacement was installed. */
+    /** Applies the merged rows only after checking an unexpected active-row drop against MDK. */
     @VisibleForTesting
-    internal fun applyChatListWindowRows(
+    internal suspend fun applyChatListWindowRows(
         accountRef: String,
-        rows: List<PresentedChatRowFfi>,
-    ) {
-        chatsDebug { "chat list window replacement account=${accountRef.take(8)} rows=${rows.size}" }
-        replacePresentedChatRows(rows)
+        windows: ChatListWindowSet,
+    ): Boolean {
+        if (!validateChatListWindowRows(accountRef, windows)) {
+            windows.close()
+            return false
+        }
+        chatsDebug { "chat list window replacement account=${accountRef.take(8)} rows=${windows.rows.size}" }
+        replacePresentedChatRows(windows.rows)
         scheduleRecompute()
+        return true
+    }
+
+    private suspend fun validateChatListWindowRows(
+        accountRef: String,
+        windows: ChatListWindowSet,
+    ): Boolean {
+        val lookup = liveSubscriptions.presentedRowByGroup ?: return true
+        val activeWindow = windows.installed(ChatListViewFfi.CHATS)
+        val previous =
+            chatRowsByGroup.map { (key, row) -> optimisticChatListPreviewByGroup[key]?.baselineRow ?: row }
+        val candidates = missingActiveTopChatRows(previous, windows.rows, activeWindow)
+        for (old in candidates) {
+            val authoritative =
+                runCatchingCancellable { lookup(accountRef, old.groupIdHex) }.getOrElse { failure ->
+                    Log.w("DMChats", "CHAT_LIST_ROW_CHECK_FAILED reason=${failure.javaClass.simpleName}")
+                    return false
+                }?.row ?: continue
+            if (authoritative.belongsInActiveChats() && activeWindow?.shouldContain(authoritative) == true) {
+                Log.w(
+                    "DMChats",
+                    "CHAT_LIST_INCOMPLETE account=${accountRef.hashCode().toUInt().toString(16)} " +
+                        "generation=${activeWindow.subscriptionGeneration.hashCode().toUInt().toString(16)} " +
+                        "sequence=${activeWindow.sequence} previous=${previous.size} incoming=${windows.rows.size}",
+                )
+                return false
+            }
+        }
+        return true
     }
 
     /** Atomically replaces both base rows and their matching selected presentation. */

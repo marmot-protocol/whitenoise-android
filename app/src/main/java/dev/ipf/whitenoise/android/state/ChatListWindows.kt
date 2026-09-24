@@ -215,14 +215,14 @@ private suspend fun currentCoroutineContextIsActive(): Boolean = kotlinx.corouti
 suspend fun ChatsController.loadMoreChats(view: ChatListViewFfi = ChatListViewFfi.CHATS) {
     val windows = chatListWindows ?: return
     val account = accountRef ?: return
-    if (windows.pageForward(view) != null) applyChatListWindowRows(account, windows.rows)
+    if (windows.pageForward(view) != null) applyChatListWindowRows(account, windows)
 }
 
 /** Loads rows before the retained active window when the reader approaches its shifted front. */
 suspend fun ChatsController.loadEarlierChats(view: ChatListViewFfi = ChatListViewFfi.CHATS) {
     val windows = chatListWindows ?: return
     val account = accountRef ?: return
-    if (windows.pageBackward(view) != null) applyChatListWindowRows(account, windows.rows)
+    if (windows.pageBackward(view) != null) applyChatListWindowRows(account, windows)
 }
 
 /** Reports the chat the user actually sees so window replacements keep it in place. */
@@ -232,14 +232,14 @@ suspend fun ChatsController.reportVisibleChat(
 ) {
     val windows = chatListWindows ?: return
     val account = accountRef ?: return
-    if (windows.setVisibleAnchor(view, groupIdHex) != null) applyChatListWindowRows(account, windows.rows)
+    if (windows.setVisibleAnchor(view, groupIdHex) != null) applyChatListWindowRows(account, windows)
 }
 
 /** Returns the active list to its top after a scroll-to-top gesture. */
 suspend fun ChatsController.returnChatListToTop(view: ChatListViewFfi = ChatListViewFfi.CHATS) {
     val windows = chatListWindows ?: return
     val account = accountRef ?: return
-    if (windows.returnToTop(view) != null) applyChatListWindowRows(account, windows.rows)
+    if (windows.returnToTop(view) != null) applyChatListWindowRows(account, windows)
 }
 
 /** Whether MDK retains more active chats than the window currently shows. */
