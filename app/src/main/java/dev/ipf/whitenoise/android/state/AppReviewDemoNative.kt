@@ -136,7 +136,7 @@ internal class AppReviewDemoNative(
                     ),
                 ).messages
             }.asSequence()
-            .filter { it.kind == 9uL && !it.deleted }
+            .filter { it.kind == DEMO_CHAT_MESSAGE_KIND && !it.deleted }
             .map { record ->
                 ReviewDemoMessage(
                     id = record.messageIdHex,
@@ -187,6 +187,7 @@ internal class AppReviewDemoNative(
     private fun AccountSummaryFfi.forReviewDemo() = ReviewDemoAccount(label, accountIdHex, localSigning, signedOut)
 
     private companion object {
+        const val DEMO_CHAT_MESSAGE_KIND = 9uL
         const val DEMO_TIMELINE_LIMIT = 100u
         const val DEMO_NAME = "Johnny Appleseed"
         const val DEMO_ABOUT = "App Review demo profile"
