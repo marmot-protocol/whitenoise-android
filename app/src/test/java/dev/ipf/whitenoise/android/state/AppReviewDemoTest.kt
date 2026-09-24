@@ -313,22 +313,25 @@ class AppReviewDemoTest {
     fun encryptedReceiptSurvivesRecreationAndRejectsInvalidData() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         context.deleteSharedPreferences("review-demo-test-secure")
-        val key = javax.crypto.KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
+        val keyGenerator = javax.crypto.KeyGenerator.getInstance("AES")
+        keyGenerator.init(256)
+        val key = keyGenerator.generateKey()
         val provider = object : SecureStoreKeyProvider {
             override fun secretKey(): javax.crypto.SecretKey = key
         }
+
         fun secureStore() = KeystoreSecureStore(context, "review-demo-test-secure", provider)
+
         val first = SecureReviewDemoStore(secureStore())
         val saved = checkpoint(demoRef = johnny.ref, demoId = johnny.id, groupId = group)
         first.save(saved)
 
         assertEquals(saved, SecureReviewDemoStore(secureStore()).load())
-        val raw =
-            context.getSharedPreferences("review-demo-test-secure", Context.MODE_PRIVATE).all.values.joinToString()
+        val preferences = context.getSharedPreferences("review-demo-test-secure", Context.MODE_PRIVATE)
+        val raw = preferences.all.values.joinToString()
         assertFalse(raw.contains(saved.originalId))
         assertFalse(raw.contains(saved.demoId!!))
-        context.getSharedPreferences("review-demo-test-secure", Context.MODE_PRIVATE)
-            .edit().putString("payload", "corrupt ciphertext").commit()
+        preferences.edit().putString("payload", "corrupt ciphertext").commit()
         assertEquals(
             ReviewDemoProblem.InvalidCheckpoint,
             assertThrows(ReviewDemoFailure::class.java) { first.load() }.problem,
@@ -343,7 +346,9 @@ class AppReviewDemoTest {
         context.deleteSharedPreferences("review-demo-migration-secure")
         val legacy = context.getSharedPreferences("review-demo-migration-legacy", Context.MODE_PRIVATE)
         legacy.edit().clear().commit()
-        val key = javax.crypto.KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
+        val keyGenerator = javax.crypto.KeyGenerator.getInstance("AES")
+        keyGenerator.init(256)
+        val key = keyGenerator.generateKey()
         val provider = object : SecureStoreKeyProvider {
             override fun secretKey(): javax.crypto.SecretKey = key
         }
