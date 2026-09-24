@@ -81,6 +81,7 @@ internal fun DeveloperScreen(
             }
         }
     }
+    var seedDialogOpen by remember { mutableStateOf(false) }
     DeveloperContent(
         developerMode = appState.developerMode,
         streamingDebug = appState.streamingDebugMode,
@@ -96,10 +97,18 @@ internal fun DeveloperScreen(
         onStartDemo = { demo.start(openDemo) },
         onOpenDemo = { ready -> openDemo(ready.accountRef, ready.groupId) },
         onClearDemo = demo::clearSavedSetup,
+        // Seeding sends real messages, so only a debuggable build offers it.
+        onSeedConversationFixture = if (BuildConfig.DEBUG) ({ seedDialogOpen = true }) else null,
     )
+    if (seedDialogOpen) {
+        ConversationFixtureSeedDialog(appState = appState, onDismiss = { seedDialogOpen = false })
+    }
 }
 
-/** The list itself. Debugging appears only while developer mode is on; Key Packages never depends on it. */
+/**
+ * The list itself. Debugging appears only while developer mode is on; Key Packages never depends on it.
+ * [onSeedConversationFixture] is null outside debuggable builds, and its row is then absent.
+ */
 @Suppress("FunctionNaming", "LongParameterList", "LongMethod")
 @Composable
 internal fun DeveloperContent(
@@ -117,6 +126,7 @@ internal fun DeveloperContent(
     onStartDemo: () -> Unit = {},
     onOpenDemo: (ReviewDemoStatus.Ready) -> Unit = {},
     onClearDemo: () -> Unit = {},
+    onSeedConversationFixture: (() -> Unit)? = null,
 ) {
     var confirmStart by remember { mutableStateOf(false) }
     var confirmClear by remember { mutableStateOf(false) }
@@ -235,6 +245,17 @@ internal fun DeveloperContent(
                                 modifier = Modifier.testTag("developer.diagnostics"),
                                 subtitle = stringResource(R.string.diagnostics_settings_subtitle),
                             )
+                        }
+                        if (onSeedConversationFixture != null) {
+                            row("seed_fixture") { context ->
+                                SettingsLink(
+                                    context = context,
+                                    title = stringResource(R.string.developer_seed_fixture),
+                                    onClick = onSeedConversationFixture,
+                                    modifier = Modifier.testTag("developer.seed_fixture"),
+                                    subtitle = stringResource(R.string.developer_seed_fixture_subtitle),
+                                )
+                            }
                         }
                     }
                 }

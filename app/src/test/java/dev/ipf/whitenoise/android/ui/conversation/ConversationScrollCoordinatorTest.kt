@@ -950,14 +950,43 @@ class ConversationScrollCoordinatorTest {
                 assertTrue(jumped)
                 assertEquals(
                     listOf(
-                        ScrollWrite.Snap(78, 0),
-                        ScrollWrite.Animate(88, 0),
+                        ScrollWrite.Snap(88, 0),
                     ),
                     writer.writes,
                 )
                 assertEquals(ConversationScrollMode.FollowingTail, coordinator.mode)
                 assertTrue(coordinator.isFollowingTail)
             }
+        }
+
+    /** A far tail lands in one snap; a tail index that moved during the snap gets one corrective snap. */
+    @Test
+    fun farJumpToNewestSnapsOnceAndCorrectsAMovedTail() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            var resolutions = 0
+
+            val completed =
+                coordinator.jumpToNewest(targetIndex = 88) {
+                    resolutions += 1
+                    if (resolutions == 1) 88 else 89
+                }
+
+            assertTrue(completed)
+            assertEquals(listOf(ScrollWrite.Snap(88, 0), ScrollWrite.Snap(89, 0)), writer.writes)
+            assertEquals(ConversationScrollMode.FollowingTail, coordinator.mode)
+        }
+
+    /** A tail already within ten rows keeps its animation. */
+    @Test
+    fun nearJumpToNewestStillAnimates() =
+        runTest {
+            val writer = RecordingScrollWriter().apply { firstVisibleItemIndex = 6 }
+            val coordinator = ConversationScrollCoordinator(writer)
+
+            assertTrue(coordinator.jumpToNewest(targetIndex = 0))
+            assertEquals(listOf(ScrollWrite.Animate(0, 0)), writer.writes)
         }
 
     @Test
@@ -1018,8 +1047,7 @@ class ConversationScrollCoordinatorTest {
                 listOf(
                     ScrollWrite.Snap(30, 0),
                     ScrollWrite.Animate(40, 0),
-                    ScrollWrite.Snap(78, 0),
-                    ScrollWrite.Animate(88, 0),
+                    ScrollWrite.Snap(88, 0),
                 ),
                 writer.writes,
             )
@@ -1107,8 +1135,7 @@ class ConversationScrollCoordinatorTest {
                 assertEquals(ConversationJumpToNewestOutcome.Tail, outcome)
                 assertEquals(
                     listOf(
-                        ScrollWrite.Snap(78, 0),
-                        ScrollWrite.Animate(88, 0),
+                        ScrollWrite.Snap(88, 0),
                     ),
                     writer.writes,
                 )
@@ -1139,8 +1166,7 @@ class ConversationScrollCoordinatorTest {
                 listOf(
                     ScrollWrite.Snap(30, 0),
                     ScrollWrite.Animate(40, 0),
-                    ScrollWrite.Snap(78, 0),
-                    ScrollWrite.Animate(88, 0),
+                    ScrollWrite.Snap(88, 0),
                 ),
                 writer.writes,
             )

@@ -7558,8 +7558,9 @@ class ConversationController(
                 val streamIdsLaunched =
                     applyTimelinePage(
                         newest.page,
-                        replaceWindow = true,
+                        replaceWindow = false,
                         updatePagination = true,
+                        reconcileNewExtendedRecords = true,
                     )
                 // An authoritative window is the recovery a stood-down forward prefetch was
                 // waiting for, so the viewport may ask for newer content again (#2764).
@@ -11373,8 +11374,7 @@ class ConversationController(
         val preparationGeneration = timelineWindowGeneration.advance()
         val installed = timelineSubscription?.latestInstalledWindow()
         val applied = installed?.page ?: page
-        val snapshot =
-            currentWindowApplySnapshot(timelineRecords.values, pendingProjectionsAwaitingBridge.keys)
+        val snapshot = currentWindowApplySnapshot()
         val preparation =
             prepareWindowApplyOn(
                 dispatcher = windowPreparationDispatcher,
@@ -11396,9 +11396,8 @@ class ConversationController(
                 pendingProjectionsAwaitingBridge.keys,
             )
         commitPlan.departedIds.forEach(::removeProjectedRecord)
-        if (replaceWindow) trimStateForWindowReplacement()
-        authoritativeTimelineOrderByMessageId.clear()
-        authoritativeTimelineOrderByMessageId.putAll(prepared.authoritativeOrder)
+        if (prepared.mode == WindowApplyMode.REPLACE) trimStateForWindowReplacement()
+        installAuthoritativeOrder(prepared)
         val streamIds = mutableListOf<String>()
         val appliedRecords = ArrayList<TimelineMessageRecordFfi>(prepared.rows.size)
         prepared.rows.forEach { row ->
@@ -11439,6 +11438,7 @@ class ConversationController(
         pruneRetentionAtSendToWindow()
         pruneConfirmedOptimisticReactions()
         pruneMessageOverlaysToWindow()
+        pruneRetainedTimelineRows(prepared)
         installWindowFrame(installed?.frame)
         // A replacement rebuilt every row, so every tally is stale. An extended window only changed
         // the rows it added, altered or dropped.

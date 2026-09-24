@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import dev.ipf.whitenoise.android.state.ConversationPagingTraceSection
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -28,6 +29,33 @@ class ConversationPagingPrefetchTest {
     @Test
     fun prefetchMarginKeepsHalfAPageOfRunway() {
         assertEquals(25, OLDER_PAGE_PREFETCH_ROWS)
+    }
+
+    /** Only a positive runway counts as invisible paging; an edge already on screen was seen. */
+    @Test
+    fun landingEventSplitsOnWhetherTheEdgeWasVisible() {
+        assertEquals(ConversationPagingTraceSection.RUNWAY_KEPT, pageLandingEvent(runwayRows = 1))
+        assertEquals(ConversationPagingTraceSection.EDGE_REACHED, pageLandingEvent(runwayRows = 0))
+        assertEquals(ConversationPagingTraceSection.EDGE_REACHED, pageLandingEvent(runwayRows = -5))
+    }
+
+    /** A stop on the edge with more history is counted once, on entry, not on every layout pass. */
+    @Test
+    fun edgeStopIsCountedOncePerStop() {
+        val tracker = PagingEdgeStopTracker()
+        assertFalse(tracker.observe(OLDEST_ROW, OLDEST_ROW, hasMoreBefore = true, scrolling = true))
+        assertTrue(tracker.observe(OLDEST_ROW, OLDEST_ROW, hasMoreBefore = true, scrolling = false))
+        assertFalse(tracker.observe(OLDEST_ROW, OLDEST_ROW, hasMoreBefore = true, scrolling = false))
+        assertFalse(tracker.observe(OLDEST_ROW - 3, OLDEST_ROW, hasMoreBefore = true, scrolling = false))
+        assertTrue(tracker.observe(OLDEST_ROW, OLDEST_ROW, hasMoreBefore = true, scrolling = false))
+    }
+
+    /** Resting on the true beginning of history, or with no rows on screen, is not a paging stop. */
+    @Test
+    fun edgeStopIgnoresExhaustedHistoryAndEmptyLayouts() {
+        val tracker = PagingEdgeStopTracker()
+        assertFalse(tracker.observe(OLDEST_ROW, OLDEST_ROW, hasMoreBefore = false, scrolling = false))
+        assertFalse(tracker.observe(-1, OLDEST_ROW, hasMoreBefore = true, scrolling = false))
     }
 
     /** Nothing is fetched before the timeline has an anchor, while a page is in flight, or at the end. */
