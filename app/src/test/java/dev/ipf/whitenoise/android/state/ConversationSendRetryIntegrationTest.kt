@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import android.os.Looper
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -50,6 +51,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 
 /** Integration boundary for optimistic send state plus the shared relay retry policy (#2016). */
@@ -63,9 +65,10 @@ class ConversationSendRetryIntegrationTest {
             val releaseOriginal = CompletableDeferred<Unit>()
             val publishedEdit = CompletableDeferred<Pair<String, String>>()
             var editCalls = 0
+            val appState = appState()
             val controller =
                 ConversationController(
-                    appState = appState(),
+                    appState = appState,
                     initialGroup = group(),
                     initialMemberSnapshot = memberSnapshot(),
                     textPublisher = { _, _, _, _ ->
@@ -87,7 +90,11 @@ class ConversationSendRetryIntegrationTest {
 
                 releaseOriginal.complete(Unit)
                 original.await()
+                val handoffKey = "$ACCOUNT_REF|$GROUP_ID|$clientToken"
+                assertTrue(appState.pendingMessageEditHandoff.hasSession(handoffKey))
                 controller.cancelMessageEdit()
+                assertFalse(appState.pendingMessageEditHandoff.hasSession(handoffKey))
+                Shadows.shadowOf(Looper.getMainLooper()).idle()
 
                 assertEquals(
                     CONFIRMED_MESSAGE_ID to "revision A",
