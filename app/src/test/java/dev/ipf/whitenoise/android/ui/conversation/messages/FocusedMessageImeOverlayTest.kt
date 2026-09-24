@@ -7,6 +7,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -93,13 +94,11 @@ class FocusedMessageImeOverlayTest {
         composeRule.waitForIdle()
 
         val previewBefore = composeRule.onNodeWithTag("message-actions-preview").fetchSemanticsNode().boundsInRoot
-        assertTrue(
-            "the message must start inside the short frame",
-            previewBefore.top >= 0f && previewBefore.bottom <= 320f,
-        )
+        assertPreviewWithinFrame(previewBefore, "the message must start inside the short frame")
         composeRule.onNodeWithTag(FOCUSED_ACTION_MENU_SCROLL_TEST_TAG).assertIsDisplayed()
         if (previewHeight > 60) {
-            val actionViewport = composeRule.onNodeWithTag(FOCUSED_ACTION_MENU_SCROLL_TEST_TAG).fetchSemanticsNode().boundsInRoot
+            val actionViewport =
+                composeRule.onNodeWithTag(FOCUSED_ACTION_MENU_SCROLL_TEST_TAG).fetchSemanticsNode().boundsInRoot
             assertTrue("tall media must leave a tappable action viewport", actionViewport.height >= 48f)
         }
 
@@ -112,10 +111,11 @@ class FocusedMessageImeOverlayTest {
 
         val previewAfter = composeRule.onNodeWithTag("message-actions-preview").fetchSemanticsNode().boundsInRoot
         assertEquals("scrolling actions must not move the lifted message", previewBefore.top, previewAfter.top, 0.5f)
-        assertTrue(
-            "the lifted message must remain fully visible",
-            previewAfter.top >= 0f && previewAfter.bottom <= 320f,
-        )
+        assertPreviewWithinFrame(previewAfter, "the lifted message must remain fully visible")
         assertEquals("the final action must remain reachable", 1, lastActionClicks)
+    }
+
+    private fun assertPreviewWithinFrame(bounds: Rect, message: String) {
+        assertTrue(message, bounds.top >= 0f && bounds.bottom <= 320f)
     }
 }
