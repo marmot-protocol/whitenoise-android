@@ -243,9 +243,14 @@ object MediaPipeline {
      * `imeta` tag and is otherwise untrusted — to a bare basename safe to use
      * as a path segment when writing to the gallery or a share temp file.
      * Strips any directory components so a malicious `"../../x"` can't traverse
-     * out of the target directory. Returns `"image.jpg"` for empty/dot names.
+     * out of the target directory. Uses [fallback] for empty/dot names.
      */
-    fun safeDisplayName(name: String): String {
+    fun safeDisplayName(name: String): String = safeDisplayName(name, "image.jpg")
+
+    fun safeDisplayName(
+        name: String,
+        fallback: String,
+    ): String {
         val base =
             name
                 .replace('\\', '/')
@@ -253,7 +258,7 @@ object MediaPipeline {
                 .filterNot { it.isISOControl() }
                 .trim()
                 .takeUnless { it.isBlank() || it == "." || it == ".." }
-                ?: "image.jpg"
+                ?: fallback
         return clampDisplayName(base)
     }
 
