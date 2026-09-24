@@ -41,11 +41,12 @@ ABI_MACHINES = {
     "x86_64": (2, 62),
 }
 JNI_FILES = tuple(f"jniLibs/{abi}/libmarmot_uniffi.so" for abi in ABI_MACHINES)
+ELF_METADATA_FILE = "android-elf.json"
 REQUIRED_ELF_EXPORTS = (
     b"uniffi_marmot_uniffi_fn_constructor_marmot_new",
     b"Java_io_crates_keyring_Keyring_00024Companion_initializeNdkContext",
 )
-PAYLOAD_FILES = (*KOTLIN_FILES, *JNI_FILES, "manifest.json")
+PAYLOAD_FILES = (*KOTLIN_FILES, *JNI_FILES, ELF_METADATA_FILE, "manifest.json")
 MANIFEST_CONTENTS = (KOTLIN_FILES[0], *JNI_FILES)
 REQUIRED_PROPERTIES = {
     "schema",
@@ -303,6 +304,8 @@ def validate_manifest(archive: zipfile.ZipFile, entry: zipfile.ZipInfo, properti
             raise PreparationError(f"manifest {key} mismatch: expected {value}, got {manifest.get(key)!r}")
     if manifest.get("contents") != list(MANIFEST_CONTENTS):
         raise PreparationError("manifest contents do not match the pinned Android contract")
+    if manifest.get("elf_validation") != ELF_METADATA_FILE:
+        raise PreparationError(f"manifest elf_validation must name {ELF_METADATA_FILE}")
     cargo_lock = manifest.get("cargo_lock_sha256", "")
     if len(cargo_lock) != 64 or any(character not in "0123456789abcdef" for character in cargo_lock):
         raise PreparationError("manifest cargo_lock_sha256 is invalid")
@@ -311,7 +314,8 @@ def validate_manifest(archive: zipfile.ZipFile, entry: zipfile.ZipInfo, properti
             raise PreparationError(f"manifest {key} is missing")
 
 
-def validate_elf(path: Path, abi: str) -> None:
+def validate_elf(path: Path, abi: str) -> tuple[int, ...]:
+    """Validate one JNI library and return its declared PT_LOAD alignments."""
     expected_class, expected_machine = ABI_MACHINES[abi]
     with path.open("rb") as library:
         if os.fstat(library.fileno()).st_size < 20:
@@ -325,6 +329,8 @@ def validate_elf(path: Path, abi: str) -> None:
 
         if expected_class == 1:
             header_format = "<16sHHIIIIIHHHHHH"
+            program_format = "<IIIIIIII"
+            program_alignment_index = 7
             section_format = "<IIIIIIIIII"
             symbol_format = "<IIIBBH"
             symbol_info_index = 3
@@ -332,6 +338,8 @@ def validate_elf(path: Path, abi: str) -> None:
             symbol_section_index = 5
         else:
             header_format = "<16sHHIQQQIHHHHHH"
+            program_format = "<IIQQQQQQ"
+            program_alignment_index = 7
             section_format = "<IIQQQQIIQQ"
             symbol_format = "<IBBHQQ"
             symbol_info_index = 1
@@ -343,12 +351,30 @@ def validate_elf(path: Path, abi: str) -> None:
             raise PreparationError(f"{abi} library has a truncated ELF header")
         header = struct.unpack_from(header_format, image)
         elf_type = header[1]
+        program_offset = header[5]
+        program_entry_size = header[9]
+        program_count = header[10]
         section_offset = header[6]
         section_entry_size = header[11]
         section_count = header[12]
         section_struct_size = struct.calcsize(section_format)
         if elf_type != 3:
             raise PreparationError(f"{abi} library is not an ELF shared object")
+        program_struct_size = struct.calcsize(program_format)
+        if program_offset == 0 or program_entry_size < program_struct_size or program_count <= 0:
+            raise PreparationError(f"{abi} library has no readable ELF program table")
+        if program_offset + program_count * program_entry_size > len(image):
+            raise PreparationError(f"{abi} library has a truncated ELF program table")
+        load_alignments = []
+        for index in range(program_count):
+            offset = program_offset + index * program_entry_size
+            program = struct.unpack_from(program_format, image, offset)
+            if program[0] == 1:
+                load_alignments.append(program[program_alignment_index])
+        if not load_alignments:
+            raise PreparationError(f"{abi} library has no loadable ELF segments")
+        if any(alignment <= 0 or alignment & (alignment - 1) for alignment in load_alignments):
+            raise PreparationError(f"{abi} library has an invalid ELF load alignment")
         if section_offset == 0 or section_entry_size < section_struct_size:
             raise PreparationError(f"{abi} library has no readable ELF section table")
 
@@ -412,6 +438,63 @@ def validate_elf(path: Path, abi: str) -> None:
     for symbol in REQUIRED_ELF_EXPORTS:
         if symbol not in found:
             raise PreparationError(f"{abi} library is missing expected export {symbol.decode()}")
+    return tuple(load_alignments)
+
+
+def validate_elf_metadata(prepared_root: Path) -> None:
+    """Cross-check the bundle's Android ABI metadata against every JNI library."""
+
+    def reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+        result: dict[str, object] = {}
+        for key, value in pairs:
+            if key in result:
+                raise PreparationError(f"duplicate {ELF_METADATA_FILE} key: {key}")
+            result[key] = value
+        return result
+
+    metadata_path = prepared_root / ELF_METADATA_FILE
+    try:
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"), object_pairs_hook=reject_duplicate_keys)
+    except (json.JSONDecodeError, UnicodeDecodeError) as error:
+        raise PreparationError(f"malformed {ELF_METADATA_FILE}: {error}") from error
+    expected_top_level = {"schema_version", "minimum_64bit_load_alignment", "libraries"}
+    if not isinstance(metadata, dict) or set(metadata) != expected_top_level:
+        raise PreparationError(f"{ELF_METADATA_FILE} has an unexpected schema")
+    if type(metadata["schema_version"]) is not int or metadata["schema_version"] != 1:
+        raise PreparationError(f"{ELF_METADATA_FILE} has an unsupported schema version")
+    minimum_alignment = metadata["minimum_64bit_load_alignment"]
+    if (
+        type(minimum_alignment) is not int
+        or minimum_alignment < 16 * 1024
+        or minimum_alignment & (minimum_alignment - 1)
+    ):
+        raise PreparationError(f"{ELF_METADATA_FILE} has an invalid 64-bit load alignment policy")
+    libraries = metadata["libraries"]
+    if not isinstance(libraries, dict) or set(libraries) != set(JNI_FILES):
+        raise PreparationError(f"{ELF_METADATA_FILE} libraries do not match the Android ABI contract")
+
+    expected_record_keys = {"abi", "elf_class", "load_alignments", "machine", "sha256"}
+    for abi, (elf_class, machine) in ABI_MACHINES.items():
+        relative = f"jniLibs/{abi}/libmarmot_uniffi.so"
+        record = libraries[relative]
+        if not isinstance(record, dict) or set(record) != expected_record_keys:
+            raise PreparationError(f"{ELF_METADATA_FILE} entry for {abi} has an unexpected schema")
+        expected_bits = 32 if elf_class == 1 else 64
+        if record["abi"] != abi or record["elf_class"] != expected_bits or record["machine"] != machine:
+            raise PreparationError(f"{ELF_METADATA_FILE} entry for {abi} has mismatched architecture data")
+        path = prepared_root / relative
+        if record["sha256"] != sha256(path):
+            raise PreparationError(f"{ELF_METADATA_FILE} entry for {abi} has a mismatched library checksum")
+        actual_alignments = validate_elf(path, abi)
+        reported_alignments = record["load_alignments"]
+        if (
+            not isinstance(reported_alignments, list)
+            or any(type(alignment) is not int for alignment in reported_alignments)
+            or tuple(reported_alignments) != actual_alignments
+        ):
+            raise PreparationError(f"{ELF_METADATA_FILE} entry for {abi} has mismatched load alignments")
+        if elf_class == 2 and any(alignment < minimum_alignment for alignment in actual_alignments):
+            raise PreparationError(f"{abi} library does not satisfy the 64-bit load alignment policy")
 
 
 def helper_api_declarations(prepared_root: Path) -> list[str]:
@@ -538,8 +621,7 @@ def validate_prepared(output: Path, properties: dict[str, str], archive_hashes: 
             path = output / relative
             if not path.is_file() or sha256(path) != expected_sha:
                 return False
-        for abi in ABI_MACHINES:
-            validate_elf(output / f"jniLibs/{abi}/libmarmot_uniffi.so", abi)
+        validate_elf_metadata(output)
         if api_signature(output, properties) != api_signature_path.read_text(encoding="utf-8"):
             return False
     except PreparationError:
@@ -559,8 +641,7 @@ def extract_atomically(archive_path: Path, output: Path, properties: dict[str, s
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 with archive.open(info) as source, destination.open("wb") as target:
                     shutil.copyfileobj(source, target, length=1024 * 1024)
-        for abi in ABI_MACHINES:
-            validate_elf(temporary / f"jniLibs/{abi}/libmarmot_uniffi.so", abi)
+        validate_elf_metadata(temporary)
         write_api_signature(
             temporary,
             temporary / "marmotkit-api-signature.txt",
