@@ -156,6 +156,7 @@ internal class ChatListWindowSet private constructor(
     ): Boolean {
         if (!cursors.getValue(view).accept(update)) return false
         installed[view] = update
+        update.logWindowFrame(view, "replace")
         return true
     }
 
@@ -203,13 +204,23 @@ internal class ChatListWindowSet private constructor(
             }
 
         private suspend fun initialReplacements(handles: OpenedWindows): InitialReplacements =
-            handles.mapValues { (_, handle) ->
-                withContext(Dispatchers.IO) { handle.snapshot() }.requireChatListWindowSnapshot()
+            handles.mapValues { (view, handle) ->
+                withContext(Dispatchers.IO) { handle.snapshot() }.requireChatListWindowSnapshot().also { snapshot ->
+                    snapshot.logWindowFrame(view, "initial")
+                }
             }
     }
 }
 
 private suspend fun currentCoroutineContextIsActive(): Boolean = kotlinx.coroutines.currentCoroutineContext().isActive
+
+/** Debug-only numeric window diagnostics; no group IDs, titles, or message content. */
+private fun ChatListWindowSnapshotFfi.logWindowFrame(view: ChatListViewFfi, phase: String) {
+    chatsDebug {
+        "chat window $phase view=$view generation=${subscriptionGeneration.hashCode().toUInt().toString(16)} " +
+            "sequence=$sequence rows=${rows.size} before=$hasMoreBefore after=$hasMoreAfter"
+    }
+}
 
 /** Loads the next page of active chats when the list reaches its end; a no-op while nothing more is retained. */
 suspend fun ChatsController.loadMoreChats(view: ChatListViewFfi = ChatListViewFfi.CHATS) {

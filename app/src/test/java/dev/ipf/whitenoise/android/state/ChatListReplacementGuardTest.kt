@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListAnchorOutcomeFfi
 import dev.ipf.marmotkit.ChatListViewFfi
 import dev.ipf.marmotkit.ChatListWindowSnapshotFfi
@@ -10,7 +11,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatListReplacementGuardTest {
-    private val pinnedDm = chatRow("pinned-dm").copy(pinned = true, pinnedPosition = 0u)
+    private val pinnedDm =
+        chatRow("pinned-dm").copy(
+            pinned = true,
+            pinnedPosition = 0u,
+            conversationKind = ChatConversationKindFfi.DIRECT,
+        )
     private val group = chatRow("active-group").copy(activitySortAt = 90uL)
     private val tail = chatRow("tail").copy(activitySortAt = 20uL)
 

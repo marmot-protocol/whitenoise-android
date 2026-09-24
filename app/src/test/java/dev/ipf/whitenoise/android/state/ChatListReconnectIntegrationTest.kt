@@ -102,7 +102,13 @@ class ChatListReconnectIntegrationTest {
     /** An incomplete live replacement keeps a pinned DM visible until a reopened coherent frame arrives. */
     @Test
     fun missingPinnedChatKeepsLastFrameAndReopensTheWindows() {
-        val pinned = notificationChatListRow().copy(groupIdHex = "aa".repeat(32), pinned = true, pinnedPosition = 0u)
+        val pinned =
+            notificationChatListRow().copy(
+                groupIdHex = "aa".repeat(32),
+                pinned = true,
+                pinnedPosition = 0u,
+                conversationKind = ChatConversationKindFfi.DIRECT,
+            )
         val group = notificationChatListRow().copy(groupIdHex = "bb".repeat(32), pinned = false)
         val subscriptions = DroppedChatSubscriptions(pinned, group)
         val appState = chatListTestAppState(testRecoveryDiagnostics(), subscriptions.liveSubscriptions)
@@ -132,7 +138,13 @@ class ChatListReconnectIntegrationTest {
 
     @Test
     fun authoritativeArchiveLeaveAndDeleteCanRemoveTheChat() {
-        val pinned = notificationChatListRow().copy(groupIdHex = "aa".repeat(32), pinned = true, pinnedPosition = 0u)
+        val pinned =
+            notificationChatListRow().copy(
+                groupIdHex = "aa".repeat(32),
+                pinned = true,
+                pinnedPosition = 0u,
+                conversationKind = ChatConversationKindFfi.DIRECT,
+            )
         val group = notificationChatListRow().copy(groupIdHex = "bb".repeat(32), pinned = false)
         val removedRows =
             listOf(
