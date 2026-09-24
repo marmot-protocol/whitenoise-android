@@ -115,6 +115,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
 import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.ConversationPagingOrigin
+import dev.ipf.whitenoise.android.state.ConversationPagingTraceSection
 import dev.ipf.whitenoise.android.state.ConversationUnreadJumpState
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.MessageAvailability
@@ -132,6 +133,7 @@ import dev.ipf.whitenoise.android.state.loadMessageAvailability
 import dev.ipf.whitenoise.android.state.loadUntilMessageAvailable
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
 import dev.ipf.whitenoise.android.state.markComposerReadyForPresentationTiming
+import dev.ipf.whitenoise.android.state.markPagingEvent
 import dev.ipf.whitenoise.android.state.markWindowVisibleForPresentationTiming
 import dev.ipf.whitenoise.android.state.mediaReferencesFor
 import dev.ipf.whitenoise.android.state.presentFailure
@@ -2580,6 +2582,27 @@ internal fun ConversationScreen(
     // list keeps history at its high-index end, so an older page appends there
     // and never disturbs the anchored newest edge — the framework holds the
     // visible rows in the same measure pass with no post-hoc scroll.
+    // Counted in its own collector: the prefetch collector below suspends on the page it requests,
+    // and a reader who reaches the edge while that page is in flight is exactly the stop to count.
+    LaunchedEffect(listState, controller) {
+        val edgeStops = PagingEdgeStopTracker()
+        snapshotFlow {
+            val visible = listState.layoutInfo.visibleItemsInfo
+            visible.lastOrNull { conversationAnchorMessageId(it.key) != null }?.index to listState.isScrollInProgress
+        }.collect { (oldestVisibleIndex, scrolling) ->
+            val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
+            if (liveRenderedSize == 0) return@collect
+            val edgeListIndex =
+                conversationTimelineListIndex(
+                    timelineIndex = 0,
+                    timelineSize = liveRenderedSize,
+                    trailingRowCount = controller.conversationTrailingRowCount(liveRenderedSize),
+                )
+            if (edgeStops.observe(oldestVisibleIndex ?: -1, edgeListIndex, controller.hasMoreBefore, scrolling)) {
+                markPagingEvent(ConversationPagingTraceSection.EDGE_STOP)
+            }
+        }
+    }
     LaunchedEffect(listState, controller) {
         snapshotFlow {
             // The reversed list emits the older-loading row, the top error row and the top spacer
@@ -2609,11 +2632,13 @@ internal fun ConversationScreen(
                     oldestMessageListIndex = oldestMessageListIndex,
                 )
             if (!prefetch) return@collect
+            val edgeMessageId = controller.timeline.firstOrNull { !MessageProjector.isEdit(it.record) }?.id
             // MDK places a replacement relative to the window's anchor, so tell it which row the
             // reader is actually on before paging. Without this an upward page is placed against
             // whatever the read pointer last reported, which only ever moves towards newer
             // messages — the reason scrolling up could move the reading position.
             controller.loadOlder(conversationAnchorMessageId(oldestVisible?.key))
+            recordOlderPageLanding(controller, listState, edgeMessageId)
         }
     }
     // Loading the authoritative unread boundary can shift a capped subscription

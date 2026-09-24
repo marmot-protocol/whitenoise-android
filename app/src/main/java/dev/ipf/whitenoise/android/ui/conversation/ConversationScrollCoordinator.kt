@@ -765,28 +765,33 @@ internal class ConversationScrollCoordinator(
             return true
         }
 
-        /** Animates to the final row and then its measured physical end. */
+        /**
+         * Reaches the newest row: animated when it is already within a few rows, in one snap when it
+         * is not.
+         *
+         * A far tail is the jump out of deep history, usually just after the bounded window was
+         * replaced with its newest rows. Snapping near and animating the last ten rows — what
+         * [animateScrollToItem] does for a reply target — composed and measured every row the
+         * animation passed at several rows per frame, which was the only paging journey a reader could
+         * feel (three consecutive 100 ms frames). The reader asked for the newest message, not a tour
+         * of the rows above it, so a far jump lands in a single write.
+         */
         suspend fun animateScrollToTail(
             index: Int,
             resolveIndex: () -> Int? = { index },
         ): Boolean {
             ensureCurrent()
-            var targetIndex = resolveIndex()?.coerceAtLeast(0)
-            var repositionAttempts = 0
-            while (
-                targetIndex != null &&
-                repositionAttempts < MAX_TARGET_REPOSITION_ATTEMPTS &&
-                prePositionIfFar(targetIndex)
-            ) {
-                repositionAttempts++
+            val targetIndex = resolveIndex()?.coerceAtLeast(0) ?: return false
+            if (isFar(targetIndex)) {
+                writer.scrollToTail(targetIndex)
+                // The snap suspends, and a page landing meanwhile can add or drop the structural rows
+                // below the newest message, moving its index. Re-read it once and correct with a
+                // second snap; still no animation.
                 ensureCurrent()
-                targetIndex = resolveIndex()?.coerceAtLeast(0)
-            }
-            val resolvedTargetIndex = targetIndex ?: return false
-            if (isFar(resolvedTargetIndex)) {
-                writer.scrollToTail(resolvedTargetIndex)
+                val settledIndex = resolveIndex()?.coerceAtLeast(0)
+                if (settledIndex != null && settledIndex != targetIndex) writer.scrollToTail(settledIndex)
             } else {
-                writer.animateScrollToTail(resolvedTargetIndex)
+                writer.animateScrollToTail(targetIndex)
             }
             return true
         }
@@ -820,13 +825,16 @@ internal class ConversationScrollCoordinator(
 }
 
 /** Performs the explicit newest-message action without bypassing coordinator ownership. */
-internal suspend fun ConversationScrollCoordinator.jumpToNewest(targetIndex: Int): Boolean =
+internal suspend fun ConversationScrollCoordinator.jumpToNewest(
+    targetIndex: Int,
+    resolveTailIndex: () -> Int? = { targetIndex },
+): Boolean =
     programmaticJump(
         targetMessageId = null,
         reason = ConversationScrollReason.JumpToNewest,
         resultingMode = ConversationScrollMode.FollowingTail,
     ) {
-        animateScrollToTail(targetIndex)
+        animateScrollToTail(targetIndex, resolveTailIndex)
     }
 
 /**
@@ -854,7 +862,7 @@ internal suspend fun ConversationScrollCoordinator.jumpToUnreadOrNewest(
                 if (!tailPrepared) {
                     throw CancellationException("Conversation newest edge was not available")
                 }
-                animateScrollToTail(resolveTailIndex())
+                animateScrollToTail(resolveTailIndex(), resolveTailIndex)
             }
         return if (completed && tailPrepared) {
             ConversationJumpToNewestOutcome.Tail
