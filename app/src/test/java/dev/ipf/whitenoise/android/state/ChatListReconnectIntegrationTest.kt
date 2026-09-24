@@ -136,6 +136,31 @@ class ChatListReconnectIntegrationTest {
         }
     }
 
+    /** Closing a set inside a suspending keyed lookup must not publish its rejected rows. */
+    @Test
+    fun closedWindowDuringValidationKeepsTheLastCoherentFrame() {
+        val pinned = notificationChatListRow().copy(groupIdHex = "aa".repeat(32), pinned = true,
+            pinnedPosition = 0u, conversationKind = ChatConversationKindFfi.DIRECT)
+        val group = notificationChatListRow().copy(groupIdHex = "bb".repeat(32), pinned = false)
+        val subscriptions = DroppedChatSubscriptions(pinned, group)
+        val controller = testChatsController(chatListTestAppState(testRecoveryDiagnostics(), subscriptions.liveSubscriptions))
+        val bindScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        bindScope.launch { controller.bind(ConversationTimelineTestIds.ACCOUNT_REF) }
+        try {
+            awaitChatListCondition { subscriptions.first.nextUpdateStarted.isCompleted && controller.items.size == 2 }
+            subscriptions.beforeKeyedLookup = { controller.chatListWindows?.close() }
+            subscriptions.pinnedProjection = null
+            subscriptions.first.emitRows(listOf(group))
+            awaitChatListCondition { subscriptions.first.closed }
+            assertEquals(setOf(pinned.groupIdHex, group.groupIdHex), controller.items.map { it.id }.toSet())
+        } finally {
+            controller.onCleared()
+            subscriptions.closeAll()
+            bindScope.cancel()
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+    }
+
     @Test
     fun authoritativeArchiveLeaveAndDeleteCanRemoveTheChat() {
         val pinned =
@@ -551,6 +576,7 @@ private class DroppedChatSubscriptions(
     val activeOpenCount = AtomicInteger()
 
     @Volatile var pinnedProjection: ChatListRowFfi? = pinned
+    var beforeKeyedLookup: (() -> Unit)? = null
     private val groupId = group.groupIdHex
     private val pinnedId = pinned.groupIdHex
     private val otherWindows = CopyOnWriteArrayList<TerminatingChatListSubscription>()
@@ -567,6 +593,7 @@ private class DroppedChatSubscriptions(
             },
             openChats = { _, _ -> ScriptedChatsSubscription().also(groupStreams::add) },
             presentedRowByGroup = { _, id ->
+                beforeKeyedLookup?.invoke()
                 when (id) {
                     pinnedId -> pinnedProjection?.let(::presentedRow)
                     groupId -> presentedRow(group)

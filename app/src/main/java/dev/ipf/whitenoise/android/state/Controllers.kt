@@ -3061,8 +3061,12 @@ class ChatsController private constructor(
                             activeChatsSubscription = chatStream
                         }
                     }
-                    requireCompleteChatListWindowRows(validateChatListWindowRows(accountRef, chatListStream))
-                    replacePresentedChatRows(chatListStream.rows)
+                    val initialRows = chatListStream.rows
+                    requireCompleteChatListWindowRows(
+                        validateChatListWindowRows(accountRef, chatListStream, initialRows) &&
+                            !chatListStream.closed && chatListWindows === chatListStream,
+                    )
+                    replacePresentedChatRows(initialRows)
                     appState.recordAccountSwitchLocalRowsReady(accountRef, chatRows.size)
                     groupRecordsById =
                         withContext(Dispatchers.IO) {
@@ -4193,11 +4197,13 @@ class ChatsController private constructor(
         accountRef: String,
         windows: ChatListWindowSet,
     ): Boolean {
-        if (!validateChatListWindowRows(accountRef, windows)) {
+        val rows = windows.rows
+        if (!validateChatListWindowRows(accountRef, windows, rows)) {
             windows.close()
             return false
         }
-        replacePresentedChatRows(windows.rows)
+        if (windows.closed || chatListWindows !== windows) return false
+        replacePresentedChatRows(rows)
         scheduleRecompute()
         return true
     }
@@ -4207,12 +4213,13 @@ class ChatsController private constructor(
     private suspend fun validateChatListWindowRows(
         accountRef: String,
         windows: ChatListWindowSet,
+        rows: List<PresentedChatRowFfi>,
     ): Boolean {
         val lookup = liveSubscriptions.presentedRowByGroup ?: return true
         val activeWindow = windows.installed(ChatListViewFfi.CHATS)
         val previous =
             chatRowsByGroup.map { (key, row) -> optimisticChatListPreviewByGroup[key]?.baselineRow ?: row }
-        val candidates = missingActiveTopChatRows(previous, windows.rows, activeWindow)
+        val candidates = missingActiveTopChatRows(previous, rows, activeWindow)
         for (old in candidates) {
             val authoritative =
                 runCatchingCancellable { lookup(accountRef, old.groupIdHex) }
@@ -4225,7 +4232,7 @@ class ChatsController private constructor(
                     "DMChats",
                     "CHAT_LIST_INCOMPLETE account=${chatListLogHash(accountRef)} " +
                         "generation=${chatListLogHash(activeWindow.subscriptionGeneration)} " +
-                        "sequence=${activeWindow.sequence} previous=${previous.size} incoming=${windows.rows.size}",
+                        "sequence=${activeWindow.sequence} previous=${previous.size} incoming=${rows.size}",
                 )
                 return false
             }

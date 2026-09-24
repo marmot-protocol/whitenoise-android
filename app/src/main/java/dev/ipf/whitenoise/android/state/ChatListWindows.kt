@@ -16,6 +16,7 @@ import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 /** The window handle opened for each rendered view. */
@@ -49,6 +50,9 @@ internal class ChatListWindowSet private constructor(
     private val cursors = initial.mapValues { (_, snapshot) -> ChatListWindowCursor(snapshot) }
     private val installed = initial.toMutableMap()
     private val commands = Mutex()
+    private val isClosed = AtomicBoolean(false)
+
+    val closed: Boolean get() = isClosed.get()
 
     /** Every retained row across the merged views, in view order. */
     val rows: List<PresentedChatRowFfi>
@@ -120,6 +124,7 @@ internal class ChatListWindowSet private constructor(
 
     /** Releases every native handle; these windows expose no separate cancel. */
     fun close() {
+        isClosed.set(true)
         handles.values.forEach { handle -> runCatching { handle.close() } }
     }
 
