@@ -6286,7 +6286,7 @@ class ConversationController(
         val readyEdit = editingMessageId?.let { pendingMessageEditHandoff.cancel(pendingEditKey(it)) }
         editingMessageId = null
         readyEdit?.let { edit ->
-            appState.launchMutation { yield(); editMessage(edit.targetId, edit.text) }
+            appState.launchMutation { editMessage(edit.targetId, edit.text) }
         }
     }
     // Production controllers start their local subscription during
