@@ -8,6 +8,16 @@ import org.junit.Test
 
 class PendingMessageEditHandoffTest {
     @Test
+    fun establishedMessageStillPublishesAgainstItsExistingEventId() {
+        val handoff = PendingMessageEditHandoff()
+
+        assertEquals(
+            PendingMessageEditHandoff.Submission.Publish("event-id"),
+            handoff.submit("account|group|event-id", "event-id", "revision"),
+        )
+    }
+
+    @Test
     fun submittedBeforeConfirmationWaitsAndPublishesOnlyOnceAgainstCanonicalId() {
         val handoff = PendingMessageEditHandoff()
         handoff.begin("local-token")
