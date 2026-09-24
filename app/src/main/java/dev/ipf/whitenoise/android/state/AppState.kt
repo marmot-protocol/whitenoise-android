@@ -4722,7 +4722,15 @@ class WhiteNoiseAppState private constructor(
     internal val appReviewDemo: AppReviewDemo by lazy {
         AppReviewDemo(
             backend = AppReviewDemoNative(this),
-            store = PreferencesReviewDemoStore(preferences),
+            store =
+                SecureReviewDemoStore(
+                    KeystoreSecureStore(
+                        context,
+                        "review_demo_receipt_secure_v1",
+                        AndroidKeystoreSecretKeyProvider("white-noise-review-demo-receipt-v1"),
+                    ),
+                    preferences,
+                ),
             scope = mutationsScope,
         )
     }

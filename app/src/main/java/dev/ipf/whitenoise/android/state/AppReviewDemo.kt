@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.security.GeneralSecurityException
 import java.util.UUID
 
 /** A local resume receipt, never a second source of truth for accounts, groups, or messages. */
@@ -44,50 +45,73 @@ internal interface ReviewDemoStore {
     fun clear()
 }
 
-internal class PreferencesReviewDemoStore(
-    private val preferences: SharedPreferences,
+internal class SecureReviewDemoStore(
+    private val secureStore: KeystoreSecureStore,
+    private val legacyPreferences: SharedPreferences? = null,
 ) : ReviewDemoStore {
     override val hasRecord: Boolean
-        get() = preferences.contains(KEY)
+        get() =
+            try {
+                KEY in secureStore.readAll() || legacyPreferences?.contains(LEGACY_KEY) == true
+            } catch (_: GeneralSecurityException) {
+                // An unreadable encrypted receipt must still offer Clear in the UI.
+                true
+            }
 
     override fun load(): ReviewDemoCheckpoint? {
-        val raw = preferences.getString(KEY, null) ?: return null
-        return try {
-            val json = JSONObject(raw)
-            require(json.getInt("version") == VERSION)
-            val initial = json.getJSONArray("initialRefs")
-            val initialRefs = (0 until initial.length()).map(initial::getString).toSet()
-            val attempts = json.optJSONArray("reactionAttempts") ?: JSONArray()
-            val reactionAttempts = (0 until attempts.length()).map(attempts::getString).toSet()
-            ReviewDemoCheckpoint(
-                runId = json.getString("runId"),
-                originalRef = json.getString("originalRef"),
-                originalId = json.getString("originalId"),
-                initialAccountRefs = initialRefs,
-                demoRef = json.optString("demoRef").takeIf(String::isNotBlank),
-                demoId = json.optString("demoId").takeIf(String::isNotBlank),
-                groupId = json.optString("groupId").takeIf(String::isNotBlank),
-                profilePublished = json.optBoolean("profilePublished"),
-                reactionAttempts = reactionAttempts,
-                completed = json.optBoolean("completed"),
-            ).also { checkpoint ->
-                require(runCatching { UUID.fromString(checkpoint.runId) }.isSuccess)
-                require(checkpoint.originalRef.isNotBlank() && checkpoint.originalId.isHexId())
-                require(checkpoint.originalRef in initialRefs && initialRefs.none(String::isBlank))
-                require((checkpoint.demoRef == null) == (checkpoint.demoId == null))
-                require(checkpoint.demoId == null || checkpoint.demoId.isHexId())
-                require(checkpoint.demoId == null || !checkpoint.demoId.equals(checkpoint.originalId, ignoreCase = true))
-                require(checkpoint.demoRef == null || checkpoint.demoRef !in initialRefs)
-                require(checkpoint.groupId == null || checkpoint.groupId.isHexGroupId())
-                require(!checkpoint.profilePublished || checkpoint.demoRef != null)
-                require(checkpoint.groupId == null || checkpoint.demoRef != null)
-                require(reactionAttempts.isEmpty() || checkpoint.groupId != null)
-                require(!checkpoint.completed || checkpoint.groupId != null)
-                require(reactionAttempts.all { it == JOHNNY_LIKE || it == ORIGINAL_HEART })
+        val encrypted =
+            try {
+                secureStore.readAll()[KEY]
+            } catch (_: GeneralSecurityException) {
+                throw ReviewDemoFailure(ReviewDemoProblem.InvalidCheckpoint)
             }
-        } catch (_: Exception) {
-            throw ReviewDemoFailure(ReviewDemoProblem.InvalidCheckpoint)
-        }
+        val raw =
+            try {
+                encrypted ?: legacyPreferences?.getString(LEGACY_KEY, null) ?: return null
+            } catch (_: RuntimeException) {
+                throw ReviewDemoFailure(ReviewDemoProblem.InvalidCheckpoint)
+            }
+        val checkpoint =
+            try {
+                val json = JSONObject(raw)
+                require(json.getInt("version") == VERSION)
+                val initial = json.getJSONArray("initialRefs")
+                val initialRefs = (0 until initial.length()).map(initial::getString).toSet()
+                val attempts = json.optJSONArray("reactionAttempts") ?: JSONArray()
+                val reactionAttempts = (0 until attempts.length()).map(attempts::getString).toSet()
+                ReviewDemoCheckpoint(
+                    runId = json.getString("runId"),
+                    originalRef = json.getString("originalRef"),
+                    originalId = json.getString("originalId"),
+                    initialAccountRefs = initialRefs,
+                    demoRef = json.optString("demoRef").takeIf(String::isNotBlank),
+                    demoId = json.optString("demoId").takeIf(String::isNotBlank),
+                    groupId = json.optString("groupId").takeIf(String::isNotBlank),
+                    profilePublished = json.optBoolean("profilePublished"),
+                    reactionAttempts = reactionAttempts,
+                    completed = json.optBoolean("completed"),
+                ).also { checkpoint ->
+                    require(runCatching { UUID.fromString(checkpoint.runId) }.isSuccess)
+                    require(checkpoint.originalRef.isNotBlank() && checkpoint.originalId.isHexId())
+                    require(checkpoint.originalRef in initialRefs && initialRefs.none(String::isBlank))
+                    require((checkpoint.demoRef == null) == (checkpoint.demoId == null))
+                    require(checkpoint.demoId == null || checkpoint.demoId.isHexId())
+                    require(checkpoint.demoId == null || !checkpoint.demoId.equals(checkpoint.originalId, ignoreCase = true))
+                    require(checkpoint.demoRef == null || checkpoint.demoRef !in initialRefs)
+                    require(checkpoint.groupId == null || checkpoint.groupId.isHexGroupId())
+                    require(!checkpoint.profilePublished || checkpoint.demoRef != null)
+                    require(checkpoint.groupId == null || checkpoint.demoRef != null)
+                    require(reactionAttempts.isEmpty() || checkpoint.groupId != null)
+                    require(!checkpoint.completed || checkpoint.groupId != null)
+                    require(reactionAttempts.all { it == JOHNNY_LIKE || it == ORIGINAL_HEART })
+                }
+            } catch (_: Exception) {
+                throw ReviewDemoFailure(ReviewDemoProblem.InvalidCheckpoint)
+            }
+        // Preview builds stored this receipt in plaintext. Move it before any
+        // resumed native side effect, then remove the old copy.
+        if (encrypted == null) save(checkpoint)
+        return checkpoint
     }
 
     override fun save(checkpoint: ReviewDemoCheckpoint) {
@@ -104,16 +128,19 @@ internal class PreferencesReviewDemoStore(
         checkpoint.demoRef?.let { json.put("demoRef", it) }
         checkpoint.demoId?.let { json.put("demoId", it) }
         checkpoint.groupId?.let { json.put("groupId", it) }
-        check(preferences.edit().putString(KEY, json.toString()).commit()) { "demo receipt could not be saved" }
+        check(secureStore.replaceAllDurably(mapOf(KEY to json.toString()))) { "demo receipt could not be saved" }
+        check(legacyPreferences?.edit()?.remove(LEGACY_KEY)?.commit() != false) { "old demo receipt could not be cleared" }
     }
 
     override fun clear() {
-        check(preferences.edit().remove(KEY).commit()) { "demo receipt could not be cleared" }
+        check(secureStore.clearDurably()) { "demo receipt could not be cleared" }
+        check(legacyPreferences?.edit()?.remove(LEGACY_KEY)?.commit() != false) { "old demo receipt could not be cleared" }
     }
 
     private companion object {
         const val VERSION = 1
         const val KEY = "review_demo_checkpoint_v1"
+        const val LEGACY_KEY = KEY
     }
 }
 

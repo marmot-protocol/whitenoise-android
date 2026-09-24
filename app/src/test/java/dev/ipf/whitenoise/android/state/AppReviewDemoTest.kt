@@ -283,24 +283,53 @@ class AppReviewDemoTest {
         }
 
     @Test
-    fun preferencesReceiptSurvivesRecreationAndRejectsInvalidData() {
-        val preferences =
-            ApplicationProvider
-                .getApplicationContext<Context>()
-                .getSharedPreferences("review-demo-test", Context.MODE_PRIVATE)
-        preferences.edit().clear().commit()
-        val first = PreferencesReviewDemoStore(preferences)
+    fun encryptedReceiptSurvivesRecreationAndRejectsInvalidData() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.deleteSharedPreferences("review-demo-test-secure")
+        val key = javax.crypto.KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
+        val provider = object : SecureStoreKeyProvider {
+            override fun secretKey(): javax.crypto.SecretKey = key
+        }
+        fun secureStore() = KeystoreSecureStore(context, "review-demo-test-secure", provider)
+        val first = SecureReviewDemoStore(secureStore())
         val saved = checkpoint(demoRef = johnny.ref, demoId = johnny.id, groupId = group)
         first.save(saved)
 
-        assertEquals(saved, PreferencesReviewDemoStore(preferences).load())
-        preferences.edit().putString("review_demo_checkpoint_v1", "{\"version\":999}").commit()
+        assertEquals(saved, SecureReviewDemoStore(secureStore()).load())
+        val raw = context.getSharedPreferences("review-demo-test-secure", Context.MODE_PRIVATE).all.values.joinToString()
+        assertFalse(raw.contains(saved.originalId))
+        assertFalse(raw.contains(saved.demoId!!))
+        context.getSharedPreferences("review-demo-test-secure", Context.MODE_PRIVATE)
+            .edit().putString("payload", "corrupt ciphertext").commit()
         assertEquals(
             ReviewDemoProblem.InvalidCheckpoint,
             assertThrows(ReviewDemoFailure::class.java) { first.load() }.problem,
         )
         first.clear()
         assertFalse(first.hasRecord)
+    }
+
+    @Test
+    fun legacyPlaintextReceiptMovesToEncryptedStorageBeforeResume() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.deleteSharedPreferences("review-demo-migration-secure")
+        val legacy = context.getSharedPreferences("review-demo-migration-legacy", Context.MODE_PRIVATE)
+        legacy.edit().clear().commit()
+        val key = javax.crypto.KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
+        val provider = object : SecureStoreKeyProvider {
+            override fun secretKey(): javax.crypto.SecretKey = key
+        }
+        val encrypted = KeystoreSecureStore(context, "review-demo-migration-secure", provider)
+        val saved = checkpoint(demoRef = johnny.ref, demoId = johnny.id, groupId = group)
+        SecureReviewDemoStore(encrypted).save(saved)
+        val json = encrypted.readAll().getValue("review_demo_checkpoint_v1")
+        encrypted.clearDurably()
+        legacy.edit().putString("review_demo_checkpoint_v1", json).commit()
+
+        val migrating = SecureReviewDemoStore(encrypted, legacy)
+        assertEquals(saved, migrating.load())
+        assertFalse(legacy.contains("review_demo_checkpoint_v1"))
+        assertEquals(saved, SecureReviewDemoStore(encrypted).load())
     }
 
     private fun checkpoint(
