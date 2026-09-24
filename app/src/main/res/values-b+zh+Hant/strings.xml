@@ -156,6 +156,7 @@
     <string name="leave">離開</string>
     <string name="couldnt_load_conversation">無法載入對話</string>
     <string name="no_messages_yet">尚無訊息</string>
+    <string name="wave_hi">揮手打招呼</string>
     <string name="conversation_empty_disappearing_title">沒有可顯示的訊息</string>
     <string name="conversation_empty_disappearing_body">已開啟閱後即焚訊息。此聊天中的新訊息將在 %1$s 後消失。</string>
     <string name="group_empty_only_you_title">這個群組目前只有你</string>
@@ -310,6 +311,7 @@
     <string name="stream_finished">串流已結束</string>
     <string name="media_attachment">媒體附件</string>
     <string name="generic_message">訊息</string>
+    <string name="giphy_media_preview">來自 GIPHY 的 GIF</string>
     <string name="waiting_for_stream">正在等待串流...</string>
     <string name="stream_failed_format">串流失敗：%1$s</string>
     <string name="copy_text">複製文字</string>
@@ -439,6 +441,10 @@
     <string name="delete_audit_logs">清除診斷日誌</string>
     <string name="delete_audit_logs_subtitle">從此裝置刪除日誌。已上傳的副本和你的分享設定維持不變。</string>
     <string name="device_protection">裝置保護</string>
+    <string name="message_privacy">訊息隱私</string>
+    <string name="default_disappearing_messages">預設閱後即焚訊息</string>
+    <string name="default_disappearing_messages_detail">當此個人檔案開始新聊天或建立新群組時使用。之後可分別更改每個對話。</string>
+    <string name="default_disappearing_messages_picker_detail">選擇此個人檔案建立的聊天和群組中新訊息的保留時間。現有對話不會改變。</string>
     <string name="incognito_keyboard_detail">要求鍵盤不要學習你在 White Noise 中輸入的內容。鍵盤可能會忽略此請求。</string>
     <string name="require_device_authentication">需要裝置身分驗證</string>
     <string name="app_lock_enabled_detail">返回 White Noise 時使用裝置螢幕鎖定。</string>
@@ -460,9 +466,11 @@
     <string name="diagnostics">診斷</string>
     <string name="diagnostics_settings_subtitle">繼電器健康狀況和 MLS 內部結構</string>
     <string name="performance_logs">效能記錄</string>
-    <string name="performance_logs_description">暫時將保護隱私的計時事件寫入 Logcat。30 分鐘後或應用程式重新啟動時停止。</string>
+    <string name="performance_logs_description">暫時在此裝置上收集保護隱私的計時事件。30 分鐘後或應用程式重新啟動時停止。</string>
     <string name="performance_logs_active">已啟用 · 剩餘 %1$d 分鐘</string>
     <string name="performance_logs_inactive">未啟用</string>
+    <string name="copy_performance_logs">複製效能記錄</string>
+    <string name="copy_performance_logs_detail">複製目前或最近一次工作階段中數量受限且保護隱私的事件。</string>
     <string name="group_system_show_details">顯示詳情</string>
     <string name="group_system_hide_details">隱藏詳情</string>
     <string name="local_notifications">通知</string>
@@ -764,7 +772,6 @@
     <string name="toast_no_audit_logs_to_delete">沒有可清除的診斷日誌</string>
     <string name="toast_chat_created">聊天已建立</string>
     <string name="group_create_stage_creating">正在建立群組…</string>
-    <string name="group_create_stage_applying_retention">正在套用閱後即焚…</string>
     <string name="toast_notification_permission_denied">通知權限被拒絕</string>
     <string name="toast_signed_out">登出</string>
     <string name="group_title_invite_from">來自 %1$s 的邀請</string>
@@ -824,6 +831,19 @@
     <string name="notifications_are_off_detail">在 Android 設定中開啟後即可使用這些選項。</string>
     <string name="delivery">推送方式</string>
     <string name="local_notifications_detail">在此裝置上產生訊息通知。沒有原生推送時，可能要等到 White Noise 處於使用中才能送達。</string>
+    <string name="notification_delivery_push">推播通知</string>
+    <string name="notification_delivery_push_detail">可能有新活動時短暫喚醒，然後安全地檢查訊息。</string>
+    <string name="notification_delivery_local_detail">啟用通知時保持持續連線。</string>
+    <string name="notification_device_policy">裝置狀態</string>
+    <string name="notification_device_policy_detail">通知權限決定提醒是否顯示。電池政策可能延遲兩種模式下的背景傳送。返回此畫面時會重新整理狀態。</string>
+    <string name="notification_permission_status">通知權限</string>
+    <string name="notification_permission_allowed">已允許</string>
+    <string name="notification_permission_blocked">已封鎖</string>
+    <string name="notification_battery_policy">電池政策</string>
+    <string name="notification_battery_optimized">已最佳化</string>
+    <string name="notification_battery_unrestricted">不受限制</string>
+    <string name="notification_battery_restricted">受限制</string>
+    <string name="notification_battery_unknown">無法使用</string>
     <string name="native_push_title">原生推送</string>
     <string name="notification_push_detail">使用通用喚醒訊號在背景檢查新訊息。訊息內容保留在此裝置上。</string>
     <string name="keep_connected_in_background">在背景保持連線</string>
@@ -1331,7 +1351,6 @@
     <string name="vibration_pattern_android_override">%1$s · Android 設定</string>
     <string name="chat_muted_badge">已靜音</string>
     <string name="collapse_long_messages_subtitle">在此聊天中顯示長訊息的預覽。</string>
-    <string name="toast_disappearing_not_applied">群組已建立，但無法開啟閱後即焚訊息</string>
     <string name="search_members">搜尋成員</string>
     <string name="recent_chats">最近的聊天</string>
     <string name="onboarding_login">登入</string>

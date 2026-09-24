@@ -5,16 +5,239 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** Exercises ownership around the actual canonical lookup/create/read state machine. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class NewMessageSessionTest {
+    @Test
+    fun preparationCriticalPathIsMaximumOfParallelOperations() =
+        runTest {
+            val preparation =
+                NewMessageRecipientPreparationCoordinator().prepare(
+                    this,
+                    preparationKey("target"),
+                    prewarm = { delay(5_000) },
+                    lookup = {
+                        delay(5_000)
+                        NewMessageDirectChatResolution(null, true)
+                    },
+                )
+
+            advanceUntilIdle()
+
+            assertEquals(5_000L, currentTime)
+            assertTrue(preparation.directChatResolution().createRequired)
+        }
+
+    @Test
+    fun stableRecipientStartsPrewarmAndLookupExactlyOnceInParallel() =
+        runTest {
+            val coordinator = NewMessageRecipientPreparationCoordinator()
+            val key = preparationKey("target")
+            val prewarmStarted = CompletableDeferred<Unit>()
+            val lookupStarted = CompletableDeferred<Unit>()
+            val releasePrewarm = CompletableDeferred<Unit>()
+            val releaseLookup = CompletableDeferred<Unit>()
+            var prewarms = 0
+            var lookups = 0
+            val first =
+                coordinator.prepare(
+                    backgroundScope,
+                    key,
+                    prewarm = {
+                        prewarms++
+                        prewarmStarted.complete(Unit)
+                        releasePrewarm.await()
+                    },
+                    lookup = {
+                        lookups++
+                        lookupStarted.complete(Unit)
+                        releaseLookup.await()
+                        NewMessageDirectChatResolution(null, true)
+                    },
+                )
+            val second =
+                coordinator.prepare(
+                    backgroundScope,
+                    key,
+                    prewarm = { error("stable key must not restart prewarm") },
+                    lookup = { error("stable key must not restart lookup") },
+                )
+
+            runCurrent()
+            assertTrue(prewarmStarted.isCompleted)
+            assertTrue(lookupStarted.isCompleted)
+            assertSame(first, second)
+            assertEquals(1, prewarms)
+            assertEquals(1, lookups)
+
+            releaseLookup.complete(Unit)
+            assertTrue(first.directChatResolution().createRequired)
+            releasePrewarm.complete(Unit)
+            first.awaitCompletion()
+        }
+
+    @Test
+    fun newChatProjectionRevisionDiscardsCompletedNegativeLookup() =
+        runTest {
+            val coordinator = NewMessageRecipientPreparationCoordinator()
+            val key = preparationKey("target")
+            val old =
+                coordinator.prepare(backgroundScope, key, prewarm = {}, lookup = {
+                    NewMessageDirectChatResolution(null, true)
+                })
+            runCurrent()
+            val fresh =
+                coordinator.prepare(backgroundScope, key.copy(chatRevision = 1L), prewarm = {}, lookup = {
+                    NewMessageDirectChatResolution(item(), false)
+                })
+            runCurrent()
+            assertNotSame(old, fresh)
+            assertEquals("canonical", fresh.directChatResolution().item?.id)
+        }
+
+    @Test
+    fun failedPreparedLookupRetriesAuthoritativeLookupOnTap() =
+        runTest {
+            val preparation =
+                NewMessageRecipientPreparationCoordinator().prepare(
+                    backgroundScope,
+                    preparationKey("target"),
+                    prewarm = {},
+                    lookup = { error("transient lookup failure") },
+                )
+            runCurrent()
+            var freshLookups = 0
+            val result =
+                preparedLookupOrFresh(preparation) {
+                    freshLookups++
+                    NewMessageDirectChatResolution(item(), false)
+                }
+            assertEquals(1, freshLookups)
+            assertEquals("canonical", result.item?.id)
+        }
+
+    @Test
+    fun retryChatRechecksAfterPreparedAndFirstTapLookupsAreUncertain() =
+        runTest {
+            val preparation =
+                NewMessageRecipientPreparationCoordinator().prepare(
+                    backgroundScope,
+                    preparationKey("target"),
+                    prewarm = {},
+                    lookup = { error("transient preparation failure") },
+                )
+            runCurrent()
+            var freshLookups = 0
+            val authoritativeLookup: suspend () -> NewMessageDirectChatResolution = {
+                freshLookups++
+                if (freshLookups == 1) {
+                    NewMessageDirectChatResolution(null, false)
+                } else {
+                    NewMessageDirectChatResolution(item(), false)
+                }
+            }
+
+            val firstTap = preparedLookupOrFresh(preparation, fresh = authoritativeLookup)
+            val retryTap = preparedLookupOrFresh(preparation, fresh = authoritativeLookup)
+
+            assertFalse(firstTap.createRequired)
+            assertNull(firstTap.item)
+            assertEquals("canonical", retryTap.item?.id)
+            assertEquals(2, freshLookups)
+        }
+
+    @Test
+    fun projectionChangesWhilePreparedLookupAwaitsSoTapUsesFreshLookup() =
+        runTest {
+            val release = CompletableDeferred<Unit>()
+            var revision = 0L
+            val preparation =
+                NewMessageRecipientPreparationCoordinator().prepare(
+                    backgroundScope,
+                    preparationKey("target"),
+                    prewarm = {},
+                    lookup = {
+                        release.await()
+                        NewMessageDirectChatResolution(null, true)
+                    },
+                )
+            val attempt =
+                async {
+                    preparedLookupOrFresh(preparation, revisionMatches = { revision == 0L }) {
+                        NewMessageDirectChatResolution(item(), false)
+                    }
+                }
+            runCurrent()
+            revision = 1L
+            release.complete(Unit)
+            assertEquals("canonical", attempt.await().item?.id)
+        }
+
+    @Test
+    fun canceledPreparationRetriesLookupWhileTapRemainsActive() =
+        runTest {
+            val coordinator = NewMessageRecipientPreparationCoordinator()
+            val preparation =
+                coordinator.prepare(
+                    backgroundScope,
+                    preparationKey("target"),
+                    prewarm = {},
+                    lookup = { awaitCancellation() },
+                )
+            var freshLookups = 0
+            val attempt =
+                async {
+                    preparedLookupOrFresh(preparation) {
+                        freshLookups++
+                        NewMessageDirectChatResolution(item(), false)
+                    }
+                }
+            runCurrent()
+            coordinator.clear()
+            runCurrent()
+            assertEquals("canonical", attempt.await().item?.id)
+            assertEquals(1, freshLookups)
+        }
+
+    @Test
+    fun changedRecipientCancelsOldPreparationBeforeItsResultCanApply() =
+        runTest {
+            val coordinator = NewMessageRecipientPreparationCoordinator()
+            val old =
+                coordinator.prepare(
+                    backgroundScope,
+                    preparationKey("old"),
+                    prewarm = { awaitCancellation() },
+                    lookup = { awaitCancellation() },
+                )
+            runCurrent()
+            val current =
+                coordinator.prepare(
+                    backgroundScope,
+                    preparationKey("new"),
+                    prewarm = {},
+                    lookup = { NewMessageDirectChatResolution(item(), false) },
+                )
+            runCurrent()
+
+            assertTrue(runCatching { old.directChatResolution() }.exceptionOrNull() is CancellationException)
+            assertEquals("canonical", current.directChatResolution().item?.id)
+        }
+
     /** A stale lookup cannot fall through to creation under the newly active account. */
     @Test fun accountSwitchDuringLookupNeverCreates() =
         runTest {
@@ -166,4 +389,13 @@ class NewMessageSessionTest {
 
     /** Reuses the existing native-projection fixture used by recipient-resolution regression tests. */
     private fun item() = dmChatItem("canonical", "a".repeat(64), null)
+
+    private fun preparationKey(target: String) =
+        NewMessageRecipientPreparationKey(
+            accountRef = "account",
+            runtimeGeneration = 1,
+            query = target,
+            targetReference = target,
+            retryKey = 0,
+        )
 }

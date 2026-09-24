@@ -55,6 +55,8 @@ import dev.ipf.whitenoise.android.state.TransientNotice
 import dev.ipf.whitenoise.android.state.WarmResumeRenderedSurface
 import dev.ipf.whitenoise.android.state.WarmResumeTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.randomProfilePseudonym
+import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.ui.common.AppLockScreen
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.InlineConfirmationNotice
@@ -513,7 +515,7 @@ internal fun WhiteNoiseApp(
                         AppSelfUpdateDialog(appState = appState)
                         val setupController = appState.accountSetup.controller
                         if (setupController != null) {
-                            AccountSetupScreen(setupController) {
+                            AccountSetupScreen(setupController, appState::randomProfilePseudonym) {
                                 appState.launchMutation { appState.accountSetup.later() }
                             }
                         } else if (appState.profileSignUpForPresentation != null) {
@@ -521,6 +523,7 @@ internal fun WhiteNoiseApp(
                                 dev.ipf.whitenoise.android.ui.onboarding.SignUpScreen(
                                     controller = checkNotNull(appState.profileSignUpForPresentation),
                                     hasValidatedInternet = appState::hasValidatedInternet,
+                                    randomName = appState::randomProfilePseudonym,
                                     onBack = { appState.dismissProfileSignUp() },
                                 )
                             }

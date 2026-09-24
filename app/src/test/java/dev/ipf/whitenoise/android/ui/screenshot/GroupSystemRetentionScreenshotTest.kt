@@ -5,12 +5,21 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -27,7 +36,10 @@ import dev.ipf.whitenoise.android.ui.conversation.CONVERSATION_TIMELINE_VERTICAL
 import dev.ipf.whitenoise.android.ui.conversation.DaySeparator
 import dev.ipf.whitenoise.android.ui.conversation.GroupSystemRow
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -118,6 +130,162 @@ class GroupSystemRetentionScreenshotTest {
         assertEquals(26f, date.top - second.bottom, 1f)
     }
 
+    @Test
+    fun waveLight() = captureWave(WaveTheme.LIGHT)
+
+    @Test
+    fun waveDark() = captureWave(WaveTheme.DARK)
+
+    @Test
+    fun waveAmoled() = captureWave(WaveTheme.AMOLED)
+
+    @Test
+    fun waveLargeRtl() = captureWave(WaveTheme.LARGE_RTL)
+
+    private fun captureWave(theme: WaveTheme) {
+        val appState = testAppState()
+        var wavedAt: String? = null
+        composeRule.setContent {
+            CompositionLocalProvider(
+                LocalDensity provides Density(1f, if (theme == WaveTheme.LARGE_RTL) 2f else 1f),
+                LocalLayoutDirection provides
+                    if (theme == WaveTheme.LARGE_RTL) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
+                WhiteNoiseTheme(darkTheme = theme != WaveTheme.LIGHT, amoled = theme == WaveTheme.AMOLED) {
+                    Surface(Modifier.width(360.dp).padding(16.dp).testTag(SCREENSHOT_TAG)) {
+                        GroupSystemRow(
+                            record = retentionChangeRecord(),
+                            appState = appState,
+                            groupSystem =
+                                addedMemberEvent().copy(
+                                    subjectDisplayName =
+                                        if (theme == WaveTheme.LARGE_RTL) {
+                                            "Bob with a very long display name"
+                                        } else {
+                                            "Bob"
+                                        },
+                                ),
+                            onWave = { target, _ -> wavedAt = target },
+                        )
+                    }
+                }
+            }
+        }
+        awaitWaveButton()
+        composeRule
+            .onNodeWithTag(SCREENSHOT_TAG)
+            .captureRoboImage("src/test/snapshots/group_system_wave_${theme.name.lowercase()}.png")
+        composeRule.onNodeWithText(context.getString(R.string.wave_hi)).performClick()
+        assertEquals(ADDED_ID, wavedAt)
+    }
+
+    @Test
+    fun waveDismissalFollowsAcceptance() {
+        val appState = testAppState()
+        var record by mutableStateOf(retentionChangeRecord())
+        var accountRef by mutableStateOf(ACCOUNT_REF)
+        var visible by mutableStateOf(true)
+        var attempts = 0
+        val finishSend = CompletableDeferred<Unit>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface(Modifier.width(360.dp).padding(16.dp).testTag(SCREENSHOT_TAG)) {
+                    if (visible) {
+                        GroupSystemRow(
+                            record = record,
+                            appState = appState,
+                            groupSystem = addedMemberEvent(),
+                            waveAccountRef = accountRef,
+                            onWave = { _, onAccepted ->
+                                attempts++
+                                if (attempts > 1) {
+                                    onAccepted()
+                                    finishSend.await()
+                                }
+                            },
+                        )
+                    }
+                }
+            }
+        }
+        awaitWaveButton()
+        val button = composeRule.onNodeWithText(context.getString(R.string.wave_hi))
+        button.performClick()
+        button.assertExists() // A rejected send remains available.
+        button.performClick()
+        button.assertDoesNotExist() // Acceptance hides it before delivery settles.
+        assertEquals(2, attempts)
+        composeRule
+            .onNodeWithTag(SCREENSHOT_TAG)
+            .captureRoboImage("src/test/snapshots/group_system_wave_accepted_light.png")
+        finishSend.completeExceptionally(CancellationException("Delivery interrupted after acceptance"))
+        button.assertDoesNotExist()
+        val stored = context.getSharedPreferences("whitenoise.wave_dismissals", Context.MODE_PRIVATE)
+        assertTrue(stored.getBoolean("${ACCOUNT_REF.length}:$ACCOUNT_REF:$GROUP_ID:$MESSAGE_ID", false))
+        composeRule.runOnIdle { visible = false }
+        composeRule.runOnIdle { visible = true }
+        composeRule.waitForIdle()
+        button.assertDoesNotExist() // A newly created row reloads the durable dismissal.
+
+        composeRule.runOnIdle { record = record.copy(messageIdHex = "rejoined-event") }
+        awaitWaveButton()
+        composeRule.runOnIdle { record = retentionChangeRecord().copy(groupIdHex = "other-group") }
+        awaitWaveButton()
+        composeRule.runOnIdle {
+            record = retentionChangeRecord()
+            accountRef = "another-account"
+        }
+        awaitWaveButton()
+        composeRule.runOnIdle { accountRef = ACCOUNT_REF }
+        composeRule.waitForIdle()
+        button.assertDoesNotExist()
+    }
+
+    private fun awaitWaveButton() {
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithText(context.getString(R.string.wave_hi)).fetchSemanticsNodes().size == 1
+        }
+    }
+
+    @Test
+    fun waveOnlyForOtherNewMembers() {
+        val appState = testAppState()
+        val added = addedMemberEvent()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                LazyColumn {
+                    items(6) { index ->
+                        GroupSystemRow(
+                            record = retentionChangeRecord().copy(direction = if (index == 5) "received" else "system"),
+                            appState = appState,
+                            groupSystem =
+                                when (index) {
+                                    0 -> added.copy(subjectAccountIdHex = ACCOUNT_ID)
+                                    1 -> added.copy(systemType = "member_removed")
+                                    2 -> added.copy(provenance = GroupSystemEventProvenanceFfi.MEMBER_AUTHORED)
+                                    3 -> added.copy(subjectAccountIdHex = null)
+                                    else -> added
+                                },
+                            onWave = if (index == 4) null else { _, _ -> error("Unexpected wave") },
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.onNodeWithText(context.getString(R.string.wave_hi)).assertDoesNotExist()
+    }
+
+    private fun addedMemberEvent() =
+        retentionChangeEvent().copy(
+            systemType = "member_added",
+            subjectAccountIdHex = ADDED_ID,
+            subjectDisplayName = "Bob",
+            oldRetentionSeconds = null,
+            newRetentionSeconds = null,
+        )
+
+    private enum class WaveTheme { LIGHT, DARK, AMOLED, LARGE_RTL }
+
     private fun testAppState(): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = context,
@@ -182,6 +350,7 @@ class GroupSystemRetentionScreenshotTest {
         val ACCOUNT_ID = "aa".repeat(32)
         val GROUP_ID = "bb".repeat(32)
         val MESSAGE_ID = "cc".repeat(32)
+        val ADDED_ID = "dd".repeat(32)
     }
 }
 

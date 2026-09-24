@@ -156,6 +156,7 @@
     <string name="leave">退出</string>
     <string name="couldnt_load_conversation">无法加载对话</string>
     <string name="no_messages_yet">暂无消息</string>
+    <string name="wave_hi">挥手打招呼</string>
     <string name="conversation_empty_disappearing_title">没有可显示的消息</string>
     <string name="conversation_empty_disappearing_body">已开启阅后即焚消息。此聊天中的新消息将在 %1$s 后消失。</string>
     <string name="group_empty_only_you_title">这个群组目前只有你</string>
@@ -310,6 +311,7 @@
     <string name="stream_finished">流已结束</string>
     <string name="media_attachment">媒体附件</string>
     <string name="generic_message">消息</string>
+    <string name="giphy_media_preview">来自 GIPHY 的 GIF</string>
     <string name="waiting_for_stream">正在等待流...</string>
     <string name="stream_failed_format">流失败：%1$s</string>
     <string name="copy_text">复制文本</string>
@@ -439,6 +441,10 @@
     <string name="delete_audit_logs">清除诊断日志</string>
     <string name="delete_audit_logs_subtitle">从此设备删除日志。已上传的副本和你的分享设置保持不变。</string>
     <string name="device_protection">设备保护</string>
+    <string name="message_privacy">消息隐私</string>
+    <string name="default_disappearing_messages">默认阅后即焚消息</string>
+    <string name="default_disappearing_messages_detail">当此个人资料发起新聊天或创建新群组时使用。之后可以分别更改每个会话。</string>
+    <string name="default_disappearing_messages_picker_detail">选择此个人资料创建的聊天和群组中新消息的保留时间。现有会话不会改变。</string>
     <string name="incognito_keyboard_detail">要求键盘不要学习你在 White Noise 中输入的内容。键盘可能会忽略此请求。</string>
     <string name="require_device_authentication">需要设备身份验证</string>
     <string name="app_lock_enabled_detail">返回 White Noise 时使用设备屏幕锁定。</string>
@@ -460,9 +466,11 @@
     <string name="diagnostics">诊断</string>
     <string name="diagnostics_settings_subtitle">继电器健康状况和 MLS 内部结构</string>
     <string name="performance_logs">性能日志</string>
-    <string name="performance_logs_description">临时将保护隐私的计时事件写入 Logcat。30 分钟后或应用重启时停止。</string>
+    <string name="performance_logs_description">在此设备上临时收集保护隐私的计时事件。30 分钟后或应用重启时停止。</string>
     <string name="performance_logs_active">已启用 · 剩余 %1$d 分钟</string>
     <string name="performance_logs_inactive">未启用</string>
+    <string name="copy_performance_logs">复制性能日志</string>
+    <string name="copy_performance_logs_detail">复制当前或最近一次会话中数量受限且保护隐私的事件。</string>
     <string name="group_system_show_details">显示详情</string>
     <string name="group_system_hide_details">隐藏详情</string>
     <string name="local_notifications">通知</string>
@@ -764,7 +772,6 @@
     <string name="toast_no_audit_logs_to_delete">没有可清除的诊断日志</string>
     <string name="toast_chat_created">聊天已创建</string>
     <string name="group_create_stage_creating">正在创建群组…</string>
-    <string name="group_create_stage_applying_retention">正在应用阅后即焚…</string>
     <string name="toast_notification_permission_denied">通知权限被拒绝</string>
     <string name="toast_signed_out">退出登录</string>
     <string name="group_title_invite_from">来自 %1$s 的邀请</string>
@@ -823,6 +830,19 @@
     <string name="notifications_are_off">通知已关闭</string>
     <string name="notifications_are_off_detail">在 Android 设置中开启后即可使用这些选项。</string>
     <string name="delivery">推送方式</string>
+    <string name="notification_delivery_push">推送通知</string>
+    <string name="notification_delivery_push_detail">可能有新活动时短暂唤醒，然后安全地检查消息。</string>
+    <string name="notification_delivery_local_detail">启用通知时保持持续连接。</string>
+    <string name="notification_device_policy">设备状态</string>
+    <string name="notification_device_policy_detail">通知权限决定提醒是否显示。电池策略可能延迟两种模式下的后台送达。返回此页面时会刷新状态。</string>
+    <string name="notification_permission_status">通知权限</string>
+    <string name="notification_permission_allowed">已允许</string>
+    <string name="notification_permission_blocked">已阻止</string>
+    <string name="notification_battery_policy">电池策略</string>
+    <string name="notification_battery_optimized">已优化</string>
+    <string name="notification_battery_unrestricted">不受限制</string>
+    <string name="notification_battery_restricted">受限制</string>
+    <string name="notification_battery_unknown">不可用</string>
     <string name="local_notifications_detail">在此设备上生成消息通知。没有原生推送时，可能要等到 White Noise 处于活动状态才能送达。</string>
     <string name="native_push_title">原生推送</string>
     <string name="notification_push_detail">使用通用唤醒信号在后台检查新消息。消息内容保留在此设备上。</string>
@@ -1331,7 +1351,6 @@
     <string name="vibration_pattern_android_override">%1$s · Android 设置</string>
     <string name="chat_muted_badge">已静音</string>
     <string name="collapse_long_messages_subtitle">在此聊天中显示长消息的预览。</string>
-    <string name="toast_disappearing_not_applied">群组已创建，但无法开启阅后即焚消息</string>
     <string name="search_members">搜索成员</string>
     <string name="recent_chats">最近聊天</string>
     <string name="onboarding_login">登录</string>

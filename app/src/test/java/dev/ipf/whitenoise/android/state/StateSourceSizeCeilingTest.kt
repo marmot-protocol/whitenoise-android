@@ -46,9 +46,11 @@ class StateSourceSizeCeilingTest {
         // PR #2792 adds covered token-bound send admission and cancellation arbitration;
         // the current base also adds group-recovery status handling. The pending-video
         // poster fix (#2732) adds 13 covered lines for attachment-aware thumbnail
-        // reconciliation on top of that. Exact Play/Zapstore unit tests and Kover run in
-        // required CI. Keep this merged-source ratchet exact.
-        const val CONTROLLERS_MAX_LINES = 13139
+        // reconciliation on top of that. PR #2798 adds 32 net lines for off-main
+        // window application and commit-time index revalidation. Its prior green
+        // head covered 4,787 / 6,614 controller lines in Kover. Exact-head CI
+        // rechecks coverage. Keep this merged-source ratchet exact.
+        const val CONTROLLERS_MAX_LINES = 13179
 
         // Master includes the covered draft lifecycle and host-timing changes. PR #2534
         // adds 38 lines for the async prepared-speech handoff while keeping preparation
@@ -60,8 +62,15 @@ class StateSourceSizeCeilingTest {
         // PR #2792 adds the covered shared send-phase registry and commit-lock helpers;
         // current base contributes two lines of fresh-group recovery state. Replacement-controller
         // retry regression adds a shared per-conversation wakeup registry (+12 lines).
+        // The interactive account-switch avatar seed (#2155) adds 8 covered lines: the
+        // bounded top-bar seed set now feeds both switch paths from one computation, and
+        // the interactive branch loads and fences it before publication.
+        // Durable push-wake recovery adds the covered lifecycle owner, generation fences,
+        // finite attempt settlement, and notification-delivery cutover orchestration.
+        // Its covered final settlement needs one formatter-required expression-body continuation.
+        // Current master also adds pending-send and bounded-window recovery state;
         // Play/Zapstore unit tests and Kover run in required CI; keep merged size exact.
-        const val APP_STATE_MAX_LINES = 10416
+        const val APP_STATE_MAX_LINES = 11298
 
         /** Counts physical source lines with the same trailing-newline semantics as `wc -l`. */
         internal fun sourceLineCount(file: File): Int = file.bufferedReader().useLines { lines -> lines.count() }

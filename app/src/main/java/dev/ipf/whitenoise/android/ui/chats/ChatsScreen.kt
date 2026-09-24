@@ -97,6 +97,7 @@ import dev.ipf.whitenoise.android.state.collectGlobalAttachments
 import dev.ipf.whitenoise.android.state.hasEarlierChats
 import dev.ipf.whitenoise.android.state.loadEarlierChats
 import dev.ipf.whitenoise.android.state.loadMoreChats
+import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reportVisibleChat
 import dev.ipf.whitenoise.android.state.returnChatListToTop
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewChatFlowHost
@@ -1697,6 +1698,7 @@ internal fun ChatsScreen(
                                     .fillMaxSize()
                                     .trackWhiteNoiseHeader(chatListState)
                                     .clipToBounds()
+                                    .chatListEdgeFade(chatListState)
                                     .cancelPointersAcrossChatListMotion(chatListInteractionsEnabled)
                                     .onGloballyPositioned { coordinates ->
                                         chatListWindowTop = coordinates.positionInWindow().y

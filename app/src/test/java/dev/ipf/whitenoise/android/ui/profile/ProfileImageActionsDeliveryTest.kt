@@ -60,6 +60,50 @@ class ProfileImageActionsDeliveryTest {
     @Test
     fun filesReturnAfterEditingCanceledIsIgnored() = exercise(Source.Files, Transition.CancelEdit)
 
+    /** A direct Settings entry waits for profile readiness, then expands the existing picture menu once. */
+    @Test
+    fun directEntryExpandsPictureActionsOnlyWhenEnabled() {
+        val enabled = mutableStateOf(false)
+        val editing = mutableStateOf(true)
+        val expandOnEntry = mutableStateOf(true)
+        var expansionCount = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                if (editing.value) {
+                    ProfileImageActions(
+                        owner = "account-a",
+                        target = ProfileImageTarget.Picture,
+                        hasImage = false,
+                        enabled = enabled.value,
+                        busy = false,
+                        onPick = { _, _ -> },
+                        onWeb = {},
+                        onRemove = {},
+                        expandOnEntry = expandOnEntry.value,
+                        onEntryExpanded = {
+                            expansionCount++
+                            expandOnEntry.value = false
+                        },
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithText(context.getString(R.string.profile_choose_photos)).assertDoesNotExist()
+        composeRule.runOnIdle { enabled.value = true }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(context.getString(R.string.profile_choose_photos)).assertExists()
+        composeRule.runOnIdle {
+            assertEquals(1, expansionCount)
+            editing.value = false
+        }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { editing.value = true }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(context.getString(R.string.profile_choose_photos)).assertDoesNotExist()
+        composeRule.runOnIdle { assertEquals(1, expansionCount) }
+    }
+
     /** Exercise. */
     private fun exercise(
         source: Source,

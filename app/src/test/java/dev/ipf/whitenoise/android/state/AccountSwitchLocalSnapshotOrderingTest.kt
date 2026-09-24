@@ -9,6 +9,7 @@ import org.junit.Test
 import java.io.File
 
 /** Regression coverage for the local-ready account-switch boundary. */
+@Suppress("LargeClass") // Source-order assertions share one parser and the same account-switch lifecycle boundary.
 class AccountSwitchLocalSnapshotOrderingTest {
     @Test
     fun profileSeedSetIncludesEveryVisibleOtherAccountAndExcludesOverflow() {
@@ -102,7 +103,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val body = setActiveAccountSection()
         val generation = body.indexOf("val requestGeneration = accountSwitchHandoff.beginRequest(label)")
         val preload = body.indexOf("loadAccountSwitchLocalSnapshot(")
-        val preloadCall = body.substring(preload, body.indexOf("\n                    )", startIndex = preload))
+        val preloadCall = body.substring(preload, body.indexOf("\n", startIndex = preload))
         val finalGenerationGuard = body.lastIndexOf("if (!activationAllowed())")
         val guardBody = body.substringAfter("val activationAllowed = {").substringBefore("}")
         assertTrue(
@@ -289,6 +290,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
     @Test
     fun catchUpLaunchIsProcessScopedAndDeduplicated() {
         val body = appStateSource().readText().kotlinFunctionBody("launchAccountCatchUp")
+        val admitted = appStateSource().readText().kotlinFunctionBody("performAdmittedAccountCatchUp")
         val instrumented = appStateSource().readText().kotlinFunctionBody("instrumentedCatchUpAccounts")
         val coordinator = connectivityRuntimeSource().readText()
 
@@ -306,14 +308,13 @@ class AccountSwitchLocalSnapshotOrderingTest {
         )
         assertTrue(
             "the background job must run the result-bearing best-effort catch-up",
-            "instrumentedCatchUpAccounts(trigger)" in body &&
+            "instrumentedCatchUpAccounts(trigger)" in admitted &&
                 "catchUpAccountsBestEffort()" in instrumented,
         )
         assertTrue(
             "completion must be fenced by account, runtime, and network generation",
-            "activeAccountRef == key.accountRef" in body &&
-                "runtimeGeneration == key.runtimeGeneration" in body &&
-                "connectivitySignalOwner.isNetworkGenerationCurrent(key.networkGeneration)" in body,
+            "performAccountCatchUp(key, trigger)" in body &&
+                "isCatchUpKeyCurrent(key)" in admitted,
         )
     }
 
@@ -369,10 +370,14 @@ class AccountSwitchLocalSnapshotOrderingTest {
         )
         val localUiState = body.indexOf("reloadMediaAutoDownloadMatrix()", startIndex = activeRef)
         val activated = body.indexOf("onActivated()", startIndex = localUiState)
-        val profile = body.indexOf("warmProfile(it)", startIndex = activated)
-        val privacy = body.indexOf("configurePrivacyRuntime()", startIndex = activated)
-        val notifications = body.indexOf("refreshLocalNotificationSettings()", startIndex = activated)
-        val push = body.indexOf("syncNativePushRegistrationIfEnabled()", startIndex = activated)
+        val refresh = body.indexOf("refreshActivatedAccount(", startIndex = activated)
+        val refreshBody = source.kotlinFunctionBody("refreshActivatedAccount")
+        val currentGuard = refreshBody.indexOf("if (!isCurrent()) return")
+        assertTrue("the refresh boundary must contain its stale-owner guard", currentGuard >= 0)
+        val profile = refreshBody.indexOf("warmProfile(it)", startIndex = currentGuard)
+        val privacy = refreshBody.indexOf("configurePrivacyRuntime()", startIndex = profile)
+        val notifications = refreshBody.indexOf("refreshLocalNotificationSettings()", startIndex = privacy)
+        val push = refreshBody.indexOf("reconcileNotificationDeliveryModeAfterActivation", startIndex = notifications)
 
         assertTrue(
             "a stale route must be rejected before the active account is published",
@@ -383,10 +388,11 @@ class AccountSwitchLocalSnapshotOrderingTest {
             activeRef >= 0 && localUiState > activeRef,
         )
         assertTrue("the activation callback must follow local account UI state", activated > localUiState)
+        assertTrue("post-activation refresh must follow the activation callback", refresh > activated)
         listOf(profile, privacy, notifications, push).forEach { postSwitchIndex ->
             assertTrue(
-                "network/best-effort switch work must follow the activation callback",
-                postSwitchIndex > activated,
+                "network/best-effort switch work must follow its stale-owner guard",
+                postSwitchIndex > currentGuard,
             )
         }
     }
@@ -401,25 +407,25 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val policyElse = body.indexOf("} else {", startIndex = rowGate)
         val activated = body.indexOf("onActivated()")
         val firstFrameGate = body.indexOf("awaitPostActivationWork()", startIndex = activated)
+        val refreshCall = body.indexOf("refreshActivatedAccount(", startIndex = firstFrameGate)
+        val refreshBody = appStateSource().readText().kotlinFunctionBody("refreshActivatedAccount")
         val staleGuard =
-            body.indexOf(
+            refreshBody.indexOf(
                 "isCurrentPostActivationAccountSwitch(label, requestGeneration)",
-                startIndex = firstFrameGate,
             )
-        val profile = body.indexOf("warmProfile(it)", startIndex = staleGuard)
+        val profile = refreshBody.indexOf("warmProfile(it)", startIndex = staleGuard)
 
         assertTrue(
             "only ordinary switches may load the broad local snapshot",
-            "includePresentationSeeds = preloadPlan.includePresentationSeeds" in body,
+            "loadAccountSwitchLocalSnapshot(label, requestGeneration, preloadPlan)" in body,
         )
         assertTrue(
             "broad account preload must be inside the policy-controlled branch",
             policyGate >= 0 && rowGate > policyGate && broadSnapshot > rowGate && policyElse > broadSnapshot,
         )
         assertTrue("the target account must activate before waiting for its readable frame", firstFrameGate > activated)
-        val refreshCall = body.indexOf("refreshActivatedAccount(label, requestGeneration, activationRuntimeGeneration)")
         assertTrue("refreshes must wait for the target frame", refreshCall > firstFrameGate)
-        assertTrue("superseded deferred work must be rejected after the wait", staleGuard > refreshCall)
+        assertTrue("superseded deferred work must be rejected inside the refresh boundary", staleGuard >= 0)
         assertTrue("profile warming must stay outside the target first-frame path", profile > staleGuard)
     }
 
@@ -448,16 +454,20 @@ class AccountSwitchLocalSnapshotOrderingTest {
 
         assertTrue("interactive account switches must still preload SQLite chat rows", interactive.loadLocalRows)
         assertFalse(
-            "interactive account switches must skip member/profile presentation reads before activation",
+            "interactive account switches must skip member/direct-peer presentation reads before activation",
             interactive.includePresentationSeeds,
+        )
+        assertTrue(
+            "interactive account switches must still seed the top bar's own avatars (#2155)",
+            interactive.includeTopBarProfileSeeds,
         )
         assertTrue(
             "setActiveAccount must execute the tested preload plan",
             "if (preloadPlan.loadLocalRows)" in setActiveAccount,
         )
         assertTrue(
-            "setActiveAccount must pass the tested presentation decision to the loader",
-            "includePresentationSeeds = preloadPlan.includePresentationSeeds" in setActiveAccount,
+            "setActiveAccount must hand the tested plan itself to the loader",
+            "loadAccountSwitchLocalSnapshot(label, requestGeneration, preloadPlan)" in setActiveAccount,
         )
         assertTrue(
             "the Settings selector must use the interactive local-row boundary",
@@ -469,8 +479,9 @@ class AccountSwitchLocalSnapshotOrderingTest {
         )
     }
 
+    /** A rejected activation preloads nothing at all, whichever policy asked for it. */
     @Test
-    fun accountSwitchPreloadPlanPinsEveryPolicyBoundary() {
+    fun rejectedActivationPreloadsNothingForAnyPolicy() {
         AccountSwitchPreloadPolicy.entries.forEach { policy ->
             val inactive = accountSwitchPreloadPlan(true, false, policy)
             assertFalse("a rejected activation must not preload rows for $policy", inactive.loadLocalRows)
@@ -478,8 +489,16 @@ class AccountSwitchLocalSnapshotOrderingTest {
                 "a rejected activation must not preload presentation for $policy",
                 inactive.includePresentationSeeds,
             )
+            assertFalse(
+                "a rejected activation must not preload top-bar profiles for $policy",
+                inactive.includeTopBarProfileSeeds,
+            )
         }
+    }
 
+    /** Every policy's row, presentation and top-bar seed decisions are pinned in one place. */
+    @Test
+    fun accountSwitchPreloadPlanPinsEveryPolicyBoundary() {
         val sameInteractive =
             accountSwitchPreloadPlan(
                 switchingAccounts = false,
@@ -488,6 +507,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
             )
         assertFalse(sameInteractive.loadLocalRows)
         assertFalse(sameInteractive.includePresentationSeeds)
+        assertFalse(sameInteractive.includeTopBarProfileSeeds)
 
         val sameFull =
             accountSwitchPreloadPlan(
@@ -497,6 +517,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
             )
         assertFalse(sameFull.loadLocalRows)
         assertFalse(sameFull.includePresentationSeeds)
+        assertFalse(sameFull.includeTopBarProfileSeeds)
 
         val conversationFirst =
             accountSwitchPreloadPlan(
@@ -506,6 +527,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
             )
         assertFalse(conversationFirst.loadLocalRows)
         assertFalse(conversationFirst.includePresentationSeeds)
+        assertFalse(conversationFirst.includeTopBarProfileSeeds)
 
         val startup =
             accountSwitchPreloadPlan(
@@ -515,6 +537,10 @@ class AccountSwitchLocalSnapshotOrderingTest {
             )
         assertTrue(startup.loadLocalRows)
         assertFalse(startup.includePresentationSeeds)
+        assertFalse(
+            "startup restoration has no previous account to switch away from",
+            startup.includeTopBarProfileSeeds,
+        )
 
         val full =
             accountSwitchPreloadPlan(
@@ -524,6 +550,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
             )
         assertTrue(full.loadLocalRows)
         assertTrue(full.includePresentationSeeds)
+        assertTrue(full.includeTopBarProfileSeeds)
     }
 
     /** Selector dismisses at activation boundary instead of awaiting post switch work. */

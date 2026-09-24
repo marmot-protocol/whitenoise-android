@@ -164,6 +164,7 @@
     <string name="leave">Quitter</string>
     <string name="couldnt_load_conversation">Impossible de charger la conversation</string>
     <string name="no_messages_yet">Pas encore de messages</string>
+    <string name="wave_hi">Faire coucou</string>
     <string name="conversation_empty_disappearing_title">Aucun message à afficher</string>
     <string name="conversation_empty_disappearing_body">Les messages éphémères sont activés. Les nouveaux messages de cette discussion disparaissent au bout de %1$s.</string>
     <string name="group_empty_only_you_title">Ce groupe ne contient que vous</string>
@@ -318,6 +319,7 @@
     <string name="stream_finished">Flux terminé</string>
     <string name="media_attachment">Pièce jointe multimédia</string>
     <string name="generic_message">Message</string>
+    <string name="giphy_media_preview">GIF fourni par GIPHY</string>
     <string name="waiting_for_stream">En attente du flux...</string>
     <string name="stream_failed_format">Échec du flux : %1$s</string>
     <string name="copy_text">Copier le texte</string>
@@ -450,6 +452,10 @@
     <string name="delete_audit_logs">Effacer les journaux de diagnostic</string>
     <string name="delete_audit_logs_subtitle">Supprime les journaux de cet appareil. Les copies déjà envoyées et votre réglage de partage restent inchangés.</string>
     <string name="device_protection">Protection de l’appareil</string>
+    <string name="message_privacy">Confidentialité des messages</string>
+    <string name="default_disappearing_messages">Messages éphémères par défaut</string>
+    <string name="default_disappearing_messages_detail">Utilisé lorsque ce profil lance une nouvelle discussion ou crée un nouveau groupe. Chaque conversation peut être modifiée ensuite.</string>
+    <string name="default_disappearing_messages_picker_detail">Choisissez combien de temps les nouveaux messages restent disponibles dans les discussions et groupes créés par ce profil. Les conversations existantes ne sont pas modifiées.</string>
     <string name="incognito_keyboard_detail">Demandez à votre clavier de ne pas apprendre de ce que vous saisissez dans White Noise. Votre clavier peut ignorer cette demande.</string>
     <string name="require_device_authentication">Exiger l’authentification de l’appareil</string>
     <string name="app_lock_enabled_detail">Utilisez le verrouillage d’écran de l’appareil en revenant dans White Noise.</string>
@@ -471,9 +477,11 @@
     <string name="diagnostics">Diagnostic</string>
     <string name="diagnostics_settings_subtitle">État de santé du relais et composants internes MLS</string>
     <string name="performance_logs">Journaux de performances</string>
-    <string name="performance_logs_description">Écrit temporairement des mesures respectueuses de la confidentialité dans Logcat. S’arrête après 30 minutes ou au redémarrage de l’application.</string>
+    <string name="performance_logs_description">Collecte temporairement des mesures respectueuses de la confidentialité sur cet appareil. S’arrête après 30 minutes ou au redémarrage de l’application.</string>
     <string name="performance_logs_active">Actif · %1$d min restantes</string>
     <string name="performance_logs_inactive">Inactif</string>
+    <string name="copy_performance_logs">Copier les journaux de performances</string>
+    <string name="copy_performance_logs_detail">Copie les événements limités et respectueux de la confidentialité de la session actuelle ou la plus récente.</string>
     <string name="group_system_show_details">Afficher les détails</string>
     <string name="group_system_hide_details">Masquer les détails</string>
     <string name="local_notifications">Notifications</string>
@@ -775,7 +783,6 @@
     <string name="toast_no_audit_logs_to_delete">Aucun journal de diagnostic à effacer</string>
     <string name="toast_chat_created">Chat créé</string>
     <string name="group_create_stage_creating">Création du groupe…</string>
-    <string name="group_create_stage_applying_retention">Application des messages éphémères…</string>
     <string name="toast_notification_permission_denied">Autorisation de notification refusée</string>
     <string name="toast_signed_out">Déconnexion</string>
     <string name="group_title_invite_from">Invitation de %1$s</string>
@@ -834,6 +841,19 @@
     <string name="notifications_are_off">Les notifications sont désactivées</string>
     <string name="notifications_are_off_detail">Activez-les dans les paramètres Android pour utiliser ces options.</string>
     <string name="delivery">Réception</string>
+    <string name="notification_delivery_push">Notifications push</string>
+    <string name="notification_delivery_push_detail">Se réveille brièvement en cas de nouvelle activité possible, puis recherche les messages de façon sécurisée.</string>
+    <string name="notification_delivery_local_detail">Maintient une connexion permanente tant que les notifications sont activées.</string>
+    <string name="notification_device_policy">État de l’appareil</string>
+    <string name="notification_device_policy_detail">L’autorisation des notifications détermine si les alertes s’affichent. La politique de batterie peut retarder la réception en arrière-plan dans les deux modes. L’état est actualisé au retour sur cet écran.</string>
+    <string name="notification_permission_status">Autorisation des notifications</string>
+    <string name="notification_permission_allowed">Autorisée</string>
+    <string name="notification_permission_blocked">Bloquée</string>
+    <string name="notification_battery_policy">Politique de batterie</string>
+    <string name="notification_battery_optimized">Optimisée</string>
+    <string name="notification_battery_unrestricted">Sans restriction</string>
+    <string name="notification_battery_restricted">Restreinte</string>
+    <string name="notification_battery_unknown">Indisponible</string>
     <string name="local_notifications_detail">Créez les notifications de messages sur cet appareil. Sans push natif, la réception peut attendre que White Noise soit actif.</string>
     <string name="native_push_title">Push natif</string>
     <string name="notification_push_detail">Utilisez un signal de réveil générique pour vérifier les nouveaux messages en arrière-plan. Le contenu des messages reste sur cet appareil.</string>
@@ -1355,7 +1375,6 @@
     <string name="vibration_pattern_android_override">%1$s · Paramètres Android</string>
     <string name="chat_muted_badge">En sourdine</string>
     <string name="collapse_long_messages_subtitle">Affiche un aperçu des messages longs dans cette discussion.</string>
-    <string name="toast_disappearing_not_applied">Le groupe a été créé, mais les messages éphémères n’ont pas pu être activés</string>
     <string name="search_members">Rechercher des membres</string>
     <string name="recent_chats">Discussions récentes</string>
     <string name="onboarding_login">Connexion</string>

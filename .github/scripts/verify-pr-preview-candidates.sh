@@ -11,6 +11,25 @@ expected_sha=${HEAD_SHA:0:7}
 max_apk_bytes=67108848
 max_expanded_bytes=536870912
 
+# Fails the run when a channel's binary manifest declares android:testOnly with
+# anything other than an explicit false. Android restricts test-only APKs to ADB
+# installs, so such an artifact can never satisfy the preview link's
+# tap-to-install/update contract, and an unrecognised value fails closed.
+reject_test_only() {
+  local channel=$1 manifest=$2 value
+  while IFS= read -r value; do
+    [[ -n "$value" ]] || continue
+    case "$value" in
+      false | 0x0 | 0) ;;
+      *)
+        printf 'Preview %s APK is packaged test-only (android:testOnly="%s").\n' \
+          "$channel" "$value" >&2
+        exit 1
+        ;;
+    esac
+  done < <(grep -oE 'android:testOnly="[^"]*"' <<< "$manifest" | sed -E 's/^[^"]*"(.*)"$/\1/')
+}
+
 for channel in stable isolated; do
   dir="$root/$channel"
   test -d "$dir"
@@ -49,6 +68,7 @@ for channel in stable isolated; do
   [[ "$actual_version" == "$expected_version" ]]
   [[ "$actual_version_name" == *"preview-pr${PR_NUMBER}-${expected_sha}"* ]]
   grep -Fq 'android:extractNativeLibs="true"' <<< "$binary_manifest"
+  reject_test_only "$channel" "$binary_manifest"
   mapfile -t native_abis < <(zipinfo -1 "${apks[0]}" | sed -nE 's#^lib/([^/]+)/.+#\1#p' | sort -u)
   (( ${#native_abis[@]} == 1 ))
   [[ "${native_abis[0]}" == "arm64-v8a" ]]

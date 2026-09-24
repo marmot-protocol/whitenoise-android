@@ -29,6 +29,10 @@ grep -Fq 'assemblePreviewPlayRelease' "$build"
 grep -Fq 'Configure transport-safe preview packaging' "$build"
 grep -Fq 'packaging.jniLibs.useLegacyPackaging = true' "$build"
 grep -Fq -- '-I "$PR_PREVIEW_INIT_SCRIPT"' "$build"
+# The ABI injection alone makes AGP stamp android:testOnly="true", which would
+# limit both preview channels to ADB installs. Keep the explicit override.
+grep -Fq -- '-Pandroid.injected.testOnly=false' "$build"
+reject '-Pandroid.injected.testOnly=true' "$build"
 grep -Fq 'include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")' "$gradle"
 grep -Fq 'create("play")' "$gradle"
 grep -Fq 'buildConfigField("boolean", "SELF_UPDATE_ENABLED", "false")' "$gradle"

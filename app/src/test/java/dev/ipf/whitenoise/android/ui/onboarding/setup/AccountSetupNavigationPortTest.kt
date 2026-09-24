@@ -165,7 +165,7 @@ class AccountSetupNavigationPortTest {
                 }
             LaunchedEffect(controller) { controller.reconnect() }
             WhiteNoiseTheme {
-                if (visible.value) AccountSetupScreen(controller) { exits++ }
+                if (visible.value) AccountSetupScreen(controller, { "Quiet Otter" }) { exits++ }
             }
         }
         composeRule.waitForIdle()

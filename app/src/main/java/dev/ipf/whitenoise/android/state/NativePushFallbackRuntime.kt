@@ -6,18 +6,26 @@ import dev.ipf.whitenoise.android.notifications.BackgroundConnectionPreferences
 import dev.ipf.whitenoise.android.notifications.ForegroundStartTrigger
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** Android boundary used to establish a restartable persistent-delivery fallback. */
 internal interface NativePushFallbackPlatform {
-    /** Re-commits the desired global transport state to durable storage. */
-    fun persistBackgroundConnectionEnabled(isStillDesired: () -> Boolean): Boolean
+    /** Commits the desired global transport state only while its transaction remains current. */
+    fun persistBackgroundConnectionEnabled(
+        enabled: Boolean,
+        isStillDesired: () -> Boolean,
+    ): Boolean
 
     /** Queues one request whose generation must be acknowledged by the running service. */
     fun startBackgroundConnection(requestGeneration: Long): Boolean
+
+    /** Stops persistent delivery; an already-absent service is a successful settled state. */
+    fun stopBackgroundConnection(): Boolean
 
     /** Durably records server-registration cleanup before native delivery is disabled. */
     fun recordPendingRegistrationClear(accountRef: String): Boolean
@@ -29,8 +37,10 @@ internal class AndroidNativePushFallbackPlatform(
 ) : NativePushFallbackPlatform {
     private val appContext = context.applicationContext
 
-    override fun persistBackgroundConnectionEnabled(isStillDesired: () -> Boolean): Boolean =
-        BackgroundConnectionPreferences.setEnabledDurablyIf(appContext, true, isStillDesired)
+    override fun persistBackgroundConnectionEnabled(
+        enabled: Boolean,
+        isStillDesired: () -> Boolean,
+    ): Boolean = BackgroundConnectionPreferences.setEnabledDurablyIf(appContext, enabled, isStillDesired)
 
     override fun startBackgroundConnection(requestGeneration: Long): Boolean =
         NotificationStreamForegroundService.start(
@@ -38,6 +48,8 @@ internal class AndroidNativePushFallbackPlatform(
             trigger = ForegroundStartTrigger.CapabilityFallback,
             capabilityFallbackGeneration = requestGeneration,
         )
+
+    override fun stopBackgroundConnection(): Boolean = NotificationStreamForegroundService.stop(appContext)
 
     override fun recordPendingRegistrationClear(accountRef: String): Boolean =
         PushTokenStore
@@ -49,6 +61,7 @@ internal class AndroidNativePushFallbackPlatform(
 private data class NativePushFallbackRuntimeRequest(
     val generation: Long,
     val owner: NativePushFallbackOwner,
+    val result: CompletableDeferred<Boolean> = CompletableDeferred(),
 )
 
 /**
@@ -75,6 +88,7 @@ internal class NativePushFallbackRuntimeReadiness {
         synchronized(lock) {
             pending?.takeIf { it.owner.matches(owner) }?.generation
                 ?: nextGeneration().also { generation ->
+                    pending?.result?.complete(false)
                     pending = NativePushFallbackRuntimeRequest(generation, owner)
                     ready = null
                 }
@@ -91,15 +105,22 @@ internal class NativePushFallbackRuntimeReadiness {
         synchronized(lock) {
             val request = pending?.takeIf { it.generation == generation } ?: return@synchronized null
             pending = null
-            if (!ownerIsCurrent(request.owner)) return@synchronized null
+            if (!ownerIsCurrent(request.owner)) {
+                request.result.complete(false)
+                return@synchronized null
+            }
             ready = request
+            request.result.complete(true)
             request.owner
         }
 
     /** Invalidates a matching pending or ready request without disturbing a newer generation. */
     fun invalidate(generation: Long) {
         synchronized(lock) {
-            if (pending?.generation == generation) pending = null
+            if (pending?.generation == generation) {
+                pending?.result?.complete(false)
+                pending = null
+            }
             if (ready?.generation == generation) ready = null
         }
     }
@@ -107,9 +128,23 @@ internal class NativePushFallbackRuntimeReadiness {
     /** Invalidates readiness across explicit stop and runtime teardown boundaries. */
     fun invalidateAll() {
         synchronized(lock) {
+            pending?.result?.complete(false)
             pending = null
             ready = null
         }
+    }
+
+    /** Awaits only the request for this exact owner; rejection or supersession completes false. */
+    suspend fun await(owner: NativePushFallbackOwner): Boolean {
+        val result =
+            synchronized(lock) {
+                when {
+                    ready?.owner?.matches(owner) == true -> return true
+                    pending?.owner?.matches(owner) == true -> pending?.result
+                    else -> null
+                }
+            }
+        return result?.await() == true
     }
 
     /** Advances the opaque identity while reserving zero for a missing request. */
@@ -248,7 +283,9 @@ internal class NativePushFallbackCoordinator(
                 readiness = readiness,
                 platform = platform,
                 ownerIsCurrent = { bindings.ownerIsCurrent(owner) },
-                intentIsCurrent = { intentLifetime.isCurrent(owner.intentGeneration) },
+                intentIsCurrent = {
+                    intentLifetime.isCurrent(owner.intentGeneration) && bindings.ownerIsCurrent(owner)
+                },
                 publishEnabled = bindings.publishPersistentConnectionEnabled,
                 onFailure = bindings::reportPreferenceCommitFailure,
             )
@@ -262,10 +299,38 @@ internal class NativePushFallbackCoordinator(
     /** Invalidates one service generation without disturbing a replacement request. */
     fun invalidate(generation: Long) = readiness.invalidate(generation)
 
+    /** Reports readiness only for the exact account, runtime, switch, and intent owner. */
+    fun isReady(owner: NativePushFallbackOwner): Boolean = readiness.isReady(owner)
+
     /** Invalidates readiness and every suspended write from the previous explicit delivery intent. */
     fun invalidateAll() {
         intentLifetime.advance()
         readiness.invalidateAll()
+    }
+
+    /**
+     * Establishes and awaits the same supervised persistent runtime used by capability fallback.
+     * Queue acceptance alone is insufficient; only the concrete service acknowledgement completes true.
+     */
+    suspend fun establishPersistentDelivery(
+        owner: NativePushFallbackOwner,
+        ownerIsCurrent: () -> Boolean,
+        publishEnabled: () -> Unit,
+        onFailure: (Throwable) -> Unit,
+        timeoutMs: Long = PERSISTENT_DELIVERY_ACK_TIMEOUT_MS,
+    ): Boolean {
+        val ready =
+            ensureNativePushFallbackRuntime(
+                owner = owner,
+                readiness = readiness,
+                platform = platform,
+                ownerIsCurrent = ownerIsCurrent,
+                intentIsCurrent = { intentLifetime.isCurrent(owner.intentGeneration) },
+                publishEnabled = publishEnabled,
+                onFailure = onFailure,
+            )
+        if (ready) return true
+        return withTimeoutOrNull(timeoutMs) { readiness.await(owner) } == true && ownerIsCurrent()
     }
 }
 
@@ -286,7 +351,7 @@ internal suspend fun ensureNativePushFallbackRuntime(
     val persisted =
         runCatchingCancellable {
             withContext(Dispatchers.IO) {
-                platform.persistBackgroundConnectionEnabled(intentIsCurrent)
+                platform.persistBackgroundConnectionEnabled(true, intentIsCurrent)
             }
         }.onFailure(onFailure)
             .getOrDefault(false)
@@ -410,3 +475,4 @@ private fun nativePushFallbackFailureMessage(
 }
 
 private const val NATIVE_PUSH_ACCOUNT_LOG_PREFIX_LENGTH = 8
+private const val PERSISTENT_DELIVERY_ACK_TIMEOUT_MS = 30_000L

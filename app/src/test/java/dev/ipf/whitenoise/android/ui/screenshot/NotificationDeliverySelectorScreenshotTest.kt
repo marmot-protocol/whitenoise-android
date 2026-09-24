@@ -14,8 +14,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.notifications.NativePushCapability
-import dev.ipf.whitenoise.android.ui.settings.NativePushSettingRow
-import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
+import dev.ipf.whitenoise.android.state.NotificationDeliveryMode
+import dev.ipf.whitenoise.android.ui.settings.NotificationDeliverySelector
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -27,46 +27,33 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
-class NativePushSettingScreenshotTest {
+class NotificationDeliverySelectorScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    /** Records the configuration-free build explanation at compact phone width. */
+    /** Records the two-choice mode selector with push delivery selected. */
     @Test
-    fun missingPushServerLight() {
-        render(NativePushCapability.MissingPushServerConfiguration)
-        capture("native_push_missing_server_light.png")
+    fun availablePushLight() {
+        render(NotificationDeliveryMode.Fcm, NativePushCapability.Available)
+        capture("notification_delivery_push_light.png")
     }
 
-    /** Exercises Play-services copy under RTL, dark theme, and enlarged text. */
+    /** Records the single local choice when push capability is unavailable. */
     @Test
-    fun unavailableGooglePlayServicesDarkLargeRtl() {
+    fun unavailablePushDarkLargeRtl() {
         render(
+            selectedMode = NotificationDeliveryMode.Local,
             capability = NativePushCapability.GooglePlayServicesUnavailable,
             darkTheme = true,
             rtl = true,
             fontScale = 1.4f,
         )
-        capture("native_push_google_play_unavailable_dark_large_rtl.png")
+        capture("notification_delivery_local_unavailable_dark_large_rtl.png")
     }
 
-    /** Records both missing-configuration and failed-initialization causes for unavailable Firebase. */
-    @Test
-    fun missingFirebaseLight() {
-        render(NativePushCapability.FirebaseUnavailable)
-        capture("native_push_firebase_unavailable_light.png")
-    }
-
-    /** Verifies Italian Firebase recovery copy remains readable with enlarged text. */
-    @Test
-    @Config(qualifiers = "it-w360dp-h780dp-mdpi")
-    fun unavailableFirebaseItalianLarge() {
-        render(NativePushCapability.FirebaseUnavailable, fontScale = 1.4f)
-        capture("native_push_firebase_unavailable_italian_large_light.png")
-    }
-
-    /** Renders the production setting row under the requested accessibility conditions. */
+    /** Renders the production mode selector under the requested accessibility conditions. */
     private fun render(
+        selectedMode: NotificationDeliveryMode,
         capability: NativePushCapability,
         darkTheme: Boolean = false,
         rtl: Boolean = false,
@@ -80,29 +67,24 @@ class NativePushSettingScreenshotTest {
             ) {
                 WhiteNoiseTheme(darkTheme = darkTheme) {
                     Surface(modifier = Modifier.width(360.dp).testTag(TAG)) {
-                        SettingsGroup {
-                            row("push") { context ->
-                                NativePushSettingRow(
-                                    context = context,
-                                    capability = capability,
-                                    accountReady = true,
-                                    checked = false,
-                                    onCheckedChange = {},
-                                )
-                            }
-                        }
+                        NotificationDeliverySelector(
+                            selectedMode = selectedMode,
+                            capability = capability,
+                            enabled = true,
+                            onSelect = {},
+                        )
                     }
                 }
             }
         }
     }
 
-    /** Captures the tagged production row into its tracked Roborazzi baseline. */
+    /** Captures the tagged production selector into its tracked baseline. */
     private fun capture(fileName: String) {
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/$fileName")
     }
 
     private companion object {
-        const val TAG = "native-push-setting"
+        const val TAG = "notification-delivery-selector"
     }
 }

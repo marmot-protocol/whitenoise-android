@@ -58,5 +58,13 @@ private val NewGroupDraftSaver =
 
 /** Retains setup fields across step changes while account/runtime keys remain with the flow caller. */
 @Composable
-internal fun rememberNewGroupDraft(initialRetryGroupIdHex: String? = null): NewGroupDraft =
-    rememberSaveable(saver = NewGroupDraftSaver) { NewGroupDraft(retryGroupIdHex = initialRetryGroupIdHex) }
+internal fun rememberNewGroupDraft(
+    initialRetryGroupIdHex: String? = null,
+    initialRetentionSeconds: Long = 0L,
+): NewGroupDraft =
+    rememberSaveable(initialRetryGroupIdHex, saver = NewGroupDraftSaver) {
+        NewGroupDraft(
+            retentionSecs = initialRetentionSeconds,
+            retryGroupIdHex = initialRetryGroupIdHex,
+        )
+    }

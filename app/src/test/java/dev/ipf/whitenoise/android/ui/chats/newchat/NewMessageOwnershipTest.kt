@@ -5,6 +5,7 @@ import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -25,6 +26,7 @@ import dev.ipf.whitenoise.android.ui.share.appStateWithDirectChat
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import dev.ipf.whitenoise.android.ui.share.testAccount
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Rule
@@ -53,6 +55,32 @@ class NewMessageOwnershipTest {
 
     /** Screen disposal rejects a retained action even if the account remains active. */
     @Test fun disposalRejectsCapturedNavigation() = capturedAction("dispose")
+
+    /** A locally decoded npub is tappable on API 36 while kind:0 enrichment is still blocked. */
+    @Test
+    fun decodedNpubIsActionableBeforeDelayedProfileRefresh() {
+        val refreshStarted = CompletableDeferred<Unit>()
+        val releaseRefresh = CompletableDeferred<Unit>()
+        val targetNpub = "npub1yqsjygeyy5nzw2pf9g4jctfw9ucrzv3nxs6nvdec8yark0pa8clst3m4tg"
+        val targetHex = requireNotNull(TestNip19.npubToHex(targetNpub))
+        val state =
+            emptyAppState(
+                profileRefresh = {
+                    refreshStarted.complete(Unit)
+                    releaseRefresh.await()
+                },
+                accountIdHex = { TestNip19.npubToHex(it) },
+            )
+        try {
+            composeRule.setContent { WhiteNoiseTheme { NewMessageScreen(state, {}, {}, { _, _ -> }) } }
+            composeRule.onNodeWithTag("new_message.searchField").performTextReplacement(targetNpub)
+            composeRule.waitUntil(timeoutMillis = 5_000) { refreshStarted.isCompleted }
+
+            composeRule.onNodeWithTag("creation.person.$targetHex").assertIsDisplayed().assertHasClickAction()
+        } finally {
+            releaseRefresh.complete(Unit)
+        }
+    }
 
     /** A new account cannot inherit the previous recipient's identifier query or resolved result. */
     @Test fun accountChangeResetsRecipientQuery() {

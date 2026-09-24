@@ -149,12 +149,7 @@ class FocusedMessageOverlayDragTest {
         assertTrue("the stack must rise, was $before now ${stackTop()}", stackTop() < before)
     }
 
-    /**
-     * A fling reaches the frame's top edge and stops on it, rather than short of it or past it.
-     *
-     * Settling exactly on the bound is the whole claim: landing short would be the #2606 report
-     * again, and overshooting would put the lifted message behind the status bar.
-     */
+    /** A fling reaches the frame's top with only the stack's 8dp shadow-safe padding remaining. */
     @Test
     fun aFlingSettlesOnTheFrameTopEdge() {
         render(anchorTop = 600, anchorBottom = 680)
@@ -168,7 +163,7 @@ class FocusedMessageOverlayDragTest {
         }
 
         assertTrue("the stack must have risen from " + before, stackTop() < before)
-        assertEquals("the stack must settle on the frame's top edge", 0f, stackTop(), 0.5f)
+        assertEquals("the stack must settle at its shadow-safe inset", 8f, stackTop(), 0.5f)
     }
 
     /** A lifted message anchored high can be pulled down, and stops inside the frame's bottom edge. */

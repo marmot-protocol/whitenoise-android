@@ -179,6 +179,19 @@ class MessageProjectorTest {
     }
 
     @Test
+    fun giphyEnvelopeUsesCompactPreviewInsteadOfCdnUrl() {
+        val message =
+            message(
+                id = "giphy",
+                plaintext = "https://media.giphy.com/media/abc/giphy.gif\nvia GIPHY · Alice",
+            )
+        val copy = MessageTextCopy.Default.copy(giphyMedia = "Animated image")
+
+        assertEquals("Animated image", MessageProjector.displayBody(message, copy))
+        assertEquals("Animated image", MessageProjector.previewText(message, copy))
+    }
+
+    @Test
     fun displayBodyUsesTypedMediaFallbackWhenCaptionAndFilenameMissing() {
         val copy = MessageTextCopy.Default
 

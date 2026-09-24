@@ -5,6 +5,7 @@ import android.content.Intent
 import android.provider.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -17,7 +18,11 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppLockDelay
 import dev.ipf.whitenoise.android.state.ProductObservation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.recordProductObservation
+import dev.ipf.whitenoise.android.state.setDefaultDisappearingMessagesSeconds
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
+import dev.ipf.whitenoise.android.ui.group.DisappearingMessagesPickerDialog
+import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 
 /**
  * Privacy & Security: device protection switches, the auto-lock choice once device authentication is on, and the
@@ -42,6 +47,14 @@ internal fun DevicePrivacyScreen(
     val secure = credentialAvailableOverride ?: appState.appLockCredentialAvailable
     val authenticationEnabled = secure && appState.requireAppUnlock
     var autoLockPicker by rememberSaveable { mutableStateOf(false) }
+    var defaultDisappearingPicker by rememberSaveable(appState.activeAccountRef) { mutableStateOf(false) }
+    val defaultDisappearingDurations by appState.defaultDisappearingMessagesPreferences.durations.collectAsState()
+    val activeAccountRef = appState.activeAccountRef
+    val defaultDisappearingSeconds =
+        appState.defaultDisappearingMessagesPreferences.durationFor(
+            accountRef = activeAccountRef,
+            snapshot = defaultDisappearingDurations,
+        )
     LaunchedEffect(authenticationEnabled) {
         if (!authenticationEnabled) autoLockPicker = false
     }
@@ -123,6 +136,21 @@ internal fun DevicePrivacyScreen(
                     }
                 }
             }
+            item { SettingsSection(stringResource(R.string.message_privacy)) }
+            item {
+                SettingsGroup(modifier = Modifier.testTag("privacy.default_disappearing.group")) {
+                    row("default_disappearing_messages") { rowContext ->
+                        SettingsLink(
+                            context = rowContext,
+                            title = stringResource(R.string.default_disappearing_messages),
+                            onClick = { defaultDisappearingPicker = true },
+                            value = disappearingMessagesLabel(defaultDisappearingSeconds),
+                            subtitle = stringResource(R.string.default_disappearing_messages_detail),
+                            enabled = activeAccountRef != null,
+                        )
+                    }
+                }
+            }
             item { SettingsSection(stringResource(R.string.diagnostics)) }
             item {
                 SettingsGroup(modifier = Modifier.testTag("privacy.diagnostics.group")) {
@@ -149,6 +177,23 @@ internal fun DevicePrivacyScreen(
             onSelect = {
                 appState.updateAppLockDelay(it)
                 autoLockPicker = false
+            },
+        )
+    }
+    if (defaultDisappearingPicker) {
+        DisappearingMessagesPickerDialog(
+            currentSecs = defaultDisappearingSeconds,
+            explainer = stringResource(R.string.default_disappearing_messages_picker_detail),
+            onDismiss = { defaultDisappearingPicker = false },
+            onPick = { seconds ->
+                if (
+                    appState.setDefaultDisappearingMessagesSeconds(
+                        seconds = seconds,
+                        accountRef = activeAccountRef,
+                    )
+                ) {
+                    defaultDisappearingPicker = false
+                }
             },
         )
     }

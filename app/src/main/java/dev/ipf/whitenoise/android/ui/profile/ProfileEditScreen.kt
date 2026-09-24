@@ -472,6 +472,8 @@ internal fun ProfileEditScreen(
     publishProfile: suspend (UserProfileMetadataFfi) -> Boolean = appState::publishProfile,
     resolveAddress: suspend (String) -> String? = { Nip05Resolver.resolve(it) },
     resolveLightning: suspend (String) -> Boolean = { Lud16Resolver.resolve(it) },
+    openPictureActionsOnEntry: Boolean = false,
+    onPictureActionsOpened: () -> Unit = {},
 ) {
     val active = appState.activeAccount
     val activeAccountId = active?.accountIdHex
@@ -493,7 +495,7 @@ internal fun ProfileEditScreen(
     val displayName = fields.name.text.toString()
     val about = fields.about.text.toString()
     var baselineDraft by remember(appState, activeAccountId) { mutableStateOf(initialDraft) }
-    var isEditing by remember(appState, activeAccountId) { mutableStateOf(false) }
+    var isEditing by remember(appState, activeAccountId) { mutableStateOf(openPictureActionsOnEntry) }
     var editRevision by remember(appState, activeAccountId) { mutableIntStateOf(0) }
     var acceptedSaveRevision by remember(appState, activeAccountId) { mutableIntStateOf(0) }
     var imageDrafts by
@@ -597,6 +599,7 @@ internal fun ProfileEditScreen(
         showBannerSheet = false
         resetDraft()
         isEditing = false
+        onPictureActionsOpened()
     }
 
     val imageOverlayOpen = fullPictureOpen || fullBannerOpen || showPictureSheet || showBannerSheet
@@ -800,6 +803,8 @@ internal fun ProfileEditScreen(
         hasAccount = active != null,
         editing = isEditing,
         ready = profileContentReady,
+        imageActionsReady = saveState.isLoadedFor(activeAccountId),
+        openPictureActionsOnEntry = openPictureActionsOnEntry,
         busy = busy,
         pictureUrl = safePictureUrl,
         bannerUrl = safeBannerUrl,
@@ -821,7 +826,9 @@ internal fun ProfileEditScreen(
         onEdit = ::beginEditing,
         onSave = ::saveProfile,
         onSuggestName = {
-            fields.name.setTextAndPlaceCursorAtEnd(appState.randomProfilePseudonym(excluding = displayName))
+            fields.name.setTextAndPlaceCursorAtEnd(
+                appState.randomProfilePseudonym(excluding = fields.name.text.toString()),
+            )
         },
         onRestoreName = { fields.name.setTextAndPlaceCursorAtEnd(baselineDraft.displayName) },
         nameDiffersFromSaved = displayName != baselineDraft.displayName,
@@ -837,6 +844,7 @@ internal fun ProfileEditScreen(
             }
         },
         onRemoveImage = { target -> imageDrafts = imageDrafts.without(target) },
+        onPictureActionsOpened = onPictureActionsOpened,
     )
 
     IdentityImageCropFlow(

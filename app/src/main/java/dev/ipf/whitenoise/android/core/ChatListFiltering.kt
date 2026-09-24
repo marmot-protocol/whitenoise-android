@@ -94,6 +94,7 @@ internal data class ChatListSearchSections<T>(
 }
 
 private enum class ChatListSynchronousSearchMatch {
+    IDENTIFIER,
     TITLE,
     METADATA,
     MESSAGE,
@@ -103,6 +104,7 @@ private enum class ChatListSynchronousSearchMatch {
 private val ChatListSynchronousSearchMatch.priority: Int
     get() =
         when (this) {
+            ChatListSynchronousSearchMatch.IDENTIFIER -> 4
             ChatListSynchronousSearchMatch.TITLE -> 3
             ChatListSynchronousSearchMatch.METADATA -> 2
             ChatListSynchronousSearchMatch.MESSAGE -> 1
@@ -111,9 +113,6 @@ private val ChatListSynchronousSearchMatch.priority: Int
 
 @Suppress("ReturnCount") // Ordered guard clauses avoid computing lower-priority matches after a hit.
 private fun <T> ChatListSearchCandidate<T>.synchronousMatch(ciNeedle: String): ChatListSynchronousSearchMatch {
-    if (localeInvariantFold(displayTitle).contains(ciNeedle)) return ChatListSynchronousSearchMatch.TITLE
-    if (localeInvariantFold(previewText).contains(ciNeedle)) return ChatListSynchronousSearchMatch.METADATA
-    if (localeInvariantFold(description).contains(ciNeedle)) return ChatListSynchronousSearchMatch.METADATA
     if (
         looksLikeGroupIdNeedle(ciNeedle) &&
         (
@@ -121,8 +120,11 @@ private fun <T> ChatListSearchCandidate<T>.synchronousMatch(ciNeedle: String): C
                 canonicalChatListGroupId(nostrGroupIdHex).contains(ciNeedle)
         )
     ) {
-        return ChatListSynchronousSearchMatch.METADATA
+        return ChatListSynchronousSearchMatch.IDENTIFIER
     }
+    if (localeInvariantFold(displayTitle).contains(ciNeedle)) return ChatListSynchronousSearchMatch.TITLE
+    if (localeInvariantFold(previewText).contains(ciNeedle)) return ChatListSynchronousSearchMatch.METADATA
+    if (localeInvariantFold(description).contains(ciNeedle)) return ChatListSynchronousSearchMatch.METADATA
     return ChatListSynchronousSearchMatch.NONE
 }
 
@@ -149,6 +151,7 @@ internal fun <T> projectChatListSearchCandidates(
             if (ciNeedle.isEmpty()) ChatListSynchronousSearchMatch.METADATA else candidate.synchronousMatch(ciNeedle)
         val match =
             when {
+                synchronousMatch == ChatListSynchronousSearchMatch.IDENTIFIER -> synchronousMatch
                 messageOnly ->
                     if (canonicalId in canonicalBodyIds) {
                         ChatListSynchronousSearchMatch.MESSAGE
@@ -167,8 +170,11 @@ internal fun <T> projectChatListSearchCandidates(
     return ChatListSearchSections(
         groups =
             classifiedById.values
-                .filter { it.second == ChatListSynchronousSearchMatch.TITLE }
+                .filter { it.second == ChatListSynchronousSearchMatch.IDENTIFIER }
                 .map(Pair<T, ChatListSynchronousSearchMatch>::first) +
+                classifiedById.values
+                    .filter { it.second == ChatListSynchronousSearchMatch.TITLE }
+                    .map(Pair<T, ChatListSynchronousSearchMatch>::first) +
                 classifiedById.values
                     .filter { it.second == ChatListSynchronousSearchMatch.METADATA }
                     .map(Pair<T, ChatListSynchronousSearchMatch>::first),

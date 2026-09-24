@@ -124,15 +124,19 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.advanceConversationReadAnchor
 import dev.ipf.whitenoise.android.state.attachmentsFor
 import dev.ipf.whitenoise.android.state.chatCreateOpenConversationTimingStage
+import dev.ipf.whitenoise.android.state.conversationWindowCanReportVisible
 import dev.ipf.whitenoise.android.state.countUnreadIncoming
 import dev.ipf.whitenoise.android.state.currentTtsConversationDestination
 import dev.ipf.whitenoise.android.state.hasKnownTranscriptPresentation
 import dev.ipf.whitenoise.android.state.loadMessageAvailability
 import dev.ipf.whitenoise.android.state.loadUntilMessageAvailable
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
+import dev.ipf.whitenoise.android.state.markComposerReadyForPresentationTiming
+import dev.ipf.whitenoise.android.state.markWindowVisibleForPresentationTiming
 import dev.ipf.whitenoise.android.state.mediaReferencesFor
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.reconcileConversationUnreadJump
+import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
 import dev.ipf.whitenoise.android.state.reportVisibleMessage
 import dev.ipf.whitenoise.android.state.returnToLatestWindow
@@ -926,6 +930,29 @@ internal fun ConversationScreen(
         onNotificationTimelineVisibilityChanged(!showDetails && transcriptReadyToReveal)
     }
 
+    // Timeline publication can precede route settlement and the first visible
+    // Compose frame. Record visibility only after the transcript can be shown.
+    LaunchedEffect(
+        controller,
+        controller.hasPublishedAuthoritativeTimeline,
+        transcriptReadyToReveal,
+        routeTransitionInProgress,
+        showDetails,
+    ) {
+        if (
+            !conversationWindowCanReportVisible(
+                timelinePublished = controller.hasPublishedAuthoritativeTimeline,
+                transcriptReadyToReveal = transcriptReadyToReveal,
+                routeTransitionInProgress = routeTransitionInProgress,
+                showingDetails = showDetails,
+            )
+        ) {
+            return@LaunchedEffect
+        }
+        withFrameNanos { }
+        controller.markWindowVisibleForPresentationTiming()
+    }
+
     // First-frame completion waits for the initial anchor and a trustworthy
     // transcript presentation. A notification-routed semantic group without an
     // account-owned roster stays neutral until membership verifies, so the trace
@@ -1283,6 +1310,12 @@ internal fun ConversationScreen(
         }
     }
     val composerGate = conversationControllerComposerGate(controller, notificationOpenRequestId)
+
+    fun canWave(): Boolean =
+        controller.canSendMessages &&
+            controller.editingMessageId == null &&
+            controller.replyingTo == null
+
     val timelineUnderlayEnabled =
         composerGate == ComposerGate.COMPOSER &&
             !selectionMode &&
@@ -3219,6 +3252,12 @@ internal fun ConversationScreen(
                 )
         }
     }
+    LaunchedEffect(controller, composerGate) {
+        if (composerGate == ComposerGate.COMPOSER) {
+            withFrameNanos { }
+            controller.markComposerReadyForPresentationTiming()
+        }
+    }
     val mentionPicker =
         rememberConversationMentionPickerState(
             controller = controller,
@@ -3960,6 +3999,26 @@ internal fun ConversationScreen(
                                         onQuickReactionsSave = { saveQuickReactionEmojis(it) },
                                         onReplyPreviewClick = { navigateToReplyTarget(it) },
                                         composerGate = composerGate,
+                                        onWave =
+                                            if (composerGate == ComposerGate.COMPOSER && canWave()) {
+                                                wave@{ accountIdHex, onAccepted ->
+                                                    if (!canWave()) {
+                                                        return@wave
+                                                    }
+                                                    val npub = appState.npubForDisplay(accountIdHex)
+                                                    if (npub.isBlank()) {
+                                                        appState.present(R.string.send_failed)
+                                                        return@wave
+                                                    }
+                                                    controller.send("👋 @$npub", onAccepted = {
+                                                        onAccepted()
+                                                        acceptedSendRevealedTranscript = true
+                                                        revealSentMessage()
+                                                    })
+                                                }
+                                            } else {
+                                                null
+                                            },
                                         onBack = exitConversation,
                                         mentionCandidates = mentionPicker.candidates,
                                         mentionPickerEnabled = mentionPicker.enabled,

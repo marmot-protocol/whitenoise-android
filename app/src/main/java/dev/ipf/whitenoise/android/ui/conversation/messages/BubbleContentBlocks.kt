@@ -49,6 +49,7 @@ import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
 import dev.ipf.whitenoise.android.core.messageContainsOnlyNostrEventReferences
 import dev.ipf.whitenoise.android.core.nostrEventReferences
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
@@ -70,6 +71,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.MediaVideoBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaVisualGridBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaVoiceBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.RejectedAttachmentPlaceholder
+import dev.ipf.whitenoise.android.ui.conversation.media.RemoteGiphyMediaBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.VoicePresentationAttachmentKey
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberVoicePresentationOwner
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
@@ -160,6 +162,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
     sharedLocation: SharedLocation?,
     sharedContact: SharedContact?,
     sharedUser: SharedUser?,
+    remoteGiphyMedia: RemoteGiphyMedia?,
     deleted: Boolean,
     mine: Boolean,
     showStatus: Boolean,
@@ -220,6 +223,13 @@ internal fun ColumnScope.BubbleMediaBlocks(
             onOpen = { appState.presentProfile(sharedUser.npub) },
             displayName = sharedUserAccountIdHex?.let { appState.displayName(it) },
             pictureUrl = sharedUserAccountIdHex?.let { appState.avatarUrl(it) },
+        )
+    }
+    if (remoteGiphyMedia != null) {
+        RemoteGiphyMediaBubble(
+            media = remoteGiphyMedia,
+            appState = appState,
+            onLongPress = onMediaLongPress,
         )
     }
     if (!deleted && bubbleMedia.visuals.isNotEmpty()) {

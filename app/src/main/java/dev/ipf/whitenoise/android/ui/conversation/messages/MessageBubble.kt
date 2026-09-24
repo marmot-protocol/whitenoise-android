@@ -94,6 +94,7 @@ import dev.ipf.whitenoise.android.core.ForwardEligibility
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageProjector
+import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
 import dev.ipf.whitenoise.android.core.ReplySwipeGesture
 import dev.ipf.whitenoise.android.core.TimelineInvalidationPresentation
 import dev.ipf.whitenoise.android.core.TimelineProjector
@@ -1836,6 +1837,10 @@ internal fun MessageBubble(
                             null
                         }
                     }
+                val remoteGiphyMedia =
+                    remember(shareBodyText, canRenderStructuredShare) {
+                        if (canRenderStructuredShare) RemoteGiphyMedia.parse(shareBodyText) else null
+                    }
                 val footerOnPendingVisual = false
                 val pendingFileFooterInCard =
                     fileCardOwnsFooter(
@@ -1870,7 +1875,8 @@ internal fun MessageBubble(
                                 pendingVisualRefs.isNotEmpty() ||
                                 showPendingPlaceholder ||
                                 sharedLocation != null ||
-                                sharedUser != null
+                                sharedUser != null ||
+                                remoteGiphyMedia != null
                         )
                 // Detached media keeps its own rounded Surface. When a caption
                 // is attached, each child delegates its corners and border to
@@ -1913,7 +1919,10 @@ internal fun MessageBubble(
                         deleted = deleted,
                         persistedFailure = persistedFailure,
                         structuredShareOwnsBody =
-                            sharedContact != null || sharedLocation != null || sharedUser != null,
+                            sharedContact != null ||
+                                sharedLocation != null ||
+                                sharedUser != null ||
+                                remoteGiphyMedia != null,
                         hasPendingMediaName = mediaPendingName != null,
                         hasConfirmedMedia = anyConfirmedMedia,
                         mediaCaption = mediaCaption,
@@ -2134,6 +2143,7 @@ internal fun MessageBubble(
                                                 sharedLocation = sharedLocation,
                                                 sharedContact = sharedContact,
                                                 sharedUser = sharedUser,
+                                                remoteGiphyMedia = remoteGiphyMedia,
                                                 deleted = deleted,
                                                 mine = mine,
                                                 showStatus = showOutgoingStatus,
@@ -2217,6 +2227,7 @@ internal fun MessageBubble(
                                                 sharedLocation = sharedLocation,
                                                 sharedContact = sharedContact,
                                                 sharedUser = sharedUser,
+                                                remoteGiphyMedia = remoteGiphyMedia,
                                                 deleted = deleted,
                                                 mine = mine,
                                                 showStatus = showOutgoingStatus,
@@ -2486,6 +2497,7 @@ internal fun MessageBubble(
                             ""
                         },
                     previewReady = !hasMedia || focusedMediaReady,
+                    previewIsMedia = hasMedia,
                     preview = {
                         val previewRetention =
                             record

@@ -4,6 +4,7 @@ import android.content.Context
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import com.google.firebase.FirebaseApp
+import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.PushPlatformFfi
 import dev.ipf.marmotkit.PushRegistrationShareOutcomeFfi
 import dev.ipf.marmotkit.PushRegistrationShareStatusFfi
@@ -29,6 +30,80 @@ internal data class NativePushFallbackOwner(
     val accountSwitchGeneration: Long,
     val intentGeneration: Long,
 )
+
+/** Exact device-wide owner of one notification-delivery transaction. */
+internal data class NotificationDeliveryModeOwner(
+    val activeAccountRef: String,
+    val accountRefs: List<String>,
+    val runtime: AppMarmotRuntime,
+    val runtimeGeneration: Int,
+    val accountSwitchGeneration: Long,
+    val intentGeneration: Long,
+)
+
+/** Activation result that carries both the selected mode and whether the device-wide invariant needs repair. */
+internal data class NotificationDeliveryActivationPlan(
+    val mode: NotificationDeliveryMode,
+    val requiresDeviceWideReconciliation: Boolean,
+)
+
+/** The only two user-facing notification delivery choices. */
+internal enum class NotificationDeliveryMode {
+    Fcm,
+    Local,
+}
+
+/** Resolves a device mode from retained runtime ownership and native account settings. */
+internal fun resolvedNotificationDeliveryMode(
+    anyNativeEnabled: Boolean,
+    persistentConnectionEnabled: Boolean,
+    nativePushCapability: NativePushCapability,
+): NotificationDeliveryMode =
+    if (persistentConnectionEnabled || !anyNativeEnabled || !nativePushCapability.isAvailable) {
+        NotificationDeliveryMode.Local
+    } else {
+        NotificationDeliveryMode.Fcm
+    }
+
+/** Checks account preferences and the runtime owner before treating a device mode as settled. */
+internal fun notificationDeliveryInvariantMatches(
+    mode: NotificationDeliveryMode,
+    settingsByAccount: Map<String, NotificationSettingsFfi>,
+    persistentConnectionEnabled: Boolean,
+    persistentServiceOwned: Boolean,
+    syncedAccounts: Set<String>,
+): Boolean {
+    val accountsMatchMode =
+        when (mode) {
+            NotificationDeliveryMode.Local -> settingsByAccount.values.none { it.nativePushEnabled }
+            NotificationDeliveryMode.Fcm ->
+                settingsByAccount.values.all { it.nativePushEnabled == it.localNotificationsEnabled }
+        }
+    val runtimeMatchesMode =
+        when (mode) {
+            NotificationDeliveryMode.Local -> persistentConnectionEnabled && persistentServiceOwned
+            NotificationDeliveryMode.Fcm ->
+                !persistentConnectionEnabled &&
+                    settingsByAccount.filterValues { it.nativePushEnabled }.keys.all(syncedAccounts::contains)
+        }
+    return accountsMatchMode && runtimeMatchesMode
+}
+
+/** Projects one truthful choice from native settings and Android persistent-delivery ownership. */
+internal fun notificationDeliveryMode(
+    settings: dev.ipf.marmotkit.NotificationSettingsFfi?,
+    persistentConnectionEnabled: Boolean,
+    nativePushCapability: NativePushCapability,
+): NotificationDeliveryMode =
+    if (
+        nativePushCapability.isAvailable &&
+        settings?.nativePushEnabled == true &&
+        !persistentConnectionEnabled
+    ) {
+        NotificationDeliveryMode.Fcm
+    } else {
+        NotificationDeliveryMode.Local
+    }
 
 /** Resolves the first unavailable build or device prerequisite without reaching later SDKs. */
 internal fun nativePushCapabilityForContext(

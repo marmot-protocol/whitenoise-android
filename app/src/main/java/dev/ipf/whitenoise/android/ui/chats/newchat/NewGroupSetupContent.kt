@@ -271,7 +271,6 @@ private fun GroupSetupStatus(
                 stringResource(
                     when (stage) {
                         NewGroupCreateStage.Creating -> R.string.group_create_stage_creating
-                        NewGroupCreateStage.ApplyingRetention -> R.string.group_create_stage_applying_retention
                     },
                 ),
             )

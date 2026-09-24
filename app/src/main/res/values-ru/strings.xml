@@ -180,6 +180,7 @@
     <string name="leave">Покинуть</string>
     <string name="couldnt_load_conversation">Не удалось загрузить беседу</string>
     <string name="no_messages_yet">Пока нет сообщений</string>
+    <string name="wave_hi">Помахать</string>
     <string name="conversation_empty_disappearing_title">Нет сообщений для показа</string>
     <string name="conversation_empty_disappearing_body">Исчезающие сообщения включены. Новые сообщения в этом чате исчезают через %1$s.</string>
     <string name="group_empty_only_you_title">В этой группе пока только вы</string>
@@ -334,6 +335,7 @@
     <string name="stream_finished">Поток завершен</string>
     <string name="media_attachment">Медиавложение</string>
     <string name="generic_message">Сообщение</string>
+    <string name="giphy_media_preview">GIF через GIPHY</string>
     <string name="waiting_for_stream">Ожидание потока...</string>
     <string name="stream_failed_format">Ошибка потока: %1$s</string>
     <string name="copy_text">Копировать текст</string>
@@ -480,6 +482,10 @@
     <string name="delete_audit_logs">Очистить диагностические журналы</string>
     <string name="delete_audit_logs_subtitle">Удаляет журналы с этого устройства. Уже загруженные копии и ваша настройка передачи данных остаются без изменений.</string>
     <string name="device_protection">Защита устройства</string>
+    <string name="message_privacy">Конфиденциальность сообщений</string>
+    <string name="default_disappearing_messages">Исчезающие сообщения по умолчанию</string>
+    <string name="default_disappearing_messages_detail">Используется, когда этот профиль начинает новый чат или создаёт группу. Каждую беседу можно изменить позже.</string>
+    <string name="default_disappearing_messages_picker_detail">Выберите, как долго хранить новые сообщения в чатах и группах, созданных этим профилем. Существующие беседы не изменятся.</string>
     <string name="incognito_keyboard_detail">Попросите свою клавиатуру не запоминать то, что вы вводите в White Noise. Ваша клавиатура может игнорировать этот запрос.</string>
     <string name="require_device_authentication">Требовать аутентификацию устройства</string>
     <string name="app_lock_enabled_detail">Используйте блокировку экрана устройства при возврате в White Noise.</string>
@@ -501,9 +507,11 @@
     <string name="diagnostics">Диагностика</string>
     <string name="diagnostics_settings_subtitle">Состояние реле и внутреннее устройство MLS</string>
     <string name="performance_logs">Журналы производительности</string>
-    <string name="performance_logs_description">Временно записывает безопасные для конфиденциальности временные события в Logcat. Отключается через 30 минут или при перезапуске приложения.</string>
+    <string name="performance_logs_description">Временно собирает на этом устройстве события измерения времени без личных данных. Отключается через 30 минут или при перезапуске приложения.</string>
     <string name="performance_logs_active">Активно · осталось %1$d мин</string>
     <string name="performance_logs_inactive">Неактивно</string>
+    <string name="copy_performance_logs">Копировать журналы производительности</string>
+    <string name="copy_performance_logs_detail">Копирует ограниченный набор событий без личных данных из текущего или последнего сеанса.</string>
     <string name="group_system_show_details">Показать подробности</string>
     <string name="group_system_hide_details">Скрыть подробности</string>
     <string name="local_notifications">Уведомления</string>
@@ -805,7 +813,6 @@
     <string name="toast_no_audit_logs_to_delete">Нет диагностических журналов для очистки</string>
     <string name="toast_chat_created">Чат создан</string>
     <string name="group_create_stage_creating">Создание группы…</string>
-    <string name="group_create_stage_applying_retention">Применение исчезающих сообщений…</string>
     <string name="toast_notification_permission_denied">Разрешение на уведомление отклонено</string>
     <string name="toast_signed_out">Выйти</string>
     <string name="group_title_invite_from">Приглашение от %1$s</string>
@@ -866,6 +873,19 @@
     <string name="notifications_are_off">Уведомления отключены</string>
     <string name="notifications_are_off_detail">Включите их в настройках Android, чтобы использовать эти параметры.</string>
     <string name="delivery">Доставка</string>
+    <string name="notification_delivery_push">Push-уведомления</string>
+    <string name="notification_delivery_push_detail">Кратковременно пробуждает приложение при возможной новой активности, затем безопасно проверяет сообщения.</string>
+    <string name="notification_delivery_local_detail">Поддерживает постоянное соединение, пока уведомления включены.</string>
+    <string name="notification_device_policy">Состояние устройства</string>
+    <string name="notification_device_policy_detail">Разрешение на уведомления определяет, будут ли видны оповещения. Настройки батареи могут задерживать доставку в фоне в обоих режимах. Состояние обновится при возврате на этот экран.</string>
+    <string name="notification_permission_status">Разрешение уведомлений</string>
+    <string name="notification_permission_allowed">Разрешено</string>
+    <string name="notification_permission_blocked">Заблокировано</string>
+    <string name="notification_battery_policy">Политика батареи</string>
+    <string name="notification_battery_optimized">Оптимизировано</string>
+    <string name="notification_battery_unrestricted">Без ограничений</string>
+    <string name="notification_battery_restricted">Ограничено</string>
+    <string name="notification_battery_unknown">Недоступно</string>
     <string name="local_notifications_detail">Создайте уведомления о сообщениях на этом устройстве. Без встроенной push доставка может подождать, пока White Noise не станет активным.</string>
     <string name="native_push_title">Родной толчок</string>
     <string name="notification_push_detail">Используйте общий сигнал пробуждения для проверки наличия новых сообщений в фоновом режиме. Информация о сообщении останется на этом устройстве.</string>
@@ -1407,7 +1427,6 @@
     <string name="vibration_pattern_android_override">%1$s · Настройки Android</string>
     <string name="chat_muted_badge">Без звука</string>
     <string name="collapse_long_messages_subtitle">Показывать предварительный просмотр длинных сообщений в этом чате.</string>
-    <string name="toast_disappearing_not_applied">Группа создана, но исчезающие сообщения включить не удалось</string>
     <string name="search_members">Поиск участников</string>
     <string name="recent_chats">Недавние чаты</string>
     <string name="onboarding_login">Войти</string>

@@ -12,7 +12,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -56,6 +55,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.ui.common.RandomProfileNameButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
@@ -96,6 +96,8 @@ internal fun ProfileEditContent(
     hasAccount: Boolean,
     editing: Boolean,
     ready: Boolean,
+    imageActionsReady: Boolean = ready,
+    openPictureActionsOnEntry: Boolean = false,
     busy: Boolean,
     pictureUrl: String?,
     bannerUrl: String?,
@@ -125,6 +127,7 @@ internal fun ProfileEditContent(
     onOpenBanner: () -> Unit,
     onPickImage: (ProfileImageTarget, Uri) -> Unit,
     onRemoveImage: (ProfileImageTarget) -> Unit,
+    onPictureActionsOpened: () -> Unit = {},
 ) {
     SettingsScaffold(
         title = stringResource(R.string.profile),
@@ -174,7 +177,7 @@ internal fun ProfileEditContent(
                     seed,
                     ProfileImageTarget.Banner,
                     bannerPresent,
-                    !busy && !bannerUploading,
+                    imageActionsReady && !busy && !bannerUploading,
                     bannerUploading,
                     onPickImage,
                     onEditBanner,
@@ -212,11 +215,13 @@ internal fun ProfileEditContent(
                     seed,
                     ProfileImageTarget.Picture,
                     picturePresent,
-                    !busy && !pictureUploading,
+                    imageActionsReady && !busy && !pictureUploading,
                     pictureUploading,
                     onPickImage,
                     onEditPicture,
                     onRemoveImage,
+                    expandOnEntry = openPictureActionsOnEntry,
+                    onEntryExpanded = onPictureActionsOpened,
                 )
                 if (!pictureValid) {
                     Text(
@@ -235,6 +240,18 @@ internal fun ProfileEditContent(
                 enabled = !busy,
                 readOnly = !editing,
                 label = { Text(stringResource(R.string.name)) },
+                trailingIcon =
+                    if (editing) {
+                        {
+                            RandomProfileNameButton(
+                                enabled = !busy,
+                                onClick = onSuggestName,
+                                modifier = Modifier.testTag("profile.suggest_name"),
+                            )
+                        }
+                    } else {
+                        null
+                    },
                 lineLimits = TextFieldLineLimits.SingleLine,
                 keyboardOptions =
                     KeyboardOptions(
@@ -243,24 +260,13 @@ internal fun ProfileEditContent(
                     ),
             )
             if (editing) {
-                // Two separate offers rather than one: suggesting a new name and putting back the name
-                // already published are opposite intentions, and the reader who tried a suggestion needs
-                // a way back that is not retyping or discarding the whole form.
-                Row(horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related)) {
-                    TextButton(
-                        onClick = onRestoreName,
-                        enabled = !busy && nameDiffersFromSaved,
-                        modifier = Modifier.testTag("profile.restore_name"),
-                    ) {
-                        Text(stringResource(R.string.profile_restore_saved_name))
-                    }
-                    TextButton(
-                        onClick = onSuggestName,
-                        enabled = !busy,
-                        modifier = Modifier.testTag("profile.suggest_name"),
-                    ) {
-                        Text(stringResource(R.string.profile_suggest_name))
-                    }
+                // Restoring the saved name remains separate from the dice action inside the field.
+                TextButton(
+                    onClick = onRestoreName,
+                    enabled = !busy && nameDiffersFromSaved,
+                    modifier = Modifier.testTag("profile.restore_name"),
+                ) {
+                    Text(stringResource(R.string.profile_restore_saved_name))
                 }
             }
             WhiteNoiseTextField(
@@ -418,7 +424,10 @@ internal fun ProfileBanner(
     }
 }
 
-/** Device selections carry the account identity that opened them; stale activity results never start an upload. */
+/**
+ * Device selections carry the account identity that opened them; stale activity results never start an upload.
+ * A requested entry expansion is acknowledged only after the enabled menu actually opens.
+ */
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList", "CyclomaticComplexMethod")
 @Composable
 internal fun ProfileImageActions(
@@ -430,8 +439,11 @@ internal fun ProfileImageActions(
     onPick: (ProfileImageTarget, Uri) -> Unit,
     onWeb: () -> Unit,
     onRemove: (ProfileImageTarget) -> Unit,
+    expandOnEntry: Boolean = false,
+    onEntryExpanded: () -> Unit = {},
 ) {
     var expanded by remember(owner) { mutableStateOf(false) }
+    var entryExpansionConsumed by remember(owner, target) { mutableStateOf(false) }
     var pickerOwner by remember(owner) { mutableStateOf<String?>(null) }
     var launchFailed by remember(owner) { mutableStateOf(false) }
     val photos =
@@ -447,6 +459,13 @@ internal fun ProfileImageActions(
             if (valid && uri != null) onPick(target, uri)
         }
     val actionTag = if (target == ProfileImageTarget.Banner) "profile.banner_actions" else "profile.photo_actions"
+    LaunchedEffect(expandOnEntry, enabled) {
+        if (expandOnEntry && enabled && !entryExpansionConsumed) {
+            expanded = true
+            entryExpansionConsumed = true
+            onEntryExpanded()
+        }
+    }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box {
             FilledTonalButton(
