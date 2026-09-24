@@ -96,7 +96,7 @@ class FreshSweepCoverageTest {
         val badgeRememberInputs =
             source
                 .substringAfter("var unreadBadge by remember(")
-                .substringBefore(") { mutableStateOf(ConversationUnreadBadge())")
+                .substringBefore(") { // Seed synchronously")
         assertTrue("badge owner must follow the visible controller", "controller" in badgeRememberInputs)
         assertTrue("badge owner must follow the visible chat", "chat.id" in badgeRememberInputs)
         val badgeEffectInputs =

@@ -1435,7 +1435,22 @@ internal fun ConversationScreen(
     // among them and holds while paging moves the anchor off screen, so a history page can never
     // switch the count between the rows and the projection or count the loaded window itself.
     var unreadBadge by
-        remember(controller, chat.id, entryUnreadSessionIdentity) { mutableStateOf(ConversationUnreadBadge()) }
+        remember(controller, chat.id, entryUnreadSessionIdentity) {
+            // Seed synchronously when the timeline is already anchored, so the first frame after a
+            // mid-history open carries its number instead of gaining it one frame later.
+            val seed =
+                if (initialTimelineAnchored) {
+                    ConversationUnreadBadge().reconcile(
+                        timeline = controller.timeline,
+                        readAnchorMessageId = readAnchorMessageId,
+                        projectionUnread = projectedUnreadCount.takeIf { entryProjectionAvailable },
+                        windowReachesTail = !controller.hasMoreAfterTimeline,
+                    )
+                } else {
+                    ConversationUnreadBadge()
+                }
+            mutableStateOf(seed)
+        }
     LaunchedEffect(
         controller,
         initialTimelineAnchored,

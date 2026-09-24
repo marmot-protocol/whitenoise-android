@@ -70,7 +70,10 @@ class ConversationUnreadBadgeTest {
         assertEquals(Source.HELD, paged.source)
     }
 
-    /** While holding, a projection that grew is an arrival; one that fell is a mark-read commit and changes nothing. */
+    /**
+     * While holding, a projection that grew is an arrival. One that fell below the held number is read
+     * as lagging it, so the rise back to that number adds nothing; only growth past it does.
+     */
     @Test
     fun heldCountRisesOnlyWhenTheProjectionGrows() {
         val counted =
@@ -87,7 +90,12 @@ class ConversationUnreadBadgeTest {
         val markReadCommitted = arrival.reconcile(history, "r199", projectionUnread = 0, windowReachesTail = true)
         val secondArrival = markReadCommitted.reconcile(history, "r199", projectionUnread = 1, windowReachesTail = true)
 
-        assertEquals(listOf(0, 1, 1, 2), listOf(evicted, arrival, markReadCommitted, secondArrival).map { it.count })
+        val thirdArrival = secondArrival.reconcile(history, "r199", projectionUnread = 2, windowReachesTail = false)
+
+        assertEquals(
+            listOf(0, 1, 1, 1, 2),
+            listOf(evicted, arrival, markReadCommitted, secondArrival, thirdArrival).map { it.count },
+        )
     }
 
     /** Reading past unread rows moves the anchor to a loaded row, and the badge recounts from the rows. */
@@ -147,27 +155,41 @@ class ConversationUnreadBadgeTest {
         assertEquals(Source.UNKNOWN, withoutProjection.source)
     }
 
-    /** Nothing read yet: the projection decides when present; without one the rows are counted once, then held. */
+    /**
+     * Nothing read yet: at the tail every received row is unread; short of it the projection decides,
+     * and without one the rows are counted once, then held.
+     */
     @Test
     fun noAnchorUsesTheProjectionOrCountsOnceThenHolds() {
-        val projected =
+        val atTail =
             ConversationUnreadBadge().reconcile(
                 receivedRange(0, 150),
                 null,
                 projectionUnread = 12,
                 windowReachesTail = true,
             )
+        assertEquals(150, atTail.count)
+        assertEquals(Source.LOADED, atTail.source)
+
+        val projected =
+            ConversationUnreadBadge().reconcile(
+                receivedRange(0, 150),
+                null,
+                projectionUnread = 12,
+                windowReachesTail = false,
+            )
         assertEquals(12, projected.count)
         assertEquals(Source.PROJECTION, projected.source)
 
+        // Short of the tail with no projection, the rows are counted once and then held.
         val counted =
             ConversationUnreadBadge().reconcile(
                 receivedRange(0, 50),
                 null,
                 projectionUnread = null,
-                windowReachesTail = true,
+                windowReachesTail = false,
             )
-        val paged = counted.reconcile(receivedRange(0, 150), null, projectionUnread = null, windowReachesTail = true)
+        val paged = counted.reconcile(receivedRange(0, 150), null, projectionUnread = null, windowReachesTail = false)
 
         assertEquals(50, counted.count)
         assertEquals(50, paged.count)
@@ -221,7 +243,7 @@ class ConversationUnreadBadgeTest {
         assertEquals(Source.LOADED, backAtTail.source)
     }
 
-    /** Opened mid-history the rows stop at the window's edge: the projection stands in, else a partial count holds. */
+    /** Opened mid-history the rows stop at the window's edge: the projection stands in, else a lower bound grows. */
     @Test
     fun openingMidHistoryUsesTheProjectionOrHoldsAPartialCount() {
         val projected =
@@ -251,8 +273,115 @@ class ConversationUnreadBadgeTest {
 
         assertEquals(39, partial.count)
         assertEquals(Source.PARTIAL, partial.source)
-        assertEquals(39, pagedForward.count)
+        // A lower bound grows with the rows a forward page adds after the anchor.
+        assertEquals(89, pagedForward.count)
         assertEquals(Source.HELD, pagedForward.source)
+    }
+
+    /** A lower bound taken without a projection never falls below the unread rows still loaded after the anchor. */
+    @Test
+    fun partialCountGrowsTowardsTheTruthAndNeverBelowTheLoadedRows() {
+        val partial =
+            ConversationUnreadBadge().reconcile(
+                receivedRange(0, 50),
+                "r10",
+                projectionUnread = null,
+                windowReachesTail = false,
+            )
+        assertEquals(39, partial.count)
+
+        val readAll = partial.reconcile(receivedRange(0, 50), "r49", projectionUnread = null, windowReachesTail = false)
+        val pagedForward =
+            readAll.reconcile(
+                receivedRange(0, 100),
+                "r49",
+                projectionUnread = null,
+                windowReachesTail = false,
+            )
+        val atTail =
+            pagedForward.reconcile(
+                receivedRange(0, 300),
+                "r49",
+                projectionUnread = null,
+                windowReachesTail = true,
+            )
+
+        assertEquals(0, readAll.count)
+        assertEquals(50, pagedForward.count)
+        assertEquals(Source.HELD, pagedForward.source)
+        assertEquals(250, atTail.count)
+        assertEquals(Source.LOADED, atTail.source)
+    }
+
+    /** A projection that lags the rows and then catches up while held is not a second set of arrivals. */
+    @Test
+    fun aProjectionCatchingUpWhileHeldIsNotCountedTwice() {
+        val counted =
+            ConversationUnreadBadge().reconcile(
+                receivedRange(0, 30),
+                "r9",
+                projectionUnread = 0,
+                windowReachesTail = true,
+            )
+        assertEquals(20, counted.count)
+
+        val held = counted.reconcile(receivedRange(0, 20), "r9", projectionUnread = 0, windowReachesTail = false)
+        val caughtUp = held.reconcile(receivedRange(0, 20), "r9", projectionUnread = 20, windowReachesTail = false)
+        val arrival = caughtUp.reconcile(receivedRange(0, 20), "r9", projectionUnread = 21, windowReachesTail = false)
+
+        assertEquals(listOf(20, 20, 21), listOf(held, caughtUp, arrival).map { it.count })
+    }
+
+    /** The window reaching the tail, leaving it and reaching it again with the same rows changes nothing. */
+    @Test
+    fun windowReachingTheTailAndLeavingIsIdempotent() {
+        val rows = receivedRange(0, 40)
+        val loaded = ConversationUnreadBadge().reconcile(rows, "r34", projectionUnread = 5, windowReachesTail = true)
+        val held = loaded.reconcile(rows, "r34", projectionUnread = 5, windowReachesTail = false)
+        val loadedAgain = held.reconcile(rows, "r34", projectionUnread = 5, windowReachesTail = true)
+
+        assertEquals(listOf(5, 5, 5), listOf(loaded, held, loadedAgain).map { it.count })
+        assertEquals(
+            listOf(Source.LOADED, Source.HELD, Source.LOADED),
+            listOf(loaded, held, loadedAgain).map { it.source },
+        )
+    }
+
+    /** Nothing read yet in a window short of the tail counts once and holds, then counts everything at the tail. */
+    @Test
+    fun noAnchorInAPartialWindowHoldsUntilTheTail() {
+        val partial =
+            ConversationUnreadBadge().reconcile(
+                receivedRange(0, 50),
+                null,
+                projectionUnread = null,
+                windowReachesTail = false,
+            )
+        val paged = partial.reconcile(receivedRange(0, 100), null, projectionUnread = null, windowReachesTail = false)
+        val atTail = paged.reconcile(receivedRange(0, 120), null, projectionUnread = null, windowReachesTail = true)
+
+        assertEquals(Source.PARTIAL, partial.source)
+        assertEquals(listOf(50, 50, 120), listOf(partial, paged, atTail).map { it.count })
+        assertEquals(Source.LOADED, atTail.source)
+    }
+
+    /** A number taken from the projection holds through a later decrease and follows only real growth. */
+    @Test
+    fun aProjectionDecreaseWithNothingReadHoldsTheCount() {
+        val rows = receivedRange(0, 50)
+        val opened = ConversationUnreadBadge().reconcile(rows, "r10", projectionUnread = 300, windowReachesTail = false)
+        val commitLanded = opened.reconcile(rows, "r10", projectionUnread = 250, windowReachesTail = false)
+        val partialRecovery = commitLanded.reconcile(rows, "r10", projectionUnread = 260, windowReachesTail = false)
+        val arrivals = partialRecovery.reconcile(rows, "r10", projectionUnread = 310, windowReachesTail = false)
+        val readOn = arrivals.reconcile(rows, "r20", projectionUnread = 310, windowReachesTail = false)
+
+        assertEquals(
+            listOf(300, 300, 300, 310),
+            listOf(opened, commitLanded, partialRecovery, arrivals).map { it.count },
+        )
+        assertEquals(Source.PROJECTION, arrivals.source)
+        assertEquals(300, readOn.count)
+        assertEquals(Source.HELD, readOn.source)
     }
 
     /** Received rows `r<from>` up to `r<until - 1>`, one loaded window of ordinary messages. */
@@ -262,19 +391,15 @@ class ConversationUnreadBadgeTest {
     ): List<TimelineMessage> = (from until until).map { received("r$it") }
 
     /** An ordinary received message. */
-
     private fun received(id: String): TimelineMessage = message(id, direction = "received")
 
     /** A message the reader sent, never unread. */
-
     private fun sent(id: String): TimelineMessage = message(id, direction = "sent")
 
     /** A group system row: received, but derived state that never counts as unread. */
-
     private fun groupSystem(id: String): TimelineMessage = message(id, direction = "received", kind = 1210uL)
 
     /** A minimal timeline row with the fields the unread count reads. */
-
     private fun message(
         id: String,
         direction: String,
