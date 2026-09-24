@@ -128,6 +128,7 @@ class LongCjkBubbleScrollAndroidTest {
         const val LIST = "long-cjk-conversation"
         const val ROW_COUNT = 80
         const val LONG_ROW = 40
+
         // Synthetic text preserves script, wrapping and length without copying a private chat.
         val longCjkMessage =
             "这是一段用于测试聊天记录快速滚动的长消息。请确认文字换行、时间标记和消息边界都保持稳定。".repeat(70)
