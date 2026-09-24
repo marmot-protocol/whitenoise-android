@@ -86,7 +86,8 @@ class WindowApplyPreparationTest {
         assertFalse(prepared.rows[0].needsProjection)
         assertEquals(document, prepared.rows[0].record.contentTokens)
         assertTrue(prepared.rows[1].needsProjection)
-        assertEquals(setOf(changedId), prepared.touchedIds)
+        val projected = prepared.rows.filter(PreparedWindowRow::needsProjection).map { it.record.messageIdHex }
+        assertEquals(listOf(changedId), projected)
     }
 
     /** A non-forced window sharing no ordered row with the held ones prepares as a replacement. */
@@ -148,7 +149,6 @@ class WindowApplyPreparationTest {
 
         assertEquals(WindowApplyMode.EXTEND, finalOlderEdge.mode)
         assertEquals(setOf(ids[0], ids[1]), finalOlderEdge.departedIds)
-        assertTrue(finalOlderEdge.departedIds.all { it in finalOlderEdge.touchedIds })
         assertEquals(emptySet<String>(), moreHistoryBefore.departedIds)
         // The row missing between b and d moved d's ordinal, so the shared rows disagree and the page replaces.
         assertEquals(WindowApplyMode.REPLACE, interiorGap.mode)

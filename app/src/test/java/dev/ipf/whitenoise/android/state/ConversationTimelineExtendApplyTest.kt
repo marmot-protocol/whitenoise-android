@@ -267,6 +267,28 @@ class ConversationTimelineExtendApplyTest {
             }
         }
 
+    /**
+     * A retained row is subject to the same local expiry as a window row: the publish filter hides it
+     * once its deadline has passed, and the foreground sweep still schedules on it, so a disappearing
+     * message that MDK's window has slid past can never outlive its deadline on screen.
+     */
+    @Test
+    fun retainedRowPastItsDeadlineStaysHiddenAndOnTheSweep() =
+        runBlocking {
+            val expired = row(THIRD).copy(direction = "sent", retentionExpiresAt = 1uL)
+            withController(seed = listOf(row(FIRST), row(SECOND), expired)) { controller, _ ->
+                controller.applyTimelinePage(
+                    page(listOf(row(FIRST), row(SECOND)), hasMoreAfter = true),
+                    replaceWindow = false,
+                    updatePagination = true,
+                )
+
+                assertTrue("the row is retained", THIRD in controller.timelineRecords)
+                assertEquals(listOf(FIRST, SECOND), timelineMessageIds(controller))
+                assertTrue("the sweep still owns its deadline", THIRD in controller.testSweepExpiryIds())
+            }
+        }
+
     /** A window sharing no row with the held ones is a new place in history, however it was requested. */
     @Test
     fun extendWithNoSharedRowReplacesTheWindow() =

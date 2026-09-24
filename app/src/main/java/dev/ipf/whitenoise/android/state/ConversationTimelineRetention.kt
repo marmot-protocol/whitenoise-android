@@ -64,7 +64,8 @@ internal fun ConversationController.pruneRetainedTimelineRows(prepared: Prepared
 /**
  * Held rows an extending page proves gone: any held row beyond an edge the page marks final, since
  * MDK's window is contiguous and nothing can lie past a final edge. Rows beyond an edge with more
- * history behind it were merely slid past and stay retained. A held row ordered inside the span of
+ * history behind it were merely slid past and stay retained, as does a row the exact send bridge
+ * still owns ([pendingProjectionIds]), whatever the page says. A held row ordered inside the span of
  * [pageOrder] that the page no longer carries would also be gone, but a removal inside the span
  * moves the rows after it, so `windowOrderShift` already turns such a page into a replacement; the
  * interior branch here only guarantees an EXTEND never keeps a row inside its span that the page lacks.
@@ -73,6 +74,7 @@ internal fun departedRetainedIds(
     page: TimelinePageFfi,
     heldOrder: Map<String, ULong>,
     pageOrder: Map<String, ULong>,
+    pendingProjectionIds: Set<String> = emptySet(),
 ): Set<String> {
     if (pageOrder.isEmpty()) return emptySet()
     val low = pageOrder.values.min()
@@ -81,6 +83,7 @@ internal fun departedRetainedIds(
     return heldOrder
         .filter { (id, ordinal) ->
             id !in pageIds &&
+                id !in pendingProjectionIds &&
                 when {
                     ordinal < low -> !page.hasMoreBefore
                     ordinal > high -> !page.hasMoreAfter

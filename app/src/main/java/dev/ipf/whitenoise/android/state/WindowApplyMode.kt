@@ -111,7 +111,6 @@ internal data class PreparedWindowApply(
     val mode: WindowApplyMode,
     val departedIds: Set<String>,
     val authoritativeOrder: Map<String, ULong>,
-    val touchedIds: Set<String>,
     val profileIds: Set<String>,
 )
 
@@ -197,7 +196,7 @@ internal fun prepareWindowApply(
         }
     val departedIds =
         if (mode == WindowApplyMode.EXTEND) {
-            departedRetainedIds(page, snapshot.heldOrder, authoritativeOrder)
+            departedRetainedIds(page, snapshot.heldOrder, authoritativeOrder, snapshot.pendingProjectionIds)
         } else {
             emptySet()
         }
@@ -225,14 +224,6 @@ internal fun prepareWindowApply(
                         (reconcileNewExtendedRecords && record.messageIdHex !in heldBefore),
             )
         }
-    val touchedIds =
-        buildSet {
-            addAll(departedIds)
-            rows
-                .asSequence()
-                .filter(PreparedWindowRow::needsProjection)
-                .mapTo(this) { it.record.messageIdHex }
-        }
     val profileIds =
         buildSet {
             rows.forEach { row ->
@@ -248,7 +239,6 @@ internal fun prepareWindowApply(
         mode = mode,
         departedIds = departedIds,
         authoritativeOrder = authoritativeOrder,
-        touchedIds = touchedIds,
         profileIds = profileIds,
     )
 }
