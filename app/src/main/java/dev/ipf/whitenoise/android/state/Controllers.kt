@@ -6267,9 +6267,7 @@ class ConversationController(
     private val optimisticEdits = mutableStateMapOf<String, OptimisticEdit>()
     private val pendingMessageEditHandoff: PendingMessageEditHandoff get() = appState.pendingMessageEditHandoff
 
-    private fun pendingEditKey(clientToken: String): String {
-        return "${conversationAccountRef.orEmpty()}|${group.groupIdHex}|$clientToken"
-    }
+    private fun pendingEditKey(token: String): String = "${conversationAccountRef.orEmpty()}|${group.groupIdHex}|$token"
 
     /** Set when the user has tapped Edit on a kind-9 they sent — the composer
      * banner reflects this and the next [send] routes through [editMessage]
