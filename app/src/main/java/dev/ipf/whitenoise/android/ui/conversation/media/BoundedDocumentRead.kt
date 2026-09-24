@@ -53,4 +53,4 @@ internal fun normalizeDocumentMime(reported: String?): String {
     return concrete.takeIf { CONCRETE_MIME.matches(it) } ?: "application/octet-stream"
 }
 
-internal fun safeDocumentDisplayName(name: String?): String = MediaPipeline.safeDisplayName(name.orEmpty(), fallback = "file")
+internal fun safeDocumentDisplayName(name: String?): String = MediaPipeline.safeDisplayName(name.orEmpty(), "file")
