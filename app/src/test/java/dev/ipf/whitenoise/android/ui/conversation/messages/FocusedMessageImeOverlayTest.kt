@@ -115,7 +115,10 @@ class FocusedMessageImeOverlayTest {
         assertEquals("the final action must remain reachable", 1, lastActionClicks)
     }
 
-    private fun assertPreviewWithinFrame(bounds: Rect, message: String) {
+    private fun assertPreviewWithinFrame(
+        bounds: Rect,
+        message: String,
+    ) {
         assertTrue(message, bounds.top >= 0f && bounds.bottom <= 320f)
     }
 }
