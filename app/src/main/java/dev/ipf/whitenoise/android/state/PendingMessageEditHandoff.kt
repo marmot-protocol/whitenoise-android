@@ -33,12 +33,13 @@ internal class PendingMessageEditHandoff {
         val entry = entries[scopedClientToken] ?: return Submission.Publish(targetId)
         entry.editing = false
         val confirmedId = entry.confirmedId
-        if (entry.ready && confirmedId != null) {
+        return if (entry.ready && confirmedId != null) {
             entries.remove(scopedClientToken)
-            return Submission.Publish(confirmedId)
+            Submission.Publish(confirmedId)
+        } else {
+            entry.queuedText = text
+            Submission.Deferred
         }
-        entry.queuedText = text
-        return Submission.Deferred
     }
 
     /** Returns one latest queued revision only when MDK has published the original. */
@@ -48,12 +49,18 @@ internal class PendingMessageEditHandoff {
         ready: Boolean,
     ): String? {
         val entry = entries[clientToken] ?: return null
-        if (confirmedId == clientToken) return null
-        entry.confirmedId = confirmedId
-        entry.ready = entry.ready || ready
-        if (!entry.ready || entry.editing) return null
-        entries.remove(clientToken)
-        return entry.queuedText
+        return if (confirmedId == clientToken) {
+            null
+        } else {
+            entry.confirmedId = confirmedId
+            entry.ready = entry.ready || ready
+            if (!entry.ready || entry.editing) {
+                null
+            } else {
+                entries.remove(clientToken)
+                entry.queuedText
+            }
+        }
     }
 
     fun cancel(clientToken: String) {

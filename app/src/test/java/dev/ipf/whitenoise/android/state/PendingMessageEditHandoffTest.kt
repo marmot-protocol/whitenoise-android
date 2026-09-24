@@ -22,7 +22,10 @@ class PendingMessageEditHandoffTest {
         val handoff = PendingMessageEditHandoff()
         handoff.begin("local-token")
 
-        assertEquals(PendingMessageEditHandoff.Submission.Deferred, handoff.submit("local-token", "local-token", "revision"))
+        assertEquals(
+            PendingMessageEditHandoff.Submission.Deferred,
+            handoff.submit("local-token", "local-token", "revision"),
+        )
         assertNull(handoff.confirm("local-token", "local-token", ready = true))
         assertNull(handoff.confirm("local-token", "event-id", ready = false))
         assertEquals("revision", handoff.confirm("local-token", "event-id", ready = true))
