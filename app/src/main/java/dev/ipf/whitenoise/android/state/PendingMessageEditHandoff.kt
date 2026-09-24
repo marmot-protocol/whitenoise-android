@@ -75,15 +75,15 @@ internal class PendingMessageEditHandoff {
         entry.editing = false
         val queuedText = entry.queuedText
         val confirmedId = entry.confirmedId
-        if (queuedText == null) {
+        return if (queuedText == null) {
             entries.remove(clientToken)
-            return null
-        }
-        if (entry.ready && confirmedId != null) {
+            null
+        } else if (entry.ready && confirmedId != null) {
             entries.remove(clientToken)
-            return ReadyEdit(confirmedId, queuedText)
+            ReadyEdit(confirmedId, queuedText)
+        } else {
+            null
         }
-        return null
     }
 
     fun abandon(clientToken: String) {
