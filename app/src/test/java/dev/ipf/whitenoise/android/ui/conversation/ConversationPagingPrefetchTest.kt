@@ -63,7 +63,7 @@ class ConversationPagingPrefetchTest {
     fun prefetchRespectsTheLoadingAndExhaustedGuards() {
         assertFalse(prefetch(anchored = false))
         assertFalse(prefetch(hasMoreBefore = false))
-        assertFalse(prefetch(isLoadingOlder = true))
+        assertFalse(prefetch(pageInFlight = true))
         assertFalse(prefetch(oldestVisibleIndex = -1))
     }
 
@@ -122,13 +122,13 @@ class ConversationPagingPrefetchTest {
     private fun prefetch(
         anchored: Boolean = true,
         hasMoreBefore: Boolean = true,
-        isLoadingOlder: Boolean = false,
+        pageInFlight: Boolean = false,
         olderPageBlocked: Boolean = false,
         oldestVisibleIndex: Int = OLDEST_ROW,
     ) = shouldPrefetchOlder(
         anchored = anchored,
         hasMoreBefore = hasMoreBefore,
-        isLoadingOlder = isLoadingOlder,
+        pageInFlight = pageInFlight,
         olderPageBlocked = olderPageBlocked,
         oldestVisibleIndex = oldestVisibleIndex,
         oldestMessageListIndex = OLDEST_ROW,

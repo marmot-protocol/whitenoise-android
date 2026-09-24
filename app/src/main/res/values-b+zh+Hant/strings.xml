@@ -2038,4 +2038,5 @@
     <string name="export_audit_logs_confirm_action">繼續</string>
     <string name="toast_couldnt_export_audit_logs">無法準備要匯出的診斷日誌</string>
     <string name="toast_no_audit_logs_to_export">沒有可匯出的診斷日誌</string>
+    <string name="conversation_loading_newer">正在載入較新的訊息</string>
 </resources>

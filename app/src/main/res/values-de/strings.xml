@@ -2083,4 +2083,5 @@
     <string name="export_audit_logs_confirm_action">Weiter</string>
     <string name="toast_couldnt_export_audit_logs">Diagnoseprotokolle konnten nicht für den Export vorbereitet werden</string>
     <string name="toast_no_audit_logs_to_export">Keine Diagnoseprotokolle zum Exportieren vorhanden</string>
+    <string name="conversation_loading_newer">Neuere Nachrichten werden geladen</string>
 </resources>

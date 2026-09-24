@@ -128,6 +128,9 @@ import dev.ipf.whitenoise.android.state.chatCreateOpenConversationTimingStage
 import dev.ipf.whitenoise.android.state.conversationWindowCanReportVisible
 import dev.ipf.whitenoise.android.state.currentTtsConversationDestination
 import dev.ipf.whitenoise.android.state.hasKnownTranscriptPresentation
+import dev.ipf.whitenoise.android.state.isLoadingNewer
+import dev.ipf.whitenoise.android.state.isLoadingOlder
+import dev.ipf.whitenoise.android.state.isLoadingPage
 import dev.ipf.whitenoise.android.state.loadMessageAvailability
 import dev.ipf.whitenoise.android.state.loadUntilMessageAvailable
 import dev.ipf.whitenoise.android.state.logUnreadBadgeTransition
@@ -288,7 +291,7 @@ private fun ConversationController.initialTimelineBackfillSnapshot() =
     ConversationInitialTimelineBackfillSnapshot(
         hasRenderableRows = timeline.any { !MessageProjector.isEdit(it.record) },
         hasMoreBefore = hasMoreBefore,
-        loadInFlight = isLoading || isLoadingOlder,
+        loadInFlight = isLoading || isLoadingPage,
         hasLoadFailure = error != null,
         rawWindowMessageIds = timeline.map { it.id },
     )
@@ -905,7 +908,7 @@ internal fun ConversationScreen(
                     renderedTimeline.isEmpty() &&
                     !controller.hasMoreBefore &&
                     !controller.hasMoreAfterTimeline &&
-                    !controller.isLoadingOlder &&
+                    !controller.isLoadingPage &&
                     !controller.isLoading,
             routePresentationSettled =
                 controller.error == null &&
@@ -2235,7 +2238,7 @@ internal fun ConversationScreen(
         controller,
         navigationState.initialTimelineLoadStarted,
         controller.isLoading,
-        controller.isLoadingOlder,
+        controller.isLoadingPage,
         latestTimelineItemId,
         navigationState.initialTimelineBackfillRetryGeneration,
     ) {
@@ -2624,7 +2627,7 @@ internal fun ConversationScreen(
                 shouldPrefetchOlder(
                     anchored = initialTimelineAnchored,
                     hasMoreBefore = controller.hasMoreBefore,
-                    isLoadingOlder = controller.isLoadingOlder,
+                    pageInFlight = controller.isLoadingPage,
                     // A page the engine never answered leaves the reader a retry row; without this
                     // the effect would re-issue it on every scroll frame, which is the silent stall
                     // this screen used to show. The retry, or a live replacement, clears the block.
@@ -2657,7 +2660,7 @@ internal fun ConversationScreen(
             shouldPrefetchNewer(
                 anchored = initialTimelineAnchored,
                 hasMoreAfter = controller.hasMoreAfterTimeline,
-                isLoadingOlder = controller.isLoadingOlder,
+                pageInFlight = controller.isLoadingPage,
                 // A send leaves the viewport on this edge, so a forward page the engine could not
                 // answer must not be re-issued on every layout pass (#2764). Any page that
                 // advances, including a live-window update, releases the block.
@@ -3835,7 +3838,7 @@ internal fun ConversationScreen(
                     renderedTimeline.isEmpty() &&
                         !controller.hasMoreBefore &&
                         !controller.hasMoreAfterTimeline &&
-                        !controller.isLoadingOlder &&
+                        !controller.isLoadingPage &&
                         !controller.isLoading &&
                         navigationState.initialTimelineLoadStarted -> {
                         if (
@@ -4126,6 +4129,11 @@ internal fun ConversationScreen(
                                     horizontalAlignment = Alignment.End,
                                     verticalArrangement = Arrangement.spacedBy(8.dp),
                                 ) {
+                                    // A newer page that takes longer than a moment shows here, beside the
+                                    // jump button, so the list's bottom edge never moves for it.
+                                    if (rememberNewerPageIndicatorVisible(controller.isLoadingNewer)) {
+                                        ConversationNewerPageIndicator()
+                                    }
                                     if (ttsFollowHandle.showResumeAction) {
                                         TtsResumeFollowButton(
                                             onClick = ttsFollowHandle::resumeFollow,

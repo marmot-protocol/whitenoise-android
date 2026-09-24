@@ -2183,4 +2183,5 @@
     <string name="diagnostics_clear_confirm_action">Clear Logs</string>
     <string name="usage_diagnostics_prompt_intro">Help us understand how White Noise is used and make messaging more reliable.</string>
     <string name="donate_open_failed">Couldn’t open the donation page. Try again or return to Settings.</string>
+    <string name="conversation_loading_newer">Loading newer messages</string>
 </resources>

@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.state
 import android.os.Looper
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
+import dev.ipf.whitenoise.android.ui.conversation.NEWER_PAGE_PREFETCH_ROWS
+import dev.ipf.whitenoise.android.ui.conversation.OLDER_PAGE_PREFETCH_ROWS
 import dev.ipf.whitenoise.android.ui.conversation.shouldPrefetchNewer
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -159,23 +161,32 @@ class ConversationForwardPrefetchOriginTest {
     fun prefetchRuleStopsAtTheEdgeWhileBlocked() {
         assertTrue(prefetchNewer(blocked = false))
         assertFalse(prefetchNewer(blocked = true))
-        assertFalse("a page already in flight is never re-issued", prefetchNewer(isLoadingOlder = true))
+        assertFalse("a page already in flight is never re-issued", prefetchNewer(pageInFlight = true))
         assertFalse("nothing newer to fetch", prefetchNewer(hasMoreAfter = false))
         assertFalse("an unanchored timeline never prefetches", prefetchNewer(anchored = false))
         assertFalse("a viewport away from the edge waits", prefetchNewer(newestVisibleIndex = 99))
+    }
+
+    /** The forward runway is the same half page as the older one, and the margin edge is exact. */
+    @Test
+    fun newerPrefetchKeepsHalfAPageOfRunway() {
+        assertEquals(OLDER_PAGE_PREFETCH_ROWS, NEWER_PAGE_PREFETCH_ROWS)
+        assertEquals(25, NEWER_PAGE_PREFETCH_ROWS)
+        assertTrue(prefetchNewer(newestVisibleIndex = NEWER_PAGE_PREFETCH_ROWS - 1))
+        assertFalse(prefetchNewer(newestVisibleIndex = NEWER_PAGE_PREFETCH_ROWS))
     }
 
     /** Evaluates the forward-prefetch rule at the newest edge with one varied input. */
     private fun prefetchNewer(
         anchored: Boolean = true,
         hasMoreAfter: Boolean = true,
-        isLoadingOlder: Boolean = false,
+        pageInFlight: Boolean = false,
         blocked: Boolean = false,
         newestVisibleIndex: Int = 0,
     ) = shouldPrefetchNewer(
         anchored = anchored,
         hasMoreAfter = hasMoreAfter,
-        isLoadingOlder = isLoadingOlder,
+        pageInFlight = pageInFlight,
         newerPrefetchBlocked = blocked,
         newestVisibleIndex = newestVisibleIndex,
         newestEdgeIndex = 0,
