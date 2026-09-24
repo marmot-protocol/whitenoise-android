@@ -6,6 +6,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -36,6 +37,27 @@ class AccountSetupContentTest {
     private var opened = 0
     private var reconnected = 0
     private var details = 0
+
+    /** The dice edits only the profile draft; native publication still requires Save and approval. */
+    @Test
+    fun profileEditorDiceStagesSuggestedName() {
+        show(
+            AccountSetupState(
+                snapshot = setupSnapshot(),
+                editor =
+                    SetupEditor(
+                        3uL,
+                        OnboardingStepFfi.PROFILE,
+                        OnboardingActionFfi.EDIT_PROFILE,
+                        displayName = "Alice",
+                    ),
+            ),
+        )
+        composeRule.onNodeWithContentDescription("Suggest name").assertExists()
+        composeRule.onNodeWithTag("setup.profile.suggest_name").performClick()
+        composeRule.onNode(hasSetTextAction() and hasText("Quiet Otter")).assertExists()
+        assertTrue(actions.isEmpty())
+    }
 
     /** Missing profile metadata offers working edit and skip choices without expanding the checklist. */
     @Test
@@ -394,6 +416,7 @@ class AccountSetupContentTest {
                     { reconnected++ },
                     { opened++ },
                     { later++ },
+                    { "Quiet Otter" },
                     { details++ },
                 )
             }

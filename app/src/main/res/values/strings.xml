@@ -220,6 +220,7 @@
     <string name="couldnt_load_conversation">Couldn\'t load conversation</string>
     <string name="error_conversation_membership_unavailable">Couldn\'t verify this conversation\'s members. Retry to show your messages.</string>
     <string name="no_messages_yet">No messages yet</string>
+    <string name="wave_hi">Wave hi</string>
     <string name="conversation_empty_disappearing_title">No messages to show</string>
     <string name="conversation_empty_disappearing_body">Disappearing messages are on. New messages in this chat disappear after %1$s.</string>
     <string name="group_empty_only_you_title">This group is only you</string>

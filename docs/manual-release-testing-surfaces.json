@@ -2165,6 +2165,12 @@
         ]
       },
       {
+        "surface": "RandomProfileNameButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/RandomProfileNameButton.kt",
+        "anchor": "fun RandomProfileNameButton(",
+        "test_ids": ["ONB-025", "PRO-001"]
+      },
+      {
         "surface": "WhiteNoiseTextField",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTextField.kt",
         "anchor": "fun WhiteNoiseTextField(",
@@ -2389,8 +2395,14 @@
         ]
       },
       {
+        "surface": "WaveHiButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": "private fun WaveHiButton(",
+        "test_ids": ["CON-019"]
+      },
+      {
         "surface": "GroupSystemRow",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationRows.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
         "anchor": "fun GroupSystemRow(",
         "test_ids": [
           "CON-001"
@@ -5072,7 +5084,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/design/KeyboardSafePopup.kt",
         "anchor": "fun KeyboardSafePopup(",
         "test_ids": [
-          "INT-001"
+          "INT-001",
+          "MSG-004"
         ]
       },
       {
@@ -5988,7 +6001,8 @@
         "anchor": "fun SignUpContent(",
         "test_ids": [
           "ONB-002",
-          "ONB-003"
+          "ONB-003",
+          "ONB-025"
         ]
       },
       {
@@ -5997,7 +6011,8 @@
         "anchor": "fun SignUpScreen(",
         "test_ids": [
           "ONB-002",
-          "ONB-003"
+          "ONB-003",
+          "ONB-025"
         ]
       },
       {
@@ -6283,7 +6298,8 @@
           "ONB-018",
           "ONB-019",
           "ONB-021",
-          "ONB-023"
+          "ONB-023",
+          "ONB-025"
         ]
       },
       {
@@ -6469,7 +6485,8 @@
         "anchor": "fun ProfileEditContent(",
         "test_ids": [
           "PRO-001",
-          "PRO-002"
+          "PRO-002",
+          "ONB-025"
         ]
       },
       {
@@ -15907,11 +15924,11 @@
       },
       {
         "surface": "string:profile_suggest_name",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditContent.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/RandomProfileNameButton.kt",
         "anchor": "R.string.profile_suggest_name",
         "test_ids": [
           "PRO-001",
-          "PRO-002"
+          "ONB-025"
         ]
       },
       {
@@ -24490,6 +24507,36 @@
         ]
       },
       {
+        "surface": "Group-system show details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": "R.string.group_system_show_details",
+        "test_ids": ["SET-020"]
+      },
+      {
+        "surface": "Group-system hide details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": "R.string.group_system_hide_details",
+        "test_ids": ["SET-020"]
+      },
+      {
+        "surface": "Delete for me on a group-system row",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": "R.string.delete_for_me",
+        "test_ids": ["MSG-008"]
+      },
+      {
+        "surface": "Wave hi greets the added member from an authenticated group-system row",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": "R.string.wave_hi",
+        "test_ids": ["CON-019"]
+      },
+      {
+        "surface": "Wave sends a mention without changing the composer draft",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "onWave =",
+        "test_ids": ["CON-019"]
+      },
+      {
         "surface": "An empty conversation explains its disappearing-message policy without claiming history was lost",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationEmptyState.kt",
         "anchor": "internal fun conversationEmptyState(",
@@ -26700,6 +26747,38 @@
       }
     ],
     "notification_content_contracts": [
+      {
+        "surface": "conversation-specific signed-in recipient relevance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationRecipientRelevance.kt",
+        "anchor": "internal fun relevantSignedInRecipientCount(",
+        "test_ids": [
+          "NTF-025"
+        ]
+      },
+      {
+        "surface": "silent active-card contact nickname reconciliation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "suspend fun refreshContactSenderName(",
+        "test_ids": [
+          "NTF-025"
+        ]
+      },
+      {
+        "surface": "group notification sender title refresh",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "R.string.notification_sender_in_group",
+        "test_ids": [
+          "NTF-025"
+        ]
+      },
+      {
+        "surface": "bounded conversation-open notification cancellation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "suspend fun dismissConversationMessages(",
+        "test_ids": [
+          "NTF-025"
+        ]
+      },
       {
         "surface": "Compose-free notification preview",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownPreviewText.kt",

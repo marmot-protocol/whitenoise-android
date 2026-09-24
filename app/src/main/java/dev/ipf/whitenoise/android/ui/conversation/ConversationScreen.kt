@@ -1310,6 +1310,12 @@ internal fun ConversationScreen(
         }
     }
     val composerGate = conversationControllerComposerGate(controller, notificationOpenRequestId)
+
+    fun canWave(): Boolean =
+        controller.canSendMessages &&
+            controller.editingMessageId == null &&
+            controller.replyingTo == null
+
     val timelineUnderlayEnabled =
         composerGate == ComposerGate.COMPOSER &&
             !selectionMode &&
@@ -3993,6 +3999,26 @@ internal fun ConversationScreen(
                                         onQuickReactionsSave = { saveQuickReactionEmojis(it) },
                                         onReplyPreviewClick = { navigateToReplyTarget(it) },
                                         composerGate = composerGate,
+                                        onWave =
+                                            if (composerGate == ComposerGate.COMPOSER && canWave()) {
+                                                wave@{ accountIdHex, onAccepted ->
+                                                    if (!canWave()) {
+                                                        return@wave
+                                                    }
+                                                    val npub = appState.npubForDisplay(accountIdHex)
+                                                    if (npub.isBlank()) {
+                                                        appState.present(R.string.send_failed)
+                                                        return@wave
+                                                    }
+                                                    controller.send("👋 @$npub", onAccepted = {
+                                                        onAccepted()
+                                                        acceptedSendRevealedTranscript = true
+                                                        revealSentMessage()
+                                                    })
+                                                }
+                                            } else {
+                                                null
+                                            },
                                         onBack = exitConversation,
                                         mentionCandidates = mentionPicker.candidates,
                                         mentionPickerEnabled = mentionPicker.enabled,
