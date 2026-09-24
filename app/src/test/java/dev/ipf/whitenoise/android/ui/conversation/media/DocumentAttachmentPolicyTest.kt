@@ -1,10 +1,10 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
-import java.io.ByteArrayInputStream
-import java.io.IOException
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.io.ByteArrayInputStream
+import java.io.IOException
 
 class DocumentAttachmentPolicyTest {
     @Test
