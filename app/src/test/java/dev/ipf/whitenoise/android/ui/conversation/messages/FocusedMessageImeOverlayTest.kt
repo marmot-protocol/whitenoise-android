@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -72,6 +73,7 @@ class FocusedMessageImeOverlayTest {
                     canCopyText = true,
                     canSpeak = true,
                     canSelectText = true,
+                    canSave = true,
                     quickReactionEmojis = listOf("👍", "❤️", "😂", "😮", "😢", "👏"),
                     onDismissRequest = {},
                     onReact = {},
@@ -87,18 +89,7 @@ class FocusedMessageImeOverlayTest {
                     onInfo = {},
                     onDelete = { deletes++ },
                     previewDescription = "Long lifted text message",
-                    preview = {
-                        FocusedTextMessagePreview(
-                            presentation = messageBubblePresentation(deleted = false, mine = false),
-                            mine = false,
-                            text = LONG_TEXT_PREVIEW,
-                            document = null,
-                            time = "12:34",
-                            status = MessageStatus.Received,
-                            showStatus = false,
-                            reply = { Text("Quoted reply with two lines of context") },
-                        )
-                    },
+                    preview = { longTextPreview() },
                 )
             }
         }
@@ -115,6 +106,20 @@ class FocusedMessageImeOverlayTest {
             .assertIsDisplayed()
             .performClick()
         composeRule.runOnIdle { assertEquals(1, deletes) }
+    }
+
+    @Composable
+    private fun longTextPreview() {
+        FocusedTextMessagePreview(
+            presentation = messageBubblePresentation(deleted = false, mine = false),
+            mine = false,
+            text = LONG_TEXT_PREVIEW,
+            document = null,
+            time = "12:34",
+            status = MessageStatus.Received,
+            showStatus = false,
+            reply = { Text("Quoted reply with two lines of context") },
+        )
     }
 
     private fun assertActionsScrollWithoutMovingPreview(
