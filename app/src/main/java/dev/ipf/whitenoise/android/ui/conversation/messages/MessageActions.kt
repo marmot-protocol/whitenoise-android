@@ -121,6 +121,7 @@ internal fun MessageActionMenu(
     selectedReactionEmojis: Set<String> = emptySet(),
     previewDescription: String = "",
     previewReady: Boolean = true,
+    previewIsMedia: Boolean = false,
     preview: (@Composable () -> Unit)? = null,
 ) {
     if (!expanded) return
@@ -207,6 +208,7 @@ internal fun MessageActionMenu(
         selectedReactions = selectedReactionEmojis,
         previewDescription = previewDescription,
         previewReady = previewReady,
+        previewIsMedia = previewIsMedia,
         preview = preview,
         onReact = onReact,
         onMoreReactions = onOpenEmojiPicker,

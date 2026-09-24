@@ -120,6 +120,20 @@ object LocalNotificationFormatter {
             id = GROUP_MEMBERSHIP_NOTIFICATION_ID,
         )
 
+    /** True only for deterministic cards owned by [accountRef]; opaque invite tags intentionally fail closed. */
+    fun deterministicTagBelongsToAccount(
+        tag: String?,
+        accountRef: String,
+    ): Boolean {
+        if (tag.isNullOrBlank() || accountRef.isBlank()) return false
+        val base = "$accountRef|"
+        return tag.startsWith(base) ||
+            tag.startsWith(REACTION_TAG_PREFIX + base) ||
+            tag.startsWith(MENTION_TAG_PREFIX + base) ||
+            tag.startsWith(AGENT_ACTIVITY_TAG_PREFIX + base) ||
+            tag.startsWith(GROUP_MEMBERSHIP_TAG_PREFIX + base)
+    }
+
     fun notificationDismissalKey(update: NotificationUpdateFfi): NotificationDismissalKey =
         when {
             update.trigger == NotificationTriggerFfi.GROUP_INVITE ->
@@ -153,14 +167,14 @@ object LocalNotificationFormatter {
 
     /**
      * The notification sub-text naming which signed-in identity received the
-     * event, or null. Shown only when more than one account is signed in (#836):
-     * a single-account user already knows who they are, so the label would be
-     * noise. Blank labels are dropped.
+     * event, or null. Shown only when more than one signed-in identity is
+     * relevant to this conversation; unrelated local accounts do not make the
+     * event ambiguous. Blank labels are dropped.
      */
     fun recipientAccountSubtext(
-        signedInAccountCount: Int,
+        relevantSignedInAccountCount: Int,
         recipientLabel: String?,
-    ): String? = recipientLabel?.takeIf { it.isNotBlank() && signedInAccountCount > 1 }
+    ): String? = recipientLabel?.takeIf { it.isNotBlank() && relevantSignedInAccountCount > 1 }
 
     fun redactedContent(
         content: LocalNotificationContent,

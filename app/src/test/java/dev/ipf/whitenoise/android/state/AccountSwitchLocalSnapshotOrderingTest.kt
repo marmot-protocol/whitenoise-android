@@ -9,6 +9,7 @@ import org.junit.Test
 import java.io.File
 
 /** Regression coverage for the local-ready account-switch boundary. */
+@Suppress("LargeClass") // Source-order assertions share one parser and the same account-switch lifecycle boundary.
 class AccountSwitchLocalSnapshotOrderingTest {
     @Test
     fun profileSeedSetIncludesEveryVisibleOtherAccountAndExcludesOverflow() {
@@ -289,6 +290,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
     @Test
     fun catchUpLaunchIsProcessScopedAndDeduplicated() {
         val body = appStateSource().readText().kotlinFunctionBody("launchAccountCatchUp")
+        val admitted = appStateSource().readText().kotlinFunctionBody("performAdmittedAccountCatchUp")
         val instrumented = appStateSource().readText().kotlinFunctionBody("instrumentedCatchUpAccounts")
         val coordinator = connectivityRuntimeSource().readText()
 
@@ -306,14 +308,13 @@ class AccountSwitchLocalSnapshotOrderingTest {
         )
         assertTrue(
             "the background job must run the result-bearing best-effort catch-up",
-            "instrumentedCatchUpAccounts(trigger)" in body &&
+            "instrumentedCatchUpAccounts(trigger)" in admitted &&
                 "catchUpAccountsBestEffort()" in instrumented,
         )
         assertTrue(
             "completion must be fenced by account, runtime, and network generation",
-            "activeAccountRef == key.accountRef" in body &&
-                "runtimeGeneration == key.runtimeGeneration" in body &&
-                "connectivitySignalOwner.isNetworkGenerationCurrent(key.networkGeneration)" in body,
+            "performAccountCatchUp(key, trigger)" in body &&
+                "isCatchUpKeyCurrent(key)" in admitted,
         )
     }
 
@@ -369,10 +370,14 @@ class AccountSwitchLocalSnapshotOrderingTest {
         )
         val localUiState = body.indexOf("reloadMediaAutoDownloadMatrix()", startIndex = activeRef)
         val activated = body.indexOf("onActivated()", startIndex = localUiState)
-        val profile = body.indexOf("warmProfile(it)", startIndex = activated)
-        val privacy = body.indexOf("configurePrivacyRuntime()", startIndex = activated)
-        val notifications = body.indexOf("refreshLocalNotificationSettings()", startIndex = activated)
-        val push = body.indexOf("syncNativePushRegistrationIfEnabled()", startIndex = activated)
+        val refresh = body.indexOf("refreshActivatedAccount(", startIndex = activated)
+        val refreshBody = source.kotlinFunctionBody("refreshActivatedAccount")
+        val currentGuard = refreshBody.indexOf("if (!isCurrent()) return")
+        assertTrue("the refresh boundary must contain its stale-owner guard", currentGuard >= 0)
+        val profile = refreshBody.indexOf("warmProfile(it)", startIndex = currentGuard)
+        val privacy = refreshBody.indexOf("configurePrivacyRuntime()", startIndex = profile)
+        val notifications = refreshBody.indexOf("refreshLocalNotificationSettings()", startIndex = privacy)
+        val push = refreshBody.indexOf("reconcileNotificationDeliveryModeAfterActivation", startIndex = notifications)
 
         assertTrue(
             "a stale route must be rejected before the active account is published",
@@ -383,10 +388,11 @@ class AccountSwitchLocalSnapshotOrderingTest {
             activeRef >= 0 && localUiState > activeRef,
         )
         assertTrue("the activation callback must follow local account UI state", activated > localUiState)
+        assertTrue("post-activation refresh must follow the activation callback", refresh > activated)
         listOf(profile, privacy, notifications, push).forEach { postSwitchIndex ->
             assertTrue(
-                "network/best-effort switch work must follow the activation callback",
-                postSwitchIndex > activated,
+                "network/best-effort switch work must follow its stale-owner guard",
+                postSwitchIndex > currentGuard,
             )
         }
     }
@@ -401,12 +407,13 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val policyElse = body.indexOf("} else {", startIndex = rowGate)
         val activated = body.indexOf("onActivated()")
         val firstFrameGate = body.indexOf("awaitPostActivationWork()", startIndex = activated)
+        val refreshCall = body.indexOf("refreshActivatedAccount(", startIndex = firstFrameGate)
+        val refreshBody = appStateSource().readText().kotlinFunctionBody("refreshActivatedAccount")
         val staleGuard =
-            body.indexOf(
+            refreshBody.indexOf(
                 "isCurrentPostActivationAccountSwitch(label, requestGeneration)",
-                startIndex = firstFrameGate,
             )
-        val profile = body.indexOf("warmProfile(it)", startIndex = staleGuard)
+        val profile = refreshBody.indexOf("warmProfile(it)", startIndex = staleGuard)
 
         assertTrue(
             "only ordinary switches may load the broad local snapshot",
@@ -417,9 +424,8 @@ class AccountSwitchLocalSnapshotOrderingTest {
             policyGate >= 0 && rowGate > policyGate && broadSnapshot > rowGate && policyElse > broadSnapshot,
         )
         assertTrue("the target account must activate before waiting for its readable frame", firstFrameGate > activated)
-        val refreshCall = body.indexOf("refreshActivatedAccount(label, requestGeneration, activationRuntimeGeneration)")
         assertTrue("refreshes must wait for the target frame", refreshCall > firstFrameGate)
-        assertTrue("superseded deferred work must be rejected after the wait", staleGuard > refreshCall)
+        assertTrue("superseded deferred work must be rejected inside the refresh boundary", staleGuard >= 0)
         assertTrue("profile warming must stay outside the target first-frame path", profile > staleGuard)
     }
 

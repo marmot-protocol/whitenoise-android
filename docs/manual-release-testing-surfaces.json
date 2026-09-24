@@ -1929,7 +1929,7 @@
         "anchor": "fun TextEntryEmojiAction(",
         "test_ids": [
           "AXY-001",
-          "CON-019"
+          "CON-020"
         ]
       },
       {
@@ -2166,6 +2166,12 @@
         ]
       },
       {
+        "surface": "RandomProfileNameButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/RandomProfileNameButton.kt",
+        "anchor": "fun RandomProfileNameButton(",
+        "test_ids": ["ONB-025", "PRO-001"]
+      },
+      {
         "surface": "WhiteNoiseTextField",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTextField.kt",
         "anchor": "fun WhiteNoiseTextField(",
@@ -2390,8 +2396,14 @@
         ]
       },
       {
+        "surface": "WaveHiButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": "private fun WaveHiButton(",
+        "test_ids": ["CON-019"]
+      },
+      {
         "surface": "GroupSystemRow",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationRows.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
         "anchor": "fun GroupSystemRow(",
         "test_ids": [
           "CON-001"
@@ -2781,7 +2793,7 @@
         "anchor": "fun ComposerActionDisc(",
         "test_ids": [
           "CON-001",
-          "CON-019"
+          "CON-020"
         ]
       },
       {
@@ -2800,7 +2812,7 @@
           "CON-001",
           "CON-005",
           "CON-017",
-          "CON-019",
+          "CON-020",
           "DIC-001",
           "DIC-002",
           "DIC-003"
@@ -2822,7 +2834,7 @@
           "CON-001",
           "CON-005",
           "CON-007",
-          "CON-019"
+          "CON-020"
         ]
       },
       {
@@ -5076,7 +5088,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/design/KeyboardSafePopup.kt",
         "anchor": "fun KeyboardSafePopup(",
         "test_ids": [
-          "INT-001"
+          "INT-001",
+          "MSG-004"
         ]
       },
       {
@@ -5992,7 +6005,8 @@
         "anchor": "fun SignUpContent(",
         "test_ids": [
           "ONB-002",
-          "ONB-003"
+          "ONB-003",
+          "ONB-025"
         ]
       },
       {
@@ -6001,7 +6015,8 @@
         "anchor": "fun SignUpScreen(",
         "test_ids": [
           "ONB-002",
-          "ONB-003"
+          "ONB-003",
+          "ONB-025"
         ]
       },
       {
@@ -6287,7 +6302,8 @@
           "ONB-018",
           "ONB-019",
           "ONB-021",
-          "ONB-023"
+          "ONB-023",
+          "ONB-025"
         ]
       },
       {
@@ -6473,7 +6489,8 @@
         "anchor": "fun ProfileEditContent(",
         "test_ids": [
           "PRO-001",
-          "PRO-002"
+          "PRO-002",
+          "ONB-025"
         ]
       },
       {
@@ -7493,6 +7510,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "fun PerformanceDiagnosticsGroup(",
         "test_ids": [
+          "NTF-024",
           "SET-020",
           "SET-021"
         ]
@@ -7832,14 +7850,6 @@
         ]
       },
       {
-        "surface": "NativePushSettingRow",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
-        "anchor": "fun NativePushSettingRow(",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
         "surface": "NotificationPermissionGroup",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
         "anchor": "fun NotificationPermissionGroup(",
@@ -7860,7 +7870,12 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
         "anchor": "fun NotificationsScreen(",
         "test_ids": [
-          "SET-001"
+          "NTF-001",
+          "NTF-002",
+          "NTF-003",
+          "NTF-004",
+          "NTF-005",
+          "NTF-023"
         ]
       },
       {
@@ -8628,6 +8643,26 @@
         "anchor": "fun rememberedMessageBubbleTime(",
         "test_ids": [
           "CON-018"
+        ]
+      },
+      {
+        "surface": "NotificationDeliverySelector",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "fun NotificationDeliverySelector(",
+        "test_ids": [
+          "NTF-002",
+          "NTF-003",
+          "NTF-004",
+          "NTF-022"
+        ]
+      },
+      {
+        "surface": "NotificationDevicePolicyGroup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "fun NotificationDevicePolicyGroup(",
+        "test_ids": [
+          "NTF-001",
+          "NTF-023"
         ]
       }
     ],
@@ -15874,11 +15909,11 @@
       },
       {
         "surface": "string:profile_suggest_name",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditContent.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/RandomProfileNameButton.kt",
         "anchor": "R.string.profile_suggest_name",
         "test_ids": [
           "PRO-001",
-          "PRO-002"
+          "ONB-025"
         ]
       },
       {
@@ -19053,6 +19088,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.accounts",
         "test_ids": [
+          "NTF-024",
+          "SET-020",
           "SET-021"
         ]
       },
@@ -19061,6 +19098,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.actions",
         "test_ids": [
+          "NTF-024",
+          "SET-020",
           "SET-021"
         ]
       },
@@ -19069,6 +19108,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.active_account",
         "test_ids": [
+          "NTF-024",
+          "SET-020",
           "SET-021"
         ]
       },
@@ -19077,6 +19118,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.attempts",
         "test_ids": [
+          "NTF-024",
+          "SET-020",
           "SET-021"
         ]
       },
@@ -19085,6 +19128,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.bootstrap_relays",
         "test_ids": [
+          "NTF-024",
+          "SET-020",
           "SET-021"
         ]
       },
@@ -19093,6 +19138,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.clear",
         "test_ids": [
+          "NTF-024",
+          "SET-020",
           "SET-021"
         ]
       },
@@ -19101,6 +19148,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.connected",
         "test_ids": [
+          "NTF-024",
+          "SET-020",
           "SET-021"
         ]
       },
@@ -19109,6 +19158,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.connecting",
         "test_ids": [
+          "NTF-024",
+          "SET-020",
           "SET-021"
         ]
       },
@@ -19117,6 +19168,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.copy",
         "test_ids": [
+          "NTF-024",
+          "SET-020",
           "SET-021"
         ]
       },
@@ -19125,6 +19178,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.diagnostic_send_to_self_failed",
         "test_ids": [
+          "NTF-024",
+          "SET-020",
           "SET-021"
         ]
       },
@@ -19133,6 +19188,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.diagnostic_sent_ping_to_self",
         "test_ids": [
+          "NTF-024",
+          "SET-020",
           "SET-021"
         ]
       },
@@ -19141,6 +19198,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.diagnostics",
         "test_ids": [
+          "NTF-024",
+          "SET-020",
           "SET-021"
         ]
       },
@@ -19149,6 +19208,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.diagnostics_events",
         "test_ids": [
+          "NTF-024",
+          "SET-020",
           "SET-021"
         ]
       },
@@ -19157,6 +19218,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.diagnostics_health",
         "test_ids": [
+          "NTF-024",
+          "SET-020",
           "SET-021"
         ]
       },
@@ -19165,6 +19228,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.diagnostics_no_events",
         "test_ids": [
+          "NTF-024",
+          "SET-020",
           "SET-021"
         ]
       },
@@ -19173,6 +19238,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.disconnected",
         "test_ids": [
+          "NTF-024",
+          "SET-020",
           "SET-021"
         ]
       },
@@ -19181,6 +19248,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.idle",
         "test_ids": [
+          "NTF-024",
+          "SET-020",
           "SET-021"
         ]
       },
@@ -19189,6 +19258,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.live",
         "test_ids": [
+          "NTF-024",
+          "SET-020",
           "SET-021"
         ]
       },
@@ -19197,6 +19268,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.no_relay_snapshot_yet",
         "test_ids": [
+          "NTF-024",
+          "SET-020",
           "SET-021"
         ]
       },
@@ -19205,6 +19278,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.none",
         "test_ids": [
+          "NTF-024",
+          "SET-020",
           "SET-021"
         ]
       },
@@ -19213,6 +19288,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.performance_logs",
         "test_ids": [
+          "NTF-024",
+          "SET-020",
           "SET-021"
         ]
       },
@@ -19221,6 +19298,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.performance_logs_active",
         "test_ids": [
+          "NTF-024",
+          "SET-020",
           "SET-021"
         ]
       },
@@ -19229,6 +19308,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.performance_logs_description",
         "test_ids": [
+          "NTF-024",
+          "SET-020",
           "SET-021"
         ]
       },
@@ -19237,6 +19318,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.performance_logs_inactive",
         "test_ids": [
+          "NTF-024",
+          "SET-020",
           "SET-021"
         ]
       },
@@ -19245,23 +19328,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.refresh",
         "test_ids": [
+          "NTF-024",
+          "SET-020",
           "SET-021"
-        ]
-      },
-      {
-        "surface": "setting:relay_health",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
-        "anchor": "R.string.relay_health",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "setting:runtime",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
-        "anchor": "R.string.runtime",
-        "test_ids": [
-          "SET-001"
         ]
       },
       {
@@ -19269,6 +19338,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.send_to_self",
         "test_ids": [
+          "NTF-024",
+          "SET-020",
           "SET-021"
         ]
       },
@@ -19277,6 +19348,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.successes",
         "test_ids": [
+          "NTF-024",
+          "SET-020",
           "SET-021"
         ]
       },
@@ -19285,6 +19358,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.total",
         "test_ids": [
+          "NTF-024",
+          "SET-020",
           "SET-021"
         ]
       },
@@ -19293,6 +19368,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.waiting_for_events",
         "test_ids": [
+          "NTF-024",
+          "SET-020",
           "SET-021"
         ]
       },
@@ -20349,7 +20426,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
         "anchor": "R.string.allow_notifications",
         "test_ids": [
-          "SET-001"
+          "NTF-001",
+          "NTF-023"
         ]
       },
       {
@@ -20357,7 +20435,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
         "anchor": "R.string.allow_notifications_detail",
         "test_ids": [
-          "SET-001"
+          "NTF-001",
+          "NTF-023"
         ]
       },
       {
@@ -20365,162 +20444,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
         "anchor": "R.string.delivery",
         "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "setting:keep_connected",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
-        "anchor": "R.string.keep_connected",
-        "test_ids": [
-          "NTF-001",
           "NTF-002",
           "NTF-003",
-          "NTF-004",
-          "NTF-005",
-          "NTF-006",
-          "NTF-007",
-          "NTF-008",
-          "NTF-009",
-          "NTF-010",
-          "NTF-011",
-          "NTF-012",
-          "NTF-013",
-          "NTF-014",
-          "NTF-015",
-          "NTF-016",
-          "NTF-017",
-          "NTF-018"
-        ]
-      },
-      {
-        "surface": "string:keep_connected_in_background",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
-        "anchor": "R.string.keep_connected_in_background",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "string:keep_connected_in_background_detail",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
-        "anchor": "R.string.keep_connected_in_background_detail",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "setting:local_notifications",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
-        "anchor": "R.string.local_notifications",
-        "test_ids": [
-          "NTF-001",
-          "NTF-002",
-          "NTF-003",
-          "NTF-004",
-          "NTF-005",
-          "NTF-006",
-          "NTF-007",
-          "NTF-008",
-          "NTF-009",
-          "NTF-010",
-          "NTF-011",
-          "NTF-012",
-          "NTF-013",
-          "NTF-014",
-          "NTF-015",
-          "NTF-016",
-          "NTF-017",
-          "NTF-018"
-        ]
-      },
-      {
-        "surface": "string:local_notifications_detail",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
-        "anchor": "R.string.local_notifications_detail",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "setting:native_push",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
-        "anchor": "R.string.native_push",
-        "test_ids": [
-          "NTF-001",
-          "NTF-002",
-          "NTF-003",
-          "NTF-004",
-          "NTF-005",
-          "NTF-006",
-          "NTF-007",
-          "NTF-008",
-          "NTF-009",
-          "NTF-010",
-          "NTF-011",
-          "NTF-012",
-          "NTF-013",
-          "NTF-014",
-          "NTF-015",
-          "NTF-016",
-          "NTF-017",
-          "NTF-018"
-        ]
-      },
-      {
-        "surface": "setting:native_push_firebase_unavailable_subtitle",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
-        "anchor": "R.string.native_push_firebase_unavailable_subtitle",
-        "test_ids": [
-          "NTF-004"
-        ]
-      },
-      {
-        "surface": "setting:native_push_google_play_unavailable_subtitle",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
-        "anchor": "R.string.native_push_google_play_unavailable_subtitle",
-        "test_ids": [
-          "NTF-004"
-        ]
-      },
-      {
-        "surface": "setting:native_push_missing_server_subtitle",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
-        "anchor": "R.string.native_push_missing_server_subtitle",
-        "test_ids": [
-          "NTF-004"
-        ]
-      },
-      {
-        "surface": "setting:native_push_subtitle",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
-        "anchor": "R.string.native_push_subtitle",
-        "test_ids": [
-          "NTF-004"
-        ]
-      },
-      {
-        "surface": "string:native_push_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
-        "anchor": "R.string.native_push_title",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "string:notification_background_off",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
-        "anchor": "R.string.notification_background_off",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "string:notification_background_on",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
-        "anchor": "R.string.notification_background_on",
-        "test_ids": [
-          "SET-001"
+          "NTF-022"
         ]
       },
       {
@@ -20544,7 +20470,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
         "anchor": "R.string.notification_channel_agent_activity",
         "test_ids": [
-          "SET-001"
+          "NTF-005"
         ]
       },
       {
@@ -20552,7 +20478,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
         "anchor": "R.string.notification_channel_app_updates",
         "test_ids": [
-          "SET-001"
+          "NTF-005"
         ]
       },
       {
@@ -20560,7 +20486,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
         "anchor": "R.string.notification_channel_direct_messages",
         "test_ids": [
-          "SET-001"
+          "NTF-005"
         ]
       },
       {
@@ -20568,7 +20494,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
         "anchor": "R.string.notification_channel_group_membership",
         "test_ids": [
-          "SET-001"
+          "NTF-005"
         ]
       },
       {
@@ -20576,7 +20502,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
         "anchor": "R.string.notification_channel_group_messages",
         "test_ids": [
-          "SET-001"
+          "NTF-005"
         ]
       },
       {
@@ -20584,7 +20510,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
         "anchor": "R.string.notification_channel_invites",
         "test_ids": [
-          "SET-001"
+          "NTF-005"
         ]
       },
       {
@@ -20592,7 +20518,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
         "anchor": "R.string.notification_channel_mentions",
         "test_ids": [
-          "SET-001"
+          "NTF-005"
         ]
       },
       {
@@ -20600,15 +20526,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
         "anchor": "R.string.notification_channel_reactions",
         "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "string:notification_push_detail",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
-        "anchor": "R.string.notification_push_detail",
-        "test_ids": [
-          "SET-001"
+          "NTF-005"
         ]
       },
       {
@@ -20624,7 +20542,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
         "anchor": "R.string.notifications_are_off",
         "test_ids": [
-          "SET-001"
+          "NTF-001",
+          "NTF-023"
         ]
       },
       {
@@ -20632,7 +20551,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
         "anchor": "R.string.notifications_are_off_detail",
         "test_ids": [
-          "SET-001"
+          "NTF-001",
+          "NTF-023"
         ]
       },
       {
@@ -20640,7 +20560,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
         "anchor": "R.string.toast_notification_permission_denied",
         "test_ids": [
-          "SET-001"
+          "NTF-001",
+          "NTF-023"
         ]
       },
       {
@@ -22418,6 +22339,205 @@
           "SEC-012",
           "SEC-013"
         ]
+      },
+      {
+        "surface": "string:copy_performance_logs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.copy_performance_logs",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:copy_performance_logs_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.copy_performance_logs_detail",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:relay_health",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.relay_health",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:runtime",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.runtime",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:local_notifications",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.local_notifications",
+        "test_ids": [
+          "NTF-002",
+          "NTF-003",
+          "NTF-022"
+        ]
+      },
+      {
+        "surface": "string:native_push_firebase_unavailable_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.native_push_firebase_unavailable_subtitle",
+        "test_ids": [
+          "NTF-004",
+          "NTF-022"
+        ]
+      },
+      {
+        "surface": "string:native_push_google_play_unavailable_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.native_push_google_play_unavailable_subtitle",
+        "test_ids": [
+          "NTF-004",
+          "NTF-022"
+        ]
+      },
+      {
+        "surface": "string:native_push_missing_server_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.native_push_missing_server_subtitle",
+        "test_ids": [
+          "NTF-004",
+          "NTF-022"
+        ]
+      },
+      {
+        "surface": "string:native_push_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.native_push_subtitle",
+        "test_ids": [
+          "NTF-004",
+          "NTF-022"
+        ]
+      },
+      {
+        "surface": "string:notification_battery_optimized",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_battery_optimized",
+        "test_ids": [
+          "NTF-023"
+        ]
+      },
+      {
+        "surface": "string:notification_battery_policy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_battery_policy",
+        "test_ids": [
+          "NTF-023"
+        ]
+      },
+      {
+        "surface": "string:notification_battery_restricted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_battery_restricted",
+        "test_ids": [
+          "NTF-023"
+        ]
+      },
+      {
+        "surface": "string:notification_battery_unknown",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_battery_unknown",
+        "test_ids": [
+          "NTF-023"
+        ]
+      },
+      {
+        "surface": "string:notification_battery_unrestricted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_battery_unrestricted",
+        "test_ids": [
+          "NTF-023"
+        ]
+      },
+      {
+        "surface": "string:notification_delivery_local_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_delivery_local_detail",
+        "test_ids": [
+          "NTF-002",
+          "NTF-003",
+          "NTF-022"
+        ]
+      },
+      {
+        "surface": "string:notification_delivery_push",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_delivery_push",
+        "test_ids": [
+          "NTF-002",
+          "NTF-003",
+          "NTF-022"
+        ]
+      },
+      {
+        "surface": "string:notification_delivery_push_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_delivery_push_detail",
+        "test_ids": [
+          "NTF-002",
+          "NTF-003",
+          "NTF-022"
+        ]
+      },
+      {
+        "surface": "string:notification_device_policy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_device_policy",
+        "test_ids": [
+          "NTF-023"
+        ]
+      },
+      {
+        "surface": "string:notification_device_policy_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_device_policy_detail",
+        "test_ids": [
+          "NTF-023"
+        ]
+      },
+      {
+        "surface": "string:notification_permission_allowed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_permission_allowed",
+        "test_ids": [
+          "NTF-001",
+          "NTF-023"
+        ]
+      },
+      {
+        "surface": "string:notification_permission_blocked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_permission_blocked",
+        "test_ids": [
+          "NTF-001",
+          "NTF-023"
+        ]
+      },
+      {
+        "surface": "string:notification_permission_status",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_permission_status",
+        "test_ids": [
+          "NTF-001",
+          "NTF-023"
+        ]
       }
     ],
     "manifest_permissions": [
@@ -22696,7 +22816,9 @@
         "test_ids": [
           "NTF-002",
           "NTF-003",
-          "NTF-006"
+          "NTF-006",
+          "NTF-019",
+          "NTF-020"
         ]
       },
       {
@@ -24370,6 +24492,36 @@
         ]
       },
       {
+        "surface": "Group-system show details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": "R.string.group_system_show_details",
+        "test_ids": ["SET-020"]
+      },
+      {
+        "surface": "Group-system hide details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": "R.string.group_system_hide_details",
+        "test_ids": ["SET-020"]
+      },
+      {
+        "surface": "Delete for me on a group-system row",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": "R.string.delete_for_me",
+        "test_ids": ["MSG-008"]
+      },
+      {
+        "surface": "Wave hi greets the added member from an authenticated group-system row",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": "R.string.wave_hi",
+        "test_ids": ["CON-019"]
+      },
+      {
+        "surface": "Wave sends a mention without changing the composer draft",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "onWave =",
+        "test_ids": ["CON-019"]
+      },
+      {
         "surface": "An empty conversation explains its disappearing-message policy without claiming history was lost",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationEmptyState.kt",
         "anchor": "internal fun conversationEmptyState(",
@@ -24514,7 +24666,7 @@
         "anchor": "R.string.cancel_edit",
         "test_ids": [
           "MSG-007",
-          "CON-019"
+          "CON-020"
         ]
       },
       {
@@ -24524,7 +24676,7 @@
         "test_ids": [
           "MSG-004",
           "MSG-007",
-          "CON-019"
+          "CON-020"
         ]
       },
       {
@@ -26507,9 +26659,113 @@
           "NAV-006",
           "NAV-005"
         ]
+      },
+      {
+        "surface": "Durable push recovery callbacks",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/MarmotFirebaseMessagingService.kt",
+        "anchor": "override fun onDeletedMessages()",
+        "test_ids": [
+          "NTF-019",
+          "NTF-020"
+        ]
+      },
+      {
+        "surface": "Live notification battery policy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationBatteryPolicy.kt",
+        "anchor": "internal fun readNotificationBatteryPolicy(",
+        "test_ids": [
+          "NTF-023"
+        ]
+      },
+      {
+        "surface": "Per-callback anonymous push diagnostics",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/PushWakeDiagnostics.kt",
+        "anchor": "internal object PushWakeDiagnostics",
+        "test_ids": [
+          "NTF-024"
+        ]
+      },
+      {
+        "surface": "Generation-aware push recovery work",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/PushWakeRecoveryWorker.kt",
+        "anchor": "override suspend fun doWork()",
+        "test_ids": [
+          "NTF-020",
+          "NTF-021"
+        ]
+      },
+      {
+        "surface": "Single notification delivery mode and safe cutover",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "internal suspend fun setNotificationDeliveryMode(",
+        "test_ids": [
+          "NTF-002",
+          "NTF-003",
+          "NTF-022"
+        ]
+      },
+      {
+        "surface": "Notification permission feedback for delivery-mode activation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.toast_notification_permission_needed",
+        "test_ids": [
+          "NTF-001",
+          "NTF-002",
+          "NTF-022"
+        ]
+      },
+      {
+        "surface": "Battery-policy settings launch failure feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.toast_notification_settings_unavailable",
+        "test_ids": [
+          "NTF-004"
+        ]
+      },
+      {
+        "surface": "Notification rendering repair failure feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.toast_couldnt_enable_notifications",
+        "test_ids": [
+          "NTF-001",
+          "NTF-002",
+          "NTF-022"
+        ]
       }
     ],
     "notification_content_contracts": [
+      {
+        "surface": "conversation-specific signed-in recipient relevance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationRecipientRelevance.kt",
+        "anchor": "internal fun relevantSignedInRecipientCount(",
+        "test_ids": [
+          "NTF-025"
+        ]
+      },
+      {
+        "surface": "silent active-card contact nickname reconciliation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "suspend fun refreshContactSenderName(",
+        "test_ids": [
+          "NTF-025"
+        ]
+      },
+      {
+        "surface": "group notification sender title refresh",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "R.string.notification_sender_in_group",
+        "test_ids": [
+          "NTF-025"
+        ]
+      },
+      {
+        "surface": "bounded conversation-open notification cancellation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "suspend fun dismissConversationMessages(",
+        "test_ids": [
+          "NTF-025"
+        ]
+      },
       {
         "surface": "Compose-free notification preview",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownPreviewText.kt",

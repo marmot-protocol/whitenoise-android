@@ -73,6 +73,7 @@ internal enum class AccountCatchUpOutcome {
 internal data class AccountCatchUpResult(
     val outcome: AccountCatchUpOutcome,
     val startSequence: Long? = null,
+    val key: AccountCatchUpKey? = null,
 ) {
     /** True only when the request executed successfully rather than failing or being coalesced. */
     val succeeded: Boolean
@@ -109,7 +110,7 @@ internal suspend fun awaitCatchUpAfterSupersession(
 internal suspend fun runCatchUpAfterTrigger(
     observedStartSequence: Long,
     launchAfter: (Long) -> Deferred<AccountCatchUpResult>,
-    onSucceeded: () -> Unit,
+    onSucceeded: suspend (AccountCatchUpResult) -> Boolean,
     maxSupersededReplacements: Int = CATCH_UP_MAX_SUPERSEDED_REPLACEMENTS,
 ): AccountCatchUpResult {
     val result =
@@ -119,7 +120,7 @@ internal suspend fun runCatchUpAfterTrigger(
             launchReplacement = { launchAfter(observedStartSequence).await() },
         )
     if (result.succeeded && result.startSequence?.let { it > observedStartSequence } == true) {
-        onSucceeded()
+        if (!onSucceeded(result)) return result.copy(outcome = AccountCatchUpOutcome.Failed)
     }
     return result
 }
@@ -214,6 +215,7 @@ internal class AccountCatchUpCoordinator(
                             AccountCatchUpResult(
                                 if (succeeded) AccountCatchUpOutcome.Succeeded else AccountCatchUpOutcome.Failed,
                                 startSequence = startSequence,
+                                key = request.key,
                             ),
                         )
                     }.onFailure { request.result.completeExceptionally(it) }

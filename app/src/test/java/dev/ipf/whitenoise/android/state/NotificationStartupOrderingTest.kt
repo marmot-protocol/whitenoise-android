@@ -109,6 +109,7 @@ class NotificationStartupOrderingTest {
                     notificationReceiverHasDisplayName = true,
                     previewText = "**ready on first draw**",
                     accounts = accounts,
+                    groupMemberAccountRefs = setOf("account-b"),
                 )
             try {
                 withNotificationWriteCount { writes ->
@@ -155,6 +156,7 @@ class NotificationStartupOrderingTest {
                 withNotificationWriteCount { writes ->
                     fixture.bootstrap()
                     fixture.awaitNotificationPosted()
+                    awaitWrites(writes, expected = 1)
 
                     assertEquals(
                         "already final",
@@ -334,18 +336,9 @@ class NotificationStartupOrderingTest {
     fun accountCacheLifetimeChangeAtTheFinalWriteBoundaryRejectsLateCorrection() =
         runBlocking {
             assertLateCorrectionRejectedAtFinalWrite(
-                accounts =
-                    listOf(
-                        signingAccount("account-a", "self"),
-                        signingAccount("account-b", "other-self"),
-                    ),
+                accounts = listOf(signingAccount("account-a", "self")),
             ) { fixture ->
-                assertTrue(
-                    fixture.appState.setActiveAccount(
-                        label = "account-b",
-                        preloadPolicy = AccountSwitchPreloadPolicy.TARGET_CONVERSATION_FIRST,
-                    ),
-                )
+                fixture.appState.clearCrossAccountCachesForTest()
             }
         }
 
@@ -674,6 +667,7 @@ class NotificationStartupOrderingTest {
             }
         }
 
+    /** A background retry preserves the actionable failure while later receiver recovery keeps a realistic timeout. */
     @Test
     fun backgroundRetryCannotReplaceAnActionableBootstrapFailureWithLoading() =
         runBlocking {
@@ -681,6 +675,7 @@ class NotificationStartupOrderingTest {
                 NotificationBootstrapTestFixture(
                     context = context,
                     initiallyBlockRuntimeStartSynchronously = true,
+                    receiverTimeoutMillis = 5_000L,
                     bootstrapActionableTimeoutMillis = 100L,
                 )
             try {

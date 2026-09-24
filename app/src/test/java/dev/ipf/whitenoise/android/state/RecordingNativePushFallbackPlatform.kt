@@ -11,10 +11,12 @@ internal class RecordingNativePushFallbackPlatform(
     private val persistResults: ArrayDeque<Boolean> = ArrayDeque(),
     private val startResults: ArrayDeque<Boolean> = ArrayDeque(),
     private val clearResults: ArrayDeque<Boolean> = ArrayDeque(),
+    private val stopResults: ArrayDeque<Boolean> = ArrayDeque(),
     private val beforePersist: () -> Unit = {},
     private val beforeClear: () -> Unit = {},
 ) : NativePushFallbackPlatform {
     val starts = mutableListOf<Long>()
+    val stops = AtomicInteger()
     private val persistCallCount = AtomicInteger()
     private val clearCallCount = AtomicInteger()
 
@@ -24,12 +26,15 @@ internal class RecordingNativePushFallbackPlatform(
     val clearCalls: Int
         get() = clearCallCount.get()
 
-    override fun persistBackgroundConnectionEnabled(isStillDesired: () -> Boolean): Boolean {
+    override fun persistBackgroundConnectionEnabled(
+        enabled: Boolean,
+        isStillDesired: () -> Boolean,
+    ): Boolean {
         persistCallCount.incrementAndGet()
         beforePersist()
         val result = persistResults.removeFirstOrNull() ?: true
         return if (result) {
-            BackgroundConnectionPreferences.setEnabledDurablyIf(context, true, isStillDesired)
+            BackgroundConnectionPreferences.setEnabledDurablyIf(context, enabled, isStillDesired)
         } else {
             if (!isStillDesired()) return false
             // SharedPreferences may expose the new in-memory value even when
@@ -37,7 +42,7 @@ internal class RecordingNativePushFallbackPlatform(
             context
                 .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
                 .edit()
-                .putBoolean("background_connection_enabled", true)
+                .putBoolean("background_connection_enabled", enabled)
                 .apply()
             false
         }
@@ -46,6 +51,11 @@ internal class RecordingNativePushFallbackPlatform(
     override fun startBackgroundConnection(requestGeneration: Long): Boolean {
         starts += requestGeneration
         return startResults.removeFirstOrNull() ?: true
+    }
+
+    override fun stopBackgroundConnection(): Boolean {
+        stops.incrementAndGet()
+        return stopResults.removeFirstOrNull() ?: true
     }
 
     override fun recordPendingRegistrationClear(accountRef: String): Boolean {

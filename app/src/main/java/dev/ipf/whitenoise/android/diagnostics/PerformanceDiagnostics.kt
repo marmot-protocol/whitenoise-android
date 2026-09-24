@@ -18,6 +18,7 @@ private fun sanitizePerformanceRevision(value: String): String =
 internal enum class PerformanceOperation(
     val wireName: String,
 ) {
+    PUSH_RECOVERY("push_recovery"),
     APP_START("app_start"),
     CHAT_OPEN("chat_open"),
     CHAT_LIST_REFRESH("chat_list_refresh"),
@@ -47,6 +48,27 @@ internal enum class PerformancePhase(
     val wireName: String,
     val minimumDurationMs: Long = 0L,
 ) {
+    PUSH_RECEIVED_HIGH("push_received_high"),
+    PUSH_RECEIVED_NORMAL("push_received_normal"),
+    PUSH_RECEIVED_UNKNOWN("push_received_unknown"),
+    PUSH_ORIGINAL_HIGH("push_original_high"),
+    PUSH_ORIGINAL_NORMAL("push_original_normal"),
+    PUSH_ORIGINAL_UNKNOWN("push_original_unknown"),
+    PUSH_DELETED("push_deleted"),
+    PUSH_OWNER_ACCEPTED("push_owner_accepted"),
+    PUSH_SERVICE_ACCEPTED("push_service_accepted"),
+    PUSH_SERVICE_STARTED("push_service_started"),
+    PUSH_SCHEDULED("push_scheduled"),
+    PUSH_SCHEDULE_FAILED("push_schedule_failed"),
+    PUSH_PERSISTENCE_FAILED("push_persistence_failed"),
+    PUSH_WORKER_STARTED("push_worker_started"),
+    PUSH_ATTEMPT_STARTED("push_attempt_started"),
+    PUSH_ATTEMPT_FAILED("push_attempt_failed"),
+    PUSH_ATTEMPT_SUCCEEDED("push_attempt_succeeded"),
+    PUSH_CANDIDATE("push_candidate"),
+    PUSH_POSTED("push_posted"),
+    PUSH_SUPPRESSED("push_suppressed"),
+    PUSH_INCOMPLETE("push_incomplete"),
     NOTIFICATION_PLATFORM_SETUP("notification_platform_setup", ROUTINE_SPAN_THRESHOLD_MS),
     ACCOUNT_REFRESH("account_refresh", ROUTINE_SPAN_THRESHOLD_MS),
     DRAFT_RECONCILIATION("draft_reconciliation", ROUTINE_SPAN_THRESHOLD_MS),
@@ -211,6 +233,29 @@ internal data class PerformanceDiagnosticStatus(
     }
 }
 
+/** Retains only the current session's already-sanitized lines beside the developer log sink. */
+internal class PerformanceDiagnosticOutput(
+    private val sink: (String) -> Unit,
+) {
+    private val retainedLines = ArrayDeque<String>()
+
+    /** Publishes one line while enforcing the same hard cap as the diagnostic session. */
+    @Synchronized
+    fun emit(line: String) {
+        sink(line)
+        if (retainedLines.size == PerformanceDiagnosticEmitter.SESSION_EVENT_LIMIT) retainedLines.removeFirst()
+        retainedLines.addLast(line)
+    }
+
+    /** Drops the previous session before a new explicit opt-in begins. */
+    @Synchronized
+    fun clear() = retainedLines.clear()
+
+    /** Returns a stable copy for an explicit in-app support action. */
+    @Synchronized
+    fun snapshot(): List<String> = retainedLines.toList()
+}
+
 /**
  * Pure bounded emitter used by [PerformanceDiagnostics]. Event inputs are
  * limited to enums and bounded numbers; source revisions are compile-time
@@ -222,10 +267,11 @@ internal class PerformanceDiagnosticEmitter(
     appRevision: String,
     mdkRevision: String,
     private val nowMs: () -> Long,
-    private val sink: (String) -> Unit,
+    sink: (String) -> Unit,
 ) {
     private val appRevision = sanitizePerformanceRevision(appRevision)
     private val mdkRevision = sanitizePerformanceRevision(mdkRevision)
+    internal val output = PerformanceDiagnosticOutput(sink)
     private var activeUntilMs = 0L
     private var sessionStartedAtMs = 0L
     private var emittedCount = 0
@@ -248,6 +294,7 @@ internal class PerformanceDiagnosticEmitter(
             droppedCount = 0
             lastTrace = null
             droppedSummaryEmitted = false
+            output.clear()
         }
         return statusAt(now)
     }
@@ -319,7 +366,7 @@ internal class PerformanceDiagnosticEmitter(
         if (emittedCount >= DATA_EVENT_LIMIT) {
             droppedCount = (droppedCount + 1).coerceAtMost(NUMERIC_COUNT_LIMIT)
         } else {
-            sink(
+            output.emit(
                 formatLine(
                     trace = currentTrace,
                     phase = phase,
@@ -365,6 +412,10 @@ internal class PerformanceDiagnosticEmitter(
             append(trace.sessionGeneration)
             append(" op=")
             append(trace.operation.wireName)
+            if (trace.operation == PerformanceOperation.PUSH_RECOVERY) {
+                append(" recovery=r#")
+                append(trace.operationId)
+            }
             trace.trigger?.let {
                 append(" trigger=")
                 append(it.wireName)
@@ -420,7 +471,7 @@ internal class PerformanceDiagnosticEmitter(
         val trace = lastTrace
         if (droppedCount > 0 && !droppedSummaryEmitted) {
             if (trace != null && emittedCount < SESSION_EVENT_LIMIT) {
-                sink(
+                output.emit(
                     formatLine(
                         trace = trace,
                         phase = PerformancePhase.EVENTS_DROPPED,
@@ -472,7 +523,7 @@ internal class PerformanceDiagnosticEmitter(
     }
 }
 
-/** Process-local facade. It has no disk, preference, clipboard, or network sink. */
+/** Process-local facade. It has no disk, preference, or network sink. */
 internal object PerformanceDiagnostics {
     private val emitter =
         PerformanceDiagnosticEmitter(
@@ -498,6 +549,9 @@ internal object PerformanceDiagnostics {
 
     /** Returns availability, activity, remaining duration, and bounded event counters. */
     fun status(): PerformanceDiagnosticStatus = emitter.status()
+
+    /** Supplies bounded sanitized evidence to the explicit in-app support copy action. */
+    fun exportLines(): List<String> = emitter.output.snapshot()
 
     /** Indicates whether a local diagnostic session currently accepts events. */
     fun isActive(): Boolean = status().active
