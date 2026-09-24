@@ -25,7 +25,7 @@ class WindowApplyPreparationTest {
     fun commitRecheckPreservesPendingProjectionBridge() {
         val id = "aa".repeat(32)
         val held = timelineRecord(id, 1uL, "held")
-        val snapshot = WindowApplySnapshot(listOf(held), emptySet())
+        val snapshot = WindowApplySnapshot(listOf(held), emptySet(), heldOrder = mapOf(id to 0uL))
         val prepared =
             prepareWindowApply(
                 page = TimelinePageFfi(listOf(held), hasMoreBefore = false, hasMoreAfter = false),
@@ -71,15 +71,99 @@ class WindowApplyPreparationTest {
         val prepared =
             prepareWindowApply(
                 page = page,
-                snapshot = WindowApplySnapshot(listOf(heldUnchanged, heldChanged), emptySet()),
+                snapshot =
+                    WindowApplySnapshot(
+                        listOf(heldUnchanged, heldChanged),
+                        emptySet(),
+                        heldOrder = mapOf(unchangedId to 7uL, changedId to 8uL),
+                    ),
                 replaceWindow = false,
                 reconcileNewExtendedRecords = true,
             )
 
+        assertEquals(WindowApplyMode.EXTEND, prepared.mode)
+        assertEquals(mapOf(unchangedId to 7uL, changedId to 8uL), prepared.authoritativeOrder)
         assertFalse(prepared.rows[0].needsProjection)
         assertEquals(document, prepared.rows[0].record.contentTokens)
         assertTrue(prepared.rows[1].needsProjection)
         assertEquals(setOf(changedId), prepared.touchedIds)
+    }
+
+    /** A non-forced window sharing no ordered row with the held ones prepares as a replacement. */
+    @Test
+    fun extendPreparationWithoutASharedRowFallsBackToReplace() {
+        val heldId = "aa".repeat(32)
+        val newId = "bb".repeat(32)
+        val page =
+            TimelinePageFfi(
+                messages = listOf(timelineRecord(newId, 5uL, "elsewhere")),
+                hasMoreBefore = true,
+                hasMoreAfter = true,
+            )
+
+        val prepared =
+            prepareWindowApply(
+                page = page,
+                snapshot =
+                    WindowApplySnapshot(
+                        listOf(timelineRecord(heldId, 1uL, "held")),
+                        emptySet(),
+                        heldOrder = mapOf(heldId to 0uL),
+                    ),
+                replaceWindow = false,
+            )
+
+        assertEquals(WindowApplyMode.REPLACE, prepared.mode)
+        assertTrue(prepared.rows.single().needsProjection)
+        assertEquals(mapOf(newId to AUTHORITATIVE_ORDER_BASE), prepared.authoritativeOrder)
+    }
+
+    /** Interior gaps and rows beyond a final edge depart; rows beyond an edge with more history stay. */
+    @Test
+    fun extendPreparationDepartsOnlyRowsThePageProvesGone() {
+        val ids = listOf("aa", "bb", "cc", "dd").map { it.repeat(32) }
+        val held = ids.mapIndexed { index, id -> timelineRecord(id, index.toULong(), "row") }
+        val heldOrder = ids.withIndex().associate { (index, id) -> id to index.toULong() }
+        val snapshot = WindowApplySnapshot(held, emptySet(), heldOrder)
+        val rows = listOf(held[1], held[3])
+
+        val finalOlderEdge =
+            prepareWindowApply(
+                page = TimelinePageFfi(rows, hasMoreBefore = false, hasMoreAfter = true),
+                snapshot = snapshot,
+                replaceWindow = false,
+            )
+        val moreHistoryBefore =
+            prepareWindowApply(
+                page = TimelinePageFfi(rows, hasMoreBefore = true, hasMoreAfter = true),
+                snapshot = snapshot,
+                replaceWindow = false,
+            )
+
+        assertEquals(setOf(ids[0], ids[2]), finalOlderEdge.departedIds)
+        assertEquals(setOf(ids[2]), moreHistoryBefore.departedIds)
+        assertTrue(ids[2] in moreHistoryBefore.touchedIds)
+    }
+
+    /** The first page row the timeline already orders decides the shift; a page sharing none has no shift. */
+    @Test
+    fun windowOrderShiftAlignsThePageToTheFirstSharedRow() {
+        val older = "aa".repeat(32)
+        val shared = "bb".repeat(32)
+        val page =
+            TimelinePageFfi(
+                messages = listOf(timelineRecord(older, 1uL, "older"), timelineRecord(shared, 2uL, "shared")),
+                hasMoreBefore = true,
+                hasMoreAfter = false,
+            )
+
+        val shift = windowOrderShift(page, mapOf(shared to 40uL))
+
+        assertEquals(39L, shift)
+        assertEquals(39uL, shiftedOrder(0, shift))
+        assertEquals(40uL, shiftedOrder(1, shift))
+        assertEquals(null, windowOrderShift(page, mapOf("cc".repeat(32) to 3uL)))
+        assertEquals(AUTHORITATIVE_ORDER_BASE + 2uL, shiftedOrder(2, null))
     }
 
     /** REPLACE prepares its immutable rows on the worker without touching controller state. */
@@ -154,7 +238,10 @@ class WindowApplyPreparationTest {
                 assertEquals(200, prepared.rows.size)
                 assertEquals(WindowApplyMode.REPLACE, prepared.mode)
                 assertEquals(emptySet<String>(), prepared.departedIds)
-                assertEquals((0 until 200).map { it.toULong() }, prepared.authoritativeOrder.values.toList())
+                assertEquals(
+                    (0 until 200).map { AUTHORITATIVE_ORDER_BASE + it.toULong() },
+                    prepared.authoritativeOrder.values.toList(),
+                )
                 assertTrue(prepared.rows.all(PreparedWindowRow::needsProjection))
                 assertTrue(prepared.rows.any { it.record.replyPreview != null })
                 assertTrue(

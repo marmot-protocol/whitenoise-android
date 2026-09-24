@@ -69,7 +69,12 @@ private suspend fun ConversationController.jumpWindowToMessage(messageIdHex: Str
         jumpIfActive = ::jumpIfSubscriptionActive,
         installPage = { page ->
             tracedPagingSection(ConversationPagingTraceSection.APPLY) {
-                applyTimelinePage(page, replaceWindow = true, updatePagination = true)
+                applyTimelinePage(
+                    page,
+                    replaceWindow = false,
+                    updatePagination = true,
+                    reconcileNewExtendedRecords = true,
+                )
             }
         },
     )

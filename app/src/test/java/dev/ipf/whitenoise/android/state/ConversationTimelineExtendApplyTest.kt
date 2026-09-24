@@ -84,7 +84,7 @@ class ConversationTimelineExtendApplyTest {
             }
         }
 
-    /** An index writer during preparation cannot leave a page row hidden or retain a departed row. */
+    /** An index writer during preparation cannot leave a page row hidden, and loses nothing it retained. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun extendRechecksLiveIndexesAfterSuspendedPreparation() =
@@ -133,7 +133,7 @@ class ConversationTimelineExtendApplyTest {
                 extend.await()
 
                 assertEquals(listOf(SECOND, THIRD), timelineMessageIds(controller))
-                assertTrue(FIRST !in controller.timelineRecords)
+                assertTrue(FIRST in controller.timelineRecords)
                 assertTrue("msg:$SECOND" in controller.timelineItemsById)
                 assertEquals("body", controller.timelineRecords.getValue(THIRD).plaintext)
                 assertEquals(2, measurements.single().committedProjectionCount)
@@ -219,19 +219,98 @@ class ConversationTimelineExtendApplyTest {
             }
         }
 
-    /** Rows the window dropped leave the timeline and every index keyed by their id. */
+    /** Rows the window dropped stay in the timeline, in order, so paging back to them rebuilds nothing. */
     @Test
-    fun extendRemovesRowsTheWindowNoLongerHolds() =
+    fun extendRetainsRowsTheWindowNoLongerHolds() =
         runBlocking {
             withController(seed = listOf(row(SECOND), row(THIRD))) { controller, _ ->
                 controller.applyTimelinePage(
-                    page(listOf(row(FIRST), row(SECOND))),
+                    page(listOf(row(FIRST), row(SECOND)), hasMoreAfter = true),
                     replaceWindow = false,
                     updatePagination = true,
                 )
 
-                assertEquals(listOf(FIRST, SECOND), timelineMessageIds(controller))
-                assertTrue(THIRD !in controller.timelineRecords)
+                assertEquals(listOf(FIRST, SECOND, THIRD), timelineMessageIds(controller))
+                assertTrue(THIRD in controller.timelineRecords)
+            }
+        }
+
+    /** A held row inside the window's span that the page no longer carries was removed, so it leaves. */
+    @Test
+    fun extendDropsHeldRowsTheWindowProvesGone() =
+        runBlocking {
+            withController(seed = listOf(row(FIRST), row(SECOND), row(THIRD))) { controller, _ ->
+                controller.applyTimelinePage(
+                    page(listOf(row(FIRST), row(THIRD)), hasMoreAfter = true),
+                    replaceWindow = false,
+                    updatePagination = true,
+                )
+
+                assertEquals(listOf(FIRST, THIRD), timelineMessageIds(controller))
+                assertTrue(SECOND !in controller.timelineRecords)
+            }
+        }
+
+    /** A final edge says nothing lies beyond it, so held rows past that edge were removed too. */
+    @Test
+    fun extendDropsHeldRowsBeyondAFinalEdge() =
+        runBlocking {
+            withController(seed = listOf(row(FIRST), row(SECOND), row(THIRD))) { controller, _ ->
+                controller.applyTimelinePage(
+                    page(listOf(row(SECOND), row(THIRD)), hasMoreBefore = false),
+                    replaceWindow = false,
+                    updatePagination = true,
+                )
+
+                assertEquals(listOf(SECOND, THIRD), timelineMessageIds(controller))
+                assertTrue(FIRST !in controller.timelineRecords)
+            }
+        }
+
+    /** A window sharing no row with the held ones is a new place in history, however it was requested. */
+    @Test
+    fun extendWithNoSharedRowReplacesTheWindow() =
+        runBlocking {
+            withController(seed = listOf(row(SECOND), row(THIRD))) { controller, _ ->
+                controller.applyTimelinePage(
+                    page(listOf(row(FIRST))),
+                    replaceWindow = false,
+                    updatePagination = true,
+                )
+
+                assertEquals(listOf(FIRST), timelineMessageIds(controller))
+                assertTrue(SECOND !in controller.timelineRecords && THIRD !in controller.timelineRecords)
+            }
+        }
+
+    /** Past the cap, the rows farthest from the latest window go first, from whichever end that is. */
+    @Test
+    fun retentionCapEvictsTheRowsFarthestFromTheLatestWindow() =
+        runBlocking {
+            withController(seed = rankedRows(0 until 200)) { controller, _ ->
+                listOf(150 until 350, 300 until 500, 450 until 650).forEach { range ->
+                    controller.applyTimelinePage(
+                        page(rankedRows(range), hasMoreAfter = range.last < 649),
+                        replaceWindow = false,
+                        updatePagination = true,
+                    )
+                }
+
+                assertEquals(MAX_RETAINED_TIMELINE_ROWS, controller.timelineRecords.size)
+                assertTrue(rankedId(49) !in controller.timelineRecords)
+                assertTrue(rankedId(50) in controller.timelineRecords && rankedId(649) in controller.timelineRecords)
+                assertEquals((50 until 650).map(::rankedId), timelineMessageIds(controller))
+
+                controller.applyTimelinePage(
+                    page(rankedRows(0 until 200), hasMoreBefore = false, hasMoreAfter = true),
+                    replaceWindow = false,
+                    updatePagination = true,
+                )
+
+                assertEquals(MAX_RETAINED_TIMELINE_ROWS, controller.timelineRecords.size)
+                assertTrue(rankedId(0) in controller.timelineRecords && rankedId(599) in controller.timelineRecords)
+                assertTrue(rankedId(600) !in controller.timelineRecords)
+                assertEquals((0 until 600).map(::rankedId), timelineMessageIds(controller))
             }
         }
 
@@ -333,11 +412,12 @@ class ConversationTimelineExtendApplyTest {
         )
     }
 
-    /** A page ordered oldest-first keeps that order after an extend. */
-    private fun page(messages: List<TimelineMessageRecordFfi>): TimelinePageFfi {
-        val older = true
-        return TimelinePageFfi(messages = messages, hasMoreBefore = older, hasMoreAfter = false)
-    }
+    /** A window page; the edge flags matter, since a final edge tells retention what lies beyond it is gone. */
+    private fun page(
+        messages: List<TimelineMessageRecordFfi>,
+        hasMoreBefore: Boolean = true,
+        hasMoreAfter: Boolean = false,
+    ) = TimelinePageFfi(messages = messages, hasMoreBefore = hasMoreBefore, hasMoreAfter = hasMoreAfter)
 
     /** A plain authoritative row whose position follows its id's rank. */
     private fun row(
@@ -348,6 +428,19 @@ class ConversationTimelineExtendApplyTest {
         timelineAt = RANK.getValue(messageId),
         plaintext = plaintext,
     )
+
+    /** Rows whose id and position both follow [indices], for windows wider than the named rows. */
+    private fun rankedRows(indices: IntRange) =
+        indices.map { index ->
+            timelineRecord(
+                messageId = rankedId(index),
+                timelineAt = 1_000uL + index.toULong(),
+                plaintext = "row $index",
+            )
+        }
+
+    /** The id [rankedRows] gives the row at [index]. */
+    private fun rankedId(index: Int) = index.toString(16).padStart(64, '0')
 
     /** The same row with Markdown already parsed, as hydration would leave it. */
     private fun hydratedRow(messageId: String) = row(messageId).withMarkdownTokens(parsedDocument())

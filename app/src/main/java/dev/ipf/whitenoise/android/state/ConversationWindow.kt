@@ -423,7 +423,7 @@ internal fun ConversationController.installWindowFrame(frame: ConversationWindow
 suspend fun ConversationController.reportVisibleMessage(messageIdHex: String) {
     if (!retainsTimelineRecord(messageIdHex)) return
     val page = timelineSubscription?.setVisibleAnchor(messageIdHex) ?: return
-    applyTimelinePage(page, replaceWindow = true, updatePagination = true)
+    applyTimelinePage(page, replaceWindow = false, updatePagination = true, reconcileNewExtendedRecords = true)
 }
 
 /** Replaces a bounded history window with its newest page, reporting whether the newest edge is ready. */
@@ -431,7 +431,7 @@ suspend fun ConversationController.returnToLatestWindow(): Boolean {
     val subscription = timelineSubscription ?: return false
     tracedPagingSection(ConversationPagingTraceSection.WINDOW) { subscription.returnToLatest() }?.let { page ->
         tracedPagingSection(ConversationPagingTraceSection.APPLY) {
-            applyTimelinePage(page, replaceWindow = true, updatePagination = true)
+            applyTimelinePage(page, replaceWindow = false, updatePagination = true, reconcileNewExtendedRecords = true)
         }
     }
     return !hasMoreAfterTimeline
