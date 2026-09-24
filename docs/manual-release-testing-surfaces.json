@@ -2165,6 +2165,12 @@
         ]
       },
       {
+        "surface": "RandomProfileNameButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/RandomProfileNameButton.kt",
+        "anchor": "fun RandomProfileNameButton(",
+        "test_ids": ["ONB-025", "PRO-001"]
+      },
+      {
         "surface": "WhiteNoiseTextField",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTextField.kt",
         "anchor": "fun WhiteNoiseTextField(",
@@ -5989,7 +5995,8 @@
         "anchor": "fun SignUpContent(",
         "test_ids": [
           "ONB-002",
-          "ONB-003"
+          "ONB-003",
+          "ONB-025"
         ]
       },
       {
@@ -5998,7 +6005,8 @@
         "anchor": "fun SignUpScreen(",
         "test_ids": [
           "ONB-002",
-          "ONB-003"
+          "ONB-003",
+          "ONB-025"
         ]
       },
       {
@@ -6284,7 +6292,8 @@
           "ONB-018",
           "ONB-019",
           "ONB-021",
-          "ONB-023"
+          "ONB-023",
+          "ONB-025"
         ]
       },
       {
@@ -6470,7 +6479,8 @@
         "anchor": "fun ProfileEditContent(",
         "test_ids": [
           "PRO-001",
-          "PRO-002"
+          "PRO-002",
+          "ONB-025"
         ]
       },
       {
@@ -15889,11 +15899,11 @@
       },
       {
         "surface": "string:profile_suggest_name",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditContent.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/RandomProfileNameButton.kt",
         "anchor": "R.string.profile_suggest_name",
         "test_ids": [
           "PRO-001",
-          "PRO-002"
+          "ONB-025"
         ]
       },
       {
