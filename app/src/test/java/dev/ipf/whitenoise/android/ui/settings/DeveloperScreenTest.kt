@@ -291,8 +291,13 @@ class DeveloperScreenTest {
         composeRule.runOnIdle { status.value = ReviewDemoStatus.Ready("original", "group") }
         composeRule.onNodeWithTag("developer.demo.action").performClick()
         composeRule.runOnIdle { assertEquals(1, openings) }
-        composeRule.runOnIdle { status.value = ReviewDemoStatus.Failed(
-            ReviewDemoStage.Preparing, ReviewDemoProblem.InvalidCheckpoint) }
+        composeRule.runOnIdle {
+            status.value =
+                ReviewDemoStatus.Failed(
+                    ReviewDemoStage.Preparing,
+                    ReviewDemoProblem.InvalidCheckpoint,
+                )
+        }
         composeRule.onNodeWithTag("developer.demo.action").assertIsNotEnabled()
         scrollTo("developer.demo.clear")
         composeRule.onNodeWithTag("developer.demo.clear").assertExists()

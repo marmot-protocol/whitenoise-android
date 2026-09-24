@@ -23,11 +23,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ReviewDemoProblem
 import dev.ipf.whitenoise.android.state.ReviewDemoStage
 import dev.ipf.whitenoise.android.state.ReviewDemoStatus
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.theme.PillShape
@@ -69,9 +69,10 @@ internal fun DeveloperScreen(
             val previous = appState.activeAccountRef
             val generation = appState.runtimeGeneration
             val activated =
-                previous == account || appState.setActiveAccount(account, shouldActivate = {
-                    appState.runtimeGeneration == generation && appState.activeAccountRef == previous
-                })
+                previous == account ||
+                    appState.setActiveAccount(account, shouldActivate = {
+                        appState.runtimeGeneration == generation && appState.activeAccountRef == previous
+                    })
             if (activated && appState.activeAccountRef == account) {
                 runCatchingCancellable { appState.preloadNotificationChatListItem(account, group) }
                     .onSuccess(onOpenDemoChat)
@@ -163,25 +164,31 @@ internal fun DeveloperContent(
                             title =
                                 when (demoStatus) {
                                     is ReviewDemoStatus.Ready -> stringResource(R.string.review_demo_open)
-                                    is ReviewDemoStatus.Failed -> stringResource(
-                                        if (demoHasSavedSetup) R.string.review_demo_resume else R.string.review_demo_create,
-                                    )
-                                    else -> stringResource(
-                                        if (demoHasSavedSetup) R.string.review_demo_resume else R.string.review_demo_create,
-                                    )
+                                    is ReviewDemoStatus.Failed ->
+                                        stringResource(
+                                            if (demoHasSavedSetup) R.string.review_demo_resume else R.string.review_demo_create,
+                                        )
+                                    else ->
+                                        stringResource(
+                                            if (demoHasSavedSetup) R.string.review_demo_resume else R.string.review_demo_create,
+                                        )
                                 },
                             subtitle =
                                 when (demoStatus) {
                                     is ReviewDemoStatus.Running -> reviewDemoStageText(demoStatus.stage)
-                                    is ReviewDemoStatus.Failed -> stringResource(
-                                        R.string.review_demo_stage_error,
-                                        reviewDemoStageText(demoStatus.stage),
-                                        reviewDemoProblemText(demoStatus.problem),
-                                    )
+                                    is ReviewDemoStatus.Failed ->
+                                        stringResource(
+                                            R.string.review_demo_stage_error,
+                                            reviewDemoStageText(demoStatus.stage),
+                                            reviewDemoProblemText(demoStatus.problem),
+                                        )
                                     is ReviewDemoStatus.Ready -> stringResource(R.string.review_demo_ready)
                                     ReviewDemoStatus.Idle ->
-                                        if (demoAvailable) stringResource(R.string.review_demo_description)
-                                        else stringResource(R.string.review_demo_unavailable)
+                                        if (demoAvailable) {
+                                            stringResource(R.string.review_demo_description)
+                                        } else {
+                                            stringResource(R.string.review_demo_unavailable)
+                                        }
                                 },
                             onClick = {
                                 when (demoStatus) {
@@ -190,9 +197,13 @@ internal fun DeveloperContent(
                                     else -> confirmStart = true
                                 }
                             },
-                            enabled = demoAvailable && demoStatus !is ReviewDemoStatus.Running &&
-                                !(demoStatus is ReviewDemoStatus.Failed &&
-                                    demoStatus.problem == ReviewDemoProblem.InvalidCheckpoint),
+                            enabled =
+                                demoAvailable &&
+                                    demoStatus !is ReviewDemoStatus.Running &&
+                                    !(
+                                        demoStatus is ReviewDemoStatus.Failed &&
+                                            demoStatus.problem == ReviewDemoProblem.InvalidCheckpoint
+                                    ),
                             busy = demoStatus is ReviewDemoStatus.Running,
                             modifier = Modifier.testTag("developer.demo.action"),
                         )
@@ -284,14 +295,18 @@ internal fun DeveloperContent(
         WhiteNoiseAlertDialog(
             onDismissRequest = { confirmStart = false },
             title = {
-                Text(stringResource(
-                    if (demoHasSavedSetup) R.string.review_demo_resume_confirm_title else R.string.review_demo_confirm_title,
-                ))
+                Text(
+                    stringResource(
+                        if (demoHasSavedSetup) R.string.review_demo_resume_confirm_title else R.string.review_demo_confirm_title,
+                    ),
+                )
             },
             text = {
-                Text(stringResource(
-                    if (demoHasSavedSetup) R.string.review_demo_resume_confirm_body else R.string.review_demo_confirm_body,
-                ))
+                Text(
+                    stringResource(
+                        if (demoHasSavedSetup) R.string.review_demo_resume_confirm_body else R.string.review_demo_confirm_body,
+                    ),
+                )
             },
             confirmButton = {
                 TextButton(
@@ -301,9 +316,11 @@ internal fun DeveloperContent(
                     },
                     modifier = Modifier.testTag("developer.demo.confirm"),
                 ) {
-                    Text(stringResource(
-                        if (demoHasSavedSetup) R.string.review_demo_resume_confirm_action else R.string.review_demo_confirm_action,
-                    ))
+                    Text(
+                        stringResource(
+                            if (demoHasSavedSetup) R.string.review_demo_resume_confirm_action else R.string.review_demo_confirm_action,
+                        ),
+                    )
                 }
             },
             dismissButton = {
@@ -333,36 +350,38 @@ internal fun DeveloperContent(
 }
 
 @Composable
-private fun reviewDemoStageText(stage: ReviewDemoStage): String = stringResource(
-    when (stage) {
-        ReviewDemoStage.Preparing -> R.string.review_demo_preparing
-        ReviewDemoStage.CreatingAccount -> R.string.review_demo_creating_account
-        ReviewDemoStage.PublishingProfile -> R.string.review_demo_publishing_profile
-        ReviewDemoStage.CreatingConversation -> R.string.review_demo_creating_conversation
-        ReviewDemoStage.SendingOriginal -> R.string.review_demo_sending_original
-        ReviewDemoStage.AcceptingInvitation -> R.string.review_demo_accepting_invitation
-        ReviewDemoStage.SendingDemo -> R.string.review_demo_sending_demo
-        ReviewDemoStage.VerifyingDelivery -> R.string.review_demo_verifying
-        ReviewDemoStage.Returning -> R.string.review_demo_returning
-    },
-)
+private fun reviewDemoStageText(stage: ReviewDemoStage): String =
+    stringResource(
+        when (stage) {
+            ReviewDemoStage.Preparing -> R.string.review_demo_preparing
+            ReviewDemoStage.CreatingAccount -> R.string.review_demo_creating_account
+            ReviewDemoStage.PublishingProfile -> R.string.review_demo_publishing_profile
+            ReviewDemoStage.CreatingConversation -> R.string.review_demo_creating_conversation
+            ReviewDemoStage.SendingOriginal -> R.string.review_demo_sending_original
+            ReviewDemoStage.AcceptingInvitation -> R.string.review_demo_accepting_invitation
+            ReviewDemoStage.SendingDemo -> R.string.review_demo_sending_demo
+            ReviewDemoStage.VerifyingDelivery -> R.string.review_demo_verifying
+            ReviewDemoStage.Returning -> R.string.review_demo_returning
+        },
+    )
 
 @Composable
-private fun reviewDemoProblemText(problem: ReviewDemoProblem): String = stringResource(
-    when (problem) {
-        ReviewDemoProblem.Unavailable -> R.string.review_demo_unavailable
-        ReviewDemoProblem.InvalidCheckpoint -> R.string.review_demo_invalid_checkpoint
-        ReviewDemoProblem.OriginalMissing -> R.string.review_demo_original_missing
-        ReviewDemoProblem.DemoMissing -> R.string.review_demo_account_missing
-        ReviewDemoProblem.AmbiguousAccount -> R.string.review_demo_ambiguous_account
-        ReviewDemoProblem.OwnerChanged -> R.string.review_demo_owner_changed
-        ReviewDemoProblem.AccountSetupTimedOut -> R.string.review_demo_setup_timed_out
-        ReviewDemoProblem.DeliveryTimedOut -> R.string.review_demo_delivery_timed_out
-        ReviewDemoProblem.ReactionUncertain -> R.string.review_demo_reaction_uncertain
-        ReviewDemoProblem.Interrupted -> R.string.review_demo_interrupted
-        ReviewDemoProblem.OperationFailed -> R.string.review_demo_operation_failed
-    },
-)
+private fun reviewDemoProblemText(problem: ReviewDemoProblem): String =
+    stringResource(
+        when (problem) {
+            ReviewDemoProblem.Unavailable -> R.string.review_demo_unavailable
+            ReviewDemoProblem.InvalidCheckpoint -> R.string.review_demo_invalid_checkpoint
+            ReviewDemoProblem.OriginalMissing -> R.string.review_demo_original_missing
+            ReviewDemoProblem.DemoMissing -> R.string.review_demo_account_missing
+            ReviewDemoProblem.AmbiguousAccount -> R.string.review_demo_ambiguous_account
+            ReviewDemoProblem.OwnerChanged -> R.string.review_demo_owner_changed
+            ReviewDemoProblem.AccountSetupTimedOut -> R.string.review_demo_setup_timed_out
+            ReviewDemoProblem.DeliveryTimedOut -> R.string.review_demo_delivery_timed_out
+            ReviewDemoProblem.ReactionUncertain -> R.string.review_demo_reaction_uncertain
+            ReviewDemoProblem.Interrupted -> R.string.review_demo_interrupted
+            ReviewDemoProblem.OperationFailed -> R.string.review_demo_operation_failed
+        },
+    )
 
 /** Retains the production variant badge beside build facts without changing the Settings home footer. */
 @Suppress("FunctionNaming")

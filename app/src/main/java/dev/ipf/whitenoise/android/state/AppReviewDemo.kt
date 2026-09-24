@@ -44,7 +44,9 @@ internal interface ReviewDemoStore {
     fun clear()
 }
 
-internal class PreferencesReviewDemoStore(private val preferences: SharedPreferences) : ReviewDemoStore {
+internal class PreferencesReviewDemoStore(
+    private val preferences: SharedPreferences,
+) : ReviewDemoStore {
     override val hasRecord: Boolean
         get() = preferences.contains(KEY)
 
@@ -117,7 +119,9 @@ internal class PreferencesReviewDemoStore(private val preferences: SharedPrefere
 
 private val HEX_ID = Regex("[0-9a-fA-F]{64}")
 private val HEX_GROUP = Regex("(?:[0-9a-fA-F]{2})+")
+
 private fun String.isHexId(): Boolean = HEX_ID.matches(this)
+
 private fun String.isHexGroupId(): Boolean = HEX_GROUP.matches(this)
 
 internal data class ReviewDemoAccount(
@@ -127,7 +131,10 @@ internal data class ReviewDemoAccount(
     val signedOut: Boolean,
 )
 
-internal data class ReviewDemoReaction(val sender: String, val emoji: String)
+internal data class ReviewDemoReaction(
+    val sender: String,
+    val emoji: String,
+)
 
 internal data class ReviewDemoMessage(
     val id: String,
@@ -145,20 +152,63 @@ internal interface ReviewDemoBackend {
     val foregroundReady: Boolean
 
     suspend fun accounts(): List<ReviewDemoAccount>
+
     suspend fun createAccount(): ReviewDemoAccount
+
     suspend fun qualifyAccount(ref: String)
+
     suspend fun accountNetworkReady(ref: String): Boolean
+
     suspend fun profilePublished(id: String): Boolean
+
     suspend fun publishProfile(ref: String)
-    suspend fun existingDirectConversation(ref: String, peerId: String): String?
-    suspend fun createDirectConversation(ref: String, peerId: String): String
-    suspend fun invitation(ref: String, groupId: String): ReviewDemoInvitation?
-    suspend fun acceptInvitation(ref: String, groupId: String)
-    suspend fun timeline(ref: String, groupId: String): List<ReviewDemoMessage>
-    suspend fun submitMessage(ref: String, groupId: String, text: String, replyTo: String?, token: String)
-    suspend fun submitReaction(ref: String, groupId: String, targetId: String, emoji: String)
+
+    suspend fun existingDirectConversation(
+        ref: String,
+        peerId: String,
+    ): String?
+
+    suspend fun createDirectConversation(
+        ref: String,
+        peerId: String,
+    ): String
+
+    suspend fun invitation(
+        ref: String,
+        groupId: String,
+    ): ReviewDemoInvitation?
+
+    suspend fun acceptInvitation(
+        ref: String,
+        groupId: String,
+    )
+
+    suspend fun timeline(
+        ref: String,
+        groupId: String,
+    ): List<ReviewDemoMessage>
+
+    suspend fun submitMessage(
+        ref: String,
+        groupId: String,
+        text: String,
+        replyTo: String?,
+        token: String,
+    )
+
+    suspend fun submitReaction(
+        ref: String,
+        groupId: String,
+        targetId: String,
+        emoji: String,
+    )
+
     suspend fun catchUp()
-    suspend fun activate(ref: String, stillOwned: () -> Boolean): Boolean
+
+    suspend fun activate(
+        ref: String,
+        stillOwned: () -> Boolean,
+    ): Boolean
 }
 
 internal enum class ReviewDemoInvitation { Pending, Accepted }
@@ -191,12 +241,25 @@ internal enum class ReviewDemoProblem {
 
 internal sealed interface ReviewDemoStatus {
     data object Idle : ReviewDemoStatus
-    data class Running(val stage: ReviewDemoStage) : ReviewDemoStatus
-    data class Failed(val stage: ReviewDemoStage, val problem: ReviewDemoProblem) : ReviewDemoStatus
-    data class Ready(val accountRef: String, val groupId: String) : ReviewDemoStatus
+
+    data class Running(
+        val stage: ReviewDemoStage,
+    ) : ReviewDemoStatus
+
+    data class Failed(
+        val stage: ReviewDemoStage,
+        val problem: ReviewDemoProblem,
+    ) : ReviewDemoStatus
+
+    data class Ready(
+        val accountRef: String,
+        val groupId: String,
+    ) : ReviewDemoStatus
 }
 
-internal class ReviewDemoFailure(val problem: ReviewDemoProblem) : IllegalStateException()
+internal class ReviewDemoFailure(
+    val problem: ReviewDemoProblem,
+) : IllegalStateException()
 
 private const val JOHNNY_LIKE = "johnny_like"
 private const val ORIGINAL_HEART = "original_heart"
@@ -221,9 +284,10 @@ internal class AppReviewDemo(
     /** A second tap never starts a second account or publisher. */
     fun start(onReady: (String, String) -> Unit = { _, _ -> }) {
         if (task?.isActive == true || status is ReviewDemoStatus.Ready) return
-        task = scope.launch {
-            run(onReady)
-        }
+        task =
+            scope.launch {
+                run(onReady)
+            }
     }
 
     fun cancel() {
@@ -257,21 +321,25 @@ internal class AppReviewDemo(
         val generation = backend.runtimeGeneration
         var originalRef: String? = null
         var restoreAllowed = false
+
         fun owned() = backend.runtimeGeneration == generation && backend.activeAccountRef == expectedActive
+
         fun requireOwned() {
             if (!owned()) throw ReviewDemoFailure(ReviewDemoProblem.OwnerChanged)
             if (!backend.foregroundReady) throw ReviewDemoFailure(ReviewDemoProblem.Unavailable)
         }
+
         suspend fun activate(ref: String) {
             requireOwned()
             if (backend.activeAccountRef != ref) {
-                val activated = try {
-                    backend.activate(ref, ::owned)
-                } catch (failure: Exception) {
-                    // Account activation can publish the selection before its post-activation refresh fails.
-                    if (backend.runtimeGeneration == generation && backend.activeAccountRef == ref) expectedActive = ref
-                    throw failure
-                }
+                val activated =
+                    try {
+                        backend.activate(ref, ::owned)
+                    } catch (failure: Exception) {
+                        // Account activation can publish the selection before its post-activation refresh fails.
+                        if (backend.runtimeGeneration == generation && backend.activeAccountRef == ref) expectedActive = ref
+                        throw failure
+                    }
                 if (!activated) throw ReviewDemoFailure(ReviewDemoProblem.OwnerChanged)
                 expectedActive = ref
             }
@@ -282,20 +350,24 @@ internal class AppReviewDemo(
             status = ReviewDemoStatus.Running(stage)
             val accounts = backend.accounts()
             val saved = store.load()
-            var checkpoint = saved ?: run {
-                val original = accounts.firstOrNull { it.ref == expectedActive && it.localSigning && !it.signedOut }
-                    ?: throw ReviewDemoFailure(ReviewDemoProblem.Unavailable)
-                ReviewDemoCheckpoint(
-                    runId = UUID.randomUUID().toString(),
-                    originalRef = original.ref,
-                    originalId = original.id,
-                    initialAccountRefs = accounts.map(ReviewDemoAccount::ref).toSet(),
-                ).also(store::save)
-            }
+            var checkpoint =
+                saved ?: run {
+                    val original =
+                        accounts.firstOrNull { it.ref == expectedActive && it.localSigning && !it.signedOut }
+                            ?: throw ReviewDemoFailure(ReviewDemoProblem.Unavailable)
+                    ReviewDemoCheckpoint(
+                        runId = UUID.randomUUID().toString(),
+                        originalRef = original.ref,
+                        originalId = original.id,
+                        initialAccountRefs = accounts.map(ReviewDemoAccount::ref).toSet(),
+                    ).also(store::save)
+                }
             originalRef = checkpoint.originalRef
-            val original = accounts.firstOrNull { it.ref == checkpoint.originalRef && it.id == checkpoint.originalId }
-                ?.takeIf { it.localSigning && !it.signedOut }
-                ?: throw ReviewDemoFailure(ReviewDemoProblem.OriginalMissing)
+            val original =
+                accounts
+                    .firstOrNull { it.ref == checkpoint.originalRef && it.id == checkpoint.originalId }
+                    ?.takeIf { it.localSigning && !it.signedOut }
+                    ?: throw ReviewDemoFailure(ReviewDemoProblem.OriginalMissing)
             if (expectedActive != checkpoint.originalRef && expectedActive != checkpoint.demoRef) {
                 throw ReviewDemoFailure(ReviewDemoProblem.OwnerChanged)
             }
@@ -330,21 +402,23 @@ internal class AppReviewDemo(
             stage = ReviewDemoStage.CreatingConversation
             status = ReviewDemoStatus.Running(stage)
             activate(original.ref)
-            val groupId = checkpoint.groupId ?: run {
-                requireOwned()
-                val found = backend.existingDirectConversation(original.ref, demo.id)
-                val id = found ?: try {
-                    backend.createDirectConversation(original.ref, demo.id)
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (failure: Exception) {
-                    // A native create can succeed before its reply is lost.
-                    backend.existingDirectConversation(original.ref, demo.id) ?: throw failure
+            val groupId =
+                checkpoint.groupId ?: run {
+                    requireOwned()
+                    val found = backend.existingDirectConversation(original.ref, demo.id)
+                    val id =
+                        found ?: try {
+                            backend.createDirectConversation(original.ref, demo.id)
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (failure: Exception) {
+                            // A native create can succeed before its reply is lost.
+                            backend.existingDirectConversation(original.ref, demo.id) ?: throw failure
+                        }
+                    checkpoint = checkpoint.copy(groupId = id)
+                    store.save(checkpoint)
+                    id
                 }
-                checkpoint = checkpoint.copy(groupId = id)
-                store.save(checkpoint)
-                id
-            }
 
             stage = ReviewDemoStage.SendingOriginal
             status = ReviewDemoStatus.Running(stage)
@@ -374,9 +448,16 @@ internal class AppReviewDemo(
             waitForMessage(original.ref, groupId, reply.id, demo.id, ::requireOwned)
             waitForMessage(original.ref, groupId, feature.id, demo.id, ::requireOwned)
             waitForReaction(original.ref, groupId, greeting.id, demo.id, "👍", ::requireOwned)
-            val finalReply = ensureMessage(
-                checkpoint, original, groupId, "original_reply", ORIGINAL_REPLY, feature.id, ::requireOwned,
-            )
+            val finalReply =
+                ensureMessage(
+                    checkpoint,
+                    original,
+                    groupId,
+                    "original_reply",
+                    ORIGINAL_REPLY,
+                    feature.id,
+                    ::requireOwned,
+                )
             checkpoint = ensureReaction(checkpoint, ORIGINAL_HEART, original, groupId, reply.id, "❤️", ::requireOwned)
             waitForMessage(demo.ref, groupId, finalReply.id, original.id, ::requireOwned)
             waitForReaction(demo.ref, groupId, reply.id, original.id, "❤️", ::requireOwned)
@@ -396,8 +477,11 @@ internal class AppReviewDemo(
             status = ReviewDemoStatus.Failed(stage, ReviewDemoProblem.OperationFailed)
         } finally {
             val restore = originalRef
-            if (restoreAllowed && restore != null && backend.activeAccountRef != restore &&
-                backend.activeAccountRef == expectedActive && backend.runtimeGeneration == generation
+            if (restoreAllowed &&
+                restore != null &&
+                backend.activeAccountRef != restore &&
+                backend.activeAccountRef == expectedActive &&
+                backend.runtimeGeneration == generation
             ) {
                 withContext(NonCancellable) {
                     runCatching { backend.activate(restore, ::owned) }
@@ -406,7 +490,10 @@ internal class AppReviewDemo(
         }
     }
 
-    private suspend fun ensureDemoAccount(checkpoint: ReviewDemoCheckpoint, requireOwned: () -> Unit): ReviewDemoAccount {
+    private suspend fun ensureDemoAccount(
+        checkpoint: ReviewDemoCheckpoint,
+        requireOwned: () -> Unit,
+    ): ReviewDemoAccount {
         val current = backend.accounts()
         checkpoint.demoRef?.let { ref ->
             return current.firstOrNull { it.ref == ref && it.id == checkpoint.demoId && it.localSigning && !it.signedOut }
@@ -426,7 +513,10 @@ internal class AppReviewDemo(
         }
     }
 
-    private suspend fun waitForSetup(ref: String, requireOwned: () -> Unit) {
+    private suspend fun waitForSetup(
+        ref: String,
+        requireOwned: () -> Unit,
+    ) {
         repeat(60) {
             requireOwned()
             if (backend.accountNetworkReady(ref)) return
@@ -435,7 +525,11 @@ internal class AppReviewDemo(
         throw ReviewDemoFailure(ReviewDemoProblem.AccountSetupTimedOut)
     }
 
-    private suspend fun waitForInvitation(ref: String, groupId: String, requireOwned: () -> Unit) {
+    private suspend fun waitForInvitation(
+        ref: String,
+        groupId: String,
+        requireOwned: () -> Unit,
+    ) {
         repeat(60) {
             requireOwned()
             backend.catchUp()
@@ -455,19 +549,27 @@ internal class AppReviewDemo(
         requireOwned: () -> Unit,
     ): ReviewDemoMessage {
         val token = checkpoint.token(step)
-        backend.timeline(sender.ref, groupId).firstOrNull {
-            it.token == token && it.sender.equals(sender.id, ignoreCase = true) && it.text == text &&
-                it.replyTo.equals(replyTo, ignoreCase = true)
-        }?.let { return it }
+        backend
+            .timeline(sender.ref, groupId)
+            .firstOrNull {
+                it.token == token &&
+                    it.sender.equals(sender.id, ignoreCase = true) &&
+                    it.text == text &&
+                    it.replyTo.equals(replyTo, ignoreCase = true)
+            }?.let { return it }
         requireOwned()
         backend.submitMessage(sender.ref, groupId, text, replyTo, token)
         repeat(60) {
             requireOwned()
             backend.catchUp()
-            backend.timeline(sender.ref, groupId).firstOrNull {
-                it.token == token && it.sender.equals(sender.id, ignoreCase = true) && it.text == text &&
-                    it.replyTo.equals(replyTo, ignoreCase = true)
-            }?.let { return it }
+            backend
+                .timeline(sender.ref, groupId)
+                .firstOrNull {
+                    it.token == token &&
+                        it.sender.equals(sender.id, ignoreCase = true) &&
+                        it.text == text &&
+                        it.replyTo.equals(replyTo, ignoreCase = true)
+                }?.let { return it }
             delay(1_000)
         }
         throw ReviewDemoFailure(ReviewDemoProblem.DeliveryTimedOut)
@@ -486,7 +588,9 @@ internal class AppReviewDemo(
             if (backend.timeline(ref, groupId).any {
                     it.id.equals(messageId, ignoreCase = true) && it.sender.equals(senderId, ignoreCase = true)
                 }
-            ) return
+            ) {
+                return
+            }
             delay(1_000)
         }
         throw ReviewDemoFailure(ReviewDemoProblem.DeliveryTimedOut)
@@ -538,8 +642,15 @@ internal class AppReviewDemo(
         throw ReviewDemoFailure(ReviewDemoProblem.DeliveryTimedOut)
     }
 
-    private suspend fun hasReaction(ref: String, groupId: String, targetId: String, senderId: String, emoji: String): Boolean =
-        backend.timeline(ref, groupId)
+    private suspend fun hasReaction(
+        ref: String,
+        groupId: String,
+        targetId: String,
+        senderId: String,
+        emoji: String,
+    ): Boolean =
+        backend
+            .timeline(ref, groupId)
             .firstOrNull { it.id.equals(targetId, ignoreCase = true) }
             ?.reactions
             ?.any { it.sender.equals(senderId, ignoreCase = true) && it.emoji == emoji } == true

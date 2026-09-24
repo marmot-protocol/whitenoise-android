@@ -46,7 +46,10 @@ class DeveloperReviewDemoScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/developer_review_demo_failure.png")
     }
 
-    private fun render(status: ReviewDemoStatus, hasSaved: Boolean) {
+    private fun render(
+        status: ReviewDemoStatus,
+        hasSaved: Boolean,
+    ) {
         composeRule.setContent {
             WhiteNoiseTheme {
                 DeveloperContent(
