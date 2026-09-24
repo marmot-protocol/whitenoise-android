@@ -1030,6 +1030,8 @@
     <string name="media_apk_invalid">Файл называется как APK, но не является допустимым пакетом Android</string>
     <string name="media_open">Открыть</string>
     <string name="media_file_too_large">Файл слишком большой для отправки</string>
+    <string name="media_file_unreadable">Не удалось прочитать этот файл. Выберите его снова.</string>
+    <string name="media_file_empty">Пустые файлы нельзя отправить.</string>
     <string name="media_album_too_large">Выбор слишком большой для отправки</string>
     <string name="group_image_search_title">Изображение группы</string>
     <string name="group_image_search_set">Задать изображение группы</string>

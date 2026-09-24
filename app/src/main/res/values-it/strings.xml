@@ -990,6 +990,8 @@
     <string name="media_apk_invalid">Il nome del file indica che è un APK, ma non è un pacchetto Android valido</string>
     <string name="media_open">Apri</string>
     <string name="media_file_too_large">File troppo grande da allegare</string>
+    <string name="media_file_unreadable">Impossibile leggere questo file. Selezionalo di nuovo.</string>
+    <string name="media_file_empty">I file vuoti non possono essere inviati.</string>
     <string name="media_album_too_large">Selezione troppo grande per essere inviata</string>
     <string name="group_image_search_title">Immagine del gruppo</string>
     <string name="group_image_search_set">Imposta immagine del gruppo</string>
