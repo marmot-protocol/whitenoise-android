@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasTestTag
@@ -15,6 +16,9 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.DraftStore
+import dev.ipf.whitenoise.android.state.ReviewDemoProblem
+import dev.ipf.whitenoise.android.state.ReviewDemoStage
+import dev.ipf.whitenoise.android.state.ReviewDemoStatus
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -83,6 +87,9 @@ class DeveloperScreenTest {
     fun keyPackagesStaysReachableWithDeveloperModeOff() {
         render(developerMode = false)
 
+        scrollTo("developer.demo.action")
+        composeRule.onNodeWithTag("developer.demo.action").assertExists()
+        scrollTo("developer.key_packages.row")
         composeRule.onNodeWithTag("developer.key_packages.row").performClick()
 
         composeRule.runOnIdle { assertEquals(1, keyPackages) }
@@ -197,6 +204,98 @@ class DeveloperScreenTest {
         render(developerMode = false)
         composeRule.onNodeWithTag("settings.list").performScrollToNode(hasText("0a5ab20"))
         composeRule.onNodeWithTag("developer.staging").assertDoesNotExist()
+    }
+
+    @Test
+    fun demoConfirmationAndClearRequireSeparateActions() {
+        var starts = 0
+        var clears = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                DeveloperContent(
+                    developerMode = false,
+                    streamingDebug = false,
+                    build = DeveloperBuildFacts("1.4.0", "140", "0a5ab20"),
+                    onDeveloperModeChange = {},
+                    onStreamingDebugChange = {},
+                    onBack = {},
+                    onOpenDiagnostics = {},
+                    onOpenKeyPackages = {},
+                    demoStatus = ReviewDemoStatus.Idle,
+                    demoAvailable = true,
+                    demoHasSavedSetup = true,
+                    onStartDemo = { starts++ },
+                    onClearDemo = { clears++ },
+                )
+            }
+        }
+        scrollTo("developer.demo.action")
+        composeRule.onNodeWithTag("developer.demo.action").performClick()
+        composeRule.runOnIdle { assertEquals(0, starts) }
+        composeRule.onNodeWithTag("developer.demo.confirm").performClick()
+        composeRule.runOnIdle { assertEquals(1, starts) }
+        scrollTo("developer.demo.clear")
+        composeRule.onNodeWithTag("developer.demo.clear").performClick()
+        composeRule.runOnIdle { assertEquals(0, clears) }
+        composeRule.onNodeWithTag("developer.demo.clear.confirm").performClick()
+        composeRule.runOnIdle { assertEquals(1, clears) }
+    }
+
+    @Test
+    fun demoExplainsWhyAnUnavailableAccountCannotStart() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                DeveloperContent(
+                    developerMode = false,
+                    streamingDebug = false,
+                    build = DeveloperBuildFacts("1.4.0", "140", "0a5ab20"),
+                    onDeveloperModeChange = {},
+                    onStreamingDebugChange = {},
+                    onBack = {},
+                    onOpenDiagnostics = {},
+                    onOpenKeyPackages = {},
+                    demoStatus = ReviewDemoStatus.Idle,
+                    demoAvailable = false,
+                )
+            }
+        }
+        scrollTo("developer.demo.action")
+        composeRule.onNodeWithTag("developer.demo.action").assertIsNotEnabled()
+        composeRule.onNodeWithText(app.getString(R.string.review_demo_unavailable)).assertExists()
+    }
+
+    @Test
+    fun runningDemoDisablesRepeatedStartAndReadyDemoOpensOnce() {
+        val status = mutableStateOf<ReviewDemoStatus>(ReviewDemoStatus.Running(ReviewDemoStage.VerifyingDelivery))
+        var openings = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                DeveloperContent(
+                    developerMode = false,
+                    streamingDebug = false,
+                    build = DeveloperBuildFacts("1.4.0", "140", "0a5ab20"),
+                    onDeveloperModeChange = {},
+                    onStreamingDebugChange = {},
+                    onBack = {},
+                    onOpenDiagnostics = {},
+                    onOpenKeyPackages = {},
+                    demoStatus = status.value,
+                    demoAvailable = true,
+                    demoHasSavedSetup = true,
+                    onOpenDemo = { openings++ },
+                )
+            }
+        }
+        scrollTo("developer.demo.action")
+        composeRule.onNodeWithTag("developer.demo.action").assertIsNotEnabled()
+        composeRule.runOnIdle { status.value = ReviewDemoStatus.Ready("original", "group") }
+        composeRule.onNodeWithTag("developer.demo.action").performClick()
+        composeRule.runOnIdle { assertEquals(1, openings) }
+        composeRule.runOnIdle { status.value = ReviewDemoStatus.Failed(
+            ReviewDemoStage.Preparing, ReviewDemoProblem.InvalidCheckpoint) }
+        composeRule.onNodeWithTag("developer.demo.action").assertIsNotEnabled()
+        scrollTo("developer.demo.clear")
+        composeRule.onNodeWithTag("developer.demo.clear").assertExists()
     }
 
     /** Brings a lazy row into the compact viewport before interaction. */

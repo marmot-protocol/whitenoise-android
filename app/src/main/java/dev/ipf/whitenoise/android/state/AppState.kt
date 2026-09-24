@@ -4705,6 +4705,15 @@ class WhiteNoiseAppState private constructor(
             ::warmProfile,
         ) { phase = AppPhase.Ready }
 
+    /** Process-owned resume receipt and coordinator for the Developer Tools conversation demo. */
+    internal val appReviewDemo: AppReviewDemo by lazy {
+        AppReviewDemo(
+            backend = AppReviewDemoNative(this),
+            store = PreferencesReviewDemoStore(preferences),
+            scope = mutationsScope,
+        )
+    }
+
     /** Process-owned receipt survives recreation while native creation or profile publication runs. */
     internal val pendingProfileSignUp: SignUpController?
         get() = profileSignUp.pending

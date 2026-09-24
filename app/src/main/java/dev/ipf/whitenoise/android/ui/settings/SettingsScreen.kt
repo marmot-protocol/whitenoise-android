@@ -503,6 +503,7 @@ private fun SettingsDetailRoute(
                 onBack = { onDetailChange(null) },
                 onOpenDiagnostics = onOpenDiagnostics,
                 onOpenKeyPackages = { onDetailChange(SettingsDetail.KeyPackages) },
+                onOpenDemoChat = onOpenSupportChat,
             )
     }
 }

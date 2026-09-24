@@ -7358,11 +7358,28 @@
         ]
       },
       {
+        "surface": "AppReviewDemo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppReviewDemo.kt",
+        "anchor": "internal class AppReviewDemo(",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "AppReviewDemoNative",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppReviewDemoNative.kt",
+        "anchor": "internal class AppReviewDemoNative(",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
         "surface": "DeveloperContent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
         "anchor": "fun DeveloperContent(",
         "test_ids": [
-          "SET-020"
+          "SET-020",
+          "SET-029"
         ]
       },
       {
@@ -7370,7 +7387,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
         "anchor": "fun DeveloperScreen(",
         "test_ids": [
-          "SET-020"
+          "SET-020",
+          "SET-029"
         ]
       },
       {
@@ -8100,7 +8118,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
         "anchor": "fun SettingsDetailRoute(",
         "test_ids": [
-          "SET-001"
+          "SET-001",
+          "SET-029"
         ]
       },
       {
