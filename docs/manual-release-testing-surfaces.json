@@ -22960,6 +22960,14 @@
     ],
     "source_coverage": [
       {
+        "surface": "System splash mark stays inside Android's circular safe zone",
+        "source": "app/src/main/res/drawable/ic_splash_mark.xml",
+        "anchor": "android:scaleX=\"0.75\"",
+        "test_ids": [
+          "INT-003"
+        ]
+      },
+      {
         "surface": "Pasted npub recipient presentation remains usable before optional profile enrichment finishes",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/RecipientResolutionPresentation.kt",
         "anchor": "internal fun resolvedRecipientResolution(",
