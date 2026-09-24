@@ -421,10 +421,12 @@ Beyond the scroll metrics below, each method reports the paging slices from the
 return-to-latest and exact-message jumps, which emit the same slice; the older
 page boundaries a reader crossed are `runwayKeptCount + edgeReachedCount`, and a
 fling journey where both are zero did not test paging), `pageWindowMs` (the engine's share), `pagePrepareMs` and `pageApplyMs` (the
-app's share, preparation and main-thread commit), and three counts that should stay at zero for paging to be invisible:
-`edgeStopCount` (the list rested on its oldest row with more history behind it),
-`edgeReachedCount` (a page landed after the reader had already reached the old
-edge) against `runwayKeptCount` (a page landed with rows to spare). The paging
+app's share, preparation and main-thread commit), and three counts. Two must stay
+at zero for paging to be invisible: `edgeStopCount` (the list rested on its
+oldest row with more history behind it) and `edgeReachedCount` (a page landed
+after the reader had already reached the old edge). The third, `runwayKeptCount`
+(a page landed with rows still to spare before the old edge), counts the pages
+that landed in time and is expected to be positive on any fling that paged. The paging
 metric set carries no `PowerMetric`: on a Pixel 9 Pro XL the power rails were
 sampled anywhere between 0 and 52 times across identical 13-second journeys, and
 Macrobenchmark drops an iteration with no samples from the results wholesale.
