@@ -4,6 +4,7 @@ import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListAnchorOutcomeFfi
 import dev.ipf.marmotkit.ChatListViewFfi
 import dev.ipf.marmotkit.ChatListWindowSnapshotFfi
+import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -44,6 +45,27 @@ class ChatListReplacementGuardTest {
     }
 
     @Test
+    fun pendingConfirmationDoesNotOverrideMdkActivityOrder() {
+        val olderInvitation = chatRow("older-invitation").copy(activitySortAt = 10uL, pendingConfirmation = true)
+        val incoming = listOf(presentedRow(tail.groupIdHex).copy(row = tail))
+
+        assertFalse(topWindow(incoming, hasMoreAfter = true).shouldContain(olderInvitation))
+        // A blocked pending invitation is hidden by MDK's page query but the keyed row
+        // lookup still returns it, so it cannot be treated as a missing active chat.
+        assertFalse(olderInvitation.belongsInActiveChats())
+    }
+
+    @Test
+    fun equalActivityUsesGroupIdAscendingAsMdkPageTieBreaker() {
+        val last = chatRow("bb").copy(activitySortAt = 20uL)
+        val incoming = listOf(presentedRow(last.groupIdHex).copy(row = last))
+        val window = topWindow(incoming, hasMoreAfter = true)
+
+        assertTrue(window.shouldContain(chatRow("aa").copy(activitySortAt = 20uL)))
+        assertFalse(window.shouldContain(chatRow("cc").copy(activitySortAt = 20uL)))
+    }
+
+    @Test
     fun shiftedWindowDoesNotTreatNormalPagingAsChatLoss() {
         val incoming = listOf(presentedRow(tail.groupIdHex))
         val shifted = topWindow(incoming, hasMoreBefore = true)
@@ -56,6 +78,9 @@ class ChatListReplacementGuardTest {
         assertFalse(pinnedDm.copy(archived = true).belongsInActiveChats())
         assertFalse(group.copy(selfMembership = SelfMembershipFfi.LEFT).belongsInActiveChats())
         assertFalse(group.copy(selfMembership = SelfMembershipFfi.REMOVED).belongsInActiveChats())
+        assertFalse(group.copy(leaveRequestPending = true).belongsInActiveChats())
+        assertFalse(group.copy(disbanding = true).belongsInActiveChats())
+        assertFalse(group.copy(lifecycleState = GroupLifecycleStateFfi.DISBANDED).belongsInActiveChats())
         assertTrue(group.belongsInActiveChats())
     }
 

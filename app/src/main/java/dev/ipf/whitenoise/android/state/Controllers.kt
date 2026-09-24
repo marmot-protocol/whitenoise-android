@@ -3061,9 +3061,7 @@ class ChatsController private constructor(
                             activeChatsSubscription = chatStream
                         }
                     }
-                    if (!validateChatListWindowRows(accountRef, chatListStream)) {
-                        throw IncompleteChatListReplacement()
-                    }
+                    requireCompleteChatListWindowRows(validateChatListWindowRows(accountRef, chatListStream))
                     replacePresentedChatRows(chatListStream.rows)
                     appState.recordAccountSwitchLocalRowsReady(accountRef, chatRows.size)
                     groupRecordsById =
@@ -3108,9 +3106,7 @@ class ChatsController private constructor(
                                         "chat list window view=$view sequence=${replacement.sequence} " +
                                             "rows=${replacement.rows.size} merged=${chatListStream.rows.size}"
                                     }
-                                    if (!applyChatListWindowRows(accountRef, chatListStream)) {
-                                        throw IncompleteChatListReplacement()
-                                    }
+                                    requireCompleteChatListWindowRows(applyChatListWindowRows(accountRef, chatListStream))
                                     receivedLiveUpdate = true
                                     connectionOwner.noteLiveUpdate(connectionAttempt)
                                 }
@@ -4205,6 +4201,7 @@ class ChatsController private constructor(
         return true
     }
 
+    @Suppress("ReturnCount") // A failed keyed read or a confirmed missing row must abort before replacing the coherent frame.
     private suspend fun validateChatListWindowRows(
         accountRef: String,
         windows: ChatListWindowSet,
@@ -4223,8 +4220,8 @@ class ChatsController private constructor(
             if (authoritative.belongsInActiveChats() && activeWindow?.shouldContain(authoritative) == true) {
                 Log.w(
                     "DMChats",
-                    "CHAT_LIST_INCOMPLETE account=${accountRef.hashCode().toUInt().toString(16)} " +
-                        "generation=${activeWindow.subscriptionGeneration.hashCode().toUInt().toString(16)} " +
+                    "CHAT_LIST_INCOMPLETE account=${accountRef.hashCode().toUInt().toString(CHAT_LIST_LOG_HASH_RADIX)} " +
+                        "generation=${activeWindow.subscriptionGeneration.hashCode().toUInt().toString(CHAT_LIST_LOG_HASH_RADIX)} " +
                         "sequence=${activeWindow.sequence} previous=${previous.size} incoming=${windows.rows.size}",
                 )
                 return false

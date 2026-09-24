@@ -214,10 +214,12 @@ internal class ChatListWindowSet private constructor(
 
 private suspend fun currentCoroutineContextIsActive(): Boolean = kotlinx.coroutines.currentCoroutineContext().isActive
 
+internal const val CHAT_LIST_LOG_HASH_RADIX = 16
+
 /** Debug-only numeric window diagnostics; no group IDs, titles, or message content. */
 private fun ChatListWindowSnapshotFfi.logWindowFrame(view: ChatListViewFfi, phase: String) {
     chatsDebug {
-        "chat window $phase view=$view generation=${subscriptionGeneration.hashCode().toUInt().toString(16)} " +
+        "chat window $phase view=$view generation=${subscriptionGeneration.hashCode().toUInt().toString(CHAT_LIST_LOG_HASH_RADIX)} " +
             "sequence=$sequence rows=${rows.size} before=$hasMoreBefore after=$hasMoreAfter"
     }
 }

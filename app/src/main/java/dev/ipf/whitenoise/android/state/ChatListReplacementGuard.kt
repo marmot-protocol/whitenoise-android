@@ -3,11 +3,17 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.ChatListAnchorOutcomeFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListWindowSnapshotFfi
+import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import java.util.Locale
 
 /** Ends the current window set so the controller's bounded reconnect path obtains a new authoritative frame. */
 internal class IncompleteChatListReplacement : IllegalStateException("incomplete active chat-list replacement")
+
+internal fun requireCompleteChatListWindowRows(complete: Boolean) {
+    if (!complete) throw IncompleteChatListReplacement()
+}
 
 /**
  * Rows worth checking against MDK before a top-of-list replacement removes them.
@@ -31,19 +37,24 @@ internal fun missingActiveTopChatRows(
 }
 
 /** The keyed MDK row is authoritative for archive, leave and deletion transitions. */
-internal fun ChatListRowFfi.belongsInActiveChats(): Boolean = !archived && selfMembership == SelfMembershipFfi.MEMBER
+internal fun ChatListRowFfi.belongsInActiveChats(): Boolean =
+    !archived &&
+        !pendingConfirmation &&
+        selfMembership == SelfMembershipFfi.MEMBER &&
+        !leaveRequestPending &&
+        !disbanding &&
+        lifecycleState != GroupLifecycleStateFfi.DISBANDED
 
-/** Conservative ranking: ties are left to MDK, while a strictly earlier row cannot fall off the top page. */
+/** Match MDK's pin, activity, and group-ID page order when deciding whether a row can fall off. */
 internal fun ChatListWindowSnapshotFfi.shouldContain(row: ChatListRowFfi): Boolean {
-    if (hasMoreBefore || anchor != ChatListAnchorOutcomeFfi.Top) return false
-    if (!hasMoreAfter) return true
-    val last = rows.lastOrNull()?.row ?: return true
-    if (row.pendingConfirmation != last.pendingConfirmation) return row.pendingConfirmation
-    if (row.pinned != last.pinned) return row.pinned
-    if (row.pinned && last.pinned) {
-        val position = row.pinnedPosition ?: UInt.MAX_VALUE
-        val lastPosition = last.pinnedPosition ?: UInt.MAX_VALUE
-        return position < lastPosition
+    val last = rows.lastOrNull()?.row
+    return when {
+        hasMoreBefore || anchor != ChatListAnchorOutcomeFfi.Top -> false
+        !hasMoreAfter || last == null -> true
+        row.pinned != last.pinned -> row.pinned
+        row.pinned && last.pinned && row.pinnedPosition != last.pinnedPosition ->
+            (row.pinnedPosition ?: UInt.MAX_VALUE) < (last.pinnedPosition ?: UInt.MAX_VALUE)
+        row.activitySortAt != last.activitySortAt -> row.activitySortAt > last.activitySortAt
+        else -> row.groupIdHex.lowercase(Locale.ROOT) < last.groupIdHex.lowercase(Locale.ROOT)
     }
-    return row.activitySortAt > last.activitySortAt
 }
