@@ -17,6 +17,8 @@ import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
+import dev.ipf.marmotkit.GroupMemberDetailsFfi
+import dev.ipf.marmotkit.GroupRosterFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.SelfMembershipFfi
@@ -75,6 +77,7 @@ class ConversationSendRetryIntegrationTest {
                     appState = appState,
                     initialGroup = group(),
                     initialMemberSnapshot = memberSnapshot(),
+                    groupRosterReader = { _, _ -> authoritativeRoster() },
                     textPublisher = { _, _, _, _ ->
                         releaseOriginal.await()
                         successfulSendSummary()
@@ -86,6 +89,8 @@ class ConversationSendRetryIntegrationTest {
                 )
 
             try {
+                controller.retryMembers()
+                assertTrue(controller.canSendMessages)
                 val original = async(start = CoroutineStart.UNDISPATCHED) { controller.send("original") }
                 val optimisticMessage = controller.timeline.single()
                 val clientToken = optimisticMessage.record.messageIdHex
@@ -99,7 +104,6 @@ class ConversationSendRetryIntegrationTest {
                 assertTrue(appState.pendingMessageEditHandoff.hasSession(handoffKey))
                 controller.cancelMessageEdit()
                 assertFalse(appState.pendingMessageEditHandoff.hasSession(handoffKey))
-                assertTrue(controller.canSendMessages)
                 runCurrent()
 
                 assertEquals(
@@ -1834,6 +1838,28 @@ class ConversationSendRetryIntegrationTest {
                     local = true,
                 ),
             ),
+        )
+
+    private fun authoritativeRoster() =
+        GroupRosterFfi(
+            groupIdHex = GROUP_ID,
+            members =
+                listOf(
+                    GroupMemberDetailsFfi(
+                        memberIdHex = ACCOUNT_ID,
+                        account = ACCOUNT_REF,
+                        local = true,
+                        isAdmin = true,
+                        isSelf = true,
+                        npub = "npub-$ACCOUNT_ID",
+                        displayName = null,
+                    ),
+                ),
+            epoch = 1uL,
+            rosterRevision = 1uL,
+            selfMembership = SelfMembershipFfi.MEMBER,
+            memberCount = 1u,
+            lifecycleState = GroupLifecycleStateFfi.STABLE,
         )
 
     private fun group(
