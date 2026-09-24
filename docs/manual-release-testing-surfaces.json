@@ -5769,6 +5769,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedContentChrome.kt",
         "anchor": "fun SharedContentCategories(",
         "test_ids": [
+          "GRP-001",
           "GRP-018"
         ]
       },
