@@ -217,6 +217,38 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
         composeRule.onRoot().captureRoboImage(FIRST_FRAME_RESOLVED_SNAPSHOT_PATH)
     }
 
+    /** Unknown remote filenames use a neutral file label in the actual received card. */
+    @Test
+    @Config(sdk = [36], qualifiers = "en-rUS-w360dp-h112dp-mdpi")
+    fun unnamedGeneralFileUsesNeutralFallback() {
+        val reference = fileReference("", "application/octet-stream")
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background)
+                        .padding(16.dp),
+                ) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        MediaFileBubbleContent(
+                            reference = reference,
+                            presentation = resolveAttachmentPresentation(reference.mediaType, reference.fileName),
+                            transferState = AttachmentTransferState.Remote,
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("file").assertExists()
+        composeRule.onRoot().captureRoboImage(UNNAMED_FILE_SNAPSHOT_PATH)
+    }
+
     /** Keeps an unconfirmed warning and timestamp inside the last file card under dense RTL layout. */
     @Test
     @Config(sdk = [36], qualifiers = "en-rUS-w320dp-h360dp-mdpi")
@@ -1089,3 +1121,4 @@ private const val FIRST_FRAME_UNRESOLVED_SNAPSHOT_PATH =
     "src/test/snapshots/received_file_first_frame_unresolved_light.png"
 private const val FIRST_FRAME_RESOLVED_SNAPSHOT_PATH =
     "src/test/snapshots/received_file_first_frame_resolved_light.png"
+private const val UNNAMED_FILE_SNAPSHOT_PATH = "src/test/snapshots/received_file_unnamed_generic_light.png"
