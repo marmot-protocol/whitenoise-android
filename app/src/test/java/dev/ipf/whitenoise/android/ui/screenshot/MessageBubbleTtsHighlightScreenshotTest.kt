@@ -40,8 +40,10 @@ import dev.ipf.whitenoise.android.audio.tts.speech.SpeechContext
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.TtsLeafHighlightResolver
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudHighlightStyle
+import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudProgress
 import dev.ipf.whitenoise.android.ui.conversation.messages.buildTtsLeafHighlightResolver
 import dev.ipf.whitenoise.android.ui.conversation.messages.preparedHighlightSpeech
+import dev.ipf.whitenoise.android.ui.conversation.messages.readAloudMessageSemantics
 import dev.ipf.whitenoise.android.ui.conversation.messages.rememberTtsReadAloudHighlightStyle
 import dev.ipf.whitenoise.android.ui.conversation.messages.ttsReadAloudHighlight
 import dev.ipf.whitenoise.android.ui.legacyTextToSpeakableProjection
@@ -123,6 +125,42 @@ class MessageBubbleTtsHighlightScreenshotTest {
     fun plainOutgoingWordHighlightDark() {
         renderPlain(mine = true, darkTheme = true, amoled = false)
         capture("message_bubble_tts_plain_outgoing_word_dark")
+    }
+
+    /**
+     * Records the visual contract that an active progress announcement shares
+     * the rendered message node and does not add height to its bubble.
+     */
+    @Test
+    fun activeProgressKeepsNaturalBubbleHeightLight() {
+        val text = "A naturally sized message bubble."
+        val projection = legacyTextToSpeakableProjection(text)
+        val passage =
+            TtsPassage(
+                messageIdHex = "m1",
+                sentenceIndex = 0,
+                projectionId = projection.projectionId,
+                visibleWord = listOf(TtsVisibleTextSpan("plain", 2, 11)),
+            )
+        val resolver = buildTtsLeafHighlightResolver(passage, "m1", projection, preparedHighlightSpeech(projection))
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false, amoled = false) {
+                BubbleFixture(mine = false, tag = TAG) { style ->
+                    readAloudMessageSemantics(
+                        progress =
+                            TtsReadAloudProgress(
+                                sentenceIndex = 0,
+                                sentenceCount = 1,
+                                messageIndex = 0,
+                                messageCount = 1,
+                            ),
+                    ) {
+                        HighlightedPlainLeaf(text = text, resolver = resolver, style = style)
+                    }
+                }
+            }
+        }
+        capture("message_bubble_tts_natural_height_light")
     }
 
     @Test

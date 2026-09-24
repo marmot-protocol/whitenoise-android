@@ -68,17 +68,23 @@ internal fun SharedContentCategories(
     onOpen: (SharedContentCategory) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val categories =
+        SharedContentCategory.entries.mapNotNull { category ->
+            val count =
+                when (category) {
+                    SharedContentCategory.Media -> tiles.visuals.size
+                    SharedContentCategory.Links -> tiles.urls.size
+                    SharedContentCategory.Documents -> tiles.files.size
+                    SharedContentCategory.Voice -> tiles.voice.size
+                }
+            if (count > 0) category to count else null
+        }
+    if (categories.isEmpty()) return
+
     SettingsSection(stringResource(R.string.shared_content_in_chat))
     SettingsGroup(modifier = modifier) {
-        SharedContentCategory.entries.forEach { category ->
+        categories.forEach { (category, count) ->
             row(key = category.name) {
-                val count =
-                    when (category) {
-                        SharedContentCategory.Media -> tiles.visuals.size
-                        SharedContentCategory.Links -> tiles.urls.size
-                        SharedContentCategory.Documents -> tiles.files.size
-                        SharedContentCategory.Voice -> tiles.voice.size
-                    }
                 val icon =
                     when (category) {
                         SharedContentCategory.Media -> R.drawable.ic_image
