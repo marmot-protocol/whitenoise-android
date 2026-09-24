@@ -185,7 +185,8 @@ class ChatListReconnectIntegrationTest {
                 release.await()
             }
         }
-        val controller = testChatsController(chatListTestAppState(testRecoveryDiagnostics(), subscriptions.liveSubscriptions))
+        val controller =
+            testChatsController(chatListTestAppState(testRecoveryDiagnostics(), subscriptions.liveSubscriptions))
         val bindScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         bindScope.launch { controller.bind(ConversationTimelineTestIds.ACCOUNT_REF) }
         try {
@@ -197,7 +198,10 @@ class ChatListReconnectIntegrationTest {
             release.complete(Unit)
             awaitChatListCondition { controller.chatRows.none { it.groupIdHex == pinned.groupIdHex } }
             shadowOf(Looper.getMainLooper()).idle()
-            assertEquals(setOf(group.groupIdHex, archived.groupIdHex), controller.chatRows.map { it.groupIdHex }.toSet())
+            assertEquals(
+                setOf(group.groupIdHex, archived.groupIdHex),
+                controller.chatRows.map { it.groupIdHex }.toSet(),
+            )
         } finally {
             release.complete(Unit)
             controller.onCleared()

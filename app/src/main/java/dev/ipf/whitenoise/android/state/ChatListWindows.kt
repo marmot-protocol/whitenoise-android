@@ -43,12 +43,14 @@ internal data class ChatListFrame(
 
 /**
  * One account's bounded live chat-list windows, merged into the single row set [ChatsController] renders.
+ * The window owns the frame-revision guard as well as native handles and paging.
  *
  * Each view owns a native handle, a [ChatListWindowCursor] and its newest installed replacement. A
  * command result and its stream echo are deduplicated by sequence, a foreign generation ends the
  * receive loop so the controller reopens every window, and a stale or outside-anchor command is
  * dropped in favour of the newest installed state instead of being repeated.
  */
+@Suppress("TooManyFunctions") // Native window operations and their atomic frame guard share one lifecycle.
 internal class ChatListWindowSet private constructor(
     private val handles: Map<ChatListViewFfi, ChatListWindowHandle>,
     initial: Map<ChatListViewFfi, ChatListWindowSnapshotFfi>,
