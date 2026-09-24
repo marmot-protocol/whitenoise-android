@@ -9804,7 +9804,8 @@ class ConversationController(
      * while the FFI call is in flight. On success it follows the same
      * confirmed-id swap path as [send]; on failure it returns to Failed.
      */
-    @Suppress("CyclomaticComplexMethod") // Preserve the covered original-send and failed-edit retry path.
+    // The original-send retry is one transaction; the failed-edit guard precedes it.
+    @Suppress("CyclomaticComplexMethod", "LongMethod", "ReturnCount")
     suspend fun retryFailedSend(item: TimelineMessage) {
         val key = item.id
         // A failed edit's bubble is the target's projected row (no
