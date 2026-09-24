@@ -59,41 +59,7 @@ class FocusedMessageImeOverlayTest {
     @Test
     fun longTextPreviewAtLargeFontKeepsDeleteReachable() {
         var deletes = 0
-        composeRule.setContent {
-            WhiteNoiseTheme(fontScale = 2f) {
-                MessageActionMenu(
-                    expanded = true,
-                    anchorBoundsInWindow = IntRect(0, 180, 360, 240),
-                    anchorWindowYPx = 210f,
-                    canReply = true,
-                    canReact = true,
-                    canDelete = true,
-                    canEdit = true,
-                    canForward = true,
-                    canSelect = true,
-                    canCopyText = true,
-                    canSpeak = true,
-                    canSelectText = true,
-                    canSave = true,
-                    quickReactionEmojis = listOf("👍", "❤️", "😂", "😮", "😢", "👏"),
-                    onDismissRequest = {},
-                    onReact = {},
-                    onOpenEmojiPicker = {},
-                    onReply = {},
-                    onEdit = {},
-                    onForward = {},
-                    onSelect = {},
-                    onSelectText = {},
-                    onCopyText = {},
-                    onSpeak = {},
-                    onSave = {},
-                    onInfo = {},
-                    onDelete = { deletes++ },
-                    previewDescription = "Long lifted text message",
-                    preview = { longTextPreview() },
-                )
-            }
-        }
+        showLongTextMenu { deletes++ }
         composeRule.waitForIdle()
 
         val preview = composeRule.onNodeWithTag("message-actions-preview").fetchSemanticsNode().boundsInRoot
@@ -123,6 +89,44 @@ class FocusedMessageImeOverlayTest {
             .assertIsDisplayed()
             .performClick()
         composeRule.runOnIdle { assertEquals(1, deletes) }
+    }
+
+    private fun showLongTextMenu(onDelete: () -> Unit) {
+        composeRule.setContent {
+            WhiteNoiseTheme(fontScale = 2f) {
+                MessageActionMenu(
+                    expanded = true,
+                    anchorBoundsInWindow = IntRect(0, 180, 360, 240),
+                    anchorWindowYPx = 210f,
+                    canReply = true,
+                    canReact = true,
+                    canDelete = true,
+                    canEdit = true,
+                    canForward = true,
+                    canSelect = true,
+                    canCopyText = true,
+                    canSpeak = true,
+                    canSelectText = true,
+                    canSave = true,
+                    quickReactionEmojis = listOf("👍", "❤️", "😂", "😮", "😢", "👏"),
+                    onDismissRequest = {},
+                    onReact = {},
+                    onOpenEmojiPicker = {},
+                    onReply = {},
+                    onEdit = {},
+                    onForward = {},
+                    onSelect = {},
+                    onSelectText = {},
+                    onCopyText = {},
+                    onSpeak = {},
+                    onSave = {},
+                    onInfo = {},
+                    onDelete = onDelete,
+                    previewDescription = "Long lifted text message",
+                    preview = { longTextPreview() },
+                )
+            }
+        }
     }
 
     @Composable
