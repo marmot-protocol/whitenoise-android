@@ -1295,6 +1295,7 @@ class LocalNotificationPresenterConversationTest {
         assertTrue(manager.activeNotifications.isEmpty())
     }
 
+    /** Nickname refresh rewrites every matching sender while preserving message payload metadata. */
     @Test
     fun nicknameRefreshRenamesEveryMatchingSenderWithoutDroppingMessageMetadata() {
         presenter.ensureChannels()
@@ -1357,6 +1358,7 @@ class LocalNotificationPresenterConversationTest {
         assertEquals("nostr:$DEFAULT_NOTIFICATION_SENDER_ID", messages.first().person?.uri)
     }
 
+    /** Nickname refresh updates the expanded single-message bridge before it gains history. */
     @Test
     fun nicknameRefreshUpdatesExpandedSingleMessageBeforeItBecomesHistory() {
         presenter.ensureChannels()

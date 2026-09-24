@@ -162,6 +162,7 @@ class NotificationFirstPostRecipientTest {
 
         override suspend fun mediaKind(update: NotificationUpdateFfi): ReplyMediaKind = ReplyMediaKind.None
 
+        /** Supplies the signing identities whose conversation relevance is being evaluated. */
         override fun signedInAccountIds(): Set<String> = signedInIds
     }
 }

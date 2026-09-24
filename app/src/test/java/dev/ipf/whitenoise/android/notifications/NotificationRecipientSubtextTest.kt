@@ -5,6 +5,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class NotificationRecipientSubtextTest {
+    /** Recipient subtext appears only when multiple signed-in accounts belong to the conversation. */
     @Test
     fun recipientSubtextShownOnlyWhenMultipleAccountsAreRelevant() {
         assertNull(

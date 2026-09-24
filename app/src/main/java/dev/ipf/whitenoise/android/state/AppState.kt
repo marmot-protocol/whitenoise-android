@@ -2364,13 +2364,22 @@ class WhiteNoiseAppState private constructor(
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
     private val notificationFirstPostContentCoordinator =
         NotificationFirstPostContentCoordinator(notificationScope, notificationDispatcher, SystemClock::elapsedRealtime)
-
     private val notificationContentResolution by lazy {
         createNotificationContentResolutionServices(appContext, NotificationContentReads())
     }
     private val notificationNicknameRefresh by lazy {
-        val identity = notificationContentResolution.identity
-        NotificationNicknameRefreshCoordinator(notificationScope, identity, localNotificationPresenter)
+        NotificationNicknameRefreshCoordinator(
+            notificationScope,
+            notificationContentResolution.identity,
+            localNotificationPresenter,
+        )
+    }
+    private val conversationOpenDismissals by lazy {
+        ConversationOpenNotificationDismissalCoordinator(
+            notificationScope,
+            notificationCardCancellationDispatcher,
+            localNotificationPresenter,
+        )
     }
 
     /** Delegates live notification reads without creating a callback class for each dependency. */
@@ -2414,6 +2423,7 @@ class WhiteNoiseAppState private constructor(
                 ::notificationMessageRecord,
             )
 
+        /** Projects only identities that can currently sign notification actions. */
         override fun signedInAccountIds(): Set<String> = accounts.signedInSigningAccountIds()
     }
 
@@ -7754,10 +7764,8 @@ class WhiteNoiseAppState private constructor(
         accountRef: String?,
         groupIdHex: String?,
     ) {
-        // Notification routing can render a conversation under its pinned
-        // account before that account becomes active. Keep suppression and
-        // dismissal tied to the account that owns the visible controller;
-        // closing (null) clears both halves via the transition.
+        conversationOpenDismissals.invalidate()
+        // Keep notification routing suppression and dismissal tied to the pinned conversation owner.
         updateNotificationSuppression(
             suppression.onActiveConversation(groupIdHex, accountRef = if (groupIdHex != null) accountRef else null),
         )
@@ -7811,22 +7819,7 @@ class WhiteNoiseAppState private constructor(
         // Publish ownership first so suppression is authoritative for the
         // visible route even if a platform cancellation call fails.
         applyActiveConversationTransition(accountRef, groupIdHex)
-        conversationOpenDismissalTarget(accountRef, groupIdHex)?.let { target ->
-            notificationScope.launch(notificationCardCancellationDispatcher) {
-                runCatching {
-                    localNotificationPresenter.dismissConversationMessages(
-                        target.accountRef,
-                        target.groupIdHex,
-                        dispatcher = notificationCardCancellationDispatcher,
-                    ) {
-                        activeConversationAccountRef == target.accountRef &&
-                            activeConversationGroupIdHex == target.groupIdHex
-                    }
-                }.onFailure {
-                    appStateDebug { "notification dismiss failed group=${target.groupIdHex.take(8)}" }
-                }
-            }
-        }
+        conversationOpenDismissals.dismiss(accountRef, groupIdHex)
         appStateDebug {
             "active conversation=${groupIdHex?.take(8) ?: "<none>"} account=${activeConversationAccountRef?.take(8) ?: "<none>"}"
         }

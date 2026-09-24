@@ -23,68 +23,6 @@ import (
 	"github.com/nbd-wtf/go-nostr/nip46"
 )
 
-// rehearsalRelay preserves the latest signer response across ZSP reconnect and subscription races.
-type rehearsalRelay struct {
-	mu               sync.Mutex
-	response         *nostr.Event
-	nextConnectionID uint64
-	subscribers      map[relaySubscription]func(...any)
-}
-
-type relaySubscription struct {
-	connectionID uint64
-	id           string
-}
-
-// newRehearsalRelay creates an empty loopback relay used only by the offline signer rehearsal.
-func newRehearsalRelay() *rehearsalRelay {
-	return &rehearsalRelay{subscribers: map[relaySubscription]func(...any){}}
-}
-
-// registerConnection reserves an identity so equal subscription IDs on separate sockets remain independent.
-func (r *rehearsalRelay) registerConnection() uint64 {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.nextConnectionID++
-	return r.nextConnectionID
-}
-
-// subscribe registers a subscription and replays the latest response when publication won the race.
-func (r *rehearsalRelay) subscribe(connectionID uint64, id string, send func(...any)) {
-	r.mu.Lock()
-	r.subscribers[relaySubscription{connectionID: connectionID, id: id}] = send
-	response := r.response
-	r.mu.Unlock()
-	if response != nil {
-		send("EVENT", id, *response)
-	}
-}
-
-// unsubscribeConnection removes every subscription owned by a closed websocket.
-func (r *rehearsalRelay) unsubscribeConnection(connectionID uint64) {
-	r.mu.Lock()
-	for subscription := range r.subscribers {
-		if subscription.connectionID == connectionID {
-			delete(r.subscribers, subscription)
-		}
-	}
-	r.mu.Unlock()
-}
-
-// publish retains and sends a signer response without holding the relay lock during socket writes.
-func (r *rehearsalRelay) publish(response nostr.Event) {
-	r.mu.Lock()
-	r.response = &response
-	subscribers := make(map[relaySubscription]func(...any), len(r.subscribers))
-	for subscription, send := range r.subscribers {
-		subscribers[subscription] = send
-	}
-	r.mu.Unlock()
-	for subscription, send := range subscribers {
-		send("EVENT", subscription.id, response)
-	}
-}
-
 func main() {
 	if err := rehearse(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -133,7 +71,7 @@ func rehearse() error {
 	}
 	defer listener.Close()
 	var mu sync.Mutex
-	relay := newRehearsalRelay()
+	peers := map[*websocket.Conn]string{}
 	requests, forbidden := 0, 0
 	server := &http.Server{ReadHeaderTimeout: 5 * time.Second}
 	server.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -142,16 +80,7 @@ func rehearse() error {
 			return
 		}
 		defer conn.CloseNow()
-		connectionID := relay.registerConnection()
-		defer relay.unsubscribeConnection(connectionID)
-		sub := ""
-		var writeMu sync.Mutex
-		send := func(values ...any) {
-			payload, _ := json.Marshal(values)
-			writeMu.Lock()
-			defer writeMu.Unlock()
-			_ = conn.Write(ctx, websocket.MessageText, payload)
-		}
+		defer func() { mu.Lock(); delete(peers, conn); mu.Unlock() }()
 		for {
 			_, raw, err := conn.Read(ctx)
 			if err != nil {
@@ -163,31 +92,36 @@ func rehearse() error {
 			}
 			var kind string
 			json.Unmarshal(parts[0], &kind)
+			mu.Lock()
+			send := func(c *websocket.Conn, values ...any) {
+				payload, _ := json.Marshal(values)
+				c.Write(ctx, websocket.MessageText, payload)
+			}
 			switch kind {
 			case "REQ":
+				var sub string
 				json.Unmarshal(parts[1], &sub)
-				relay.subscribe(connectionID, sub, send)
-				send("EOSE", sub)
+				peers[conn] = sub
+				send(conn, "EOSE", sub)
 			case "EVENT":
 				var event nostr.Event
 				json.Unmarshal(parts[1], &event)
 				valid, _ := event.CheckSignature()
 				if event.Kind != 24133 || event.PubKey != clientPub || !valid {
-					mu.Lock()
 					forbidden++
-					mu.Unlock()
-					send("OK", event.ID, false, "fixture only accepts its preseeded NIP-46 client")
+					send(conn, "OK", event.ID, false, "fixture only accepts its preseeded NIP-46 client")
 				} else {
 					_, _, response, err := signer.HandleRequest(ctx, &event)
 					if err == nil {
-						mu.Lock()
 						requests++
-						mu.Unlock()
-						send("OK", event.ID, true, "")
-						relay.publish(response)
+						send(conn, "OK", event.ID, true, "")
+						for peer, sub := range peers {
+							send(peer, "EVENT", sub, response)
+						}
 					}
 				}
 			}
+			mu.Unlock()
 		}
 	})
 	go server.Serve(listener)

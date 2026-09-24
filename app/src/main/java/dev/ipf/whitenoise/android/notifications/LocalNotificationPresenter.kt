@@ -82,6 +82,13 @@ internal data class ConversationDismissalResult(
                 }
 }
 
+/** Opening-time boundary used to keep queued cleanup from consuming later notifications. */
+internal data class ConversationDismissalRequest(
+    val accountRef: String,
+    val groupIdHex: String,
+    val cutoffMs: Long,
+)
+
 @SuppressLint("MissingPermission")
 private fun postLocalNotification(
     manager: NotificationManagerCompat,
@@ -231,18 +238,37 @@ class LocalNotificationPresenter(
             refreshed
         }
 
-    /** Clears every opening-time card for one conversation with bounded convergence retries. */
+    /** Invalidates in-flight cards and captures the exact opening-time cleanup boundary. */
+    internal fun captureConversationDismissal(
+        accountRef: String,
+        groupIdHex: String,
+    ): ConversationDismissalRequest? {
+        if (accountRef.isBlank() || groupIdHex.isBlank()) return null
+        ConversationCardPostSynchronizer.markConversationDismissed(ConversationCardScope(accountRef, groupIdHex))
+        return ConversationDismissalRequest(accountRef, groupIdHex, nowMillis())
+    }
+
+    /** Captures and clears every opening-time card for one conversation. */
     suspend fun dismissConversationMessages(
         accountRef: String,
         groupIdHex: String,
         dispatcher: CoroutineDispatcher = Dispatchers.Default,
         shouldContinue: () -> Boolean = { true },
+    ): Boolean {
+        val request = captureConversationDismissal(accountRef, groupIdHex) ?: return false
+        return dismissConversationMessages(request, dispatcher, shouldContinue)
+    }
+
+    /** Clears one captured opening boundary while its navigation owner remains current. */
+    internal suspend fun dismissConversationMessages(
+        request: ConversationDismissalRequest,
+        dispatcher: CoroutineDispatcher = Dispatchers.Default,
+        shouldContinue: () -> Boolean = { true },
     ): Boolean =
         withContext(dispatcher) {
-            if (accountRef.isBlank() || groupIdHex.isBlank()) return@withContext false
-            ConversationCardPostSynchronizer.markConversationDismissed(ConversationCardScope(accountRef, groupIdHex))
-            val cutoffMs = System.currentTimeMillis()
-            var result = dismissConversationMessagesOnce(accountRef, groupIdHex, cutoffMs)
+            if (!shouldContinue()) return@withContext false
+            var result =
+                dismissConversationMessagesOnce(request.accountRef, request.groupIdHex, request.cutoffMs)
             var attempts = 1
             var retryOwned = shouldContinue()
             while (!result.complete && attempts < CONVERSATION_DISMISSAL_MAX_ATTEMPTS && retryOwned) {
@@ -250,12 +276,13 @@ class LocalNotificationPresenter(
                 currentCoroutineContext().ensureActive()
                 retryOwned = shouldContinue()
                 if (retryOwned) {
-                    result = dismissConversationMessagesOnce(accountRef, groupIdHex, cutoffMs)
+                    result =
+                        dismissConversationMessagesOnce(request.accountRef, request.groupIdHex, request.cutoffMs)
                     attempts += 1
                 }
             }
-            logConversationDismissal(groupIdHex, attempts, result)
-            true
+            logConversationDismissal(request.groupIdHex, attempts, result)
+            result.complete
         }
 
     /**
@@ -267,12 +294,10 @@ class LocalNotificationPresenter(
         accountRef: String,
         groupIdHex: String,
     ): Boolean {
-        if (accountRef.isBlank() || groupIdHex.isBlank()) return false
-        ConversationCardPostSynchronizer.markConversationDismissed(ConversationCardScope(accountRef, groupIdHex))
-        val cutoffMs = System.currentTimeMillis()
-        val result = dismissConversationMessagesOnce(accountRef, groupIdHex, cutoffMs)
+        val request = captureConversationDismissal(accountRef, groupIdHex) ?: return false
+        val result = dismissConversationMessagesOnce(accountRef, groupIdHex, request.cutoffMs)
         logConversationDismissal(groupIdHex, attempts = 1, result)
-        return true
+        return result.complete
     }
 
     /** Runs one cancellation and verification pass without invalidating genuinely later registrations. */

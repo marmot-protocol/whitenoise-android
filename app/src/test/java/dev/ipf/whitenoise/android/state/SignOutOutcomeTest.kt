@@ -148,6 +148,7 @@ class OtherAccountAvatarsTest {
         assertEquals(listOf("Amber"), others.map { it.label })
     }
 
+    /** Local and external signers are active identities; read-only, blank, and signed-out entries are not. */
     @Test
     fun signedInSigningAccountIncludesExternalSignersButNotReadOnlyOrSignedOut() {
         assertTrue(account("local").isSignedInSigningAccount())

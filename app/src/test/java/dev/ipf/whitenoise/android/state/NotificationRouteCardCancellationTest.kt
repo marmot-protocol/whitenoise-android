@@ -88,6 +88,20 @@ class NotificationRouteCardCancellationTest {
             assertEquals(2, manager.activeNotifications.size)
         }
 
+    /** A later conversation transition retires queued cleanup before its first platform read. */
+    @Test
+    fun replacedVisibleConversationCannotRunItsQueuedCleanup() =
+        runTest {
+            val state = appState(StandardTestDispatcher(testScheduler))
+            state.setActiveConversationFromUi(TARGET, GROUP)
+            state.setActiveConversationFromUi(SOURCE, GROUP)
+
+            testScheduler.runCurrent()
+
+            val targetKey = LocalNotificationFormatter.conversationDismissalKey(TARGET, GROUP)
+            assertEquals(listOf(targetKey.tag to targetKey.id), manager.activeNotifications.map { it.tag to it.id })
+        }
+
     /** Avoids platform services and native account access while using the real notification presenter. */
     private fun appState(dispatcher: CoroutineDispatcher) =
         WhiteNoiseAppState(

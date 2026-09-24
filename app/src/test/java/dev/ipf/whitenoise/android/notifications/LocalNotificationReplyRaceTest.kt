@@ -70,6 +70,7 @@ class LocalNotificationReplyRaceTest {
         val showFailure = AtomicReference<Throwable>()
         ConversationCardPostSynchronizer.testHook =
             object : ConversationCardTestHook {
+                /** Holds the successful platform write open until dismissal owns the generation. */
                 override fun onBarrier(
                     op: ConversationCardOp,
                     barrier: ConversationCardBarrier,
@@ -87,6 +88,7 @@ class LocalNotificationReplyRaceTest {
                     }
                 }
 
+                /** Signals when the cleanup is serialized behind the completed write. */
                 override fun onAwaitingLock(
                     op: ConversationCardOp,
                     notificationTag: String,
@@ -391,6 +393,7 @@ class LocalNotificationReplyRaceTest {
         assertTrue(manager.activeNotifications.isEmpty())
     }
 
+    /** Conversation opening waits for a registered write, then cancels that write before completion. */
     @Test
     fun conversationDismissWaitsForInFlightPostThenCancelsIt() {
         val conversation = conversationKey()
@@ -558,7 +561,7 @@ class LocalNotificationReplyRaceTest {
         assertTrue(manager.activeNotifications.isEmpty())
     }
 
-    /** A nickname rewrite keeps the original card age so an overlapping conversation open still cancels it. */
+    /** A nickname rewrite that loses dismissal ownership cannot repost its stale card. */
     @Suppress("LongMethod") // The complete latch ordering is the regression contract for this race.
     @Test
     fun conversationDismissOwnsNicknameRewriteThatLandsAfterItsCutoff() {
@@ -643,6 +646,7 @@ class LocalNotificationReplyRaceTest {
         assertTrue(manager.activeNotifications.isEmpty())
     }
 
+    /** Dismissal invalidates a show that registered before it could enter the card lock. */
     @Test
     fun conversationDismissInvalidatesPostThatHasRegisteredButNotReachedTheLock() {
         val conversation = conversationKey()
@@ -654,6 +658,7 @@ class LocalNotificationReplyRaceTest {
         val showFailure = AtomicReference<Throwable>()
         ConversationCardPostSynchronizer.testHook =
             object : ConversationCardTestHook {
+                /** Holds the registered post so opening can invalidate it before the card lock. */
                 override fun onBarrier(
                     op: ConversationCardOp,
                     barrier: ConversationCardBarrier,
@@ -699,6 +704,7 @@ class LocalNotificationReplyRaceTest {
         assertTrue(manager.activeNotifications.isEmpty())
     }
 
+    /** Opening a conversation invalidates an opaque invite registered before the opening boundary. */
     @Test
     fun conversationDismissInvalidatesOpaqueInviteRegisteredBeforeTheOpen() {
         val presenter = LocalNotificationPresenter(context)
@@ -710,6 +716,7 @@ class LocalNotificationReplyRaceTest {
         val showFailure = AtomicReference<Throwable>()
         ConversationCardPostSynchronizer.testHook =
             object : ConversationCardTestHook {
+                /** Holds the opaque invite after registration so opening can invalidate it deterministically. */
                 override fun onBarrier(
                     op: ConversationCardOp,
                     barrier: ConversationCardBarrier,
@@ -809,6 +816,7 @@ class LocalNotificationReplyRaceTest {
         isFromSelf = false,
     )
 
+    /** Builds the stable opaque-invite fixture shared by dismissal race tests. */
     private fun groupInviteUpdate() =
         NotificationUpdateFfi(
             notificationKey = "opaque-invite-key",
@@ -831,6 +839,7 @@ class LocalNotificationReplyRaceTest {
             isFromSelf = false,
         )
 
+    /** Builds a keyed MessagingStyle card so rename races can identify the sender without text matching. */
     private fun messagingNotification(
         messageIdHex: String?,
         vararg lines: Pair<String, Long>,
@@ -862,6 +871,7 @@ class LocalNotificationReplyRaceTest {
             }.build()
     }
 
+    /** Builds a notification identity with a stable sender key for reconciliation tests. */
     private fun user(
         accountIdHex: String = SENDER,
         displayName: String? = null,

@@ -119,6 +119,7 @@ class LocalNotificationDismissalTest {
         assertEquals(1, manager.activeNotifications.size)
     }
 
+    /** Opening one conversation clears all of its card types without crossing account or group scope. */
     @Test
     fun dismissConversationMessagesClearsSiblingCardsAndInviteOnlyForTargetConversation() {
         val account = "account-a"
@@ -152,6 +153,7 @@ class LocalNotificationDismissalTest {
         assertEquals(listOf(other.tag to other.id), remaining)
     }
 
+    /** A stale first platform snapshot triggers another pass that observes successful removal. */
     @Test
     fun staleFirstSnapshotRetriesUntilTheConversationCardIsAbsent() {
         val account = "account-stale"
@@ -174,6 +176,7 @@ class LocalNotificationDismissalTest {
         assertTrue(manager.activeNotifications.isEmpty())
     }
 
+    /** One failed sibling cancellation is isolated and retried without blocking the other card. */
     @Test
     fun oneCancellationFailureDoesNotBlockSiblingCardsAndIsRetried() {
         val account = "account-failure"
@@ -204,6 +207,7 @@ class LocalNotificationDismissalTest {
         assertTrue(manager.activeNotifications.isEmpty())
     }
 
+    /** A card newer than the captured conversation-open boundary remains visible. */
     @Test
     fun cardPostedAfterConversationOpenBoundarySurvivesVerification() {
         val account = "account-newer"
@@ -240,8 +244,9 @@ class LocalNotificationDismissalTest {
         assertTrue(cancelled.isEmpty())
     }
 
+    /** Ownership loss before dispatch prevents even the first cancellation pass. */
     @Test
-    fun navigationOwnershipLossStopsBeforeAConvergenceRetry() {
+    fun navigationOwnershipLossStopsBeforeTheFirstCancellationPass() {
         val account = "account-navigation"
         val group = "group-navigation"
         val conversation = LocalNotificationFormatter.conversationDismissalKey(account, group)
@@ -256,14 +261,49 @@ class LocalNotificationDismissalTest {
                 },
             )
 
-        assertTrue(
+        assertFalse(
             runBlocking {
                 presenter.dismissConversationMessages(account, group, shouldContinue = { false })
             },
         )
 
-        assertEquals(2, reads.get())
+        assertEquals(0, reads.get())
         assertEquals(listOf(conversation.tag to conversation.id), manager.activeNotifications.map { it.tag to it.id })
+    }
+
+    /** A queued cleanup retains its opening-time cutoff instead of aging while awaiting dispatch. */
+    @Test
+    fun queuedCleanupUsesTheCapturedOpeningBoundary() {
+        val account = "account-queued"
+        val group = "group-queued"
+        val conversation = LocalNotificationFormatter.conversationDismissalKey(account, group)
+        var nowMs = 1_000L
+        val newerCard =
+            StatusBarNotification(
+                context.packageName,
+                context.packageName,
+                conversation.id,
+                conversation.tag,
+                1_000,
+                0,
+                0,
+                notification(),
+                Process.myUserHandle(),
+                nowMs + 1,
+            )
+        val cancelled = mutableListOf<NotificationDismissalKey>()
+        val presenter =
+            LocalNotificationPresenter(
+                context = context,
+                nowMillis = { nowMs },
+                notificationCanceller = { _, tag, id -> cancelled += NotificationDismissalKey(tag, id) },
+                activeNotificationsProvider = { arrayOf(newerCard) },
+            )
+        val request = requireNotNull(presenter.captureConversationDismissal(account, group))
+        nowMs += 10_000
+
+        assertTrue(runBlocking { presenter.dismissConversationMessages(request) })
+        assertTrue(cancelled.isEmpty())
     }
 
     @Test
@@ -570,7 +610,10 @@ class LocalNotificationDismissalTest {
         val presenter =
             LocalNotificationPresenter(
                 context,
-                notificationCanceller = { _, tag, id -> cancelled += tag to id },
+                notificationCanceller = { compat, tag, id ->
+                    cancelled += tag to id
+                    compat.cancel(tag, id)
+                },
             )
 
         assertTrue(presenter.dismissConversationMessagesImmediately(account, group))

@@ -81,6 +81,7 @@ class LocalNotificationEnrichmentRaceTest {
             )
         ConversationCardPostSynchronizer.testHook =
             object : ConversationCardTestHook {
+                /** Signals when dismissal is queued behind the in-flight enrichment write. */
                 override fun onAwaitingLock(
                     op: ConversationCardOp,
                     notificationTag: String,
