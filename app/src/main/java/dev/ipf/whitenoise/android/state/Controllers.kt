@@ -7512,9 +7512,11 @@ class ConversationController(
                         updatePagination = true,
                         reconcileNewExtendedRecords = true,
                     )
-                // An authoritative window is the recovery a stood-down forward prefetch was
-                // waiting for, so the viewport may ask for newer content again (#2764).
-                automaticNewerPaging.reset()
+                // An authoritative window is the recovery a stood-down prefetch was waiting
+                // for, so the viewport may ask for more content in either direction (#2764).
+                // A reader parked at the start of history therefore asks once more per live
+                // batch, which is bounded by arrivals rather than by layout passes (#2727).
+                automaticPaging.reset()
                 publishRecoveryTimelineProjection(batch.mapNotNull { it.recoveryGeneration }.maxOrNull())
                 // Scroll-driven mark-read in the UI layer handles
                 // the user-visible read pointer.
@@ -11015,8 +11017,12 @@ class ConversationController(
         }.getOrNull()
     }
 
-    suspend fun loadOlder(anchorMessageIdHex: String? = null) {
-        loadOlderPage(anchorMessageIdHex)
+    /** Pages older from [anchorMessageIdHex]; an automatic [origin] stands down once the engine has nothing older. */
+    suspend fun loadOlder(
+        anchorMessageIdHex: String? = null,
+        origin: PagingOrigin = PagingOrigin.EXPLICIT,
+    ) {
+        loadOlderPage(anchorMessageIdHex, origin)
     }
 
     /** True when the canonical timeline holds more history after the loaded window. */
@@ -11136,7 +11142,10 @@ class ConversationController(
      *
      * True only when new rows arrived, so callers that page in a loop still stop on no progress.
      */
-    private suspend fun loadOlderPage(anchorMessageIdHex: String? = null): Boolean = loadOlderPageInternal(anchorMessageIdHex) == ConversationPageLoad.ADVANCED
+    private suspend fun loadOlderPage(
+        anchorMessageIdHex: String? = null,
+        origin: PagingOrigin = PagingOrigin.EXPLICIT,
+    ): Boolean = loadOlderPageInternal(anchorMessageIdHex, origin) == ConversationPageLoad.ADVANCED
 
     /** Pages the window newer for [origin]; true only when new rows arrived. */
     private suspend fun loadNewerPage(origin: PagingOrigin = PagingOrigin.EXPLICIT): Boolean {
@@ -11144,12 +11153,16 @@ class ConversationController(
         return load == ConversationPageLoad.ADVANCED
     }
 
-    // Bounds the opportunistic forward prefetch after a failure the reader is never shown (#2764).
-    internal val automaticNewerPaging = AutomaticNewerPagingGuard()
+    // Bounds the opportunistic prefetch in each direction once it stops making progress (#2764, #2727).
+    internal val automaticPaging = AutomaticPagingGuards()
 
     /** Whether viewport-driven forward prefetch should stand down until a page advances. */
     val automaticNewerPagingBlocked: Boolean
-        get() = automaticNewerPaging.blocked
+        get() = automaticPaging.newer.blocked
+
+    /** Whether scroll-driven older prefetch should stand down after a page brought no older rows (#2727). */
+    val automaticOlderPagingBlocked: Boolean
+        get() = automaticPaging.older.blocked
 
     /**
      * Whether an older page failed in a way the reader must retry.
@@ -11379,6 +11392,9 @@ class ConversationController(
             hasMoreBefore = applied.hasMoreBefore
             hasMoreAfter = applied.hasMoreAfter
         }
+        // A rebuilt window is a new place in history, so a prefetch that stood down at the old
+        // edge gets to ask again from here (#2727).
+        if (replaceWindow || prepared.mode == WindowApplyMode.REPLACE) automaticPaging.reset()
         // Rows this page kept skip re-projection, so their projected items still carry the ordinal
         // from where the window used to sit. Display sorts on that ordinal, so re-stamp it before
         // publishing or a slid window would reorder history the reader is looking at.

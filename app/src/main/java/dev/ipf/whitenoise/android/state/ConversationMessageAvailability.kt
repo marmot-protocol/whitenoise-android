@@ -76,6 +76,9 @@ private suspend fun ConversationController.jumpWindowToMessage(messageIdHex: Str
                     reconcileNewExtendedRecords = true,
                 )
             }
+            // The reader landed somewhere else in history, so an older prefetch that stood
+            // down at the previous edge may ask again from here (#2727).
+            automaticPaging.older.reset()
         },
     )
 

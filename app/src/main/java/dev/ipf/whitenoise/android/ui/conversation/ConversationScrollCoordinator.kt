@@ -422,23 +422,36 @@ internal class ConversationScrollCoordinator(
         )
     }
 
-    /** Commits the durable tail or history intent selected by a completed user gesture. */
+    /**
+     * Commits the durable tail or history intent selected by a completed user gesture.
+     *
+     * The gesture now settles only once its fling has come to rest, so a command the reader
+     * started while the transcript was still coasting, a send, the jump button or a reply quote,
+     * may already own the list. That command supersedes the gesture: it settles its own mode when
+     * it completes, and cancelling it here would discard the reader's later, deliberate action.
+     * Where the gesture ended is still recorded as the durable intent, so a command that fails
+     * falls back to it rather than to the anchor captured when the finger first landed, but the
+     * command's transient mode is left untouched so nothing re-anchors underneath it.
+     */
     fun onUserGestureSettled(
         anchor: ConversationScrollAnchor,
         nearBottom: Boolean,
     ) {
-        invalidateActiveCommand()
         userGestureInProgress = false
-        if (nearBottom) {
-            readingAnchor = null
-            setSettledMode(ConversationScrollMode.FollowingTail, forceRevision = true)
-        } else {
-            readingAnchor = anchor
-            setSettledMode(
-                ConversationScrollMode.ReadingHistory(anchor.messageId, anchor.pixelOffset),
-                forceRevision = true,
-            )
+        val settled =
+            if (nearBottom) {
+                ConversationScrollMode.FollowingTail
+            } else {
+                ConversationScrollMode.ReadingHistory(anchor.messageId, anchor.pixelOffset)
+            }
+        readingAnchor = anchor.takeUnless { nearBottom }
+        if (activeCommand != null) {
+            intentLifetime.advance()
+            settledMode = settled
+            return
         }
+        invalidateActiveCommand()
+        setSettledMode(settled, forceRevision = true)
     }
 
     /** Replaces transient command ownership with a durable logical history anchor. */
@@ -929,11 +942,19 @@ private val ConversationScrollReason.supersedesUnreadJump: Boolean
 /**
  * Processes a newer drag immediately, cancelling any older Stop/Cancel waiter
  * that is still waiting for fling motion to finish.
+ *
+ * The drag stops when the finger lifts, and Compose starts the fling only after
+ * it has reported that stop, so at that instant the list reads as idle although
+ * it is about to coast. [awaitFrame] lets the fling begin before
+ * [awaitScrollSettled] is consulted, otherwise a flick would settle at its
+ * release point and hand history re-anchoring a stale anchor to snap the
+ * coasting transcript back to (#2727).
  */
 internal suspend fun Flow<Interaction>.collectConversationDragInteractions(
     onStarted: () -> Unit,
     awaitScrollSettled: suspend () -> Unit,
     onSettled: () -> Unit,
+    awaitFrame: suspend () -> Unit = { withFrameNanos { } },
 ) {
     filter { interaction ->
         interaction is DragInteraction.Start ||
@@ -945,6 +966,7 @@ internal suspend fun Flow<Interaction>.collectConversationDragInteractions(
             is DragInteraction.Stop,
             is DragInteraction.Cancel,
             -> {
+                awaitFrame()
                 awaitScrollSettled()
                 onSettled()
             }

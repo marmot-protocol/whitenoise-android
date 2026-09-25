@@ -2618,7 +2618,11 @@ internal fun ConversationScreen(
             // Read here rather than in the collector: snapshotFlow observes only what this block reads,
             // and a page that ends without moving the list — a newer page that failed, say — must
             // re-evaluate the older edge once it no longer blocks it, as must a retry clearing the block.
-            Triple(oldestVisible, controller.isLoadingPage, controller.olderPageBlocked)
+            // The two blocks are folded together: a page the engine never answered leaves the reader a
+            // retry row, and a prefetch it answered without older rows stands down until the reader
+            // asks again from the header or a window replacement arrives (#2727).
+            val olderPageBlocked = controller.olderPageBlocked || controller.automaticOlderPagingBlocked
+            Triple(oldestVisible, controller.isLoadingPage, olderPageBlocked)
         }.collect { (oldestVisible, pageInFlight, olderPageBlocked) ->
             val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
             if (liveRenderedSize == 0) return@collect
@@ -2646,7 +2650,7 @@ internal fun ConversationScreen(
             // reader is actually on before paging. Without this an upward page is placed against
             // whatever the read pointer last reported, which only ever moves towards newer
             // messages — the reason scrolling up could move the reading position.
-            controller.loadOlder(conversationAnchorMessageId(oldestVisible?.key))
+            controller.loadOlder(conversationAnchorMessageId(oldestVisible?.key), ConversationPagingOrigin.AUTOMATIC)
             recordOlderPageLanding(controller, listState, edgeMessageId)
         }
     }

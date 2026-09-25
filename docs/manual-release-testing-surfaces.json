@@ -23038,9 +23038,25 @@
       {
         "surface": "Automatic forward prefetch recovers without reporting a paging failure",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationForwardPrefetchGuard.kt",
-        "anchor": "internal class AutomaticNewerPagingGuard",
+        "anchor": "internal class AutomaticPagingGuard(",
         "test_ids": [
           "CON-005",
+          "CON-003"
+        ]
+      },
+      {
+        "surface": "Automatic older prefetch stands down after a page brings no older rows instead of looping",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationTimelinePaging.kt",
+        "anchor": "fun ConversationController.settleOlderPrefetchGuard(",
+        "test_ids": [
+          "CON-003"
+        ]
+      },
+      {
+        "surface": "A flick settles only once its fling rests, so a page landing mid-fling cannot snap the transcript back",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScrollCoordinator.kt",
+        "anchor": "fun Flow<Interaction>.collectConversationDragInteractions(",
+        "test_ids": [
           "CON-003"
         ]
       },
