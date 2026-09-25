@@ -6275,7 +6275,7 @@ class ConversationController(
             conversationStartsLoading(startOnConstruction, accountRefOverride, appState.activeAccountRef),
         )
         private set
-    var isLoadingOlder by mutableStateOf(false)
+    internal var pageLoadInFlight by mutableStateOf<ConversationSearchPageDirection?>(null)
         internal set
     var hasMoreBefore by mutableStateOf(false)
         private set

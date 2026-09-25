@@ -2066,4 +2066,5 @@
     <string name="export_audit_logs_confirm_action">Continuer</string>
     <string name="toast_couldnt_export_audit_logs">Impossible de préparer les journaux de diagnostic pour l’exportation</string>
     <string name="toast_no_audit_logs_to_export">Aucun journal de diagnostic à exporter</string>
+    <string name="conversation_loading_newer">Chargement des messages plus récents</string>
 </resources>

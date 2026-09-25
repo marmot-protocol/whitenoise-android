@@ -2064,4 +2064,5 @@
     <string name="export_audit_logs_confirm_action">Devam</string>
     <string name="toast_couldnt_export_audit_logs">Tanılama günlükleri dışa aktarmaya hazırlanamadı</string>
     <string name="toast_no_audit_logs_to_export">Dışa aktarılacak tanılama günlüğü yok</string>
+    <string name="conversation_loading_newer">Daha yeni mesajlar yükleniyor</string>
 </resources>

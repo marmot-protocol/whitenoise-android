@@ -128,6 +128,9 @@ import dev.ipf.whitenoise.android.state.chatCreateOpenConversationTimingStage
 import dev.ipf.whitenoise.android.state.conversationWindowCanReportVisible
 import dev.ipf.whitenoise.android.state.currentTtsConversationDestination
 import dev.ipf.whitenoise.android.state.hasKnownTranscriptPresentation
+import dev.ipf.whitenoise.android.state.isLoadingNewer
+import dev.ipf.whitenoise.android.state.isLoadingOlder
+import dev.ipf.whitenoise.android.state.isLoadingPage
 import dev.ipf.whitenoise.android.state.loadMessageAvailability
 import dev.ipf.whitenoise.android.state.loadUntilMessageAvailable
 import dev.ipf.whitenoise.android.state.logUnreadBadgeTransition
@@ -288,7 +291,7 @@ private fun ConversationController.initialTimelineBackfillSnapshot() =
     ConversationInitialTimelineBackfillSnapshot(
         hasRenderableRows = timeline.any { !MessageProjector.isEdit(it.record) },
         hasMoreBefore = hasMoreBefore,
-        loadInFlight = isLoading || isLoadingOlder,
+        loadInFlight = isLoading || isLoadingPage,
         hasLoadFailure = error != null,
         rawWindowMessageIds = timeline.map { it.id },
     )
@@ -905,7 +908,7 @@ internal fun ConversationScreen(
                     renderedTimeline.isEmpty() &&
                     !controller.hasMoreBefore &&
                     !controller.hasMoreAfterTimeline &&
-                    !controller.isLoadingOlder &&
+                    !controller.isLoadingPage &&
                     !controller.isLoading,
             routePresentationSettled =
                 controller.error == null &&
@@ -2235,7 +2238,7 @@ internal fun ConversationScreen(
         controller,
         navigationState.initialTimelineLoadStarted,
         controller.isLoading,
-        controller.isLoadingOlder,
+        controller.isLoadingPage,
         latestTimelineItemId,
         navigationState.initialTimelineBackfillRetryGeneration,
     ) {
@@ -2610,8 +2613,13 @@ internal fun ConversationScreen(
             // after the messages, so they hold the highest indexes — exactly the oldest end, and
             // exactly what is on screen when a page is due. Taking the last visible item would pick
             // one of those, resolve no anchor, and page unanchored: the bug this is meant to fix.
-            listState.layoutInfo.visibleItemsInfo.lastOrNull { conversationAnchorMessageId(it.key) != null }
-        }.collect { oldestVisible ->
+            val oldestVisible =
+                listState.layoutInfo.visibleItemsInfo.lastOrNull { conversationAnchorMessageId(it.key) != null }
+            // Read here rather than in the collector: snapshotFlow observes only what this block reads,
+            // and a page that ends without moving the list — a newer page that failed, say — must
+            // re-evaluate the older edge once it no longer blocks it, as must a retry clearing the block.
+            Triple(oldestVisible, controller.isLoadingPage, controller.olderPageBlocked)
+        }.collect { (oldestVisible, pageInFlight, olderPageBlocked) ->
             val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
             if (liveRenderedSize == 0) return@collect
             val oldestMessageListIndex =
@@ -2624,11 +2632,11 @@ internal fun ConversationScreen(
                 shouldPrefetchOlder(
                     anchored = initialTimelineAnchored,
                     hasMoreBefore = controller.hasMoreBefore,
-                    isLoadingOlder = controller.isLoadingOlder,
+                    pageInFlight = pageInFlight,
                     // A page the engine never answered leaves the reader a retry row; without this
                     // the effect would re-issue it on every scroll frame, which is the silent stall
                     // this screen used to show. The retry, or a live replacement, clears the block.
-                    olderPageBlocked = controller.olderPageBlocked,
+                    olderPageBlocked = olderPageBlocked,
                     oldestVisibleIndex = oldestVisible?.index ?: -1,
                     oldestMessageListIndex = oldestMessageListIndex,
                 )
@@ -2657,7 +2665,7 @@ internal fun ConversationScreen(
             shouldPrefetchNewer(
                 anchored = initialTimelineAnchored,
                 hasMoreAfter = controller.hasMoreAfterTimeline,
-                isLoadingOlder = controller.isLoadingOlder,
+                pageInFlight = controller.isLoadingPage,
                 // A send leaves the viewport on this edge, so a forward page the engine could not
                 // answer must not be re-issued on every layout pass (#2764). Any page that
                 // advances, including a live-window update, releases the block.
@@ -3835,7 +3843,7 @@ internal fun ConversationScreen(
                     renderedTimeline.isEmpty() &&
                         !controller.hasMoreBefore &&
                         !controller.hasMoreAfterTimeline &&
-                        !controller.isLoadingOlder &&
+                        !controller.isLoadingPage &&
                         !controller.isLoading &&
                         navigationState.initialTimelineLoadStarted -> {
                         if (
@@ -4116,7 +4124,7 @@ internal fun ConversationScreen(
                                     labelState = stickyDayLabelState,
                                 )
                             }
-                            if (transcriptReadyToReveal && !selectionMode) {
+                            if (transcriptReadyToReveal) {
                                 Column(
                                     modifier =
                                         Modifier
@@ -4126,7 +4134,14 @@ internal fun ConversationScreen(
                                     horizontalAlignment = Alignment.End,
                                     verticalArrangement = Arrangement.spacedBy(8.dp),
                                 ) {
-                                    if (ttsFollowHandle.showResumeAction) {
+                                    // A newer page that takes longer than a moment shows here, beside the
+                                    // jump button, so the list's bottom edge never moves for it.
+                                    if (rememberNewerPageIndicatorVisible(controller.isLoadingNewer)) {
+                                        ConversationNewerPageIndicator()
+                                    }
+                                    // Selection hides the controls below; the newer-page indicator above stays,
+                                    // since a page can be in flight when selection starts or start during it.
+                                    if (!selectionMode && ttsFollowHandle.showResumeAction) {
                                         TtsResumeFollowButton(
                                             onClick = ttsFollowHandle::resumeFollow,
                                         )
@@ -4134,7 +4149,7 @@ internal fun ConversationScreen(
                                     // Jump-to-mention chip: tap visits the oldest unread
                                     // mention and marks it read, so the count steps down.
                                     val mentionCount = unreadMentionMessageIds.size
-                                    if (mentionCount > 0) {
+                                    if (!selectionMode && mentionCount > 0) {
                                         val jumpToMentionLabel = stringResource(R.string.conversation_jump_to_mention)
                                         Surface(
                                             shape = CircleShape,
@@ -4160,7 +4175,7 @@ internal fun ConversationScreen(
                                             }
                                         }
                                     }
-                                    if (!nearBottom) {
+                                    if (!selectionMode && !nearBottom) {
                                         ConversationJumpToNewestButton(
                                             unreadIncomingCount = unreadIncomingCount,
                                             onClick = {

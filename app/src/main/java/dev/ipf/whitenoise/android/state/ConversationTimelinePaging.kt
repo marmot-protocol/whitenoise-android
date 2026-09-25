@@ -50,6 +50,18 @@ internal enum class ConversationPageLoad {
     FAILED,
 }
 
+/** Whether an older-history page is in flight; the older header shows its spinner for this. */
+internal val ConversationController.isLoadingOlder: Boolean
+    get() = pageLoadInFlight == ConversationSearchPageDirection.OLDER
+
+/** Whether a newer page is in flight; the overlay indicator beside the jump button shows for this. */
+internal val ConversationController.isLoadingNewer: Boolean
+    get() = pageLoadInFlight == ConversationSearchPageDirection.NEWER
+
+/** Whether any page is in flight. Pages are serialized, so a second one waits for this to clear. */
+internal val ConversationController.isLoadingPage: Boolean
+    get() = pageLoadInFlight != null
+
 /**
  * Pages the window towards older history.
  *
@@ -61,7 +73,7 @@ internal enum class ConversationPageLoad {
  */
 @Suppress("TooGenericExceptionCaught", "ReturnCount")
 internal suspend fun ConversationController.loadOlderPageInternal(anchorId: String? = null): ConversationPageLoad {
-    if (!hasMoreBefore || isLoadingOlder) return ConversationPageLoad.NO_PROGRESS
+    if (!hasMoreBefore || isLoadingPage) return ConversationPageLoad.NO_PROGRESS
     val subscription = timelineSubscription ?: return ConversationPageLoad.INACTIVE
     val priorMessageIds = timelineRecords.keys.toSet()
     // A previous loadOlderPage failure leaves `error` set; clear it now
@@ -69,7 +81,7 @@ internal suspend fun ConversationController.loadOlderPageInternal(anchorId: Stri
     // a successful retry and a developer can't distinguish "still broken"
     // from "we forgot to clear it".
     pageError = null
-    isLoadingOlder = true
+    pageLoadInFlight = ConversationSearchPageDirection.OLDER
     val trace = PerformanceDiagnostics.begin(PerformanceOperation.CHAT_HISTORY_PAGE)
     val startedMs = SystemClock.elapsedRealtime()
     return try {
@@ -118,7 +130,7 @@ internal suspend fun ConversationController.loadOlderPageInternal(anchorId: Stri
         reportPageFailure(ConversationSearchPageDirection.OLDER, throwable)
         ConversationPageLoad.FAILED
     } finally {
-        isLoadingOlder = false
+        pageLoadInFlight = null
     }
 }
 
@@ -135,7 +147,7 @@ internal suspend fun ConversationController.loadOlderPageInternal(anchorId: Stri
 @Suppress("TooGenericExceptionCaught", "ReturnCount")
 internal suspend fun ConversationController.loadNewerPageInternal(origin: PagingOrigin): ConversationPageLoad {
     val subscription = timelineSubscription
-    if (!hasMoreAfter || isLoadingOlder) return ConversationPageLoad.NO_PROGRESS
+    if (!hasMoreAfter || isLoadingPage) return ConversationPageLoad.NO_PROGRESS
     if (subscription == null) return ConversationPageLoad.INACTIVE
     val automatic = origin == ConversationPagingOrigin.AUTOMATIC
     if (automatic && automaticNewerPaging.blocked) return ConversationPageLoad.NO_PROGRESS
@@ -143,7 +155,7 @@ internal suspend fun ConversationController.loadNewerPageInternal(origin: Paging
     // An opportunistic page must not clear a failure the reader can still act on; it clears only
     // the matching newer-page failure, and only once newer rows have actually arrived.
     if (!automatic) pageError = null
-    isLoadingOlder = true
+    pageLoadInFlight = ConversationSearchPageDirection.NEWER
     val trace = PerformanceDiagnostics.begin(PerformanceOperation.CHAT_HISTORY_PAGE)
     val startedMs = SystemClock.elapsedRealtime()
     return try {
@@ -162,7 +174,7 @@ internal suspend fun ConversationController.loadNewerPageInternal(origin: Paging
         reportPageFailure(ConversationSearchPageDirection.NEWER, throwable, origin)
         ConversationPageLoad.FAILED
     } finally {
-        isLoadingOlder = false
+        pageLoadInFlight = null
     }
 }
 

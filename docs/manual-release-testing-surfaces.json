@@ -2441,6 +2441,18 @@
         "test_ids": ["CON-003"]
       },
       {
+        "surface": "ConversationNewerPageIndicator",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationNewerPageIndicator.kt",
+        "anchor": "fun ConversationNewerPageIndicator(",
+        "test_ids": ["CON-003"]
+      },
+      {
+        "surface": "string:conversation_loading_newer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationNewerPageIndicator.kt",
+        "anchor": "R.string.conversation_loading_newer",
+        "test_ids": ["CON-003"]
+      },
+      {
         "surface": "ConversationLoadErrorContent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "anchor": "fun ConversationLoadErrorContent(",

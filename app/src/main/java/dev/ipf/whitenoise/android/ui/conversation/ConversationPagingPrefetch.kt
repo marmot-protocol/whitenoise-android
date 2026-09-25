@@ -26,7 +26,8 @@ private fun isMessageIdHex(value: String): Boolean {
 }
 
 /**
- * Whether the reader is close enough to the oldest loaded row to fetch the page behind it.
+ * Whether the reader is close enough to the oldest loaded row to fetch the page behind it. Pages in
+ * either direction are serialized, so [pageInFlight] covers both.
  *
  * [olderPageBlocked] holds the prefetch off after a page the engine never answered, so the retry is
  * the reader's to make rather than something the effect re-issues on every scroll frame.
@@ -34,13 +35,13 @@ private fun isMessageIdHex(value: String): Boolean {
 internal fun shouldPrefetchOlder(
     anchored: Boolean,
     hasMoreBefore: Boolean,
-    isLoadingOlder: Boolean,
+    pageInFlight: Boolean,
     olderPageBlocked: Boolean,
     oldestVisibleIndex: Int,
     oldestMessageListIndex: Int,
 ): Boolean {
     val canPage = anchored && hasMoreBefore
-    val idle = !isLoadingOlder && !olderPageBlocked
+    val idle = !pageInFlight && !olderPageBlocked
     val withinMargin =
         oldestVisibleIndex >= 0 &&
             oldestVisibleIndex >= oldestMessageListIndex - OLDER_PAGE_PREFETCH_ROWS
@@ -58,13 +59,13 @@ internal fun shouldPrefetchOlder(
 internal fun shouldPrefetchNewer(
     anchored: Boolean,
     hasMoreAfter: Boolean,
-    isLoadingOlder: Boolean,
+    pageInFlight: Boolean,
     newerPrefetchBlocked: Boolean,
     newestVisibleIndex: Int,
     newestEdgeIndex: Int,
 ): Boolean {
     val canPage = anchored && hasMoreAfter
-    val idle = !isLoadingOlder && !newerPrefetchBlocked
+    val idle = !pageInFlight && !newerPrefetchBlocked
     // Reversed list: the newest edge is the low-index end, so the lowest visible row approaches it.
     val withinMargin = newestVisibleIndex <= newestEdgeIndex + NEWER_PAGE_PREFETCH_ROWS - 1
     return canPage && idle && withinMargin

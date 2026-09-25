@@ -2038,4 +2038,5 @@
     <string name="export_audit_logs_confirm_action">继续</string>
     <string name="toast_couldnt_export_audit_logs">无法准备要导出的诊断日志</string>
     <string name="toast_no_audit_logs_to_export">没有可导出的诊断日志</string>
+    <string name="conversation_loading_newer">正在加载更新的消息</string>
 </resources>

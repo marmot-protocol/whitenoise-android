@@ -2126,4 +2126,5 @@
     <string name="export_audit_logs_confirm_action">Продолжить</string>
     <string name="toast_couldnt_export_audit_logs">Не удалось подготовить диагностические журналы к экспорту</string>
     <string name="toast_no_audit_logs_to_export">Нет диагностических журналов для экспорта</string>
+    <string name="conversation_loading_newer">Загрузка более новых сообщений</string>
 </resources>

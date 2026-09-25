@@ -2066,4 +2066,5 @@
     <string name="export_audit_logs_confirm_action">Continuar</string>
     <string name="toast_couldnt_export_audit_logs">No se pudieron preparar los registros de diagnóstico para exportarlos</string>
     <string name="toast_no_audit_logs_to_export">No hay registros de diagnóstico para exportar</string>
+    <string name="conversation_loading_newer">Cargando mensajes más recientes</string>
 </resources>
