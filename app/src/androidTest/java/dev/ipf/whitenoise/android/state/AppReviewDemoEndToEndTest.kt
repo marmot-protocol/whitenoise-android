@@ -67,5 +67,10 @@ class AppReviewDemoEndToEndTest {
         val originalById = originalTimeline.associateBy { it.id }
         val demoById = demoTimeline.associateBy { it.id }
         assertTrue(originalById.values.any { it.sender == johnny.id && it.replyTo != null })
-        assertTru...[truncated]    }
+        assertTrue(originalById.values.sumOf { it.reactions.size } >= 2)
+        for (id in sentIds) {
+            assertEquals(originalById.getValue(id).replyTo, demoById.getValue(id).replyTo)
+            assertEquals(originalById.getValue(id).reactions, demoById.getValue(id).reactions)
+        }
+    }
 }

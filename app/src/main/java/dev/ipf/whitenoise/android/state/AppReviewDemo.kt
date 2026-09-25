@@ -717,6 +717,7 @@ internal class AppReviewDemo(
         requireOwned()
         val attempted = checkpoint.copy(reactionAttempts = checkpoint.reactionAttempts + step)
         save(attempted)
+        requireOwned()
         backend.submitReaction(sender.ref, groupId, targetId, emoji)
         waitForReaction(sender.ref, groupId, targetId, sender.id, emoji, requireOwned)
         return attempted
