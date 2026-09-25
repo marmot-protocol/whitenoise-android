@@ -7,10 +7,17 @@ name: Android Instrumented Tests
 # not run it, but MarmotKit artifact-integration changes must prove the pinned
 # x86_64 native library loads before merge.
 #
-# Dev debug variant only: no signing secrets, no Firebase config,
-# matching the unit-test workflow's no-credentials posture.
+# Ordinary runs use dev debug. The opt-in review demo uses an unsigned
+# isolated preview debug build and a disposable test identity.
 
 on:
+  workflow_dispatch:
+    inputs:
+      review_demo_e2e:
+        description: Run the opt-in isolated-preview real-relay demo test
+        required: true
+        type: boolean
+        default: false
   push:
     branches: [master]
   pull_request:
@@ -106,7 +113,7 @@ jobs:
           disable-animations: true
           # android-emulator-runner executes this input through /bin/sh. Keep it
           # to one command and delegate conditional selection to the executable.
-          script: ./scripts/run-android-instrumented-tests.sh "${{ github.event_name }}"
+          script: ./scripts/run-android-instrumented-tests.sh "${{ github.event_name }}" "${{ inputs.review_demo_e2e }}"
 
       - name: Upload instrumented test reports
         if: always()

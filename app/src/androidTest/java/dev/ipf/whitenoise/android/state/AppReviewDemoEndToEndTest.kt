@@ -54,8 +54,11 @@ class AppReviewDemoEndToEndTest {
         val johnny = newAccounts.single()
         val originalTimeline = runBlocking { backend.timeline(original, ready.groupId) }
         val demoTimeline = runBlocking { backend.timeline(johnny.ref, ready.groupId) }
-        assertEquals(5, originalTimeline.count { it.token?.startsWith("review-demo:") == true })
-        assertEquals(originalTimeline.map { it.id }.toSet(), demoTimeline.map { it.id }.toSet())
+        val originalDemoMessages = originalTimeline.filter { it.token?.startsWith("review-demo:") == true }
+        val peerDemoMessages = demoTimeline.filter { it.token?.startsWith("review-demo:") == true }
+        assertEquals(5, originalDemoMessages.size)
+        assertEquals(5, peerDemoMessages.size)
+        assertEquals(originalDemoMessages.map { it.id }.toSet(), peerDemoMessages.map { it.id }.toSet())
         assertTrue(originalTimeline.any { it.sender == johnny.id && it.replyTo != null })
         assertTrue(demoTimeline.sumOf { it.reactions.size } >= 2)
     }

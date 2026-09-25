@@ -263,6 +263,8 @@ val productionPushRelayHint =
 // base-branch-only workflow; Gradle never receives the preview signing key.
 val prNumber: String? = System.getenv("PR_NUMBER")?.takeIf { it.isNotBlank() }
 val prPreviewChannel: String? = System.getenv("PR_PREVIEW_CHANNEL")?.takeIf { it.isNotBlank() }
+// The isolated preview's real-relay AndroidTest runs only on an explicit CI invocation.
+val previewE2eTestBuild = providers.gradleProperty("whitenoise.previewE2eTestBuild").map(String::toBoolean).getOrElse(false)
 // Android accepts an update whose versionCode equals the installed version.
 // A fixed preview-only code therefore lets a tester move between any two PR
 // builds without uninstalling and losing the preview app's data.
@@ -689,7 +691,7 @@ androidComponents {
                             "benchmarkRelease",
                             "nonMinifiedRelease",
                         )
-                "preview" -> variantBuilder.buildType == "release"
+                "preview" -> variantBuilder.buildType == "release" || (previewE2eTestBuild && variantBuilder.buildType == "debug")
                 "production", "staging" -> variantBuilder.buildType == "release"
                 else -> true
             }

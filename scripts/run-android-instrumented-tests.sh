@@ -4,6 +4,11 @@
 set -euo pipefail
 
 event_name="${1:-}"
+review_demo_e2e="${2:-false}"
+
+if [[ "$event_name" == "workflow_dispatch" && "$review_demo_e2e" == "true" ]]; then
+  exec ./scripts/run-review-demo-e2e.sh
+fi
 
 # Pull requests run only the classes annotated @PullRequestDeviceSmoke. The filter is an
 # annotation rather than a class list because AGP hands a comma-separated
