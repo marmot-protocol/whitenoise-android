@@ -17,7 +17,6 @@
                 <data android:scheme="content" android:mimeType="application/pdf" />
             </intent-filter>
         </activity>
-        <receiver android:name=".FixtureGrantReceiver" android:exported="true" />
         <provider android:name=".FixtureStatusProvider" android:authorities="dev.ipf.fixture.status" android:exported="true" />
     </application>
 </manifest>

@@ -1,8 +1,8 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
+import android.os.Bundle
 import android.provider.DocumentsContract
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -61,8 +61,10 @@ class DocumentProviderRelayMatrixTest {
             val allIds = fixtureCases.map(Case::id) + listOf("empty", "unreadable")
             allIds.forEach { grant(context, it) }
             fixtureCases.forEach { fixture ->
-                awaitCondition {
-                    runCatching { context.contentResolver.openInputStream(uri(fixture.id))?.close() }.isSuccess
+                val opened =
+                    runCatching { context.contentResolver.openInputStream(uri(fixture.id))?.use { it.read() } }
+                check(opened.isSuccess && opened.getOrNull() != null) {
+                    "Granted ${fixture.id} document is unreadable: ${opened.exceptionOrNull()}"
                 }
             }
 
@@ -197,12 +199,14 @@ class DocumentProviderRelayMatrixTest {
     private fun revoke(context: Context, id: String) = sendGrantCommand(context, "REVOKE", id)
 
     private fun sendGrantCommand(context: Context, action: String, id: String) {
-        context.sendBroadcast(
-            Intent("dev.ipf.fixture.$action")
-                .setClassName("dev.ipf.fixture", "dev.ipf.fixture.FixtureGrantReceiver")
-                .putExtra("targetPackage", context.packageName)
-                .putExtra("documentId", id),
-        )
+        val reply =
+            context.contentResolver.call(
+                Uri.parse("content://dev.ipf.fixture.status"),
+                action.lowercase(),
+                id,
+                Bundle().apply { putString("targetPackage", context.packageName) },
+            )
+        check(reply?.getBoolean("ok") == true) { "Fixture $action failed for $id" }
     }
 
     private fun viewerStatus(context: Context): ViewerStatus {
