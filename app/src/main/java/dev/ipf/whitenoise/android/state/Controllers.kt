@@ -2036,77 +2036,6 @@ internal fun duplicateSignatureKeyDisplayName(
     displayName: (String) -> String,
 ): String = refs.firstOrNull()?.let(displayName).orEmpty()
 
-/**
- * Whether the engine's authoritative self-membership says the local account is
- * no longer in the group: [SelfMembershipFfi.REMOVED] (evicted) or
- * [SelfMembershipFfi.LEFT] (voluntary departure). Both are terminal non-member
- * states; [SelfMembershipFfi.MEMBER] is the only membership-preserving value.
- */
-internal fun SelfMembershipFfi.isNonMember(): Boolean = this == SelfMembershipFfi.REMOVED || this == SelfMembershipFfi.LEFT
-
-internal data class ConversationMembershipSeed(
-    val members: List<AppGroupMemberRecordFfi>,
-    val membersLoaded: Boolean,
-    val seededSelfMember: Boolean,
-    val seededMembershipKnown: Boolean,
-    val membersVerified: Boolean,
-)
-
-internal fun conversationMembershipSeed(
-    initialGroup: AppGroupRecordFfi,
-    initialMemberSnapshot: GroupMemberSnapshot?,
-    activeAccountIdHex: String?,
-): ConversationMembershipSeed {
-    val initialMembers = initialMemberSnapshot?.members.orEmpty()
-    val projectedNonMember = initialGroup.selfMembership.isNonMember()
-    val projectedMember = initialGroup.selfMembership == SelfMembershipFfi.MEMBER
-    val seededMembers =
-        if (projectedNonMember) {
-            GroupProjector.membersWithoutActiveAccount(initialMembers, activeAccountIdHex)
-        } else {
-            initialMembers
-        }
-    val seededSelfMember =
-        projectedMember ||
-            (
-                !projectedNonMember &&
-                    initialMembers.any { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
-            )
-    return ConversationMembershipSeed(
-        members = seededMembers,
-        membersLoaded = initialMemberSnapshot?.members?.isNotEmpty() == true,
-        seededSelfMember = seededSelfMember,
-        seededMembershipKnown = projectedMember || projectedNonMember || initialMemberSnapshot != null,
-        membersVerified = projectedNonMember,
-    )
-}
-
-internal class ConversationSelfLeftState(
-    seededMembershipKnown: Boolean,
-    seededSelfMember: Boolean,
-) {
-    var selfLeft by mutableStateOf(seededMembershipKnown && !seededSelfMember)
-        private set
-
-    fun recordSelfLeft() {
-        selfLeft = true
-    }
-
-    fun clearSelfLeft() {
-        selfLeft = false
-    }
-
-    fun isSelfMember(
-        members: List<AppGroupMemberRecordFfi>,
-        activeAccountIdHex: String?,
-    ): Boolean = GroupProjector.isSelfStillMember(members, activeAccountIdHex, selfLeft)
-
-    fun rosterHonoringSelfLeft(
-        members: List<AppGroupMemberRecordFfi>,
-        activeAccountIdHex: String?,
-    ): List<AppGroupMemberRecordFfi> = GroupProjector.rosterHonoringSelfLeft(members, activeAccountIdHex, selfLeft)
-}
-
 internal fun agentStreamFailureText(
     throwable: Throwable,
     copy: ConversationControllerCopy,
@@ -3056,6 +2985,7 @@ class ChatsController private constructor(
                         }
                     }
                     replacePresentedChatRows(chatListStream.rows)
+                    appState.schedulePendingLocalGroupDeleteCleanup()
                     appState.recordAccountSwitchLocalRowsReady(accountRef, chatRows.size)
                     groupRecordsById =
                         withContext(Dispatchers.IO) {
@@ -3098,6 +3028,7 @@ class ChatsController private constructor(
                                     receivedLiveUpdate = true
                                     connectionOwner.noteLiveUpdate(connectionAttempt)
                                     applyChatListWindowRows(accountRef, chatListStream.rows)
+                                    appState.schedulePendingLocalGroupDeleteCleanup()
                                 }
                             },
                             second = {
@@ -4362,24 +4293,32 @@ class ChatsController private constructor(
         )
     }
 
-    private fun removeChatRow(groupIdHex: String) {
+    private fun removeChatRow(
+        groupIdHex: String,
+        optimistic: Boolean = false,
+    ) {
         val rowKey = chatRowKey(groupIdHex)
         val removedRow = chatRowsByGroup.remove(rowKey)
         if (removedRow != null) {
-            selectedPresentationsByGroup = selectedPresentationsByGroup - rowKey
-            selectedPreviewsByGroup = selectedPreviewsByGroup - rowKey
-            selectedActionsByGroup = selectedActionsByGroup - rowKey
             activitySequenceByGroup.remove(rowKey)
             optimisticChatListPreviewByGroup.remove(rowKey)
-            cancelMemberSnapshotRetry(removedRow.groupIdHex)
-            memberFetchRetryBackoffTierByGroup.remove(removedRow.groupIdHex)
-            failedMemberFetches.remove(removedRow.groupIdHex)
-            selfOnlyDirectGraceRetryGroups.remove(removedRow.groupIdHex)
-            presentationMembersByGroup = presentationMembersByGroup - removedRow.groupIdHex
-            localGroupNames.forget(removedRow.groupIdHex)
+            if (!optimistic) finishRemovedChatRowClientState(removedRow.groupIdHex)
             noteMaterializedGroupMembershipChanged()
             scheduleRecompute()
         }
+    }
+
+    private fun finishRemovedChatRowClientState(groupIdHex: String) {
+        val rowKey = chatRowKey(groupIdHex)
+        selectedPresentationsByGroup = selectedPresentationsByGroup - rowKey
+        selectedPreviewsByGroup = selectedPreviewsByGroup - rowKey
+        selectedActionsByGroup = selectedActionsByGroup - rowKey
+        cancelMemberSnapshotRetry(groupIdHex)
+        memberFetchRetryBackoffTierByGroup.remove(groupIdHex)
+        failedMemberFetches.remove(groupIdHex)
+        selfOnlyDirectGraceRetryGroups.remove(groupIdHex)
+        presentationMembersByGroup = presentationMembersByGroup - groupIdHex
+        localGroupNames.forget(groupIdHex)
     }
 
     private fun restoreRemovedChatRow(snapshot: RemovedChatRowSnapshot) {
@@ -4772,15 +4711,31 @@ class ChatsController private constructor(
         notify: Boolean = true,
     ): Boolean {
         val account = accountRef ?: return false
+        val epoch = bindEpoch
+        val isCurrent = { accountRef == account && isActiveBindEpoch(epoch) }
         val removedSnapshot = snapshotChatRowForRemoval(groupIdHex)
-        removeChatRow(groupIdHex)
-        val wipe = runCatching { appState.deleteGroupLocalWithClientCleanup(account, groupIdHex) }
+        removeChatRow(groupIdHex, optimistic = true)
+        var nativeCommitted = false
+        val wipe =
+            runCatching {
+                appState.deleteChatGroupLocalWithRecovery(account, groupIdHex, isCurrent) {
+                    nativeCommitted = true
+                }
+            }
         wipe.exceptionOrNull()?.let {
+            appState.schedulePendingLocalGroupDeleteCleanup(retryTransport = true)
+            if (isCurrent() && !nativeCommitted) removedSnapshot?.let(::restoreRemovedChatRow)
+            if (isCurrent() && nativeCommitted) {
+                removeChatRow(groupIdHex)
+                finishRemovedChatRowClientState(groupIdHex)
+            }
             if (it is CancellationException) throw it
-            removedSnapshot?.let(::restoreRemovedChatRow)
-            appState.presentFailure(R.string.toast_couldnt_delete_chat, "CHAT_LOCAL_DELETE", it)
+            if (isCurrent()) appState.presentFailure(R.string.toast_couldnt_delete_chat, "CHAT_LOCAL_DELETE", it)
             return false
         }
+        if (!isCurrent()) return false
+        removeChatRow(groupIdHex)
+        finishRemovedChatRowClientState(groupIdHex)
         if (notify) {
             appState.presentTransient(R.string.toast_chat_deleted_local)
         }
