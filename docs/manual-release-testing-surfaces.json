@@ -2438,6 +2438,9 @@
         "surface": "Jump-to-newest badge count owner",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "anchor": "rememberConversationUnreadBadgeCount(",
+        "test_ids": ["CON-003"]
+      },
+      {
         "surface": "ConversationNewerPageIndicator",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationNewerPageIndicator.kt",
         "anchor": "fun ConversationNewerPageIndicator(",

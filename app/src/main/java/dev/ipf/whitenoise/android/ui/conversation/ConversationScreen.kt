@@ -2613,8 +2613,13 @@ internal fun ConversationScreen(
             // after the messages, so they hold the highest indexes — exactly the oldest end, and
             // exactly what is on screen when a page is due. Taking the last visible item would pick
             // one of those, resolve no anchor, and page unanchored: the bug this is meant to fix.
-            listState.layoutInfo.visibleItemsInfo.lastOrNull { conversationAnchorMessageId(it.key) != null }
-        }.collect { oldestVisible ->
+            val oldestVisible =
+                listState.layoutInfo.visibleItemsInfo.lastOrNull { conversationAnchorMessageId(it.key) != null }
+            // Read here rather than in the collector: snapshotFlow observes only what this block reads,
+            // and a page that ends without moving the list — a newer page that failed, say — must
+            // re-evaluate the older edge once it no longer blocks it, as must a retry clearing the block.
+            Triple(oldestVisible, controller.isLoadingPage, controller.olderPageBlocked)
+        }.collect { (oldestVisible, pageInFlight, olderPageBlocked) ->
             val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
             if (liveRenderedSize == 0) return@collect
             val oldestMessageListIndex =
@@ -2627,11 +2632,11 @@ internal fun ConversationScreen(
                 shouldPrefetchOlder(
                     anchored = initialTimelineAnchored,
                     hasMoreBefore = controller.hasMoreBefore,
-                    pageInFlight = controller.isLoadingPage,
+                    pageInFlight = pageInFlight,
                     // A page the engine never answered leaves the reader a retry row; without this
                     // the effect would re-issue it on every scroll frame, which is the silent stall
                     // this screen used to show. The retry, or a live replacement, clears the block.
-                    olderPageBlocked = controller.olderPageBlocked,
+                    olderPageBlocked = olderPageBlocked,
                     oldestVisibleIndex = oldestVisible?.index ?: -1,
                     oldestMessageListIndex = oldestMessageListIndex,
                 )
