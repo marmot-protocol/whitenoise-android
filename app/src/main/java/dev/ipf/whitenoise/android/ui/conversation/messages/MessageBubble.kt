@@ -147,6 +147,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.messageHasShareablePaylo
 import dev.ipf.whitenoise.android.ui.conversation.media.presentAttachmentSaveOutcome
 import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachments
 import dev.ipf.whitenoise.android.ui.conversation.media.shareMessageExternally
+import dev.ipf.whitenoise.android.ui.conversation.media.shouldExpandCaptionedPortrait
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ConfigureReactionsSheet
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionDetailsSheet
@@ -1941,6 +1942,27 @@ internal fun MessageBubble(
                     )
                 val bodyOrWarningInsideBubble =
                     shouldFrameMessageBubbleSupplement(bodyTextToRender, outerInvalidationWarning)
+                val soleCaptionedVisual =
+                    if (bubbleMedia.hasConfirmedMedia) {
+                        bubbleMedia.visuals.singleOrNull()?.value.takeIf {
+                            bubbleMedia.audio.isEmpty() && bubbleMedia.files.isEmpty()
+                        }
+                    } else {
+                        bubbleMedia.pendingVisuals.singleOrNull()?.value.takeIf {
+                            bubbleMedia.pendingAudio.isEmpty()
+                        }
+                    }
+                val expandCaptionedNarrowVisual =
+                    bodyOrWarningInsideBubble &&
+                        sharedLocation == null &&
+                        sharedContact == null &&
+                        sharedUser == null &&
+                        remoteGiphyMedia == null &&
+                        bubbleMedia.rejected.isEmpty() &&
+                        shouldExpandCaptionedPortrait(
+                            hasCaption = mediaCaption != null,
+                            dim = soleCaptionedVisual?.dim,
+                        )
                 // The footer's time and delivery glyph are secondary metadata: a quiet
                 // gray against the resolved bubble fill, the error pairing for a
                 // persisted failure, and the AMOLED directional accent. Media scrim
@@ -2154,6 +2176,7 @@ internal fun MessageBubble(
                                                 onMediaLongPress = onMediaLongPress,
                                                 focusedPreview = isActionMenuOpen,
                                                 hasCaption = mediaCaption != null,
+                                                expandNarrowVisualToStandardWidth = expandCaptionedNarrowVisual,
                                             )
                                         }
                                     }
@@ -2238,6 +2261,7 @@ internal fun MessageBubble(
                                                 onMediaLongPress = onMediaLongPress,
                                                 focusedPreview = isActionMenuOpen,
                                                 hasCaption = mediaCaption != null,
+                                                expandNarrowVisualToStandardWidth = expandCaptionedNarrowVisual,
                                             )
                                         }
                                     }

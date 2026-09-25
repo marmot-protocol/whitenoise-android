@@ -4454,6 +4454,17 @@
         ]
       },
       {
+        "surface": "MediaCaptionContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MediaCaptionContent.kt",
+        "anchor": "fun MediaCaptionContent(",
+        "test_ids": [
+          "MED-003",
+          "MED-007",
+          "CON-011",
+          "SET-005"
+        ]
+      },
+      {
         "surface": "MediaSupplementEnvelope",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleFrame.kt",
         "anchor": "fun MediaSupplementEnvelope(",

@@ -6,7 +6,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -96,8 +95,8 @@ internal fun MessageBubbleFrame(
  * One message surface for media and its caption/footer.
  *
  * The media is measured first so the caption adopts its width, but both are
- * clipped and bordered by this single outer surface. Attached media uses
- * square internal corners; the outer surface owns all four visible corners.
+ * clipped by this single outer surface. The bubble fill remains visible as a
+ * consistent inset around attached media, matching the prototype treatment.
  */
 @Composable
 @Suppress("FunctionNaming")
@@ -140,7 +139,6 @@ internal fun MediaCaptionFrame(
             accentArgb = presentation.mentionAccentArgb,
             integratedWithBorder = amoled,
         )
-
     Surface(
         modifier = modifier.then(highlightModifier).then(mentionModifier),
         color = colorFromArgb(presentation.backgroundArgb),
@@ -148,36 +146,17 @@ internal fun MediaCaptionFrame(
         shape = shape,
         border = messageFrameBorder(presentation, mine, mentionedSelf, amoled),
     ) {
-        MediaSupplementEnvelope(
-            alignEnd = alignEnd,
-            modifier = Modifier.padding(ConversationMessageMetrics.RichOuterInset),
-            media = media,
-        ) {
-            Column(modifier = contentModifier.fillMaxWidth()) {
-                Column(
-                    modifier =
-                        Modifier.padding(
-                            start = ConversationMessageMetrics.RichTextHorizontalAdjustment,
-                            end = ConversationMessageMetrics.RichTextHorizontalAdjustment,
-                            top = ConversationMessageMetrics.RichContentSpacing,
-                            bottom = ConversationMessageMetrics.RichTextBottomAdjustment,
-                        ),
-                    verticalArrangement = bubbleContentArrangement,
-                    content = caption,
-                )
-            }
-        }
+        MediaCaptionContent(alignEnd, contentModifier, media, caption)
     }
 }
 
 /**
- * Measures media first, then lets a wider supplement establish the bounded shared width.
+ * Measures media first, then lets a wider supplement establish a capped shared width.
  *
- * Media children intentionally retain their existing sizing policy: a
- * landscape image, grid, or voice note may consume the available width while
- * a portrait image can keep its fixed card width. The real media measurement
- * remains one source of truth; the supplement's intrinsic width can only widen
- * the shared frame and never resizes or stretches the media child.
+ * Media children intentionally retain their existing sizing policy. A normal
+ * photo therefore keeps the same card width with or without a caption, while
+ * callers may expand a narrow portrait only to the standard media canvas.
+ * Captions wrap at that canvas width instead of turning media into a wide text bubble.
  */
 @Composable
 @Suppress("FunctionNaming")
@@ -203,7 +182,11 @@ internal fun MediaSupplementEnvelope(
                 Column(content = supplement)
             }.single()
         val supplementWidth = supplementMeasurable.maxIntrinsicWidth(Constraints.Infinity)
-        val envelopeWidth = constraints.constrainWidth(maxOf(mediaPlaceable.width, supplementWidth))
+        val captionWidthCap = ConversationMessageMetrics.RichContentCanvasWidth.roundToPx()
+        val envelopeWidth =
+            constraints.constrainWidth(
+                maxOf(mediaPlaceable.width, minOf(supplementWidth, captionWidthCap)),
+            )
         val supplementPlaceable =
             supplementMeasurable.measure(
                 relaxedConstraints.copy(
@@ -214,7 +197,7 @@ internal fun MediaSupplementEnvelope(
 
         val measuredHeight = mediaPlaceable.height + supplementPlaceable.height
         layout(envelopeWidth, constraints.constrainHeight(measuredHeight)) {
-            val mediaX = if (alignEnd) envelopeWidth - mediaPlaceable.width else 0
+            val mediaX = ((envelopeWidth - mediaPlaceable.width) / 2).coerceAtLeast(0)
             mediaPlaceable.placeRelative(mediaX, 0)
             supplementPlaceable.placeRelative(0, mediaPlaceable.height)
         }
