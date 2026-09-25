@@ -929,11 +929,19 @@ private val ConversationScrollReason.supersedesUnreadJump: Boolean
 /**
  * Processes a newer drag immediately, cancelling any older Stop/Cancel waiter
  * that is still waiting for fling motion to finish.
+ *
+ * The drag stops when the finger lifts, and Compose starts the fling only after
+ * it has reported that stop, so at that instant the list reads as idle although
+ * it is about to coast. [awaitFrame] lets the fling begin before
+ * [awaitScrollSettled] is consulted, otherwise a flick would settle at its
+ * release point and hand history re-anchoring a stale anchor to snap the
+ * coasting transcript back to (#2727).
  */
 internal suspend fun Flow<Interaction>.collectConversationDragInteractions(
     onStarted: () -> Unit,
     awaitScrollSettled: suspend () -> Unit,
     onSettled: () -> Unit,
+    awaitFrame: suspend () -> Unit = { withFrameNanos { } },
 ) {
     filter { interaction ->
         interaction is DragInteraction.Start ||
@@ -945,6 +953,7 @@ internal suspend fun Flow<Interaction>.collectConversationDragInteractions(
             is DragInteraction.Stop,
             is DragInteraction.Cancel,
             -> {
+                awaitFrame()
                 awaitScrollSettled()
                 onSettled()
             }
