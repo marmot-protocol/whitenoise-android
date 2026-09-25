@@ -18,15 +18,9 @@ internal data class RecoveryStampedTimelineWindow(
 internal fun WhiteNoiseAppState.conversationWindowPresentationTiming() =
     ConversationWindowPresentationTiming(
         nowMs = SystemClock::elapsedRealtime,
+        beginHostAttempt = ::beginHostPerformance,
         emit = { ticket, observation ->
             recordProductEvent(observation.event(), ticket)
-            observation.hostOperation()?.let { operation ->
-                recordHostPerformance(
-                    operation = operation,
-                    durationMs = observation.elapsedMs,
-                    outcome = observation.outcome.hostOutcome(),
-                )
-            }
         },
     )
 
@@ -86,13 +80,16 @@ internal data class ConversationPresentationObservation(
         )
 
     /** Maps rendered milestones onto MDK's fixed host registry. */
-    fun hostOperation(): HostPerformanceOperationFfi? =
-        when (stage) {
-            ConversationPresentationStage.WINDOW_VISIBLE -> HostPerformanceOperationFfi.CONVERSATION_LOCAL_VISIBLE
-            ConversationPresentationStage.COMPOSER_READY -> HostPerformanceOperationFfi.CONVERSATION_COMPOSER_READY
-            ConversationPresentationStage.TIMELINE_PUBLISHED -> null
-        }
+    fun hostOperation(): HostPerformanceOperationFfi? = stage.hostOperation()
 }
+
+/** Maps a presentation stage onto MDK's fixed host registry when Android owns that boundary. */
+private fun ConversationPresentationStage.hostOperation(): HostPerformanceOperationFfi? =
+    when (this) {
+        ConversationPresentationStage.WINDOW_VISIBLE -> HostPerformanceOperationFfi.CONVERSATION_LOCAL_VISIBLE
+        ConversationPresentationStage.COMPOSER_READY -> HostPerformanceOperationFfi.CONVERSATION_COMPOSER_READY
+        ConversationPresentationStage.TIMELINE_PUBLISHED -> null
+    }
 
 /** Converts the existing presentation terminal state without inventing success. */
 private fun ConversationPresentationOutcome.hostOutcome(): HostPerformanceOutcomeFfi =
@@ -113,10 +110,12 @@ internal fun productDurationBucket(elapsedMs: Long): String {
  * Exactly-once lifecycle for initial conversation presentation timing.
  *
  * The timer starts at the first native window receipt. A controller clear or load failure settles
- * only milestones that have not already succeeded, preventing duplicate outcome samples.
+ * only milestones that have not already succeeded, preventing duplicate outcome samples. Host
+ * attempts start at that same receipt so runtime replacement cannot inherit stale UI callbacks.
  */
 internal class ConversationWindowPresentationTiming(
     private val nowMs: () -> Long,
+    private val beginHostAttempt: ((HostPerformanceOperationFfi, Long) -> HostPerformanceAttempt)? = null,
     private val emit: (Long?, ConversationPresentationObservation) -> Unit,
 ) {
     private var startedAtElapsedMs: Long? = null
@@ -127,6 +126,8 @@ internal class ConversationWindowPresentationTiming(
     private var composerSettled = false
     private var composerObservedBeforeReceipt = false
     private var windowObservedBeforePublication = false
+    private var windowHostAttempt: HostPerformanceAttempt? = null
+    private var composerHostAttempt: HostPerformanceAttempt? = null
 
     /** Captures the first native receipt and the consent ticket attached to that receipt. */
     @Synchronized
@@ -136,8 +137,17 @@ internal class ConversationWindowPresentationTiming(
     ) {
         if (startedAtElapsedMs != null) return
         if (publicationSettled || windowSettled || composerSettled) return
-        startedAtElapsedMs = receivedAtElapsedMs.coerceAtLeast(0L)
+        val normalizedStartedAt = receivedAtElapsedMs.coerceAtLeast(0L)
+        startedAtElapsedMs = normalizedStartedAt
         this.ticket = ticket
+        windowHostAttempt =
+            ConversationPresentationStage.WINDOW_VISIBLE.hostOperation()?.let { operation ->
+                beginHostAttempt?.invoke(operation, normalizedStartedAt)
+            }
+        composerHostAttempt =
+            ConversationPresentationStage.COMPOSER_READY.hostOperation()?.let { operation ->
+                beginHostAttempt?.invoke(operation, normalizedStartedAt)
+            }
         if (composerObservedBeforeReceipt) settleComposer(ConversationPresentationOutcome.SUCCESS)
     }
 
@@ -201,6 +211,8 @@ internal class ConversationWindowPresentationTiming(
     private fun settleWindow(outcome: ConversationPresentationOutcome) {
         if (windowSettled || startedAtElapsedMs == null) return
         windowSettled = true
+        windowHostAttempt?.complete(outcome.hostOutcome())
+        windowHostAttempt = null
         emit(ConversationPresentationStage.WINDOW_VISIBLE, outcome)
     }
 
@@ -208,6 +220,8 @@ internal class ConversationWindowPresentationTiming(
     private fun settleComposer(outcome: ConversationPresentationOutcome) {
         if (composerSettled || startedAtElapsedMs == null) return
         composerSettled = true
+        composerHostAttempt?.complete(outcome.hostOutcome())
+        composerHostAttempt = null
         emit(ConversationPresentationStage.COMPOSER_READY, outcome)
     }
 

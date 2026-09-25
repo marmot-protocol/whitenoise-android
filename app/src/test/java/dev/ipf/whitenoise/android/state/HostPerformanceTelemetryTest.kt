@@ -10,6 +10,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HostPerformanceTelemetryTest {
+    /** Verifies a timing attempt emits only its first requested terminal outcome. */
     @Test
     fun firstTerminalOutcomeWins() {
         var now = 100L
@@ -27,6 +28,7 @@ class HostPerformanceTelemetryTest {
         )
     }
 
+    /** Verifies work owned by an old runtime is cancelled instead of succeeding in its replacement. */
     @Test
     fun staleGenerationCannotReportSuccessIntoReplacementRuntime() {
         var generation = 7
@@ -45,6 +47,7 @@ class HostPerformanceTelemetryTest {
         )
     }
 
+    /** Verifies a completed startup sample waits for the matching runtime emitter. */
     @Test
     fun coldStartSampleReplaysWhenItsRuntimeIsPublished() {
         val samples = mutableListOf<Sample>()
@@ -65,6 +68,7 @@ class HostPerformanceTelemetryTest {
         )
     }
 
+    /** Verifies an attempt started before bootstrap remains bound to the first published runtime. */
     @Test
     fun coldStartAttemptCompletesAfterItsFirstRuntimePublication() {
         var now = 20L
@@ -93,6 +97,7 @@ class HostPerformanceTelemetryTest {
         assertTrue(replacementSamples.isEmpty())
     }
 
+    /** Verifies samples from an unpublished generation are never replayed into a replacement runtime. */
     @Test
     fun unpublishedStaleGenerationIsNotReplayedIntoReplacementRuntime() {
         var generation = 1
@@ -110,6 +115,7 @@ class HostPerformanceTelemetryTest {
         assertTrue(replacementSamples.isEmpty())
     }
 
+    /** Verifies the bounded pre-runtime queue discards its oldest sample first. */
     @Test
     fun deferredSamplesDiscardTheOldestEntryAtTheBound() {
         val samples = mutableListOf<Sample>()
@@ -129,6 +135,7 @@ class HostPerformanceTelemetryTest {
         assertEquals(MAX_DEFERRED_HOST_PERFORMANCE_EMITTERS.toLong(), samples.last().durationMs)
     }
 
+    /** Verifies a normally returned apply without a commit is classified as cancelled. */
     @Test
     fun commitMeasuredWorkCancelsANormalReturnWithoutACommit() =
         runTest {
@@ -140,6 +147,7 @@ class HostPerformanceTelemetryTest {
             assertEquals(HostPerformanceOutcomeFfi.CANCELLED, samples.single().outcome)
         }
 
+    /** Verifies the explicit commit callback is the only successful apply boundary. */
     @Test
     fun commitMeasuredWorkSucceedsOnlyFromTheCommitCallback() =
         runTest {
@@ -151,6 +159,7 @@ class HostPerformanceTelemetryTest {
             assertEquals(HostPerformanceOutcomeFfi.SUCCESS, samples.single().outcome)
         }
 
+    /** Verifies a failed apply emits failure before preserving the exception. */
     @Test
     fun commitMeasuredWorkRecordsAndRethrowsFailures() =
         runTest {
@@ -166,6 +175,7 @@ class HostPerformanceTelemetryTest {
             assertEquals(HostPerformanceOutcomeFfi.FAILURE, samples.single().outcome)
         }
 
+    /** Verifies a cancelled apply emits cancellation before preserving cooperative cancellation. */
     @Test
     fun commitMeasuredWorkRecordsAndRethrowsCancellation() =
         runTest {
@@ -181,6 +191,7 @@ class HostPerformanceTelemetryTest {
             assertEquals(HostPerformanceOutcomeFfi.CANCELLED, samples.single().outcome)
         }
 
+    /** Verifies measured suspending work treats cancellation as terminal and rethrows it. */
     @Test
     fun cancellationIsTerminalAndRethrown() =
         runTest {
@@ -198,6 +209,7 @@ class HostPerformanceTelemetryTest {
             assertEquals(HostPerformanceOutcomeFfi.CANCELLED, samples.single().outcome)
         }
 
+    /** Verifies Android's catalog covers every shared non-Linux operation exactly once. */
     @Test
     fun androidCatalogContainsEverySharedStageAndNoLinuxStage() {
         val expected =
@@ -207,6 +219,92 @@ class HostPerformanceTelemetryTest {
         assertEquals(34, expected.size)
     }
 
+    /** Verifies conversation-visible and composer-ready milestones reach MDK once at their real boundaries. */
+    @Test
+    fun conversationMilestonesSucceedExactlyOnceAtRenderedBoundaries() {
+        var now = 100L
+        val samples = mutableListOf<Sample>()
+        val recorder = recorder(now = { now }, samples = samples)
+        val timing =
+            ConversationWindowPresentationTiming(
+                nowMs = { now },
+                beginHostAttempt = recorder::begin,
+                emit = { _, _ -> },
+            )
+
+        timing.begin(receivedAtElapsedMs = 100L, ticket = null)
+        timing.timelinePublished()
+        now = 125L
+        timing.windowVisible()
+        timing.windowVisible()
+        now = 140L
+        timing.composerReady()
+        timing.composerReady()
+        timing.cancel()
+
+        assertEquals(
+            listOf(
+                Sample(
+                    HostPerformanceOperationFfi.CONVERSATION_LOCAL_VISIBLE,
+                    25L,
+                    HostPerformanceOutcomeFfi.SUCCESS,
+                ),
+                Sample(
+                    HostPerformanceOperationFfi.CONVERSATION_COMPOSER_READY,
+                    40L,
+                    HostPerformanceOutcomeFfi.SUCCESS,
+                ),
+            ),
+            samples,
+        )
+    }
+
+    /** Verifies stale conversation callbacks cancel their original attempts without touching a replacement runtime. */
+    @Test
+    fun conversationReplacementCancelsOldMilestonesWithoutCompletingTheNewRuntime() {
+        var generation = 1
+        var now = 50L
+        val originalSamples = mutableListOf<Sample>()
+        val replacementSamples = mutableListOf<Sample>()
+        val recorder = HostPerformanceRecorder(generation = { generation }, nowMs = { now })
+        val originalOwner = Any()
+        recorder.publishEmitter(originalOwner, ownerGeneration = generation, emitter = originalSamples.emitter())
+        val staleTiming =
+            ConversationWindowPresentationTiming(
+                nowMs = { now },
+                beginHostAttempt = recorder::begin,
+                emit = { _, _ -> },
+            )
+        staleTiming.begin(receivedAtElapsedMs = now, ticket = null)
+
+        generation = 2
+        recorder.clearEmitter(originalOwner)
+        recorder.publishEmitter(Any(), ownerGeneration = generation, emitter = replacementSamples.emitter())
+        now = 75L
+        staleTiming.cancel()
+        staleTiming.timelinePublished()
+        staleTiming.windowVisible()
+        staleTiming.composerReady()
+
+        assertEquals(
+            listOf(
+                Sample(
+                    HostPerformanceOperationFfi.CONVERSATION_LOCAL_VISIBLE,
+                    25L,
+                    HostPerformanceOutcomeFfi.CANCELLED,
+                ),
+                Sample(
+                    HostPerformanceOperationFfi.CONVERSATION_COMPOSER_READY,
+                    25L,
+                    HostPerformanceOutcomeFfi.CANCELLED,
+                ),
+            ),
+            originalSamples,
+        )
+        assertTrue(replacementSamples.isEmpty())
+    }
+
+    /** Verifies a warm resume can complete from local readiness without waiting for Compose. */
     @Test
     fun warmForegroundReadySettlesWithoutAComposeCallback() {
         var now = 10L
@@ -232,6 +330,7 @@ class HostPerformanceTelemetryTest {
         )
     }
 
+    /** Verifies cold foreground timing remains open until local state is ready. */
     @Test
     fun coldForegroundWaitsForLocalReadiness() {
         var now = 100L
@@ -250,6 +349,7 @@ class HostPerformanceTelemetryTest {
         assertEquals(45L, samples.single().durationMs)
     }
 
+    /** Verifies outbound attempts settle only after their claimed optimistic rows render. */
     @Test
     fun outboundVisibilityWaitsForTheClaimedRenderedBatch() {
         var now = 20L
@@ -272,6 +372,7 @@ class HostPerformanceTelemetryTest {
         )
     }
 
+    /** Verifies a newer inbound frame owner cancels the superseded visibility attempt. */
     @Test
     fun inboundReplacementCancelsTheSupersededFrameOwner() {
         var now = 0L
@@ -294,6 +395,7 @@ class HostPerformanceTelemetryTest {
         )
     }
 
+    /** Verifies settings timing reflects the durable commit result rather than enqueue success. */
     @Test
     fun settingsSaveUsesTheDurableCommitResult() {
         val samples = mutableListOf<Sample>()

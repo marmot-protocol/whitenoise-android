@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class AndroidFramePerformanceReporterTest {
+    /** Verifies Android frame buckets map to non-overlapping shared host stages. */
     @Test
     fun frameworkBucketsMapToSharedStagesWithoutDoubleCounting() {
         val sample =
@@ -23,6 +24,7 @@ class AndroidFramePerformanceReporterTest {
         )
     }
 
+    /** Verifies unsupported framework metrics remain unavailable instead of becoming zero successes. */
     @Test
     fun unsupportedFrameworkBucketsRemainUnavailable() {
         val sample =
@@ -39,6 +41,7 @@ class AndroidFramePerformanceReporterTest {
         assertEquals(AndroidFramePerformanceSample(null, null, null, null), sample)
     }
 
+    /** Verifies one incomplete aggregate does not suppress other complete frame stages. */
     @Test
     fun incompleteCombinedStageIsUnavailableWithoutDiscardingCompleteStages() {
         val sample =
@@ -55,6 +58,7 @@ class AndroidFramePerformanceReporterTest {
         assertEquals(AndroidFramePerformanceSample(null, 3L, null, 5L), sample)
     }
 
+    /** Verifies queued callbacks cannot outlive their Activity token or first runtime owner. */
     @Test
     fun queuedCallbacksStayBoundToTheirLifetimeAndFirstOwner() {
         var currentOwner: String? = null
