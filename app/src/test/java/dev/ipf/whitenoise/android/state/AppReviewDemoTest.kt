@@ -188,6 +188,24 @@ class AppReviewDemoTest {
         }
 
     @Test
+    fun unrelatedSoleNewAccountIsNeverAdoptedByAResumedDemo() =
+        runTest {
+            val backend = FakeBackend().apply { accountList += johnny }
+            val demo = AppReviewDemo(backend, MemoryStore(checkpoint()), this, StandardTestDispatcher(testScheduler))
+
+            demo.start()
+            advanceUntilIdle()
+
+            assertEquals(
+                ReviewDemoStatus.Failed(ReviewDemoStage.CreatingAccount, ReviewDemoProblem.AmbiguousAccount),
+                demo.status,
+            )
+            assertEquals(0, backend.profilePublishes)
+            assertEquals(0, backend.groupCreates)
+            assertEquals(0, backend.accountCreates)
+        }
+
+    @Test
     fun lostCreateReplyReusesTheProjectedConversation() =
         runTest {
             val backend = FakeBackend().apply { loseGroupCreateReply = true }
