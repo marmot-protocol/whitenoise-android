@@ -43,7 +43,9 @@ class AppReviewDemoEndToEndTest {
         }
         val ready =
             app.appReviewDemo.status as? ReviewDemoStatus.Ready
-                ?: error("Demo failed: ${app.appReviewDemo.status}")
+                ?: error(
+                    "Demo failed: ${app.appReviewDemo.status}\n${app.appReviewDemo.debugFailure?.stackTraceToString()}",
+                )
         assertEquals(original, app.activeAccountRef)
         assertEquals(original, ready.accountRef)
 

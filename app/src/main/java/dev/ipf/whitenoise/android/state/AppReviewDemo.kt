@@ -4,6 +4,7 @@ import android.content.SharedPreferences
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import dev.ipf.whitenoise.android.BuildConfig
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -314,6 +315,10 @@ internal class AppReviewDemo(
     var status by mutableStateOf<ReviewDemoStatus>(initialStatus())
         private set
 
+    /** Debug-only native failure detail for disposable device tests; never shown in the UI. */
+    internal var debugFailure: Throwable? = null
+        private set
+
     val hasSavedSetup: Boolean
         get() = store.hasRecord
 
@@ -325,6 +330,7 @@ internal class AppReviewDemo(
     /** A second tap never starts a second account or publisher. */
     fun start(onReady: (String, String) -> Unit = { _, _ -> }) {
         if (task?.isActive == true || status is ReviewDemoStatus.Ready) return
+        debugFailure = null
         task =
             scope.launch {
                 run(onReady)
@@ -528,8 +534,10 @@ internal class AppReviewDemo(
         } catch (_: CancellationException) {
             status = ReviewDemoStatus.Failed(stage, ReviewDemoProblem.Interrupted)
         } catch (failure: ReviewDemoFailure) {
+            if (BuildConfig.DEBUG) debugFailure = failure
             status = ReviewDemoStatus.Failed(stage, failure.problem)
-        } catch (_: Exception) {
+        } catch (failure: Exception) {
+            if (BuildConfig.DEBUG) debugFailure = failure
             status = ReviewDemoStatus.Failed(stage, ReviewDemoProblem.OperationFailed)
         } finally {
             val restore = originalRef
