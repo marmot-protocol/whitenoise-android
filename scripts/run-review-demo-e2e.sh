@@ -22,8 +22,9 @@ sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
 aapt="$(find "$sdk_root/build-tools" -mindepth 2 -maxdepth 2 -type f -name aapt | sort -V | tail -n 1)"
 [[ -x "$aapt" ]] || { echo "aapt unavailable" >&2; exit 1; }
 
-mapfile -t app_apks < <(find app/build/outputs/apk/preview/play/debug -type f -name '*universal*.apk' | sort)
-mapfile -t test_apks < <(find app/build/outputs/apk/androidTest -type f -name '*.apk' | sort)
+apk_root=app/build/outputs/apk
+mapfile -t app_apks < <(find "$apk_root" -type f -name '*universal*debug*.apk' | sort)
+mapfile -t test_apks < <(find "$apk_root" -type f -name '*androidTest*.apk' | sort)
 [[ "${#app_apks[@]}" -eq 1 && "${#test_apks[@]}" -eq 1 ]] || {
   echo "Expected one universal isolated preview APK and one test APK" >&2
   exit 1
