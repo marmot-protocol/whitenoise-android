@@ -23108,6 +23108,14 @@
         ]
       },
       {
+        "surface": "An incomplete live top-window replacement retains active chats until authoritative reopen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatListReplacementGuard.kt",
+        "anchor": "internal fun missingActiveTopChatRows(",
+        "test_ids": [
+          "CHL-016"
+        ]
+      },
+      {
         "surface": "Direct-message headers prefer the viewer's private contact nickname",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/core/ConversationHeaderTitle.kt",
         "anchor": "internal fun conversationHeaderTitle(",

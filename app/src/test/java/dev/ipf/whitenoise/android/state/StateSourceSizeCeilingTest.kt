@@ -49,8 +49,12 @@ class StateSourceSizeCeilingTest {
         // reconciliation on top of that. PR #2798 adds 32 net lines for off-main
         // window application and commit-time index revalidation. Its prior green
         // head covered 4,787 / 6,614 controller lines in Kover. Exact-head CI
-        // rechecks coverage. Keep this merged-source ratchet exact.
-        const val CONTROLLERS_MAX_LINES = 13179
+        // rechecks coverage. Issue #2784 adds a narrow controller check before
+        // dropping a still-active top-window row; its ordering guard and tests
+        // live in smaller files. Revision-bound publication across views brings
+        // the controller to 13,240 lines; focused race regressions and exact-head
+        // CI recheck the corresponding coverage and style contracts.
+        const val CONTROLLERS_MAX_LINES = 13240
 
         // Master includes the covered draft lifecycle and host-timing changes. PR #2534
         // adds 38 lines for the async prepared-speech handoff while keeping preparation

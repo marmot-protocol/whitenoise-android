@@ -26,6 +26,7 @@ import dev.ipf.marmotkit.ChatListRowActionsFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
+import dev.ipf.marmotkit.ChatListViewFfi
 import dev.ipf.marmotkit.ChatPinStateFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.DeletionSourceFfi
@@ -2984,7 +2985,13 @@ class ChatsController private constructor(
                             activeChatsSubscription = chatStream
                         }
                     }
-                    replacePresentedChatRows(chatListStream.rows)
+                    val initialFrame = chatListStream.frame()
+                    requireCompleteChatListWindowRows(
+                        validateChatListWindowRows(accountRef, chatListStream, initialFrame.rows) &&
+                            !chatListStream.closed &&
+                            chatListWindows === chatListStream,
+                    )
+                    chatListStream.publishIfCurrent(initialFrame, ::replacePresentedChatRows)
                     appState.schedulePendingLocalGroupDeleteCleanup()
                     appState.recordAccountSwitchLocalRowsReady(accountRef, chatRows.size)
                     groupRecordsById =
@@ -3002,7 +3009,6 @@ class ChatsController private constructor(
                     isLoading = false
                     error = null
                     recompute()
-
                     // Draw the local projection before catch-up; live updates fold fresh state afterward.
                     if (!localFramePresented) {
                         awaitRenderedChatListFrame()
@@ -3019,15 +3025,21 @@ class ChatsController private constructor(
                     coroutineScope {
                         runUntilFirstLiveSubscriptionEnds(
                             first = {
-                                chatListStream.receive { _, _ ->
+                                chatListStream.receive { view, replacement ->
                                     appState.recoveryDiagnostics
                                         .recordChatListSubscriptionReceived()
                                         ?.let { generation ->
                                             pendingRecoveryProjectionGeneration.publish(generation)
                                         }
+                                    chatsDebug {
+                                        "chat list window view=$view sequence=${replacement.sequence} " +
+                                            "rows=${replacement.rows.size} merged=${chatListStream.rows.size}"
+                                    }
+                                    requireCompleteChatListWindowRows(
+                                        applyChatListWindowRows(accountRef, chatListStream),
+                                    )
                                     receivedLiveUpdate = true
                                     connectionOwner.noteLiveUpdate(connectionAttempt)
-                                    applyChatListWindowRows(accountRef, chatListStream.rows)
                                     appState.schedulePendingLocalGroupDeleteCleanup()
                                 }
                             },
@@ -4105,15 +4117,64 @@ class ChatsController private constructor(
         }
     }
 
-    /** Applies the merged rows of every open chat-list window after a newer replacement was installed. */
+    /** Applies the merged rows only after checking an unexpected active-row drop against MDK. */
     @VisibleForTesting
-    internal fun applyChatListWindowRows(
+    internal suspend fun applyChatListWindowRows(
         accountRef: String,
+        windows: ChatListWindowSet,
+    ): Boolean {
+        val frame = windows.frame()
+        val valid = validateChatListWindowRows(accountRef, windows, frame.rows)
+        return when {
+            windows.closed || chatListWindows !== windows -> {
+                windows.close()
+                false
+            }
+            !windows.isCurrent(frame) -> true
+            !valid -> {
+                windows.close()
+                false
+            }
+            else -> {
+                windows.publishIfCurrent(frame) { rows ->
+                    replacePresentedChatRows(rows)
+                    scheduleRecompute()
+                }
+                !windows.closed
+            }
+        }
+    }
+
+    // A failed keyed read or a confirmed missing row must abort before replacing the coherent frame.
+    @Suppress("ReturnCount")
+    private suspend fun validateChatListWindowRows(
+        accountRef: String,
+        windows: ChatListWindowSet,
         rows: List<PresentedChatRowFfi>,
-    ) {
-        chatsDebug { "chat list window replacement account=${accountRef.take(8)} rows=${rows.size}" }
-        replacePresentedChatRows(rows)
-        scheduleRecompute()
+    ): Boolean {
+        val lookup = liveSubscriptions.presentedRowByGroup ?: return true
+        val activeWindow = windows.installed(ChatListViewFfi.CHATS)
+        val previous =
+            chatRowsByGroup.map { (key, row) -> optimisticChatListPreviewByGroup[key]?.baselineRow ?: row }
+        val candidates = missingActiveTopChatRows(previous, rows, activeWindow)
+        for (old in candidates) {
+            val authoritative =
+                runCatchingCancellable { lookup(accountRef, old.groupIdHex) }
+                    .getOrElse { failure ->
+                        Log.w("DMChats", "CHAT_LIST_ROW_CHECK_FAILED reason=${failure.javaClass.simpleName}")
+                        return false
+                    }?.row ?: continue
+            if (authoritative.belongsInActiveChats() && activeWindow?.shouldContain(authoritative) == true) {
+                Log.w(
+                    "DMChats",
+                    "CHAT_LIST_INCOMPLETE account=${chatListLogHash(accountRef)} " +
+                        "generation=${chatListLogHash(activeWindow.subscriptionGeneration)} " +
+                        "sequence=${activeWindow.sequence} previous=${previous.size} incoming=${rows.size}",
+                )
+                return false
+            }
+        }
+        return true
     }
 
     /** Atomically replaces both base rows and their matching selected presentation. */
