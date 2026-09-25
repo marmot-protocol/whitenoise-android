@@ -632,7 +632,10 @@ private class ScriptedChatListSubscription(
     ): ChatListWindowSnapshotFfi = current
 
     /** Return-to-top echoes the installed replacement. */
-    override suspend fun returnToTop(sequence: ULong): ChatListWindowSnapshotFfi = commandRows?.let { windowSnapshot(it, sequence + 1uL, view) } ?: current
+    override suspend fun returnToTop(sequence: ULong): ChatListWindowSnapshotFfi {
+        val rows = commandRows ?: return current
+        return windowSnapshot(rows, sequence + 1uL, view)
+    }
 
     /** Delivers one authoritative update without blocking the test thread. */
     fun emit(update: ChatListSubscriptionUpdateFfi) {
