@@ -54,11 +54,14 @@ class AppReviewDemoEndToEndTest {
         val johnny = newAccounts.single()
         val originalTimeline = runBlocking { backend.timeline(original, ready.groupId) }
         val demoTimeline = runBlocking { backend.timeline(johnny.ref, ready.groupId) }
-        val originalDemoMessages = originalTimeline.filter { it.token?.startsWith("review-demo:") == true }
-        val peerDemoMessages = demoTimeline.filter { it.token?.startsWith("review-demo:") == true }
-        assertEquals(5, originalDemoMessages.size)
-        assertEquals(5, peerDemoMessages.size)
-        assertEquals(originalDemoMessages.map { it.id }.toSet(), peerDemoMessages.map { it.id }.toSet())
+        // Client tokens are sender-local idempotency metadata; received rows carry the same event ID.
+        val tokenizedSends =
+            (originalTimeline + demoTimeline).filter { it.token?.startsWith("review-demo:") == true }
+        val sentIds = tokenizedSends.map { it.id }.toSet()
+        assertEquals(5, sentIds.size)
+        assertEquals(5, tokenizedSends.mapNotNull { it.token }.toSet().size)
+        assertEquals(sentIds, originalTimeline.map { it.id }.toSet())
+        assertEquals(sentIds, demoTimeline.map { it.id }.toSet())
         assertTrue(originalTimeline.any { it.sender == johnny.id && it.replyTo != null })
         assertTrue(demoTimeline.sumOf { it.reactions.size } >= 2)
     }
