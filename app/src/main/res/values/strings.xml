@@ -1335,6 +1335,8 @@
     <string name="attachment_type_image">Image</string>
     <string name="attachment_type_file">File</string>
     <string name="media_file_too_large">File too large to attach</string>
+    <string name="media_file_unreadable">Couldn\'t read this file. Select it again.</string>
+    <string name="media_file_empty">Empty files can\'t be sent</string>
     <string name="media_album_too_large">Selection too large to send</string>
     <string name="group_image_search_title">Group image</string>
     <string name="group_image_search_set">Set group image</string>

@@ -7,10 +7,17 @@ name: Android Instrumented Tests
 # not run it, but MarmotKit artifact-integration changes must prove the pinned
 # x86_64 native library loads before merge.
 #
-# Dev debug variant only: no signing secrets, no Firebase config,
-# matching the unit-test workflow's no-credentials posture.
+# Ordinary runs use dev debug. The opt-in document matrix uses an unsigned
+# isolated preview debug build, synthetic files, and disposable identities.
 
 on:
+  workflow_dispatch:
+    inputs:
+      document_provider_matrix:
+        description: Run the opt-in isolated-preview real provider and relay matrix
+        required: true
+        type: boolean
+        default: false
   push:
     branches: [master]
   pull_request:
@@ -106,7 +113,7 @@ jobs:
           disable-animations: true
           # android-emulator-runner executes this input through /bin/sh. Keep it
           # to one command and delegate conditional selection to the executable.
-          script: ./scripts/run-android-instrumented-tests.sh "${{ github.event_name }}"
+          script: ./scripts/run-android-instrumented-tests.sh "${{ github.event_name }}" "${{ inputs.document_provider_matrix }}"
 
       - name: Upload instrumented test reports
         if: always()
@@ -116,5 +123,6 @@ jobs:
           path: |
             app/build/reports/androidTests/
             app/build/outputs/androidTest-results/
+            app/build/reports/document-provider-matrix/
           if-no-files-found: ignore
           retention-days: 7

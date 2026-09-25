@@ -78,6 +78,45 @@ class MediaAttachmentSaveTest {
     }
 
     @Test
+    fun generalDocumentTypesRoundTripThroughDownloadsAndExternalView() {
+        val cases =
+            listOf(
+                "notes.txt" to "text/plain",
+                "report.pdf" to "application/pdf",
+                "archive.zip" to "application/zip",
+                "draft.docx" to "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "voice.ogg" to "audio/ogg",
+                "clip.mp4" to "video/mp4",
+                "opaque.bin" to "application/octet-stream",
+                "mismatch.pdf" to "text/plain",
+            )
+        val source = File.createTempFile("document-matrix", ".bin")
+        try {
+            source.writeBytes(PAYLOAD)
+            cases.forEach { (name, mime) ->
+                assertTrue(saveDocumentToDownloads(context(), source, name, mime))
+                assertEquals(name, provider.insertedValues?.getAsString(MediaStore.Downloads.DISPLAY_NAME))
+                assertEquals(mime, provider.insertedValues?.getAsString(MediaStore.Downloads.MIME_TYPE))
+                assertArrayEquals(PAYLOAD, outputFile.readBytes())
+                assertEquals(AttachmentOpenClassification.Ready(mime), classifyAttachmentOpen(mime, name) { false })
+                assertEquals(Intent.ACTION_VIEW, attachmentOpenIntent(Uri.EMPTY, mime).action)
+            }
+        } finally {
+            source.delete()
+        }
+    }
+
+    @Test
+    fun unknownDocumentMetadataUsesSafeGenericFallbackOnSaveAndPicker() {
+        assertTrue(saveAttachmentToMediaStore(context(), PAYLOAD, "../..", "*/*"))
+        assertEquals("file", provider.insertedValues?.getAsString(MediaStore.Downloads.DISPLAY_NAME))
+        assertEquals("application/octet-stream", provider.insertedValues?.getAsString(MediaStore.Downloads.MIME_TYPE))
+        val intent = createDocumentIntent("..\\..", "application/pdf/invalid")
+        assertEquals("file", intent.getStringExtra(Intent.EXTRA_TITLE))
+        assertEquals("application/octet-stream", intent.type)
+    }
+
+    @Test
     fun materializedFileStreamsToDownloadsCollection() {
         val source = File.createTempFile("materialized-attachment", ".apk")
         try {

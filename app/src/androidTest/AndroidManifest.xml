@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Instrumentation resolves these providers using the test package's visibility. -->
+    <queries>
+        <package android:name="dev.ipf.fixture" />
+        <provider android:authorities="dev.ipf.fixture.documents;dev.ipf.fixture.status" />
+    </queries>
     <application>
         <provider
             android:name="dev.ipf.whitenoise.android.share.ExternalShareTestFileProvider"

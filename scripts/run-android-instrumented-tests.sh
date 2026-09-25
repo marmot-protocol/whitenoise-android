@@ -4,6 +4,11 @@
 set -euo pipefail
 
 event_name="${1:-}"
+document_provider_matrix="${2:-false}"
+
+if [[ "$event_name" == "workflow_dispatch" && "$document_provider_matrix" == "true" ]]; then
+  exec ./scripts/run-document-provider-matrix.sh
+fi
 
 # Pull requests run only the classes annotated @PullRequestDeviceSmoke. The filter is an
 # annotation rather than a class list because AGP hands a comma-separated

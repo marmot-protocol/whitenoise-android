@@ -984,6 +984,8 @@
     <string name="media_apk_invalid">此檔案的名稱顯示為 APK，但不是有效的 Android 套件</string>
     <string name="media_open">開啟</string>
     <string name="media_file_too_large">檔案太大,無法附加</string>
+    <string name="media_file_unreadable">無法讀取此檔案。請重新選取。</string>
+    <string name="media_file_empty">無法傳送空檔案。</string>
     <string name="media_album_too_large">選取內容太大,無法傳送</string>
     <string name="group_image_search_title">群組頭像</string>
     <string name="group_image_search_set">設定群組頭像</string>

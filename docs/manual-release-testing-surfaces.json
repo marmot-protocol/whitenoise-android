@@ -3,6 +3,30 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "Empty document send feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
+        "anchor": "R.string.media_file_empty",
+        "test_ids": ["MED-009"]
+      },
+      {
+        "surface": "Unreadable document send feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
+        "anchor": "R.string.media_file_unreadable",
+        "test_ids": ["MED-009"]
+      },
+      {
+        "surface": "Oversized document send feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
+        "anchor": "R.string.media_file_too_large",
+        "test_ids": ["MED-009"]
+      },
+      {
+        "surface": "Unprocessable document image feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
+        "anchor": "R.string.toast_couldnt_decode_image",
+        "test_ids": ["MED-009"]
+      },
+      {
         "surface": "Modifier.chatListEdgeFade",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEdgeFade.kt",
         "anchor": "fun Modifier.chatListEdgeFade(",
