@@ -26793,7 +26793,7 @@
         ]
       },
       {
-        "surface": "MarmotKit SDK pin: backed-up in-place upgrade, startup, sign-in, and replicated attachment download compatibility",
+        "surface": "MarmotKit SDK pin: backed-up in-place upgrade, startup, sign-in, replicated attachment download, and fixed performance-registry compatibility",
         "source": "app/src/main/marmotkit/MARMOT_VERSION",
         "anchor": "mdk-sha=",
         "test_ids": [
@@ -26806,6 +26806,7 @@
           "ONB-018",
           "ONB-020",
           "SEC-007",
+          "SET-021",
           "MED-019",
           "MED-020"
         ]
