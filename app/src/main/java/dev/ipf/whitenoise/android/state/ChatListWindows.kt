@@ -68,12 +68,16 @@ internal class ChatListWindowSet private constructor(
     val rows: List<PresentedChatRowFfi>
         get() = frame().rows
 
-    fun frame(): ChatListFrame = synchronized(frameLock) {
-        ChatListFrame(CHAT_LIST_WINDOW_VIEWS.flatMap { view -> installed[view]?.rows.orEmpty() }, revision)
-    }
+    fun frame(): ChatListFrame =
+        synchronized(frameLock) {
+            ChatListFrame(CHAT_LIST_WINDOW_VIEWS.flatMap { view -> installed[view]?.rows.orEmpty() }, revision)
+        }
 
     /** Prevents a callback suspended during validation from publishing over a newer view's frame. */
-    fun publishIfCurrent(frame: ChatListFrame, publish: (List<PresentedChatRowFfi>) -> Unit): Boolean =
+    fun publishIfCurrent(
+        frame: ChatListFrame,
+        publish: (List<PresentedChatRowFfi>) -> Unit,
+    ): Boolean =
         synchronized(frameLock) {
             if (closed || frame.revision != revision) return@synchronized false
             publish(frame.rows)
@@ -190,12 +194,13 @@ internal class ChatListWindowSet private constructor(
         view: ChatListViewFfi,
         update: ChatListWindowSnapshotFfi,
     ): Boolean {
-        val accepted = synchronized(frameLock) {
-            if (!cursors.getValue(view).accept(update)) return@synchronized false
-            installed[view] = update
-            revision++
-            true
-        }
+        val accepted =
+            synchronized(frameLock) {
+                if (!cursors.getValue(view).accept(update)) return@synchronized false
+                installed[view] = update
+                revision++
+                true
+            }
         if (!accepted) return false
         update.logWindowFrame(view, "replace")
         return true

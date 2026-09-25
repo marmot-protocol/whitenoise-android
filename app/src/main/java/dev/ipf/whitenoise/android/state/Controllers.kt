@@ -3064,7 +3064,8 @@ class ChatsController private constructor(
                     val initialRows = chatListStream.rows
                     requireCompleteChatListWindowRows(
                         validateChatListWindowRows(accountRef, chatListStream, initialRows) &&
-                            !chatListStream.closed && chatListWindows === chatListStream,
+                            !chatListStream.closed &&
+                            chatListWindows === chatListStream,
                     )
                     replacePresentedChatRows(initialRows)
                     appState.recordAccountSwitchLocalRowsReady(accountRef, chatRows.size)
@@ -3083,7 +3084,6 @@ class ChatsController private constructor(
                     isLoading = false
                     error = null
                     recompute()
-
                     // Draw the local projection before catch-up; live updates fold fresh state afterward.
                     if (!localFramePresented) {
                         awaitRenderedChatListFrame()
