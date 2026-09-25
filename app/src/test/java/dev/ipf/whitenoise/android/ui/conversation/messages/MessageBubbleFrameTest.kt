@@ -407,9 +407,9 @@ class MessageBubbleFrameTest {
         }
     }
 
-    /** A wide caption wraps at the standard media width instead of widening the whole bubble. */
+    /** A wide caption caps the envelope and keeps narrower media centered within it. */
     @Test
-    fun substantialSupplementKeepsStandardVisualWidth() {
+    fun substantialSupplementCapsAndCentersNarrowMedia() {
         composeRule.setContent {
             Column {
                 listOf(false, true).forEach { alignEnd ->
@@ -420,7 +420,7 @@ class MessageBubbleFrameTest {
                             media = {
                                 Box(
                                     Modifier
-                                        .width(ConversationMessageMetrics.RichContentCanvasWidth)
+                                        .width(80.dp)
                                         .height(100.dp)
                                         .testTag("narrow-media-$alignEnd"),
                                 )
@@ -438,7 +438,7 @@ class MessageBubbleFrameTest {
                     composeRule.onNodeWithTag("wide-envelope-$alignEnd").fetchSemanticsNode().boundsInRoot
                 val media = composeRule.onNodeWithTag("narrow-media-$alignEnd").fetchSemanticsNode().boundsInRoot
                 assertEquals(ConversationMessageMetrics.RichContentCanvasWidth.value, envelope.width, 1f)
-                assertEquals(ConversationMessageMetrics.RichContentCanvasWidth.value, media.width, 1f)
+                assertEquals(80f, media.width, 1f)
                 assertEquals(envelope.center.x, media.center.x, 1f)
             }
         }

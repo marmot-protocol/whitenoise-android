@@ -50,13 +50,14 @@ class MediaBubbleAspectRatioTest {
         assertNull(sourceShortSideFromDim("0x180"))
     }
 
-    /** A caption widens only portrait media; square and landscape cards keep their prototype size. */
+    /** Only captioned portrait media widens; warning-only and wider cards keep their prototype size. */
     @Test
-    fun onlyPortraitMediaFillsTheCaptionWidth() {
-        assertTrue(shouldExpandCaptionedPortrait("600x1200"))
-        assertFalse(shouldExpandCaptionedPortrait("1200x1200"))
-        assertFalse(shouldExpandCaptionedPortrait("1200x600"))
-        assertFalse(shouldExpandCaptionedPortrait(null))
-        assertFalse(shouldExpandCaptionedPortrait("invalid"))
+    fun onlyCaptionedPortraitMediaUsesStandardWidth() {
+        assertTrue(shouldExpandCaptionedPortrait(hasCaption = true, dim = "600x1200"))
+        assertFalse(shouldExpandCaptionedPortrait(hasCaption = false, dim = "600x1200"))
+        assertFalse(shouldExpandCaptionedPortrait(hasCaption = true, dim = "1200x1200"))
+        assertFalse(shouldExpandCaptionedPortrait(hasCaption = true, dim = "1200x600"))
+        assertFalse(shouldExpandCaptionedPortrait(hasCaption = true, dim = null))
+        assertFalse(shouldExpandCaptionedPortrait(hasCaption = true, dim = "invalid"))
     }
 }

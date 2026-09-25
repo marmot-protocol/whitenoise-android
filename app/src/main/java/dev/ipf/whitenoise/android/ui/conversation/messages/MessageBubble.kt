@@ -1959,7 +1959,10 @@ internal fun MessageBubble(
                         sharedUser == null &&
                         remoteGiphyMedia == null &&
                         bubbleMedia.rejected.isEmpty() &&
-                        shouldExpandCaptionedPortrait(soleCaptionedVisual?.dim)
+                        shouldExpandCaptionedPortrait(
+                            hasCaption = mediaCaption != null,
+                            dim = soleCaptionedVisual?.dim,
+                        )
                 // The footer's time and delivery glyph are secondary metadata: a quiet
                 // gray against the resolved bubble fill, the error pairing for a
                 // persisted failure, and the AMOLED directional accent. Media scrim
