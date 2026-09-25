@@ -121,6 +121,7 @@ class ConversationSendRetryIntegrationTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    @Suppress("LongMethod") // One controller replacement must cover the original confirmation and queued edit.
     fun replacingControllerDispatchesTheSubmittedRevisionAfterOriginalConfirms() =
         runTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
