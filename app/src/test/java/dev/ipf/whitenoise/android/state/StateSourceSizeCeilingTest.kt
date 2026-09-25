@@ -78,8 +78,10 @@ class StateSourceSizeCeilingTest {
         // Play/Zapstore unit tests and Kover run in required CI; keep merged size exact.
         // Android host telemetry adds the runtime, queue, profile and durable-settings
         // integration boundaries while its concurrency and replay logic stays in the
-        // smaller HostPerformanceTelemetry unit; exact-head Kover rechecks the wiring.
-        const val APP_STATE_MAX_LINES = 11462
+        // smaller HostPerformanceTelemetry unit. Review-added frame callback ownership
+        // fencing keeps stale Activity samples out of replacement MDK runtimes (+27 lines);
+        // exact-head Kover rechecks the wiring and this ratchet stays at the source size.
+        const val APP_STATE_MAX_LINES = 11489
 
         /** Counts physical source lines with the same trailing-newline semantics as `wc -l`. */
         internal fun sourceLineCount(file: File): Int = file.bufferedReader().useLines { lines -> lines.count() }
