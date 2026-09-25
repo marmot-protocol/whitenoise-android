@@ -52,8 +52,8 @@ class AccountSetupEndToEndTest {
             }
         composeRule.waitUntil(30_000) { app.phase == AppPhase.Onboarding }
         composeRule.onNodeWithText(context.getString(R.string.onboarding_login)).performClick()
-        composeRule.onNodeWithText(context.getString(R.string.nostr_nsec)).performTextInput(nsec)
-        composeRule.onNodeWithText(context.getString(R.string.sign_in)).performClick()
+        composeRule.onNodeWithTag("onboarding.sign_in.private_key").performTextInput(nsec)
+        composeRule.onNodeWithTag("onboarding.sign_in.action").performClick()
         composeRule.waitUntil(30_000) { app.accountSetup.controller != null }
         val setup = requireNotNull(app.accountSetup.controller)
         assertNotEquals(setup.account, app.activeAccountRef)
