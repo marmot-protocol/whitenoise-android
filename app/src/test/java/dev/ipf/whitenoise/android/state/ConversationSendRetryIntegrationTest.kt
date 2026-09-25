@@ -149,7 +149,10 @@ class ConversationSendRetryIntegrationTest {
                 controller.retryMembers()
                 assertTrue(controller.canSendMessages)
                 val original = async(start = CoroutineStart.UNDISPATCHED) { controller.send("original") }
-                val clientToken = controller.timeline.single().record.messageIdHex
+                val clientToken =
+                    controller.timeline
+                        .single()
+                        .record.messageIdHex
                 controller.beginMessageEdit(clientToken)
                 controller.send("revision A")
                 controller.beginMessageEdit(clientToken)
