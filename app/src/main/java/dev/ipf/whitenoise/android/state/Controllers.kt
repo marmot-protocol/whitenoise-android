@@ -5964,6 +5964,9 @@ class ConversationController(
         }
     },
     private val textPublisher: (suspend (String?, String, String, String) -> SendSummaryFfi)? = null,
+    private val messageEditPublisher: suspend (String, String, String, String) -> Unit = { account, groupId, target, text ->
+        appState.marmotIo(MarmotTraceSection.MESSAGE_EDIT) { editMessage(account, groupId, target, text) }
+    },
     private val mediaUploader: MediaUploader? = null,
     private val mediaImetaTagsBuilder: MediaImetaTagsBuilder = { account, groupIdHex, references ->
         appState.marmotIo {
@@ -6215,12 +6218,26 @@ class ConversationController(
      * [optimisticMessages] map: local-first display, reconciled on engine echo.
      */
     private val optimisticEdits = mutableStateMapOf<String, OptimisticEdit>()
+    private val pendingMessageEditHandoff: PendingMessageEditHandoff get() = appState.pendingMessageEditHandoff
+
+    private fun pendingEditKey(token: String): String = "${conversationAccountRef.orEmpty()}|${group.groupIdHex}|$token"
 
     /** Set when the user has tapped Edit on a kind-9 they sent — the composer
      * banner reflects this and the next [send] routes through [editMessage]
      * instead of producing a new chat. Cleared on submit, cancel, or
      * navigation away. */
     var editingMessageId by mutableStateOf<String?>(null)
+
+    fun beginMessageEdit(messageId: String) {
+        if ("msg:$messageId" in optimisticMessages) pendingMessageEditHandoff.begin(pendingEditKey(messageId))
+        editingMessageId = messageId
+    }
+
+    fun cancelMessageEdit() {
+        val readyEdit = editingMessageId?.let { pendingMessageEditHandoff.cancel(pendingEditKey(it)) }
+        editingMessageId = null
+        readyEdit?.let { edit -> appState.launchMutation { editMessage(edit.targetId, edit.text) } }
+    }
 
     // Production controllers start their local subscription during
     // construction. Reflect that synchronously so the first composition cannot
@@ -7380,6 +7397,7 @@ class ConversationController(
      * (#279).
      */
     fun onCleared() {
+        cancelMessageEdit()
         synchronized(liveSubscriptionLock) {
             controllerCleared = true
             memberRosterRefreshGeneration.advance()
@@ -7621,8 +7639,23 @@ class ConversationController(
         // [editsByTarget] picks it up.
         val editTarget = editingMessageId
         if (editTarget != null) {
+            val handoffKey = pendingEditKey(editTarget)
+            if ("msg:$editTarget" in optimisticMessages && !pendingMessageEditHandoff.hasSession(handoffKey)) {
+                pendingMessageEditHandoff.begin(handoffKey)
+            }
+            val editSubmission = pendingMessageEditHandoff.submit(handoffKey, editTarget, trimmed)
             editingMessageId = null
-            editMessage(editTarget, trimmed)
+            when (editSubmission) {
+                is PendingMessageEditHandoff.Submission.Publish -> editMessage(editSubmission.targetId, trimmed)
+                PendingMessageEditHandoff.Submission.Deferred -> {
+                    // The UUID is a client token, not an event id. Keep the
+                    // revision visible, but publish no kind-1009 until the
+                    // original has a confirmed target.
+                    val previous = optimisticEdits[editTarget]?.preEditText ?: currentDisplayedText(editTarget)
+                    optimisticEdits[editTarget] = OptimisticEdit(trimmed, previous, MessageStatus.Pending)
+                    publishTimelineFromIndexes()
+                }
+            }
             return
         }
 
@@ -7764,6 +7797,11 @@ class ConversationController(
                     timelineOrder = optimisticOrder,
                     acceptedPendingTextOptimisticIdsByMessageId = acceptedPendingTextOptimisticIds,
                 )
+            handoffPendingMessageEdit(
+                tempId,
+                reconciliation.confirmedId,
+                ready = !reconciliation.acceptedPending && !reconciliation.awaitingEcho,
+            )
             appState.pendingSendDiagnostics.alias(tempId, reconciliation.confirmedId)
             appState.pendingSendDiagnostics.recordAcceptedPending(tempId, reconciliation.acceptedPending)
             convergeAcceptedPendingTextSend(account, reconciliation, tempId)
@@ -8944,6 +8982,8 @@ class ConversationController(
         optimisticKey: String,
         tempId: String,
     ) {
+        pendingMessageEditHandoff.abandon(pendingEditKey(tempId))
+        optimisticEdits.remove(tempId)
         optimisticMessages.remove(optimisticKey)
         durableAcceptanceCallbacks.remove(optimisticKey)
         messageById.remove(tempId)
@@ -9169,9 +9209,7 @@ class ConversationController(
         publishTimelineFromIndexes()
         try {
             appState.withGroupCommitLock(account, group.groupIdHex) {
-                appState.marmotIo(MarmotTraceSection.MESSAGE_EDIT) {
-                    editMessage(account, group.groupIdHex, target, trimmed)
-                }
+                messageEditPublisher(account, group.groupIdHex, target, trimmed)
             }
             // Publish accepted: drop the Pending indicator but keep the text
             // overlay so the bubble doesn't flicker back to the old body in the
@@ -9198,6 +9236,24 @@ class ConversationController(
                 ?.let { optimisticEdits[target] = OptimisticEdit(trimmed, preEditText, MessageStatus.Failed) }
             publishTimelineFromIndexes()
             appState.presentFailure(R.string.toast_couldnt_edit_message, "MESSAGE_EDIT", throwable)
+        }
+    }
+
+    private fun handoffPendingMessageEdit(
+        clientToken: String,
+        confirmedId: String,
+        ready: Boolean,
+    ) {
+        val queuedText = pendingMessageEditHandoff.confirm(pendingEditKey(clientToken), confirmedId, ready)
+        if (!ready || confirmedId == clientToken) return
+        optimisticEdits.remove(clientToken)?.let { optimisticEdits[confirmedId] = it }
+        if (queuedText != null) {
+            // Projection installation can still be mid-batch here. Resume on
+            // the next main turn before publishing and rebuilding the timeline.
+            appState.launchMutation {
+                yield()
+                editMessage(confirmedId, queuedText)
+            }
         }
     }
 
@@ -9699,7 +9755,9 @@ class ConversationController(
      * so the bubble doesn't visually jump) and transitions Failed -> Pending
      * while the FFI call is in flight. On success it follows the same
      * confirmed-id swap path as [send]; on failure it returns to Failed.
+     * Keep the established original-send retry transaction behind the failed-edit guard.
      */
+    @Suppress("CyclomaticComplexMethod", "LongMethod", "ReturnCount")
     suspend fun retryFailedSend(item: TimelineMessage) {
         val key = item.id
         // A failed edit's bubble is the target's projected row (no
@@ -9811,6 +9869,7 @@ class ConversationController(
                         localTimelineTimestampOverrides[committedProjection.messageIdHex],
                     )
                 messageById[committedProjection.messageIdHex] = projectedRecord
+                handoffPendingMessageEdit(tempId, committedProjection.messageIdHex, ready = true)
                 invalidatedProjectionIdsMatchingMessage(timelineRecords, projectedRecord)
                     .forEach(::removeProjectedRecord)
                 if (discardedDuringRetry.remove(key)) {
@@ -9857,6 +9916,11 @@ class ConversationController(
                     timelineOrder = order,
                     acceptedPendingTextOptimisticIdsByMessageId = acceptedPendingTextOptimisticIds,
                 )
+            handoffPendingMessageEdit(
+                tempId,
+                reconciliation.confirmedId,
+                ready = !reconciliation.acceptedPending && !reconciliation.awaitingEcho,
+            )
             appState.pendingSendDiagnostics.alias(tempId, reconciliation.confirmedId)
             appState.pendingSendDiagnostics.recordAcceptedPending(tempId, reconciliation.acceptedPending)
             convergeAcceptedPendingTextSend(account, reconciliation, tempId)
@@ -11866,6 +11930,7 @@ class ConversationController(
                 optimisticMessageId = reconciledOptimisticId,
             )
         reconciledOptimisticId?.let { optimisticId ->
+            handoffPendingMessageEdit(optimisticId, record.messageIdHex, ready = true)
             preserveOptimisticDisplayPosition(record.messageIdHex, optimisticId)
             val optimisticKey = "msg:$optimisticId"
             // An authoritative own-message projection proves the engine has
@@ -11894,6 +11959,14 @@ class ConversationController(
             appState.pendingSendDiagnostics.recordEchoReconcile(optimisticId)
         }
         messageById[record.messageIdHex] = actionRecord
+        record.clientToken?.let { clientToken ->
+            // A newly mounted controller may see the native projection after
+            // the editor's original controller was disposed. The process-owned
+            // handoff still knows this token and can publish its queued edit.
+            if (pendingMessageEditHandoff.hasSession(pendingEditKey(clientToken))) {
+                handoffPendingMessageEdit(clientToken, record.messageIdHex, ready = true)
+            }
+        }
         val item =
             timelineMessageFromProjection(
                 record = record,

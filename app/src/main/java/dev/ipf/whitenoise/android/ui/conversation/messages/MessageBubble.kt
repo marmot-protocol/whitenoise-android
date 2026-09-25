@@ -2428,7 +2428,7 @@ internal fun MessageBubble(
                             // edit modes are mutually exclusive in the
                             // composer banner.
                             controller.replyingTo = null
-                            controller.editingMessageId = record.messageIdHex
+                            controller.beginMessageEdit(record.messageIdHex)
                         }
                     },
                     onCopyText = ::copyMessageText,
@@ -2777,7 +2777,7 @@ internal fun MessageBubble(
                                             textState = composerTextState,
                                             editingMessageId = controller.editingMessageId,
                                             editingInitialText = editingRecord?.let { controller.displayedText(it) },
-                                            onCancelEdit = { controller.editingMessageId = null },
+                                            onCancelEdit = controller::cancelMessageEdit,
                                             appState = appState,
                                             mentionCandidates = mentionCandidates,
                                             mentionPickerEnabled = mentionPickerEnabled,

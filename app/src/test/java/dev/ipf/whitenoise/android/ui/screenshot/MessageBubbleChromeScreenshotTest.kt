@@ -125,6 +125,51 @@ class MessageBubbleChromeScreenshotTest {
             .captureRoboImage("src/test/snapshots/message_bubble_accepted_pending_light.png")
     }
 
+    @Test
+    fun pendingRevisionLight() {
+        renderPendingRevision(darkTheme = false)
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/message_pending_revision_light.png")
+    }
+
+    @Test
+    fun pendingRevisionDark() {
+        renderPendingRevision(darkTheme = true)
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/message_pending_revision_dark.png")
+    }
+
+    private fun renderPendingRevision(darkTheme: Boolean) {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = darkTheme) {
+                Surface(color = MaterialTheme.colorScheme.background) {
+                    Column(modifier = Modifier.width(360.dp).padding(16.dp).testTag(TAG)) {
+                        MessageBubbleFrame(
+                            presentation = messageBubblePresentation(deleted = false, mine = true),
+                            highlighted = false,
+                            mine = true,
+                            mentionedSelf = false,
+                            mentionedYouLabel = "Mentioned you",
+                            modifier = Modifier.align(Alignment.End),
+                        ) {
+                            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)) {
+                                Text("Revised before delivery")
+                                MessageInlineFooter(
+                                    timeText = "12:36",
+                                    color = messageBubbleTimestampColor(mine = true, deleted = false),
+                                    showStatus = true,
+                                    status = MessageStatus.Pending,
+                                    editedLabel = "Edited",
+                                    onEditedClick = null,
+                                    retention = null,
+                                    modifier = Modifier.align(Alignment.End),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /** Recent labels stay compact beside incoming and outgoing delivery chrome. */
     @Test
     fun recentElapsedTimeFootersLight() {

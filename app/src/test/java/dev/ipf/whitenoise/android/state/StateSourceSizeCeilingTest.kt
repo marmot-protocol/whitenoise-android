@@ -49,8 +49,9 @@ class StateSourceSizeCeilingTest {
         // reconciliation on top of that. PR #2798 adds 32 net lines for off-main
         // window application and commit-time index revalidation. Its prior green
         // head covered 4,787 / 6,614 controller lines in Kover. Exact-head CI
-        // rechecks coverage. Keep this merged-source ratchet exact.
-        const val CONTROLLERS_MAX_LINES = 13179
+        // rechecks coverage. The pending-message edit handoff adds the covered
+        // native confirmation/retry paths; keep this merged-source ratchet exact.
+        const val CONTROLLERS_MAX_LINES = 13251
 
         // Master includes the covered draft lifecycle and host-timing changes. PR #2534
         // adds 38 lines for the async prepared-speech handoff while keeping preparation
@@ -70,7 +71,8 @@ class StateSourceSizeCeilingTest {
         // Its covered final settlement needs one formatter-required expression-body continuation.
         // Current master also adds pending-send and bounded-window recovery state;
         // Play/Zapstore unit tests and Kover run in required CI; keep merged size exact.
-        const val APP_STATE_MAX_LINES = 11298
+        // The pending-edit handoff adds process-scoped ownership and sign-out cleanup.
+        const val APP_STATE_MAX_LINES = 11303
 
         /** Counts physical source lines with the same trailing-newline semantics as `wc -l`. */
         internal fun sourceLineCount(file: File): Int = file.bufferedReader().useLines { lines -> lines.count() }

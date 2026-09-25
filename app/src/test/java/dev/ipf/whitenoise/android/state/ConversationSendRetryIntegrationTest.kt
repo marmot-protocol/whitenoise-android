@@ -17,6 +17,8 @@ import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
+import dev.ipf.marmotkit.GroupMemberDetailsFfi
+import dev.ipf.marmotkit.GroupRosterFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.SelfMembershipFfi
@@ -32,14 +34,19 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -56,6 +63,134 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36], qualifiers = "en")
 @Suppress("LargeClass") // Send, retry, projection, preview, and durable-draft scenarios share one controller fixture.
 class ConversationSendRetryIntegrationTest {
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun cancellingReopenedEditorDispatchesTheSubmittedRevisionAfterOriginalConfirms() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val releaseOriginal = CompletableDeferred<Unit>()
+            val publishedEdit = CompletableDeferred<Pair<String, String>>()
+            var editCalls = 0
+            val appState = appState()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    groupRosterReader = { _, _ -> authoritativeRoster() },
+                    textPublisher = { _, _, _, _ ->
+                        releaseOriginal.await()
+                        successfulSendSummary()
+                    },
+                    messageEditPublisher = { _, _, target, text ->
+                        editCalls += 1
+                        publishedEdit.complete(target to text)
+                    },
+                )
+
+            try {
+                controller.retryMembers()
+                assertTrue(controller.canSendMessages)
+                val original = async(start = CoroutineStart.UNDISPATCHED) { controller.send("original") }
+                val optimisticMessage = controller.timeline.single()
+                val clientToken = optimisticMessage.record.messageIdHex
+                controller.beginMessageEdit(clientToken)
+                controller.send("revision A")
+                controller.beginMessageEdit(clientToken)
+
+                releaseOriginal.complete(Unit)
+                original.await()
+                val handoffKey = "$ACCOUNT_REF|$GROUP_ID|$clientToken"
+                assertTrue(appState.pendingMessageEditHandoff.hasSession(handoffKey))
+                controller.cancelMessageEdit()
+                assertFalse(appState.pendingMessageEditHandoff.hasSession(handoffKey))
+                runCurrent()
+
+                assertEquals(
+                    CONFIRMED_MESSAGE_ID to "revision A",
+                    withTimeout(5_000) { publishedEdit.await() },
+                )
+                controller.cancelMessageEdit()
+                assertEquals(1, editCalls)
+            } finally {
+                releaseOriginal.complete(Unit)
+                controller.onCleared()
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Suppress("LongMethod") // One controller replacement must cover the original confirmation and queued edit.
+    fun replacingControllerDispatchesTheSubmittedRevisionAfterOriginalConfirms() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val releaseOriginal = CompletableDeferred<Unit>()
+            val publishedEdit = CompletableDeferred<Pair<String, String>>()
+            var editCalls = 0
+            val appState = appState()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    groupRosterReader = { _, _ -> authoritativeRoster() },
+                    textPublisher = { _, _, _, _ ->
+                        releaseOriginal.await()
+                        successfulSendSummary()
+                    },
+                    messageEditPublisher = { _, _, target, text ->
+                        editCalls += 1
+                        publishedEdit.complete(target to text)
+                    },
+                )
+            var replacement: ConversationController? = null
+
+            try {
+                controller.retryMembers()
+                assertTrue(controller.canSendMessages)
+                val original = async(start = CoroutineStart.UNDISPATCHED) { controller.send("original") }
+                val clientToken =
+                    controller.timeline
+                        .single()
+                        .record.messageIdHex
+                controller.beginMessageEdit(clientToken)
+                controller.send("revision A")
+                controller.beginMessageEdit(clientToken)
+
+                releaseOriginal.complete(Unit)
+                original.await()
+                val handoffKey = "$ACCOUNT_REF|$GROUP_ID|$clientToken"
+                assertTrue(appState.pendingMessageEditHandoff.hasSession(handoffKey))
+
+                controller.onCleared()
+                val recreated =
+                    ConversationController(
+                        appState = appState,
+                        initialGroup = group(),
+                        initialMemberSnapshot = memberSnapshot(),
+                        groupRosterReader = { _, _ -> authoritativeRoster() },
+                    )
+                replacement = recreated
+                assertFalse(appState.pendingMessageEditHandoff.hasSession(handoffKey))
+                recreated.cancelMessageEdit()
+                runCurrent()
+
+                assertEquals(
+                    CONFIRMED_MESSAGE_ID to "revision A",
+                    withTimeout(5_000) { publishedEdit.await() },
+                )
+                controller.onCleared()
+                recreated.onCleared()
+                assertEquals(1, editCalls)
+            } finally {
+                releaseOriginal.complete(Unit)
+                replacement?.onCleared()
+                controller.onCleared()
+                Dispatchers.resetMain()
+            }
+        }
+
     /** Exact caller identity settles only its bubble even when text and timestamps are identical. */
     @Test
     fun callerTokenReconcilesIdenticalOptimisticMessagesWithoutHeuristics() =
@@ -1775,6 +1910,28 @@ class ConversationSendRetryIntegrationTest {
                     local = true,
                 ),
             ),
+        )
+
+    private fun authoritativeRoster() =
+        GroupRosterFfi(
+            groupIdHex = GROUP_ID,
+            members =
+                listOf(
+                    GroupMemberDetailsFfi(
+                        memberIdHex = ACCOUNT_ID,
+                        account = ACCOUNT_REF,
+                        local = true,
+                        isAdmin = true,
+                        isSelf = true,
+                        npub = "npub-$ACCOUNT_ID",
+                        displayName = null,
+                    ),
+                ),
+            epoch = 1uL,
+            rosterRevision = 1uL,
+            selfMembership = SelfMembershipFfi.MEMBER,
+            memberCount = 1u,
+            lifecycleState = GroupLifecycleStateFfi.STABLE,
         )
 
     private fun group(
