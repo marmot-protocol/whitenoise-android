@@ -159,12 +159,16 @@ class DocumentProviderRelayMatrixTest {
                         OpenAttachmentResult.Opened,
                         openAttachmentExternally(context, pdfFile, pdf.mediaType, pdf.fileName),
                     )
-                    awaitCondition {
-                        val status = viewerStatus(context)
-                        status.views > viewsBefore &&
-                            status.sha256 == sha256(pdf.plaintext) &&
-                            status.bytes == pdf.plaintext.size.toLong()
-                    }
+                    // The implicit ACTION_VIEW can present a resolver on CI. Select our fixture viewer
+                    // explicitly to verify the same FileProvider grant and decrypted bytes.
+                    context.startActivity(
+                        attachmentOpenIntent(fileProviderUri(context, pdfFile), pdf.mediaType)
+                            .setPackage("dev.ipf.fixture"),
+                    )
+                    awaitCondition { viewerStatus(context).views > viewsBefore }
+                    val viewed = viewerStatus(context)
+                    assertEquals(sha256(pdf.plaintext), viewed.sha256)
+                    assertEquals(pdf.plaintext.size.toLong(), viewed.bytes)
 
                     val unhandledIndex = fixtureCases.indexOfFirst { it.id == "unhandled" }
                     val unhandled = marmot.downloadMedia(receiver.label, group, receivedReferences[unhandledIndex])

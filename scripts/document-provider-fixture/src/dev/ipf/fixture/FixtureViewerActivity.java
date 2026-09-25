@@ -27,7 +27,12 @@ public final class FixtureViewerActivity extends Activity {
             getSharedPreferences("viewer", MODE_PRIVATE).edit().putString("sha256", hex.toString()).putLong("bytes", length).putInt("views", views).apply();
         } catch (Exception error) {
             label.setText("WN fixture viewer\nCould not read granted URI: " + error.getClass().getSimpleName());
-            getSharedPreferences("viewer", MODE_PRIVATE).edit().putString("sha256", "ERROR").apply();
+            int views = getSharedPreferences("viewer", MODE_PRIVATE).getInt("views", 0) + 1;
+            getSharedPreferences("viewer", MODE_PRIVATE).edit()
+                .putString("sha256", "ERROR:" + error.getClass().getSimpleName())
+                .putLong("bytes", -1)
+                .putInt("views", views)
+                .apply();
         }
         setContentView(label);
     }
