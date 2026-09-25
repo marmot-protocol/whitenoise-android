@@ -29,6 +29,7 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.core.ReactionTally
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
 import dev.ipf.whitenoise.android.ui.conversation.messages.MediaCaptionFrame
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubbleFrame
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageInlineFooter
@@ -74,7 +75,7 @@ class MessageBubbleChromeScreenshotTest {
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/message_bubble_chrome_dark.png")
     }
 
-    /** Long captions and narrow portrait media share an edge-to-edge frame. */
+    /** Long captions and narrow portrait media share the prototype's inset frame. */
     @Test
     fun narrowMediaWithLongCaptionsUsesReadableSharedWidth() {
         composeRule.setContent {
@@ -97,6 +98,35 @@ class MessageBubbleChromeScreenshotTest {
         composeRule
             .onNodeWithTag(NARROW_MEDIA_CAPTION_TAG)
             .captureRoboImage("src/test/snapshots/message_bubble_narrow_media_long_caption_light.png")
+    }
+
+    /** A dark image keeps the bubble-fill frame visible around the media. */
+    @Test
+    fun darkNarrowMediaWithLongCaptionsKeepsVisibleBubbleFrame() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                Surface(color = MaterialTheme.colorScheme.background) {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                            .testTag(NARROW_MEDIA_CAPTION_TAG),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        NarrowCaptionBubble(mine = false, mediaColor = Color.Black)
+                        NarrowCaptionBubble(
+                            mine = true,
+                            mediaColor = Color.Black,
+                            modifier = Modifier.align(Alignment.End),
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule
+            .onNodeWithTag(NARROW_MEDIA_CAPTION_TAG)
+            .captureRoboImage("src/test/snapshots/message_bubble_narrow_media_long_caption_dark.png")
     }
 
     @Test
@@ -470,6 +500,7 @@ class MessageBubbleChromeScreenshotTest {
 private fun NarrowCaptionBubble(
     mine: Boolean,
     modifier: Modifier = Modifier,
+    mediaColor: Color = if (mine) Color(0xFF6A4C93) else Color(0xFF2A9D8F),
 ) {
     MediaCaptionFrame(
         presentation = messageBubblePresentation(deleted = false, mine = mine),
@@ -478,14 +509,13 @@ private fun NarrowCaptionBubble(
         mentionedSelf = false,
         mentionedYouLabel = "Mentioned you",
         alignEnd = mine,
-        edgeToEdgeMedia = true,
         modifier = modifier.widthIn(max = 290.dp),
         media = {
             Box(
                 Modifier
-                    .fillMaxWidth()
+                    .width(ConversationMessageMetrics.RichContentCanvasWidth)
                     .height(138.dp)
-                    .background(if (mine) Color(0xFF6A4C93) else Color(0xFF2A9D8F)),
+                    .background(mediaColor),
             )
         },
     ) {
@@ -561,7 +591,6 @@ private fun CustomAmoledMediaCaptionBubble(highlighted: Boolean) {
         mentionedSelf = false,
         mentionedYouLabel = "Mentioned you",
         alignEnd = true,
-        edgeToEdgeMedia = true,
         media = { Box(Modifier.fillMaxWidth().height(80.dp).background(Color(0xFF303030))) },
     ) {
         Text("Highlighted media caption")

@@ -18,6 +18,9 @@ internal fun aspectRatioFromDim(dim: String?): Float? {
     return sides?.takeIf { it.size == 2 }?.let { (width, height) -> width.toFloat() / height.toFloat() }
 }
 
+/** Only portrait media needs the standard-width caption treatment. */
+internal fun shouldExpandCaptionedPortrait(dim: String?): Boolean = aspectRatioFromDim(dim)?.let { it < 1f } == true
+
 /** A GIF keeps the shared rich-content canvas width and the prototype's fixed banner height. */
 internal fun isGifAttachmentMediaType(mediaType: String?): Boolean = mediaType.equals("image/gif", ignoreCase = true)
 

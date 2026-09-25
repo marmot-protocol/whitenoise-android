@@ -9,35 +9,28 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
-/** Places full-bleed visual media above a conventionally padded caption. */
+/** Places visual media inside the prototype bubble inset above a padded caption. */
 @Composable
 @Suppress("FunctionNaming")
 internal fun MediaCaptionContent(
-    edgeToEdgeMedia: Boolean,
     alignEnd: Boolean,
     contentModifier: Modifier,
     media: @Composable ColumnScope.() -> Unit,
     caption: @Composable ColumnScope.() -> Unit,
 ) {
-    val outerInset = ConversationMessageMetrics.RichOuterInset
-    val horizontalPadding =
-        ConversationMessageMetrics.RichTextHorizontalAdjustment +
-            if (edgeToEdgeMedia) outerInset else 0.dp
     MediaSupplementEnvelope(
         alignEnd = alignEnd,
-        modifier = if (edgeToEdgeMedia) Modifier else Modifier.padding(outerInset),
+        modifier = Modifier.padding(ConversationMessageMetrics.RichOuterInset),
         media = media,
     ) {
         Column(modifier = contentModifier.fillMaxWidth()) {
             Column(
                 modifier =
                     Modifier.padding(
-                        start = horizontalPadding,
-                        end = horizontalPadding,
+                        start = ConversationMessageMetrics.RichTextHorizontalAdjustment,
+                        end = ConversationMessageMetrics.RichTextHorizontalAdjustment,
                         top = ConversationMessageMetrics.RichContentSpacing,
-                        bottom =
-                            ConversationMessageMetrics.RichTextBottomAdjustment +
-                                if (edgeToEdgeMedia) outerInset else 0.dp,
+                        bottom = ConversationMessageMetrics.RichTextBottomAdjustment,
                     ),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 content = caption,

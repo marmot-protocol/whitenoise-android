@@ -95,8 +95,8 @@ internal fun MessageBubbleFrame(
  * One message surface for media and its caption/footer.
  *
  * The media is measured first so the caption adopts its width, but both are
- * clipped and bordered by this single outer surface. Attached media uses
- * square internal corners; the outer surface owns all four visible corners.
+ * clipped by this single outer surface. The bubble fill remains visible as a
+ * consistent inset around attached media, matching the prototype treatment.
  */
 @Composable
 @Suppress("FunctionNaming")
@@ -107,7 +107,6 @@ internal fun MediaCaptionFrame(
     mentionedSelf: Boolean,
     mentionedYouLabel: String,
     alignEnd: Boolean,
-    edgeToEdgeMedia: Boolean = false,
     modifier: Modifier = Modifier,
     contentModifier: Modifier = Modifier,
     shape: Shape = MaterialTheme.shapes.large,
@@ -140,7 +139,6 @@ internal fun MediaCaptionFrame(
             accentArgb = presentation.mentionAccentArgb,
             integratedWithBorder = amoled,
         )
-
     Surface(
         modifier = modifier.then(highlightModifier).then(mentionModifier),
         color = colorFromArgb(presentation.backgroundArgb),
@@ -148,18 +146,17 @@ internal fun MediaCaptionFrame(
         shape = shape,
         border = messageFrameBorder(presentation, mine, mentionedSelf, amoled),
     ) {
-        MediaCaptionContent(edgeToEdgeMedia, alignEnd, contentModifier, media, caption)
+        MediaCaptionContent(alignEnd, contentModifier, media, caption)
     }
 }
 
 /**
- * Measures media first, then lets a wider supplement establish the bounded shared width.
+ * Measures media first, then lets a wider supplement establish a capped shared width.
  *
- * Media children intentionally retain their existing sizing policy: a
- * landscape image, grid, or voice note may consume the available width while
- * a portrait image can keep its fixed card width. Callers that render a
- * captioned single visual make that visual fill the available width so the
- * image reaches both edges of the shared frame.
+ * Media children intentionally retain their existing sizing policy. A normal
+ * photo therefore keeps the same card width with or without a caption, while
+ * callers may expand a narrow portrait only to the standard media canvas.
+ * Captions wrap at that canvas width instead of turning media into a wide text bubble.
  */
 @Composable
 @Suppress("FunctionNaming")
@@ -185,7 +182,11 @@ internal fun MediaSupplementEnvelope(
                 Column(content = supplement)
             }.single()
         val supplementWidth = supplementMeasurable.maxIntrinsicWidth(Constraints.Infinity)
-        val envelopeWidth = constraints.constrainWidth(maxOf(mediaPlaceable.width, supplementWidth))
+        val captionWidthCap = ConversationMessageMetrics.RichContentCanvasWidth.roundToPx()
+        val envelopeWidth =
+            constraints.constrainWidth(
+                maxOf(mediaPlaceable.width, minOf(supplementWidth, captionWidthCap)),
+            )
         val supplementPlaceable =
             supplementMeasurable.measure(
                 relaxedConstraints.copy(
