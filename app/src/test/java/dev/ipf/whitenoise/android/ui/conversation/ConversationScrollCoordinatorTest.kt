@@ -12,6 +12,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import java.util.concurrent.CancellationException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @Suppress("LargeClass") // Scroll state-machine invariants share one command/writer harness.
@@ -765,6 +766,76 @@ class ConversationScrollCoordinatorTest {
             jump.join()
 
             assertTrue(jumpResult)
+            assertEquals(listOf(ScrollWrite.Snap(0, 0)), writer.writes)
+            assertEquals(ConversationScrollMode.FollowingTail, coordinator.mode)
+            assertTrue(coordinator.isFollowingTail)
+        }
+
+    /**
+     * When the command that owned the settle then fails, the fallback is where the gesture ended,
+     * not the anchor captured when the finger first landed (#2727).
+     */
+    @Test
+    fun failedCommandFallsBackToWhereTheGestureEnded() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            val engineAnswered = CompletableDeferred<Unit>()
+            var jumpResult = true
+            coordinator.onUserGestureStarted(anchor(messageId = "pressed", listIndex = 10, pixelOffset = 24))
+            val jump =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    jumpResult =
+                        coordinator.programmaticJump(
+                            targetMessageId = null,
+                            reason = ConversationScrollReason.UnreadTail,
+                            resultingMode = ConversationScrollMode.FollowingTail,
+                        ) {
+                            engineAnswered.await()
+                            throw CancellationException("newest edge was not available")
+                        }
+                }
+            runCurrent()
+            val released = anchor(messageId = "released", listIndex = 3, pixelOffset = 8)
+            coordinator.onUserGestureSettled(released, nearBottom = false)
+            assertTrue(
+                "the owning command keeps its transient mode",
+                coordinator.mode is ConversationScrollMode.ProgrammaticJump,
+            )
+
+            engineAnswered.complete(Unit)
+            jump.join()
+
+            assertFalse(jumpResult)
+            assertTrue(writer.writes.isEmpty())
+            assertEquals(ConversationScrollMode.ReadingHistory("released", 8), coordinator.mode)
+            assertEquals("released", coordinator.bookmark(released).anchor.messageId)
+        }
+
+    /**
+     * A command that finishes before the delayed settle keeps its result, the settle only confirms
+     * the live geometry.
+     */
+    @Test
+    fun commandFinishingBeforeTheDelayedSettleKeepsItsResult() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            coordinator.onUserGestureStarted(anchor(messageId = "pressed", listIndex = 10, pixelOffset = 24))
+            val completed =
+                coordinator.programmaticJump(
+                    targetMessageId = null,
+                    reason = ConversationScrollReason.JumpToNewest,
+                    resultingMode = ConversationScrollMode.FollowingTail,
+                ) { scrollToTail(0) }
+            assertTrue(completed)
+            assertTrue(coordinator.isFollowingTail)
+
+            coordinator.onUserGestureSettled(
+                anchor(messageId = "newest", listIndex = 0, pixelOffset = 0),
+                nearBottom = true,
+            )
+
             assertEquals(listOf(ScrollWrite.Snap(0, 0)), writer.writes)
             assertEquals(ConversationScrollMode.FollowingTail, coordinator.mode)
             assertTrue(coordinator.isFollowingTail)

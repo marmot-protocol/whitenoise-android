@@ -429,23 +429,29 @@ internal class ConversationScrollCoordinator(
      * started while the transcript was still coasting, a send, the jump button or a reply quote,
      * may already own the list. That command supersedes the gesture: it settles its own mode when
      * it completes, and cancelling it here would discard the reader's later, deliberate action.
+     * Where the gesture ended is still recorded as the durable intent, so a command that fails
+     * falls back to it rather than to the anchor captured when the finger first landed, but the
+     * command's transient mode is left untouched so nothing re-anchors underneath it.
      */
     fun onUserGestureSettled(
         anchor: ConversationScrollAnchor,
         nearBottom: Boolean,
     ) {
         userGestureInProgress = false
-        if (activeCommand != null) return
-        if (nearBottom) {
-            readingAnchor = null
-            setSettledMode(ConversationScrollMode.FollowingTail, forceRevision = true)
-        } else {
-            readingAnchor = anchor
-            setSettledMode(
-                ConversationScrollMode.ReadingHistory(anchor.messageId, anchor.pixelOffset),
-                forceRevision = true,
-            )
+        val settled =
+            if (nearBottom) {
+                ConversationScrollMode.FollowingTail
+            } else {
+                ConversationScrollMode.ReadingHistory(anchor.messageId, anchor.pixelOffset)
+            }
+        readingAnchor = anchor.takeUnless { nearBottom }
+        if (activeCommand != null) {
+            intentLifetime.advance()
+            settledMode = settled
+            return
         }
+        invalidateActiveCommand()
+        setSettledMode(settled, forceRevision = true)
     }
 
     /** Replaces transient command ownership with a durable logical history anchor. */
