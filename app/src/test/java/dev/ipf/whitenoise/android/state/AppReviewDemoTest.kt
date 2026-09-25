@@ -208,10 +208,11 @@ class AppReviewDemoTest {
     @Test
     fun lostAccountCreateReplyDoesNotCreateAgainBeforeAccountAppears() =
         runTest {
-            val backend = FakeBackend().apply {
-                loseAccountCreateReply = true
-                hideCreatedAccount = true
-            }
+            val backend =
+                FakeBackend().apply {
+                    loseAccountCreateReply = true
+                    hideCreatedAccount = true
+                }
             val store = MemoryStore()
             val demo = AppReviewDemo(backend, store, this, StandardTestDispatcher(testScheduler))
 
@@ -473,8 +474,7 @@ class AppReviewDemoTest {
         var loseAccountCreateReply = false
         var hideCreatedAccount = false
 
-        override suspend fun accounts() =
-            accountList.filter { !hideCreatedAccount || it.ref == original.ref }
+        override suspend fun accounts() = accountList.filter { !hideCreatedAccount || it.ref == original.ref }
 
         override suspend fun createAccount(): ReviewDemoAccount {
             accountCreates++
