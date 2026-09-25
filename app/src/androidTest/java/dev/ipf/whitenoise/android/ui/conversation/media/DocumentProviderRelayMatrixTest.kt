@@ -8,6 +8,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotAndroid
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
@@ -85,7 +86,8 @@ class DocumentProviderRelayMatrixTest {
 
             revoke(context, "text")
             awaitCondition {
-                runCatching { context.contentResolver.openInputStream(uri("text"))?.use { it.read() } }.isFailure
+                val reopened = runCatching { context.contentResolver.openInputStream(uri("text"))?.use { it.read() } }
+                reopened.isFailure || reopened.getOrNull() == null
             }
             val afterRevoke = reader.readPickedDocuments(listOf(uri("text")))
             assertEquals(setOf(DocumentReadFailure.UNREADABLE), afterRevoke.failures)
@@ -104,7 +106,18 @@ class DocumentProviderRelayMatrixTest {
                     accounts += receiver.label
                     val group = marmot.createGroup(sender.label, "Document matrix", listOf(receiver.accountIdHex), null)
                     awaitCondition(180_000) { marmot.chatList(receiver.label, false).any { it.groupIdHex == group } }
-                    marmot.acceptGroupInvite(receiver.label, group)
+                    awaitCondition(180_000) {
+                        try {
+                            marmot.acceptGroupInvite(receiver.label, group)
+                            true
+                        } catch (_: MarmotKitException.GroupInviteNotPending) {
+                            true
+                        } catch (_: MarmotKitException.AccountWorkerBusy) {
+                            false
+                        } catch (_: MarmotKitException.AccountWorkerResponseTimedOut) {
+                            false
+                        }
+                    }
 
                     val uploaded =
                         marmot.uploadMedia(
@@ -130,10 +143,12 @@ class DocumentProviderRelayMatrixTest {
                     var receivedReferences = emptyList<dev.ipf.marmotkit.MediaAttachmentReferenceFfi>()
                     awaitCondition(180_000) {
                         val message =
-                            marmot.timelineMessages(
-                                receiver.label,
-                                TimelineMessageQueryFfi(group, null, null, null, null, null, 30u),
-                            ).messages.firstOrNull { it.messageIdHex == messageId }
+                            marmot
+                                .timelineMessages(
+                                    receiver.label,
+                                    TimelineMessageQueryFfi(group, null, null, null, null, null, 30u),
+                                ).messages
+                                .firstOrNull { it.messageIdHex == messageId }
                         receivedReferences = message?.let { MessageAttachments.acceptedReferences(it.media) }.orEmpty()
                         receivedReferences.size == fixtureCases.size
                     }
@@ -177,7 +192,7 @@ class DocumentProviderRelayMatrixTest {
                         OpenAttachmentResult.NoHandler,
                         openAttachmentExternally(context, unhandledFile, unhandled.mediaType, unhandled.fileName),
                     )
-                    AttachmentPlaintextCache.trimDirectoryToByteCap(pdfFile.parentFile, 0)
+                    AttachmentPlaintextCache.trimDirectoryToByteCap(requireNotNull(pdfFile.parentFile), 0)
                     assertFalse(pdfFile.exists())
                     assertFalse(unhandledFile.exists())
                 }
@@ -188,17 +203,35 @@ class DocumentProviderRelayMatrixTest {
             }
         }
 
-    private data class Case(val id: String, val name: String, val mime: String)
+    private data class Case(
+        val id: String,
+        val name: String,
+        val mime: String,
+    )
 
-    private data class ViewerStatus(val sha256: String, val bytes: Long, val views: Int)
+    private data class ViewerStatus(
+        val sha256: String,
+        val bytes: Long,
+        val views: Int,
+    )
 
     private fun uri(id: String): Uri = DocumentsContract.buildDocumentUri("dev.ipf.fixture.documents", id)
 
-    private fun grant(context: Context, id: String) = sendGrantCommand(context, "GRANT", id)
+    private fun grant(
+        context: Context,
+        id: String,
+    ) = sendGrantCommand(context, "GRANT", id)
 
-    private fun revoke(context: Context, id: String) = sendGrantCommand(context, "REVOKE", id)
+    private fun revoke(
+        context: Context,
+        id: String,
+    ) = sendGrantCommand(context, "REVOKE", id)
 
-    private fun sendGrantCommand(context: Context, action: String, id: String) {
+    private fun sendGrantCommand(
+        context: Context,
+        action: String,
+        id: String,
+    ) {
         val reply =
             context.contentResolver.call(
                 Uri.parse("content://dev.ipf.fixture.status"),
@@ -221,8 +254,7 @@ class DocumentProviderRelayMatrixTest {
         }
     }
 
-    private fun sha256(bytes: ByteArray): String =
-        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it.toInt() and 0xff) }
+    private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
     private suspend fun awaitCondition(
         timeoutMs: Long = 30_000,
