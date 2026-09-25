@@ -732,6 +732,44 @@ class ConversationScrollCoordinatorTest {
             assertEquals(ConversationScrollMode.ReadingHistory("reader", 24), coordinator.mode)
         }
 
+    /**
+     * A gesture settles only once its fling rests, so a command the reader started while the list
+     * was still coasting owns the settle: it is neither cancelled nor overruled by the stale gesture
+     * intent, and it commits its own resulting mode (#2727).
+     */
+    @Test
+    fun gestureSettlingAfterACommandTookOwnershipLeavesTheCommandAlive() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            val engineAnswered = CompletableDeferred<Unit>()
+            var jumpResult = false
+            coordinator.onUserGestureStarted(anchor(messageId = "reader", listIndex = 10, pixelOffset = 24))
+            val jump =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    jumpResult =
+                        coordinator.programmaticJump(
+                            targetMessageId = null,
+                            reason = ConversationScrollReason.Send,
+                            resultingMode = ConversationScrollMode.FollowingTail,
+                        ) {
+                            engineAnswered.await()
+                            scrollToTail(0)
+                        }
+                }
+            runCurrent()
+
+            val released = anchor(messageId = "reader", listIndex = 8, pixelOffset = 0)
+            coordinator.onUserGestureSettled(released, nearBottom = false)
+            engineAnswered.complete(Unit)
+            jump.join()
+
+            assertTrue(jumpResult)
+            assertEquals(listOf(ScrollWrite.Snap(0, 0)), writer.writes)
+            assertEquals(ConversationScrollMode.FollowingTail, coordinator.mode)
+            assertTrue(coordinator.isFollowingTail)
+        }
+
     @Test
     fun paginationAndHeaderInsertionResolveTheSameMessageIdAndOffset() =
         runTest {

@@ -422,13 +422,20 @@ internal class ConversationScrollCoordinator(
         )
     }
 
-    /** Commits the durable tail or history intent selected by a completed user gesture. */
+    /**
+     * Commits the durable tail or history intent selected by a completed user gesture.
+     *
+     * The gesture now settles only once its fling has come to rest, so a command the reader
+     * started while the transcript was still coasting, a send, the jump button or a reply quote,
+     * may already own the list. That command supersedes the gesture: it settles its own mode when
+     * it completes, and cancelling it here would discard the reader's later, deliberate action.
+     */
     fun onUserGestureSettled(
         anchor: ConversationScrollAnchor,
         nearBottom: Boolean,
     ) {
-        invalidateActiveCommand()
         userGestureInProgress = false
+        if (activeCommand != null) return
         if (nearBottom) {
             readingAnchor = null
             setSettledMode(ConversationScrollMode.FollowingTail, forceRevision = true)
