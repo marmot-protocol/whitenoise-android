@@ -2985,13 +2985,13 @@ class ChatsController private constructor(
                             activeChatsSubscription = chatStream
                         }
                     }
-                    val initialRows = chatListStream.rows
+                    val initialFrame = chatListStream.frame()
                     requireCompleteChatListWindowRows(
-                        validateChatListWindowRows(accountRef, chatListStream, initialRows) &&
+                        validateChatListWindowRows(accountRef, chatListStream, initialFrame.rows) &&
                             !chatListStream.closed &&
                             chatListWindows === chatListStream,
                     )
-                    replacePresentedChatRows(initialRows)
+                    chatListStream.publishIfCurrent(initialFrame, ::replacePresentedChatRows)
                     appState.schedulePendingLocalGroupDeleteCleanup()
                     appState.recordAccountSwitchLocalRowsReady(accountRef, chatRows.size)
                     groupRecordsById =

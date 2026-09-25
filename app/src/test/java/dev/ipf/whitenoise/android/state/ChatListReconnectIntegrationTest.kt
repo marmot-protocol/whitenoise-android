@@ -632,8 +632,7 @@ private class ScriptedChatListSubscription(
     ): ChatListWindowSnapshotFfi = current
 
     /** Return-to-top echoes the installed replacement. */
-    override suspend fun returnToTop(sequence: ULong): ChatListWindowSnapshotFfi =
-        commandRows?.let { windowSnapshot(it, this.sequence + 1uL, view) } ?: current
+    override suspend fun returnToTop(sequence: ULong): ChatListWindowSnapshotFfi = commandRows?.let { windowSnapshot(it, sequence + 1uL, view) } ?: current
 
     /** Delivers one authoritative update without blocking the test thread. */
     fun emit(update: ChatListSubscriptionUpdateFfi) {
@@ -671,6 +670,7 @@ private class DroppedChatSubscriptions(
     private val archivedOpenCount = AtomicInteger()
 
     @Volatile var pinnedProjection: ChatListRowFfi? = pinned
+
     @Volatile var groupProjection: ChatListRowFfi? = group
     var beforeKeyedLookup: (() -> Unit)? = null
     var suspendBeforeKeyedLookup: (suspend () -> Unit)? = null
