@@ -16,6 +16,7 @@ import dev.ipf.whitenoise.android.core.MarmotClient
 import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.ui.conversation.ConversationAttachmentReader
+import dev.ipf.whitenoise.android.ui.conversation.DocumentReadFailure
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
