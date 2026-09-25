@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- The opt-in preview emulator matrix reads a separate fixture package. -->
+    <queries>
+        <package android:name="dev.ipf.fixture" />
+    </queries>
+</manifest>
