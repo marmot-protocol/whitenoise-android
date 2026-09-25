@@ -1,8 +1,10 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Process
 import android.provider.DocumentsContract
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -21,6 +23,7 @@ import dev.ipf.whitenoise.android.ui.conversation.DocumentReadFailure
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -85,10 +88,7 @@ class DocumentProviderRelayMatrixTest {
             }
 
             revoke(context, "text")
-            awaitCondition {
-                val reopened = runCatching { context.contentResolver.openInputStream(uri("text"))?.use { it.read() } }
-                reopened.isFailure || reopened.getOrNull() == null
-            }
+            awaitRevokedDocument(context, uri("text"))
             val afterRevoke = reader.readPickedDocuments(listOf(uri("text")))
             assertEquals(setOf(DocumentReadFailure.UNREADABLE), afterRevoke.failures)
             assertTrue(afterRevoke.attachments.isEmpty())
@@ -106,18 +106,7 @@ class DocumentProviderRelayMatrixTest {
                     accounts += receiver.label
                     val group = marmot.createGroup(sender.label, "Document matrix", listOf(receiver.accountIdHex), null)
                     awaitCondition(180_000) { marmot.chatList(receiver.label, false).any { it.groupIdHex == group } }
-                    awaitCondition(180_000) {
-                        try {
-                            marmot.acceptGroupInvite(receiver.label, group)
-                            true
-                        } catch (_: MarmotKitException.GroupInviteNotPending) {
-                            true
-                        } catch (_: MarmotKitException.AccountWorkerBusy) {
-                            false
-                        } catch (_: MarmotKitException.AccountWorkerResponseTimedOut) {
-                            false
-                        }
-                    }
+                    acceptInviteWhenReady(marmot, receiver.label, group)
 
                     val uploaded =
                         marmot.uploadMedia(
@@ -227,6 +216,52 @@ class DocumentProviderRelayMatrixTest {
         id: String,
     ) = sendGrantCommand(context, "REVOKE", id)
 
+    private suspend fun awaitRevokedDocument(
+        context: Context,
+        documentUri: Uri,
+    ) {
+        val denied =
+            withTimeoutOrNull(15_000) {
+                var inaccessible = false
+                while (!inaccessible) {
+                    val reopened =
+                        runCatching { context.contentResolver.openInputStream(documentUri)?.use { it.read() } }
+                    inaccessible = reopened.isFailure || reopened.getOrNull() == null
+                    if (!inaccessible) delay(500)
+                }
+                true
+            }
+        check(denied == true) {
+            val permission =
+                context.checkUriPermission(
+                    documentUri,
+                    Process.myPid(),
+                    Process.myUid(),
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
+            "Revoked document remained readable; URI permission check=$permission"
+        }
+    }
+
+    private suspend fun acceptInviteWhenReady(
+        marmot: Marmot,
+        account: String,
+        group: String,
+    ) {
+        awaitCondition(180_000) {
+            try {
+                marmot.acceptGroupInvite(account, group)
+                true
+            } catch (_: MarmotKitException.GroupInviteNotPending) {
+                true
+            } catch (_: MarmotKitException.AccountWorkerBusy) {
+                false
+            } catch (_: MarmotKitException.AccountWorkerResponseTimedOut) {
+                false
+            }
+        }
+    }
+
     private fun sendGrantCommand(
         context: Context,
         action: String,
@@ -254,7 +289,10 @@ class DocumentProviderRelayMatrixTest {
         }
     }
 
-    private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it.toInt() and 0xff) }
+    private fun sha256(bytes: ByteArray): String {
+        val digest = MessageDigest.getInstance("SHA-256").digest(bytes)
+        return digest.joinToString("") { "%02x".format(it.toInt() and 0xff) }
+    }
 
     private suspend fun awaitCondition(
         timeoutMs: Long = 30_000,

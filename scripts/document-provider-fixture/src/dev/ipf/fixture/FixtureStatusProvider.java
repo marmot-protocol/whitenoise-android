@@ -28,7 +28,8 @@ public final class FixtureStatusProvider extends ContentProvider {
         if ("grant".equals(method)) {
             getContext().grantUriPermission(target, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
         } else {
-            getContext().revokeUriPermission(target, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            // Revoke every matching grant, including any held by the instrumentation package.
+            getContext().revokeUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
         }
         Bundle result = new Bundle();
         result.putBoolean("ok", true);
