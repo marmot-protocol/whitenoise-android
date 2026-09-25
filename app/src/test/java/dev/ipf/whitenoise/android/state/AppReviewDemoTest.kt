@@ -441,9 +441,9 @@ class AppReviewDemoTest {
         original.ref,
         original.id,
         setOf(original.ref),
-        demoRef,
-        demoId,
-        groupId,
+        demoRef = demoRef,
+        demoId = demoId,
+        groupId = groupId,
         reactionAttempts = reactionAttempts,
         completed = completed,
     )
