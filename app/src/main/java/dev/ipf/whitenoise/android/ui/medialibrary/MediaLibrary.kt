@@ -409,7 +409,7 @@ internal fun sharedMediaFallbackContent(
         else -> SharedMediaFallback(SharedMediaFallbackType.Generic)
     }
 
-/** Opens the four native per-chat categories from the same bounded, visibility-filtered source. */
+/** Opens available per-chat categories from the same bounded, visibility-filtered source. */
 @Composable
 internal fun SharedMediaSection(
     tiles: SharedMediaTiles,

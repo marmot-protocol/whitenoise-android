@@ -472,6 +472,15 @@
     <string name="developer_mode">Modo de desenvolvedor</string>
     <string name="developer_mode_subtitle">Mostra diagnósticos e componentes internos do MLS.</string>
     <string name="developer_testing_only">Apenas para desenvolvimento e testes</string>
+    <string name="developer_seed_fixture">Preencher conversa de teste</string>
+    <string name="developer_seed_fixture_subtitle">Enviar mensagens sintéticas para uma conversa para testes de paginação</string>
+    <string name="seed_fixture_title">Preencher conversa de teste</string>
+    <string name="seed_fixture_detail">Envia mensagens sintéticas numeradas para a conversa escolhida como mensagens reais desta conta. Use um grupo de teste privado; os outros membros receberão todas elas.</string>
+    <string name="seed_fixture_count">Mensagens a enviar</string>
+    <string name="seed_fixture_start">Iniciar</string>
+    <string name="seed_fixture_progress">%1$d de %2$d enviadas · %3$d com falha</string>
+    <string name="seed_fixture_no_groups">Esta conta não tem conversas para preencher.</string>
+    <string name="seed_fixture_stopped">Parado · %1$d de %2$d enviadas</string>
     <string name="developer_testing_only_detail">Estas ferramentas podem expor informações técnicas e alterar o comportamento do aplicativo.</string>
     <string name="developer_debugging">Depuração</string>
     <string name="diagnostics">Diagnóstico</string>
@@ -990,6 +999,8 @@
     <string name="media_apk_invalid">Este ficheiro tem o nome de um APK, mas não é um pacote Android válido</string>
     <string name="media_open">Abrir</string>
     <string name="media_file_too_large">Arquivo muito grande para anexar</string>
+    <string name="media_file_unreadable">Não foi possível ler este arquivo. Selecione-o novamente.</string>
+    <string name="media_file_empty">Arquivos vazios não podem ser enviados.</string>
     <string name="media_album_too_large">Seleção muito grande para enviar</string>
     <string name="group_image_search_title">Imagem do grupo</string>
     <string name="group_image_search_set">Definir imagem do grupo</string>
@@ -2057,4 +2068,5 @@
     <string name="export_audit_logs_confirm_action">Continuar</string>
     <string name="toast_couldnt_export_audit_logs">Não foi possível preparar os logs de diagnóstico para exportação</string>
     <string name="toast_no_audit_logs_to_export">Não há logs de diagnóstico para exportar</string>
+    <string name="conversation_loading_newer">Carregando mensagens mais recentes</string>
 </resources>

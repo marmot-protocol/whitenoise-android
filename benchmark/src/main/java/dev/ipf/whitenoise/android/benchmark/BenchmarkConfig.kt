@@ -33,6 +33,15 @@ internal object BenchmarkConfig {
     val allowNetworkToggle: Boolean
         get() = arguments.getString("allowNetworkToggle") == "true"
 
+    /** Flicks for the deep paging journeys; the default reaches a few pages, a deeper run reaches the retention cap. */
+    val pagingDeepFlings: Int?
+        get() =
+            arguments
+                .getString("pagingDeepFlings")
+                ?.trim()
+                ?.toIntOrNull()
+                ?.takeIf { it > 0 }
+
     val originalAirplaneMode: BenchmarkAirplaneMode?
         get() = BenchmarkAirplaneMode.fromStatusValue(arguments.getString("originalAirplaneMode"))
 

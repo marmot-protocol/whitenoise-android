@@ -134,6 +134,7 @@ internal fun MediaImageBubble(
     appState: WhiteNoiseAppState,
     onOpenConversationMedia: (ConversationMediaViewerOpenRequest) -> Unit,
     mine: Boolean,
+    modifier: Modifier = Modifier,
     onLongPress: () -> Unit = {},
     uploading: Boolean = false,
 ) {
@@ -292,13 +293,15 @@ internal fun MediaImageBubble(
         // upload-phase bubble so the optimistic → confirmed swap is a
         // visual no-op.
         modifier =
-            if (gifFrame) {
-                Modifier
-                    .width(ConversationMessageMetrics.RichContentCanvasWidth)
-                    .height(ConversationMessageMetrics.GifHeight)
-            } else {
-                imageBubbleSizing(bubbleAspectRatio, sourceShortSideFromDim(reference.dim))
-            },
+            modifier.then(
+                if (gifFrame) {
+                    Modifier
+                        .width(ConversationMessageMetrics.RichContentCanvasWidth)
+                        .height(ConversationMessageMetrics.GifHeight)
+                } else {
+                    imageBubbleSizing(bubbleAspectRatio, sourceShortSideFromDim(reference.dim))
+                },
+            ),
     ) {
         Box(contentAlignment = Alignment.Center) {
             val downloadLabel = stringResource(R.string.media_tap_to_download)

@@ -422,23 +422,36 @@ internal class ConversationScrollCoordinator(
         )
     }
 
-    /** Commits the durable tail or history intent selected by a completed user gesture. */
+    /**
+     * Commits the durable tail or history intent selected by a completed user gesture.
+     *
+     * The gesture now settles only once its fling has come to rest, so a command the reader
+     * started while the transcript was still coasting, a send, the jump button or a reply quote,
+     * may already own the list. That command supersedes the gesture: it settles its own mode when
+     * it completes, and cancelling it here would discard the reader's later, deliberate action.
+     * Where the gesture ended is still recorded as the durable intent, so a command that fails
+     * falls back to it rather than to the anchor captured when the finger first landed, but the
+     * command's transient mode is left untouched so nothing re-anchors underneath it.
+     */
     fun onUserGestureSettled(
         anchor: ConversationScrollAnchor,
         nearBottom: Boolean,
     ) {
-        invalidateActiveCommand()
         userGestureInProgress = false
-        if (nearBottom) {
-            readingAnchor = null
-            setSettledMode(ConversationScrollMode.FollowingTail, forceRevision = true)
-        } else {
-            readingAnchor = anchor
-            setSettledMode(
-                ConversationScrollMode.ReadingHistory(anchor.messageId, anchor.pixelOffset),
-                forceRevision = true,
-            )
+        val settled =
+            if (nearBottom) {
+                ConversationScrollMode.FollowingTail
+            } else {
+                ConversationScrollMode.ReadingHistory(anchor.messageId, anchor.pixelOffset)
+            }
+        readingAnchor = anchor.takeUnless { nearBottom }
+        if (activeCommand != null) {
+            intentLifetime.advance()
+            settledMode = settled
+            return
         }
+        invalidateActiveCommand()
+        setSettledMode(settled, forceRevision = true)
     }
 
     /** Replaces transient command ownership with a durable logical history anchor. */
@@ -765,28 +778,33 @@ internal class ConversationScrollCoordinator(
             return true
         }
 
-        /** Animates to the final row and then its measured physical end. */
+        /**
+         * Reaches the newest row: animated when it is already within a few rows, in one snap when it
+         * is not.
+         *
+         * A far tail is the jump out of deep history, usually just after the bounded window was
+         * replaced with its newest rows. Snapping near and animating the last ten rows — what
+         * [animateScrollToItem] does for a reply target — composed and measured every row the
+         * animation passed at several rows per frame, which was the only paging journey a reader could
+         * feel (three consecutive 100 ms frames). The reader asked for the newest message, not a tour
+         * of the rows above it, so a far jump lands in a single write.
+         */
         suspend fun animateScrollToTail(
             index: Int,
             resolveIndex: () -> Int? = { index },
         ): Boolean {
             ensureCurrent()
-            var targetIndex = resolveIndex()?.coerceAtLeast(0)
-            var repositionAttempts = 0
-            while (
-                targetIndex != null &&
-                repositionAttempts < MAX_TARGET_REPOSITION_ATTEMPTS &&
-                prePositionIfFar(targetIndex)
-            ) {
-                repositionAttempts++
+            val targetIndex = resolveIndex()?.coerceAtLeast(0) ?: return false
+            if (isFar(targetIndex)) {
+                writer.scrollToTail(targetIndex)
+                // The snap suspends, and a page landing meanwhile can add or drop the structural rows
+                // below the newest message, moving its index. Re-read it once and correct with a
+                // second snap; still no animation.
                 ensureCurrent()
-                targetIndex = resolveIndex()?.coerceAtLeast(0)
-            }
-            val resolvedTargetIndex = targetIndex ?: return false
-            if (isFar(resolvedTargetIndex)) {
-                writer.scrollToTail(resolvedTargetIndex)
+                val settledIndex = resolveIndex()?.coerceAtLeast(0)
+                if (settledIndex != null && settledIndex != targetIndex) writer.scrollToTail(settledIndex)
             } else {
-                writer.animateScrollToTail(resolvedTargetIndex)
+                writer.animateScrollToTail(targetIndex)
             }
             return true
         }
@@ -820,13 +838,16 @@ internal class ConversationScrollCoordinator(
 }
 
 /** Performs the explicit newest-message action without bypassing coordinator ownership. */
-internal suspend fun ConversationScrollCoordinator.jumpToNewest(targetIndex: Int): Boolean =
+internal suspend fun ConversationScrollCoordinator.jumpToNewest(
+    targetIndex: Int,
+    resolveTailIndex: () -> Int? = { targetIndex },
+): Boolean =
     programmaticJump(
         targetMessageId = null,
         reason = ConversationScrollReason.JumpToNewest,
         resultingMode = ConversationScrollMode.FollowingTail,
     ) {
-        animateScrollToTail(targetIndex)
+        animateScrollToTail(targetIndex, resolveTailIndex)
     }
 
 /**
@@ -854,7 +875,7 @@ internal suspend fun ConversationScrollCoordinator.jumpToUnreadOrNewest(
                 if (!tailPrepared) {
                     throw CancellationException("Conversation newest edge was not available")
                 }
-                animateScrollToTail(resolveTailIndex())
+                animateScrollToTail(resolveTailIndex(), resolveTailIndex)
             }
         return if (completed && tailPrepared) {
             ConversationJumpToNewestOutcome.Tail
@@ -921,11 +942,19 @@ private val ConversationScrollReason.supersedesUnreadJump: Boolean
 /**
  * Processes a newer drag immediately, cancelling any older Stop/Cancel waiter
  * that is still waiting for fling motion to finish.
+ *
+ * The drag stops when the finger lifts, and Compose starts the fling only after
+ * it has reported that stop, so at that instant the list reads as idle although
+ * it is about to coast. [awaitFrame] lets the fling begin before
+ * [awaitScrollSettled] is consulted, otherwise a flick would settle at its
+ * release point and hand history re-anchoring a stale anchor to snap the
+ * coasting transcript back to (#2727).
  */
 internal suspend fun Flow<Interaction>.collectConversationDragInteractions(
     onStarted: () -> Unit,
     awaitScrollSettled: suspend () -> Unit,
     onSettled: () -> Unit,
+    awaitFrame: suspend () -> Unit = { withFrameNanos { } },
 ) {
     filter { interaction ->
         interaction is DragInteraction.Start ||
@@ -937,6 +966,7 @@ internal suspend fun Flow<Interaction>.collectConversationDragInteractions(
             is DragInteraction.Stop,
             is DragInteraction.Cancel,
             -> {
+                awaitFrame()
                 awaitScrollSettled()
                 onSettled()
             }

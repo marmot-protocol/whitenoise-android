@@ -167,6 +167,7 @@ internal fun swipeTestProjectedRecord(
         mediaJson = null,
         media = MessageAttachments.acceptedOutcomes(if (media) listOf(reference) else emptyList()),
         agentTextStreamJson = null,
+        poll = null,
         groupSystem = null,
         reactions = swipeTestReactions(reacted),
         deleted = false,

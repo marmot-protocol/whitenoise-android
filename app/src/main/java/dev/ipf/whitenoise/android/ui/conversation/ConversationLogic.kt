@@ -133,8 +133,9 @@ internal data class ImageAttachmentReadOutcome(
 // after the window arrived.
 internal const val OLDER_PAGE_PREFETCH_ROWS = 25
 
-// Symmetric edge threshold after an unread-anchor load has shifted the bounded window.
-internal const val NEWER_PAGE_PREFETCH_ROWS = 4
+// The same half-page of runway towards newer messages. Four rows meant a reader flinging back down
+// after an unread-anchor or reply jump reached the newest loaded row before the next page arrived.
+internal const val NEWER_PAGE_PREFETCH_ROWS = 25
 
 /**
  * Restore a bounded timeline to its physical newest edge before a jump-to-bottom.

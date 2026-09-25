@@ -3,6 +3,30 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "Empty document send feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
+        "anchor": "R.string.media_file_empty",
+        "test_ids": ["MED-009"]
+      },
+      {
+        "surface": "Unreadable document send feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
+        "anchor": "R.string.media_file_unreadable",
+        "test_ids": ["MED-009"]
+      },
+      {
+        "surface": "Oversized document send feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
+        "anchor": "R.string.media_file_too_large",
+        "test_ids": ["MED-009"]
+      },
+      {
+        "surface": "Unprocessable document image feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
+        "anchor": "R.string.toast_couldnt_decode_image",
+        "test_ids": ["MED-009"]
+      },
+      {
         "surface": "Modifier.chatListEdgeFade",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEdgeFade.kt",
         "anchor": "fun Modifier.chatListEdgeFade(",
@@ -240,6 +264,14 @@
         "test_ids": [
           "CHL-010",
           "GRP-010"
+        ]
+      },
+      {
+        "surface": "chat-list local delete transport recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupLocalRemoval.kt",
+        "anchor": "deleteChatGroupLocalWithRecovery",
+        "test_ids": [
+          "CHL-010"
         ]
       },
       {
@@ -2436,6 +2468,24 @@
         ]
       },
       {
+        "surface": "Jump-to-newest badge count owner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "rememberConversationUnreadBadgeCount(",
+        "test_ids": ["CON-003"]
+      },
+      {
+        "surface": "ConversationNewerPageIndicator",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationNewerPageIndicator.kt",
+        "anchor": "fun ConversationNewerPageIndicator(",
+        "test_ids": ["CON-003"]
+      },
+      {
+        "surface": "string:conversation_loading_newer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationNewerPageIndicator.kt",
+        "anchor": "R.string.conversation_loading_newer",
+        "test_ids": ["CON-003"]
+      },
+      {
         "surface": "ConversationLoadErrorContent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "anchor": "fun ConversationLoadErrorContent(",
@@ -4432,6 +4482,17 @@
         ]
       },
       {
+        "surface": "MediaCaptionContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MediaCaptionContent.kt",
+        "anchor": "fun MediaCaptionContent(",
+        "test_ids": [
+          "MED-003",
+          "MED-007",
+          "CON-011",
+          "SET-005"
+        ]
+      },
+      {
         "surface": "MediaSupplementEnvelope",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleFrame.kt",
         "anchor": "fun MediaSupplementEnvelope(",
@@ -4752,6 +4813,22 @@
         "anchor": "fun ReportReasonRow(",
         "test_ids": [
           "MSG-016"
+        ]
+      },
+      {
+        "surface": "readAloudMessageSemantics",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/TtsReadAloudHighlight.kt",
+        "anchor": "fun readAloudMessageSemantics(",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "R.string.tts_bar_progress",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/TtsReadAloudHighlight.kt",
+        "anchor": "R.string.tts_bar_progress",
+        "test_ids": [
+          "TTS-001"
         ]
       },
       {
@@ -5773,6 +5850,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedContentChrome.kt",
         "anchor": "fun SharedContentCategories(",
         "test_ids": [
+          "GRP-001",
           "GRP-018"
         ]
       },
@@ -6564,6 +6642,12 @@
           "PRO-002",
           "GRP-003"
         ]
+      },
+      {
+        "surface": "string:seed_fixture_stopped",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": "R.string.seed_fixture_stopped",
+        "test_ids": ["SET-020"]
       },
       {
         "surface": "string:identity_crop_title",
@@ -8664,6 +8748,90 @@
           "NTF-001",
           "NTF-023"
         ]
+      },
+      {
+        "surface": "ConversationFixtureSeedDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": "fun ConversationFixtureSeedDialog(",
+        "test_ids": ["SET-020", "CON-003"]
+      },
+      {
+        "surface": "ConversationFixtureSeedDialogContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": "fun ConversationFixtureSeedDialogContent(",
+        "test_ids": ["SET-020"]
+      },
+      {
+        "surface": "ConversationFixtureTargetList",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": "fun ConversationFixtureTargetList(",
+        "test_ids": ["SET-020"]
+      },
+      {
+        "surface": "SeedProgressText",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": "fun SeedProgressText(",
+        "test_ids": ["SET-020"]
+      },
+      {
+        "surface": "Developer Tools seed-fixture row",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.developer_seed_fixture",
+        "test_ids": ["SET-020"]
+      },
+      {
+        "surface": "Developer Tools seed-fixture row subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.developer_seed_fixture_subtitle",
+        "test_ids": ["SET-020"]
+      },
+      {
+        "surface": "string:seed_fixture_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": "R.string.seed_fixture_title",
+        "test_ids": ["SET-020"]
+      },
+      {
+        "surface": "string:seed_fixture_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": "R.string.seed_fixture_detail",
+        "test_ids": ["SET-020"]
+      },
+      {
+        "surface": "string:seed_fixture_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": "R.string.seed_fixture_count",
+        "test_ids": ["SET-020"]
+      },
+      {
+        "surface": "string:seed_fixture_start",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": "R.string.seed_fixture_start",
+        "test_ids": ["SET-020"]
+      },
+      {
+        "surface": "string:seed_fixture_progress",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": "R.string.seed_fixture_progress",
+        "test_ids": ["SET-020"]
+      },
+      {
+        "surface": "string:seed_fixture_no_groups",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": "R.string.seed_fixture_no_groups",
+        "test_ids": ["SET-020"]
+      },
+      {
+        "surface": "string:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": ["SET-020"]
+      },
+      {
+        "surface": "string:close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": "R.string.close",
+        "test_ids": ["SET-020"]
       }
     ],
     "settings_controls": [
@@ -22874,6 +23042,14 @@
     ],
     "source_coverage": [
       {
+        "surface": "System splash mark stays inside Android's circular safe zone",
+        "source": "app/src/main/res/drawable/ic_splash_mark.xml",
+        "anchor": "android:scaleX=\"0.75\"",
+        "test_ids": [
+          "INT-003"
+        ]
+      },
+      {
         "surface": "Pasted npub recipient presentation remains usable before optional profile enrichment finishes",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/RecipientResolutionPresentation.kt",
         "anchor": "internal fun resolvedRecipientResolution(",
@@ -22901,9 +23077,25 @@
       {
         "surface": "Automatic forward prefetch recovers without reporting a paging failure",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationForwardPrefetchGuard.kt",
-        "anchor": "internal class AutomaticNewerPagingGuard",
+        "anchor": "internal class AutomaticPagingGuard(",
         "test_ids": [
           "CON-005",
+          "CON-003"
+        ]
+      },
+      {
+        "surface": "Automatic older prefetch stands down after a page brings no older rows instead of looping",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationTimelinePaging.kt",
+        "anchor": "fun ConversationController.settleOlderPrefetchGuard(",
+        "test_ids": [
+          "CON-003"
+        ]
+      },
+      {
+        "surface": "A flick settles only once its fling rests, so a page landing mid-fling cannot snap the transcript back",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScrollCoordinator.kt",
+        "anchor": "fun Flow<Interaction>.collectConversationDragInteractions(",
+        "test_ids": [
           "CON-003"
         ]
       },
@@ -22940,6 +23132,14 @@
         "anchor": "internal class LocalGroupNameAuthority",
         "test_ids": [
           "GRP-002",
+          "CHL-016"
+        ]
+      },
+      {
+        "surface": "An incomplete live top-window replacement retains active chats until authoritative reopen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatListReplacementGuard.kt",
+        "anchor": "internal fun missingActiveTopChatRows(",
+        "test_ids": [
           "CHL-016"
         ]
       },
@@ -23465,7 +23665,7 @@
       },
       {
         "surface": "string:error_loaded_content_kept",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationTimelinePaging.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationPageFailure.kt",
         "anchor": "R.string.error_loaded_content_kept",
         "test_ids": [
           "CON-003"
@@ -24966,6 +25166,14 @@
         "surface": "Every non-action part of the focused-message overlay dismisses it, including the lifted message",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
         "anchor": "internal fun FocusedMessageActions(",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
+        "surface": "Long text and media previews leave a tappable action viewport above the keyboard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "val previewHeightLimit =",
         "test_ids": [
           "MSG-004"
         ]
@@ -26591,7 +26799,7 @@
         ]
       },
       {
-        "surface": "MarmotKit SDK pin: backed-up in-place upgrade, startup, and sign-in compatibility",
+        "surface": "MarmotKit SDK pin: backed-up in-place upgrade, startup, sign-in, and replicated attachment download compatibility",
         "source": "app/src/main/marmotkit/MARMOT_VERSION",
         "anchor": "mdk-sha=",
         "test_ids": [
@@ -26603,7 +26811,9 @@
           "ONB-017",
           "ONB-018",
           "ONB-020",
-          "SEC-007"
+          "SEC-007",
+          "MED-019",
+          "MED-020"
         ]
       },
       {
@@ -26731,6 +26941,12 @@
           "NTF-002",
           "NTF-022"
         ]
+      },
+      {
+        "surface": "Far jump-to-newest lands in one snap instead of animating through history",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScrollCoordinator.kt",
+        "anchor": "suspend fun animateScrollToTail(",
+        "test_ids": ["CON-003"]
       }
     ],
     "notification_content_contracts": [

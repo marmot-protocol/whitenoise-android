@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
@@ -174,6 +175,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
     focusedPreview: Boolean = false,
     // A caption carries the footer, so no file card may draw the time, state or retention glyph.
     hasCaption: Boolean = false,
+    expandNarrowVisualToStandardWidth: Boolean = false,
 ) {
     val retentionInput =
         record.retentionIndicatorInput(
@@ -250,6 +252,12 @@ internal fun ColumnScope.BubbleMediaBlocks(
                         attachmentIndex = entry.index,
                         reference = entry.value,
                         mine = mine,
+                        modifier =
+                            if (expandNarrowVisualToStandardWidth) {
+                                Modifier.width(ConversationMessageMetrics.RichContentCanvasWidth)
+                            } else {
+                                Modifier
+                            },
                         controller = controller,
                         appState = appState,
                         onOpenConversationMedia = onOpenConversationMedia,
@@ -264,6 +272,12 @@ internal fun ColumnScope.BubbleMediaBlocks(
                         appState = appState,
                         onOpenConversationMedia = onOpenConversationMedia,
                         mine = mine,
+                        modifier =
+                            if (expandNarrowVisualToStandardWidth) {
+                                Modifier.width(ConversationMessageMetrics.RichContentCanvasWidth)
+                            } else {
+                                Modifier
+                            },
                         onLongPress = onMediaLongPress,
                     )
                 }
@@ -398,6 +412,12 @@ internal fun ColumnScope.BubbleMediaBlocks(
                         attachmentIndex = entry.index,
                         reference = entry.value,
                         mine = true,
+                        modifier =
+                            if (expandNarrowVisualToStandardWidth) {
+                                Modifier.width(ConversationMessageMetrics.RichContentCanvasWidth)
+                            } else {
+                                Modifier
+                            },
                         controller = controller,
                         appState = appState,
                         onOpenConversationMedia = onOpenConversationMedia,
@@ -415,6 +435,12 @@ internal fun ColumnScope.BubbleMediaBlocks(
                         appState = appState,
                         onOpenConversationMedia = onOpenConversationMedia,
                         mine = true,
+                        modifier =
+                            if (expandNarrowVisualToStandardWidth) {
+                                Modifier.width(ConversationMessageMetrics.RichContentCanvasWidth)
+                            } else {
+                                Modifier
+                            },
                         onLongPress = onMediaLongPress,
                         uploading = !uploadFailed,
                     )

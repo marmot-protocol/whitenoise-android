@@ -850,6 +850,7 @@ open class MessageBubbleFileAttachmentFixtures {
                         attachments.map { (name, attachmentMediaType) -> fileReference(name, attachmentMediaType) },
                     ),
                 agentTextStreamJson = null,
+                poll = null,
                 groupSystem = null,
                 hasReports = false,
                 edit = null,

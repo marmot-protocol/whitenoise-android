@@ -115,6 +115,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
 import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.ConversationPagingOrigin
+import dev.ipf.whitenoise.android.state.ConversationPagingTraceSection
 import dev.ipf.whitenoise.android.state.ConversationUnreadJumpState
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.MessageAvailability
@@ -125,13 +126,17 @@ import dev.ipf.whitenoise.android.state.advanceConversationReadAnchor
 import dev.ipf.whitenoise.android.state.attachmentsFor
 import dev.ipf.whitenoise.android.state.chatCreateOpenConversationTimingStage
 import dev.ipf.whitenoise.android.state.conversationWindowCanReportVisible
-import dev.ipf.whitenoise.android.state.countUnreadIncoming
 import dev.ipf.whitenoise.android.state.currentTtsConversationDestination
 import dev.ipf.whitenoise.android.state.hasKnownTranscriptPresentation
+import dev.ipf.whitenoise.android.state.isLoadingNewer
+import dev.ipf.whitenoise.android.state.isLoadingOlder
+import dev.ipf.whitenoise.android.state.isLoadingPage
 import dev.ipf.whitenoise.android.state.loadMessageAvailability
 import dev.ipf.whitenoise.android.state.loadUntilMessageAvailable
+import dev.ipf.whitenoise.android.state.logUnreadBadgeTransition
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
 import dev.ipf.whitenoise.android.state.markComposerReadyForPresentationTiming
+import dev.ipf.whitenoise.android.state.markPagingEvent
 import dev.ipf.whitenoise.android.state.markWindowVisibleForPresentationTiming
 import dev.ipf.whitenoise.android.state.mediaReferencesFor
 import dev.ipf.whitenoise.android.state.presentFailure
@@ -286,7 +291,7 @@ private fun ConversationController.initialTimelineBackfillSnapshot() =
     ConversationInitialTimelineBackfillSnapshot(
         hasRenderableRows = timeline.any { !MessageProjector.isEdit(it.record) },
         hasMoreBefore = hasMoreBefore,
-        loadInFlight = isLoading || isLoadingOlder,
+        loadInFlight = isLoading || isLoadingPage,
         hasLoadFailure = error != null,
         rawWindowMessageIds = timeline.map { it.id },
     )
@@ -903,7 +908,7 @@ internal fun ConversationScreen(
                     renderedTimeline.isEmpty() &&
                     !controller.hasMoreBefore &&
                     !controller.hasMoreAfterTimeline &&
-                    !controller.isLoadingOlder &&
+                    !controller.isLoadingPage &&
                     !controller.isLoading,
             routePresentationSettled =
                 controller.error == null &&
@@ -1427,35 +1432,36 @@ internal fun ConversationScreen(
             )
         }
     }
-    val unreadIncomingCount by
-        remember(
-            controller,
-            chat.id,
-            projectedUnreadCount,
-            entryProjectionAvailable,
-        ) {
-            derivedStateOf {
-                if (!initialTimelineAnchored) {
-                    0
-                } else {
-                    countUnreadIncoming(
-                        timeline = controller.timeline,
-                        readAnchorMessageId = readAnchorMessageId,
-                        missingAnchorUnreadCount = projectedUnreadCount.takeIf { entryProjectionAvailable },
-                    )
-                }
-            }
-        }
+    // One owner for the badge's number (#2726): it follows the loaded rows while the read anchor is
+    // among them and holds while paging moves the anchor off screen, so a history page can never
+    // switch the count between the rows and the projection or count the loaded window itself.
+    val unreadBadgeUi =
+        rememberConversationUnreadBadgeCount(
+            identity = Triple(controller, chat.id, entryUnreadSessionIdentity),
+            anchored = initialTimelineAnchored,
+            timeline = controller.timeline,
+            readAnchorMessageId = readAnchorMessageId,
+            projectionUnread = projectedUnreadCount.takeIf { entryProjectionAvailable },
+            windowReachesTail = !controller.hasMoreAfterTimeline,
+            onTransition = { before, after ->
+                logUnreadBadgeTransition("DMConversation", before, after, controller.timeline.size)
+            },
+        )
+    // The first composition after anchoring has not reconciled yet; exposing 0 there would retire the
+    // two-stage jump target, so the count and its consumers wait for the first reconciliation.
+    val badgeReconciled = unreadBadgeUi.reconciled
+    val unreadIncomingCount = unreadBadgeUi.count
     LaunchedEffect(
         controller,
         initialTimelineAnchored,
         renderedTimeline,
         readAnchorMessageId,
+        badgeReconciled,
         unreadIncomingCount,
         nearBottom,
         unreadJumpState,
     ) {
-        if (!initialTimelineAnchored) return@LaunchedEffect
+        if (!badgeReconciled) return@LaunchedEffect
         unreadJumpState =
             reconcileConversationUnreadJump(
                 current = unreadJumpState,
@@ -2232,7 +2238,7 @@ internal fun ConversationScreen(
         controller,
         navigationState.initialTimelineLoadStarted,
         controller.isLoading,
-        controller.isLoadingOlder,
+        controller.isLoadingPage,
         latestTimelineItemId,
         navigationState.initialTimelineBackfillRetryGeneration,
     ) {
@@ -2580,14 +2586,44 @@ internal fun ConversationScreen(
     // list keeps history at its high-index end, so an older page appends there
     // and never disturbs the anchored newest edge — the framework holds the
     // visible rows in the same measure pass with no post-hoc scroll.
+    // Counted in its own collector: the prefetch collector below suspends on the page it requests,
+    // and a reader who reaches the edge while that page is in flight is exactly the stop to count.
+    LaunchedEffect(listState, controller) {
+        val edgeStops = PagingEdgeStopTracker()
+        snapshotFlow {
+            val visible = listState.layoutInfo.visibleItemsInfo
+            visible.lastOrNull { conversationAnchorMessageId(it.key) != null }?.index to listState.isScrollInProgress
+        }.collect { (oldestVisibleIndex, scrolling) ->
+            val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
+            if (liveRenderedSize == 0) return@collect
+            val edgeListIndex =
+                conversationTimelineListIndex(
+                    timelineIndex = 0,
+                    timelineSize = liveRenderedSize,
+                    trailingRowCount = controller.conversationTrailingRowCount(liveRenderedSize),
+                )
+            if (edgeStops.observe(oldestVisibleIndex ?: -1, edgeListIndex, controller.hasMoreBefore, scrolling)) {
+                markPagingEvent(ConversationPagingTraceSection.EDGE_STOP)
+            }
+        }
+    }
     LaunchedEffect(listState, controller) {
         snapshotFlow {
             // The reversed list emits the older-loading row, the top error row and the top spacer
             // after the messages, so they hold the highest indexes — exactly the oldest end, and
             // exactly what is on screen when a page is due. Taking the last visible item would pick
             // one of those, resolve no anchor, and page unanchored: the bug this is meant to fix.
-            listState.layoutInfo.visibleItemsInfo.lastOrNull { conversationAnchorMessageId(it.key) != null }
-        }.collect { oldestVisible ->
+            val oldestVisible =
+                listState.layoutInfo.visibleItemsInfo.lastOrNull { conversationAnchorMessageId(it.key) != null }
+            // Read here rather than in the collector: snapshotFlow observes only what this block reads,
+            // and a page that ends without moving the list — a newer page that failed, say — must
+            // re-evaluate the older edge once it no longer blocks it, as must a retry clearing the block.
+            // The two blocks are folded together: a page the engine never answered leaves the reader a
+            // retry row, and a prefetch it answered without older rows stands down until the reader
+            // asks again from the header or a window replacement arrives (#2727).
+            val olderPageBlocked = controller.olderPageBlocked || controller.automaticOlderPagingBlocked
+            Triple(oldestVisible, controller.isLoadingPage, olderPageBlocked)
+        }.collect { (oldestVisible, pageInFlight, olderPageBlocked) ->
             val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
             if (liveRenderedSize == 0) return@collect
             val oldestMessageListIndex =
@@ -2600,20 +2636,22 @@ internal fun ConversationScreen(
                 shouldPrefetchOlder(
                     anchored = initialTimelineAnchored,
                     hasMoreBefore = controller.hasMoreBefore,
-                    isLoadingOlder = controller.isLoadingOlder,
+                    pageInFlight = pageInFlight,
                     // A page the engine never answered leaves the reader a retry row; without this
                     // the effect would re-issue it on every scroll frame, which is the silent stall
                     // this screen used to show. The retry, or a live replacement, clears the block.
-                    olderPageBlocked = controller.olderPageBlocked,
+                    olderPageBlocked = olderPageBlocked,
                     oldestVisibleIndex = oldestVisible?.index ?: -1,
                     oldestMessageListIndex = oldestMessageListIndex,
                 )
             if (!prefetch) return@collect
+            val edgeMessageId = controller.timeline.firstOrNull { !MessageProjector.isEdit(it.record) }?.id
             // MDK places a replacement relative to the window's anchor, so tell it which row the
             // reader is actually on before paging. Without this an upward page is placed against
             // whatever the read pointer last reported, which only ever moves towards newer
             // messages — the reason scrolling up could move the reading position.
-            controller.loadOlder(conversationAnchorMessageId(oldestVisible?.key))
+            controller.loadOlder(conversationAnchorMessageId(oldestVisible?.key), ConversationPagingOrigin.AUTOMATIC)
+            recordOlderPageLanding(controller, listState, edgeMessageId)
         }
     }
     // Loading the authoritative unread boundary can shift a capped subscription
@@ -2631,7 +2669,7 @@ internal fun ConversationScreen(
             shouldPrefetchNewer(
                 anchored = initialTimelineAnchored,
                 hasMoreAfter = controller.hasMoreAfterTimeline,
-                isLoadingOlder = controller.isLoadingOlder,
+                pageInFlight = controller.isLoadingPage,
                 // A send leaves the viewport on this edge, so a forward page the engine could not
                 // answer must not be re-issued on every layout pass (#2764). Any page that
                 // advances, including a live-window update, releases the block.
@@ -3809,7 +3847,7 @@ internal fun ConversationScreen(
                     renderedTimeline.isEmpty() &&
                         !controller.hasMoreBefore &&
                         !controller.hasMoreAfterTimeline &&
-                        !controller.isLoadingOlder &&
+                        !controller.isLoadingPage &&
                         !controller.isLoading &&
                         navigationState.initialTimelineLoadStarted -> {
                         if (
@@ -4090,7 +4128,7 @@ internal fun ConversationScreen(
                                     labelState = stickyDayLabelState,
                                 )
                             }
-                            if (transcriptReadyToReveal && !selectionMode) {
+                            if (transcriptReadyToReveal) {
                                 Column(
                                     modifier =
                                         Modifier
@@ -4100,7 +4138,14 @@ internal fun ConversationScreen(
                                     horizontalAlignment = Alignment.End,
                                     verticalArrangement = Arrangement.spacedBy(8.dp),
                                 ) {
-                                    if (ttsFollowHandle.showResumeAction) {
+                                    // A newer page that takes longer than a moment shows here, beside the
+                                    // jump button, so the list's bottom edge never moves for it.
+                                    if (rememberNewerPageIndicatorVisible(controller.isLoadingNewer)) {
+                                        ConversationNewerPageIndicator()
+                                    }
+                                    // Selection hides the controls below; the newer-page indicator above stays,
+                                    // since a page can be in flight when selection starts or start during it.
+                                    if (!selectionMode && ttsFollowHandle.showResumeAction) {
                                         TtsResumeFollowButton(
                                             onClick = ttsFollowHandle::resumeFollow,
                                         )
@@ -4108,7 +4153,7 @@ internal fun ConversationScreen(
                                     // Jump-to-mention chip: tap visits the oldest unread
                                     // mention and marks it read, so the count steps down.
                                     val mentionCount = unreadMentionMessageIds.size
-                                    if (mentionCount > 0) {
+                                    if (!selectionMode && mentionCount > 0) {
                                         val jumpToMentionLabel = stringResource(R.string.conversation_jump_to_mention)
                                         Surface(
                                             shape = CircleShape,
@@ -4134,7 +4179,7 @@ internal fun ConversationScreen(
                                             }
                                         }
                                     }
-                                    if (!nearBottom) {
+                                    if (!selectionMode && !nearBottom) {
                                         ConversationJumpToNewestButton(
                                             unreadIncomingCount = unreadIncomingCount,
                                             onClick = {

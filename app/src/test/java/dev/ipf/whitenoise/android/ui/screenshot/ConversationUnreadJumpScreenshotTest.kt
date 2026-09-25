@@ -32,9 +32,10 @@ import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.whitenoise.android.state.ConversationUnreadBadge
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
-import dev.ipf.whitenoise.android.state.countUnreadIncoming
+import dev.ipf.whitenoise.android.state.reconcile
 import dev.ipf.whitenoise.android.ui.conversation.ConversationJumpToNewestButton
 import dev.ipf.whitenoise.android.ui.conversation.ConversationJumpToNewestOutcome
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollAnchor
@@ -67,12 +68,15 @@ class ConversationUnreadJumpScreenshotTest {
     @Test
     fun offWindowReadAnchorRendersProjectedUnreadBadge() {
         val projectedUnreadCount = 93
-        val unreadIncomingCount =
-            countUnreadIncoming(
+        val badge =
+            ConversationUnreadBadge().reconcile(
                 timeline = listOf(receivedMessage("historical-1"), receivedMessage("historical-2")),
                 readAnchorMessageId = "newest-read-message",
-                missingAnchorUnreadCount = projectedUnreadCount,
+                projectionUnread = projectedUnreadCount,
+                windowReachesTail = false,
             )
+        assertEquals(ConversationUnreadBadge.Source.PROJECTION, badge.source)
+        val unreadIncomingCount = badge.count
         assertEquals(projectedUnreadCount, unreadIncomingCount)
 
         composeRule.setContent {

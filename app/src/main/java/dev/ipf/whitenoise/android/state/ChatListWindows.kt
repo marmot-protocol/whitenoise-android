@@ -16,6 +16,7 @@ import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 /** The window handle opened for each rendered view. */
@@ -27,25 +28,63 @@ private typealias InitialReplacements = Map<ChatListViewFfi, ChatListWindowSnaps
 /** The MDK chat-list views whose rows the app renders: active chats, archived chats and departed groups. */
 internal val CHAT_LIST_WINDOW_VIEWS = listOf(ChatListViewFfi.CHATS, ChatListViewFfi.ARCHIVED, ChatListViewFfi.LEFT)
 
+/** Ends the current window set so the controller's bounded reconnect path obtains a new authoritative frame. */
+internal class IncompleteChatListReplacement : IllegalStateException("incomplete active chat-list replacement")
+
+internal fun requireCompleteChatListWindowRows(complete: Boolean) {
+    if (!complete) throw IncompleteChatListReplacement()
+}
+
+/** A merged row snapshot bound to the replacement that produced it. */
+internal data class ChatListFrame(
+    val rows: List<PresentedChatRowFfi>,
+    val revision: Long,
+)
+
 /**
  * One account's bounded live chat-list windows, merged into the single row set [ChatsController] renders.
+ * The window owns the frame-revision guard as well as native handles and paging.
  *
  * Each view owns a native handle, a [ChatListWindowCursor] and its newest installed replacement. A
  * command result and its stream echo are deduplicated by sequence, a foreign generation ends the
  * receive loop so the controller reopens every window, and a stale or outside-anchor command is
  * dropped in favour of the newest installed state instead of being repeated.
  */
+@Suppress("TooManyFunctions") // Native window operations and their atomic frame guard share one lifecycle.
 internal class ChatListWindowSet private constructor(
     private val handles: Map<ChatListViewFfi, ChatListWindowHandle>,
     initial: Map<ChatListViewFfi, ChatListWindowSnapshotFfi>,
 ) {
     private val cursors = initial.mapValues { (_, snapshot) -> ChatListWindowCursor(snapshot) }
     private val installed = initial.toMutableMap()
+    private val frameLock = Any()
+    private var revision = 0L
     private val commands = Mutex()
+    private val isClosed = AtomicBoolean(false)
+
+    val closed: Boolean get() = isClosed.get()
 
     /** Every retained row across the merged views, in view order. */
     val rows: List<PresentedChatRowFfi>
-        get() = CHAT_LIST_WINDOW_VIEWS.flatMap { view -> installed[view]?.rows.orEmpty() }
+        get() = frame().rows
+
+    fun frame(): ChatListFrame =
+        synchronized(frameLock) {
+            ChatListFrame(CHAT_LIST_WINDOW_VIEWS.flatMap { view -> installed[view]?.rows.orEmpty() }, revision)
+        }
+
+    /** Prevents a callback suspended during validation from publishing over a newer view's frame. */
+    fun publishIfCurrent(
+        frame: ChatListFrame,
+        publish: (List<PresentedChatRowFfi>) -> Unit,
+    ): Boolean =
+        synchronized(frameLock) {
+            if (closed || frame.revision != revision) return@synchronized false
+            publish(frame.rows)
+            true
+        }
+
+    fun isCurrent(frame: ChatListFrame): Boolean = synchronized(frameLock) { !closed && frame.revision == revision }
 
     /** Whether MDK retains rows beyond this view's window that a forward page can load. */
     fun hasMoreAfter(view: ChatListViewFfi): Boolean = installed[view]?.hasMoreAfter == true
@@ -113,6 +152,7 @@ internal class ChatListWindowSet private constructor(
 
     /** Releases every native handle; these windows expose no separate cancel. */
     fun close() {
+        synchronized(frameLock) { isClosed.set(true) }
         handles.values.forEach { handle -> runCatching { handle.close() } }
     }
 
@@ -154,8 +194,15 @@ internal class ChatListWindowSet private constructor(
         view: ChatListViewFfi,
         update: ChatListWindowSnapshotFfi,
     ): Boolean {
-        if (!cursors.getValue(view).accept(update)) return false
-        installed[view] = update
+        val accepted =
+            synchronized(frameLock) {
+                if (!cursors.getValue(view).accept(update)) return@synchronized false
+                installed[view] = update
+                revision++
+                true
+            }
+        if (!accepted) return false
+        update.logWindowFrame(view, "replace")
         return true
     }
 
@@ -203,26 +250,43 @@ internal class ChatListWindowSet private constructor(
             }
 
         private suspend fun initialReplacements(handles: OpenedWindows): InitialReplacements =
-            handles.mapValues { (_, handle) ->
-                withContext(Dispatchers.IO) { handle.snapshot() }.requireChatListWindowSnapshot()
+            handles.mapValues { (view, handle) ->
+                withContext(Dispatchers.IO) { handle.snapshot() }.requireChatListWindowSnapshot().also { snapshot ->
+                    snapshot.logWindowFrame(view, "initial")
+                }
             }
     }
 }
 
 private suspend fun currentCoroutineContextIsActive(): Boolean = kotlinx.coroutines.currentCoroutineContext().isActive
 
+internal const val CHAT_LIST_LOG_HASH_RADIX = 16
+
+internal fun chatListLogHash(value: String): String = value.hashCode().toUInt().toString(CHAT_LIST_LOG_HASH_RADIX)
+
+/** Debug-only numeric window diagnostics; no group IDs, titles, or message content. */
+private fun ChatListWindowSnapshotFfi.logWindowFrame(
+    view: ChatListViewFfi,
+    phase: String,
+) {
+    chatsDebug {
+        "chat window $phase view=$view generation=${chatListLogHash(subscriptionGeneration)} " +
+            "sequence=$sequence rows=${rows.size} before=$hasMoreBefore after=$hasMoreAfter"
+    }
+}
+
 /** Loads the next page of active chats when the list reaches its end; a no-op while nothing more is retained. */
 suspend fun ChatsController.loadMoreChats(view: ChatListViewFfi = ChatListViewFfi.CHATS) {
     val windows = chatListWindows ?: return
     val account = accountRef ?: return
-    if (windows.pageForward(view) != null) applyChatListWindowRows(account, windows.rows)
+    if (windows.pageForward(view) != null) applyChatListWindowRows(account, windows)
 }
 
 /** Loads rows before the retained active window when the reader approaches its shifted front. */
 suspend fun ChatsController.loadEarlierChats(view: ChatListViewFfi = ChatListViewFfi.CHATS) {
     val windows = chatListWindows ?: return
     val account = accountRef ?: return
-    if (windows.pageBackward(view) != null) applyChatListWindowRows(account, windows.rows)
+    if (windows.pageBackward(view) != null) applyChatListWindowRows(account, windows)
 }
 
 /** Reports the chat the user actually sees so window replacements keep it in place. */
@@ -232,14 +296,14 @@ suspend fun ChatsController.reportVisibleChat(
 ) {
     val windows = chatListWindows ?: return
     val account = accountRef ?: return
-    if (windows.setVisibleAnchor(view, groupIdHex) != null) applyChatListWindowRows(account, windows.rows)
+    if (windows.setVisibleAnchor(view, groupIdHex) != null) applyChatListWindowRows(account, windows)
 }
 
 /** Returns the active list to its top after a scroll-to-top gesture. */
 suspend fun ChatsController.returnChatListToTop(view: ChatListViewFfi = ChatListViewFfi.CHATS) {
     val windows = chatListWindows ?: return
     val account = accountRef ?: return
-    if (windows.returnToTop(view) != null) applyChatListWindowRows(account, windows.rows)
+    if (windows.returnToTop(view) != null) applyChatListWindowRows(account, windows)
 }
 
 /** Whether MDK retains more active chats than the window currently shows. */

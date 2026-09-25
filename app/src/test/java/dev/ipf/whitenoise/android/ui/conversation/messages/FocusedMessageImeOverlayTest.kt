@@ -1,15 +1,19 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -18,6 +22,9 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -49,6 +56,141 @@ class FocusedMessageImeOverlayTest {
             previewHeight = 400,
         )
 
+    /** The real text preview can fill five 200%-scale lines plus a reply and footer. */
+    @Test
+    fun longTextPreviewAtLargeFontKeepsDeleteReachable() {
+        var deletes = 0
+        showLongTextMenu(onDelete = { deletes++ })
+        composeRule.waitForIdle()
+
+        val preview = composeRule.onNodeWithTag("message-actions-preview").fetchSemanticsNode().boundsInRoot
+        assertPreviewWithinFrame(preview, "the bounded text preview must fit the short frame")
+        val viewport = composeRule.onNodeWithTag(FOCUSED_ACTION_MENU_SCROLL_TEST_TAG).fetchSemanticsNode().boundsInRoot
+        assertTrue("long text must leave a tappable action viewport", viewport.height >= 48f)
+        val excerpt = composeRule.onNodeWithTag("message-actions-excerpt", useUnmergedTree = true)
+        val footer = composeRule.onNodeWithText("12:34", useUnmergedTree = true)
+        excerpt.assertIsDisplayed()
+        footer.assertIsDisplayed()
+        val excerptBounds = excerpt.getUnclippedBoundsInRoot()
+        val footerBounds = footer.getUnclippedBoundsInRoot()
+        with(composeRule.density) {
+            assertTrue(
+                "target excerpt must fit the visible preview",
+                excerptBounds.top.toPx() >= preview.top && excerptBounds.bottom.toPx() <= preview.bottom,
+            )
+            assertTrue(
+                "timestamp must fit the visible preview",
+                footerBounds.top.toPx() >= preview.top && footerBounds.bottom.toPx() <= preview.bottom,
+            )
+        }
+        val delete = ApplicationProvider.getApplicationContext<Context>().getString(R.string.delete)
+        composeRule
+            .onNodeWithText(delete)
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.runOnIdle { assertEquals(1, deletes) }
+    }
+
+    @Test
+    fun tallMediaPreviewAtLargeFontKeepsArtworkAndFooterInsideShortFrame() {
+        showLongTextMenu(onDelete = {}, preview = { tallMediaPreview() })
+        composeRule.waitForIdle()
+
+        val preview = composeRule.onNodeWithTag("message-actions-preview").fetchSemanticsNode().boundsInRoot
+        assertPreviewWithinFrame(preview, "the media preview must fit the short frame")
+        val artwork = composeRule.onNodeWithTag("focused-test-artwork", useUnmergedTree = true)
+        val mediaViewport = composeRule.onNodeWithTag("message-actions-media-viewport", useUnmergedTree = true)
+        val footer = composeRule.onNodeWithText("12:34", useUnmergedTree = true)
+        artwork.assertIsDisplayed()
+        mediaViewport.assertIsDisplayed()
+        footer.assertIsDisplayed()
+        with(composeRule.density) {
+            val artworkBounds = mediaViewport.getUnclippedBoundsInRoot()
+            val footerBounds = footer.getUnclippedBoundsInRoot()
+            assertTrue("some artwork must remain visible", artworkBounds.top.toPx() >= preview.top)
+            assertTrue("artwork must not cover the footer", artworkBounds.bottom.toPx() <= footerBounds.top.toPx())
+            assertTrue("footer must fit the preview", footerBounds.bottom.toPx() <= preview.bottom)
+        }
+    }
+
+    private fun showLongTextMenu(
+        onDelete: () -> Unit,
+        preview: @Composable () -> Unit = { longTextPreview() },
+    ) {
+        composeRule.setContent {
+            WhiteNoiseTheme(fontScale = 2f) {
+                MessageActionMenu(
+                    expanded = true,
+                    anchorBoundsInWindow = IntRect(0, 180, 360, 240),
+                    anchorWindowYPx = 210f,
+                    canReply = true,
+                    canReact = true,
+                    canDelete = true,
+                    canEdit = true,
+                    canForward = true,
+                    canSelect = true,
+                    canCopyText = true,
+                    canSpeak = true,
+                    canSelectText = true,
+                    canSave = true,
+                    quickReactionEmojis = listOf("👍", "❤️", "😂", "😮", "😢", "👏"),
+                    onDismissRequest = {},
+                    onReact = {},
+                    onOpenEmojiPicker = {},
+                    onReply = {},
+                    onEdit = {},
+                    onForward = {},
+                    onSelect = {},
+                    onSelectText = {},
+                    onCopyText = {},
+                    onSpeak = {},
+                    onSave = {},
+                    onInfo = {},
+                    onDelete = onDelete,
+                    previewDescription = "Long lifted text message",
+                    preview = preview,
+                )
+            }
+        }
+    }
+
+    @Composable
+    private fun longTextPreview() {
+        FocusedTextMessagePreview(
+            presentation = messageBubblePresentation(deleted = false, mine = false),
+            mine = false,
+            text = LONG_TEXT_PREVIEW,
+            document = null,
+            time = "12:34",
+            status = MessageStatus.Received,
+            showStatus = false,
+            reply = { Text("Quoted reply with two lines of context") },
+        )
+    }
+
+    @Composable
+    private fun tallMediaPreview() {
+        FocusedTextMessagePreview(
+            presentation = messageBubblePresentation(deleted = false, mine = false),
+            mine = false,
+            text = "A media caption with a few words",
+            document = null,
+            time = "12:34",
+            status = MessageStatus.Received,
+            showStatus = false,
+            reply = { Text("Quoted reply with two lines of context") },
+            media = {
+                Box(
+                    Modifier
+                        .size(200.dp, 400.dp)
+                        .background(MaterialTheme.colorScheme.primary)
+                        .testTag("focused-test-artwork"),
+                )
+            },
+        )
+    }
+
     private fun assertActionsScrollWithoutMovingPreview(
         fontScale: Float,
         layoutDirection: LayoutDirection,
@@ -78,7 +220,6 @@ class FocusedMessageImeOverlayTest {
                         selectedReactions = emptySet(),
                         previewDescription = "Lifted message",
                         previewReady = true,
-                        previewIsMedia = previewHeight > 60,
                         preview = {
                             Box(Modifier.size(200.dp, previewHeight.dp).background(MaterialTheme.colorScheme.surface)) {
                                 Text("Lifted message")
@@ -120,5 +261,9 @@ class FocusedMessageImeOverlayTest {
         message: String,
     ) {
         assertTrue(message, bounds.top >= 0f && bounds.bottom <= 320f)
+    }
+
+    private companion object {
+        val LONG_TEXT_PREVIEW = (1..8).joinToString(" ") { "This sentence fills the lifted message preview." }
     }
 }

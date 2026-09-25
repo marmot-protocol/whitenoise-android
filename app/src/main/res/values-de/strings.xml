@@ -472,6 +472,15 @@
     <string name="developer_mode">Entwicklermodus</string>
     <string name="developer_mode_subtitle">Zeigt Diagnosen und MLS-Interna an.</string>
     <string name="developer_testing_only">Nur für Entwicklung und Tests</string>
+    <string name="developer_seed_fixture">Unterhaltungs-Fixture befüllen</string>
+    <string name="developer_seed_fixture_subtitle">Synthetische Nachrichten in einen Chat senden, für Paging-Benchmarks</string>
+    <string name="seed_fixture_title">Unterhaltungs-Fixture befüllen</string>
+    <string name="seed_fixture_detail">Sendet nummerierte synthetische Nachrichten als echte Nachrichten dieses Kontos in den gewählten Chat. Verwende eine private Testgruppe; alle anderen Mitglieder erhalten jede einzelne.</string>
+    <string name="seed_fixture_count">Anzahl zu sendender Nachrichten</string>
+    <string name="seed_fixture_start">Starten</string>
+    <string name="seed_fixture_progress">%1$d von %2$d gesendet · %3$d fehlgeschlagen</string>
+    <string name="seed_fixture_no_groups">Dieses Konto hat keine Chats zum Befüllen.</string>
+    <string name="seed_fixture_stopped">Gestoppt · %1$d von %2$d gesendet</string>
     <string name="developer_testing_only_detail">Diese Werkzeuge können technische Informationen offenlegen und das Verhalten der App verändern.</string>
     <string name="developer_debugging">Fehlersuche</string>
     <string name="diagnostics">Diagnose</string>
@@ -990,6 +999,8 @@
     <string name="media_apk_invalid">Diese Datei ist als APK benannt, ist aber kein gültiges Android-Paket</string>
     <string name="media_open">Öffnen</string>
     <string name="media_file_too_large">Datei zu groß zum Anhängen</string>
+    <string name="media_file_unreadable">Diese Datei konnte nicht gelesen werden. Wähle sie erneut aus.</string>
+    <string name="media_file_empty">Leere Dateien können nicht gesendet werden.</string>
     <string name="media_album_too_large">Auswahl zu groß zum Senden</string>
     <string name="group_image_search_title">Gruppenbild</string>
     <string name="group_image_search_set">Gruppenbild festlegen</string>
@@ -2074,4 +2085,5 @@
     <string name="export_audit_logs_confirm_action">Weiter</string>
     <string name="toast_couldnt_export_audit_logs">Diagnoseprotokolle konnten nicht für den Export vorbereitet werden</string>
     <string name="toast_no_audit_logs_to_export">Keine Diagnoseprotokolle zum Exportieren vorhanden</string>
+    <string name="conversation_loading_newer">Neuere Nachrichten werden geladen</string>
 </resources>

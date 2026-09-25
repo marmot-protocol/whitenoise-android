@@ -461,6 +461,15 @@
     <string name="developer_mode">開發者模式</string>
     <string name="developer_mode_subtitle">顯示診斷和 MLS 內部結構。</string>
     <string name="developer_testing_only">僅用於開發和測試</string>
+    <string name="developer_seed_fixture">填充測試對話</string>
+    <string name="developer_seed_fixture_subtitle">向一個聊天傳送合成訊息，用於分頁基準測試</string>
+    <string name="seed_fixture_title">填充測試對話</string>
+    <string name="seed_fixture_detail">以此帳號的真實訊息形式，向所選聊天傳送帶編號的合成訊息。請使用私人測試群組；其他成員會收到每一則。</string>
+    <string name="seed_fixture_count">要傳送的訊息數</string>
+    <string name="seed_fixture_start">開始</string>
+    <string name="seed_fixture_progress">已傳送 %1$d/%2$d · 失敗 %3$d</string>
+    <string name="seed_fixture_no_groups">此帳號沒有可填充的聊天。</string>
+    <string name="seed_fixture_stopped">已停止 · 已傳送 %1$d/%2$d</string>
     <string name="developer_testing_only_detail">這些工具可能會暴露技術資訊並改變應用程式的行為。</string>
     <string name="developer_debugging">除錯</string>
     <string name="diagnostics">診斷</string>
@@ -975,6 +984,8 @@
     <string name="media_apk_invalid">此檔案的名稱顯示為 APK，但不是有效的 Android 套件</string>
     <string name="media_open">開啟</string>
     <string name="media_file_too_large">檔案太大,無法附加</string>
+    <string name="media_file_unreadable">無法讀取此檔案。請重新選取。</string>
+    <string name="media_file_empty">無法傳送空檔案。</string>
     <string name="media_album_too_large">選取內容太大,無法傳送</string>
     <string name="group_image_search_title">群組頭像</string>
     <string name="group_image_search_set">設定群組頭像</string>
@@ -2029,4 +2040,5 @@
     <string name="export_audit_logs_confirm_action">繼續</string>
     <string name="toast_couldnt_export_audit_logs">無法準備要匯出的診斷日誌</string>
     <string name="toast_no_audit_logs_to_export">沒有可匯出的診斷日誌</string>
+    <string name="conversation_loading_newer">正在載入較新的訊息</string>
 </resources>

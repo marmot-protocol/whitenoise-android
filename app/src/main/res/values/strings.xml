@@ -596,6 +596,15 @@
     <string name="developer_mode">Developer mode</string>
     <string name="developer_mode_subtitle">Shows diagnostics and MLS internals.</string>
     <string name="developer_testing_only">For development and testing only</string>
+    <string name="developer_seed_fixture">Seed conversation fixture</string>
+    <string name="developer_seed_fixture_subtitle">Send synthetic messages to one chat for paging benchmarks</string>
+    <string name="seed_fixture_title">Seed conversation fixture</string>
+    <string name="seed_fixture_detail">Sends numbered synthetic messages into the chosen chat as real messages from this account. Use a private test group; the other members will receive every one.</string>
+    <string name="seed_fixture_count">Messages to send</string>
+    <string name="seed_fixture_start">Start</string>
+    <string name="seed_fixture_progress">%1$d of %2$d sent · %3$d failed</string>
+    <string name="seed_fixture_no_groups">This account has no chats to seed.</string>
+    <string name="seed_fixture_stopped">Stopped · %1$d of %2$d sent</string>
     <string name="developer_testing_only_detail">These tools can expose technical information and change how the app behaves.</string>
     <string name="developer_debugging">Debugging</string>
     <string name="diagnostics">Diagnostics</string>
@@ -1326,6 +1335,8 @@
     <string name="attachment_type_image">Image</string>
     <string name="attachment_type_file">File</string>
     <string name="media_file_too_large">File too large to attach</string>
+    <string name="media_file_unreadable">Couldn\'t read this file. Select it again.</string>
+    <string name="media_file_empty">Empty files can\'t be sent</string>
     <string name="media_album_too_large">Selection too large to send</string>
     <string name="group_image_search_title">Group image</string>
     <string name="group_image_search_set">Set group image</string>
@@ -2174,4 +2185,5 @@
     <string name="diagnostics_clear_confirm_action">Clear Logs</string>
     <string name="usage_diagnostics_prompt_intro">Help us understand how White Noise is used and make messaging more reliable.</string>
     <string name="donate_open_failed">Couldn’t open the donation page. Try again or return to Settings.</string>
+    <string name="conversation_loading_newer">Loading newer messages</string>
 </resources>

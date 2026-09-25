@@ -472,6 +472,15 @@
     <string name="developer_mode">Mode développeur</string>
     <string name="developer_mode_subtitle">Affiche les diagnostics et les éléments internes MLS.</string>
     <string name="developer_testing_only">Réservé au développement et aux tests</string>
+    <string name="developer_seed_fixture">Remplir une conversation de test</string>
+    <string name="developer_seed_fixture_subtitle">Envoyer des messages synthétiques dans une discussion pour les mesures de pagination</string>
+    <string name="seed_fixture_title">Remplir une conversation de test</string>
+    <string name="seed_fixture_detail">Envoie des messages synthétiques numérotés dans la discussion choisie, comme de vrais messages de ce compte. Utilisez un groupe de test privé : les autres membres recevront chacun d’eux.</string>
+    <string name="seed_fixture_count">Messages à envoyer</string>
+    <string name="seed_fixture_start">Démarrer</string>
+    <string name="seed_fixture_progress">%1$d sur %2$d envoyés · %3$d en échec</string>
+    <string name="seed_fixture_no_groups">Ce compte n’a aucune discussion à remplir.</string>
+    <string name="seed_fixture_stopped">Arrêté · %1$d sur %2$d envoyés</string>
     <string name="developer_testing_only_detail">Ces outils peuvent exposer des informations techniques et modifier le comportement de l’application.</string>
     <string name="developer_debugging">Débogage</string>
     <string name="diagnostics">Diagnostic</string>
@@ -990,6 +999,8 @@
     <string name="media_apk_invalid">Ce fichier porte un nom d’APK, mais ce n’est pas un paquet Android valide</string>
     <string name="media_open">Ouvrir</string>
     <string name="media_file_too_large">Fichier trop volumineux pour être joint</string>
+    <string name="media_file_unreadable">Impossible de lire ce fichier. Sélectionnez-le à nouveau.</string>
+    <string name="media_file_empty">Les fichiers vides ne peuvent pas être envoyés.</string>
     <string name="media_album_too_large">Sélection trop volumineuse pour être envoyée</string>
     <string name="group_image_search_title">Image du groupe</string>
     <string name="group_image_search_set">Définir l\'image du groupe</string>
@@ -2057,4 +2068,5 @@
     <string name="export_audit_logs_confirm_action">Continuer</string>
     <string name="toast_couldnt_export_audit_logs">Impossible de préparer les journaux de diagnostic pour l’exportation</string>
     <string name="toast_no_audit_logs_to_export">Aucun journal de diagnostic à exporter</string>
+    <string name="conversation_loading_newer">Chargement des messages plus récents</string>
 </resources>
