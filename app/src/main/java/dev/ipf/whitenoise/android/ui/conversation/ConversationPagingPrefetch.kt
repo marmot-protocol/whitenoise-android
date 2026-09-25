@@ -29,8 +29,9 @@ private fun isMessageIdHex(value: String): Boolean {
  * Whether the reader is close enough to the oldest loaded row to fetch the page behind it. Pages in
  * either direction are serialized, so [pageInFlight] covers both.
  *
- * [olderPageBlocked] holds the prefetch off after a page the engine never answered, so the retry is
- * the reader's to make rather than something the effect re-issues on every scroll frame.
+ * [olderPageBlocked] holds the prefetch off after a page the engine never answered, or answered
+ * without any older rows, so the retry is the reader's to make rather than something the effect
+ * re-issues on every scroll frame or the moment the last page finished (#2727).
  */
 internal fun shouldPrefetchOlder(
     anchored: Boolean,

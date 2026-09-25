@@ -70,10 +70,21 @@ internal val ConversationController.isLoadingPage: Boolean
  * somewhere else — see `set_visible_anchor` in MDK's window contract. It is ignored when the window
  * no longer retains the row, which is the case for optimistic rows carrying local ids MDK never
  * issued.
+ *
+ * [origin] decides what a page without new rows means. The reader's own request or retry is simply
+ * reported. An automatic prefetch stands down through [AutomaticPagingGuards.older] instead: the
+ * viewport parked on the oldest row keeps the prefetch condition true, and each finished page
+ * re-evaluates it, so without the guard an engine that still claims older history it cannot deliver
+ * would be asked again the moment it answered, keeping the header spinner on for good (#2727).
  */
 @Suppress("TooGenericExceptionCaught", "ReturnCount")
-internal suspend fun ConversationController.loadOlderPageInternal(anchorId: String? = null): ConversationPageLoad {
+internal suspend fun ConversationController.loadOlderPageInternal(
+    anchorId: String? = null,
+    origin: PagingOrigin = PagingOrigin.EXPLICIT,
+): ConversationPageLoad {
     if (!hasMoreBefore || isLoadingPage) return ConversationPageLoad.NO_PROGRESS
+    val automatic = origin == ConversationPagingOrigin.AUTOMATIC
+    if (automatic && automaticPaging.older.blocked) return ConversationPageLoad.NO_PROGRESS
     val subscription = timelineSubscription ?: return ConversationPageLoad.INACTIVE
     val priorMessageIds = timelineRecords.keys.toSet()
     // A previous loadOlderPage failure leaves `error` set; clear it now
@@ -119,7 +130,10 @@ internal suspend fun ConversationController.loadOlderPageInternal(anchorId: Stri
                     progressPageLoad(priorMessageIds)
                 }
             }
-        }.also { trace.recordCompletion(it, startedMs) }
+        }.also { load ->
+            trace.recordCompletion(load, startedMs)
+            settleOlderPrefetchGuard(load, automatic)
+        }
     } catch (cancel: CancellationException) {
         // A cancelled page used to leave no trace at all, so a tester could not tell it from one
         // still waiting on the engine. `INACTIVE` closes it as `dropped`.
@@ -135,13 +149,28 @@ internal suspend fun ConversationController.loadOlderPageInternal(anchorId: Stri
 }
 
 /**
+ * Feeds one answered older page to the automatic prefetch guard: rows that arrived release it in
+ * every case, while an automatic page that brought none counts against it. Deadline and not-ready
+ * outcomes are left to the visible retry row that already blocks the prefetch.
+ */
+private fun ConversationController.settleOlderPrefetchGuard(
+    load: ConversationPageLoad,
+    automatic: Boolean,
+) {
+    when {
+        load == ConversationPageLoad.ADVANCED -> automaticPaging.older.reset()
+        automatic && load == ConversationPageLoad.NO_PROGRESS -> automaticPaging.older.recordFailure()
+    }
+}
+
+/**
  * Pages the window towards newer history, back down to the live tail.
  *
  * [origin] decides what a failure means. An explicit navigation or retry keeps the bottom-edge
  * retry affordance it has always had. An automatic prefetch — the viewport drifting to the newest
  * edge, which a successful send does on its own — recovers quietly instead: the loaded
  * conversation and the sent message are already correct, so the reader is told nothing, the
- * failure is logged with its privacy-safe operation code, and [AutomaticNewerPagingGuard] bounds
+ * failure is logged with its privacy-safe operation code, and [AutomaticPagingGuards.newer] bounds
  * the retries so the effect cannot re-issue the page on every layout pass (#2764).
  */
 @Suppress("TooGenericExceptionCaught", "ReturnCount")
@@ -150,7 +179,7 @@ internal suspend fun ConversationController.loadNewerPageInternal(origin: Paging
     if (!hasMoreAfter || isLoadingPage) return ConversationPageLoad.NO_PROGRESS
     if (subscription == null) return ConversationPageLoad.INACTIVE
     val automatic = origin == ConversationPagingOrigin.AUTOMATIC
-    if (automatic && automaticNewerPaging.blocked) return ConversationPageLoad.NO_PROGRESS
+    if (automatic && automaticPaging.newer.blocked) return ConversationPageLoad.NO_PROGRESS
     val priorMessageIds = timelineRecords.keys.toSet()
     // An opportunistic page must not clear a failure the reader can still act on; it clears only
     // the matching newer-page failure, and only once newer rows have actually arrived.
@@ -201,7 +230,7 @@ private suspend fun ConversationController.applyNewerPage(
     }
     if (!committed) return ConversationPageLoad.INACTIVE
     clearRecoveredNewerPageFailure()
-    automaticNewerPaging.reset()
+    automaticPaging.newer.reset()
     protectedTimelineMessageIds.clear()
     if (hasLoadedOlderPages) {
         protectedTimelineMessageIds.addAll(timelineRecords.keys)

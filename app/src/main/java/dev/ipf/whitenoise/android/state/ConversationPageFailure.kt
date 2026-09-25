@@ -43,8 +43,8 @@ internal fun ConversationController.reportPageFailure(
     origin: ConversationPagingOrigin = ConversationPagingOrigin.EXPLICIT,
 ) {
     if (origin == ConversationPagingOrigin.AUTOMATIC) {
-        automaticNewerPaging.recordFailure()
-        val attempt = automaticNewerPaging.consecutiveFailures
+        automaticPaging.newer.recordFailure()
+        val attempt = automaticPaging.newer.consecutiveFailures
         Log.w("DMConversation", "automatic_page_failed operation=${pageOperation(direction)} attempt=$attempt")
         return
     }
