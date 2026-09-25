@@ -557,6 +557,12 @@ internal data class AppMarmotRuntime(
     val marmot: MarmotInterface,
 )
 
+/** One runtime identity captured by an Activity-owned host-performance reporter. */
+internal data class HostPerformanceRuntimeOwner(
+    val runtime: AppMarmotRuntime,
+    val generation: Int,
+)
+
 private fun openMarmotRuntime(context: Context) = MarmotClient(context).let { AppMarmotRuntime(it.rootPath, it.marmot) }
 
 private class NativeNotificationSubscription(
@@ -2820,6 +2826,27 @@ class WhiteNoiseAppState private constructor(
         outcome: HostPerformanceOutcomeFfi,
     ) {
         hostPerformance.record(operation, durationMs, outcome)
+    }
+
+    /** Captures the current runtime for an Activity-owned frame reporter. */
+    internal fun captureHostPerformanceRuntimeOwner(): HostPerformanceRuntimeOwner? =
+        marmotRuntime
+            ?.let { HostPerformanceRuntimeOwner(it, runtimeGeneration) }
+
+    /** Checks that a frame reporter still belongs to the current runtime identity. */
+    internal fun ownsHostPerformanceRuntimeOwner(owner: HostPerformanceRuntimeOwner): Boolean =
+        marmotRuntime === owner.runtime && runtimeGeneration == owner.generation
+
+    /** Records a frame sample only while its captured runtime owner remains current. */
+    internal fun recordHostPerformance(
+        owner: HostPerformanceRuntimeOwner,
+        operation: HostPerformanceOperationFfi,
+        durationMs: Long,
+        outcome: HostPerformanceOutcomeFfi,
+    ): Boolean {
+        if (!ownsHostPerformanceRuntimeOwner(owner)) return false
+        hostPerformance.record(operation, durationMs, outcome)
+        return true
     }
 
     /** Measures a suspending Android-owned stage without changing its failure semantics. */

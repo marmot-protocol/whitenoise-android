@@ -7,6 +7,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import java.util.concurrent.atomic.AtomicBoolean
 
+internal const val MAX_DEFERRED_HOST_PERFORMANCE_EMITTERS = 128
+
 /** Every shared MDK operation Android can truthfully own; Linux-only stages stay unreported. */
 internal val ANDROID_HOST_PERFORMANCE_OPERATIONS =
     setOf(
@@ -152,8 +154,44 @@ internal class HostPerformanceRecorder(
             currentEmitter
                 ?.takeIf { it.generation == ownerGeneration }
                 ?.emitter
-                ?: DeferredHostPerformanceEmitter(ownerGeneration).also(deferredEmitters::add)
+                ?: DeferredHostPerformanceEmitter(ownerGeneration).also { deferred ->
+                    if (deferredEmitters.size >= MAX_DEFERRED_HOST_PERFORMANCE_EMITTERS) {
+                        deferredEmitters.removeAt(0).discard()
+                    }
+                    deferredEmitters.add(deferred)
+                }
         }
+}
+
+/**
+ * Measures work whose success boundary is an explicit commit callback rather than block return.
+ *
+ * A normally returned stale-generation apply is cancelled, while thrown exits preserve their
+ * timeout, cancellation, or failure classification.
+ */
+@Suppress("TooGenericExceptionCaught", "ThrowsCount")
+internal suspend fun <T> measureHostPerformanceCommit(
+    attempt: HostPerformanceAttempt,
+    block: suspend (onCommitted: () -> Unit) -> T,
+): T {
+    var committed = false
+    return try {
+        block {
+            committed = true
+            attempt.success()
+        }
+    } catch (timeout: TimeoutCancellationException) {
+        attempt.timeout()
+        throw timeout
+    } catch (cancel: CancellationException) {
+        attempt.cancel()
+        throw cancel
+    } catch (throwable: Throwable) {
+        attempt.failure()
+        throw throwable
+    } finally {
+        if (!committed) attempt.cancel()
+    }
 }
 
 /** One currently published runtime emitter and its identity fence. */

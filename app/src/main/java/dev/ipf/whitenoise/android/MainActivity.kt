@@ -33,6 +33,7 @@ import dev.ipf.marmotkit.HostPerformanceOperationFfi
 import dev.ipf.marmotkit.HostPerformanceOutcomeFfi
 import dev.ipf.whitenoise.android.amber.AmberActivityCoordinator
 import dev.ipf.whitenoise.android.diagnostics.AndroidFramePerformanceReporter
+import dev.ipf.whitenoise.android.diagnostics.FramePerformanceCallbackGuard
 import dev.ipf.whitenoise.android.notifications.InboundIntentRouting
 import dev.ipf.whitenoise.android.notifications.NotificationNavigation
 import dev.ipf.whitenoise.android.notifications.NotificationRouteTrace
@@ -49,6 +50,7 @@ import dev.ipf.whitenoise.android.state.AppThemeMode
 import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.state.ChatScreenshotPreferences
 import dev.ipf.whitenoise.android.state.HostPerformanceAttemptSlot
+import dev.ipf.whitenoise.android.state.HostPerformanceRuntimeOwner
 import dev.ipf.whitenoise.android.state.WarmResumeTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.shouldReattachAppUnlockPrompt
@@ -92,6 +94,7 @@ class MainActivity : AppCompatActivity() {
     private var fontsHostReadyRecorded = false
     private val foregroundHostReady = HostPerformanceAttemptSlot()
     private var framePerformanceReporter: AndroidFramePerformanceReporter? = null
+    private var framePerformanceCallbackGuard: FramePerformanceCallbackGuard<HostPerformanceRuntimeOwner>? = null
     private val mainShellStateHolder: MainShellStateHolder by viewModels {
         MainShellStateHolder.Factory(
             appState = appState,
@@ -166,14 +169,25 @@ class MainActivity : AppCompatActivity() {
             HostPerformanceOperationFfi.WINDOW_INIT,
             activityCreatedAtElapsedMs,
         )
+        startFramePerformanceReporter()
+    }
+
+    /** Starts frame sampling with one Activity lifetime and one lazily captured runtime owner. */
+    private fun startFramePerformanceReporter() {
+        val frameCallbackGuard =
+            FramePerformanceCallbackGuard(
+                captureOwner = appState::captureHostPerformanceRuntimeOwner,
+                isCurrent = appState::ownsHostPerformanceRuntimeOwner,
+            ).also { framePerformanceCallbackGuard = it }
         framePerformanceReporter =
             AndroidFramePerformanceReporter(window = window, emit = { operation, durationMs ->
                 window.decorView.post {
-                    if (::appState.isInitialized) {
+                    frameCallbackGuard.runIfCurrent { owner ->
                         appState.recordHostPerformance(
-                            operation,
-                            durationMs,
-                            HostPerformanceOutcomeFfi.SUCCESS,
+                            owner = owner,
+                            operation = operation,
+                            durationMs = durationMs,
+                            outcome = HostPerformanceOutcomeFfi.SUCCESS,
                         )
                     }
                 }
@@ -472,6 +486,8 @@ class MainActivity : AppCompatActivity() {
             appState.onAllowChatScreenshotsChanged = null
         }
         releaseRecentsPreferenceSecureFlag()
+        framePerformanceCallbackGuard?.invalidate()
+        framePerformanceCallbackGuard = null
         framePerformanceReporter?.close()
         framePerformanceReporter = null
         super.onDestroy()

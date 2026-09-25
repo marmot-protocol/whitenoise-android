@@ -764,11 +764,19 @@ internal fun ProfileEditScreen(
         val loadSaveRevision = acceptedSaveRevision
         try {
             val profile = loadProfile(accountId)
-            if (profile == null) hostAttempt.unavailable() else hostAttempt.success()
-            if (appState.activeAccount?.accountIdHex != accountId) return@LaunchedEffect
+            if (appState.activeAccount?.accountIdHex != accountId) {
+                hostAttempt.cancel()
+                return@LaunchedEffect
+            }
             // A refresh started before an accepted publication cannot replace its new read/edit baseline.
-            if (loadSaveRevision != acceptedSaveRevision) return@LaunchedEffect
-            if (profile == null && cachedDraft != null) return@LaunchedEffect
+            if (loadSaveRevision != acceptedSaveRevision) {
+                hostAttempt.cancel()
+                return@LaunchedEffect
+            }
+            if (profile == null && cachedDraft != null) {
+                hostAttempt.unavailable()
+                return@LaunchedEffect
+            }
 
             val refreshed = profileEditDraft(profile)
             val current =
@@ -781,11 +789,15 @@ internal fun ProfileEditScreen(
                     fields.lightning.text.toString(),
                 )
             val merged = current.mergeUntouchedFields(loadStartedWith, refreshed)
-            if (!saveState.completeLoad(accountId, refreshed.metadata())) return@LaunchedEffect
+            if (!saveState.completeLoad(accountId, refreshed.metadata())) {
+                hostAttempt.cancel()
+                return@LaunchedEffect
+            }
             baselineDraft = refreshed
             fields.restore(merged)
             imageDrafts = ProfileImageDrafts(picture = merged.picture, banner = merged.banner)
             profileContentReady = true
+            if (profile == null) hostAttempt.unavailable() else hostAttempt.success()
         } catch (cancelled: CancellationException) {
             hostAttempt.cancel()
             throw cancelled

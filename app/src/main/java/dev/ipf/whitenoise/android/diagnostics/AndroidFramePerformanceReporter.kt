@@ -11,10 +11,10 @@ private const val NANOS_PER_MILLISECOND = 1_000_000L
 
 /** One Android framework frame sample translated into MDK's shared frame boundaries. */
 internal data class AndroidFramePerformanceSample(
-    val updateMs: Long,
-    val layoutMs: Long,
-    val drawMs: Long,
-    val presentMs: Long,
+    val updateMs: Long?,
+    val layoutMs: Long?,
+    val drawMs: Long?,
+    val presentMs: Long?,
 )
 
 /** Converts framework nanosecond buckets into the four platform-neutral frame stages. */
@@ -40,22 +40,48 @@ internal fun androidFramePerformanceSample(
     swapBuffersNanos: Long,
 ): AndroidFramePerformanceSample =
     AndroidFramePerformanceSample(
-        updateMs =
-            nanosToMillis(
-                inputNanos.coerceAtLeast(0L) + animationNanos.coerceAtLeast(0L),
-            ),
+        updateMs = nanosToMillis(inputNanos, animationNanos),
         layoutMs = nanosToMillis(layoutNanos),
-        drawMs =
-            nanosToMillis(
-                drawNanos.coerceAtLeast(0L) +
-                    syncNanos.coerceAtLeast(0L) +
-                    commandIssueNanos.coerceAtLeast(0L),
-            ),
+        drawMs = nanosToMillis(drawNanos, syncNanos, commandIssueNanos),
         presentMs = nanosToMillis(swapBuffersNanos),
     )
 
-/** Preserves sub-millisecond work as zero while saturating invalid framework values. */
-private fun nanosToMillis(nanos: Long): Long = nanos.coerceAtLeast(0L) / NANOS_PER_MILLISECOND
+/** Sums only complete framework stages and preserves sub-millisecond work as zero. */
+private fun nanosToMillis(vararg nanos: Long): Long? =
+    nanos
+        .takeIf { it.all { bucket -> bucket >= 0L } }
+        ?.sum()
+        ?.div(NANOS_PER_MILLISECOND)
+
+/**
+ * Fences queued frame callbacks to the Activity and first runtime owner that accepted a sample.
+ *
+ * A cold Activity may start before MDK exists, so owner capture remains lazy. Once captured, a
+ * replacement owner is never adopted by this reporter.
+ */
+internal class FramePerformanceCallbackGuard<Owner : Any>(
+    private val captureOwner: () -> Owner?,
+    private val isCurrent: (Owner) -> Boolean,
+) {
+    private var active = true
+    private var owner: Owner? = null
+
+    /** Runs one queued callback only while this lifetime and its captured owner remain current. */
+    @Synchronized
+    fun runIfCurrent(block: (Owner) -> Unit): Boolean {
+        val captured = if (active) owner ?: captureOwner()?.also { owner = it } else null
+        val shouldRun = captured != null && isCurrent(captured)
+        if (shouldRun) block(requireNotNull(captured))
+        return shouldRun
+    }
+
+    /** Invalidates this Activity lifetime before its reporter begins teardown. */
+    @Synchronized
+    fun invalidate() {
+        active = false
+        owner = null
+    }
+}
 
 /**
  * Samples framework-owned frame phases off the UI thread.
@@ -77,10 +103,10 @@ internal class AndroidFramePerformanceReporter(
             val index = frameCount.getAndIncrement()
             if (index % sampleEveryFrames != 0) return@OnFrameMetricsAvailableListener
             val sample = metrics.toHostPerformanceSample()
-            emit(HostPerformanceOperationFfi.FRAME_UPDATE, sample.updateMs)
-            emit(HostPerformanceOperationFfi.FRAME_LAYOUT, sample.layoutMs)
-            emit(HostPerformanceOperationFfi.FRAME_DRAW, sample.drawMs)
-            emit(HostPerformanceOperationFfi.FRAME_PRESENT, sample.presentMs)
+            sample.updateMs?.let { emit(HostPerformanceOperationFfi.FRAME_UPDATE, it) }
+            sample.layoutMs?.let { emit(HostPerformanceOperationFfi.FRAME_LAYOUT, it) }
+            sample.drawMs?.let { emit(HostPerformanceOperationFfi.FRAME_DRAW, it) }
+            sample.presentMs?.let { emit(HostPerformanceOperationFfi.FRAME_PRESENT, it) }
         }
 
     init {

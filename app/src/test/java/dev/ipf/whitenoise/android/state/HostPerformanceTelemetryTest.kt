@@ -111,6 +111,77 @@ class HostPerformanceTelemetryTest {
     }
 
     @Test
+    fun deferredSamplesDiscardTheOldestEntryAtTheBound() {
+        val samples = mutableListOf<Sample>()
+        val recorder = HostPerformanceRecorder(generation = { 1 }, nowMs = { 0L })
+
+        repeat(MAX_DEFERRED_HOST_PERFORMANCE_EMITTERS + 1) { index ->
+            recorder.record(
+                HostPerformanceOperationFfi.WINDOW_INIT,
+                durationMs = index.toLong(),
+                outcome = HostPerformanceOutcomeFfi.SUCCESS,
+            )
+        }
+        recorder.publishEmitter(Any(), ownerGeneration = 1, emitter = samples.emitter())
+
+        assertEquals(MAX_DEFERRED_HOST_PERFORMANCE_EMITTERS, samples.size)
+        assertEquals(1L, samples.first().durationMs)
+        assertEquals(MAX_DEFERRED_HOST_PERFORMANCE_EMITTERS.toLong(), samples.last().durationMs)
+    }
+
+    @Test
+    fun commitMeasuredWorkCancelsANormalReturnWithoutACommit() =
+        runTest {
+            val samples = mutableListOf<Sample>()
+            val attempt = recorder(samples = samples).begin(HostPerformanceOperationFfi.TIMELINE_APPLY)
+
+            measureHostPerformanceCommit(attempt) { "stale" }
+
+            assertEquals(HostPerformanceOutcomeFfi.CANCELLED, samples.single().outcome)
+        }
+
+    @Test
+    fun commitMeasuredWorkSucceedsOnlyFromTheCommitCallback() =
+        runTest {
+            val samples = mutableListOf<Sample>()
+            val attempt = recorder(samples = samples).begin(HostPerformanceOperationFfi.TIMELINE_APPLY)
+
+            measureHostPerformanceCommit(attempt) { committed -> committed() }
+
+            assertEquals(HostPerformanceOutcomeFfi.SUCCESS, samples.single().outcome)
+        }
+
+    @Test
+    fun commitMeasuredWorkRecordsAndRethrowsFailures() =
+        runTest {
+            val samples = mutableListOf<Sample>()
+            val attempt = recorder(samples = samples).begin(HostPerformanceOperationFfi.TIMELINE_APPLY)
+
+            val thrown =
+                runCatching {
+                    measureHostPerformanceCommit(attempt) { throw IllegalStateException("apply failed") }
+                }.exceptionOrNull()
+
+            assertTrue(thrown is IllegalStateException)
+            assertEquals(HostPerformanceOutcomeFfi.FAILURE, samples.single().outcome)
+        }
+
+    @Test
+    fun commitMeasuredWorkRecordsAndRethrowsCancellation() =
+        runTest {
+            val samples = mutableListOf<Sample>()
+            val attempt = recorder(samples = samples).begin(HostPerformanceOperationFfi.TIMELINE_APPLY)
+
+            val thrown =
+                runCatching {
+                    measureHostPerformanceCommit(attempt) { throw CancellationException("apply cancelled") }
+                }.exceptionOrNull()
+
+            assertTrue(thrown is CancellationException)
+            assertEquals(HostPerformanceOutcomeFfi.CANCELLED, samples.single().outcome)
+        }
+
+    @Test
     fun cancellationIsTerminalAndRethrown() =
         runTest {
             val samples = mutableListOf<Sample>()

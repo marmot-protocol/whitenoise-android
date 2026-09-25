@@ -113,12 +113,17 @@ internal suspend fun ConversationController.loadOlderPageInternal(
                 val appliedAtMs = SystemClock.elapsedRealtime()
                 var committed = false
                 tracedPagingSection(ConversationPagingTraceSection.APPLY) {
-                    appState.measureHostPerformance(HostPerformanceOperationFfi.TIMELINE_APPLY) {
+                    measureHostPerformanceCommit(
+                        appState.beginHostPerformance(HostPerformanceOperationFfi.TIMELINE_APPLY),
+                    ) { onCommitted ->
                         applyTimelinePage(
                             outcome.page,
                             replaceWindow = false,
                             updatePagination = true,
-                            onCommitted = { committed = true },
+                            onCommitted = {
+                                committed = true
+                                onCommitted()
+                            },
                         )
                     }
                 }
@@ -250,13 +255,18 @@ private suspend fun ConversationController.applyNewerPage(
     val appliedAtMs = SystemClock.elapsedRealtime()
     var committed = false
     tracedPagingSection(ConversationPagingTraceSection.APPLY) {
-        appState.measureHostPerformance(HostPerformanceOperationFfi.TIMELINE_APPLY) {
+        measureHostPerformanceCommit(
+            appState.beginHostPerformance(HostPerformanceOperationFfi.TIMELINE_APPLY),
+        ) { onCommitted ->
             applyTimelinePage(
                 page,
                 replaceWindow = false,
                 updatePagination = true,
                 reconcileNewExtendedRecords = true,
-                onCommitted = { committed = true },
+                onCommitted = {
+                    committed = true
+                    onCommitted()
+                },
             )
         }
     }
@@ -318,8 +328,15 @@ private suspend fun ConversationController.pageOlderIfActive(
             // would put a stale window on screen until the new subscription's snapshot lands.
             if (!retainsSubscription(handle)) return@withLock null
             if (anchored != null) {
-                appState.measureHostPerformance(HostPerformanceOperationFfi.TIMELINE_APPLY) {
-                    applyTimelinePage(anchored, replaceWindow = false, updatePagination = true)
+                measureHostPerformanceCommit(
+                    appState.beginHostPerformance(HostPerformanceOperationFfi.TIMELINE_APPLY),
+                ) { onCommitted ->
+                    applyTimelinePage(
+                        anchored,
+                        replaceWindow = false,
+                        updatePagination = true,
+                        onCommitted = onCommitted,
+                    )
                 }
             }
         }
