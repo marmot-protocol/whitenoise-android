@@ -22,7 +22,6 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
-import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_GESTURE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -58,9 +57,16 @@ class ComposerEditScreenshotTest {
                 .onNodeWithContentDescription(context.getString(R.string.open_emoji_picker))
                 .fetchSemanticsNode()
                 .boundsInRoot
+        // Edit uses the normal expanded geometry, whose field padding reaches 4dp into the 48dp
+        // action targets while staying clear of the painted icons.
+        val allowedOverlap = with(composeRule.density) { 4.dp.toPx() }
         assertTrue(
             "Edit text should stay above its separate control row",
-            editor.bottom <= send.top && editor.bottom <= emoji.top,
+            editor.bottom <= send.top + allowedOverlap && editor.bottom <= emoji.top + allowedOverlap,
+        )
+        assertTrue(
+            "Emoji and Send should share one bottom action line",
+            abs(send.center.y - emoji.center.y) <= with(composeRule.density) { 1.dp.toPx() },
         )
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_short_edit_light.png")
     }
@@ -95,31 +101,32 @@ class ComposerEditScreenshotTest {
                 .onNodeWithContentDescription(context.getString(R.string.cancel_edit))
                 .fetchSemanticsNode()
                 .boundsInRoot
-        val cancelVisual =
-            composeRule
-                .onNodeWithTag("conversation.composer.remove.visual", useUnmergedTree = true)
-                .fetchSemanticsNode()
-                .boundsInRoot
         val editLabel =
             composeRule
-                .onNodeWithText(context.getString(R.string.editing_message))
+                .onNodeWithText(context.getString(R.string.edit_message))
                 .fetchSemanticsNode()
                 .boundsInRoot
         val editor = composeRule.onNode(hasSetTextAction()).fetchSemanticsNode().boundsInRoot
-        val border =
+        val send =
             composeRule
-                .onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG, useUnmergedTree = true)
+                .onNodeWithContentDescription(context.getString(R.string.send))
                 .fetchSemanticsNode()
                 .boundsInRoot
+        val onePx = with(composeRule.density) { 1.dp.toPx() }
         assertTrue(cancel.left >= surface.left && cancel.right <= surface.right)
-        assertTrue(cancel.top >= border.bottom)
+        assertTrue(
+            "The Edit pill should sit on the Send action line",
+            abs(editLabel.center.y - send.center.y) <= onePx,
+        )
         assertTrue(
             "Cancel X should be vertically centered on the Edit label",
-            abs(cancelVisual.center.y - editLabel.center.y) <= with(composeRule.density) { 1.dp.toPx() },
+            abs(cancel.center.y - editLabel.center.y) <= onePx,
         )
-        // Only four dp of the field's empty leading overlaps the Cancel target.
-        assertTrue(cancel.bottom <= editor.top + with(composeRule.density) { 4.dp.toPx() })
-        assertTrue(editor.bottom <= surface.bottom)
+        assertTrue(
+            "The Edit pill should not overlap Send",
+            cancel.right <= send.left || cancel.left >= send.right,
+        )
+        assertTrue(editor.top < editLabel.top && editor.bottom <= surface.bottom)
         composeRule.onNodeWithContentDescription(context.getString(R.string.cancel_edit)).performClick()
         assertEquals(1, cancelled)
     }
@@ -149,6 +156,8 @@ class ComposerEditScreenshotTest {
                             initialDraft = TextFieldValue(""),
                             editingMessageId = "edited-message",
                             editingInitialText = editText,
+                            // The conversation keeps its attachment action while editing.
+                            onPickFromGallery = {},
                         )
                     }
                 }

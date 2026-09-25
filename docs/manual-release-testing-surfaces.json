@@ -2838,6 +2838,15 @@
         ]
       },
       {
+        "surface": "ComposerEditPill",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerEditPill.kt",
+        "anchor": "fun ComposerEditPill(",
+        "test_ids": [
+          "MSG-007",
+          "CON-020"
+        ]
+      },
+      {
         "surface": "ComposerActionDisc",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerActionDisc.kt",
         "anchor": "fun ComposerActionDisc(",
@@ -24862,7 +24871,7 @@
       },
       {
         "surface": "R.string.cancel_edit",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerEditPill.kt",
         "anchor": "R.string.cancel_edit",
         "test_ids": [
           "MSG-007",
@@ -24870,9 +24879,9 @@
         ]
       },
       {
-        "surface": "R.string.editing_message",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
-        "anchor": "R.string.editing_message",
+        "surface": "R.string.edit_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerEditPill.kt",
+        "anchor": "R.string.edit_message",
         "test_ids": [
           "MSG-004",
           "MSG-007",

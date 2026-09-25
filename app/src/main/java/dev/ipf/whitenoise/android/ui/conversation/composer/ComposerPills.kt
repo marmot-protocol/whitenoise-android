@@ -118,7 +118,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
@@ -149,9 +148,6 @@ private val CompactEditorBottomInset = 12.dp
 private val ComposerResizeHandleWidth = 32.dp
 private val ComposerResizeHandleThickness = 4.dp
 private val ExpandedEditorBottomInset = 44.dp
-
-// Keep the last edited line and caret outside the action row's full touch area.
-private val EditEditorBottomInset = 48.dp
 
 private const val COMPOSER_ACTION_CENTER_BIAS = 0.5f
 
@@ -415,8 +411,9 @@ internal fun ComposerPill(
     compactMeasurementReservesTrailingAction: Boolean = trailingAction != null,
     compactOuterEndInset: Dp = 0.dp,
     forceEditingLayout: Boolean = false,
-    compactEditTextSpacing: Boolean = false,
     accessoryContent: (@Composable () -> Unit)? = null,
+    // Sits in the bottom action row directly before the trailing Send slot.
+    sendAccessoryContent: (@Composable () -> Unit)? = null,
     voiceReviewContent: (@Composable () -> Unit)? = null,
     inputContentVisible: Boolean = true,
     inputFocusEnabled: Boolean = true,
@@ -653,8 +650,6 @@ internal fun ComposerPill(
         MaterialTheme.typography.bodyLarge.copy(
             color = MaterialTheme.colorScheme.onSurface,
             textDirection = TextDirection.ContentOrLtr,
-            // Edit needs less leading around each line without changing normal drafts or replies.
-            lineHeight = if (compactEditTextSpacing) 20.sp else MaterialTheme.typography.bodyLarge.lineHeight,
         )
     val textMeasurer = rememberTextMeasurer()
     val editingRequested =
@@ -922,7 +917,9 @@ internal fun ComposerPill(
                                             editingProgress.value,
                                         )
                                     },
-                                    top = { if (compactEditTextSpacing) 0.dp else CompactEditorTopInset },
+                                    top = {
+                                        CompactEditorTopInset
+                                    },
                                     end = {
                                         interpolateDp(
                                             compactTrailingReserve,
@@ -933,11 +930,7 @@ internal fun ComposerPill(
                                     bottom = {
                                         interpolateDp(
                                             CompactEditorBottomInset,
-                                            if (compactEditTextSpacing) {
-                                                EditEditorBottomInset
-                                            } else {
-                                                ExpandedEditorBottomInset
-                                            },
+                                            ExpandedEditorBottomInset,
                                             editingProgress.value,
                                         )
                                     },
@@ -1175,7 +1168,6 @@ internal fun ComposerPill(
                                 togglesKeyboard = true,
                                 modifier = Modifier.width(32.dp).height(48.dp),
                                 iconSize = 24.dp,
-                                iconOffsetY = if (compactEditTextSpacing) (-8).dp else 0.dp,
                                 emojiIcon = painterResource(R.drawable.ic_emoji_smileys),
                             )
                         }
@@ -1217,6 +1209,19 @@ internal fun ComposerPill(
                                     modifier = Modifier.size(24.dp),
                                 )
                             }
+                        }
+                        if (sendAccessoryContent != null && inputContentVisible) {
+                            Box(
+                                Modifier.layout { measurable, constraints ->
+                                    // Stays clear of the leading tools; the label ellipsizes first.
+                                    val reserved =
+                                        (leadingControlsWidth + reservedTrailingWidth + dictationControlWidth)
+                                            .roundToPx()
+                                    val available = (constraints.maxWidth - reserved).coerceAtLeast(0)
+                                    val child = measurable.measure(constraints.copy(minWidth = 0, maxWidth = available))
+                                    layout(child.width, child.height) { child.placeRelative(0, 0) }
+                                },
+                            ) { sendAccessoryContent() }
                         }
                         if (expandedTrailingActionInset > 0.dp) {
                             Spacer(

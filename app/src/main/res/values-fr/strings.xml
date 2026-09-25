@@ -737,7 +737,7 @@
     <string name="toast_reaction_failed">La réaction a échoué</string>
     <string name="toast_couldnt_delete_message">Échec de la suppression du message. Veuillez réessayer.</string>
     <string name="toast_couldnt_edit_message">Impossible de modifier le message</string>
-    <string name="editing_message">Modification du message</string>
+    <string name="edit_message">Modifier le message</string>
     <string name="cancel_edit">Annuler la modification</string>
     <string name="edited">modifié</string>
     <string name="edited_count">modifié · %1$d</string>

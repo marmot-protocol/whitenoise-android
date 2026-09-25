@@ -6,7 +6,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,7 +13,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,14 +23,12 @@ import androidx.compose.foundation.layout.imeAnimationTarget
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -69,7 +65,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppMessageRecordFfi
@@ -1068,123 +1063,81 @@ internal fun ComposerBar(
             ) {
                 val voiceReviewClip = voiceReview?.clip?.takeUnless { voiceRecordingController?.isRecording == true }
                 val accessoryContent: (@Composable () -> Unit)? =
-                    if (editingMessageId != null || replyingTo != null || attachmentContent != null) {
+                    // Edit shows its pill in the action row instead, and takes precedence over a reply.
+                    if (editingMessageId == null && (replyingTo != null || attachmentContent != null)) {
                         {
                             Column {
-                                if (editingMessageId == null) attachmentContent?.invoke()
-                                if (editingMessageId != null || replyingTo != null) {
+                                attachmentContent?.invoke()
+                                if (replyingTo != null) {
                                     Box(
                                         // The accessory owns its shape. A second outer clip with a different
-                                        // radius trims the AMOLED reply outline at all four corners. The edit
-                                        // row keeps the existing wrapper clip because it uses the same shape.
-                                        Modifier
-                                            .padding(
-                                                start = 8.dp,
-                                                top = if (editingMessageId != null) 4.dp else 8.dp,
-                                                end = 8.dp,
-                                                bottom = if (editingMessageId != null) 0.dp else 8.dp,
-                                            ).then(
-                                                if (editingMessageId != null) {
-                                                    Modifier.clip(MaterialTheme.shapes.large)
-                                                } else {
-                                                    Modifier
-                                                },
-                                            ),
+                                        // radius trims the AMOLED reply outline at all four corners.
+                                        Modifier.padding(8.dp),
                                     ) {
-                                        if (editingMessageId != null) {
-                                            Row(
-                                                Modifier
-                                                    .fillMaxWidth()
-                                                    .clip(MaterialTheme.shapes.large)
-                                                    .background(MaterialTheme.colorScheme.surfaceContainer)
-                                                    .padding(horizontal = 10.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.Edit,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(18.dp),
-                                                )
-                                                Spacer(Modifier.width(8.dp))
-                                                Text(
-                                                    stringResource(R.string.editing_message),
-                                                    modifier = Modifier.weight(1f),
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                )
-                                                ComposerAccessoryRemoveButton(
-                                                    onClick = onCancelEdit,
-                                                    description = stringResource(R.string.cancel_edit),
-                                                    // Clear the top resize strip without adding height to the Edit bar.
-                                                    modifier = Modifier.offset(y = 4.dp).size(32.dp),
-                                                )
-                                            }
-                                        } else if (replyingTo != null) {
-                                            val mediaFallback =
-                                                remember(replyingToMedia) { typedReplyMediaFallback(replyingToMedia) }
-                                            val mediaKind =
-                                                replyingToDisplay?.mediaKind
-                                                    ?: remember(
+                                        val mediaFallback =
+                                            remember(replyingToMedia) { typedReplyMediaFallback(replyingToMedia) }
+                                        val mediaKind =
+                                            replyingToDisplay?.mediaKind
+                                                ?: remember(
+                                                    mediaFallback,
+                                                    replyingTo.tags,
+                                                    replyingTo.sourceEpoch,
+                                                ) {
+                                                    composerReplyMediaKind(
                                                         mediaFallback,
                                                         replyingTo.tags,
                                                         replyingTo.sourceEpoch,
-                                                    ) {
-                                                        composerReplyMediaKind(
-                                                            mediaFallback,
-                                                            replyingTo.tags,
-                                                            replyingTo.sourceEpoch,
-                                                        )
-                                                    }
-                                            val profileRevision = appState?.profileRevisionForCompose
-                                            val replyMentionDisplayName =
-                                                remember(appState, profileRevision) {
-                                                    appState?.let { state ->
-                                                        { bech32: String -> state.mentionDisplayName(bech32) }
-                                                    }
+                                                    )
                                                 }
-                                            val projectedReplyBody =
-                                                remember(replyingTo, messageTextCopy) {
-                                                    MessageProjector.displayBody(replyingTo, messageTextCopy)
+                                        val profileRevision = appState?.profileRevisionForCompose
+                                        val replyMentionDisplayName =
+                                            remember(appState, profileRevision) {
+                                                appState?.let { state ->
+                                                    { bech32: String -> state.mentionDisplayName(bech32) }
                                                 }
-                                            val replyBody =
-                                                replyingToDisplay?.body
-                                                    ?: remember(
-                                                        replyingTo,
-                                                        projectedReplyBody,
-                                                        mediaFallback,
-                                                        messageTextCopy,
-                                                    ) {
-                                                        replyBodyWithTypedMediaFallback(
-                                                            plaintext = replyingTo.plaintext,
-                                                            projectedBody = projectedReplyBody,
-                                                            mediaFallback = mediaFallback,
-                                                            copy = messageTextCopy,
-                                                        )
-                                                    }
-                                            ReplyPreviewCard(
-                                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                                contentColor = MaterialTheme.colorScheme.onSurface,
-                                                secondaryColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                accentColor = MaterialTheme.colorScheme.primary,
-                                                senderTitle =
-                                                    if (replyingTo.direction == "sent") {
-                                                        stringResource(R.string.reply_you)
-                                                    } else {
-                                                        appState?.displayName(replyingTo.sender)
-                                                            ?: replyingTo.sender.take(8)
-                                                    },
-                                                isOwn = replyingTo.direction == "sent",
-                                                body = replyBody,
-                                                mediaKind = mediaKind,
-                                                mediaFileName =
-                                                    replyingToDisplay?.mediaFileName ?: mediaFallback?.filename,
-                                                mediaType = replyingToDisplay?.mediaType ?: mediaFallback?.mediaType,
-                                                warning = replyingToDisplay?.warning,
-                                                onClick = null,
-                                                onDismiss = onCancelReply,
-                                                mentionDisplayName = replyMentionDisplayName,
-                                            )
-                                        }
+                                            }
+                                        val projectedReplyBody =
+                                            remember(replyingTo, messageTextCopy) {
+                                                MessageProjector.displayBody(replyingTo, messageTextCopy)
+                                            }
+                                        val replyBody =
+                                            replyingToDisplay?.body
+                                                ?: remember(
+                                                    replyingTo,
+                                                    projectedReplyBody,
+                                                    mediaFallback,
+                                                    messageTextCopy,
+                                                ) {
+                                                    replyBodyWithTypedMediaFallback(
+                                                        plaintext = replyingTo.plaintext,
+                                                        projectedBody = projectedReplyBody,
+                                                        mediaFallback = mediaFallback,
+                                                        copy = messageTextCopy,
+                                                    )
+                                                }
+                                        ReplyPreviewCard(
+                                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                            contentColor = MaterialTheme.colorScheme.onSurface,
+                                            secondaryColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            accentColor = MaterialTheme.colorScheme.primary,
+                                            senderTitle =
+                                                if (replyingTo.direction == "sent") {
+                                                    stringResource(R.string.reply_you)
+                                                } else {
+                                                    appState?.displayName(replyingTo.sender)
+                                                        ?: replyingTo.sender.take(8)
+                                                },
+                                            isOwn = replyingTo.direction == "sent",
+                                            body = replyBody,
+                                            mediaKind = mediaKind,
+                                            mediaFileName =
+                                                replyingToDisplay?.mediaFileName ?: mediaFallback?.filename,
+                                            mediaType = replyingToDisplay?.mediaType ?: mediaFallback?.mediaType,
+                                            warning = replyingToDisplay?.warning,
+                                            onClick = null,
+                                            onDismiss = onCancelReply,
+                                            mentionDisplayName = replyMentionDisplayName,
+                                        )
                                     }
                                 }
                             }
@@ -1440,7 +1393,12 @@ internal fun ComposerBar(
                                 replyingTo != null ||
                                 dictationActiveInComposer ||
                                 hasPendingAttachments,
-                        compactEditTextSpacing = editingMessageId != null,
+                        sendAccessoryContent =
+                            if (editingMessageId != null) {
+                                { ComposerEditPill(onCancelEdit = onCancelEdit) }
+                            } else {
+                                null
+                            },
                         onMultilineControlsChanged = { composerUsesMultilineControls = it },
                         multilineControlsSuppressed = composerMultilineControlsSuppressed(automaticComposerCeiling),
                         dismissInProgress = composerDismissInProgress,
@@ -1497,7 +1455,6 @@ internal fun ComposerBar(
                                 contentColor = actionColors.content,
                                 description = stringResource(R.string.send),
                                 icon = R.drawable.ic_arrow_upward,
-                                visualOffsetY = if (editingMessageId != null) (-8).dp else 0.dp,
                             )
                         }
                     }

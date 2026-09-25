@@ -4,7 +4,6 @@ import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -35,12 +34,11 @@ internal fun ComposerActionDisc(
     @DrawableRes icon: Int,
     enabled: Boolean = true,
     width: Dp = 40.dp,
-    visualOffsetY: Dp = 0.dp,
 ) {
     val outline = amoledOutlineBorder()
     IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.width(width).height(48.dp)) {
         Surface(
-            modifier = Modifier.size(32.dp).offset(y = visualOffsetY),
+            modifier = Modifier.size(32.dp),
             shape = CircleShape,
             color = if (outline == null) containerColor else MaterialTheme.colorScheme.surface,
             contentColor = if (outline == null) contentColor else MaterialTheme.colorScheme.onSurface,
