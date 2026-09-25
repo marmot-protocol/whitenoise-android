@@ -47,6 +47,11 @@ class FocusedMessageImeScreenshotTest {
     }
 
     @Test
+    fun captionedMediaAtLargeFontKeepsFooterVisible() {
+        capture("focused_overlay_keyboard_captioned_media_large_font_dark", dark = true, fontScale = 2f, media = true)
+    }
+
+    @Test
     fun tallMediaKeepsActionsVisible() {
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -84,6 +89,7 @@ class FocusedMessageImeScreenshotTest {
         dark: Boolean,
         fontScale: Float,
         longText: Boolean = false,
+        media: Boolean = false,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = dark, fontScale = fontScale) {
@@ -134,7 +140,19 @@ class FocusedMessageImeScreenshotTest {
                             time = "12:34",
                             status = MessageStatus.Received,
                             showStatus = false,
-                            reply = if (longText) ({ Text("Quoted reply with two lines of context") }) else null,
+                            reply = if (longText || media) ({ Text("Quoted reply with two lines of context") }) else null,
+                            media =
+                                if (media) {
+                                    {
+                                        Box(
+                                            Modifier
+                                                .size(200.dp, 400.dp)
+                                                .background(MaterialTheme.colorScheme.primaryContainer),
+                                        ) { Text("Portrait media") }
+                                    }
+                                } else {
+                                    null
+                                },
                         )
                     },
                 )

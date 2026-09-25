@@ -11,6 +11,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -59,7 +60,7 @@ class FocusedMessageImeOverlayTest {
     @Test
     fun longTextPreviewAtLargeFontKeepsDeleteReachable() {
         var deletes = 0
-        showLongTextMenu { deletes++ }
+        showLongTextMenu(onDelete = { deletes++ })
         composeRule.waitForIdle()
 
         val preview = composeRule.onNodeWithTag("message-actions-preview").fetchSemanticsNode().boundsInRoot
@@ -91,7 +92,32 @@ class FocusedMessageImeOverlayTest {
         composeRule.runOnIdle { assertEquals(1, deletes) }
     }
 
-    private fun showLongTextMenu(onDelete: () -> Unit) {
+    @Test
+    fun tallMediaPreviewAtLargeFontKeepsArtworkAndFooterInsideShortFrame() {
+        showLongTextMenu(onDelete = {}, preview = { tallMediaPreview() })
+        composeRule.waitForIdle()
+
+        val preview = composeRule.onNodeWithTag("message-actions-preview").fetchSemanticsNode().boundsInRoot
+        assertPreviewWithinFrame(preview, "the media preview must fit the short frame")
+        val artwork = composeRule.onNodeWithTag("focused-test-artwork", useUnmergedTree = true)
+        val mediaViewport = composeRule.onNodeWithTag("message-actions-media-viewport", useUnmergedTree = true)
+        val footer = composeRule.onNodeWithText("12:34", useUnmergedTree = true)
+        artwork.assertIsDisplayed()
+        mediaViewport.assertIsDisplayed()
+        footer.assertIsDisplayed()
+        with(composeRule.density) {
+            val artworkBounds = mediaViewport.getUnclippedBoundsInRoot()
+            val footerBounds = footer.getUnclippedBoundsInRoot()
+            assertTrue("some artwork must remain visible", artworkBounds.top.toPx() >= preview.top)
+            assertTrue("artwork must not cover the footer", artworkBounds.bottom.toPx() <= footerBounds.top.toPx())
+            assertTrue("footer must fit the preview", footerBounds.bottom.toPx() <= preview.bottom)
+        }
+    }
+
+    private fun showLongTextMenu(
+        onDelete: () -> Unit,
+        preview: @Composable () -> Unit = { longTextPreview() },
+    ) {
         composeRule.setContent {
             WhiteNoiseTheme(fontScale = 2f) {
                 MessageActionMenu(
@@ -123,7 +149,7 @@ class FocusedMessageImeOverlayTest {
                     onInfo = {},
                     onDelete = onDelete,
                     previewDescription = "Long lifted text message",
-                    preview = { longTextPreview() },
+                    preview = preview,
                 )
             }
         }
@@ -140,6 +166,28 @@ class FocusedMessageImeOverlayTest {
             status = MessageStatus.Received,
             showStatus = false,
             reply = { Text("Quoted reply with two lines of context") },
+        )
+    }
+
+    @Composable
+    private fun tallMediaPreview() {
+        FocusedTextMessagePreview(
+            presentation = messageBubblePresentation(deleted = false, mine = false),
+            mine = false,
+            text = "A media caption with a few words",
+            document = null,
+            time = "12:34",
+            status = MessageStatus.Received,
+            showStatus = false,
+            reply = { Text("Quoted reply with two lines of context") },
+            media = {
+                Box(
+                    Modifier
+                        .size(200.dp, 400.dp)
+                        .background(MaterialTheme.colorScheme.primary)
+                        .testTag("focused-test-artwork"),
+                )
+            },
         )
     }
 

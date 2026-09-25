@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -165,7 +166,7 @@ internal fun FocusedTextMessagePreview(
         BoxWithConstraints {
             // A short IME viewport cannot fit the quoted reply, five lines and footer.
             // Keep the target excerpt and footer instead of clipping both out of view.
-            val compact = maxHeight < 200.dp
+            val compact = maxHeight <= 200.dp
             MessageBubbleFrame(
                 presentation = presentation,
                 highlighted = false,
@@ -178,20 +179,38 @@ internal fun FocusedTextMessagePreview(
             }
         }
     } else {
-        Column(
-            horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            reply?.invoke()
-            MediaCaptionFrame(
-                presentation = presentation,
-                highlighted = false,
-                mine = mine,
-                mentionedSelf = mentionedSelf,
-                mentionedYouLabel = mentionedYouLabel,
-                alignEnd = mine,
-                media = { media() },
-            ) { content(false) }
+        BoxWithConstraints {
+            val compact = maxHeight <= 200.dp
+            // The media envelope measures artwork before its caption. In a short IME frame a
+            // full-height artwork would otherwise consume the entire preview and clip the
+            // caption/footer. Retain an unscaled crop and reserve room for native-size text.
+            val mediaHeightLimit = (maxHeight - 100.dp).coerceAtLeast(24.dp)
+            Column(
+                horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (!compact) reply?.invoke()
+                MediaCaptionFrame(
+                    presentation = presentation,
+                    highlighted = false,
+                    mine = mine,
+                    mentionedSelf = mentionedSelf,
+                    mentionedYouLabel = mentionedYouLabel,
+                    alignEnd = mine,
+                    media = {
+                        if (compact) {
+                            Box(
+                                Modifier
+                                    .heightIn(max = mediaHeightLimit)
+                                    .clipToBounds()
+                                    .testTag("message-actions-media-viewport"),
+                            ) { media() }
+                        } else {
+                            media()
+                        }
+                    },
+                ) { content(compact) }
+            }
         }
     }
 }
