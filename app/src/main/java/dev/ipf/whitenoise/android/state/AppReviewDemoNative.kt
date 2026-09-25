@@ -6,6 +6,8 @@ import dev.ipf.marmotkit.CreateGroupOptionsFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** Android's narrow adapter to the same MDK operations used by normal sign-up and conversations. */
 @Suppress("TooManyFunctions") // Each method maps one coordinator operation to an existing MDK call.
@@ -114,10 +116,36 @@ internal class AppReviewDemoNative(
         ref: String,
         groupId: String,
     ) {
-        try {
-            appState.marmotIo { acceptGroupInvite(ref, groupId) }
-        } catch (_: MarmotKitException.GroupInviteNotPending) {
-            // An interrupted earlier acceptance already won.
+        val accepted =
+            withTimeoutOrNull(INVITE_ACCEPT_TIMEOUT_MS) {
+                var settled = false
+                while (!settled) {
+                    settled =
+                        try {
+                            appState.marmotIo { acceptGroupInvite(ref, groupId) }
+                            true
+                        } catch (_: MarmotKitException.GroupInviteNotPending) {
+                            // An interrupted earlier acceptance already won.
+                            true
+                        } catch (_: MarmotKitException.AccountWorkerBusy) {
+                            false
+                        } catch (_: MarmotKitException.AccountWorkerResponseTimedOut) {
+                            false
+                        }
+                    if (!settled) {
+                        delay(INVITE_RETRY_DELAY_MS)
+                        settled =
+                            try {
+                                invitation(ref, groupId) == ReviewDemoInvitation.Accepted
+                            } catch (_: MarmotKitException.AccountWorkerBusy) {
+                                false
+                            }
+                    }
+                }
+                true
+            }
+        if (accepted != true) {
+            throw ReviewDemoFailure(ReviewDemoProblem.OperationFailed)
         }
     }
 
@@ -195,5 +223,7 @@ internal class AppReviewDemoNative(
         const val DEMO_TIMELINE_LIMIT = 100u
         const val DEMO_NAME = "Johnny Appleseed"
         const val DEMO_ABOUT = "App Review demo profile"
+        const val INVITE_ACCEPT_TIMEOUT_MS = 90_000L
+        const val INVITE_RETRY_DELAY_MS = 500L
     }
 }
