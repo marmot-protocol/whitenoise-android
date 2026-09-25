@@ -74,7 +74,7 @@ class MessageBubbleChromeScreenshotTest {
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/message_bubble_chrome_dark.png")
     }
 
-    /** Long captions widen narrow portrait media while preserving directional media alignment. */
+    /** Long captions widen the frame and center narrow portrait media without stretching it. */
     @Test
     fun narrowMediaWithLongCaptionsUsesReadableSharedWidth() {
         composeRule.setContent {

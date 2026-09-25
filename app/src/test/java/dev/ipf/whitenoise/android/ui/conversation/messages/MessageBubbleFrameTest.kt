@@ -407,9 +407,9 @@ class MessageBubbleFrameTest {
         }
     }
 
-    /** Substantial supplemental content widens a narrow media frame without stretching the media. */
+    /** Substantial content widens the frame and centers narrow media without stretching it. */
     @Test
-    fun substantialSupplementWidensNarrowMediaAndPreservesAlignment() {
+    fun substantialSupplementWidensAndCentersNarrowMedia() {
         composeRule.setContent {
             Column {
                 listOf(false, true).forEach { alignEnd ->
@@ -439,11 +439,7 @@ class MessageBubbleFrameTest {
                 val media = composeRule.onNodeWithTag("narrow-media-$alignEnd").fetchSemanticsNode().boundsInRoot
                 assertEquals(240f, envelope.width, 1f)
                 assertEquals(80f, media.width, 1f)
-                if (alignEnd) {
-                    assertEquals(envelope.right, media.right, 1f)
-                } else {
-                    assertEquals(envelope.left, media.left, 1f)
-                }
+                assertEquals(envelope.center.x, media.center.x, 1f)
             }
         }
     }

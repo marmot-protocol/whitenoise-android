@@ -177,7 +177,9 @@ internal fun MediaCaptionFrame(
  * landscape image, grid, or voice note may consume the available width while
  * a portrait image can keep its fixed card width. The real media measurement
  * remains one source of truth; the supplement's intrinsic width can only widen
- * the shared frame and never resizes or stretches the media child.
+ * the shared frame and never resizes or stretches the media child. When that
+ * happens, the media block is centered in the wider frame, matching Signal's
+ * bounded-thumbnail treatment instead of leaving one large empty side.
  */
 @Composable
 @Suppress("FunctionNaming")
@@ -214,7 +216,7 @@ internal fun MediaSupplementEnvelope(
 
         val measuredHeight = mediaPlaceable.height + supplementPlaceable.height
         layout(envelopeWidth, constraints.constrainHeight(measuredHeight)) {
-            val mediaX = if (alignEnd) envelopeWidth - mediaPlaceable.width else 0
+            val mediaX = ((envelopeWidth - mediaPlaceable.width) / 2).coerceAtLeast(0)
             mediaPlaceable.placeRelative(mediaX, 0)
             supplementPlaceable.placeRelative(0, mediaPlaceable.height)
         }
