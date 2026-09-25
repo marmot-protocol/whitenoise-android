@@ -6,8 +6,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.ipf.whitenoise.android.BuildConfig
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -325,13 +325,15 @@ internal class AppReviewDemo(
     var hasSavedSetup by mutableStateOf(false)
         private set
 
-    private val initialLoad = scope.launch {
-        val (loadedStatus, saved) = withContext(ioDispatcher) {
-            initialStatus() to store.hasRecord
+    private val initialLoad =
+        scope.launch {
+            val (loadedStatus, saved) =
+                withContext(ioDispatcher) {
+                    initialStatus() to store.hasRecord
+                }
+            status = loadedStatus
+            hasSavedSetup = saved
         }
-        status = loadedStatus
-        hasSavedSetup = saved
-    }
 
     val canBegin: Boolean
         get() = backend.foregroundReady && initialLoad.isCompleted
@@ -356,18 +358,19 @@ internal class AppReviewDemo(
 
     fun clearSavedSetup() {
         if (task?.isActive == true) return
-        task = scope.launch {
-            initialLoad.join()
-            try {
-                withContext(ioDispatcher) { store.clear() }
-                hasSavedSetup = false
-                status = ReviewDemoStatus.Idle
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                status = ReviewDemoStatus.Failed(ReviewDemoStage.Preparing, ReviewDemoProblem.OperationFailed)
+        task =
+            scope.launch {
+                initialLoad.join()
+                try {
+                    withContext(ioDispatcher) { store.clear() }
+                    hasSavedSetup = false
+                    status = ReviewDemoStatus.Idle
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    status = ReviewDemoStatus.Failed(ReviewDemoStage.Preparing, ReviewDemoProblem.OperationFailed)
+                }
             }
-        }
     }
 
     fun reportOpenFailure() {
