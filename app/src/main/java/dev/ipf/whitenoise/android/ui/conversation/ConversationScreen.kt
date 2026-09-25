@@ -126,11 +126,11 @@ import dev.ipf.whitenoise.android.state.advanceConversationReadAnchor
 import dev.ipf.whitenoise.android.state.attachmentsFor
 import dev.ipf.whitenoise.android.state.chatCreateOpenConversationTimingStage
 import dev.ipf.whitenoise.android.state.conversationWindowCanReportVisible
-import dev.ipf.whitenoise.android.state.countUnreadIncoming
 import dev.ipf.whitenoise.android.state.currentTtsConversationDestination
 import dev.ipf.whitenoise.android.state.hasKnownTranscriptPresentation
 import dev.ipf.whitenoise.android.state.loadMessageAvailability
 import dev.ipf.whitenoise.android.state.loadUntilMessageAvailable
+import dev.ipf.whitenoise.android.state.logUnreadBadgeTransition
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
 import dev.ipf.whitenoise.android.state.markComposerReadyForPresentationTiming
 import dev.ipf.whitenoise.android.state.markPagingEvent
@@ -1429,35 +1429,36 @@ internal fun ConversationScreen(
             )
         }
     }
-    val unreadIncomingCount by
-        remember(
-            controller,
-            chat.id,
-            projectedUnreadCount,
-            entryProjectionAvailable,
-        ) {
-            derivedStateOf {
-                if (!initialTimelineAnchored) {
-                    0
-                } else {
-                    countUnreadIncoming(
-                        timeline = controller.timeline,
-                        readAnchorMessageId = readAnchorMessageId,
-                        missingAnchorUnreadCount = projectedUnreadCount.takeIf { entryProjectionAvailable },
-                    )
-                }
-            }
-        }
+    // One owner for the badge's number (#2726): it follows the loaded rows while the read anchor is
+    // among them and holds while paging moves the anchor off screen, so a history page can never
+    // switch the count between the rows and the projection or count the loaded window itself.
+    val unreadBadgeUi =
+        rememberConversationUnreadBadgeCount(
+            identity = Triple(controller, chat.id, entryUnreadSessionIdentity),
+            anchored = initialTimelineAnchored,
+            timeline = controller.timeline,
+            readAnchorMessageId = readAnchorMessageId,
+            projectionUnread = projectedUnreadCount.takeIf { entryProjectionAvailable },
+            windowReachesTail = !controller.hasMoreAfterTimeline,
+            onTransition = { before, after ->
+                logUnreadBadgeTransition("DMConversation", before, after, controller.timeline.size)
+            },
+        )
+    // The first composition after anchoring has not reconciled yet; exposing 0 there would retire the
+    // two-stage jump target, so the count and its consumers wait for the first reconciliation.
+    val badgeReconciled = unreadBadgeUi.reconciled
+    val unreadIncomingCount = unreadBadgeUi.count
     LaunchedEffect(
         controller,
         initialTimelineAnchored,
         renderedTimeline,
         readAnchorMessageId,
+        badgeReconciled,
         unreadIncomingCount,
         nearBottom,
         unreadJumpState,
     ) {
-        if (!initialTimelineAnchored) return@LaunchedEffect
+        if (!badgeReconciled) return@LaunchedEffect
         unreadJumpState =
             reconcileConversationUnreadJump(
                 current = unreadJumpState,
