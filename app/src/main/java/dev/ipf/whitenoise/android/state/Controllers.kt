@@ -7447,6 +7447,7 @@ class ConversationController(
      * (#279).
      */
     fun onCleared() {
+        cancelMessageEdit()
         synchronized(liveSubscriptionLock) {
             controllerCleared = true
             memberRosterRefreshGeneration.advance()

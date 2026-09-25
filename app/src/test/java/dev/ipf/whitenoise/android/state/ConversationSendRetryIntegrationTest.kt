@@ -119,6 +119,74 @@ class ConversationSendRetryIntegrationTest {
             }
         }
 
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun replacingControllerDispatchesTheSubmittedRevisionAfterOriginalConfirms() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val releaseOriginal = CompletableDeferred<Unit>()
+            val publishedEdit = CompletableDeferred<Pair<String, String>>()
+            var editCalls = 0
+            val appState = appState()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    groupRosterReader = { _, _ -> authoritativeRoster() },
+                    textPublisher = { _, _, _, _ ->
+                        releaseOriginal.await()
+                        successfulSendSummary()
+                    },
+                    messageEditPublisher = { _, _, target, text ->
+                        editCalls += 1
+                        publishedEdit.complete(target to text)
+                    },
+                )
+            var replacement: ConversationController? = null
+
+            try {
+                controller.retryMembers()
+                assertTrue(controller.canSendMessages)
+                val original = async(start = CoroutineStart.UNDISPATCHED) { controller.send("original") }
+                val clientToken = controller.timeline.single().record.messageIdHex
+                controller.beginMessageEdit(clientToken)
+                controller.send("revision A")
+                controller.beginMessageEdit(clientToken)
+
+                releaseOriginal.complete(Unit)
+                original.await()
+                val handoffKey = "$ACCOUNT_REF|$GROUP_ID|$clientToken"
+                assertTrue(appState.pendingMessageEditHandoff.hasSession(handoffKey))
+
+                controller.onCleared()
+                val recreated =
+                    ConversationController(
+                        appState = appState,
+                        initialGroup = group(),
+                        initialMemberSnapshot = memberSnapshot(),
+                        groupRosterReader = { _, _ -> authoritativeRoster() },
+                    )
+                replacement = recreated
+                assertFalse(appState.pendingMessageEditHandoff.hasSession(handoffKey))
+                recreated.cancelMessageEdit()
+                runCurrent()
+
+                assertEquals(
+                    CONFIRMED_MESSAGE_ID to "revision A",
+                    withTimeout(5_000) { publishedEdit.await() },
+                )
+                controller.onCleared()
+                recreated.onCleared()
+                assertEquals(1, editCalls)
+            } finally {
+                releaseOriginal.complete(Unit)
+                replacement?.onCleared()
+                controller.onCleared()
+                Dispatchers.resetMain()
+            }
+        }
+
     /** Exact caller identity settles only its bubble even when text and timestamps are identical. */
     @Test
     fun callerTokenReconcilesIdenticalOptimisticMessagesWithoutHeuristics() =
