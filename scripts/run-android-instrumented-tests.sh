@@ -7,6 +7,11 @@ event_name="${1:-}"
 review_demo_e2e="${2:-false}"
 document_provider_matrix="${3:-false}"
 
+if [[ "$event_name" == "workflow_dispatch" && "$review_demo_e2e" == "true" && "$document_provider_matrix" == "true" ]]; then
+  echo "Select one opt-in instrumented suite per dispatch" >&2
+  exit 2
+fi
+
 if [[ "$event_name" == "workflow_dispatch" && "$review_demo_e2e" == "true" ]]; then
   exec ./scripts/run-review-demo-e2e.sh
 fi

@@ -7,6 +7,8 @@ import androidx.compose.runtime.setValue
 import dev.ipf.whitenoise.android.BuildConfig
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
@@ -311,19 +313,28 @@ internal class AppReviewDemo(
     private val backend: ReviewDemoBackend,
     private val store: ReviewDemoStore,
     private val scope: CoroutineScope,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
-    var status by mutableStateOf<ReviewDemoStatus>(initialStatus())
+    var status by mutableStateOf<ReviewDemoStatus>(ReviewDemoStatus.Idle)
         private set
 
     /** Debug-only native failure detail for disposable device tests; never shown in the UI. */
     internal var debugFailure: Throwable? = null
         private set
 
-    val hasSavedSetup: Boolean
-        get() = store.hasRecord
+    var hasSavedSetup by mutableStateOf(false)
+        private set
+
+    private val initialLoad = scope.launch {
+        val (loadedStatus, saved) = withContext(ioDispatcher) {
+            initialStatus() to store.hasRecord
+        }
+        status = loadedStatus
+        hasSavedSetup = saved
+    }
 
     val canBegin: Boolean
-        get() = backend.foregroundReady
+        get() = backend.foregroundReady && initialLoad.isCompleted
 
     private var task: Job? = null
 
@@ -333,6 +344,8 @@ internal class AppReviewDemo(
         debugFailure = null
         task =
             scope.launch {
+                initialLoad.join()
+                if (status is ReviewDemoStatus.Ready) return@launch
                 run(onReady)
             }
     }
@@ -343,8 +356,18 @@ internal class AppReviewDemo(
 
     fun clearSavedSetup() {
         if (task?.isActive == true) return
-        store.clear()
-        status = ReviewDemoStatus.Idle
+        task = scope.launch {
+            initialLoad.join()
+            try {
+                withContext(ioDispatcher) { store.clear() }
+                hasSavedSetup = false
+                status = ReviewDemoStatus.Idle
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                status = ReviewDemoStatus.Failed(ReviewDemoStage.Preparing, ReviewDemoProblem.OperationFailed)
+            }
+        }
     }
 
     fun reportOpenFailure() {
@@ -362,6 +385,11 @@ internal class AppReviewDemo(
         } catch (failure: ReviewDemoFailure) {
             ReviewDemoStatus.Failed(ReviewDemoStage.Preparing, failure.problem)
         }
+
+    private suspend fun save(checkpoint: ReviewDemoCheckpoint) {
+        withContext(ioDispatcher) { store.save(checkpoint) }
+        hasSavedSetup = true
+    }
 
     @Suppress("TooGenericExceptionCaught", "CyclomaticComplexMethod", "LongMethod", "ThrowsCount")
     private suspend fun run(onReady: (String, String) -> Unit) {
@@ -400,7 +428,7 @@ internal class AppReviewDemo(
             if (!backend.foregroundReady) throw ReviewDemoFailure(ReviewDemoProblem.Unavailable)
             status = ReviewDemoStatus.Running(stage)
             val accounts = backend.accounts()
-            val saved = store.load()
+            val saved = withContext(ioDispatcher) { store.load() }
             var checkpoint =
                 saved ?: run {
                     val original =
@@ -411,7 +439,7 @@ internal class AppReviewDemo(
                         originalRef = original.ref,
                         originalId = original.id,
                         initialAccountRefs = accounts.map(ReviewDemoAccount::ref).toSet(),
-                    ).also(store::save)
+                    ).also { save(it) }
                 }
             originalRef = checkpoint.originalRef
             val original =
@@ -433,7 +461,7 @@ internal class AppReviewDemo(
             }
             if (checkpoint.demoRef == null) {
                 checkpoint = checkpoint.copy(demoRef = demo.ref, demoId = demo.id)
-                store.save(checkpoint)
+                save(checkpoint)
             }
             requireOwned()
             backend.qualifyAccount(demo.ref)
@@ -447,7 +475,7 @@ internal class AppReviewDemo(
                 // response can therefore be reconciled without a second event.
                 if (!backend.profilePublished(demo.id)) backend.publishProfile(demo.ref)
                 checkpoint = checkpoint.copy(profilePublished = true)
-                store.save(checkpoint)
+                save(checkpoint)
             }
 
             stage = ReviewDemoStage.CreatingConversation
@@ -467,7 +495,7 @@ internal class AppReviewDemo(
                             backend.existingDirectConversation(original.ref, demo.id) ?: throw failure
                         }
                     checkpoint = checkpoint.copy(groupId = id)
-                    store.save(checkpoint)
+                    save(checkpoint)
                     id
                 }
 
@@ -528,7 +556,7 @@ internal class AppReviewDemo(
             status = ReviewDemoStatus.Running(stage)
             activate(original.ref)
             checkpoint = checkpoint.copy(completed = true)
-            store.save(checkpoint)
+            save(checkpoint)
             status = ReviewDemoStatus.Ready(original.ref, groupId)
             runCatching { onReady(original.ref, groupId) }
         } catch (_: CancellationException) {
@@ -688,7 +716,7 @@ internal class AppReviewDemo(
         }
         requireOwned()
         val attempted = checkpoint.copy(reactionAttempts = checkpoint.reactionAttempts + step)
-        store.save(attempted)
+        save(attempted)
         backend.submitReaction(sender.ref, groupId, targetId, emoji)
         waitForReaction(sender.ref, groupId, targetId, sender.id, emoji, requireOwned)
         return attempted

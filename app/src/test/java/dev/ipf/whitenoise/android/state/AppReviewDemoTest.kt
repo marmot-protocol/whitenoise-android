@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -24,11 +25,29 @@ class AppReviewDemoTest {
     private val group = "c".repeat(64)
 
     @Test
+    fun initialReceiptLoadsAsynchronouslyIntoSnapshotState() =
+        runTest {
+            val store = MemoryStore(checkpoint(groupId = group, demoRef = johnny.ref, demoId = johnny.id, completed = true))
+            val demo = AppReviewDemo(FakeBackend(), store, this, StandardTestDispatcher(testScheduler))
+
+            assertEquals(ReviewDemoStatus.Idle, demo.status)
+            assertFalse(demo.hasSavedSetup)
+            advanceUntilIdle()
+            assertEquals(ReviewDemoStatus.Ready(original.ref, group), demo.status)
+            assertTrue(demo.hasSavedSetup)
+
+            demo.clearSavedSetup()
+            advanceUntilIdle()
+            assertFalse(demo.hasSavedSetup)
+            assertEquals(ReviewDemoStatus.Idle, demo.status)
+        }
+
+    @Test
     fun setupCreatesOneConversationAndVerifiesBothAccounts() =
         runTest {
             val backend = FakeBackend()
             val store = MemoryStore()
-            val demo = AppReviewDemo(backend, store, this)
+            val demo = AppReviewDemo(backend, store, this, StandardTestDispatcher(testScheduler))
             val openings = mutableListOf<Pair<String, String>>()
 
             demo.start { account, groupId -> openings += account to groupId }
@@ -71,7 +90,7 @@ class AppReviewDemoTest {
                         )
                 }
             val store = MemoryStore(checkpoint(demoRef = johnny.ref, demoId = johnny.id, groupId = group))
-            val demo = AppReviewDemo(backend, store, this)
+            val demo = AppReviewDemo(backend, store, this, StandardTestDispatcher(testScheduler))
 
             demo.start()
             advanceUntilIdle()
@@ -101,7 +120,7 @@ class AppReviewDemoTest {
                         reactionAttempts = setOf("johnny_like"),
                     ),
                 )
-            val demo = AppReviewDemo(backend, store, this)
+            val demo = AppReviewDemo(backend, store, this, StandardTestDispatcher(testScheduler))
 
             demo.start()
             advanceUntilIdle()
@@ -119,7 +138,7 @@ class AppReviewDemoTest {
         runTest {
             val backend = FakeBackend().apply { accountList.clear() }
             val store = MemoryStore(checkpoint())
-            val demo = AppReviewDemo(backend, store, this)
+            val demo = AppReviewDemo(backend, store, this, StandardTestDispatcher(testScheduler))
 
             demo.start()
             advanceUntilIdle()
@@ -137,7 +156,7 @@ class AppReviewDemoTest {
     fun missingCrossAccountDeliveryNeverReportsReady() =
         runTest {
             val backend = FakeBackend().apply { crossDeliveryEnabled = false }
-            val demo = AppReviewDemo(backend, MemoryStore(), this)
+            val demo = AppReviewDemo(backend, MemoryStore(), this, StandardTestDispatcher(testScheduler))
 
             demo.start()
             advanceUntilIdle()
@@ -154,7 +173,7 @@ class AppReviewDemoTest {
     fun secondOriginalMessageMustReachJohnnyBeforeReady() =
         runTest {
             val backend = FakeBackend().apply { blockedDeliveryStep = "original_privacy" }
-            val demo = AppReviewDemo(backend, MemoryStore(), this)
+            val demo = AppReviewDemo(backend, MemoryStore(), this, StandardTestDispatcher(testScheduler))
 
             demo.start()
             advanceUntilIdle()
@@ -171,7 +190,7 @@ class AppReviewDemoTest {
     fun lostCreateReplyReusesTheProjectedConversation() =
         runTest {
             val backend = FakeBackend().apply { loseGroupCreateReply = true }
-            val demo = AppReviewDemo(backend, MemoryStore(), this)
+            val demo = AppReviewDemo(backend, MemoryStore(), this, StandardTestDispatcher(testScheduler))
 
             demo.start()
             advanceUntilIdle()
@@ -185,7 +204,7 @@ class AppReviewDemoTest {
         runTest {
             val backend = FakeBackend().apply { loseProfileReply = true }
             val store = MemoryStore()
-            val demo = AppReviewDemo(backend, store, this)
+            val demo = AppReviewDemo(backend, store, this, StandardTestDispatcher(testScheduler))
 
             demo.start()
             advanceUntilIdle()
@@ -206,7 +225,7 @@ class AppReviewDemoTest {
         runTest {
             val backend = FakeBackend().apply { loseFirstMessageReply = true }
             val store = MemoryStore()
-            val demo = AppReviewDemo(backend, store, this)
+            val demo = AppReviewDemo(backend, store, this, StandardTestDispatcher(testScheduler))
 
             demo.start()
             advanceUntilIdle()
@@ -224,7 +243,7 @@ class AppReviewDemoTest {
     fun changedRuntimeOwnerStopsSetupWithoutSwitchingBack() =
         runTest {
             val backend = FakeBackend().apply { changeOwnerOnCreate = true }
-            val demo = AppReviewDemo(backend, MemoryStore(), this)
+            val demo = AppReviewDemo(backend, MemoryStore(), this, StandardTestDispatcher(testScheduler))
 
             demo.start()
             advanceUntilIdle()
@@ -242,7 +261,7 @@ class AppReviewDemoTest {
         runTest {
             val backend = FakeBackend().apply { activeAccountRef = "other" }
             val store = MemoryStore(checkpoint(demoRef = johnny.ref, demoId = johnny.id))
-            val demo = AppReviewDemo(backend, store, this)
+            val demo = AppReviewDemo(backend, store, this, StandardTestDispatcher(testScheduler))
 
             demo.start()
             advanceUntilIdle()
@@ -260,7 +279,7 @@ class AppReviewDemoTest {
         runTest {
             val backend = FakeBackend().apply { accountReady = false }
             val store = MemoryStore()
-            val demo = AppReviewDemo(backend, store, this)
+            val demo = AppReviewDemo(backend, store, this, StandardTestDispatcher(testScheduler))
 
             demo.start()
             runCurrent()
@@ -280,7 +299,7 @@ class AppReviewDemoTest {
     fun activationRefreshFailureStillRestoresOriginalAccount() =
         runTest {
             val backend = FakeBackend().apply { failAfterFirstActivation = true }
-            val demo = AppReviewDemo(backend, MemoryStore(), this)
+            val demo = AppReviewDemo(backend, MemoryStore(), this, StandardTestDispatcher(testScheduler))
 
             demo.start()
             advanceUntilIdle()
@@ -297,11 +316,12 @@ class AppReviewDemoTest {
         runTest {
             val backend = FakeBackend()
             val store = MemoryStore()
-            val demo = AppReviewDemo(backend, store, this)
+            val demo = AppReviewDemo(backend, store, this, StandardTestDispatcher(testScheduler))
             demo.start()
             advanceUntilIdle()
 
             demo.clearSavedSetup()
+            advanceUntilIdle()
 
             assertFalse(store.hasRecord)
             assertEquals(ReviewDemoStatus.Idle, demo.status)
@@ -372,6 +392,7 @@ class AppReviewDemoTest {
         demoId: String? = null,
         groupId: String? = null,
         reactionAttempts: Set<String> = emptySet(),
+        completed: Boolean = false,
     ) = ReviewDemoCheckpoint(
         RUN_ID,
         original.ref,
@@ -381,6 +402,7 @@ class AppReviewDemoTest {
         demoId,
         groupId,
         reactionAttempts = reactionAttempts,
+        completed = completed,
     )
 
     private inner class FakeBackend : ReviewDemoBackend {

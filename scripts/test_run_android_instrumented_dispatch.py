@@ -27,3 +27,8 @@ class InstrumentedDispatchTest(unittest.TestCase):
 
     def test_document_provider_dispatch_remains_available(self):
         self.assertEqual(self.run_dispatch("workflow_dispatch", "false", "true"), "run-document-provider-matrix.sh")
+
+    def test_both_opt_in_suites_are_rejected(self):
+        with self.assertRaises(subprocess.CalledProcessError) as caught:
+            self.run_dispatch("workflow_dispatch", "true", "true")
+        self.assertIn("Select one", caught.exception.stderr)
