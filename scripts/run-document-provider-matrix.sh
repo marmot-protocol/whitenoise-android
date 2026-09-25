@@ -39,6 +39,14 @@ fi
 adb install -r -t "$fixture_apk"
 adb install -r -t "${app_apks[0]}"
 adb install -r -t "${test_apks[0]}"
+adb shell pm path dev.ipf.fixture | grep -q '^package:' || {
+  echo "Document fixture package was not installed" >&2
+  exit 1
+}
+adb shell content query --uri content://dev.ipf.fixture.status/viewer | grep -q 'Row: 0' || {
+  echo "Document fixture status provider did not register" >&2
+  exit 1
+}
 
 report_dir=app/build/reports/document-provider-matrix
 mkdir -p "$report_dir"

@@ -3,5 +3,6 @@
     <!-- The opt-in preview emulator matrix reads a separate fixture package. -->
     <queries>
         <package android:name="dev.ipf.fixture" />
+        <provider android:authorities="dev.ipf.fixture.documents;dev.ipf.fixture.status" />
     </queries>
 </manifest>
