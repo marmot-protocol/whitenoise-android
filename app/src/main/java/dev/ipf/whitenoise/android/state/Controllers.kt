@@ -7514,6 +7514,8 @@ class ConversationController(
                     )
                 // An authoritative window is the recovery a stood-down prefetch was waiting
                 // for, so the viewport may ask for more content in either direction (#2764).
+                // A reader parked at the start of history therefore asks once more per live
+                // batch, which is bounded by arrivals rather than by layout passes (#2727).
                 automaticPaging.reset()
                 publishRecoveryTimelineProjection(batch.mapNotNull { it.recoveryGeneration }.maxOrNull())
                 // Scroll-driven mark-read in the UI layer handles
@@ -11390,6 +11392,9 @@ class ConversationController(
             hasMoreBefore = applied.hasMoreBefore
             hasMoreAfter = applied.hasMoreAfter
         }
+        // A rebuilt window is a new place in history, so a prefetch that stood down at the old
+        // edge gets to ask again from here (#2727).
+        if (replaceWindow || prepared.mode == WindowApplyMode.REPLACE) automaticPaging.reset()
         // Rows this page kept skip re-projection, so their projected items still carry the ordinal
         // from where the window used to sit. Display sorts on that ordinal, so re-stamp it before
         // publishing or a slid window would reorder history the reader is looking at.

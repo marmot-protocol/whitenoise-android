@@ -103,6 +103,8 @@ internal suspend fun ConversationController.loadOlderPageInternal(
         val outcome = pageOlderIfActive(subscription, anchorId, trace)
         when (outcome) {
             null -> ConversationPageLoad.INACTIVE
+            // Reported without the origin on purpose: a deadline or not-ready older page arms the
+            // header's visible retry row whoever asked for it, unlike the quiet forward recovery.
             is TimelinePageOutcome.Unchanged -> unchangedPageLoad(outcome, ConversationSearchPageDirection.OLDER)
             is TimelinePageOutcome.Advanced -> {
                 val appliedAtMs = SystemClock.elapsedRealtime()
@@ -132,7 +134,7 @@ internal suspend fun ConversationController.loadOlderPageInternal(
             }
         }.also { load ->
             trace.recordCompletion(load, startedMs)
-            settleOlderPrefetchGuard(load, automatic)
+            settleOlderPrefetchGuard(load, automatic && outcome is TimelinePageOutcome.Advanced)
         }
     } catch (cancel: CancellationException) {
         // A cancelled page used to leave no trace at all, so a tester could not tell it from one
@@ -149,17 +151,19 @@ internal suspend fun ConversationController.loadOlderPageInternal(
 }
 
 /**
- * Feeds one answered older page to the automatic prefetch guard: rows that arrived release it in
- * every case, while an automatic page that brought none counts against it. Deadline and not-ready
- * outcomes are left to the visible retry row that already blocks the prefetch.
+ * Feeds one older page to the automatic prefetch guard: rows that arrived release it in every
+ * case, while an automatic page the engine answered with a window holding nothing older counts
+ * against it. Only an answered window counts, [answeredAutomatically] is false for a superseded or
+ * closed window whose live replacement owns the answer, and deadline and not-ready outcomes are
+ * left to the visible retry row that already blocks the prefetch.
  */
 private fun ConversationController.settleOlderPrefetchGuard(
     load: ConversationPageLoad,
-    automatic: Boolean,
+    answeredAutomatically: Boolean,
 ) {
     when {
         load == ConversationPageLoad.ADVANCED -> automaticPaging.older.reset()
-        automatic && load == ConversationPageLoad.NO_PROGRESS -> automaticPaging.older.recordFailure()
+        answeredAutomatically && load == ConversationPageLoad.NO_PROGRESS -> automaticPaging.older.recordFailure()
     }
 }
 

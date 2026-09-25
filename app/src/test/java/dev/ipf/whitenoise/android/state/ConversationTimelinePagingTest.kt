@@ -354,6 +354,42 @@ class ConversationTimelinePagingTest {
             }
         }
 
+    /** A superseded window is a live replacement owning the answer, not the engine saying there is nothing older. */
+    @Test
+    fun supersededAutomaticOlderPageDoesNotStandThePrefetchDown() =
+        runBlocking {
+            val subscription = subscriptionWith(outcome(ConversationWindowUnchangedReason.SUPERSEDED), olderPage())
+            withController(subscription) { controller ->
+                settle()
+
+                val load = controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC)
+
+                assertEquals(ConversationPageLoad.NO_PROGRESS, load)
+                assertFalse(controller.automaticOlderPagingBlocked)
+                val retried = controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC)
+                assertEquals("the next automatic ask still reaches the engine", ConversationPageLoad.ADVANCED, retried)
+            }
+        }
+
+    /** A rebuilt window is a new place in history, so the prefetch may ask again from there. */
+    @Test
+    fun windowReplacementReleasesTheOlderPrefetch() =
+        runBlocking {
+            val subscription = subscriptionWith(sameWindow(), olderPage())
+            withController(subscription) { controller ->
+                settle()
+                controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC)
+                assertTrue(controller.automaticOlderPagingBlocked)
+
+                controller.testRefreshCurrentTimeline(ConversationTimelineTestIds.ACCOUNT_REF) {
+                    page(listOf(record(TARGET_ID, timelineAt = 150uL)), hasMoreBefore = true)
+                }
+                settle()
+
+                assertFalse("a replaced window releases the prefetch", controller.automaticOlderPagingBlocked)
+            }
+        }
+
     /** An authoritative live window is recovery for the older prefetch too. */
     @Test
     fun liveWindowReplacementReleasesTheOlderPrefetch() =
