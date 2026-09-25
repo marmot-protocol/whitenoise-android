@@ -206,6 +206,30 @@ class AppReviewDemoTest {
         }
 
     @Test
+    fun lostAccountCreateReplyDoesNotCreateAgainBeforeAccountAppears() =
+        runTest {
+            val backend = FakeBackend().apply {
+                loseAccountCreateReply = true
+                hideCreatedAccount = true
+            }
+            val store = MemoryStore()
+            val demo = AppReviewDemo(backend, store, this, StandardTestDispatcher(testScheduler))
+
+            demo.start()
+            advanceUntilIdle()
+            assertEquals(1, backend.accountCreates)
+            assertEquals(
+                ReviewDemoStatus.Failed(ReviewDemoStage.CreatingAccount, ReviewDemoProblem.OperationFailed),
+                demo.status,
+            )
+
+            demo.start()
+            advanceUntilIdle()
+            assertEquals(1, backend.accountCreates)
+            assertEquals(0, backend.profilePublishes)
+        }
+
+    @Test
     fun lostCreateReplyReusesTheProjectedConversation() =
         runTest {
             val backend = FakeBackend().apply { loseGroupCreateReply = true }
@@ -446,12 +470,19 @@ class AppReviewDemoTest {
         var profileStored = false
         var profilePublishes = 0
         var loseProfileReply = false
+        var loseAccountCreateReply = false
+        var hideCreatedAccount = false
 
-        override suspend fun accounts() = accountList.toList()
+        override suspend fun accounts() =
+            accountList.filter { !hideCreatedAccount || it.ref == original.ref }
 
         override suspend fun createAccount(): ReviewDemoAccount {
             accountCreates++
             accountList += johnny
+            if (loseAccountCreateReply) {
+                loseAccountCreateReply = false
+                throw IllegalStateException("lost account response")
+            }
             if (changeOwnerOnCreate) {
                 activeAccountRef = "other"
                 runtimeGeneration++
