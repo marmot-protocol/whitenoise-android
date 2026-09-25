@@ -595,21 +595,13 @@ internal class AppReviewDemo(
             }
                 ?: throw ReviewDemoFailure(ReviewDemoProblem.DemoMissing)
         }
-        val candidates = current.filter { it.ref !in checkpoint.initialAccountRefs && it.localSigning && !it.signedOut }
-        if (candidates.size > 1) throw ReviewDemoFailure(ReviewDemoProblem.AmbiguousAccount)
-        if (candidates.size == 1) return candidates.single()
-        requireOwned()
-        return try {
-            backend.createAccount()
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (failure: Exception) {
-            val after =
-                backend.accounts().filter {
-                    it.ref !in checkpoint.initialAccountRefs && it.localSigning && !it.signedOut
-                }
-            if (after.size == 1) after.single() else throw failure
+        // Without native creation provenance, a newly listed account may belong
+        // to another setup. Never publish demo data from that account.
+        if (current.any { it.ref !in checkpoint.initialAccountRefs }) {
+            throw ReviewDemoFailure(ReviewDemoProblem.AmbiguousAccount)
         }
+        requireOwned()
+        return backend.createAccount()
     }
 
     private suspend fun waitForSetup(
