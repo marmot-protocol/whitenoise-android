@@ -57,3 +57,5 @@ with wave.open(audio, "wb") as wav:
     wav.setframerate(8000)
     wav.writeframes(b"".join(struct.pack("<h", (i % 100) * 100) for i in range(8000)))
 (root / "tone.wav").write_bytes(audio.getvalue())
+# A tiny one-frame MPEG-4 fixture is checked in so CI needs no video encoder.
+(root / "clip.mp4").write_bytes((Path(__file__).parent / "fixtures" / "clip.mp4").read_bytes())
