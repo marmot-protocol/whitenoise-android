@@ -25,6 +25,7 @@ internal data class ReviewDemoCheckpoint(
     val originalRef: String,
     val originalId: String,
     val initialAccountRefs: Set<String>,
+    val accountCreationAttempted: Boolean = false,
     val demoRef: String? = null,
     val demoId: String? = null,
     val groupId: String? = null,
@@ -88,6 +89,7 @@ internal class SecureReviewDemoStore(
                     originalRef = json.getString("originalRef"),
                     originalId = json.getString("originalId"),
                     initialAccountRefs = initialRefs,
+                    accountCreationAttempted = json.optBoolean("accountCreationAttempted", true),
                     demoRef = json.optString("demoRef").takeIf(String::isNotBlank),
                     demoId = json.optString("demoId").takeIf(String::isNotBlank),
                     groupId = json.optString("groupId").takeIf(String::isNotBlank),
@@ -129,6 +131,7 @@ internal class SecureReviewDemoStore(
                 .put("originalRef", checkpoint.originalRef)
                 .put("originalId", checkpoint.originalId)
                 .put("initialRefs", JSONArray(checkpoint.initialAccountRefs.sorted()))
+                .put("accountCreationAttempted", checkpoint.accountCreationAttempted)
                 .put("profilePublished", checkpoint.profilePublished)
                 .put("reactionAttempts", JSONArray(checkpoint.reactionAttempts.sorted()))
                 .put("completed", checkpoint.completed)
@@ -463,7 +466,7 @@ internal class AppReviewDemo(
                 throw ReviewDemoFailure(ReviewDemoProblem.AmbiguousAccount)
             }
             if (checkpoint.demoRef == null) {
-                checkpoint = checkpoint.copy(demoRef = demo.ref, demoId = demo.id)
+                checkpoint = checkpoint.copy(accountCreationAttempted = true, demoRef = demo.ref, demoId = demo.id)
                 save(checkpoint)
             }
             requireOwned()
@@ -600,6 +603,11 @@ internal class AppReviewDemo(
         if (current.any { it.ref !in checkpoint.initialAccountRefs }) {
             throw ReviewDemoFailure(ReviewDemoProblem.AmbiguousAccount)
         }
+        // A prior create may have succeeded without returning a visible account.
+        // Never issue a second creation until native run-key lookup exists.
+        if (checkpoint.accountCreationAttempted) throw ReviewDemoFailure(ReviewDemoProblem.AmbiguousAccount)
+        requireOwned()
+        save(checkpoint.copy(accountCreationAttempted = true))
         requireOwned()
         return backend.createAccount()
     }
