@@ -691,8 +691,9 @@ androidComponents {
                             "benchmarkRelease",
                             "nonMinifiedRelease",
                         )
-                "preview" -> variantBuilder.buildType == "release" ||
-                    (previewProviderMatrixBuild && variantBuilder.buildType == "debug")
+                "preview" ->
+                    variantBuilder.buildType == "release" ||
+                        (previewProviderMatrixBuild && variantBuilder.buildType == "debug")
                 "production", "staging" -> variantBuilder.buildType == "release"
                 else -> true
             }
