@@ -63,22 +63,27 @@ internal fun interface HostPerformanceEmitter {
  */
 internal class HostPerformanceRecorder(
     private val generation: () -> Int,
-    private val emitter: () -> HostPerformanceEmitter?,
     private val nowMs: () -> Long = SystemClock::elapsedRealtime,
 ) {
+    private val emitterLock = Any()
+    private var currentEmitter: BoundHostPerformanceEmitter? = null
+    private val deferredEmitters = mutableListOf<DeferredHostPerformanceEmitter>()
+
     /** Starts an attempt with a monotonic timestamp and the current runtime owner. */
     fun begin(
         operation: HostPerformanceOperationFfi,
         startedAtMs: Long = nowMs(),
-    ): HostPerformanceAttempt =
-        HostPerformanceAttempt(
+    ): HostPerformanceAttempt {
+        val ownerGeneration = generation()
+        return HostPerformanceAttempt(
             operation = operation,
             startedAtMs = startedAtMs,
-            generation = generation(),
+            generation = ownerGeneration,
             currentGeneration = generation,
-            emitter = emitter(),
+            emitter = emitterFor(ownerGeneration),
             nowMs = nowMs,
         )
+    }
 
     /** Records an already-completed stage against the runtime that is current at this call. */
     fun record(
@@ -86,7 +91,38 @@ internal class HostPerformanceRecorder(
         durationMs: Long,
         outcome: HostPerformanceOutcomeFfi,
     ) {
-        emitter()?.emit(operation, durationMs.coerceAtLeast(0L), outcome)
+        val ownerGeneration = generation()
+        emitterFor(ownerGeneration).emit(operation, durationMs.coerceAtLeast(0L), outcome)
+    }
+
+    /**
+     * Publishes one runtime owner and replays only samples captured for its generation.
+     *
+     * Deferred attempts are bound before leaving this call, so a later replacement cannot
+     * inherit them even when the app-level generation number has not changed.
+     */
+    fun publishEmitter(
+        owner: Any,
+        ownerGeneration: Int,
+        emitter: HostPerformanceEmitter,
+    ) {
+        val matching: List<DeferredHostPerformanceEmitter>
+        val stale: List<DeferredHostPerformanceEmitter>
+        synchronized(emitterLock) {
+            currentEmitter = BoundHostPerformanceEmitter(owner, ownerGeneration, emitter)
+            matching = deferredEmitters.filter { it.generation == ownerGeneration }
+            stale = deferredEmitters.filterNot { it.generation == ownerGeneration }
+            deferredEmitters.clear()
+        }
+        stale.forEach(DeferredHostPerformanceEmitter::discard)
+        matching.forEach { it.bind(emitter) }
+    }
+
+    /** Stops assigning new work to [owner] without detaching attempts it already owns. */
+    fun clearEmitter(owner: Any) {
+        synchronized(emitterLock) {
+            if (currentEmitter?.owner === owner) currentEmitter = null
+        }
     }
 
     /** Measures one suspending block and maps every exit to a terminal MDK outcome. */
@@ -109,7 +145,83 @@ internal class HostPerformanceRecorder(
             throw throwable
         }
     }
+
+    /** Returns the published owner or a replayable sink created atomically with publication. */
+    private fun emitterFor(ownerGeneration: Int): HostPerformanceEmitter =
+        synchronized(emitterLock) {
+            currentEmitter
+                ?.takeIf { it.generation == ownerGeneration }
+                ?.emitter
+                ?: DeferredHostPerformanceEmitter(ownerGeneration).also(deferredEmitters::add)
+        }
 }
+
+/** One currently published runtime emitter and its identity fence. */
+private data class BoundHostPerformanceEmitter(
+    val owner: Any,
+    val generation: Int,
+    val emitter: HostPerformanceEmitter,
+)
+
+/**
+ * Holds one pre-runtime sample or attempt until its first matching runtime is published.
+ *
+ * Binding and completion may race across the bootstrap IO and UI threads. The first matching
+ * bind delivers at most one stored sample; discarding a stale generation is terminal.
+ */
+private class DeferredHostPerformanceEmitter(
+    val generation: Int,
+) : HostPerformanceEmitter {
+    private val lock = Any()
+    private var target: HostPerformanceEmitter? = null
+    private var pending: DeferredHostPerformanceSample? = null
+    private var discarded = false
+
+    /** Stores one sample until binding or forwards it to the already-bound owner. */
+    override fun emit(
+        operation: HostPerformanceOperationFfi,
+        durationMs: Long,
+        outcome: HostPerformanceOutcomeFfi,
+    ) {
+        val sample = DeferredHostPerformanceSample(operation, durationMs, outcome)
+        val bound =
+            synchronized(lock) {
+                if (discarded || pending != null) return
+                target ?: run {
+                    pending = sample
+                    null
+                }
+            }
+        bound?.emit(sample.operation, sample.durationMs, sample.outcome)
+    }
+
+    /** Binds exactly once and drains a sample that completed before runtime publication. */
+    fun bind(emitter: HostPerformanceEmitter) {
+        val stored =
+            synchronized(lock) {
+                if (discarded || target != null) return
+                target = emitter
+                pending.also { pending = null }
+            }
+        stored?.let { emitter.emit(it.operation, it.durationMs, it.outcome) }
+    }
+
+    /** Permanently drops a sample owned by a generation that was never published. */
+    fun discard() {
+        synchronized(lock) {
+            discarded = true
+            pending = null
+            target = null
+        }
+    }
+}
+
+/** One closed-schema sample retained only until its owning runtime is available. */
+private data class DeferredHostPerformanceSample(
+    val operation: HostPerformanceOperationFfi,
+    val durationMs: Long,
+    val outcome: HostPerformanceOutcomeFfi,
+)
 
 /** One generation-fenced timing attempt whose first terminal outcome wins. */
 internal class HostPerformanceAttempt(

@@ -46,6 +46,71 @@ class HostPerformanceTelemetryTest {
     }
 
     @Test
+    fun coldStartSampleReplaysWhenItsRuntimeIsPublished() {
+        val samples = mutableListOf<Sample>()
+        val recorder = HostPerformanceRecorder(generation = { 4 }, nowMs = { 10L })
+
+        recorder.record(
+            HostPerformanceOperationFfi.WINDOW_INIT,
+            durationMs = 7L,
+            outcome = HostPerformanceOutcomeFfi.SUCCESS,
+        )
+        assertTrue(samples.isEmpty())
+
+        recorder.publishEmitter(owner = Any(), ownerGeneration = 4, emitter = samples.emitter())
+
+        assertEquals(
+            listOf(Sample(HostPerformanceOperationFfi.WINDOW_INIT, 7L, HostPerformanceOutcomeFfi.SUCCESS)),
+            samples,
+        )
+    }
+
+    @Test
+    fun coldStartAttemptCompletesAfterItsFirstRuntimePublication() {
+        var now = 20L
+        val firstRuntimeSamples = mutableListOf<Sample>()
+        val replacementSamples = mutableListOf<Sample>()
+        val recorder = HostPerformanceRecorder(generation = { 2 }, nowMs = { now })
+        val attempt = recorder.begin(HostPerformanceOperationFfi.FOREGROUND_LOCAL_READY)
+        val firstOwner = Any()
+
+        recorder.publishEmitter(firstOwner, ownerGeneration = 2, emitter = firstRuntimeSamples.emitter())
+        recorder.clearEmitter(firstOwner)
+        recorder.publishEmitter(Any(), ownerGeneration = 2, emitter = replacementSamples.emitter())
+        now = 35L
+        attempt.success()
+
+        assertEquals(
+            listOf(
+                Sample(
+                    HostPerformanceOperationFfi.FOREGROUND_LOCAL_READY,
+                    15L,
+                    HostPerformanceOutcomeFfi.SUCCESS,
+                ),
+            ),
+            firstRuntimeSamples,
+        )
+        assertTrue(replacementSamples.isEmpty())
+    }
+
+    @Test
+    fun unpublishedStaleGenerationIsNotReplayedIntoReplacementRuntime() {
+        var generation = 1
+        val replacementSamples = mutableListOf<Sample>()
+        val recorder = HostPerformanceRecorder(generation = { generation }, nowMs = { 0L })
+
+        recorder.record(
+            HostPerformanceOperationFfi.SPLASH_READY,
+            durationMs = 5L,
+            outcome = HostPerformanceOutcomeFfi.SUCCESS,
+        )
+        generation = 2
+        recorder.publishEmitter(Any(), ownerGeneration = 2, emitter = replacementSamples.emitter())
+
+        assertTrue(replacementSamples.isEmpty())
+    }
+
+    @Test
     fun cancellationIsTerminalAndRethrown() =
         runTest {
             val samples = mutableListOf<Sample>()
@@ -172,15 +237,14 @@ class HostPerformanceTelemetryTest {
         generation: () -> Int = { 1 },
         now: () -> Long = { 0L },
         samples: MutableList<Sample>,
-    ) = HostPerformanceRecorder(
-        generation = generation,
-        emitter = {
-            HostPerformanceEmitter { operation, durationMs, outcome ->
-                samples += Sample(operation, durationMs, outcome)
-            }
-        },
-        nowMs = now,
-    )
+    ) = HostPerformanceRecorder(generation = generation, nowMs = now).also { recorder ->
+        recorder.publishEmitter(owner = Any(), ownerGeneration = generation(), emitter = samples.emitter())
+    }
+
+    private fun MutableList<Sample>.emitter() =
+        HostPerformanceEmitter { operation, durationMs, outcome ->
+            this += Sample(operation, durationMs, outcome)
+        }
 
     private data class Sample(
         val operation: HostPerformanceOperationFfi,

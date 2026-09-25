@@ -629,7 +629,6 @@ internal fun ChatsScreen(
             profileRev,
             bodyMatches,
             messageSearchConstraints,
-            searchActive,
         ) {
             val attempt =
                 if (searchActive) {

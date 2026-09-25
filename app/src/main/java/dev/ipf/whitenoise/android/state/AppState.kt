@@ -1444,6 +1444,7 @@ class WhiteNoiseAppState private constructor(
     /** Publishes a runtime, invalidates obsolete permission work, and seeds synchronization for retained accounts. */
     private fun publishMarmotRuntime(runtime: AppMarmotRuntime) {
         marmotRuntime = runtime
+        hostPerformance.publishEmitter(runtime, runtimeGeneration, runtimeHostPerformanceEmitter(runtime))
         nativeAttachmentPermissions.invalidate(runtime)
         mutationsScope.launch {
             if (marmotRuntime === runtime) refreshNativeAttachmentPermissions()
@@ -1453,6 +1454,7 @@ class WhiteNoiseAppState private constructor(
     /** Clears only the runtime that failed and immediately fences its permission callbacks. */
     private fun clearMarmotRuntime(runtime: AppMarmotRuntime) {
         if (marmotRuntime !== runtime) return
+        hostPerformance.clearEmitter(runtime)
         marmotRuntime = null
         nativeAttachmentPermissions.invalidate(null)
     }
@@ -2295,23 +2297,25 @@ class WhiteNoiseAppState private constructor(
     internal val mutationsScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
     private val hostPerformance =
-        HostPerformanceRecorder(
-            generation = { runtimeGeneration },
-            emitter = {
-                marmotRuntime?.marmot?.let { engine ->
-                    HostPerformanceEmitter { operation, durationMs, outcome ->
-                        mutationsScope.launch(Dispatchers.IO) {
-                            runCatching {
-                                engine.recordHostPerformance(operation, durationMs.toULong(), outcome)
-                            }
-                        }
-                    }
-                }
-            },
-        )
+        HostPerformanceRecorder(generation = { runtimeGeneration }).also { recorder ->
+            initialMarmotRuntime?.let { runtime ->
+                recorder.publishEmitter(runtime, runtimeGeneration, runtimeHostPerformanceEmitter(runtime))
+            }
+        }
     private val hostPreferenceCommitMutex = Mutex()
     private val inFlightAttachmentAcquisitions =
         InFlightAttachmentAcquisitions(mutationsScope, attachmentDownloadGate::promote)
+
+    /** Captures one runtime so later replacement cannot receive an older owner's sample. */
+    private fun runtimeHostPerformanceEmitter(runtime: AppMarmotRuntime): HostPerformanceEmitter =
+        HostPerformanceEmitter { operation, durationMs, outcome ->
+            mutationsScope.launch(Dispatchers.IO) {
+                runCatching {
+                    runtime.marmot.recordHostPerformance(operation, durationMs.toULong(), outcome)
+                }
+            }
+        }
+
     internal val attachmentOpens =
         AttachmentOpenCoordinator(
             intentStore = attachmentDownloadIntents,

@@ -53,8 +53,10 @@ class StateSourceSizeCeilingTest {
         // dropping a still-active top-window row; its ordering guard and tests
         // live in smaller files. Revision-bound publication across views brings
         // the controller to 13,240 lines; focused race regressions and exact-head
-        // CI recheck the corresponding coverage and style contracts.
-        const val CONTROLLERS_MAX_LINES = 13240
+        // CI recheck the corresponding coverage and style contracts. Android host
+        // telemetry adds only the controller integration boundaries; attempt ownership,
+        // replay and settlement remain in the focused HostPerformanceTelemetry unit.
+        const val CONTROLLERS_MAX_LINES = 13309
 
         // Master includes the covered draft lifecycle and host-timing changes. PR #2534
         // adds 38 lines for the async prepared-speech handoff while keeping preparation
@@ -74,7 +76,10 @@ class StateSourceSizeCeilingTest {
         // Its covered final settlement needs one formatter-required expression-body continuation.
         // Current master also adds pending-send and bounded-window recovery state;
         // Play/Zapstore unit tests and Kover run in required CI; keep merged size exact.
-        const val APP_STATE_MAX_LINES = 11298
+        // Android host telemetry adds the runtime, queue, profile and durable-settings
+        // integration boundaries while its concurrency and replay logic stays in the
+        // smaller HostPerformanceTelemetry unit; exact-head Kover rechecks the wiring.
+        const val APP_STATE_MAX_LINES = 11462
 
         /** Counts physical source lines with the same trailing-newline semantics as `wc -l`. */
         internal fun sourceLineCount(file: File): Int = file.bufferedReader().useLines { lines -> lines.count() }
