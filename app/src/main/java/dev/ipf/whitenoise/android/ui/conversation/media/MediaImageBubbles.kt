@@ -34,6 +34,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -48,6 +49,7 @@ import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import dev.ipf.marmotkit.HostPerformanceOperationFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
@@ -243,16 +245,21 @@ internal fun MediaImageBubble(
                     return@LaunchedEffect
                 }
             val decoded =
-                decodeMessageAttachmentImage(
-                    bytes = data,
-                    mediaType = reference.mediaType,
-                    staticMaxEdgePx = MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
-                )
+                appState.measureHostPerformance(HostPerformanceOperationFfi.MEDIA_DECODE) {
+                    decodeMessageAttachmentImage(
+                        bytes = data,
+                        mediaType = reference.mediaType,
+                        staticMaxEdgePx = MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
+                    )
+                }
             if (decoded != null) {
                 if (decoded is DecodedAttachmentPresentation.Static) {
                     controller.cacheThumbnail(key, attachmentIndex, decoded.bitmap)
                 }
-                presentation = decoded
+                appState.measureHostPerformance(HostPerformanceOperationFfi.MEDIA_APPLY) {
+                    presentation = decoded
+                    withFrameNanos { }
+                }
             } else {
                 failed = true
             }
@@ -656,16 +663,21 @@ internal fun MediaImageGridTile(
                     return@LaunchedEffect
                 }
             val decoded =
-                decodeMessageAttachmentImage(
-                    bytes = data,
-                    mediaType = reference.mediaType,
-                    staticMaxEdgePx = MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
-                )
+                appState.measureHostPerformance(HostPerformanceOperationFfi.MEDIA_DECODE) {
+                    decodeMessageAttachmentImage(
+                        bytes = data,
+                        mediaType = reference.mediaType,
+                        staticMaxEdgePx = MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
+                    )
+                }
             if (decoded != null) {
                 if (decoded is DecodedAttachmentPresentation.Static) {
                     controller.cacheThumbnail(messageIdHex, attachmentIndex, decoded.bitmap)
                 }
-                presentation = decoded
+                appState.measureHostPerformance(HostPerformanceOperationFfi.MEDIA_APPLY) {
+                    presentation = decoded
+                    withFrameNanos { }
+                }
             } else {
                 failed = true
             }

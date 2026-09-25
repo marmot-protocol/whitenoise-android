@@ -78,6 +78,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.ChatListViewFfi
+import dev.ipf.marmotkit.HostPerformanceOperationFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
 import dev.ipf.whitenoise.android.core.GlobalAttachmentItem
@@ -150,7 +151,7 @@ internal fun ChatListBodyFrame(
 /** Renders the active account's authoritative chat-list projection and actions. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-@Suppress("ReturnCount", "FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
+@Suppress("ReturnCount", "FunctionNaming", "LongMethod", "CyclomaticComplexMethod", "TooGenericExceptionCaught")
 internal fun ChatsScreen(
     appState: WhiteNoiseAppState,
     controller: ChatsController,
@@ -629,15 +630,21 @@ internal fun ChatsScreen(
             bodyMatches,
             messageSearchConstraints,
         ) {
-            projectChatListSearchSections(
-                source = scopedSourceList,
-                rawQuery = trimmedQuery,
-                appState = appState,
-                titleCopy = groupTitleCopy,
-                bodyMatchGroupIds = bodyMatches.keys,
-                folderChatIds = effectiveFolderChatIds,
-                messageOnly = messageSearchConstraints != null,
-            )
+            val attempt = appState.beginHostPerformance(HostPerformanceOperationFfi.CONVERSATION_SEARCH)
+            try {
+                projectChatListSearchSections(
+                    source = scopedSourceList,
+                    rawQuery = trimmedQuery,
+                    appState = appState,
+                    titleCopy = groupTitleCopy,
+                    bodyMatchGroupIds = bodyMatches.keys,
+                    folderChatIds = effectiveFolderChatIds,
+                    messageOnly = messageSearchConstraints != null,
+                ).also { attempt.success() }
+            } catch (throwable: Throwable) {
+                attempt.failure()
+                throw throwable
+            }
         }
     val visibleItems = remember(searchSections) { searchSections.orderedItems() }
 

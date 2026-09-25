@@ -60,6 +60,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import dev.ipf.marmotkit.HostPerformanceOperationFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
@@ -758,10 +759,12 @@ internal fun ProfileEditScreen(
     @Suppress("TooGenericExceptionCaught") // The injected or FFI profile reader can throw any non-cancellation failure.
     LaunchedEffect(activeAccountId) {
         val accountId = activeAccountId ?: return@LaunchedEffect
+        val hostAttempt = appState.beginHostPerformance(HostPerformanceOperationFfi.PROFILE_LOAD)
         val loadStartedWith = ProfileEditDraft(displayName, about, picture, banner, nip05, lud16)
         val loadSaveRevision = acceptedSaveRevision
         try {
             val profile = loadProfile(accountId)
+            if (profile == null) hostAttempt.unavailable() else hostAttempt.success()
             if (appState.activeAccount?.accountIdHex != accountId) return@LaunchedEffect
             // A refresh started before an accepted publication cannot replace its new read/edit baseline.
             if (loadSaveRevision != acceptedSaveRevision) return@LaunchedEffect
@@ -784,8 +787,10 @@ internal fun ProfileEditScreen(
             imageDrafts = ProfileImageDrafts(picture = merged.picture, banner = merged.banner)
             profileContentReady = true
         } catch (cancelled: CancellationException) {
+            hostAttempt.cancel()
             throw cancelled
         } catch (error: Exception) {
+            hostAttempt.failure()
             if (appState.activeAccount?.accountIdHex == accountId) {
                 profileContentReady = true
                 appState.presentFailure(

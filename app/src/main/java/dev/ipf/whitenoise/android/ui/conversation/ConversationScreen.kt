@@ -136,6 +136,7 @@ import dev.ipf.whitenoise.android.state.loadUntilMessageAvailable
 import dev.ipf.whitenoise.android.state.logUnreadBadgeTransition
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
 import dev.ipf.whitenoise.android.state.markComposerReadyForPresentationTiming
+import dev.ipf.whitenoise.android.state.markInboundMessageVisibleForHostPerformance
 import dev.ipf.whitenoise.android.state.markPagingEvent
 import dev.ipf.whitenoise.android.state.markWindowVisibleForPresentationTiming
 import dev.ipf.whitenoise.android.state.mediaReferencesFor
@@ -943,6 +944,7 @@ internal fun ConversationScreen(
         transcriptReadyToReveal,
         routeTransitionInProgress,
         showDetails,
+        renderedTimeline.lastOrNull()?.id,
     ) {
         if (
             !conversationWindowCanReportVisible(
@@ -956,6 +958,7 @@ internal fun ConversationScreen(
         }
         withFrameNanos { }
         controller.markWindowVisibleForPresentationTiming()
+        controller.markInboundMessageVisibleForHostPerformance()
     }
 
     // First-frame completion waits for the initial anchor and a trustworthy

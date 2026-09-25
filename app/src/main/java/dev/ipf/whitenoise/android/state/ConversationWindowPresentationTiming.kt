@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.state
 
 import android.os.SystemClock
+import dev.ipf.marmotkit.HostPerformanceOperationFfi
+import dev.ipf.marmotkit.HostPerformanceOutcomeFfi
 import dev.ipf.marmotkit.ProductEventFfi
 import dev.ipf.marmotkit.ProductEventPropertyFfi
 import dev.ipf.marmotkit.TimelinePageFfi
@@ -16,11 +18,26 @@ internal data class RecoveryStampedTimelineWindow(
 internal fun WhiteNoiseAppState.conversationWindowPresentationTiming() =
     ConversationWindowPresentationTiming(
         nowMs = SystemClock::elapsedRealtime,
-        emit = { ticket, observation -> recordProductEvent(observation.event(), ticket) },
+        emit = { ticket, observation ->
+            recordProductEvent(observation.event(), ticket)
+            observation.hostOperation()?.let { operation ->
+                recordHostPerformance(
+                    operation = operation,
+                    durationMs = observation.elapsedMs,
+                    outcome = observation.outcome.hostOutcome(),
+                )
+            }
+        },
     )
 
 /** Records the first shown conversation frame after its authoritative timeline is published. */
 internal fun ConversationController.markWindowVisibleForPresentationTiming() = windowPresentationTiming.windowVisible()
+
+/** Settles the newest live inbound-message timing only after Compose has produced a visible frame. */
+internal fun ConversationController.markInboundMessageVisibleForHostPerformance() {
+    inboundVisibleHostAttempt?.success()
+    inboundVisibleHostAttempt = null
+}
 
 /** Records the first frame for which this conversation's composer is actually available. */
 internal fun ConversationController.markComposerReadyForPresentationTiming() = windowPresentationTiming.composerReady()
@@ -68,7 +85,23 @@ internal data class ConversationPresentationObservation(
                     ProductEventPropertyFfi("outcome", outcome.value),
                 ),
         )
+
+    /** Maps rendered milestones onto MDK's fixed host registry. */
+    fun hostOperation(): HostPerformanceOperationFfi? =
+        when (stage) {
+            ConversationPresentationStage.WINDOW_VISIBLE -> HostPerformanceOperationFfi.CONVERSATION_LOCAL_VISIBLE
+            ConversationPresentationStage.COMPOSER_READY -> HostPerformanceOperationFfi.CONVERSATION_COMPOSER_READY
+            ConversationPresentationStage.TIMELINE_PUBLISHED -> null
+        }
 }
+
+/** Converts the existing presentation terminal state without inventing success. */
+private fun ConversationPresentationOutcome.hostOutcome(): HostPerformanceOutcomeFfi =
+    when (this) {
+        ConversationPresentationOutcome.SUCCESS -> HostPerformanceOutcomeFfi.SUCCESS
+        ConversationPresentationOutcome.FAILURE -> HostPerformanceOutcomeFfi.FAILURE
+        ConversationPresentationOutcome.CANCELLED -> HostPerformanceOutcomeFfi.CANCELLED
+    }
 
 /** Maps raw monotonic milliseconds onto MDK's fixed, bounded duration vocabulary. */
 internal fun productDurationBucket(elapsedMs: Long): String {
