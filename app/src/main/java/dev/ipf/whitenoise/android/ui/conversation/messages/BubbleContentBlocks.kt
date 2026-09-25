@@ -174,6 +174,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
     focusedPreview: Boolean = false,
     // A caption carries the footer, so no file card may draw the time, state or retention glyph.
     hasCaption: Boolean = false,
+    fillSingleVisualWidth: Boolean = false,
 ) {
     val retentionInput =
         record.retentionIndicatorInput(
@@ -250,6 +251,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
                         attachmentIndex = entry.index,
                         reference = entry.value,
                         mine = mine,
+                        modifier = if (fillSingleVisualWidth) Modifier.fillMaxWidth() else Modifier,
                         controller = controller,
                         appState = appState,
                         onOpenConversationMedia = onOpenConversationMedia,
@@ -264,6 +266,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
                         appState = appState,
                         onOpenConversationMedia = onOpenConversationMedia,
                         mine = mine,
+                        modifier = if (fillSingleVisualWidth) Modifier.fillMaxWidth() else Modifier,
                         onLongPress = onMediaLongPress,
                     )
                 }
@@ -398,6 +401,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
                         attachmentIndex = entry.index,
                         reference = entry.value,
                         mine = true,
+                        modifier = if (fillSingleVisualWidth) Modifier.fillMaxWidth() else Modifier,
                         controller = controller,
                         appState = appState,
                         onOpenConversationMedia = onOpenConversationMedia,
@@ -415,6 +419,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
                         appState = appState,
                         onOpenConversationMedia = onOpenConversationMedia,
                         mine = true,
+                        modifier = if (fillSingleVisualWidth) Modifier.fillMaxWidth() else Modifier,
                         onLongPress = onMediaLongPress,
                         uploading = !uploadFailed,
                     )

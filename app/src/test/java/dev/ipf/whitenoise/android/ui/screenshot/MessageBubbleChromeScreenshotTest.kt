@@ -74,7 +74,7 @@ class MessageBubbleChromeScreenshotTest {
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/message_bubble_chrome_dark.png")
     }
 
-    /** Long captions widen the frame and center narrow portrait media without stretching it. */
+    /** Long captions and narrow portrait media share an edge-to-edge frame. */
     @Test
     fun narrowMediaWithLongCaptionsUsesReadableSharedWidth() {
         composeRule.setContent {
@@ -478,11 +478,12 @@ private fun NarrowCaptionBubble(
         mentionedSelf = false,
         mentionedYouLabel = "Mentioned you",
         alignEnd = mine,
+        edgeToEdgeMedia = true,
         modifier = modifier.widthIn(max = 290.dp),
         media = {
             Box(
                 Modifier
-                    .width(82.dp)
+                    .fillMaxWidth()
                     .height(138.dp)
                     .background(if (mine) Color(0xFF6A4C93) else Color(0xFF2A9D8F)),
             )
@@ -560,7 +561,8 @@ private fun CustomAmoledMediaCaptionBubble(highlighted: Boolean) {
         mentionedSelf = false,
         mentionedYouLabel = "Mentioned you",
         alignEnd = true,
-        media = { Box(Modifier.width(180.dp).height(80.dp).background(Color(0xFF303030))) },
+        edgeToEdgeMedia = true,
+        media = { Box(Modifier.fillMaxWidth().height(80.dp).background(Color(0xFF303030))) },
     ) {
         Text("Highlighted media caption")
         Text(

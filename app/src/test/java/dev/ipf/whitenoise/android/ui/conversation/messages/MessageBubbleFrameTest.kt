@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -407,9 +408,9 @@ class MessageBubbleFrameTest {
         }
     }
 
-    /** Substantial content widens the frame and centers narrow media without stretching it. */
+    /** Substantial content and a width-filling visual share both horizontal edges. */
     @Test
-    fun substantialSupplementWidensAndCentersNarrowMedia() {
+    fun substantialSupplementFillsVisualWidth() {
         composeRule.setContent {
             Column {
                 listOf(false, true).forEach { alignEnd ->
@@ -420,7 +421,7 @@ class MessageBubbleFrameTest {
                             media = {
                                 Box(
                                     Modifier
-                                        .width(80.dp)
+                                        .fillMaxWidth()
                                         .height(100.dp)
                                         .testTag("narrow-media-$alignEnd"),
                                 )
@@ -437,9 +438,9 @@ class MessageBubbleFrameTest {
                 val envelope =
                     composeRule.onNodeWithTag("wide-envelope-$alignEnd").fetchSemanticsNode().boundsInRoot
                 val media = composeRule.onNodeWithTag("narrow-media-$alignEnd").fetchSemanticsNode().boundsInRoot
-                assertEquals(240f, envelope.width, 1f)
-                assertEquals(80f, media.width, 1f)
-                assertEquals(envelope.center.x, media.center.x, 1f)
+                assertEquals(300f, envelope.width, 1f)
+                assertEquals(envelope.left, media.left, 1f)
+                assertEquals(envelope.right, media.right, 1f)
             }
         }
     }

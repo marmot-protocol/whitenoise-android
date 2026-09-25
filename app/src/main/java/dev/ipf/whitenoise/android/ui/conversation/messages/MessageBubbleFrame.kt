@@ -6,7 +6,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -108,6 +107,7 @@ internal fun MediaCaptionFrame(
     mentionedSelf: Boolean,
     mentionedYouLabel: String,
     alignEnd: Boolean,
+    edgeToEdgeMedia: Boolean = false,
     modifier: Modifier = Modifier,
     contentModifier: Modifier = Modifier,
     shape: Shape = MaterialTheme.shapes.large,
@@ -148,25 +148,7 @@ internal fun MediaCaptionFrame(
         shape = shape,
         border = messageFrameBorder(presentation, mine, mentionedSelf, amoled),
     ) {
-        MediaSupplementEnvelope(
-            alignEnd = alignEnd,
-            modifier = Modifier.padding(ConversationMessageMetrics.RichOuterInset),
-            media = media,
-        ) {
-            Column(modifier = contentModifier.fillMaxWidth()) {
-                Column(
-                    modifier =
-                        Modifier.padding(
-                            start = ConversationMessageMetrics.RichTextHorizontalAdjustment,
-                            end = ConversationMessageMetrics.RichTextHorizontalAdjustment,
-                            top = ConversationMessageMetrics.RichContentSpacing,
-                            bottom = ConversationMessageMetrics.RichTextBottomAdjustment,
-                        ),
-                    verticalArrangement = bubbleContentArrangement,
-                    content = caption,
-                )
-            }
-        }
+        MediaCaptionContent(edgeToEdgeMedia, alignEnd, contentModifier, media, caption)
     }
 }
 
@@ -175,11 +157,9 @@ internal fun MediaCaptionFrame(
  *
  * Media children intentionally retain their existing sizing policy: a
  * landscape image, grid, or voice note may consume the available width while
- * a portrait image can keep its fixed card width. The real media measurement
- * remains one source of truth; the supplement's intrinsic width can only widen
- * the shared frame and never resizes or stretches the media child. When that
- * happens, the media block is centered in the wider frame, matching Signal's
- * bounded-thumbnail treatment instead of leaving one large empty side.
+ * a portrait image can keep its fixed card width. Callers that render a
+ * captioned single visual make that visual fill the available width so the
+ * image reaches both edges of the shared frame.
  */
 @Composable
 @Suppress("FunctionNaming")

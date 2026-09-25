@@ -1941,6 +1941,20 @@ internal fun MessageBubble(
                     )
                 val bodyOrWarningInsideBubble =
                     shouldFrameMessageBubbleSupplement(bodyTextToRender, outerInvalidationWarning)
+                val fullBleedSingleVisual =
+                    bodyOrWarningInsideBubble &&
+                        sharedLocation == null &&
+                        sharedContact == null &&
+                        sharedUser == null &&
+                        remoteGiphyMedia == null &&
+                        bubbleMedia.rejected.isEmpty() &&
+                        if (bubbleMedia.hasConfirmedMedia) {
+                            bubbleMedia.visuals.size == 1 &&
+                                bubbleMedia.audio.isEmpty() &&
+                                bubbleMedia.files.isEmpty()
+                        } else {
+                            bubbleMedia.pendingVisuals.size == 1 && bubbleMedia.pendingAudio.isEmpty()
+                        }
                 // The footer's time and delivery glyph are secondary metadata: a quiet
                 // gray against the resolved bubble fill, the error pairing for a
                 // persisted failure, and the AMOLED directional accent. Media scrim
@@ -2125,6 +2139,7 @@ internal fun MessageBubble(
                                 mentionedSelf = mentionedSelf,
                                 mentionedYouLabel = mentionedYouLabel,
                                 alignEnd = mine,
+                                edgeToEdgeMedia = fullBleedSingleVisual,
                                 contentModifier = textSelectionBoundsModifier,
                                 media = {
                                     LookaheadScope {
@@ -2154,6 +2169,7 @@ internal fun MessageBubble(
                                                 onMediaLongPress = onMediaLongPress,
                                                 focusedPreview = isActionMenuOpen,
                                                 hasCaption = mediaCaption != null,
+                                                fillSingleVisualWidth = fullBleedSingleVisual,
                                             )
                                         }
                                     }
@@ -2210,6 +2226,7 @@ internal fun MessageBubble(
                                 mentionedSelf = mentionedSelf,
                                 mentionedYouLabel = mentionedYouLabel,
                                 alignEnd = mine,
+                                edgeToEdgeMedia = fullBleedSingleVisual,
                                 media = {
                                     LookaheadScope {
                                         Column(
@@ -2238,6 +2255,7 @@ internal fun MessageBubble(
                                                 onMediaLongPress = onMediaLongPress,
                                                 focusedPreview = isActionMenuOpen,
                                                 hasCaption = mediaCaption != null,
+                                                fillSingleVisualWidth = fullBleedSingleVisual,
                                             )
                                         }
                                     }
