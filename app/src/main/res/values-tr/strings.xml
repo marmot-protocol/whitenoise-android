@@ -472,6 +472,15 @@
     <string name="developer_mode">Geliştirici modu</string>
     <string name="developer_mode_subtitle">Teşhisleri ve MLS dahili bilgilerini gösterir.</string>
     <string name="developer_testing_only">Yalnızca geliştirme ve test amaçlıdır</string>
+    <string name="developer_seed_fixture">Test sohbetini doldur</string>
+    <string name="developer_seed_fixture_subtitle">Sayfalama ölçümleri için bir sohbete yapay mesajlar gönder</string>
+    <string name="seed_fixture_title">Test sohbetini doldur</string>
+    <string name="seed_fixture_detail">Seçilen sohbete bu hesaptan gerçek mesajlar olarak numaralandırılmış yapay mesajlar gönderir. Özel bir test grubu kullanın; diğer üyeler hepsini alır.</string>
+    <string name="seed_fixture_count">Gönderilecek mesaj sayısı</string>
+    <string name="seed_fixture_start">Başlat</string>
+    <string name="seed_fixture_progress">%2$d mesajdan %1$d gönderildi · %3$d başarısız</string>
+    <string name="seed_fixture_no_groups">Bu hesapta doldurulacak sohbet yok.</string>
+    <string name="seed_fixture_stopped">Durduruldu · %2$d mesajdan %1$d gönderildi</string>
     <string name="developer_testing_only_detail">Bu araçlar teknik bilgileri açığa çıkarabilir ve uygulamanın davranışını değiştirebilir.</string>
     <string name="developer_debugging">Hata ayıklama</string>
     <string name="diagnostics">Teşhis</string>
@@ -2055,4 +2064,5 @@
     <string name="export_audit_logs_confirm_action">Devam</string>
     <string name="toast_couldnt_export_audit_logs">Tanılama günlükleri dışa aktarmaya hazırlanamadı</string>
     <string name="toast_no_audit_logs_to_export">Dışa aktarılacak tanılama günlüğü yok</string>
+    <string name="conversation_loading_newer">Daha yeni mesajlar yükleniyor</string>
 </resources>

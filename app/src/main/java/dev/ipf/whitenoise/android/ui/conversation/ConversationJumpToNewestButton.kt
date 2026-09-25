@@ -19,7 +19,10 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
+import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 
+/** The floating arrow that returns the reader to the newest message, badged with the unread count. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun ConversationJumpToNewestButton(
@@ -34,6 +37,7 @@ internal fun ConversationJumpToNewestButton(
             modifier
                 .size(42.dp)
                 .semantics { contentDescription = jumpToNewestLabel }
+                .performanceTestTag(PerformanceTestTags.JUMP_TO_NEWEST)
                 .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {

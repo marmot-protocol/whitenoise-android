@@ -502,6 +502,15 @@
     <string name="developer_mode">Режим разработчика</string>
     <string name="developer_mode_subtitle">Показывает диагностику и внутренние компоненты MLS.</string>
     <string name="developer_testing_only">Только для разработки и тестирования</string>
+    <string name="developer_seed_fixture">Заполнить тестовый чат</string>
+    <string name="developer_seed_fixture_subtitle">Отправить синтетические сообщения в чат для тестов подгрузки истории</string>
+    <string name="seed_fixture_title">Заполнить тестовый чат</string>
+    <string name="seed_fixture_detail">Отправляет пронумерованные синтетические сообщения в выбранный чат как настоящие сообщения от этого аккаунта. Используйте приватную тестовую группу: остальные участники получат каждое из них.</string>
+    <string name="seed_fixture_count">Сколько сообщений отправить</string>
+    <string name="seed_fixture_start">Начать</string>
+    <string name="seed_fixture_progress">Отправлено %1$d из %2$d · ошибок: %3$d</string>
+    <string name="seed_fixture_no_groups">В этом аккаунте нет чатов для заполнения.</string>
+    <string name="seed_fixture_stopped">Остановлено · отправлено %1$d из %2$d</string>
     <string name="developer_testing_only_detail">Эти инструменты могут раскрывать технические сведения и изменять поведение приложения.</string>
     <string name="developer_debugging">Отладка</string>
     <string name="diagnostics">Диагностика</string>
@@ -2117,4 +2126,5 @@
     <string name="export_audit_logs_confirm_action">Продолжить</string>
     <string name="toast_couldnt_export_audit_logs">Не удалось подготовить диагностические журналы к экспорту</string>
     <string name="toast_no_audit_logs_to_export">Нет диагностических журналов для экспорта</string>
+    <string name="conversation_loading_newer">Загрузка более новых сообщений</string>
 </resources>

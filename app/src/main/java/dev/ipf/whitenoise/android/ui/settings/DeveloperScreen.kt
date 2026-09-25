@@ -9,6 +9,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -48,6 +52,7 @@ internal fun DeveloperScreen(
     onOpenDiagnostics: () -> Unit,
     onOpenKeyPackages: () -> Unit,
 ) {
+    var seedDialogOpen by remember { mutableStateOf(false) }
     DeveloperContent(
         developerMode = appState.developerMode,
         streamingDebug = appState.streamingDebugMode,
@@ -57,10 +62,18 @@ internal fun DeveloperScreen(
         onBack = onBack,
         onOpenDiagnostics = onOpenDiagnostics,
         onOpenKeyPackages = onOpenKeyPackages,
+        // Seeding sends real messages, so only a debuggable build offers it.
+        onSeedConversationFixture = if (BuildConfig.DEBUG) ({ seedDialogOpen = true }) else null,
     )
+    if (seedDialogOpen) {
+        ConversationFixtureSeedDialog(appState = appState, onDismiss = { seedDialogOpen = false })
+    }
 }
 
-/** The list itself. Debugging appears only while developer mode is on; Key Packages never depends on it. */
+/**
+ * The list itself. Debugging appears only while developer mode is on; Key Packages never depends on it.
+ * [onSeedConversationFixture] is null outside debuggable builds, and its row is then absent.
+ */
 @Suppress("FunctionNaming", "LongParameterList", "LongMethod")
 @Composable
 internal fun DeveloperContent(
@@ -72,6 +85,7 @@ internal fun DeveloperContent(
     onBack: () -> Unit,
     onOpenDiagnostics: () -> Unit,
     onOpenKeyPackages: () -> Unit,
+    onSeedConversationFixture: (() -> Unit)? = null,
 ) {
     SettingsScaffold(title = stringResource(R.string.settings_developer_tools), onBack = onBack) {
         SettingsList {
@@ -131,6 +145,17 @@ internal fun DeveloperContent(
                                 modifier = Modifier.testTag("developer.diagnostics"),
                                 subtitle = stringResource(R.string.diagnostics_settings_subtitle),
                             )
+                        }
+                        if (onSeedConversationFixture != null) {
+                            row("seed_fixture") { context ->
+                                SettingsLink(
+                                    context = context,
+                                    title = stringResource(R.string.developer_seed_fixture),
+                                    onClick = onSeedConversationFixture,
+                                    modifier = Modifier.testTag("developer.seed_fixture"),
+                                    subtitle = stringResource(R.string.developer_seed_fixture_subtitle),
+                                )
+                            }
                         }
                     }
                 }

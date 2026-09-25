@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import android.content.Context
+import android.os.Looper
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -40,8 +41,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.lang.reflect.Proxy
+import java.time.Duration
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
@@ -50,6 +53,7 @@ import kotlin.coroutines.resumeWithException
 /** Verifies retained composer geometry follows real leave and local-delete commit boundaries. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
+@Suppress("LargeClass") // The lifecycle tests share one native proxy and seeded-controller fixture.
 class ComposerExpansionDestructiveLifecycleTest {
     @Test
     fun acceptedDictationSendClearsOnlyItsOriginDraftAndGeometry() =
@@ -465,6 +469,7 @@ class ComposerExpansionDestructiveLifecycleTest {
                     fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID),
                 )
                 assertTrue(controller.deleteGroupLocalFromChatList(GROUP_ID, notify = false))
+                shadowOf(Looper.getMainLooper()).idle()
 
                 assertEquals(1, fixture.calls.delete.get())
                 assertNull(fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
@@ -496,10 +501,94 @@ class ComposerExpansionDestructiveLifecycleTest {
             }
         }
 
+    @Test(timeout = 10_000)
+    fun closedTransportRetriesLocalDeleteAndCleansUpOnce() =
+        runBlocking {
+            val fixture = fixture(deleteTransportFailures = 1)
+            fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("keep until commit"))
+            // The test blocks Robolectric's main thread during deletion, so finish its queued draft write first.
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300))
+            retainExpansion(fixture.appState, GROUP_ID)
+            val controller = fixture.seededChatsController()
+            try {
+                assertTrue(controller.deleteGroupLocalFromChatList(GROUP_ID, notify = false))
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(20))
+                assertEquals(2, fixture.calls.delete.get())
+                assertEquals(1, fixture.calls.chatList.get())
+                assertTrue(controller.items.none { it.group.groupIdHex == GROUP_ID })
+                assertNull(fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+                assertTrue(fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID).isNullOrEmpty())
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    @Test(timeout = 10_000)
+    fun committedLocalDeleteWithLostResponseDoesNotRepeatWipe() =
+        runBlocking {
+            val fixture = fixture(deleteTransportFailures = 1, commitBeforeTransportFailure = true)
+            val controller = fixture.seededChatsController()
+            try {
+                assertTrue(controller.deleteGroupLocalFromChatList(GROUP_ID, notify = false))
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(20))
+                assertEquals(1, fixture.calls.delete.get())
+                assertEquals(1, fixture.calls.chatList.get())
+                assertTrue(controller.items.none { it.group.groupIdHex == GROUP_ID })
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    @Test(timeout = 10_000)
+    fun committedLocalDeleteStillClearsLocalArtifactsWhenNativeDraftCleanupFails() =
+        runBlocking {
+            val fixture = fixture(failDraftDelete = true)
+            fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("remove locally"))
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300))
+            retainExpansion(fixture.appState, GROUP_ID)
+            val controller = fixture.seededChatsController()
+            try {
+                assertTrue(controller.deleteGroupLocalFromChatList(GROUP_ID, notify = false))
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(20))
+                assertEquals(1, fixture.calls.delete.get())
+                assertTrue(controller.items.none { it.group.groupIdHex == GROUP_ID })
+                assertTrue(fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID).isNullOrEmpty())
+                assertNull(fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    @Test(timeout = 10_000)
+    fun exhaustedClosedTransportRestoresRowDraftAndGeometry() =
+        runBlocking {
+            val fixture = fixture(deleteTransportFailures = IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS)
+            fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("still drafting"))
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300))
+            val retained = retainExpansion(fixture.appState, GROUP_ID)
+            val controller = fixture.seededChatsController()
+            try {
+                assertFalse(controller.deleteGroupLocalFromChatList(GROUP_ID, notify = false))
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(20))
+                assertEquals(IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS, fixture.calls.delete.get())
+                assertEquals(1, controller.items.count { it.group.groupIdHex == GROUP_ID })
+                assertEquals("still drafting", fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID))
+                assertEquals(
+                    retained,
+                    fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID),
+                )
+            } finally {
+                controller.onCleared()
+            }
+        }
+
     /** Creates one isolated app/runtime pair with controllable native leave and delete commits. */
     private fun fixture(
         failLeave: Boolean = false,
         failDelete: Boolean = false,
+        deleteTransportFailures: Int = 0,
+        commitBeforeTransportFailure: Boolean = false,
+        failDraftDelete: Boolean = false,
         sendResult: () -> SendSummaryFfi = ::successfulSendSummary,
         attachConversationController: Boolean = true,
     ): LifecycleFixture {
@@ -511,10 +600,18 @@ class ComposerExpansionDestructiveLifecycleTest {
                 accountIdHexResolver = { ACCOUNT_ID },
                 accounts = listOf(account()),
                 activeAccountRef = ACCOUNT_REF,
-                messageDraftRepository = draftRepository(),
+                messageDraftRepository = draftRepository(failDraftDelete),
             )
         val calls = LifecycleCalls()
-        val marmot = lifecycleMarmot(failLeave, failDelete, calls, sendResult)
+        val marmot =
+            lifecycleMarmot(
+                failLeave,
+                failDelete,
+                deleteTransportFailures,
+                commitBeforeTransportFailure,
+                calls,
+                sendResult,
+            )
         WhiteNoiseAppState::class.java
             .getDeclaredField("marmotRuntime")
             .apply { isAccessible = true }
@@ -547,10 +644,13 @@ class ComposerExpansionDestructiveLifecycleTest {
     private fun lifecycleMarmot(
         failLeave: Boolean,
         failDelete: Boolean,
+        deleteTransportFailures: Int,
+        commitBeforeTransportFailure: Boolean,
         calls: LifecycleCalls,
         sendResult: () -> SendSummaryFfi,
-    ): MarmotInterface =
-        Proxy.newProxyInstance(
+    ): MarmotInterface {
+        var localGroupPresent = true
+        return Proxy.newProxyInstance(
             MarmotInterface::class.java.classLoader,
             arrayOf(MarmotInterface::class.java),
         ) { proxy, method, arguments ->
@@ -578,6 +678,10 @@ class ComposerExpansionDestructiveLifecycleTest {
                 }
                 "groupMembers" -> members()
                 "listMedia" -> emptyList<Any>()
+                "chatList" -> {
+                    calls.chatList.incrementAndGet()
+                    if (localGroupPresent) listOf(groupRow()) else emptyList<ChatListRowFfi>()
+                }
                 "leaveGroup" -> {
                     calls.leave.incrementAndGet()
                     if (failLeave) {
@@ -592,10 +696,14 @@ class ComposerExpansionDestructiveLifecycleTest {
                     }
                 }
                 "deleteGroupLocal" -> {
-                    calls.delete.incrementAndGet()
+                    val attempt = calls.delete.incrementAndGet()
                     if (failDelete) {
                         suspendFailure(IllegalStateException("delete rejected"))
+                    } else if (attempt <= deleteTransportFailures) {
+                        if (commitBeforeTransportFailure) localGroupPresent = false
+                        suspendFailure(MarmotKitException.TransportClosed())
                     } else {
+                        localGroupPresent = false
                         true
                     }
                 }
@@ -605,6 +713,7 @@ class ComposerExpansionDestructiveLifecycleTest {
                 else -> throw UnsupportedOperationException("Unexpected Marmot call: ${method.name}")
             }
         } as MarmotInterface
+    }
 
     /** Creates a signed-in local account matching the self member returned by the native fixture. */
     private fun account() =
@@ -625,9 +734,31 @@ class ComposerExpansionDestructiveLifecycleTest {
         )
 
     /** Wraps an injected repository whose successful draft delete cannot invoke Marmot. */
-    private fun draftRepository() =
+    private fun draftRepository(failDelete: Boolean = false) =
         MessageDraftRepository(
-            gateway = EmptyDraftGateway,
+            gateway =
+                if (failDelete) {
+                    object : MessageDraftGateway by EmptyDraftGateway {
+                        override fun read(
+                            accountRef: String,
+                            groupIdHex: String,
+                        ): MessageDraftFfi =
+                            EmptyDraftGateway.save(
+                                accountRef,
+                                groupIdHex,
+                                "persisted draft",
+                                null,
+                                emptyList(),
+                            )
+
+                        override fun delete(
+                            accountRef: String,
+                            groupIdHex: String,
+                        ): Unit = throw IllegalStateException("draft deletion rejected")
+                    }
+                } else {
+                    EmptyDraftGateway
+                },
             editorSessions = EditorSessionStore(LifecycleEditorStrings),
             ioDispatcher = Dispatchers.Unconfined,
         )
@@ -657,6 +788,7 @@ class ComposerExpansionDestructiveLifecycleTest {
         val send = AtomicInteger()
         val leave = AtomicInteger()
         val delete = AtomicInteger()
+        val chatList = AtomicInteger()
     }
 
     private companion object {

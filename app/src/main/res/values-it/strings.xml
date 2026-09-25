@@ -472,6 +472,15 @@
     <string name="developer_mode">Modalità sviluppatore</string>
     <string name="developer_mode_subtitle">Mostra la diagnostica e gli interni MLS.</string>
     <string name="developer_testing_only">Solo per sviluppo e test</string>
+    <string name="developer_seed_fixture">Popola una conversazione di prova</string>
+    <string name="developer_seed_fixture_subtitle">Invia messaggi sintetici in una chat per i benchmark di paginazione</string>
+    <string name="seed_fixture_title">Popola una conversazione di prova</string>
+    <string name="seed_fixture_detail">Invia messaggi sintetici numerati nella chat scelta come messaggi reali da questo account. Usa un gruppo di prova privato: gli altri membri li riceveranno tutti.</string>
+    <string name="seed_fixture_count">Messaggi da inviare</string>
+    <string name="seed_fixture_start">Avvia</string>
+    <string name="seed_fixture_progress">%1$d di %2$d inviati · %3$d non riusciti</string>
+    <string name="seed_fixture_no_groups">Questo account non ha chat da popolare.</string>
+    <string name="seed_fixture_stopped">Interrotto · %1$d di %2$d inviati</string>
     <string name="developer_testing_only_detail">Questi strumenti possono esporre informazioni tecniche e cambiare il comportamento dell’app.</string>
     <string name="developer_debugging">Debug</string>
     <string name="diagnostics">Diagnostica</string>
@@ -2057,4 +2066,5 @@
     <string name="export_audit_logs_confirm_action">Continua</string>
     <string name="toast_couldnt_export_audit_logs">Impossibile preparare i log diagnostici per l’esportazione</string>
     <string name="toast_no_audit_logs_to_export">Nessun log diagnostico da esportare</string>
+    <string name="conversation_loading_newer">Caricamento dei messaggi più recenti</string>
 </resources>

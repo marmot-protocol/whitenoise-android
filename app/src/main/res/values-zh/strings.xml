@@ -461,6 +461,15 @@
     <string name="developer_mode">开发者模式</string>
     <string name="developer_mode_subtitle">显示诊断和 MLS 内部结构。</string>
     <string name="developer_testing_only">仅用于开发和测试</string>
+    <string name="developer_seed_fixture">填充测试会话</string>
+    <string name="developer_seed_fixture_subtitle">向一个聊天发送合成消息，用于分页基准测试</string>
+    <string name="seed_fixture_title">填充测试会话</string>
+    <string name="seed_fixture_detail">以此账号的真实消息形式，向所选聊天发送带编号的合成消息。请使用私有测试群组；其他成员会收到每一条。</string>
+    <string name="seed_fixture_count">要发送的消息数</string>
+    <string name="seed_fixture_start">开始</string>
+    <string name="seed_fixture_progress">已发送 %1$d/%2$d · 失败 %3$d</string>
+    <string name="seed_fixture_no_groups">此账号没有可填充的聊天。</string>
+    <string name="seed_fixture_stopped">已停止 · 已发送 %1$d/%2$d</string>
     <string name="developer_testing_only_detail">这些工具可能会暴露技术信息并改变应用的行为。</string>
     <string name="developer_debugging">调试</string>
     <string name="diagnostics">诊断</string>
@@ -2029,4 +2038,5 @@
     <string name="export_audit_logs_confirm_action">继续</string>
     <string name="toast_couldnt_export_audit_logs">无法准备要导出的诊断日志</string>
     <string name="toast_no_audit_logs_to_export">没有可导出的诊断日志</string>
+    <string name="conversation_loading_newer">正在加载更新的消息</string>
 </resources>

@@ -30,7 +30,12 @@ class MessageMultiSelectCoverageTest {
         assertTrue(screenSource.contains("batchCopyText(actionItems)"))
         assertTrue(screenSource.contains("batchForwardPayloads(actionItems)"))
         assertTrue(screenSource.contains("batchSelectionActionAvailability("))
-        assertTrue(screenSource.contains("if (transcriptReadyToReveal && !selectionMode)"))
+        // Selection hides the jump controls one by one; the overlay column itself stays so the
+        // newer-page indicator can show while a page is in flight during selection.
+        assertTrue(screenSource.contains("if (transcriptReadyToReveal)"))
+        assertTrue(screenSource.contains("if (!selectionMode && ttsFollowHandle.showResumeAction)"))
+        assertTrue(screenSource.contains("if (!selectionMode && mentionCount > 0)"))
+        assertTrue(screenSource.contains("if (!selectionMode && !nearBottom)"))
     }
 
     @Test

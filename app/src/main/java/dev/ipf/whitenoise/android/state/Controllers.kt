@@ -1490,28 +1490,23 @@ internal fun firstUnreadReceivedIndex(
 /**
  * Count of received messages positioned after the read anchor in [timeline].
  * A null anchor is treated as "nothing read yet", so the count starts from
- * the first row. When a bounded window has evicted a non-null anchor, callers
- * can supply [missingAnchorUnreadCount] from the authoritative projection;
- * counting the historical window itself would label every retained row unread.
- * Anchoring on a message id (not an index) keeps the count stable when
- * load-older prepends shift every index by the same offset.
+ * the first row; an anchor the window does not hold counts the same way, so
+ * callers that may be looking at evicted history decide for themselves
+ * (see `ConversationUnreadBadge`). Anchoring on a message id (not an index)
+ * keeps the count stable when load-older prepends shift every index by the
+ * same offset.
  */
 internal fun countUnreadIncoming(
     timeline: List<TimelineMessage>,
     readAnchorMessageId: String?,
-    missingAnchorUnreadCount: Int? = null,
 ): Int {
     if (timeline.isEmpty()) return 0
     val anchorIdx =
         readAnchorMessageId?.let { id ->
             timeline.indexOfFirst { it.record.messageIdHex == id }
         } ?: -1
-    return if (readAnchorMessageId != null && anchorIdx < 0 && missingAnchorUnreadCount != null) {
-        missingAnchorUnreadCount.coerceAtLeast(0)
-    } else {
-        timeline.drop(anchorIdx + 1).count {
-            it.record.direction == "received" && !isDerivedStateKind(it.record.kind)
-        }
+    return timeline.drop(anchorIdx + 1).count {
+        it.record.direction == "received" && !isDerivedStateKind(it.record.kind)
     }
 }
 
@@ -2041,77 +2036,6 @@ internal fun duplicateSignatureKeyDisplayName(
     refs: List<String>,
     displayName: (String) -> String,
 ): String = refs.firstOrNull()?.let(displayName).orEmpty()
-
-/**
- * Whether the engine's authoritative self-membership says the local account is
- * no longer in the group: [SelfMembershipFfi.REMOVED] (evicted) or
- * [SelfMembershipFfi.LEFT] (voluntary departure). Both are terminal non-member
- * states; [SelfMembershipFfi.MEMBER] is the only membership-preserving value.
- */
-internal fun SelfMembershipFfi.isNonMember(): Boolean = this == SelfMembershipFfi.REMOVED || this == SelfMembershipFfi.LEFT
-
-internal data class ConversationMembershipSeed(
-    val members: List<AppGroupMemberRecordFfi>,
-    val membersLoaded: Boolean,
-    val seededSelfMember: Boolean,
-    val seededMembershipKnown: Boolean,
-    val membersVerified: Boolean,
-)
-
-internal fun conversationMembershipSeed(
-    initialGroup: AppGroupRecordFfi,
-    initialMemberSnapshot: GroupMemberSnapshot?,
-    activeAccountIdHex: String?,
-): ConversationMembershipSeed {
-    val initialMembers = initialMemberSnapshot?.members.orEmpty()
-    val projectedNonMember = initialGroup.selfMembership.isNonMember()
-    val projectedMember = initialGroup.selfMembership == SelfMembershipFfi.MEMBER
-    val seededMembers =
-        if (projectedNonMember) {
-            GroupProjector.membersWithoutActiveAccount(initialMembers, activeAccountIdHex)
-        } else {
-            initialMembers
-        }
-    val seededSelfMember =
-        projectedMember ||
-            (
-                !projectedNonMember &&
-                    initialMembers.any { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
-            )
-    return ConversationMembershipSeed(
-        members = seededMembers,
-        membersLoaded = initialMemberSnapshot?.members?.isNotEmpty() == true,
-        seededSelfMember = seededSelfMember,
-        seededMembershipKnown = projectedMember || projectedNonMember || initialMemberSnapshot != null,
-        membersVerified = projectedNonMember,
-    )
-}
-
-internal class ConversationSelfLeftState(
-    seededMembershipKnown: Boolean,
-    seededSelfMember: Boolean,
-) {
-    var selfLeft by mutableStateOf(seededMembershipKnown && !seededSelfMember)
-        private set
-
-    fun recordSelfLeft() {
-        selfLeft = true
-    }
-
-    fun clearSelfLeft() {
-        selfLeft = false
-    }
-
-    fun isSelfMember(
-        members: List<AppGroupMemberRecordFfi>,
-        activeAccountIdHex: String?,
-    ): Boolean = GroupProjector.isSelfStillMember(members, activeAccountIdHex, selfLeft)
-
-    fun rosterHonoringSelfLeft(
-        members: List<AppGroupMemberRecordFfi>,
-        activeAccountIdHex: String?,
-    ): List<AppGroupMemberRecordFfi> = GroupProjector.rosterHonoringSelfLeft(members, activeAccountIdHex, selfLeft)
-}
 
 internal fun agentStreamFailureText(
     throwable: Throwable,
@@ -3068,6 +2992,7 @@ class ChatsController private constructor(
                             chatListWindows === chatListStream,
                     )
                     replacePresentedChatRows(initialRows)
+                    appState.schedulePendingLocalGroupDeleteCleanup()
                     appState.recordAccountSwitchLocalRowsReady(accountRef, chatRows.size)
                     groupRecordsById =
                         withContext(Dispatchers.IO) {
@@ -3115,6 +3040,7 @@ class ChatsController private constructor(
                                     )
                                     receivedLiveUpdate = true
                                     connectionOwner.noteLiveUpdate(connectionAttempt)
+                                    appState.schedulePendingLocalGroupDeleteCleanup()
                                 }
                             },
                             second = {
@@ -4428,24 +4354,32 @@ class ChatsController private constructor(
         )
     }
 
-    private fun removeChatRow(groupIdHex: String) {
+    private fun removeChatRow(
+        groupIdHex: String,
+        optimistic: Boolean = false,
+    ) {
         val rowKey = chatRowKey(groupIdHex)
         val removedRow = chatRowsByGroup.remove(rowKey)
         if (removedRow != null) {
-            selectedPresentationsByGroup = selectedPresentationsByGroup - rowKey
-            selectedPreviewsByGroup = selectedPreviewsByGroup - rowKey
-            selectedActionsByGroup = selectedActionsByGroup - rowKey
             activitySequenceByGroup.remove(rowKey)
             optimisticChatListPreviewByGroup.remove(rowKey)
-            cancelMemberSnapshotRetry(removedRow.groupIdHex)
-            memberFetchRetryBackoffTierByGroup.remove(removedRow.groupIdHex)
-            failedMemberFetches.remove(removedRow.groupIdHex)
-            selfOnlyDirectGraceRetryGroups.remove(removedRow.groupIdHex)
-            presentationMembersByGroup = presentationMembersByGroup - removedRow.groupIdHex
-            localGroupNames.forget(removedRow.groupIdHex)
+            if (!optimistic) finishRemovedChatRowClientState(removedRow.groupIdHex)
             noteMaterializedGroupMembershipChanged()
             scheduleRecompute()
         }
+    }
+
+    private fun finishRemovedChatRowClientState(groupIdHex: String) {
+        val rowKey = chatRowKey(groupIdHex)
+        selectedPresentationsByGroup = selectedPresentationsByGroup - rowKey
+        selectedPreviewsByGroup = selectedPreviewsByGroup - rowKey
+        selectedActionsByGroup = selectedActionsByGroup - rowKey
+        cancelMemberSnapshotRetry(groupIdHex)
+        memberFetchRetryBackoffTierByGroup.remove(groupIdHex)
+        failedMemberFetches.remove(groupIdHex)
+        selfOnlyDirectGraceRetryGroups.remove(groupIdHex)
+        presentationMembersByGroup = presentationMembersByGroup - groupIdHex
+        localGroupNames.forget(groupIdHex)
     }
 
     private fun restoreRemovedChatRow(snapshot: RemovedChatRowSnapshot) {
@@ -4838,15 +4772,31 @@ class ChatsController private constructor(
         notify: Boolean = true,
     ): Boolean {
         val account = accountRef ?: return false
+        val epoch = bindEpoch
+        val isCurrent = { accountRef == account && isActiveBindEpoch(epoch) }
         val removedSnapshot = snapshotChatRowForRemoval(groupIdHex)
-        removeChatRow(groupIdHex)
-        val wipe = runCatching { appState.deleteGroupLocalWithClientCleanup(account, groupIdHex) }
+        removeChatRow(groupIdHex, optimistic = true)
+        var nativeCommitted = false
+        val wipe =
+            runCatching {
+                appState.deleteChatGroupLocalWithRecovery(account, groupIdHex, isCurrent) {
+                    nativeCommitted = true
+                }
+            }
         wipe.exceptionOrNull()?.let {
+            appState.schedulePendingLocalGroupDeleteCleanup(retryTransport = true)
+            if (isCurrent() && !nativeCommitted) removedSnapshot?.let(::restoreRemovedChatRow)
+            if (isCurrent() && nativeCommitted) {
+                removeChatRow(groupIdHex)
+                finishRemovedChatRowClientState(groupIdHex)
+            }
             if (it is CancellationException) throw it
-            removedSnapshot?.let(::restoreRemovedChatRow)
-            appState.presentFailure(R.string.toast_couldnt_delete_chat, "CHAT_LOCAL_DELETE", it)
+            if (isCurrent()) appState.presentFailure(R.string.toast_couldnt_delete_chat, "CHAT_LOCAL_DELETE", it)
             return false
         }
+        if (!isCurrent()) return false
+        removeChatRow(groupIdHex)
+        finishRemovedChatRowClientState(groupIdHex)
         if (notify) {
             appState.presentTransient(R.string.toast_chat_deleted_local)
         }
@@ -6341,7 +6291,7 @@ class ConversationController(
             conversationStartsLoading(startOnConstruction, accountRefOverride, appState.activeAccountRef),
         )
         private set
-    var isLoadingOlder by mutableStateOf(false)
+    internal var pageLoadInFlight by mutableStateOf<ConversationSearchPageDirection?>(null)
         internal set
     var hasMoreBefore by mutableStateOf(false)
         private set
@@ -7619,8 +7569,9 @@ class ConversationController(
                 val streamIdsLaunched =
                     applyTimelinePage(
                         newest.page,
-                        replaceWindow = true,
+                        replaceWindow = false,
                         updatePagination = true,
+                        reconcileNewExtendedRecords = true,
                     )
                 // An authoritative window is the recovery a stood-down forward prefetch was
                 // waiting for, so the viewport may ask for newer content again (#2764).
@@ -11434,8 +11385,7 @@ class ConversationController(
         val preparationGeneration = timelineWindowGeneration.advance()
         val installed = timelineSubscription?.latestInstalledWindow()
         val applied = installed?.page ?: page
-        val snapshot =
-            currentWindowApplySnapshot(timelineRecords.values, pendingProjectionsAwaitingBridge.keys)
+        val snapshot = currentWindowApplySnapshot()
         val preparation =
             prepareWindowApplyOn(
                 dispatcher = windowPreparationDispatcher,
@@ -11457,9 +11407,8 @@ class ConversationController(
                 pendingProjectionsAwaitingBridge.keys,
             )
         commitPlan.departedIds.forEach(::removeProjectedRecord)
-        if (replaceWindow) trimStateForWindowReplacement()
-        authoritativeTimelineOrderByMessageId.clear()
-        authoritativeTimelineOrderByMessageId.putAll(prepared.authoritativeOrder)
+        if (prepared.mode == WindowApplyMode.REPLACE) trimStateForWindowReplacement()
+        installAuthoritativeOrder(prepared)
         val streamIds = mutableListOf<String>()
         val appliedRecords = ArrayList<TimelineMessageRecordFfi>(prepared.rows.size)
         prepared.rows.forEach { row ->
@@ -11500,6 +11449,7 @@ class ConversationController(
         pruneRetentionAtSendToWindow()
         pruneConfirmedOptimisticReactions()
         pruneMessageOverlaysToWindow()
+        pruneRetainedTimelineRows(prepared)
         installWindowFrame(installed?.frame)
         // A replacement rebuilt every row, so every tally is stale. An extended window only changed
         // the rows it added, altered or dropped.
