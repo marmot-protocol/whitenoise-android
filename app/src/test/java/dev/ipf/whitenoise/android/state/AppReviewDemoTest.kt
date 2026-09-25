@@ -27,7 +27,8 @@ class AppReviewDemoTest {
     @Test
     fun initialReceiptLoadsAsynchronouslyIntoSnapshotState() =
         runTest {
-            val store = MemoryStore(checkpoint(groupId = group, demoRef = johnny.ref, demoId = johnny.id, completed = true))
+            val store =
+                MemoryStore(checkpoint(groupId = group, demoRef = johnny.ref, demoId = johnny.id, completed = true))
             val demo = AppReviewDemo(FakeBackend(), store, this, StandardTestDispatcher(testScheduler))
 
             assertEquals(ReviewDemoStatus.Idle, demo.status)
