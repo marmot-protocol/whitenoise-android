@@ -45,7 +45,7 @@ class DocumentProviderRelayMatrixTest {
             val arguments = InstrumentationRegistry.getArguments()
             assumeTrue(arguments.getString("documentProviderMatrix") == "true")
             val context = InstrumentationRegistry.getInstrumentation().targetContext
-            check(context.packageName == "dev.ipf.whitenoise.android.preview.pr2830")
+            check(context.packageName == arguments.getString("expectedPackage"))
             val fixtureCases =
                 listOf(
                     Case("text", "note.txt", "text/plain"),

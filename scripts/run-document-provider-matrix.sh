@@ -2,15 +2,12 @@
 # Fresh-emulator matrix for real SAF grants, relay delivery, viewers, and cleanup.
 set -euo pipefail
 
-[[ "${GITHUB_REF:-}" == "refs/heads/datawav/arbitrary-safe-files" ]] || {
-  echo "Document matrix is scoped to the PR 2830 branch" >&2
-  exit 1
-}
 [[ "${GITHUB_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || { echo "Missing exact source revision" >&2; exit 1; }
 
 fixture_apk="$(./scripts/document-provider-fixture/build.sh | tail -n 1)"
 [[ -f "$fixture_apk" ]] || { echo "Provider fixture build missing" >&2; exit 1; }
-export PR_NUMBER=2830
+# Reserve an isolated preview identity for this disposable CI matrix on any ref.
+export PR_NUMBER=900000
 export PR_PREVIEW_CHANNEL=isolated
 export PREVIEW_HEAD_SHA="$GITHUB_SHA"
 ./gradlew :app:assemblePreviewPlayDebug :app:assemblePreviewPlayDebugAndroidTest \
@@ -27,7 +24,7 @@ mapfile -t test_apks < <(find "$apk_root" -type f -name '*androidTest*.apk' | so
   exit 1
 }
 package_name() { "$aapt" dump badging "$1" | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -n 1; }
-app_package=dev.ipf.whitenoise.android.preview.pr2830
+app_package="dev.ipf.whitenoise.android.preview.pr${PR_NUMBER}"
 test_package="$app_package.test"
 [[ "$(package_name "${app_apks[0]}")" == "$app_package" ]] || { echo "Wrong preview package" >&2; exit 1; }
 [[ "$(package_name "${test_apks[0]}")" == "$test_package" ]] || { echo "Wrong test package" >&2; exit 1; }
@@ -53,6 +50,7 @@ mkdir -p "$report_dir"
 if ! timeout 1500 adb shell am instrument -w \
   -e class dev.ipf.whitenoise.android.ui.conversation.media.DocumentProviderRelayMatrixTest#providerGrantsSurviveReadAndRelayDeliveryButRevokeAndPlaintextCleanupWork \
   -e documentProviderMatrix true \
+  -e expectedPackage "$app_package" \
   "$test_package/androidx.test.runner.AndroidJUnitRunner" >"$report_dir/instrumentation.txt" 2>&1; then
   tail -n 100 "$report_dir/instrumentation.txt" >&2
   exit 1
