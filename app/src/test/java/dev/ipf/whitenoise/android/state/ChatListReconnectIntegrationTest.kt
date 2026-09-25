@@ -211,6 +211,45 @@ class ChatListReconnectIntegrationTest {
         }
     }
 
+    /** A window command during reconnect must not be overwritten by an older initial frame. */
+    @Test
+    fun commandDuringInitialValidationKeepsTheNewerFrame() {
+        val pinned = notificationChatListRow().copy(groupIdHex = "aa".repeat(32), pinned = true)
+        val group = notificationChatListRow().copy(groupIdHex = "bb".repeat(32))
+        val subscriptions = DroppedChatSubscriptions(pinned, group, secondRows = listOf(pinned))
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        subscriptions.suspendBeforeKeyedLookup = {
+            entered.complete(Unit)
+            release.await()
+        }
+        val controller =
+            testChatsController(chatListTestAppState(testRecoveryDiagnostics(), subscriptions.liveSubscriptions))
+        val bindScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        bindScope.launch { controller.bind(ConversationTimelineTestIds.ACCOUNT_REF) }
+        try {
+            awaitChatListCondition { subscriptions.first.nextUpdateStarted.isCompleted && controller.items.size == 2 }
+            subscriptions.groupProjection = null
+            subscriptions.second.commandRows = listOf(pinned, group)
+            subscriptions.first.close()
+            awaitChatListCondition { entered.isCompleted }
+            bindScope.launch { controller.returnChatListToTop() }
+            awaitChatListCondition {
+                controller.chatRows.map { it.groupIdHex }.toSet() == setOf(pinned.groupIdHex, group.groupIdHex)
+            }
+            release.complete(Unit)
+            awaitChatListCondition { subscriptions.second.nextUpdateStarted.isCompleted }
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(setOf(pinned.groupIdHex, group.groupIdHex), controller.chatRows.map { it.groupIdHex }.toSet())
+        } finally {
+            release.complete(Unit)
+            controller.onCleared()
+            subscriptions.closeAll()
+            bindScope.cancel()
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+    }
+
     @Test
     fun authoritativeArchiveLeaveAndDeleteCanRemoveTheChat() {
         val pinned =
@@ -565,6 +604,7 @@ private class ScriptedChatListSubscription(
     private val updates = Channel<ChatListWindowSnapshotFfi>(Channel.UNLIMITED)
     private var sequence = 0uL
     private var current = windowSnapshot(initialRows, sequence, view)
+    var commandRows: List<ChatListRowFfi>? = null
     val nextUpdateStarted = CompletableDeferred<Unit>()
 
     @Volatile var closed = false
@@ -592,7 +632,8 @@ private class ScriptedChatListSubscription(
     ): ChatListWindowSnapshotFfi = current
 
     /** Return-to-top echoes the installed replacement. */
-    override suspend fun returnToTop(sequence: ULong): ChatListWindowSnapshotFfi = current
+    override suspend fun returnToTop(sequence: ULong): ChatListWindowSnapshotFfi =
+        commandRows?.let { windowSnapshot(it, this.sequence + 1uL, view) } ?: current
 
     /** Delivers one authoritative update without blocking the test thread. */
     fun emit(update: ChatListSubscriptionUpdateFfi) {
@@ -621,14 +662,16 @@ private class ScriptedChatListSubscription(
 private class DroppedChatSubscriptions(
     pinned: ChatListRowFfi,
     group: ChatListRowFfi,
+    secondRows: List<ChatListRowFfi> = listOf(pinned, group),
 ) {
     val first = ScriptedChatListSubscription(listOf(pinned, group))
-    val second = ScriptedChatListSubscription(listOf(pinned, group))
+    val second = ScriptedChatListSubscription(secondRows)
     val archived = ScriptedChatListSubscription(emptyList(), ChatListViewFfi.ARCHIVED)
     val activeOpenCount = AtomicInteger()
     private val archivedOpenCount = AtomicInteger()
 
     @Volatile var pinnedProjection: ChatListRowFfi? = pinned
+    @Volatile var groupProjection: ChatListRowFfi? = group
     var beforeKeyedLookup: (() -> Unit)? = null
     var suspendBeforeKeyedLookup: (suspend () -> Unit)? = null
     private val groupId = group.groupIdHex
@@ -653,7 +696,7 @@ private class DroppedChatSubscriptions(
                 suspendBeforeKeyedLookup?.invoke()
                 when (id) {
                     pinnedId -> pinnedProjection?.let(::presentedRow)
-                    groupId -> presentedRow(group)
+                    groupId -> groupProjection?.let(::presentedRow)
                     else -> null
                 }
             },
