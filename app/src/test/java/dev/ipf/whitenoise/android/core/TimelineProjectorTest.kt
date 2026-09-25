@@ -610,6 +610,7 @@ class TimelineProjectorTest {
         mediaJson = mediaJson,
         media = media,
         agentTextStreamJson = null,
+        poll = null,
         groupSystem = null,
         hasReports = false,
         edit = null,

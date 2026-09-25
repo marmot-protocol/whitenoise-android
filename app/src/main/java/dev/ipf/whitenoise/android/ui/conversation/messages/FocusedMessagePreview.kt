@@ -4,7 +4,9 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -132,7 +134,7 @@ internal fun FocusedTextMessagePreview(
                 statusContainerColor = colorFromArgb(presentation.backgroundArgb),
             )
         }
-    val content: @Composable () -> Unit = {
+    val content: @Composable (Boolean) -> Unit = { compact ->
         senderName?.let { Text(it, style = MaterialTheme.typography.labelMedium) }
         BubbleFooterLayout(
             footer = footer,
@@ -143,7 +145,7 @@ internal fun FocusedTextMessagePreview(
                 Text(
                     text = excerpt,
                     style = MaterialTheme.typography.bodyLarge,
-                    maxLines = FOCUSED_PREVIEW_TEXT_LINES,
+                    maxLines = if (compact) 1 else FOCUSED_PREVIEW_TEXT_LINES,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.testTag("message-actions-excerpt"),
                     onTextLayout = { layout ->
@@ -161,31 +163,54 @@ internal fun FocusedTextMessagePreview(
         }
     }
     if (media == null) {
-        MessageBubbleFrame(
-            presentation = presentation,
-            highlighted = false,
-            mine = mine,
-            mentionedSelf = mentionedSelf,
-            mentionedYouLabel = mentionedYouLabel,
-        ) {
-            reply?.invoke()
-            content()
-        }
-    } else {
-        Column(
-            horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            reply?.invoke()
-            MediaCaptionFrame(
+        BoxWithConstraints {
+            // A short IME viewport cannot fit the quoted reply, five lines and footer.
+            // Keep the target excerpt and footer instead of clipping both out of view.
+            val compact = maxHeight <= 200.dp
+            MessageBubbleFrame(
                 presentation = presentation,
                 highlighted = false,
                 mine = mine,
                 mentionedSelf = mentionedSelf,
                 mentionedYouLabel = mentionedYouLabel,
-                alignEnd = mine,
-                media = { media() },
-            ) { content() }
+            ) {
+                if (!compact) reply?.invoke()
+                content(compact)
+            }
+        }
+    } else {
+        BoxWithConstraints {
+            val compact = maxHeight <= 200.dp
+            // The media envelope measures artwork before its caption. In a short IME frame a
+            // full-height artwork would otherwise consume the entire preview and clip the
+            // caption/footer. Retain an unscaled crop and reserve room for native-size text.
+            val mediaHeightLimit = (maxHeight - 100.dp).coerceAtLeast(24.dp)
+            Column(
+                horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (!compact) reply?.invoke()
+                MediaCaptionFrame(
+                    presentation = presentation,
+                    highlighted = false,
+                    mine = mine,
+                    mentionedSelf = mentionedSelf,
+                    mentionedYouLabel = mentionedYouLabel,
+                    alignEnd = mine,
+                    media = {
+                        if (compact) {
+                            Box(
+                                Modifier
+                                    .heightIn(max = mediaHeightLimit)
+                                    .clipToBounds()
+                                    .testTag("message-actions-media-viewport"),
+                            ) { media() }
+                        } else {
+                            media()
+                        }
+                    },
+                ) { content(compact) }
+            }
         }
     }
 }

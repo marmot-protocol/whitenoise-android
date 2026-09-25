@@ -407,9 +407,9 @@ class MessageBubbleFrameTest {
         }
     }
 
-    /** Substantial supplemental content widens a narrow media frame without stretching the media. */
+    /** A wide caption caps the envelope and keeps narrower media centered within it. */
     @Test
-    fun substantialSupplementWidensNarrowMediaAndPreservesAlignment() {
+    fun substantialSupplementCapsAndCentersNarrowMedia() {
         composeRule.setContent {
             Column {
                 listOf(false, true).forEach { alignEnd ->
@@ -425,7 +425,7 @@ class MessageBubbleFrameTest {
                                         .testTag("narrow-media-$alignEnd"),
                                 )
                             },
-                            supplement = { Box(Modifier.width(240.dp).height(40.dp)) },
+                            supplement = { Box(Modifier.width(300.dp).height(40.dp)) },
                         )
                     }
                 }
@@ -437,13 +437,9 @@ class MessageBubbleFrameTest {
                 val envelope =
                     composeRule.onNodeWithTag("wide-envelope-$alignEnd").fetchSemanticsNode().boundsInRoot
                 val media = composeRule.onNodeWithTag("narrow-media-$alignEnd").fetchSemanticsNode().boundsInRoot
-                assertEquals(240f, envelope.width, 1f)
+                assertEquals(ConversationMessageMetrics.RichContentCanvasWidth.value, envelope.width, 1f)
                 assertEquals(80f, media.width, 1f)
-                if (alignEnd) {
-                    assertEquals(envelope.right, media.right, 1f)
-                } else {
-                    assertEquals(envelope.left, media.left, 1f)
-                }
+                assertEquals(envelope.center.x, media.center.x, 1f)
             }
         }
     }

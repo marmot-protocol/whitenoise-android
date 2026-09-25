@@ -3,6 +3,30 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "Empty document send feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
+        "anchor": "R.string.media_file_empty",
+        "test_ids": ["MED-009"]
+      },
+      {
+        "surface": "Unreadable document send feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
+        "anchor": "R.string.media_file_unreadable",
+        "test_ids": ["MED-009"]
+      },
+      {
+        "surface": "Oversized document send feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
+        "anchor": "R.string.media_file_too_large",
+        "test_ids": ["MED-009"]
+      },
+      {
+        "surface": "Unprocessable document image feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
+        "anchor": "R.string.toast_couldnt_decode_image",
+        "test_ids": ["MED-009"]
+      },
+      {
         "surface": "Modifier.chatListEdgeFade",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEdgeFade.kt",
         "anchor": "fun Modifier.chatListEdgeFade(",
@@ -240,6 +264,14 @@
         "test_ids": [
           "CHL-010",
           "GRP-010"
+        ]
+      },
+      {
+        "surface": "chat-list local delete transport recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupLocalRemoval.kt",
+        "anchor": "deleteChatGroupLocalWithRecovery",
+        "test_ids": [
+          "CHL-010"
         ]
       },
       {
@@ -2435,6 +2467,24 @@
         ]
       },
       {
+        "surface": "Jump-to-newest badge count owner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "rememberConversationUnreadBadgeCount(",
+        "test_ids": ["CON-003"]
+      },
+      {
+        "surface": "ConversationNewerPageIndicator",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationNewerPageIndicator.kt",
+        "anchor": "fun ConversationNewerPageIndicator(",
+        "test_ids": ["CON-003"]
+      },
+      {
+        "surface": "string:conversation_loading_newer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationNewerPageIndicator.kt",
+        "anchor": "R.string.conversation_loading_newer",
+        "test_ids": ["CON-003"]
+      },
+      {
         "surface": "ConversationLoadErrorContent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "anchor": "fun ConversationLoadErrorContent(",
@@ -4420,6 +4470,17 @@
         "surface": "MediaCaptionFrame",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleFrame.kt",
         "anchor": "fun MediaCaptionFrame(",
+        "test_ids": [
+          "MED-003",
+          "MED-007",
+          "CON-011",
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "MediaCaptionContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MediaCaptionContent.kt",
+        "anchor": "fun MediaCaptionContent(",
         "test_ids": [
           "MED-003",
           "MED-007",
@@ -23067,9 +23128,25 @@
       {
         "surface": "Automatic forward prefetch recovers without reporting a paging failure",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationForwardPrefetchGuard.kt",
-        "anchor": "internal class AutomaticNewerPagingGuard",
+        "anchor": "internal class AutomaticPagingGuard(",
         "test_ids": [
           "CON-005",
+          "CON-003"
+        ]
+      },
+      {
+        "surface": "Automatic older prefetch stands down after a page brings no older rows instead of looping",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationTimelinePaging.kt",
+        "anchor": "fun ConversationController.settleOlderPrefetchGuard(",
+        "test_ids": [
+          "CON-003"
+        ]
+      },
+      {
+        "surface": "A flick settles only once its fling rests, so a page landing mid-fling cannot snap the transcript back",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScrollCoordinator.kt",
+        "anchor": "fun Flow<Interaction>.collectConversationDragInteractions(",
+        "test_ids": [
           "CON-003"
         ]
       },
@@ -23106,6 +23183,14 @@
         "anchor": "internal class LocalGroupNameAuthority",
         "test_ids": [
           "GRP-002",
+          "CHL-016"
+        ]
+      },
+      {
+        "surface": "An incomplete live top-window replacement retains active chats until authoritative reopen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatListReplacementGuard.kt",
+        "anchor": "internal fun missingActiveTopChatRows(",
+        "test_ids": [
           "CHL-016"
         ]
       },
@@ -25135,6 +25220,14 @@
         ]
       },
       {
+        "surface": "Long text and media previews leave a tappable action viewport above the keyboard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "val previewHeightLimit =",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
         "surface": "The long-press actions form a two-column labelled grid, falling back to one readable column",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActionGrid.kt",
         "anchor": "fun FocusedActionMenu(",
@@ -26755,7 +26848,7 @@
         ]
       },
       {
-        "surface": "MarmotKit SDK pin: backed-up in-place upgrade, startup, and sign-in compatibility",
+        "surface": "MarmotKit SDK pin: backed-up in-place upgrade, startup, sign-in, and replicated attachment download compatibility",
         "source": "app/src/main/marmotkit/MARMOT_VERSION",
         "anchor": "mdk-sha=",
         "test_ids": [
@@ -26767,7 +26860,9 @@
           "ONB-017",
           "ONB-018",
           "ONB-020",
-          "SEC-007"
+          "SEC-007",
+          "MED-019",
+          "MED-020"
         ]
       },
       {

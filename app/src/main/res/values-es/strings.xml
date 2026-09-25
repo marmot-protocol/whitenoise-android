@@ -999,6 +999,8 @@
     <string name="media_apk_invalid">El nombre de este archivo indica que es un APK, pero no es un paquete de Android válido</string>
     <string name="media_open">Abrir</string>
     <string name="media_file_too_large">Archivo demasiado grande para adjuntar</string>
+    <string name="media_file_unreadable">No se pudo leer este archivo. Selecciónalo de nuevo.</string>
+    <string name="media_file_empty">No se pueden enviar archivos vacíos.</string>
     <string name="media_album_too_large">Selección demasiado grande para enviar</string>
     <string name="group_image_search_title">Imagen del grupo</string>
     <string name="group_image_search_set">Establecer imagen del grupo</string>
@@ -2066,4 +2068,5 @@
     <string name="export_audit_logs_confirm_action">Continuar</string>
     <string name="toast_couldnt_export_audit_logs">No se pudieron preparar los registros de diagnóstico para exportarlos</string>
     <string name="toast_no_audit_logs_to_export">No hay registros de diagnóstico para exportar</string>
+    <string name="conversation_loading_newer">Cargando mensajes más recientes</string>
 </resources>

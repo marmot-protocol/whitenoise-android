@@ -984,6 +984,8 @@
     <string name="media_apk_invalid">此文件的名称显示为 APK，但不是有效的 Android 软件包</string>
     <string name="media_open">打开</string>
     <string name="media_file_too_large">文件过大,无法附加</string>
+    <string name="media_file_unreadable">无法读取此文件。请重新选择。</string>
+    <string name="media_file_empty">无法发送空文件。</string>
     <string name="media_album_too_large">所选内容过大,无法发送</string>
     <string name="group_image_search_title">群组头像</string>
     <string name="group_image_search_set">设置群组头像</string>
@@ -2038,4 +2040,5 @@
     <string name="export_audit_logs_confirm_action">继续</string>
     <string name="toast_couldnt_export_audit_logs">无法准备要导出的诊断日志</string>
     <string name="toast_no_audit_logs_to_export">没有可导出的诊断日志</string>
+    <string name="conversation_loading_newer">正在加载更新的消息</string>
 </resources>

@@ -1191,6 +1191,9 @@ class WhiteNoiseAppState private constructor(
 
     internal val appContext = context.applicationContext
     private val preferences = preferencesOverride ?: appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+    internal val localGroupDeleteCleanupJournal =
+        LocalGroupDeleteCleanupJournal(appContext.noBackupFilesDir.resolve("local-group-delete-cleanup"))
+    internal val localGroupDeleteCleanupMutex = Mutex()
     internal val defaultDisappearingMessagesPreferences =
         DefaultDisappearingMessagesPreferences(appContext, preferences)
     internal val conversationDictationPreferences = ConversationDictationPreferences(appContext)
@@ -2734,14 +2737,6 @@ class WhiteNoiseAppState private constructor(
         accountRef: String,
         groupIdHex: String,
     ): MessageDraftMutationResult = composerDraftExpansionBridge.deleteBeforeGroupRemoval(accountRef, groupIdHex)
-
-    /** Drops UI-only composer geometry when its owning conversation is explicitly removed. */
-    internal fun removeComposerExpansionForGroup(
-        accountRef: String,
-        groupIdHex: String,
-    ) {
-        composerExpansionStateRetention.removeGroup(accountRef, groupIdHex)
-    }
 
     /** Refreshes draft summaries behind account, request, and local-fingerprint fences. */
     internal fun refreshDraftSummaries(accountRef: String) {
@@ -4300,6 +4295,7 @@ class WhiteNoiseAppState private constructor(
             }
             startBootstrapRuntime()
             val refreshedAccounts = startupPerformance.stage(PerformancePhase.ACCOUNT_REFRESH, ::refreshAccountSnapshot)
+            schedulePendingLocalGroupDeleteCleanup()
             prepareStartupUnreadRefresh(refreshedAccounts)
             migrateLegacyDrafts()
             migrateLegacyMutePreferences()
@@ -4454,6 +4450,7 @@ class WhiteNoiseAppState private constructor(
 
     private suspend fun resumeCompletedBootstrap(): Boolean {
         if (!bootstrapCompleted) return false
+        schedulePendingLocalGroupDeleteCleanup()
         if (accounts.isNotEmpty() && activeAccountRef != null) phase = AppPhase.Ready
         val receiverReady = awaitNotificationReceiverForStartupWithin(notificationReceiverTimeoutMillis())
         appStateDebug { "bootstrap resumed; notification receiver active=$receiverReady" }
@@ -5009,6 +5006,7 @@ class WhiteNoiseAppState private constructor(
     /** Publishes the newest account snapshot, then refreshes unread state for that accepted set. */
     suspend fun refreshAccounts() {
         val refreshedAccounts = refreshAccountSnapshot()
+        schedulePendingLocalGroupDeleteCleanup()
         refreshAccountUnreadCounts(refreshedAccounts)
     }
 

@@ -1039,6 +1039,8 @@
     <string name="media_apk_invalid">Файл называется как APK, но не является допустимым пакетом Android</string>
     <string name="media_open">Открыть</string>
     <string name="media_file_too_large">Файл слишком большой для отправки</string>
+    <string name="media_file_unreadable">Не удалось прочитать этот файл. Выберите его снова.</string>
+    <string name="media_file_empty">Пустые файлы нельзя отправить.</string>
     <string name="media_album_too_large">Выбор слишком большой для отправки</string>
     <string name="group_image_search_title">Изображение группы</string>
     <string name="group_image_search_set">Задать изображение группы</string>
@@ -2126,4 +2128,5 @@
     <string name="export_audit_logs_confirm_action">Продолжить</string>
     <string name="toast_couldnt_export_audit_logs">Не удалось подготовить диагностические журналы к экспорту</string>
     <string name="toast_no_audit_logs_to_export">Нет диагностических журналов для экспорта</string>
+    <string name="conversation_loading_newer">Загрузка более новых сообщений</string>
 </resources>

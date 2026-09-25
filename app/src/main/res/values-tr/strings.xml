@@ -999,6 +999,8 @@
     <string name="media_apk_invalid">Bu dosya APK olarak adlandırılmış ancak geçerli bir Android paketi değil</string>
     <string name="media_open">Aç</string>
     <string name="media_file_too_large">Dosya eklenemeyecek kadar büyük</string>
+    <string name="media_file_unreadable">Bu dosya okunamadı. Yeniden seçin.</string>
+    <string name="media_file_empty">Boş dosyalar gönderilemez.</string>
     <string name="media_album_too_large">Seçim gönderilemeyecek kadar büyük</string>
     <string name="group_image_search_title">Grup görseli</string>
     <string name="group_image_search_set">Grup görseli ayarla</string>
@@ -2064,4 +2066,5 @@
     <string name="export_audit_logs_confirm_action">Devam</string>
     <string name="toast_couldnt_export_audit_logs">Tanılama günlükleri dışa aktarmaya hazırlanamadı</string>
     <string name="toast_no_audit_logs_to_export">Dışa aktarılacak tanılama günlüğü yok</string>
+    <string name="conversation_loading_newer">Daha yeni mesajlar yükleniyor</string>
 </resources>

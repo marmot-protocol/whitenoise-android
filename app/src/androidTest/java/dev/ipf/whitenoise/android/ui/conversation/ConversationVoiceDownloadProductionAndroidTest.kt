@@ -1183,6 +1183,7 @@ private fun instrumentedTimelineRecord(
         mediaJson = null,
         media = listOfNotNull(media).mapIndexed { slot, reference -> accepted(slot, reference) },
         agentTextStreamJson = null,
+        poll = null,
         groupSystem = null,
         hasReports = false,
         edit = null,

@@ -26,6 +26,7 @@ import dev.ipf.marmotkit.ChatListRowActionsFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
+import dev.ipf.marmotkit.ChatListViewFfi
 import dev.ipf.marmotkit.ChatPinStateFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.DeletionSourceFfi
@@ -1489,28 +1490,23 @@ internal fun firstUnreadReceivedIndex(
 /**
  * Count of received messages positioned after the read anchor in [timeline].
  * A null anchor is treated as "nothing read yet", so the count starts from
- * the first row. When a bounded window has evicted a non-null anchor, callers
- * can supply [missingAnchorUnreadCount] from the authoritative projection;
- * counting the historical window itself would label every retained row unread.
- * Anchoring on a message id (not an index) keeps the count stable when
- * load-older prepends shift every index by the same offset.
+ * the first row; an anchor the window does not hold counts the same way, so
+ * callers that may be looking at evicted history decide for themselves
+ * (see `ConversationUnreadBadge`). Anchoring on a message id (not an index)
+ * keeps the count stable when load-older prepends shift every index by the
+ * same offset.
  */
 internal fun countUnreadIncoming(
     timeline: List<TimelineMessage>,
     readAnchorMessageId: String?,
-    missingAnchorUnreadCount: Int? = null,
 ): Int {
     if (timeline.isEmpty()) return 0
     val anchorIdx =
         readAnchorMessageId?.let { id ->
             timeline.indexOfFirst { it.record.messageIdHex == id }
         } ?: -1
-    return if (readAnchorMessageId != null && anchorIdx < 0 && missingAnchorUnreadCount != null) {
-        missingAnchorUnreadCount.coerceAtLeast(0)
-    } else {
-        timeline.drop(anchorIdx + 1).count {
-            it.record.direction == "received" && !isDerivedStateKind(it.record.kind)
-        }
+    return timeline.drop(anchorIdx + 1).count {
+        it.record.direction == "received" && !isDerivedStateKind(it.record.kind)
     }
 }
 
@@ -2040,77 +2036,6 @@ internal fun duplicateSignatureKeyDisplayName(
     refs: List<String>,
     displayName: (String) -> String,
 ): String = refs.firstOrNull()?.let(displayName).orEmpty()
-
-/**
- * Whether the engine's authoritative self-membership says the local account is
- * no longer in the group: [SelfMembershipFfi.REMOVED] (evicted) or
- * [SelfMembershipFfi.LEFT] (voluntary departure). Both are terminal non-member
- * states; [SelfMembershipFfi.MEMBER] is the only membership-preserving value.
- */
-internal fun SelfMembershipFfi.isNonMember(): Boolean = this == SelfMembershipFfi.REMOVED || this == SelfMembershipFfi.LEFT
-
-internal data class ConversationMembershipSeed(
-    val members: List<AppGroupMemberRecordFfi>,
-    val membersLoaded: Boolean,
-    val seededSelfMember: Boolean,
-    val seededMembershipKnown: Boolean,
-    val membersVerified: Boolean,
-)
-
-internal fun conversationMembershipSeed(
-    initialGroup: AppGroupRecordFfi,
-    initialMemberSnapshot: GroupMemberSnapshot?,
-    activeAccountIdHex: String?,
-): ConversationMembershipSeed {
-    val initialMembers = initialMemberSnapshot?.members.orEmpty()
-    val projectedNonMember = initialGroup.selfMembership.isNonMember()
-    val projectedMember = initialGroup.selfMembership == SelfMembershipFfi.MEMBER
-    val seededMembers =
-        if (projectedNonMember) {
-            GroupProjector.membersWithoutActiveAccount(initialMembers, activeAccountIdHex)
-        } else {
-            initialMembers
-        }
-    val seededSelfMember =
-        projectedMember ||
-            (
-                !projectedNonMember &&
-                    initialMembers.any { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
-            )
-    return ConversationMembershipSeed(
-        members = seededMembers,
-        membersLoaded = initialMemberSnapshot?.members?.isNotEmpty() == true,
-        seededSelfMember = seededSelfMember,
-        seededMembershipKnown = projectedMember || projectedNonMember || initialMemberSnapshot != null,
-        membersVerified = projectedNonMember,
-    )
-}
-
-internal class ConversationSelfLeftState(
-    seededMembershipKnown: Boolean,
-    seededSelfMember: Boolean,
-) {
-    var selfLeft by mutableStateOf(seededMembershipKnown && !seededSelfMember)
-        private set
-
-    fun recordSelfLeft() {
-        selfLeft = true
-    }
-
-    fun clearSelfLeft() {
-        selfLeft = false
-    }
-
-    fun isSelfMember(
-        members: List<AppGroupMemberRecordFfi>,
-        activeAccountIdHex: String?,
-    ): Boolean = GroupProjector.isSelfStillMember(members, activeAccountIdHex, selfLeft)
-
-    fun rosterHonoringSelfLeft(
-        members: List<AppGroupMemberRecordFfi>,
-        activeAccountIdHex: String?,
-    ): List<AppGroupMemberRecordFfi> = GroupProjector.rosterHonoringSelfLeft(members, activeAccountIdHex, selfLeft)
-}
 
 internal fun agentStreamFailureText(
     throwable: Throwable,
@@ -3060,7 +2985,14 @@ class ChatsController private constructor(
                             activeChatsSubscription = chatStream
                         }
                     }
-                    replacePresentedChatRows(chatListStream.rows)
+                    val initialFrame = chatListStream.frame()
+                    requireCompleteChatListWindowRows(
+                        validateChatListWindowRows(accountRef, chatListStream, initialFrame.rows) &&
+                            !chatListStream.closed &&
+                            chatListWindows === chatListStream,
+                    )
+                    chatListStream.publishIfCurrent(initialFrame, ::replacePresentedChatRows)
+                    appState.schedulePendingLocalGroupDeleteCleanup()
                     appState.recordAccountSwitchLocalRowsReady(accountRef, chatRows.size)
                     groupRecordsById =
                         withContext(Dispatchers.IO) {
@@ -3077,7 +3009,6 @@ class ChatsController private constructor(
                     isLoading = false
                     error = null
                     recompute()
-
                     // Draw the local projection before catch-up; live updates fold fresh state afterward.
                     if (!localFramePresented) {
                         awaitRenderedChatListFrame()
@@ -3094,15 +3025,22 @@ class ChatsController private constructor(
                     coroutineScope {
                         runUntilFirstLiveSubscriptionEnds(
                             first = {
-                                chatListStream.receive { _, _ ->
+                                chatListStream.receive { view, replacement ->
                                     appState.recoveryDiagnostics
                                         .recordChatListSubscriptionReceived()
                                         ?.let { generation ->
                                             pendingRecoveryProjectionGeneration.publish(generation)
                                         }
+                                    chatsDebug {
+                                        "chat list window view=$view sequence=${replacement.sequence} " +
+                                            "rows=${replacement.rows.size} merged=${chatListStream.rows.size}"
+                                    }
+                                    requireCompleteChatListWindowRows(
+                                        applyChatListWindowRows(accountRef, chatListStream),
+                                    )
                                     receivedLiveUpdate = true
                                     connectionOwner.noteLiveUpdate(connectionAttempt)
-                                    applyChatListWindowRows(accountRef, chatListStream.rows)
+                                    appState.schedulePendingLocalGroupDeleteCleanup()
                                 }
                             },
                             second = {
@@ -4179,15 +4117,64 @@ class ChatsController private constructor(
         }
     }
 
-    /** Applies the merged rows of every open chat-list window after a newer replacement was installed. */
+    /** Applies the merged rows only after checking an unexpected active-row drop against MDK. */
     @VisibleForTesting
-    internal fun applyChatListWindowRows(
+    internal suspend fun applyChatListWindowRows(
         accountRef: String,
+        windows: ChatListWindowSet,
+    ): Boolean {
+        val frame = windows.frame()
+        val valid = validateChatListWindowRows(accountRef, windows, frame.rows)
+        return when {
+            windows.closed || chatListWindows !== windows -> {
+                windows.close()
+                false
+            }
+            !windows.isCurrent(frame) -> true
+            !valid -> {
+                windows.close()
+                false
+            }
+            else -> {
+                windows.publishIfCurrent(frame) { rows ->
+                    replacePresentedChatRows(rows)
+                    scheduleRecompute()
+                }
+                !windows.closed
+            }
+        }
+    }
+
+    // A failed keyed read or a confirmed missing row must abort before replacing the coherent frame.
+    @Suppress("ReturnCount")
+    private suspend fun validateChatListWindowRows(
+        accountRef: String,
+        windows: ChatListWindowSet,
         rows: List<PresentedChatRowFfi>,
-    ) {
-        chatsDebug { "chat list window replacement account=${accountRef.take(8)} rows=${rows.size}" }
-        replacePresentedChatRows(rows)
-        scheduleRecompute()
+    ): Boolean {
+        val lookup = liveSubscriptions.presentedRowByGroup ?: return true
+        val activeWindow = windows.installed(ChatListViewFfi.CHATS)
+        val previous =
+            chatRowsByGroup.map { (key, row) -> optimisticChatListPreviewByGroup[key]?.baselineRow ?: row }
+        val candidates = missingActiveTopChatRows(previous, rows, activeWindow)
+        for (old in candidates) {
+            val authoritative =
+                runCatchingCancellable { lookup(accountRef, old.groupIdHex) }
+                    .getOrElse { failure ->
+                        Log.w("DMChats", "CHAT_LIST_ROW_CHECK_FAILED reason=${failure.javaClass.simpleName}")
+                        return false
+                    }?.row ?: continue
+            if (authoritative.belongsInActiveChats() && activeWindow?.shouldContain(authoritative) == true) {
+                Log.w(
+                    "DMChats",
+                    "CHAT_LIST_INCOMPLETE account=${chatListLogHash(accountRef)} " +
+                        "generation=${chatListLogHash(activeWindow.subscriptionGeneration)} " +
+                        "sequence=${activeWindow.sequence} previous=${previous.size} incoming=${rows.size}",
+                )
+                return false
+            }
+        }
+        return true
     }
 
     /** Atomically replaces both base rows and their matching selected presentation. */
@@ -4367,24 +4354,32 @@ class ChatsController private constructor(
         )
     }
 
-    private fun removeChatRow(groupIdHex: String) {
+    private fun removeChatRow(
+        groupIdHex: String,
+        optimistic: Boolean = false,
+    ) {
         val rowKey = chatRowKey(groupIdHex)
         val removedRow = chatRowsByGroup.remove(rowKey)
         if (removedRow != null) {
-            selectedPresentationsByGroup = selectedPresentationsByGroup - rowKey
-            selectedPreviewsByGroup = selectedPreviewsByGroup - rowKey
-            selectedActionsByGroup = selectedActionsByGroup - rowKey
             activitySequenceByGroup.remove(rowKey)
             optimisticChatListPreviewByGroup.remove(rowKey)
-            cancelMemberSnapshotRetry(removedRow.groupIdHex)
-            memberFetchRetryBackoffTierByGroup.remove(removedRow.groupIdHex)
-            failedMemberFetches.remove(removedRow.groupIdHex)
-            selfOnlyDirectGraceRetryGroups.remove(removedRow.groupIdHex)
-            presentationMembersByGroup = presentationMembersByGroup - removedRow.groupIdHex
-            localGroupNames.forget(removedRow.groupIdHex)
+            if (!optimistic) finishRemovedChatRowClientState(removedRow.groupIdHex)
             noteMaterializedGroupMembershipChanged()
             scheduleRecompute()
         }
+    }
+
+    private fun finishRemovedChatRowClientState(groupIdHex: String) {
+        val rowKey = chatRowKey(groupIdHex)
+        selectedPresentationsByGroup = selectedPresentationsByGroup - rowKey
+        selectedPreviewsByGroup = selectedPreviewsByGroup - rowKey
+        selectedActionsByGroup = selectedActionsByGroup - rowKey
+        cancelMemberSnapshotRetry(groupIdHex)
+        memberFetchRetryBackoffTierByGroup.remove(groupIdHex)
+        failedMemberFetches.remove(groupIdHex)
+        selfOnlyDirectGraceRetryGroups.remove(groupIdHex)
+        presentationMembersByGroup = presentationMembersByGroup - groupIdHex
+        localGroupNames.forget(groupIdHex)
     }
 
     private fun restoreRemovedChatRow(snapshot: RemovedChatRowSnapshot) {
@@ -4777,15 +4772,31 @@ class ChatsController private constructor(
         notify: Boolean = true,
     ): Boolean {
         val account = accountRef ?: return false
+        val epoch = bindEpoch
+        val isCurrent = { accountRef == account && isActiveBindEpoch(epoch) }
         val removedSnapshot = snapshotChatRowForRemoval(groupIdHex)
-        removeChatRow(groupIdHex)
-        val wipe = runCatching { appState.deleteGroupLocalWithClientCleanup(account, groupIdHex) }
+        removeChatRow(groupIdHex, optimistic = true)
+        var nativeCommitted = false
+        val wipe =
+            runCatching {
+                appState.deleteChatGroupLocalWithRecovery(account, groupIdHex, isCurrent) {
+                    nativeCommitted = true
+                }
+            }
         wipe.exceptionOrNull()?.let {
+            appState.schedulePendingLocalGroupDeleteCleanup(retryTransport = true)
+            if (isCurrent() && !nativeCommitted) removedSnapshot?.let(::restoreRemovedChatRow)
+            if (isCurrent() && nativeCommitted) {
+                removeChatRow(groupIdHex)
+                finishRemovedChatRowClientState(groupIdHex)
+            }
             if (it is CancellationException) throw it
-            removedSnapshot?.let(::restoreRemovedChatRow)
-            appState.presentFailure(R.string.toast_couldnt_delete_chat, "CHAT_LOCAL_DELETE", it)
+            if (isCurrent()) appState.presentFailure(R.string.toast_couldnt_delete_chat, "CHAT_LOCAL_DELETE", it)
             return false
         }
+        if (!isCurrent()) return false
+        removeChatRow(groupIdHex)
+        finishRemovedChatRowClientState(groupIdHex)
         if (notify) {
             appState.presentTransient(R.string.toast_chat_deleted_local)
         }
@@ -6280,7 +6291,7 @@ class ConversationController(
             conversationStartsLoading(startOnConstruction, accountRefOverride, appState.activeAccountRef),
         )
         private set
-    var isLoadingOlder by mutableStateOf(false)
+    internal var pageLoadInFlight by mutableStateOf<ConversationSearchPageDirection?>(null)
         internal set
     var hasMoreBefore by mutableStateOf(false)
         private set
@@ -7562,9 +7573,11 @@ class ConversationController(
                         updatePagination = true,
                         reconcileNewExtendedRecords = true,
                     )
-                // An authoritative window is the recovery a stood-down forward prefetch was
-                // waiting for, so the viewport may ask for newer content again (#2764).
-                automaticNewerPaging.reset()
+                // An authoritative window is the recovery a stood-down prefetch was waiting
+                // for, so the viewport may ask for more content in either direction (#2764).
+                // A reader parked at the start of history therefore asks once more per live
+                // batch, which is bounded by arrivals rather than by layout passes (#2727).
+                automaticPaging.reset()
                 publishRecoveryTimelineProjection(batch.mapNotNull { it.recoveryGeneration }.maxOrNull())
                 // Scroll-driven mark-read in the UI layer handles
                 // the user-visible read pointer.
@@ -11065,8 +11078,12 @@ class ConversationController(
         }.getOrNull()
     }
 
-    suspend fun loadOlder(anchorMessageIdHex: String? = null) {
-        loadOlderPage(anchorMessageIdHex)
+    /** Pages older from [anchorMessageIdHex]; an automatic [origin] stands down once the engine has nothing older. */
+    suspend fun loadOlder(
+        anchorMessageIdHex: String? = null,
+        origin: PagingOrigin = PagingOrigin.EXPLICIT,
+    ) {
+        loadOlderPage(anchorMessageIdHex, origin)
     }
 
     /** True when the canonical timeline holds more history after the loaded window. */
@@ -11186,7 +11203,10 @@ class ConversationController(
      *
      * True only when new rows arrived, so callers that page in a loop still stop on no progress.
      */
-    private suspend fun loadOlderPage(anchorMessageIdHex: String? = null): Boolean = loadOlderPageInternal(anchorMessageIdHex) == ConversationPageLoad.ADVANCED
+    private suspend fun loadOlderPage(
+        anchorMessageIdHex: String? = null,
+        origin: PagingOrigin = PagingOrigin.EXPLICIT,
+    ): Boolean = loadOlderPageInternal(anchorMessageIdHex, origin) == ConversationPageLoad.ADVANCED
 
     /** Pages the window newer for [origin]; true only when new rows arrived. */
     private suspend fun loadNewerPage(origin: PagingOrigin = PagingOrigin.EXPLICIT): Boolean {
@@ -11194,12 +11214,16 @@ class ConversationController(
         return load == ConversationPageLoad.ADVANCED
     }
 
-    // Bounds the opportunistic forward prefetch after a failure the reader is never shown (#2764).
-    internal val automaticNewerPaging = AutomaticNewerPagingGuard()
+    // Bounds the opportunistic prefetch in each direction once it stops making progress (#2764, #2727).
+    internal val automaticPaging = AutomaticPagingGuards()
 
     /** Whether viewport-driven forward prefetch should stand down until a page advances. */
     val automaticNewerPagingBlocked: Boolean
-        get() = automaticNewerPaging.blocked
+        get() = automaticPaging.newer.blocked
+
+    /** Whether scroll-driven older prefetch should stand down after a page brought no older rows (#2727). */
+    val automaticOlderPagingBlocked: Boolean
+        get() = automaticPaging.older.blocked
 
     /**
      * Whether an older page failed in a way the reader must retry.
@@ -11429,6 +11453,9 @@ class ConversationController(
             hasMoreBefore = applied.hasMoreBefore
             hasMoreAfter = applied.hasMoreAfter
         }
+        // A rebuilt window is a new place in history, so a prefetch that stood down at the old
+        // edge gets to ask again from here (#2727).
+        if (replaceWindow || prepared.mode == WindowApplyMode.REPLACE) automaticPaging.reset()
         // Rows this page kept skip re-projection, so their projected items still carry the ordinal
         // from where the window used to sit. Display sorts on that ordinal, so re-stamp it before
         // publishing or a slid window would reorder history the reader is looking at.

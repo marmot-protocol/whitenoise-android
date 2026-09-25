@@ -11,9 +11,13 @@ import dev.ipf.whitenoise.android.media.Thumbhash
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.conversation.media.BoundedDocumentRead
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
+import dev.ipf.whitenoise.android.ui.conversation.media.normalizeDocumentMime
 import dev.ipf.whitenoise.android.ui.conversation.media.queryContentSize
 import dev.ipf.whitenoise.android.ui.conversation.media.queryDisplayName
+import dev.ipf.whitenoise.android.ui.conversation.media.readBoundedDocument
+import dev.ipf.whitenoise.android.ui.conversation.media.safeDocumentDisplayName
 import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
 import dev.ipf.whitenoise.android.ui.conversation.share.SharedContact
 import dev.ipf.whitenoise.android.ui.conversation.share.VCARD_MIME_TYPE
@@ -30,10 +34,26 @@ private const val MEDIA_ALBUM_MAX_TOTAL_BYTES = ConversationController.MEDIA_RET
 
 internal data class DocumentReadOutcome(
     val attachments: List<PendingAttachment>,
-    val rejected: Boolean,
+    val failures: Set<DocumentReadFailure>,
     val albumOverflowed: Boolean,
     val totalBytes: Long,
 )
+
+internal enum class DocumentReadFailure {
+    TOO_LARGE,
+    UNREADABLE,
+    EMPTY,
+    UNPROCESSABLE_IMAGE,
+}
+
+private val DocumentReadFailure.messageResource: Int
+    get() =
+        when (this) {
+            DocumentReadFailure.TOO_LARGE -> R.string.media_file_too_large
+            DocumentReadFailure.UNREADABLE -> R.string.media_file_unreadable
+            DocumentReadFailure.EMPTY -> R.string.media_file_empty
+            DocumentReadFailure.UNPROCESSABLE_IMAGE -> R.string.toast_couldnt_decode_image
+        }
 
 internal data class VisualReadOutcome(
     val attachments: List<PendingAttachment>,
@@ -174,11 +194,11 @@ internal class ConversationAttachmentReader(
     // sendStagedAttachments path can blend its results with the image decode.
     private data class DocumentReadAccumulator(
         val attachments: MutableList<PendingAttachment> = mutableListOf(),
-        var rejected: Boolean = false,
+        val failures: MutableSet<DocumentReadFailure> = mutableSetOf(),
         var albumOverflowed: Boolean = false,
         var totalBytes: Long = 0L,
     ) {
-        fun outcome(): DocumentReadOutcome = DocumentReadOutcome(attachments, rejected, albumOverflowed, totalBytes)
+        fun outcome(): DocumentReadOutcome = DocumentReadOutcome(attachments, failures, albumOverflowed, totalBytes)
     }
 
     suspend fun readPickedDocuments(
@@ -202,14 +222,13 @@ internal class ConversationAttachmentReader(
         bytesBudget: Long,
         state: DocumentReadAccumulator,
     ) {
-        val reportedMime = safeGetType(context.contentResolver, uri)
-        val resolvedMime = reportedMime.takeIf { it.isNotBlank() } ?: "application/octet-stream"
+        val resolvedMime = normalizeDocumentMime(safeGetType(context.contentResolver, uri))
         val remainingBytes = (bytesBudget - state.totalBytes).coerceAtLeast(0L)
         val sniffedImageMime = MediaPipeline.sniffImageMediaType(context.contentResolver, uri)
         if (isImageDocumentPick(resolvedMime, sniffedImageMime)) {
             readSanitizedImageDocument(uri, remainingBytes, state)
         } else {
-            readRawDocument(uri, resolvedMime, remainingBytes, bytesBudget, state)
+            readRawDocument(uri, resolvedMime, remainingBytes, state)
         }
     }
 
@@ -222,7 +241,8 @@ internal class ConversationAttachmentReader(
         val attachment = outcome.attachment
         when {
             outcome.overflowed && remainingBytes < MEDIA_ATTACHMENT_MAX_BYTES -> state.albumOverflowed = true
-            outcome.overflowed || attachment == null -> state.rejected = true
+            outcome.overflowed -> state.failures += DocumentReadFailure.TOO_LARGE
+            attachment == null -> state.failures += DocumentReadFailure.UNPROCESSABLE_IMAGE
             else -> {
                 state.totalBytes += attachment.plaintextBytes.size
                 state.attachments += attachment
@@ -234,34 +254,33 @@ internal class ConversationAttachmentReader(
         uri: android.net.Uri,
         mediaType: String,
         remainingBytes: Long,
-        bytesBudget: Long,
         state: DocumentReadAccumulator,
     ) {
         val declaredSize = queryContentSize(context.contentResolver, uri)
-        if (declaredSize > 0L && declaredSize > MEDIA_ATTACHMENT_MAX_BYTES) {
-            state.rejected = true
+        if (declaredSize > MEDIA_ATTACHMENT_MAX_BYTES) {
+            state.failures += DocumentReadFailure.TOO_LARGE
         } else {
             val perFileCap =
                 minOf(MEDIA_ATTACHMENT_MAX_BYTES, remainingBytes)
                     .coerceAtMost(Int.MAX_VALUE.toLong())
                     .toInt()
-            val bytes =
-                runCatching {
-                    context.contentResolver.openInputStream(uri)?.use { stream ->
-                        MediaPipeline.readBoundedBytes(stream, perFileCap)
+            when (val read = readBoundedDocument(perFileCap) { context.contentResolver.openInputStream(uri) }) {
+                BoundedDocumentRead.TooLarge -> {
+                    if (remainingBytes < MEDIA_ATTACHMENT_MAX_BYTES) {
+                        state.albumOverflowed = true
+                    } else {
+                        state.failures += DocumentReadFailure.TOO_LARGE
                     }
-                }.getOrNull()
-            when {
-                bytes == null -> state.rejected = true
-                bytes.isEmpty() -> Unit
-                state.totalBytes + bytes.size > bytesBudget -> state.albumOverflowed = true
-                else -> {
-                    state.totalBytes += bytes.size
+                }
+                BoundedDocumentRead.Empty -> state.failures += DocumentReadFailure.EMPTY
+                BoundedDocumentRead.Unreadable -> state.failures += DocumentReadFailure.UNREADABLE
+                is BoundedDocumentRead.Success -> {
+                    state.totalBytes += read.bytes.size
                     state.attachments +=
                         PendingAttachment(
-                            plaintextBytes = bytes,
+                            plaintextBytes = read.bytes,
                             mediaType = mediaType,
-                            fileName = queryDisplayName(context.contentResolver, uri) ?: "file",
+                            fileName = safeDocumentDisplayName(queryDisplayName(context.contentResolver, uri)),
                             dim = null,
                         )
                 }
@@ -499,7 +518,7 @@ internal class ConversationMediaSender(
         val documentBudget = (MEDIA_ALBUM_MAX_TOTAL_BYTES - images.totalBytes).coerceAtLeast(0L)
         val documents =
             if (documentUris.isEmpty()) {
-                DocumentReadOutcome(emptyList(), rejected = false, albumOverflowed = false, totalBytes = 0L)
+                DocumentReadOutcome(emptyList(), emptySet(), albumOverflowed = false, totalBytes = 0L)
             } else {
                 readStagedDocuments(documentUris, preparedDocumentAttachments, documentBudget)
             }
@@ -524,7 +543,7 @@ internal class ConversationMediaSender(
     ): DocumentReadOutcome {
         val attachments = mutableListOf<PendingAttachment>()
         var totalBytes = 0L
-        var rejected = false
+        val failures = mutableSetOf<DocumentReadFailure>()
         var overflowed = false
         documentUris.forEach { uri ->
             val remaining = (bytesBudget - totalBytes).coerceAtLeast(0L)
@@ -544,11 +563,11 @@ internal class ConversationMediaSender(
                 val read = attachmentReader.readPickedDocuments(listOf(uri), remaining)
                 attachments += read.attachments
                 totalBytes += read.totalBytes
-                rejected = rejected || read.rejected
+                failures += read.failures
                 overflowed = overflowed || read.albumOverflowed
             }
         }
-        return DocumentReadOutcome(attachments, rejected, overflowed, totalBytes)
+        return DocumentReadOutcome(attachments, failures, overflowed, totalBytes)
     }
 
     private suspend fun readStagedImages(
@@ -626,8 +645,9 @@ internal class ConversationMediaSender(
         }
         if (prepared.imageOverflowed || prepared.documents.albumOverflowed) {
             appState.present(R.string.media_album_too_large)
-        } else if (prepared.documents.rejected) {
-            appState.present(R.string.media_file_too_large)
+        } else {
+            val failure = prepared.documents.failures.firstOrNull()
+            if (failure != null) appState.present(failure.messageResource)
         }
         return !prepared.isEmpty
     }

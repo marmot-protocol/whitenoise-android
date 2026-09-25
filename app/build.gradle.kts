@@ -265,6 +265,8 @@ val prNumber: String? = System.getenv("PR_NUMBER")?.takeIf { it.isNotBlank() }
 val prPreviewChannel: String? = System.getenv("PR_PREVIEW_CHANNEL")?.takeIf { it.isNotBlank() }
 // The isolated preview's real-relay AndroidTest runs only on an explicit CI invocation.
 val previewE2eTestBuild = providers.gradleProperty("whitenoise.previewE2eTestBuild").map(String::toBoolean).getOrElse(false)
+val previewProviderMatrixBuild =
+    providers.gradleProperty("whitenoise.previewProviderMatrixBuild").map(String::toBoolean).getOrElse(false)
 // Android accepts an update whose versionCode equals the installed version.
 // A fixed preview-only code therefore lets a tester move between any two PR
 // builds without uninstalling and losing the preview app's data.
@@ -691,7 +693,9 @@ androidComponents {
                             "benchmarkRelease",
                             "nonMinifiedRelease",
                         )
-                "preview" -> variantBuilder.buildType == "release" || (previewE2eTestBuild && variantBuilder.buildType == "debug")
+                "preview" ->
+                    variantBuilder.buildType == "release" ||
+                        ((previewE2eTestBuild || previewProviderMatrixBuild) && variantBuilder.buildType == "debug")
                 "production", "staging" -> variantBuilder.buildType == "release"
                 else -> true
             }
@@ -1165,6 +1169,10 @@ tasks.withType<Test>().configureEach {
     // A failed assertion's message (expected vs actual) must reach the CI log: the reports are not uploaded,
     // so the default short format left only "AssertionError at File.kt:162" to diagnose from.
     testLogging.exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+    // A worker killed by the CI timeout never uploads reports. Keep its last entered test visible in the CI log.
+    if (providers.environmentVariable("CI").orNull == "true") {
+        testLogging.events = testLogging.events + org.gradle.api.tasks.testing.logging.TestLogEvent.STARTED
+    }
 }
 
 tasks.register<Test>("replayAppFuzzSyntheticCorpus") {
