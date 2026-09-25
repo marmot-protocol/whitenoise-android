@@ -245,8 +245,14 @@ internal object ChatScreenshotPreferences {
         preferences: SharedPreferences,
         enabled: Boolean,
     ) {
-        preferences.edit().putBoolean(KEY_ALLOW_CHAT_SCREENSHOTS, enabled).apply()
+        editAllowChatScreenshots(preferences.edit(), enabled).apply()
     }
+
+    /** Adds the screenshot preference to a caller-owned durable editor transaction. */
+    fun editAllowChatScreenshots(
+        editor: SharedPreferences.Editor,
+        enabled: Boolean,
+    ): SharedPreferences.Editor = editor.putBoolean(KEY_ALLOW_CHAT_SCREENSHOTS, enabled)
 }
 
 internal object LongMessageCollapsePreferences {
@@ -2303,6 +2309,7 @@ class WhiteNoiseAppState private constructor(
                 }
             },
         )
+    private val hostPreferenceCommitMutex = Mutex()
     private val inFlightAttachmentAcquisitions =
         InFlightAttachmentAcquisitions(mutationsScope, attachmentDownloadGate::promote)
     internal val attachmentOpens =
@@ -6415,36 +6422,47 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /** Times one synchronous preference serialization/enqueue without changing its write policy. */
-    private inline fun persistHostSetting(write: () -> Unit) {
+    /** Commits one host preference transaction off-main and times actual durable completion. */
+    @Suppress("TooGenericExceptionCaught") // Editor creation/configuration can throw provider-specific failures.
+    private fun persistHostSetting(edit: SharedPreferences.Editor.() -> Unit) {
         val attempt = beginHostPerformance(HostPerformanceOperationFfi.SETTINGS_SAVE)
-        try {
-            write()
-            attempt.success()
-        } catch (throwable: Throwable) {
-            attempt.failure()
-            throw throwable
-        }
+        val editor =
+            try {
+                preferences.edit().apply(edit)
+            } catch (throwable: Throwable) {
+                attempt.failure()
+                throw throwable
+            }
+        mutationsScope
+            .launch {
+                hostPreferenceCommitMutex.withLock {
+                    withContext(Dispatchers.IO) {
+                        completeHostPreferenceCommit(attempt, editor::commit)
+                    }
+                }
+            }.invokeOnCompletion { cause ->
+                if (cause is CancellationException) attempt.cancel()
+            }
     }
 
     fun updateDeveloperMode(enabled: Boolean) {
         developerMode = enabled
-        persistHostSetting { preferences.edit().putBoolean(DEVELOPER_MODE_KEY, enabled).apply() }
+        persistHostSetting { putBoolean(DEVELOPER_MODE_KEY, enabled) }
     }
 
     fun updateStreamingDebugMode(enabled: Boolean) {
         streamingDebugMode = enabled
-        persistHostSetting { preferences.edit().putBoolean(STREAMING_DEBUG_MODE_KEY, enabled).apply() }
+        persistHostSetting { putBoolean(STREAMING_DEBUG_MODE_KEY, enabled) }
     }
 
     fun updateForceIncognitoKeyboard(enabled: Boolean) {
         forceIncognitoKeyboard = enabled
-        persistHostSetting { preferences.edit().putBoolean(FORCE_INCOGNITO_KEYBOARD_KEY, enabled).apply() }
+        persistHostSetting { putBoolean(FORCE_INCOGNITO_KEYBOARD_KEY, enabled) }
     }
 
     fun updateAllowChatScreenshotsInChats(enabled: Boolean) {
         allowChatScreenshotsInChats = enabled
-        persistHostSetting { ChatScreenshotPreferences.writeAllowChatScreenshots(preferences, enabled) }
+        persistHostSetting { ChatScreenshotPreferences.editAllowChatScreenshots(this, enabled) }
         onAllowChatScreenshotsChanged?.invoke(enabled)
     }
 
@@ -6462,12 +6480,12 @@ class WhiteNoiseAppState private constructor(
         refreshAppLockCredentialAvailability()
         if (enabled && !appLockCredentialAvailable) {
             requireAppUnlock = false
-            persistHostSetting { preferences.edit().putBoolean(REQUIRE_APP_UNLOCK_KEY, false).apply() }
+            persistHostSetting { putBoolean(REQUIRE_APP_UNLOCK_KEY, false) }
             present(R.string.toast_app_lock_screen_lock_required)
             return
         }
         requireAppUnlock = enabled
-        persistHostSetting { preferences.edit().putBoolean(REQUIRE_APP_UNLOCK_KEY, enabled).apply() }
+        persistHostSetting { putBoolean(REQUIRE_APP_UNLOCK_KEY, enabled) }
         if (enabled) {
             requestAppUnlock()
         } else {
@@ -6480,7 +6498,7 @@ class WhiteNoiseAppState private constructor(
 
     fun updateAppLockDelay(delay: AppLockDelay) {
         appLockDelay = delay
-        persistHostSetting { preferences.edit().putString(APP_LOCK_DELAY_KEY, delay.preferenceValue).apply() }
+        persistHostSetting { putString(APP_LOCK_DELAY_KEY, delay.preferenceValue) }
     }
 
     fun requestAppUnlock() {
@@ -6746,17 +6764,17 @@ class WhiteNoiseAppState private constructor(
 
     fun updateThemeMode(mode: AppThemeMode) {
         themeMode = mode
-        persistHostSetting { preferences.edit().putString(THEME_MODE_KEY, mode.preferenceValue).apply() }
+        persistHostSetting { putString(THEME_MODE_KEY, mode.preferenceValue) }
     }
 
     fun updateFontScale(scale: AppFontScale) {
         fontScale = scale
-        persistHostSetting { preferences.edit().putString(FONT_SCALE_KEY, scale.preferenceValue).apply() }
+        persistHostSetting { putString(FONT_SCALE_KEY, scale.preferenceValue) }
     }
 
     fun updateAppFont(font: AppFont) {
         appFont = font
-        persistHostSetting { preferences.edit().putString(APP_FONT_KEY, font.preferenceValue).apply() }
+        persistHostSetting { putString(APP_FONT_KEY, font.preferenceValue) }
     }
 
     internal fun globalBubbleColorArgb(
@@ -7298,13 +7316,13 @@ class WhiteNoiseAppState private constructor(
         // value. The in-memory matrix still updates so the UI reflects the toggle;
         // a later toggle once the account resolves persists it to the right bucket.
         val key = mediaAutoDownloadPrefKeyOrNull(activeAccountRef) ?: return
-        persistHostSetting { persistMediaAutoDownloadMatrix(preferences, key, updated) }
+        persistHostSetting { editMediaAutoDownloadMatrix(this, key, updated) }
         refreshNativeAttachmentPermissions()
     }
 
     fun updateEnterKeyBehavior(behavior: EnterKeyBehavior) {
         enterKeyBehavior = behavior
-        persistHostSetting { preferences.edit().putString(ENTER_KEY_BEHAVIOR_KEY, behavior.preferenceValue).apply() }
+        persistHostSetting { putString(ENTER_KEY_BEHAVIOR_KEY, behavior.preferenceValue) }
     }
 
     /**
@@ -7314,7 +7332,7 @@ class WhiteNoiseAppState private constructor(
      */
     fun updateMediaQuality(quality: MediaQuality) {
         mediaQuality = quality
-        persistHostSetting { preferences.edit().putString(MEDIA_QUALITY_KEY, quality.preferenceValue).apply() }
+        persistHostSetting { putString(MEDIA_QUALITY_KEY, quality.preferenceValue) }
     }
 
     /**
@@ -7772,7 +7790,7 @@ class WhiteNoiseAppState private constructor(
     fun updateLanguageTag(tag: String) {
         val normalized = tag.trim()
         languageTag = normalized
-        persistHostSetting { preferences.edit().putString(APP_LANGUAGE_TAG_KEY, normalized).apply() }
+        persistHostSetting { putString(APP_LANGUAGE_TAG_KEY, normalized) }
         applyApplicationLanguageTag(normalized)
     }
 

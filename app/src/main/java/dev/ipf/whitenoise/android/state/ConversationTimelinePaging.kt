@@ -79,7 +79,7 @@ internal val ConversationController.isLoadingPage: Boolean
  * re-evaluates it, so without the guard an engine that still claims older history it cannot deliver
  * would be asked again the moment it answered, keeping the header spinner on for good (#2727).
  */
-@Suppress("TooGenericExceptionCaught", "ReturnCount")
+@Suppress("TooGenericExceptionCaught", "ReturnCount", "LongMethod")
 internal suspend fun ConversationController.loadOlderPageInternal(
     anchorId: String? = null,
     origin: PagingOrigin = PagingOrigin.EXPLICIT,

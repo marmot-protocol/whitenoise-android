@@ -25,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -34,10 +35,10 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -56,6 +57,7 @@ import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.media.Thumbhash
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.HostPerformanceAttemptSlot
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -71,6 +73,13 @@ internal const val SINGLE_MEDIA_MAX_EXTENT_DP = 256f
 
 /** Sources smaller than the frame are shown at 192 dp instead of being upscaled to fill it. */
 internal const val SMALL_SOURCE_DISPLAY_EXTENT_DP = 192f
+
+/** Completes media application only after decoded content has executed its draw pass. */
+private fun Modifier.reportMediaApplyAfterDraw(attempt: HostPerformanceAttemptSlot): Modifier =
+    drawWithContent {
+        drawContent()
+        attempt.success()
+    }
 
 /** Sizing modifier for the optimistic and confirmed single-image or video frame. */
 @Composable
@@ -176,6 +185,10 @@ internal fun MediaImageBubble(
             cached?.let { DecodedAttachmentPresentation.Static(it) },
         )
     }
+    val mediaApplyHostAttempt = remember(key, attachmentIndex, epoch) { HostPerformanceAttemptSlot() }
+    DisposableEffect(mediaApplyHostAttempt) {
+        onDispose(mediaApplyHostAttempt::cancel)
+    }
     var failed by remember(key, attachmentIndex, epoch) { mutableStateOf(false) }
     var reloadToken by remember(key, attachmentIndex, epoch) { mutableIntStateOf(0) }
     var cachedPlaintextOnEntry by
@@ -256,10 +269,10 @@ internal fun MediaImageBubble(
                 if (decoded is DecodedAttachmentPresentation.Static) {
                     controller.cacheThumbnail(key, attachmentIndex, decoded.bitmap)
                 }
-                appState.measureHostPerformance(HostPerformanceOperationFfi.MEDIA_APPLY) {
-                    presentation = decoded
-                    withFrameNanos { }
-                }
+                mediaApplyHostAttempt.replace(
+                    appState.beginHostPerformance(HostPerformanceOperationFfi.MEDIA_APPLY),
+                )
+                presentation = decoded
             } else {
                 failed = true
             }
@@ -334,6 +347,7 @@ internal fun MediaImageBubble(
                         modifier =
                             Modifier
                                 .fillMaxSize()
+                                .reportMediaApplyAfterDraw(mediaApplyHostAttempt)
                                 .combinedClickable(
                                     onLongClick = onLongPress,
                                     onClick = ::dispatchViewerOpen,
@@ -347,6 +361,7 @@ internal fun MediaImageBubble(
                         modifier =
                             Modifier
                                 .fillMaxSize()
+                                .reportMediaApplyAfterDraw(mediaApplyHostAttempt)
                                 .combinedClickable(
                                     onLongClick = onLongPress,
                                     onClick = ::dispatchViewerOpen,
@@ -602,6 +617,10 @@ internal fun MediaImageGridTile(
             cached?.let { DecodedAttachmentPresentation.Static(it) },
         )
     }
+    val mediaApplyHostAttempt = remember(decodeKey) { HostPerformanceAttemptSlot() }
+    DisposableEffect(mediaApplyHostAttempt) {
+        onDispose(mediaApplyHostAttempt::cancel)
+    }
     var failed by remember(decodeKey) { mutableStateOf(false) }
     var reloadToken by remember(decodeKey) { mutableIntStateOf(0) }
     var cachedPlaintextOnEntry by rememberImageAttachmentCacheAvailability(
@@ -674,10 +693,10 @@ internal fun MediaImageGridTile(
                 if (decoded is DecodedAttachmentPresentation.Static) {
                     controller.cacheThumbnail(messageIdHex, attachmentIndex, decoded.bitmap)
                 }
-                appState.measureHostPerformance(HostPerformanceOperationFfi.MEDIA_APPLY) {
-                    presentation = decoded
-                    withFrameNanos { }
-                }
+                mediaApplyHostAttempt.replace(
+                    appState.beginHostPerformance(HostPerformanceOperationFfi.MEDIA_APPLY),
+                )
+                presentation = decoded
             } else {
                 failed = true
             }
@@ -740,14 +759,14 @@ internal fun MediaImageGridTile(
                     bitmap = current.toImageBitmap(),
                     contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().reportMediaApplyAfterDraw(mediaApplyHostAttempt),
                 )
             is DecodedAttachmentPresentation.Animated ->
                 AnimatedDrawableAttachmentImage(
                     drawable = current.drawable,
                     contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().reportMediaApplyAfterDraw(mediaApplyHostAttempt),
                 )
             null ->
                 when {

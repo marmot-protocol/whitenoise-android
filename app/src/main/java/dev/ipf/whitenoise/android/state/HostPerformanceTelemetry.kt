@@ -154,3 +154,108 @@ internal class HostPerformanceAttempt(
         return true
     }
 }
+
+/** Owns one replaceable attempt and guarantees that supersession is terminal. */
+internal class HostPerformanceAttemptSlot {
+    private var active: HostPerformanceAttempt? = null
+
+    /** Replaces the active attempt, cancelling the superseded owner first. */
+    @Synchronized
+    fun replace(next: HostPerformanceAttempt) {
+        active?.cancel()
+        active = next
+    }
+
+    /** Completes the active attempt only when its host milestone is ready. */
+    @Synchronized
+    fun successIf(ready: Boolean): Boolean = if (ready) successLocked() else false
+
+    /** Completes and releases the active attempt successfully. */
+    @Synchronized
+    fun success(): Boolean = successLocked()
+
+    /** Cancels and releases the active attempt. */
+    @Synchronized
+    fun cancel(): Boolean {
+        val attempt = active ?: return false
+        active = null
+        return attempt.cancel()
+    }
+
+    private fun successLocked(): Boolean {
+        val attempt = active ?: return false
+        active = null
+        return attempt.success()
+    }
+}
+
+/** A claimed set of visibility attempts that shares one rendered-frame outcome. */
+internal class HostPerformanceAttemptBatch internal constructor(
+    private val attempts: List<HostPerformanceAttempt>,
+) {
+    val isEmpty: Boolean
+        get() = attempts.isEmpty()
+
+    /** Marks every claimed attempt visible after the owning draw/frame boundary. */
+    fun success() {
+        attempts.forEach(HostPerformanceAttempt::success)
+    }
+
+    /** Cancels every claimed attempt when its render owner disappears. */
+    fun cancel() {
+        attempts.forEach(HostPerformanceAttempt::cancel)
+    }
+}
+
+/** Holds keyed attempts until the UI atomically claims the published rows it will reveal. */
+internal class HostPerformanceAttemptRegistry {
+    private val attempts = linkedMapOf<String, HostPerformanceAttempt>()
+
+    /** Registers one identity and cancels an impossible duplicate owner. */
+    @Synchronized
+    fun register(
+        identity: String,
+        attempt: HostPerformanceAttempt,
+    ) {
+        attempts.put(identity, attempt)?.cancel()
+    }
+
+    /** Transfers every published attempt to one UI reveal transaction. */
+    @Synchronized
+    fun claimAll(): HostPerformanceAttemptBatch {
+        val claimed = attempts.values.toList()
+        attempts.clear()
+        return HostPerformanceAttemptBatch(claimed)
+    }
+
+    /** Cancels one admitted identity that failed before publication. */
+    @Synchronized
+    fun cancel(identity: String): Boolean = attempts.remove(identity)?.cancel() ?: false
+
+    /** Cancels attempts that never obtained a UI reveal owner. */
+    @Synchronized
+    fun cancelAll() {
+        attempts.values.forEach(HostPerformanceAttempt::cancel)
+        attempts.clear()
+    }
+}
+
+/** Converts the actual durable preference commit result into one terminal timing outcome. */
+@Suppress("TooGenericExceptionCaught", "ThrowsCount") // The commit boundary must classify every provider failure.
+internal fun completeHostPreferenceCommit(
+    attempt: HostPerformanceAttempt,
+    commit: () -> Boolean,
+) {
+    try {
+        if (commit()) attempt.success() else attempt.failure()
+    } catch (timeout: TimeoutCancellationException) {
+        attempt.timeout()
+        throw timeout
+    } catch (cancel: CancellationException) {
+        attempt.cancel()
+        throw cancel
+    } catch (throwable: Throwable) {
+        attempt.failure()
+        throw throwable
+    }
+}

@@ -48,7 +48,7 @@ import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.AppThemeMode
 import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.state.ChatScreenshotPreferences
-import dev.ipf.whitenoise.android.state.HostPerformanceAttempt
+import dev.ipf.whitenoise.android.state.HostPerformanceAttemptSlot
 import dev.ipf.whitenoise.android.state.WarmResumeTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.shouldReattachAppUnlockPrompt
@@ -90,7 +90,7 @@ class MainActivity : AppCompatActivity() {
     private var mainShellHolderCreatedForActivity = false
     private var splashHostReadyRecorded = false
     private var fontsHostReadyRecorded = false
-    private var foregroundHostReady: HostPerformanceAttempt? = null
+    private val foregroundHostReady = HostPerformanceAttemptSlot()
     private var framePerformanceReporter: AndroidFramePerformanceReporter? = null
     private val mainShellStateHolder: MainShellStateHolder by viewModels {
         MainShellStateHolder.Factory(
@@ -206,8 +206,7 @@ class MainActivity : AppCompatActivity() {
                     )
                 }
                 if (state.phase == AppPhase.Ready) {
-                    foregroundHostReady?.success()
-                    foregroundHostReady = null
+                    foregroundHostReady.success()
                 }
             }
             WhiteNoiseTheme(
@@ -415,8 +414,9 @@ class MainActivity : AppCompatActivity() {
             activityClass = warmResumeLifecycleClass,
         )
         if (::appState.isInitialized) {
-            foregroundHostReady?.cancel()
-            foregroundHostReady = appState.beginHostPerformance(HostPerformanceOperationFfi.FOREGROUND_LOCAL_READY)
+            foregroundHostReady.replace(
+                appState.beginHostPerformance(HostPerformanceOperationFfi.FOREGROUND_LOCAL_READY),
+            )
             // A stopped Activity receives onStart before onNewIntent when a
             // notification brings its existing task forward. Defer the
             // retained-conversation dismissal until onResume has observed
@@ -428,6 +428,9 @@ class MainActivity : AppCompatActivity() {
                 foreground = true,
                 dismissRetainedVisibleConversation = false,
             )
+            // A warm process already has usable local content and may not recompose merely because
+            // the Activity restarted, so settle directly at the lifecycle boundary in that case.
+            foregroundHostReady.successIf(appState.phase == AppPhase.Ready)
             applyRecentsPreferenceSecureFlag(appState.allowChatScreenshotsInChats)
             if (!appState.appLockScreenVisible) releaseAppLockBackgroundSecureFlag()
         }
@@ -453,8 +456,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStop() {
         if (::appState.isInitialized) {
-            foregroundHostReady?.cancel()
-            foregroundHostReady = null
+            foregroundHostReady.cancel()
             retainAppLockBackgroundSecureFlagIfNeeded()
             appState.setAppInForeground(false)
         }

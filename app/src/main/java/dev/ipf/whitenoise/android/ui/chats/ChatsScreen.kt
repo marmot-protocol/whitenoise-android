@@ -629,8 +629,14 @@ internal fun ChatsScreen(
             profileRev,
             bodyMatches,
             messageSearchConstraints,
+            searchActive,
         ) {
-            val attempt = appState.beginHostPerformance(HostPerformanceOperationFfi.CONVERSATION_SEARCH)
+            val attempt =
+                if (searchActive) {
+                    appState.beginHostPerformance(HostPerformanceOperationFfi.CONVERSATION_SEARCH)
+                } else {
+                    null
+                }
             try {
                 projectChatListSearchSections(
                     source = scopedSourceList,
@@ -640,9 +646,9 @@ internal fun ChatsScreen(
                     bodyMatchGroupIds = bodyMatches.keys,
                     folderChatIds = effectiveFolderChatIds,
                     messageOnly = messageSearchConstraints != null,
-                ).also { attempt.success() }
+                ).also { attempt?.success() }
             } catch (throwable: Throwable) {
-                attempt.failure()
+                attempt?.failure()
                 throw throwable
             }
         }

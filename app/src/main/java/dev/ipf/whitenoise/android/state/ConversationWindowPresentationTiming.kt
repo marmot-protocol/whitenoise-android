@@ -35,8 +35,7 @@ internal fun ConversationController.markWindowVisibleForPresentationTiming() = w
 
 /** Settles the newest live inbound-message timing only after Compose has produced a visible frame. */
 internal fun ConversationController.markInboundMessageVisibleForHostPerformance() {
-    inboundVisibleHostAttempt?.success()
-    inboundVisibleHostAttempt = null
+    inboundVisibleHostAttempt.success()
 }
 
 /** Records the first frame for which this conversation's composer is actually available. */

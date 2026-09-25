@@ -71,6 +71,103 @@ class HostPerformanceTelemetryTest {
         assertEquals(34, expected.size)
     }
 
+    @Test
+    fun warmForegroundReadySettlesWithoutAComposeCallback() {
+        var now = 10L
+        val samples = mutableListOf<Sample>()
+        val slot = HostPerformanceAttemptSlot()
+        slot.replace(
+            recorder(now = { now }, samples = samples)
+                .begin(HostPerformanceOperationFfi.FOREGROUND_LOCAL_READY),
+        )
+
+        now = 14L
+        assertTrue(slot.successIf(ready = true))
+
+        assertEquals(
+            listOf(
+                Sample(
+                    HostPerformanceOperationFfi.FOREGROUND_LOCAL_READY,
+                    4L,
+                    HostPerformanceOutcomeFfi.SUCCESS,
+                ),
+            ),
+            samples,
+        )
+    }
+
+    @Test
+    fun coldForegroundWaitsForLocalReadiness() {
+        var now = 100L
+        val samples = mutableListOf<Sample>()
+        val slot = HostPerformanceAttemptSlot()
+        slot.replace(
+            recorder(now = { now }, samples = samples)
+                .begin(HostPerformanceOperationFfi.FOREGROUND_LOCAL_READY),
+        )
+
+        assertFalse(slot.successIf(ready = false))
+        assertTrue(samples.isEmpty())
+
+        now = 145L
+        assertTrue(slot.success())
+        assertEquals(45L, samples.single().durationMs)
+    }
+
+    @Test
+    fun outboundVisibilityWaitsForTheClaimedRenderedBatch() {
+        var now = 20L
+        val samples = mutableListOf<Sample>()
+        val registry = HostPerformanceAttemptRegistry()
+        registry.register(
+            "optimistic-1",
+            recorder(now = { now }, samples = samples).begin(HostPerformanceOperationFfi.OUTBOUND_MESSAGE_VISIBLE),
+        )
+
+        val rendered = registry.claimAll()
+        assertTrue(samples.isEmpty())
+        assertTrue(registry.claimAll().isEmpty)
+
+        now = 35L
+        rendered.success()
+        assertEquals(
+            Sample(HostPerformanceOperationFfi.OUTBOUND_MESSAGE_VISIBLE, 15L, HostPerformanceOutcomeFfi.SUCCESS),
+            samples.single(),
+        )
+    }
+
+    @Test
+    fun inboundReplacementCancelsTheSupersededFrameOwner() {
+        var now = 0L
+        val samples = mutableListOf<Sample>()
+        val telemetry = recorder(now = { now }, samples = samples)
+        val slot = HostPerformanceAttemptSlot()
+        slot.replace(telemetry.begin(HostPerformanceOperationFfi.INBOUND_MESSAGE_VISIBLE))
+
+        now = 8L
+        slot.replace(telemetry.begin(HostPerformanceOperationFfi.INBOUND_MESSAGE_VISIBLE))
+        now = 13L
+        slot.success()
+
+        assertEquals(
+            listOf(
+                Sample(HostPerformanceOperationFfi.INBOUND_MESSAGE_VISIBLE, 8L, HostPerformanceOutcomeFfi.CANCELLED),
+                Sample(HostPerformanceOperationFfi.INBOUND_MESSAGE_VISIBLE, 5L, HostPerformanceOutcomeFfi.SUCCESS),
+            ),
+            samples,
+        )
+    }
+
+    @Test
+    fun settingsSaveUsesTheDurableCommitResult() {
+        val samples = mutableListOf<Sample>()
+        val telemetry = recorder(samples = samples)
+
+        completeHostPreferenceCommit(telemetry.begin(HostPerformanceOperationFfi.SETTINGS_SAVE)) { false }
+
+        assertEquals(HostPerformanceOutcomeFfi.FAILURE, samples.single().outcome)
+    }
+
     private fun recorder(
         generation: () -> Int = { 1 },
         now: () -> Long = { 0L },
