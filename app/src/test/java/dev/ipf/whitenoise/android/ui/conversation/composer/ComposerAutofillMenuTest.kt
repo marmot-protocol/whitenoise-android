@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.contextmenu.builder.item
 import androidx.compose.foundation.text.contextmenu.data.TextContextMenuItem
@@ -10,16 +12,20 @@ import androidx.compose.foundation.text.contextmenu.provider.LocalTextContextMen
 import androidx.compose.foundation.text.contextmenu.provider.TextContextMenuDataProvider
 import androidx.compose.foundation.text.contextmenu.provider.TextContextMenuProvider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.input.TextFieldValue
@@ -54,6 +60,7 @@ class ComposerAutofillMenuTest {
         val keys = menuKeys()
         assertFalse(keys.contains(TextContextMenuKeys.AutofillKey))
         assertTrue(keys.contains(TextContextMenuKeys.PasteKey))
+        composeRule.onNodeWithText("Paste").assertIsDisplayed()
         composeRule.onNodeWithTag(ROOT_TAG).captureRoboImage("src/test/snapshots/composer_empty_long_press_menu.png")
     }
 
@@ -88,6 +95,20 @@ class ComposerAutofillMenuTest {
                                         item(TextContextMenuKeys.PasteKey, "Paste") {}
                                     },
                             )
+                            // Show the filtered menu data inside the captured root: Robolectric
+                            // does not include Android's separate native toolbar window.
+                            menuProvider.dataProvider?.let { provider ->
+                                Surface(
+                                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 48.dp),
+                                    shadowElevation = 8.dp,
+                                ) {
+                                    Row(Modifier.padding(12.dp)) {
+                                        provider.data().components.filterIsInstance<TextContextMenuItem>().forEach { item ->
+                                            Text(item.label, Modifier.padding(horizontal = 8.dp))
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -118,7 +139,8 @@ class ComposerAutofillMenuTest {
     }
 
     private class CapturingTextContextMenuProvider : TextContextMenuProvider {
-        @Volatile var dataProvider: TextContextMenuDataProvider? = null
+        var dataProvider by mutableStateOf<TextContextMenuDataProvider?>(null)
+            private set
 
         override suspend fun showTextContextMenu(dataProvider: TextContextMenuDataProvider): Nothing {
             this.dataProvider = dataProvider
