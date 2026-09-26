@@ -4,7 +4,9 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.GroupRecoveryStatusFfi
+import dev.ipf.marmotkit.MarmotKitException
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -48,6 +50,45 @@ class ConversationGroupRecoveryPresentationTest {
         assertTrue(controller.groupRecoveryReadFailed)
     }
 
+    /** A closed runtime worker says the advisory answer is unavailable, not that recovery is needed. */
+    @Test
+    fun anExistingGroupKeepsAnExhaustedTransientReadQuietWithoutEvidence() =
+        runTest {
+            val appState = testAppState()
+            var attempts = 0
+            val controller =
+                controller(appState) {
+                    attempts += 1
+                    throw MarmotKitException.TransportClosed()
+                }
+
+            controller.retryGroupRecoveryStatus()
+
+            assertEquals(GROUP_RECOVERY_READ_RETRY_ATTEMPTS, attempts)
+            assertFalse(controller.groupRecoveryReadFailed)
+            assertNull(controller.groupRecoveryStatus)
+        }
+
+    /** A short worker interruption is retried and publishes the eventual authoritative answer. */
+    @Test
+    fun aTransientReadRetriesThenPublishesSuccess() =
+        runTest {
+            val appState = testAppState()
+            var attempts = 0
+            val controller =
+                controller(appState) {
+                    attempts += 1
+                    if (attempts < 2) throw MarmotKitException.TransportClosed()
+                    recoveryStatus(pendingReinvites = 1u)
+                }
+
+            controller.retryGroupRecoveryStatus()
+
+            assertEquals(2, attempts)
+            assertFalse(controller.groupRecoveryReadFailed)
+            assertEquals(1u, controller.groupRecoveryStatus?.pendingReinvites)
+        }
+
     /** Confirmed evidence stays inspectable when a later refresh fails, with a retry beside it. */
     @Test
     fun aFailedRefreshKeepsAlreadyConfirmedRecoveryEvidence() {
@@ -66,6 +107,61 @@ class ConversationGroupRecoveryPresentationTest {
         assertTrue(controller.groupRecoveryReadFailed)
         assertEquals(true, controller.groupRecoveryStatus?.automaticRecoveryFailed)
     }
+
+    /** A transient refresh failure keeps real recovery evidence and its bounded manual retry. */
+    @Test
+    fun aTransientRefreshFailureKeepsAlreadyConfirmedRecoveryEvidence() =
+        runTest {
+            val appState = testAppState()
+            var fail = false
+            val controller =
+                controller(appState) {
+                    if (fail) throw MarmotKitException.TransportClosed()
+                    recoveryStatus(automaticRecoveryFailed = true)
+                }
+
+            controller.retryGroupRecoveryStatus()
+            fail = true
+            controller.retryGroupRecoveryStatus()
+
+            assertTrue(controller.groupRecoveryReadFailed)
+            assertEquals(true, controller.groupRecoveryStatus?.automaticRecoveryFailed)
+        }
+
+    /** Replacing the Marmot runtime while a read is in flight rejects its stale result. */
+    @Test
+    fun aReplacedRuntimeCannotPublishARecoveryRead() =
+        runTest {
+            val appState = testAppState()
+            val controller =
+                controller(appState) {
+                    replaceRuntimeOwner(appState)
+                    recoveryStatus(pendingReinvites = 1u)
+                }
+
+            controller.retryGroupRecoveryStatus()
+
+            assertNull(controller.groupRecoveryStatus)
+            assertFalse(controller.groupRecoveryReadFailed)
+        }
+
+    /** Disposing the controller while a read is in flight rejects its stale result. */
+    @Test
+    fun aDisposedControllerCannotPublishARecoveryRead() =
+        runTest {
+            val appState = testAppState()
+            lateinit var controller: ConversationController
+            controller =
+                controller(appState) {
+                    controller.onCleared()
+                    recoveryStatus(pendingReinvites = 1u)
+                }
+
+            controller.retryGroupRecoveryStatus()
+
+            assertNull(controller.groupRecoveryStatus)
+            assertFalse(controller.groupRecoveryReadFailed)
+        }
 
     /** A confirmed empty status is an answer, so nothing is shown and nothing is remembered as fresh. */
     @Test
@@ -133,10 +229,26 @@ class ConversationGroupRecoveryPresentationTest {
     /** The presentation rule itself, stated without a controller around it. */
     @Test
     fun onlyANeverAnsweredFreshGroupSuppressesItsFailure() {
-        assertFalse(groupRecoveryReadFailureIsPresentable(lastConfirmedStatus = null, freshlyCreated = true))
-        assertTrue(groupRecoveryReadFailureIsPresentable(lastConfirmedStatus = null, freshlyCreated = false))
-        assertTrue(groupRecoveryReadFailureIsPresentable(recoveryStatus(), freshlyCreated = true))
-        assertTrue(groupRecoveryReadFailureIsPresentable(recoveryStatus(), freshlyCreated = false))
+        val terminal = IllegalStateException("terminal")
+        assertFalse(groupRecoveryReadFailureIsPresentable(null, freshlyCreated = true, failure = terminal))
+        assertTrue(groupRecoveryReadFailureIsPresentable(null, freshlyCreated = false, failure = terminal))
+        assertTrue(groupRecoveryReadFailureIsPresentable(recoveryStatus(), freshlyCreated = true, failure = terminal))
+        assertTrue(groupRecoveryReadFailureIsPresentable(recoveryStatus(), freshlyCreated = false, failure = terminal))
+    }
+
+    /** Applies the existing runtime-replacement publication fence without wiping test data. */
+    private fun replaceRuntimeOwner(appState: WhiteNoiseAppState) {
+        val state =
+            DestructiveAccountWipeRuntimeState(
+                activeAccountRef = appState.activeAccountRef,
+                activeConversationAccountRef = null,
+                activeConversationGroupIdHex = null,
+                runtimeGeneration = appState.runtimeGeneration + 1,
+            )
+        WhiteNoiseAppState::class.java
+            .getDeclaredMethod("applyDestructiveWipeRuntimeState", DestructiveAccountWipeRuntimeState::class.java)
+            .apply { isAccessible = true }
+            .invoke(appState, state)
     }
 
     /** The group id this suite's controller owns. */

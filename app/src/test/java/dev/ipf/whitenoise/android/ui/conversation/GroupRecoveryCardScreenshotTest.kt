@@ -1,6 +1,12 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -16,6 +22,8 @@ import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.marmotkit.GroupRejoinInvitationFfi
+import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.whitenoise.android.state.groupRecoveryReadFailureIsPresentable
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -134,6 +142,44 @@ class GroupRecoveryCardScreenshotTest {
         composeRule.onNodeWithTag("group-recovery-card").assertDoesNotExist()
         composeRule.onNodeWithText("Couldn’t check group recovery. Try again.").assertDoesNotExist()
         composeRule.onNodeWithText("Retry").assertDoesNotExist()
+    }
+
+    /** Captures the clean conversation chrome retained after an exhausted transient worker read. */
+    @Test
+    fun aTransientWorkerClosureWithoutRecoveryEvidenceShowsNoCard() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface(
+                    modifier = Modifier.width(360.dp).height(180.dp).testTag("healthy-conversation"),
+                    color = MaterialTheme.colorScheme.background,
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Wednesday", style = MaterialTheme.typography.labelSmall)
+                        Text("Earlier messages remain visible", style = MaterialTheme.typography.bodyMedium)
+                        GroupRecoveryCard(
+                            status = null,
+                            busy = false,
+                            inviterName = { it },
+                            inviterIdentity = { it },
+                            onConfirm = {},
+                            onDecline = {},
+                            readFailed =
+                                groupRecoveryReadFailureIsPresentable(
+                                    lastConfirmedStatus = null,
+                                    freshlyCreated = false,
+                                    failure = MarmotKitException.TransportClosed(),
+                                ),
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Couldn’t check group recovery. Try again.").assertDoesNotExist()
+        composeRule.onNodeWithText("Retry").assertDoesNotExist()
+        composeRule.onNodeWithTag("healthy-conversation").captureRoboImage(
+            "src/test/snapshots/group_recovery_transient_read_hidden_light.png",
+        )
     }
 
     /** Dark recovery keeps the native retry action visible within the prototype notice frame. */

@@ -1,7 +1,11 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.GroupRecoveryStatusFfi
+import kotlinx.coroutines.delay
 import java.util.Locale
+
+internal const val GROUP_RECOVERY_READ_RETRY_ATTEMPTS: Int = 3
+internal const val GROUP_RECOVERY_READ_RETRY_BACKOFF_MS: Long = 250L
 
 /** One conversation this device created and opened, pinned to the account and runtime that did it. */
 internal data class FreshGroupCreation(
@@ -74,13 +78,40 @@ private fun String.normalizedGroupId(): String = trim().lowercase(Locale.ROOT)
 /**
  * Whether a failed advisory recovery read is evidence the conversation should show.
  *
- * A read that fails while confirmed evidence is already on screen is always presentable: the user
- * keeps that evidence and gets a bounded retry beside it. A read that has never succeeded for a
- * group the account just created is not — it proves nothing about a group that was created and
- * opened successfully, and rendering "Couldn't check group recovery" there makes a healthy new
- * conversation look unsafe. Every other failure keeps the behaviour it has always had.
+ * A transient worker closure is presentable only beside confirmed recovery evidence; without that
+ * evidence it says nothing about the group. Other failures retain the existing fresh-group rule:
+ * prior evidence stays visible, while a never-answered group created moments ago stays quiet.
  */
 internal fun groupRecoveryReadFailureIsPresentable(
     lastConfirmedStatus: GroupRecoveryStatusFfi?,
     freshlyCreated: Boolean,
-): Boolean = lastConfirmedStatus != null || !freshlyCreated
+    failure: Throwable,
+): Boolean =
+    if (isTransientRuntimeWorkerError(failure)) {
+        lastConfirmedStatus?.hasVisibleRecoveryEvidence() == true
+    } else {
+        lastConfirmedStatus != null || !freshlyCreated
+    }
+
+/** Whether a confirmed status contains recovery information that must remain inspectable. */
+private fun GroupRecoveryStatusFfi.hasVisibleRecoveryEvidence(): Boolean =
+    automaticRecoveryFailed || pendingReinvites > 0u || failedReinvites > 0u || rejoinInvitations.isNotEmpty()
+
+/** Retries only a typed closed-worker read, with a short bounded backoff and cancellation propagation. */
+@Suppress("TooGenericExceptionCaught") // Native failures must be classified at this boundary.
+internal suspend fun <T> retryTransientGroupRecoveryRead(read: suspend () -> T): T {
+    var lastFailure: Throwable? = null
+    for (attempt in 1..GROUP_RECOVERY_READ_RETRY_ATTEMPTS) {
+        try {
+            return read()
+        } catch (failure: Throwable) {
+            rethrowIfCancellation(failure)
+            if (!isTransientRuntimeWorkerError(failure)) throw failure
+            lastFailure = failure
+            if (attempt < GROUP_RECOVERY_READ_RETRY_ATTEMPTS) {
+                delay(GROUP_RECOVERY_READ_RETRY_BACKOFF_MS * attempt)
+            }
+        }
+    }
+    throw lastFailure ?: IllegalStateException("group recovery read retry budget exhausted")
+}
