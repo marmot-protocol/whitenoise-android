@@ -103,9 +103,13 @@ class ComposerAutofillMenuTest {
                                     shadowElevation = 8.dp,
                                 ) {
                                     Row(Modifier.padding(12.dp)) {
-                                        provider.data().components.filterIsInstance<TextContextMenuItem>().forEach { item ->
-                                            Text(item.label, Modifier.padding(horizontal = 8.dp))
-                                        }
+                                        provider
+                                            .data()
+                                            .components
+                                            .filterIsInstance<TextContextMenuItem>()
+                                            .forEach { item ->
+                                                Text(item.label, Modifier.padding(horizontal = 8.dp))
+                                            }
                                     }
                                 }
                             }
