@@ -70,6 +70,7 @@ class AmberActivityCoordinatorTest {
     }
 
     private inner class CapturingLauncher : androidx.activity.result.ActivityResultLauncher<Intent>() {
+        /** Records the latest intent and ordered launch history for ordinary coordinator assertions. */
         override fun launch(
             input: Intent,
             options: androidx.core.app.ActivityOptionsCompat?,
@@ -93,6 +94,7 @@ class AmberActivityCoordinatorTest {
         var onNewIntentCount = 0
             private set
 
+        /** Records whether each launch reaches Amber's cold-create or warm-intent lifecycle path. */
         override fun launch(
             input: Intent,
             options: androidx.core.app.ActivityOptionsCompat?,
@@ -691,6 +693,7 @@ class AmberActivityCoordinatorTest {
         assertEquals(requestId, outcome.data?.getStringExtra(AmberSignerRelay.EXTRA_REQUEST_ID))
     }
 
+    /** A simultaneous cold burst opens Amber once, then merges every remaining request exactly once. */
     @Test
     fun groupedBurstWaitsForColdSignerBeforeMergingEveryRequestExactlyOnce() {
         AmberActivityCoordinator.detach(coordinatorLauncher)
@@ -752,6 +755,7 @@ class AmberActivityCoordinatorTest {
         }
     }
 
+    /** Completes a grouped approval with one correlated result for every [requestIds] entry. */
     private fun deliverGroupedResults(requestIds: List<String>) {
         val aggregate =
             JSONArray().apply {
