@@ -41,6 +41,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.contextmenu.data.TextContextMenuKeys
+import androidx.compose.foundation.text.contextmenu.modifier.filterTextContextMenuComponents
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Key
@@ -1011,7 +1013,10 @@ internal fun ComposerPill(
                                     // commits can follow the real selection, not merely
                                     // the final text line or the conversation tail.
                                     .verticalScroll(composerScrollState)
-                                    .focusProperties { canFocus = inputFocusEnabled }
+                                    .filterTextContextMenuComponents { component ->
+                                        textFieldValue.text.isNotEmpty() ||
+                                            component.key !== TextContextMenuKeys.AutofillKey
+                                    }.focusProperties { canFocus = inputFocusEnabled }
                                     .contentReceiver(pasteImageReceiver)
                                     .onPreInterceptKeyBeforeSoftKeyboard { event ->
                                         when (
