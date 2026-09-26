@@ -60,6 +60,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import dev.ipf.marmotkit.HostPerformanceOperationFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
@@ -758,14 +759,24 @@ internal fun ProfileEditScreen(
     @Suppress("TooGenericExceptionCaught") // The injected or FFI profile reader can throw any non-cancellation failure.
     LaunchedEffect(activeAccountId) {
         val accountId = activeAccountId ?: return@LaunchedEffect
+        val hostAttempt = appState.beginHostPerformance(HostPerformanceOperationFfi.PROFILE_LOAD)
         val loadStartedWith = ProfileEditDraft(displayName, about, picture, banner, nip05, lud16)
         val loadSaveRevision = acceptedSaveRevision
         try {
             val profile = loadProfile(accountId)
-            if (appState.activeAccount?.accountIdHex != accountId) return@LaunchedEffect
+            if (appState.activeAccount?.accountIdHex != accountId) {
+                hostAttempt.cancel()
+                return@LaunchedEffect
+            }
             // A refresh started before an accepted publication cannot replace its new read/edit baseline.
-            if (loadSaveRevision != acceptedSaveRevision) return@LaunchedEffect
-            if (profile == null && cachedDraft != null) return@LaunchedEffect
+            if (loadSaveRevision != acceptedSaveRevision) {
+                hostAttempt.cancel()
+                return@LaunchedEffect
+            }
+            if (profile == null && cachedDraft != null) {
+                hostAttempt.unavailable()
+                return@LaunchedEffect
+            }
 
             val refreshed = profileEditDraft(profile)
             val current =
@@ -778,14 +789,20 @@ internal fun ProfileEditScreen(
                     fields.lightning.text.toString(),
                 )
             val merged = current.mergeUntouchedFields(loadStartedWith, refreshed)
-            if (!saveState.completeLoad(accountId, refreshed.metadata())) return@LaunchedEffect
+            if (!saveState.completeLoad(accountId, refreshed.metadata())) {
+                hostAttempt.cancel()
+                return@LaunchedEffect
+            }
             baselineDraft = refreshed
             fields.restore(merged)
             imageDrafts = ProfileImageDrafts(picture = merged.picture, banner = merged.banner)
             profileContentReady = true
+            if (profile == null) hostAttempt.unavailable() else hostAttempt.success()
         } catch (cancelled: CancellationException) {
+            hostAttempt.cancel()
             throw cancelled
         } catch (error: Exception) {
+            hostAttempt.failure()
             if (appState.activeAccount?.accountIdHex == accountId) {
                 profileContentReady = true
                 appState.presentFailure(

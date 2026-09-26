@@ -2626,6 +2626,22 @@
         ]
       },
       {
+        "surface": "Group recovery closed-worker retry policy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/FreshGroupCreation.kt",
+        "anchor": "suspend fun <T> retryTransientGroupRecoveryRead(",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "Existing conversation group-recovery refresh",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "private suspend fun refreshGroupRecoveryStatus(",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
         "surface": "GroupRejoinInvitationDialog",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
         "anchor": "fun GroupRejoinInvitationDialog(",
@@ -26864,7 +26880,7 @@
         ]
       },
       {
-        "surface": "MarmotKit SDK pin: backed-up in-place upgrade, startup, sign-in, replicated attachment download, and fixed performance-registry compatibility",
+        "surface": "MarmotKit SDK pin: backed-up in-place upgrade, startup, sign-in, replicated attachment download, and all Android-applicable performance-registry compatibility",
         "source": "app/src/main/marmotkit/MARMOT_VERSION",
         "anchor": "mdk-sha=",
         "test_ids": [

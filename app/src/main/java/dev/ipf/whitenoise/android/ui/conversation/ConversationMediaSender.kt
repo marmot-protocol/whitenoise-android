@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -368,6 +369,7 @@ internal class ConversationMediaSender(
     private val attachmentReader = ConversationAttachmentReader(appState, context)
 
     fun sendSharedContact(contact: SharedContact) {
+        val outboundVisibleStartedAtElapsedMs = SystemClock.elapsedRealtime()
         appState.launchMutation {
             val vcardBytes =
                 withContext(Dispatchers.IO) {
@@ -384,7 +386,12 @@ internal class ConversationMediaSender(
                     fileName = contactVCardFileName(contact),
                 )
             val caption = formatContactShareText(contact).ifBlank { null }
-            val seeded = controller.queueAttachments(listOf(attachment), caption) ?: return@launchMutation
+            val seeded =
+                controller.queueAttachments(
+                    attachments = listOf(attachment),
+                    caption = caption,
+                    outboundVisibleStartedAtElapsedMs = outboundVisibleStartedAtElapsedMs,
+                ) ?: return@launchMutation
             onRevealSent()
             controller.uploadQueued(seeded)
         }
@@ -397,6 +404,7 @@ internal class ConversationMediaSender(
         canSend: () -> Boolean,
         onQueued: (Boolean) -> Unit,
     ) {
+        val outboundVisibleStartedAtElapsedMs = SystemClock.elapsedRealtime()
         appState.launchMutation {
             var accepted = false
             try {
@@ -418,6 +426,7 @@ internal class ConversationMediaSender(
                         listOf(attachment),
                         null,
                         canQueue = { canSend() && controller.canSendMessages },
+                        outboundVisibleStartedAtElapsedMs = outboundVisibleStartedAtElapsedMs,
                     ) ?: return@launchMutation
                 accepted = true
                 onQueued(true)
@@ -463,6 +472,7 @@ internal class ConversationMediaSender(
         val pendingDraftClear =
             appState.captureDraftForSend(controller.boundAccountRef, controller.group.groupIdHex)
         val trimmedCaption = caption.trim().takeIf { it.isNotBlank() }
+        val outboundVisibleStartedAtElapsedMs = SystemClock.elapsedRealtime()
         appState.launchMutation {
             var accepted = false
             try {
@@ -484,6 +494,7 @@ internal class ConversationMediaSender(
                     seedPreparedAttachments(
                         prepared.copy(documents = readyDocuments),
                         trimmedCaption,
+                        outboundVisibleStartedAtElapsedMs,
                     )
                 if (seeded.isEmpty()) {
                     return@launchMutation
@@ -655,15 +666,26 @@ internal class ConversationMediaSender(
     private suspend fun seedPreparedAttachments(
         prepared: PreparedStagedAttachments,
         caption: String?,
+        outboundVisibleStartedAtElapsedMs: Long,
     ): List<ConversationController.QueuedAttachmentSend> {
         val seeded = mutableListOf<ConversationController.QueuedAttachmentSend>()
         if (prepared.images.isNotEmpty()) {
-            controller.queueAttachments(prepared.images, caption)?.let(seeded::add)
+            controller
+                .queueAttachments(
+                    attachments = prepared.images,
+                    caption = caption,
+                    outboundVisibleStartedAtElapsedMs = outboundVisibleStartedAtElapsedMs,
+                )?.let(seeded::add)
         }
         val captionConsumedByImages = prepared.images.isNotEmpty()
         prepared.documents.attachments.forEachIndexed { index, attachment ->
             val itemCaption = if (!captionConsumedByImages && index == 0) caption else null
-            controller.queueAttachments(listOf(attachment), itemCaption)?.let(seeded::add)
+            controller
+                .queueAttachments(
+                    attachments = listOf(attachment),
+                    caption = itemCaption,
+                    outboundVisibleStartedAtElapsedMs = outboundVisibleStartedAtElapsedMs,
+                )?.let(seeded::add)
         }
         return seeded
     }

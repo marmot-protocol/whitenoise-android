@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.state
 
 import android.os.SystemClock
+import dev.ipf.marmotkit.HostPerformanceOperationFfi
+import dev.ipf.marmotkit.HostPerformanceOutcomeFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
@@ -77,7 +79,7 @@ internal val ConversationController.isLoadingPage: Boolean
  * re-evaluates it, so without the guard an engine that still claims older history it cannot deliver
  * would be asked again the moment it answered, keeping the header spinner on for good (#2727).
  */
-@Suppress("TooGenericExceptionCaught", "ReturnCount")
+@Suppress("TooGenericExceptionCaught", "ReturnCount", "LongMethod")
 internal suspend fun ConversationController.loadOlderPageInternal(
     anchorId: String? = null,
     origin: PagingOrigin = PagingOrigin.EXPLICIT,
@@ -95,6 +97,7 @@ internal suspend fun ConversationController.loadOlderPageInternal(
     pageLoadInFlight = ConversationSearchPageDirection.OLDER
     val trace = PerformanceDiagnostics.begin(PerformanceOperation.CHAT_HISTORY_PAGE)
     val startedMs = SystemClock.elapsedRealtime()
+    val hostAttempt = appState.beginHostPerformance(HostPerformanceOperationFfi.TIMELINE_PAGE)
     return try {
         // The subscription's paginate_backwards extends the runtime's
         // materialized window backwards by `count` and returns the new
@@ -110,12 +113,19 @@ internal suspend fun ConversationController.loadOlderPageInternal(
                 val appliedAtMs = SystemClock.elapsedRealtime()
                 var committed = false
                 tracedPagingSection(ConversationPagingTraceSection.APPLY) {
-                    applyTimelinePage(
-                        outcome.page,
-                        replaceWindow = false,
-                        updatePagination = true,
-                        onCommitted = { committed = true },
-                    )
+                    measureHostPerformanceCommit(
+                        appState.beginHostPerformance(HostPerformanceOperationFfi.TIMELINE_APPLY),
+                    ) { onCommitted ->
+                        applyTimelinePage(
+                            outcome.page,
+                            replaceWindow = false,
+                            updatePagination = true,
+                            onCommitted = {
+                                committed = true
+                                onCommitted()
+                            },
+                        )
+                    }
                 }
                 if (!committed) {
                     ConversationPageLoad.INACTIVE
@@ -134,15 +144,18 @@ internal suspend fun ConversationController.loadOlderPageInternal(
             }
         }.also { load ->
             trace.recordCompletion(load, startedMs)
+            hostAttempt.complete(load.hostOutcome())
             settleOlderPrefetchGuard(load, automatic && outcome is TimelinePageOutcome.Advanced)
         }
     } catch (cancel: CancellationException) {
         // A cancelled page used to leave no trace at all, so a tester could not tell it from one
         // still waiting on the engine. `INACTIVE` closes it as `dropped`.
         trace.recordCompletion(ConversationPageLoad.INACTIVE, startedMs)
+        hostAttempt.cancel()
         throw cancel
     } catch (throwable: Throwable) {
         trace.recordCompletion(ConversationPageLoad.FAILED, startedMs)
+        hostAttempt.failure()
         reportPageFailure(ConversationSearchPageDirection.OLDER, throwable)
         ConversationPageLoad.FAILED
     } finally {
@@ -191,6 +204,7 @@ internal suspend fun ConversationController.loadNewerPageInternal(origin: Paging
     pageLoadInFlight = ConversationSearchPageDirection.NEWER
     val trace = PerformanceDiagnostics.begin(PerformanceOperation.CHAT_HISTORY_PAGE)
     val startedMs = SystemClock.elapsedRealtime()
+    val hostAttempt = appState.beginHostPerformance(HostPerformanceOperationFfi.TIMELINE_PAGE)
     return try {
         val outcome = pageNewerIfActive(subscription, trace)
         when (outcome) {
@@ -198,18 +212,35 @@ internal suspend fun ConversationController.loadNewerPageInternal(origin: Paging
             is TimelinePageOutcome.Unchanged ->
                 unchangedPageLoad(outcome, ConversationSearchPageDirection.NEWER, origin)
             is TimelinePageOutcome.Advanced -> applyNewerPage(outcome.page, priorMessageIds, trace)
-        }.also { trace.recordCompletion(it, startedMs) }
+        }.also {
+            trace.recordCompletion(it, startedMs)
+            hostAttempt.complete(it.hostOutcome())
+        }
     } catch (cancel: CancellationException) {
         trace.recordCompletion(ConversationPageLoad.INACTIVE, startedMs)
+        hostAttempt.cancel()
         throw cancel
     } catch (throwable: Throwable) {
         trace.recordCompletion(ConversationPageLoad.FAILED, startedMs)
+        hostAttempt.failure()
         reportPageFailure(ConversationSearchPageDirection.NEWER, throwable, origin)
         ConversationPageLoad.FAILED
     } finally {
         pageLoadInFlight = null
     }
 }
+
+/** Maps the page contract onto MDK's bounded terminal vocabulary. */
+private fun ConversationPageLoad.hostOutcome(): HostPerformanceOutcomeFfi =
+    when (this) {
+        ConversationPageLoad.ADVANCED,
+        ConversationPageLoad.NO_PROGRESS,
+        -> HostPerformanceOutcomeFfi.SUCCESS
+        ConversationPageLoad.TIMED_OUT -> HostPerformanceOutcomeFfi.TIMEOUT
+        ConversationPageLoad.INACTIVE -> HostPerformanceOutcomeFfi.CANCELLED
+        ConversationPageLoad.NOT_READY -> HostPerformanceOutcomeFfi.UNAVAILABLE
+        ConversationPageLoad.FAILED -> HostPerformanceOutcomeFfi.FAILURE
+    }
 
 /**
  * Folds a newer page in and settles the state a forward advance clears: the recovered failure, the
@@ -224,13 +255,20 @@ private suspend fun ConversationController.applyNewerPage(
     val appliedAtMs = SystemClock.elapsedRealtime()
     var committed = false
     tracedPagingSection(ConversationPagingTraceSection.APPLY) {
-        applyTimelinePage(
-            page,
-            replaceWindow = false,
-            updatePagination = true,
-            reconcileNewExtendedRecords = true,
-            onCommitted = { committed = true },
-        )
+        measureHostPerformanceCommit(
+            appState.beginHostPerformance(HostPerformanceOperationFfi.TIMELINE_APPLY),
+        ) { onCommitted ->
+            applyTimelinePage(
+                page,
+                replaceWindow = false,
+                updatePagination = true,
+                reconcileNewExtendedRecords = true,
+                onCommitted = {
+                    committed = true
+                    onCommitted()
+                },
+            )
+        }
     }
     if (!committed) return ConversationPageLoad.INACTIVE
     clearRecoveredNewerPageFailure()
@@ -290,7 +328,16 @@ private suspend fun ConversationController.pageOlderIfActive(
             // would put a stale window on screen until the new subscription's snapshot lands.
             if (!retainsSubscription(handle)) return@withLock null
             if (anchored != null) {
-                applyTimelinePage(anchored, replaceWindow = false, updatePagination = true)
+                measureHostPerformanceCommit(
+                    appState.beginHostPerformance(HostPerformanceOperationFfi.TIMELINE_APPLY),
+                ) { onCommitted ->
+                    applyTimelinePage(
+                        anchored,
+                        replaceWindow = false,
+                        updatePagination = true,
+                        onCommitted = onCommitted,
+                    )
+                }
             }
         }
         // Time the window command from here, not from the caller's start: page_window is documented
