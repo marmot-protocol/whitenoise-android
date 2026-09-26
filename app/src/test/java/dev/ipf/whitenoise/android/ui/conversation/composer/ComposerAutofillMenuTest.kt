@@ -66,6 +66,7 @@ class ComposerAutofillMenuTest {
 
     private fun render(initialText: String) {
         value = TextFieldValue(initialText)
+        val focusRequester = FocusRequester()
         composeRule.setContent {
             CompositionLocalProvider(LocalTextContextMenuToolbarProvider provides menuProvider) {
                 WhiteNoiseTheme {
@@ -73,7 +74,7 @@ class ComposerAutofillMenuTest {
                         Box(Modifier.width(360.dp).testTag(ROOT_TAG)) {
                             ComposerPill(
                                 textFieldValue = value,
-                                composerFocus = FocusRequester(),
+                                composerFocus = focusRequester,
                                 emojiPickerOpen = false,
                                 onValueChange = { value = it },
                                 onEmojiPickerToggle = {},
