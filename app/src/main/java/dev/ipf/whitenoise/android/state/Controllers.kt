@@ -38,6 +38,7 @@ import dev.ipf.marmotkit.GroupPushDebugInfoFfi
 import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.marmotkit.GroupRejoinInvitationFfi
 import dev.ipf.marmotkit.GroupRosterFfi
+import dev.ipf.marmotkit.HostPerformanceOperationFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -2927,6 +2928,8 @@ class ChatsController private constructor(
             }
             return
         }
+        val chatListLoad = appState.beginHostPerformance(HostPerformanceOperationFfi.CHAT_LIST_LOAD)
+        val archivedChatListLoad = appState.beginHostPerformance(HostPerformanceOperationFfi.ARCHIVED_CHAT_LIST_LOAD)
         appState.refreshDraftSummaries(accountRef)
         try {
             val catchUpGate = ChatListCatchUpGate()
@@ -3009,6 +3012,8 @@ class ChatsController private constructor(
                     isLoading = false
                     error = null
                     recompute()
+                    chatListLoad.success()
+                    archivedChatListLoad.success()
                     // Draw the local projection before catch-up; live updates fold fresh state afterward.
                     if (!localFramePresented) {
                         awaitRenderedChatListFrame()
@@ -3061,6 +3066,8 @@ class ChatsController private constructor(
                 } catch (cancel: CancellationException) {
                     throw cancel
                 } catch (throwable: Throwable) {
+                    chatListLoad.failure()
+                    archivedChatListLoad.failure()
                     chatsDebug(throwable) {
                         "live chat subscription failed account=${accountRef.take(8)}: " +
                             "${throwable.message ?: throwable.javaClass.simpleName}"
@@ -3120,16 +3127,22 @@ class ChatsController private constructor(
                     }
             }
         } catch (cancel: CancellationException) {
+            chatListLoad.cancel()
+            archivedChatListLoad.cancel()
             // Expected when LaunchedEffect re-keys (account switch, navigate
             // away). Re-throw so structured concurrency unwinds cleanly and we
             // don't log normal lifecycle events as bind failures.
             throw cancel
         } catch (throwable: Throwable) {
+            chatListLoad.failure()
+            archivedChatListLoad.failure()
             chatsDebug(throwable) { "bind failed account=${accountRef.take(8)}: ${throwable.message ?: throwable.javaClass.simpleName}" }
             isLoading = false
             error = privacySafeErrorPresentation("CHAT_LIST_LOAD", throwable)
             terminalLoadFailure = true
         } finally {
+            chatListLoad.unavailable()
+            archivedChatListLoad.unavailable()
             synchronized(liveSubscriptionLock) {
                 if (bindJob === currentBindJob) {
                     bindJob = null
@@ -4433,18 +4446,20 @@ class ChatsController private constructor(
         val needle = rawQuery.trim()
         if (needle.isEmpty() && constraints == null) return emptyMap()
         val ciNeedle = needle.lowercase()
-        return withContext(Dispatchers.IO) {
-            val semaphore = Semaphore(SEARCH_FANOUT)
-            coroutineScope {
-                val deferred =
-                    chats.map { item ->
-                        async {
-                            semaphore.withPermit {
-                                searchOneChat(account, item.group.groupIdHex, needle, ciNeedle, constraints)
+        return appState.measureHostPerformance(HostPerformanceOperationFfi.MESSAGE_SEARCH) {
+            withContext(Dispatchers.IO) {
+                val semaphore = Semaphore(SEARCH_FANOUT)
+                coroutineScope {
+                    val deferred =
+                        chats.map { item ->
+                            async {
+                                semaphore.withPermit {
+                                    searchOneChat(account, item.group.groupIdHex, needle, ciNeedle, constraints)
+                                }
                             }
                         }
-                    }
-                deferred.awaitAll().filterNotNull().associateBy { it.groupIdHex }
+                    deferred.awaitAll().filterNotNull().associateBy { it.groupIdHex }
+                }
             }
         }
     }
@@ -6529,6 +6544,10 @@ class ConversationController(
     private var conversationScope: CoroutineScope? = null
     internal var accountTeardownRequested = false
     private var controllerCleared = false
+    internal val inboundVisibleHostAttempt = HostPerformanceAttemptSlot()
+    internal var inboundVisibleHostGeneration by mutableLongStateOf(0L)
+        private set
+    private val outboundVisibleHostAttempts = HostPerformanceAttemptRegistry()
     private val activeStreamIds = mutableSetOf<String>()
     private val foregroundSweepScheduleSignals = Channel<Unit>(Channel.CONFLATED)
     private var lastForegroundSweepStartedAtMillis = 0L
@@ -7051,11 +7070,13 @@ class ConversationController(
             hasLoadedOlderPages = false
             protectedTimelineMessageIds.clear()
             val streamIds =
-                applyTimelinePage(
-                    snapshot,
-                    replaceWindow = true,
-                    updatePagination = true,
-                )
+                appState.measureHostPerformance(HostPerformanceOperationFfi.TIMELINE_APPLY) {
+                    applyTimelinePage(
+                        snapshot,
+                        replaceWindow = true,
+                        updatePagination = true,
+                    )
+                }
             initializeReadState(account)
             publishRecoveryTimelineProjection(recoveryGeneration)
             streamIds
@@ -7101,6 +7122,7 @@ class ConversationController(
      * can reset).
      */
     private suspend fun runConversationSubscriptionIteration(account: String): Pair<Boolean, Boolean> {
+        val timelineOpen = appState.beginHostPerformance(HostPerformanceOperationFfi.TIMELINE_OPEN)
         var groupSubscription: ConversationGroupStateSubscriptionHandle? = null
         var timelineStream: ConversationTimelineSubscriptionHandle? = null
         // A notification-routed group hides its transcript until the roster lands (#586).
@@ -7121,6 +7143,7 @@ class ConversationController(
                 }
             if (stopAfterTimelineOpen) return true to false
             val snapshotStreamIds = publishInitialTimelineSnapshot(account, timelineStream)
+            timelineOpen.success()
             // Don't blanket-mark the absolute newest as read here — the UI
             // layer now drives mark-read as the user scrolls so partial-read
             // sessions retain accurate unread counts on the chat list.
@@ -7172,8 +7195,10 @@ class ConversationController(
             }
             return false to connected
         } catch (cancel: CancellationException) {
+            timelineOpen.cancel()
             throw cancel
         } catch (throwable: Throwable) {
+            timelineOpen.failure()
             windowPresentationTiming.fail()
             if (throwable.isUseAfterEviction()) {
                 discardInitialTimelineSeedForFailure(preserveOptimisticMessages = false)
@@ -7205,6 +7230,7 @@ class ConversationController(
                 return true to false
             }
         } finally {
+            timelineOpen.unavailable()
             rosterPrefetch?.cancel() // A no-op once awaited; an early return must not leave it running.
             closeConversationSubscriptionHandles(groupSubscription, timelineStream)
         }
@@ -7447,12 +7473,17 @@ class ConversationController(
             timelineWindowGeneration.advance()
         }
         windowPresentationTiming.cancel()
+        inboundVisibleHostAttempt.cancel()
+        outboundVisibleHostAttempts.cancelAll()
         initialTimelineSubscriptionRead.cancel()
         initialTimelineSnapshotRead.cancel()
         controllerScope.cancel()
         inviteStreamScope.cancel()
         attachmentTransferScope.cancel()
     }
+
+    /** Transfers every just-published optimistic row to the next conversation reveal frame. */
+    internal fun claimVisibleHostAttempts(): HostPerformanceAttemptBatch = outboundVisibleHostAttempts.claimAll()
 
     internal fun matchesConversation(
         accountRef: String?,
@@ -7562,17 +7593,40 @@ class ConversationController(
                     batch += more
                 }
                 val newest = batch.last()
+                if (
+                    newest.page.messages.any { message ->
+                        message.direction != "sent" &&
+                            message.messageIdHex !in timelineRecords &&
+                            !MessageProjector.isControlMutationKind(message.kind)
+                    }
+                ) {
+                    inboundVisibleHostAttempt.replace(
+                        appState.beginHostPerformance(
+                            HostPerformanceOperationFfi.INBOUND_MESSAGE_VISIBLE,
+                            newest.receivedAtElapsedMs,
+                        ),
+                    )
+                    // This observable ticket restarts the frame owner even when an older inbound
+                    // row leaves the chronological tail id unchanged.
+                    inboundVisibleHostGeneration += 1
+                }
+                appState.recordHostPerformanceSince(
+                    HostPerformanceOperationFfi.TIMELINE_HANDOFF,
+                    newest.receivedAtElapsedMs,
+                )
                 windowPresentationTiming.begin(
                     receivedAtElapsedMs = batch.first().receivedAtElapsedMs,
                     ticket = batch.first().productObservationTicket,
                 )
                 val streamIdsLaunched =
-                    applyTimelinePage(
-                        newest.page,
-                        replaceWindow = false,
-                        updatePagination = true,
-                        reconcileNewExtendedRecords = true,
-                    )
+                    appState.measureHostPerformance(HostPerformanceOperationFfi.TIMELINE_APPLY) {
+                        applyTimelinePage(
+                            newest.page,
+                            replaceWindow = false,
+                            updatePagination = true,
+                            reconcileNewExtendedRecords = true,
+                        )
+                    }
                 // An authoritative window is the recovery a stood-down prefetch was waiting
                 // for, so the viewport may ask for more content in either direction (#2764).
                 // A reader parked at the start of history therefore asks once more per live
@@ -7688,6 +7742,9 @@ class ConversationController(
             editMessage(editTarget, trimmed)
             return
         }
+        val sendHostAttempt = appState.beginHostPerformance(HostPerformanceOperationFfi.MESSAGE_SEND)
+        val outboundVisibleAttempt =
+            appState.beginHostPerformance(HostPerformanceOperationFfi.OUTBOUND_MESSAGE_VISIBLE)
 
         val replyTarget = replyingTo?.messageIdHex?.takeIf { it.isNotBlank() }
         // WNPerf assigns an opaque process-local operation id only while the
@@ -7695,6 +7752,7 @@ class ConversationController(
         val trace = PerformanceDiagnostics.begin(PerformanceOperation.TEXT_SEND)
         sendTrace(trace, PerformancePhase.ACCEPTED, elapsedMs = 0L, result = PerformanceResult.PENDING)
         val tempId = UUID.randomUUID().toString()
+        outboundVisibleHostAttempts.register(tempId, outboundVisibleAttempt)
         appState.pendingSendDiagnostics.track(tempId, trace)
         val now = nowSeconds()
         val retentionAtSendSeconds = rememberRetentionAtSend(tempId, group.disappearingMessageSecs)
@@ -7863,8 +7921,10 @@ class ConversationController(
             if (!reconciliation.acceptedPending) {
                 optimisticSendPhases.remove(optimisticKey)
             }
+            sendHostAttempt.success()
         } catch (throwable: Throwable) {
             if (throwable is OptimisticSendCancelledException) {
+                sendHostAttempt.cancel()
                 discardedDuringRetry.remove(optimisticKey)
                 removeCancelledOptimisticSend(optimisticKey, tempId)
                 trimCancelledSendTombstones()
@@ -7878,8 +7938,10 @@ class ConversationController(
                 discardedDuringRetry.remove(optimisticKey)
                 trimCancelledSendTombstones()
             }
+            if (throwable is CancellationException) sendHostAttempt.cancel()
             throwable.rethrowIfCancellation()
             if (throwable.isUseAfterEviction()) {
+                sendHostAttempt.failure()
                 // The engine realized our own eviction while replaying to send:
                 // we are no longer a member, so this message can never publish.
                 // Drop the optimistic bubble (a retry would only re-fail) and
@@ -7899,6 +7961,7 @@ class ConversationController(
                 return
             }
             if (isAmbiguousRelayDeliveryError(throwable)) {
+                sendHostAttempt.unavailable()
                 if (optimisticSendPhases[optimisticKey] == OptimisticSendPhase.PRE_ACCEPTANCE) {
                     optimisticSendPhases[optimisticKey] = OptimisticSendPhase.ACCEPTANCE_UNKNOWN
                 }
@@ -7921,6 +7984,7 @@ class ConversationController(
                 return
             }
             if (optimisticSendIsMdkOwnedOrUnknown(optimisticKey)) {
+                sendHostAttempt.unavailable()
                 publishTimelineFromIndexes()
                 return
             }
@@ -7949,8 +8013,11 @@ class ConversationController(
                 result = PerformanceResult.FAILURE,
             )
             appState.pendingSendDiagnostics.forget(tempId)
+            sendHostAttempt.failure()
             presentSendFailure(appState, throwable, sendFailureAttempt(optimisticKey))
             onTerminalFailure()
+        } finally {
+            sendHostAttempt.unavailable()
         }
     }
 
@@ -8139,7 +8206,12 @@ class ConversationController(
         attachments: List<PendingAttachment>,
         caption: String?,
     ) {
-        val seeded = queueAttachments(attachments, caption) ?: return
+        val seeded =
+            queueAttachments(
+                attachments = attachments,
+                caption = caption,
+                outboundVisibleStartedAtElapsedMs = SystemClock.elapsedRealtime(),
+            ) ?: return
         uploadQueued(seeded)
     }
 
@@ -8166,11 +8238,16 @@ class ConversationController(
      * matching [uploadQueued] call to drive the FFI work. [canQueue] rechecks a caller's
      * presentation owner after Markdown preparation, before publishing any optimistic state.
      */
-    @Suppress("LongMethod", "ReturnCount") // Admission guards precede the single optimistic publication.
+    @Suppress(
+        "LongMethod",
+        "ReturnCount",
+        "TooGenericExceptionCaught",
+    ) // Admission guards precede the single optimistic publication and cancel timing on any preparation failure.
     suspend fun queueAttachments(
         attachments: List<PendingAttachment>,
         caption: String?,
         canQueue: () -> Boolean = { true },
+        outboundVisibleStartedAtElapsedMs: Long = SystemClock.elapsedRealtime(),
     ): QueuedAttachmentSend? {
         if (!canQueue()) return null
         val account =
@@ -8192,6 +8269,11 @@ class ConversationController(
         }
         val tempId = UUID.randomUUID().toString()
         val key = "msg:$tempId"
+        val outboundVisibleAttempt =
+            appState.beginHostPerformance(
+                HostPerformanceOperationFfi.OUTBOUND_MESSAGE_VISIBLE,
+                outboundVisibleStartedAtElapsedMs,
+            )
         val now = nowSeconds()
         val retentionSnapshot = group.disappearingMessageSecs
         val trimmedCaption = caption?.trim()?.takeIf { it.isNotBlank() }
@@ -8203,14 +8285,24 @@ class ConversationController(
             }
         val body = trimmedCaption ?: "📎 $placeholderName"
         val optimistic =
-            pendingAttachmentRecord(
-                tempId = tempId,
-                body = body,
-                attachments = attachments,
-                now = now,
-            )
+            try {
+                appState.measureHostPerformance(HostPerformanceOperationFfi.MEDIA_PREPARE) {
+                    pendingAttachmentRecord(
+                        tempId = tempId,
+                        body = body,
+                        attachments = attachments,
+                        now = now,
+                    )
+                }
+            } catch (throwable: Throwable) {
+                outboundVisibleAttempt.cancel()
+                throw throwable
+            }
         // Markdown preparation can suspend: a reviewed take must still belong to its visible owner.
-        if (!canQueue()) return null
+        if (!canQueue()) {
+            outboundVisibleAttempt.cancel()
+            return null
+        }
         val retentionAtSendSeconds = rememberRetentionAtSend(tempId, retentionSnapshot)
         val optimisticOrder = nextOptimisticTimelineOrder()
         retainedMediaUploads.put(key, RetainedMediaUpload(attachments, trimmedCaption))
@@ -8229,6 +8321,9 @@ class ConversationController(
             )
         optimisticSendPhases[key] = OptimisticSendPhase.PRE_ACCEPTANCE
         messageById[tempId] = optimistic
+        // Do not expose this attempt to an unrelated reveal while preparation is suspended. Once
+        // registered, the optimistic row is published synchronously in the same main-thread turn.
+        outboundVisibleHostAttempts.register(tempId, outboundVisibleAttempt)
         publishTimelineFromIndexes()
         // Media sends bump the chat-list row like text sends do: the
         // optimistic body is the caption or the attachment placeholder, so the
@@ -8300,6 +8395,7 @@ class ConversationController(
         order: ULong,
         optimistic: AppMessageRecordFfi,
     ) {
+        val sendHostAttempt = appState.beginHostPerformance(HostPerformanceOperationFfi.MESSAGE_SEND)
         val retentionAtSendSeconds = optimisticMessages[key]?.retentionAtSendSeconds
         val uploadJob = appState.trackInFlightMediaUpload(conversationAccountRef, group.groupIdHex, key)
         val diagnostics = appState.pendingSendDiagnostics
@@ -8461,6 +8557,7 @@ class ConversationController(
                                 }.also { diagnostics.finishMediaPublish(tempId, startedAtMs) }
                         }
                 completeDurableAcceptance(key)
+                sendHostAttempt.success()
                 val canonicalId = summary.messageIds.firstOrNull()
                 diagnostics.alias(tempId, canonicalId)
                 if (summary.acceptDisposition == SendAcceptDispositionFfi.ACCEPTED_PENDING) {
@@ -8689,6 +8786,7 @@ class ConversationController(
                 // Coroutine cancellation (e.g. leaving the screen) is not a send
                 // failure — rethrow so it isn't surfaced as a Failed bubble/toast.
                 if (throwable is CancellationException) {
+                    sendHostAttempt.cancel()
                     if (optimisticSendPhases[key] == OptimisticSendPhase.CANCELLED) {
                         discardedDuringRetry.remove(key)
                         trimCancelledSendTombstones()
@@ -8696,12 +8794,14 @@ class ConversationController(
                     throw throwable
                 }
                 if (throwable is OptimisticSendCancelledException) {
+                    sendHostAttempt.cancel()
                     discardedDuringRetry.remove(key)
                     removeCancelledOptimisticSend(key, tempId)
                     trimCancelledSendTombstones()
                     return
                 }
                 if (discardedDuringRetry.remove(key)) {
+                    sendHostAttempt.cancel()
                     optimisticMessages.remove(key)
                     durableAcceptanceCallbacks.remove(key)
                     messageById.remove(tempId)
@@ -8714,6 +8814,7 @@ class ConversationController(
                     return
                 }
                 if (optimisticSendIsMdkOwnedOrUnknown(key)) {
+                    sendHostAttempt.unavailable()
                     publishTimelineFromIndexes()
                     if (BuildConfig.DEBUG) Log.w("DMConversation", "post-acceptance media settlement failed", throwable)
                     return
@@ -8740,9 +8841,11 @@ class ConversationController(
                     PerformancePhase.SEND_FAILED,
                     PerformanceResult.FAILURE,
                 )
+                sendHostAttempt.failure()
                 presentSendFailure(appState, throwable, sendFailureAttempt(key))
             }
         } finally {
+            sendHostAttempt.unavailable()
             appState.untrackInFlightMediaUpload(conversationAccountRef, group.groupIdHex, key, uploadJob)
         }
     }

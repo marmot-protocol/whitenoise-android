@@ -136,6 +136,7 @@ import dev.ipf.whitenoise.android.state.loadUntilMessageAvailable
 import dev.ipf.whitenoise.android.state.logUnreadBadgeTransition
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
 import dev.ipf.whitenoise.android.state.markComposerReadyForPresentationTiming
+import dev.ipf.whitenoise.android.state.markInboundMessageVisibleForHostPerformance
 import dev.ipf.whitenoise.android.state.markPagingEvent
 import dev.ipf.whitenoise.android.state.markWindowVisibleForPresentationTiming
 import dev.ipf.whitenoise.android.state.mediaReferencesFor
@@ -943,6 +944,8 @@ internal fun ConversationScreen(
         transcriptReadyToReveal,
         routeTransitionInProgress,
         showDetails,
+        renderedTimeline.lastOrNull()?.id,
+        controller.inboundVisibleHostGeneration,
     ) {
         if (
             !conversationWindowCanReportVisible(
@@ -954,8 +957,11 @@ internal fun ConversationScreen(
         ) {
             return@LaunchedEffect
         }
-        withFrameNanos { }
+        // Compose frame-clock callbacks run before traversal. Waiting twice guarantees the
+        // timeline state observed above has completed one layout/draw pass.
+        repeat(2) { withFrameNanos { } }
         controller.markWindowVisibleForPresentationTiming()
+        controller.markInboundMessageVisibleForHostPerformance()
     }
 
     // First-frame completion waits for the initial anchor and a trustworthy
@@ -1546,23 +1552,45 @@ internal fun ConversationScreen(
 
     /** Reveals the optimistic row using controller state published before the acceptance callback. */
     fun revealSentMessage() {
-        scope.launch {
-            scrollCoordinator.revealSentAtLiveTail(
-                controller = controller,
-                captureLayout = { tailIndex ->
-                    val layoutInfo = timelineViewport.readingLayoutInfo()
-                    val tailInfo = layoutInfo.visibleItemsInfo.firstOrNull { it.index == tailIndex }
-                    ConversationTailLayout(
-                        lastRowHeightPx = tailInfo?.size,
-                        tailOffsetPx = tailInfo?.offset,
-                        tailSizePx = tailInfo?.size,
-                        viewportStartOffsetPx = layoutInfo.viewportStartOffset,
-                        viewportEndOffsetPx = layoutInfo.viewportEndOffset,
-                        beforeContentPaddingPx = layoutInfo.beforeContentPadding,
-                        viewportSizePx = layoutInfo.viewportSize.height,
-                    )
-                },
-            )
+        val visibilityAttempts = controller.claimVisibleHostAttempts()
+        val revealJob =
+            scope.launch {
+                var terminalOutcomeRecorded = false
+                try {
+                    val revealed =
+                        scrollCoordinator.revealSentAtLiveTail(
+                            controller = controller,
+                            captureLayout = { tailIndex ->
+                                val layoutInfo = timelineViewport.readingLayoutInfo()
+                                val tailInfo = layoutInfo.visibleItemsInfo.firstOrNull { it.index == tailIndex }
+                                ConversationTailLayout(
+                                    lastRowHeightPx = tailInfo?.size,
+                                    tailOffsetPx = tailInfo?.offset,
+                                    tailSizePx = tailInfo?.size,
+                                    viewportStartOffsetPx = layoutInfo.viewportStartOffset,
+                                    viewportEndOffsetPx = layoutInfo.viewportEndOffset,
+                                    beforeContentPaddingPx = layoutInfo.beforeContentPadding,
+                                    viewportSizePx = layoutInfo.viewportSize.height,
+                                )
+                            },
+                        )
+                    if (revealed) {
+                        // The reveal can mutate the list during its frame callback; the next full
+                        // frame is the first boundary that proves the optimistic row was drawn.
+                        repeat(2) { withFrameNanos { } }
+                        visibilityAttempts.success()
+                    } else {
+                        visibilityAttempts.cancel()
+                    }
+                    terminalOutcomeRecorded = true
+                } finally {
+                    if (!terminalOutcomeRecorded) visibilityAttempts.cancel()
+                }
+            }
+        // A launch into an already-cancelled scope never executes its body, so keep the claimed
+        // attempts from leaking when the conversation leaves composition at the same instant.
+        revealJob.invokeOnCompletion { failure ->
+            if (failure != null) visibilityAttempts.cancel()
         }
     }
 

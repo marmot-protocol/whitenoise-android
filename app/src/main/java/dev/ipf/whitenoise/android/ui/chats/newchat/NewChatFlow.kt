@@ -22,6 +22,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -35,6 +36,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import dev.ipf.marmotkit.HostPerformanceOperationFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
@@ -377,6 +379,10 @@ private fun NewMessageAccountScreen(
             }
         }
     val preparationCoordinator = remember(session) { NewMessageRecipientPreparationCoordinator() }
+    val contactsLoadAttempt =
+        remember(session) {
+            appState.beginHostPerformance(HostPerformanceOperationFfi.CONTACTS_LOAD)
+        }
     var profileTimingKey by remember(session) { mutableStateOf<NewMessageRecipientPreparationKey?>(null) }
     val queryState = rememberTextFieldState()
     var searchRetry by remember { mutableIntStateOf(0) }
@@ -389,6 +395,7 @@ private fun NewMessageAccountScreen(
     DisposableEffect(session) {
         onDispose {
             preparationCoordinator.clear()
+            contactsLoadAttempt.cancel()
             session.dispose()
             scannerSession = null
         }
@@ -497,6 +504,7 @@ private fun NewMessageAccountScreen(
                 )
             }
         }
+    SideEffect { contactsLoadAttempt.success() }
 
     val resolvedHex = resolution.resolvedHex?.takeUnless { it.equals(activeHex, ignoreCase = true) }
     val identifierPreparationKey =
