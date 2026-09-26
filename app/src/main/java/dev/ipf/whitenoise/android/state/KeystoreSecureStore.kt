@@ -153,6 +153,9 @@ internal class KeystoreSecureStore(
         synchronized(lock) { prefs.edit().clear().apply() }
     }
 
+    /** Clears a workflow receipt before its owner starts a fresh attempt. */
+    fun clearDurably(): Boolean = synchronized(lock) { prefs.edit().clear().commit() }
+
     // Anything the Keystore/Base64/JSON layers raise becomes the one exception
     // type callers are documented to handle. Errors (OOM and friends) are not
     // storage failures and keep propagating.
