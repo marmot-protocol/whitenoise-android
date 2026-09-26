@@ -737,7 +737,7 @@
     <string name="toast_reaction_failed">Tepki başarısız oldu</string>
     <string name="toast_couldnt_delete_message">Mesaj silinemedi. Lütfen tekrar deneyin.</string>
     <string name="toast_couldnt_edit_message">Mesaj düzenlenemedi</string>
-    <string name="editing_message">Mesaj düzenleniyor</string>
+    <string name="edit_message">Mesajı düzenle</string>
     <string name="cancel_edit">Düzenlemeyi iptal et</string>
     <string name="edited">düzenlendi</string>
     <string name="edited_count">düzenlendi · %1$d</string>

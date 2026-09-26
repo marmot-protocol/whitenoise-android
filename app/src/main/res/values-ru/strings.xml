@@ -767,7 +767,7 @@
     <string name="toast_reaction_failed">Реакция не удалась</string>
     <string name="toast_couldnt_delete_message">Не удалось удалить сообщение. Попробуйте снова.</string>
     <string name="toast_couldnt_edit_message">Не удалось изменить сообщение</string>
-    <string name="editing_message">Редактирование сообщения</string>
+    <string name="edit_message">Редактировать сообщение</string>
     <string name="cancel_edit">Отменить редактирование</string>
     <string name="edited">изменено</string>
     <string name="edited_count">изменено · %1$d</string>

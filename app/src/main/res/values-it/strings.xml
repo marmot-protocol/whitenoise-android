@@ -737,7 +737,7 @@
     <string name="toast_reaction_failed">La reazione è fallita</string>
     <string name="toast_couldnt_delete_message">Eliminazione del messaggio fallita. Riprova.</string>
     <string name="toast_couldnt_edit_message">Impossibile modificare il messaggio</string>
-    <string name="editing_message">Modifica del messaggio</string>
+    <string name="edit_message">Modifica messaggio</string>
     <string name="cancel_edit">Annulla modifica</string>
     <string name="edited">modificato</string>
     <string name="edited_count">modificato · %1$d</string>

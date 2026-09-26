@@ -1960,7 +1960,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/TextEntryEmojiAction.kt",
         "anchor": "fun TextEntryEmojiAction(",
         "test_ids": [
-          "AXY-001"
+          "AXY-001",
+          "CON-020"
         ]
       },
       {
@@ -2837,11 +2838,21 @@
         ]
       },
       {
+        "surface": "ComposerEditPill",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerEditPill.kt",
+        "anchor": "fun ComposerEditPill(",
+        "test_ids": [
+          "MSG-007",
+          "CON-020"
+        ]
+      },
+      {
         "surface": "ComposerActionDisc",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerActionDisc.kt",
         "anchor": "fun ComposerActionDisc(",
         "test_ids": [
-          "CON-001"
+          "CON-001",
+          "CON-020"
         ]
       },
       {
@@ -2860,6 +2871,7 @@
           "CON-001",
           "CON-005",
           "CON-017",
+          "CON-020",
           "DIC-001",
           "DIC-002",
           "DIC-003"
@@ -2880,7 +2892,8 @@
         "test_ids": [
           "CON-001",
           "CON-005",
-          "CON-007"
+          "CON-007",
+          "CON-020"
         ]
       },
       {
@@ -24858,19 +24871,21 @@
       },
       {
         "surface": "R.string.cancel_edit",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerEditPill.kt",
         "anchor": "R.string.cancel_edit",
         "test_ids": [
-          "MSG-007"
+          "MSG-007",
+          "CON-020"
         ]
       },
       {
-        "surface": "R.string.editing_message",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
-        "anchor": "R.string.editing_message",
+        "surface": "R.string.edit_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerEditPill.kt",
+        "anchor": "R.string.edit_message",
         "test_ids": [
           "MSG-004",
-          "MSG-007"
+          "MSG-007",
+          "CON-020"
         ]
       },
       {

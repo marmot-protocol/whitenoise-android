@@ -412,6 +412,8 @@ internal fun ComposerPill(
     compactOuterEndInset: Dp = 0.dp,
     forceEditingLayout: Boolean = false,
     accessoryContent: (@Composable () -> Unit)? = null,
+    // Sits in the bottom action row directly before the trailing Send slot.
+    sendAccessoryContent: (@Composable () -> Unit)? = null,
     voiceReviewContent: (@Composable () -> Unit)? = null,
     inputContentVisible: Boolean = true,
     inputFocusEnabled: Boolean = true,
@@ -1207,6 +1209,19 @@ internal fun ComposerPill(
                                     modifier = Modifier.size(24.dp),
                                 )
                             }
+                        }
+                        if (sendAccessoryContent != null && inputContentVisible) {
+                            Box(
+                                Modifier.layout { measurable, constraints ->
+                                    // Stays clear of the leading tools; the label ellipsizes first.
+                                    val reserved =
+                                        (leadingControlsWidth + reservedTrailingWidth + dictationControlWidth)
+                                            .roundToPx()
+                                    val available = (constraints.maxWidth - reserved).coerceAtLeast(0)
+                                    val child = measurable.measure(constraints.copy(minWidth = 0, maxWidth = available))
+                                    layout(child.width, child.height) { child.placeRelative(0, 0) }
+                                },
+                            ) { sendAccessoryContent() }
                         }
                         if (expandedTrailingActionInset > 0.dp) {
                             Spacer(

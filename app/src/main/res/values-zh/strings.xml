@@ -726,7 +726,7 @@
     <string name="toast_reaction_failed">反应失败</string>
     <string name="toast_couldnt_delete_message">删除消息失败。请重试。</string>
     <string name="toast_couldnt_edit_message">无法编辑消息</string>
-    <string name="editing_message">正在编辑消息</string>
+    <string name="edit_message">编辑消息</string>
     <string name="cancel_edit">取消编辑</string>
     <string name="edited">已编辑</string>
     <string name="edited_count">已编辑 · %1$d</string>
