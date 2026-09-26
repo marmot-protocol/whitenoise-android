@@ -1016,8 +1016,7 @@ internal fun ComposerPill(
                                     .filterTextContextMenuComponents { component ->
                                         textFieldValue.text.isNotEmpty() ||
                                             component.key !== TextContextMenuKeys.AutofillKey
-                                    }
-                                    .focusProperties { canFocus = inputFocusEnabled }
+                                    }.focusProperties { canFocus = inputFocusEnabled }
                                     .contentReceiver(pasteImageReceiver)
                                     .onPreInterceptKeyBeforeSoftKeyboard { event ->
                                         when (
