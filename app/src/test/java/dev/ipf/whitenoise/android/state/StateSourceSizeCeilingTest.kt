@@ -56,7 +56,9 @@ class StateSourceSizeCeilingTest {
         // CI recheck the corresponding coverage and style contracts. Android host
         // telemetry adds only the controller integration boundaries; attempt ownership,
         // replay and settlement remain in the focused HostPerformanceTelemetry unit.
-        const val CONTROLLERS_MAX_LINES = 13309
+        // Merged PR #2856 adds 23 lines for bounded transient group-recovery reads
+        // and publication ownership; its recovery regressions cover those paths.
+        const val CONTROLLERS_MAX_LINES = 13332
 
         // Master includes the covered draft lifecycle and host-timing changes. PR #2534
         // adds 38 lines for the async prepared-speech handoff while keeping preparation
