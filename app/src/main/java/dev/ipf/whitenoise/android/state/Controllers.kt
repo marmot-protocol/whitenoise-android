@@ -7256,30 +7256,43 @@ class ConversationController(
     }
 
     /** Re-reads group recovery after each authoritative group-state edge. */
+    @Suppress("TooGenericExceptionCaught") // Every non-cancellation native failure is classified for presentation.
     private suspend fun refreshGroupRecoveryStatus() {
         val accountRef = conversationAccountRef ?: return
         val groupIdHex = group.groupIdHex
+        val runtimeGeneration = appState.runtimeGeneration
         val recoveryEpoch = groupRecoveryLifetime.capture()
         val status =
             try {
-                groupRecoveryStatusReader(accountRef, groupIdHex)
+                retryTransientGroupRecoveryRead {
+                    groupRecoveryStatusReader(accountRef, groupIdHex)
+                }
             } catch (cancel: CancellationException) {
                 throw cancel
-            } catch (_: Throwable) {
+            } catch (failure: Throwable) {
                 // An advisory read that has never succeeded for a group this account just created
                 // is not evidence of anything; see groupRecoveryReadFailureIsPresentable.
                 val presentable =
-                    groupRecoveryReadFailureIsPresentable(groupRecoveryStatus, isFreshlyCreatedGroup(groupIdHex))
+                    groupRecoveryReadFailureIsPresentable(
+                        lastConfirmedStatus = groupRecoveryStatus,
+                        freshlyCreated = isFreshlyCreatedGroup(groupIdHex),
+                        failure = failure,
+                    )
                 groupRecoveryLifetime.runIfCurrent(recoveryEpoch) {
-                    if (presentable) groupRecoveryReadFailed = true
+                    if (ownsGroupRecoveryRead(accountRef, groupIdHex, runtimeGeneration)) {
+                        groupRecoveryReadFailed = presentable
+                    }
                 }
                 return
             }
         groupRecoveryLifetime.runIfCurrent(recoveryEpoch) {
-            if (ownsGroupRecoveryGroup(groupIdHex) && status.groupIdHex == groupIdHex) {
+            if (
+                ownsGroupRecoveryRead(accountRef, groupIdHex, runtimeGeneration) &&
+                status.groupIdHex == groupIdHex
+            ) {
                 groupRecoveryStatus = status
                 groupRecoveryReadFailed = false
-                appState.freshGroupCreations.settle(accountRef, groupIdHex, appState.runtimeGeneration)
+                appState.freshGroupCreations.settle(accountRef, groupIdHex, runtimeGeneration)
             }
         }
     }
@@ -7365,6 +7378,16 @@ class ConversationController(
 
     /** Whether this controller still owns UI publication for the captured group. */
     private fun ownsGroupRecoveryGroup(groupIdHex: String): Boolean = !controllerCleared && !isAccountTeardownRequested() && group.groupIdHex == groupIdHex
+
+    /** Whether the captured account, group, and runtime still own recovery-read publication. */
+    private fun ownsGroupRecoveryRead(
+        accountRef: String,
+        groupIdHex: String,
+        runtimeGeneration: Int,
+    ): Boolean =
+        conversationAccountRef == accountRef &&
+            appState.runtimeGeneration == runtimeGeneration &&
+            ownsGroupRecoveryGroup(groupIdHex)
 
     private suspend fun runGroupStateSubscriptionLoop(groupStream: ConversationGroupStateSubscriptionHandle) {
         while (coroutineContext.isActive) {
