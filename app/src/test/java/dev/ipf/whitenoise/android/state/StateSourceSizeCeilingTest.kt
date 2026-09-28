@@ -58,7 +58,10 @@ class StateSourceSizeCeilingTest {
         // replay and settlement remain in the focused HostPerformanceTelemetry unit.
         // PR #2856 adds 23 covered lines to keep transient group-recovery reads out of
         // persistent presentation state; the policy and regression tests stay elsewhere.
-        const val CONTROLLERS_MAX_LINES = 13332
+        // The pending-message edit handoff adds native confirmation, retry, and
+        // edit-target switch settlement paths;
+        // keep the combined source ceiling exact and recheck coverage in CI.
+        const val CONTROLLERS_MAX_LINES = 13406
 
         // Master includes the covered draft lifecycle and host-timing changes. PR #2534
         // adds 38 lines for the async prepared-speech handoff while keeping preparation
@@ -83,7 +86,8 @@ class StateSourceSizeCeilingTest {
         // smaller HostPerformanceTelemetry unit. Review-added frame callback ownership
         // fencing keeps stale Activity samples out of replacement MDK runtimes (+27 lines);
         // exact-head Kover rechecks the wiring and this ratchet stays at the source size.
-        const val APP_STATE_MAX_LINES = 11489
+        // The pending-edit handoff adds process-scoped ownership and sign-out cleanup.
+        const val APP_STATE_MAX_LINES = 11491
 
         /** Counts physical source lines with the same trailing-newline semantics as `wc -l`. */
         internal fun sourceLineCount(file: File): Int = file.bufferedReader().useLines { lines -> lines.count() }
