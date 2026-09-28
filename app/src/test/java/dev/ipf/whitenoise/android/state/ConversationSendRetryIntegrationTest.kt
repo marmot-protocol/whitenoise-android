@@ -121,6 +121,67 @@ class ConversationSendRetryIntegrationTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun switchingEditTargetsSettlesThePreviousPendingRevision() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val releaseOriginal = CompletableDeferred<Unit>()
+            val publishedEdit = CompletableDeferred<Pair<String, String>>()
+            var editCalls = 0
+            val appState = appState()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    groupRosterReader = { _, _ -> authoritativeRoster() },
+                    textPublisher = { _, _, _, _ ->
+                        releaseOriginal.await()
+                        successfulSendSummary()
+                    },
+                    messageEditPublisher = { _, _, target, text ->
+                        editCalls += 1
+                        publishedEdit.complete(target to text)
+                    },
+                )
+
+            try {
+                controller.retryMembers()
+                assertTrue(controller.canSendMessages)
+                val original = async(start = CoroutineStart.UNDISPATCHED) { controller.send("original") }
+                val clientToken =
+                    controller.timeline
+                        .single()
+                        .record.messageIdHex
+                controller.beginMessageEdit(clientToken)
+                controller.send("revision A")
+                controller.beginMessageEdit(clientToken)
+
+                val otherMessageId = "b2".repeat(32)
+                controller.beginMessageEdit(otherMessageId)
+                assertEquals(otherMessageId, controller.editingMessageId)
+                val handoffKey = "$ACCOUNT_REF|$GROUP_ID|$clientToken"
+                assertTrue(appState.pendingMessageEditHandoff.hasSession(handoffKey))
+
+                releaseOriginal.complete(Unit)
+                original.await()
+                runCurrent()
+                assertEquals(
+                    CONFIRMED_MESSAGE_ID to "revision A",
+                    withTimeout(5_000) { publishedEdit.await() },
+                )
+                controller.cancelMessageEdit()
+                assertNull(controller.editingMessageId)
+                assertFalse(appState.pendingMessageEditHandoff.hasSession(handoffKey))
+                assertEquals(1, editCalls)
+            } finally {
+                releaseOriginal.complete(Unit)
+                controller.onCleared()
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Suppress("LongMethod") // One controller replacement must cover the original confirmation and queued edit.
     fun replacingControllerDispatchesTheSubmittedRevisionAfterOriginalConfirms() =
         runTest {

@@ -58,9 +58,10 @@ class StateSourceSizeCeilingTest {
         // replay and settlement remain in the focused HostPerformanceTelemetry unit.
         // PR #2856 adds 23 covered lines to keep transient group-recovery reads out of
         // persistent presentation state; the policy and regression tests stay elsewhere.
-        // The pending-message edit handoff adds native confirmation and retry paths;
+        // The pending-message edit handoff adds native confirmation, retry, and
+        // edit-target switch settlement paths;
         // keep the combined source ceiling exact and recheck coverage in CI.
-        const val CONTROLLERS_MAX_LINES = 13405
+        const val CONTROLLERS_MAX_LINES = 13406
 
         // Master includes the covered draft lifecycle and host-timing changes. PR #2534
         // adds 38 lines for the async prepared-speech handoff while keeping preparation

@@ -6305,6 +6305,7 @@ class ConversationController(
     var editingMessageId by mutableStateOf<String?>(null)
 
     fun beginMessageEdit(messageId: String) {
+        if (editingMessageId != messageId) cancelMessageEdit()
         if ("msg:$messageId" in optimisticMessages) pendingMessageEditHandoff.begin(pendingEditKey(messageId))
         editingMessageId = messageId
     }
