@@ -212,8 +212,7 @@ private fun documentAttachmentExtension(
     mediaType: String,
 ): String {
     val fromName =
-        MediaPipeline
-            .safeDisplayName(fileName)
+        safeDocumentDisplayName(fileName)
             .substringAfterLast('.', "")
             .lowercase()
             .takeIf { candidate ->
@@ -422,7 +421,7 @@ internal fun classifyAttachmentOpen(
             .substringBefore(';')
             .trim()
             .lowercase(java.util.Locale.ROOT)
-    val openMime = mediaType.trim().ifBlank { GENERIC_BINARY_MIME }
+    val openMime = normalizeDocumentMime(mediaType)
     return when {
         normalizedMime == ANDROID_PACKAGE_MIME -> AttachmentOpenClassification.Ready(ANDROID_PACKAGE_MIME)
         (
@@ -532,14 +531,14 @@ internal fun saveAttachmentToMediaStore(
     bytes: ByteArray,
     fileName: String,
     mediaType: String,
-): Boolean =
-    when {
-        mediaType.startsWith("image/", ignoreCase = true) ->
-            saveImageToGallery(context, bytes, fileName, mediaType)
-        mediaType.startsWith("video/", ignoreCase = true) ->
-            saveVideoToGallery(context, bytes, fileName, mediaType)
-        else -> saveFileToDownloads(context, bytes, fileName, mediaType)
+): Boolean {
+    val normalizedMime = normalizeDocumentMime(mediaType)
+    return when {
+        normalizedMime.startsWith("image/") -> saveImageToGallery(context, bytes, fileName, normalizedMime)
+        normalizedMime.startsWith("video/") -> saveVideoToGallery(context, bytes, fileName, normalizedMime)
+        else -> saveFileToDownloads(context, bytes, fileName, normalizedMime)
     }
+}
 
 /** Stream a reusable general-file artifact into public Downloads. */
 internal fun saveDocumentToDownloads(
@@ -566,8 +565,8 @@ private fun saveFileToDownloads(
     val resolver = context.contentResolver
     val values =
         android.content.ContentValues().apply {
-            put(android.provider.MediaStore.Downloads.DISPLAY_NAME, MediaPipeline.safeDisplayName(fileName))
-            put(android.provider.MediaStore.Downloads.MIME_TYPE, mediaType.ifBlank { "application/octet-stream" })
+            put(android.provider.MediaStore.Downloads.DISPLAY_NAME, safeDocumentDisplayName(fileName))
+            put(android.provider.MediaStore.Downloads.MIME_TYPE, normalizeDocumentMime(mediaType))
             put(android.provider.MediaStore.Downloads.RELATIVE_PATH, "Download/White Noise")
             put(android.provider.MediaStore.Downloads.IS_PENDING, 1)
         }

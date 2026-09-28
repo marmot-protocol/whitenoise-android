@@ -52,12 +52,13 @@ class AccountSetupEndToEndTest {
             }
         composeRule.waitUntil(30_000) { app.phase == AppPhase.Onboarding }
         composeRule.onNodeWithText(context.getString(R.string.onboarding_login)).performClick()
-        composeRule.onNodeWithText(context.getString(R.string.nostr_nsec)).performTextInput(nsec)
-        composeRule.onNodeWithText(context.getString(R.string.sign_in)).performClick()
+        composeRule.onNodeWithTag("onboarding.sign_in.private_key").performTextInput(nsec)
+        composeRule.onNodeWithTag("onboarding.sign_in.action").performClick()
         composeRule.waitUntil(30_000) { app.accountSetup.controller != null }
         val setup = requireNotNull(app.accountSetup.controller)
         assertNotEquals(setup.account, app.activeAccountRef)
         waitForDecision(setup, OnboardingStepFfi.PROFILE)
+        openDecision(OnboardingStepFfi.PROFILE)
         click(OnboardingActionFfi.EDIT_PROFILE)
         composeRule.waitUntil(30_000) { setup.state.value.editor != null && !setup.state.value.busy }
         composeRule.onNodeWithText(context.getString(R.string.setup_display_name)).performTextInput("Onboarding test")
@@ -69,10 +70,12 @@ class AccountSetupEndToEndTest {
         }
         click(OnboardingActionFfi.APPROVE_REPAIR)
         waitForDecision(setup, OnboardingStepFfi.SINGLE_DEVICE)
+        openDecision(OnboardingStepFfi.SINGLE_DEVICE)
         assertNotEquals(setup.account, app.activeAccountRef)
         composeRule.activityRule.scenario.recreate()
         composeRule.waitForIdle()
         assertEquals(setup.account, app.accountSetup.controller?.account)
+        openDecision(OnboardingStepFfi.SINGLE_DEVICE)
         click(OnboardingActionFfi.CONTINUE_ANYWAY)
         composeRule.waitUntil(30_000) {
             app.accountSetup.controller == null && app.activeAccountRef == setup.account && app.phase == AppPhase.Ready
@@ -101,6 +104,11 @@ class AccountSetupEndToEndTest {
                 .actions
                 .isNotEmpty(),
         )
+    }
+
+    /** Opens the current checkpoint's detail page, where its native action buttons are shown. */
+    private fun openDecision(step: OnboardingStepFfi) {
+        composeRule.onNodeWithTag("setup-step-${step.name}").performScrollTo().performClick()
     }
 
     /** Scrolls to the native action button before tapping it through the real Compose surface. */

@@ -324,6 +324,9 @@ object MessageProjector {
 
     fun isEdit(message: AppMessageRecordFfi): Boolean = message.kind == KindEdit
 
+    /** True for mutation records that update another bubble instead of rendering a new row. */
+    fun isControlMutationKind(kind: ULong): Boolean = kind == KindReaction || kind == KindDelete || kind == KindEdit
+
     /**
      * For a kind-1009 edit record, the target message id from its single
      * `e` tag, or null when malformed/missing. Use this to route an edit

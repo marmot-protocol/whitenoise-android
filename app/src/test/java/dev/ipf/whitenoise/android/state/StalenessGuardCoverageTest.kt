@@ -234,6 +234,8 @@ class StalenessGuardCoverageTest {
                 "Controllers.kt:leaveGroup" to "serialized authoritative group mutation",
                 // One subscription attempt owns its handles and consults account teardown under a monitor.
                 "Controllers.kt:runConversationSubscriptionIteration" to "attempt-owned subscription state machine",
+                // One admitted timeline subscription consumes and publishes its ordered windows serially.
+                "Controllers.kt:runTimelineSubscriptionPipeline" to "single-owner ordered subscription pipeline",
                 // Handle identity is compared under the subscription monitor before clearing.
                 "Controllers.kt:closeTimelineSubscriptionSafely" to "identity-checked handle teardown",
                 // Delete rollback is conditional on its optimistic tombstone and the commit is group-serialized.

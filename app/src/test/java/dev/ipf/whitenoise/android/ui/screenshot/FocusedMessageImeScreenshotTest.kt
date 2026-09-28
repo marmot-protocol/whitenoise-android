@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -42,6 +43,16 @@ class FocusedMessageImeScreenshotTest {
     }
 
     @Test
+    fun longTextAtLargeFontLeavesActionsVisible() {
+        capture("focused_overlay_keyboard_long_text_large_font_dark", dark = true, fontScale = 2f, longText = true)
+    }
+
+    @Test
+    fun captionedMediaAtLargeFontKeepsFooterVisible() {
+        capture("focused_overlay_keyboard_captioned_media_large_font_dark", dark = true, fontScale = 2f, media = true)
+    }
+
+    @Test
     fun tallMediaKeepsActionsVisible() {
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -58,7 +69,6 @@ class FocusedMessageImeScreenshotTest {
                     selectedReactions = emptySet(),
                     previewDescription = "Tall media",
                     previewReady = true,
-                    previewIsMedia = true,
                     preview = {
                         Box(Modifier.size(200.dp, 400.dp).background(MaterialTheme.colorScheme.primaryContainer)) {
                             Text("Portrait media")
@@ -79,6 +89,8 @@ class FocusedMessageImeScreenshotTest {
         name: String,
         dark: Boolean,
         fontScale: Float,
+        longText: Boolean = false,
+        media: Boolean = false,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = dark, fontScale = fontScale) {
@@ -115,20 +127,49 @@ class FocusedMessageImeScreenshotTest {
                     onInfo = {},
                     onDelete = {},
                     previewDescription = "Lifted message",
-                    preview = {
-                        FocusedTextMessagePreview(
-                            presentation = messageBubblePresentation(deleted = false, mine = false),
-                            mine = false,
-                            text = "A lifted message above the keyboard",
-                            document = null,
-                            time = "12:34",
-                            status = MessageStatus.Received,
-                            showStatus = false,
-                        )
-                    },
+                    preview = { focusedPreview(longText, media) },
                 )
             }
         }
         composeRule.onNodeWithTag(FOCUSED_OVERLAY_FRAME_TEST_TAG).captureRoboImage("src/test/snapshots/$name.png")
+    }
+
+    @Composable
+    private fun focusedPreview(
+        longText: Boolean,
+        media: Boolean,
+    ) {
+        FocusedTextMessagePreview(
+            presentation = messageBubblePresentation(deleted = false, mine = false),
+            mine = false,
+            text =
+                if (longText) {
+                    (1..8).joinToString(" ") { "A longer message above the keyboard." }
+                } else {
+                    "A lifted message above the keyboard"
+                },
+            document = null,
+            time = "12:34",
+            status = MessageStatus.Received,
+            showStatus = false,
+            reply =
+                if (longText || media) {
+                    { Text("Quoted reply with two lines of context") }
+                } else {
+                    null
+                },
+            media =
+                if (media) {
+                    {
+                        Box(
+                            Modifier
+                                .size(200.dp, 400.dp)
+                                .background(MaterialTheme.colorScheme.primaryContainer),
+                        ) { Text("Portrait media") }
+                    }
+                } else {
+                    null
+                },
+        )
     }
 }

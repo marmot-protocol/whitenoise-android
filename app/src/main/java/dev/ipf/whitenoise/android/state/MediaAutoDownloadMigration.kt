@@ -55,9 +55,15 @@ internal fun persistMediaAutoDownloadMatrix(
     matrixKey: String,
     matrix: MediaAutoDownloadMatrix,
 ) {
-    preferences
-        .edit()
+    editMediaAutoDownloadMatrix(preferences.edit(), matrixKey, matrix).apply()
+}
+
+/** Adds one matrix and its schema stamp to a caller-owned durable editor transaction. */
+internal fun editMediaAutoDownloadMatrix(
+    editor: SharedPreferences.Editor,
+    matrixKey: String,
+    matrix: MediaAutoDownloadMatrix,
+): SharedPreferences.Editor =
+    editor
         .putInt(matrixKey + MATRIX_VERSION_KEY_SUFFIX, METERED_SAFE_MATRIX_VERSION)
         .putString(matrixKey, matrix.toPreference())
-        .apply()
-}

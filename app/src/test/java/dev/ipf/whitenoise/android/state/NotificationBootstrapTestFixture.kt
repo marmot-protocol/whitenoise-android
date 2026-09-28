@@ -108,6 +108,7 @@ internal class NotificationBootstrapTestFixture(
     senderPictureUrl: String? = null,
     isDm: Boolean = false,
     private val accounts: List<AccountSummaryFfi> = emptyList(),
+    private val groupMemberAccountRefs: Set<String> = emptySet(),
     private val chatListRows: List<ChatListRowFfi> = emptyList(),
     private val chatGroups: List<AppGroupRecordFfi> = emptyList(),
     private val markReadRow: ChatListRowFfi? = null,
@@ -394,7 +395,7 @@ internal class NotificationBootstrapTestFixture(
                     // A loaded roster missing the querying account suppresses that
                     // row's unread count, so answer with the account itself.
                     accounts
-                        .filter { it.label == accountRef }
+                        .filter { it.label == accountRef || it.label in groupMemberAccountRefs }
                         .map { member ->
                             AppGroupMemberRecordFfi(
                                 memberIdHex = member.accountIdHex,

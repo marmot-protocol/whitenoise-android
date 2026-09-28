@@ -29,6 +29,8 @@ import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.HostPerformanceOperationFfi
+import dev.ipf.marmotkit.HostPerformanceOutcomeFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -115,7 +117,6 @@ import dev.ipf.whitenoise.android.notifications.ConversationNotificationChannels
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationRouting
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPattern
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPreferences
-import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
 import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.NotificationBatteryPolicy
@@ -177,6 +178,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -243,8 +245,14 @@ internal object ChatScreenshotPreferences {
         preferences: SharedPreferences,
         enabled: Boolean,
     ) {
-        preferences.edit().putBoolean(KEY_ALLOW_CHAT_SCREENSHOTS, enabled).apply()
+        editAllowChatScreenshots(preferences.edit(), enabled).apply()
     }
+
+    /** Adds the screenshot preference to a caller-owned durable editor transaction. */
+    fun editAllowChatScreenshots(
+        editor: SharedPreferences.Editor,
+        enabled: Boolean,
+    ): SharedPreferences.Editor = editor.putBoolean(KEY_ALLOW_CHAT_SCREENSHOTS, enabled)
 }
 
 internal object LongMessageCollapsePreferences {
@@ -547,6 +555,12 @@ internal interface AppNotificationSubscription {
 internal data class AppMarmotRuntime(
     val rootPath: String,
     val marmot: MarmotInterface,
+)
+
+/** One runtime identity captured by an Activity-owned host-performance reporter. */
+internal data class HostPerformanceRuntimeOwner(
+    val runtime: AppMarmotRuntime,
+    val generation: Int,
 )
 
 private fun openMarmotRuntime(context: Context) = MarmotClient(context).let { AppMarmotRuntime(it.rootPath, it.marmot) }
@@ -1195,6 +1209,9 @@ class WhiteNoiseAppState private constructor(
 
     internal val appContext = context.applicationContext
     private val preferences = preferencesOverride ?: appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+    internal val localGroupDeleteCleanupJournal =
+        LocalGroupDeleteCleanupJournal(appContext.noBackupFilesDir.resolve("local-group-delete-cleanup"))
+    internal val localGroupDeleteCleanupMutex = Mutex()
     internal val defaultDisappearingMessagesPreferences =
         DefaultDisappearingMessagesPreferences(appContext, preferences)
     internal val conversationDictationPreferences = ConversationDictationPreferences(appContext)
@@ -1436,6 +1453,7 @@ class WhiteNoiseAppState private constructor(
     /** Publishes a runtime, invalidates obsolete permission work, and seeds synchronization for retained accounts. */
     private fun publishMarmotRuntime(runtime: AppMarmotRuntime) {
         marmotRuntime = runtime
+        hostPerformance.publishEmitter(runtime, runtimeGeneration, runtimeHostPerformanceEmitter(runtime))
         nativeAttachmentPermissions.invalidate(runtime)
         mutationsScope.launch {
             if (marmotRuntime === runtime) refreshNativeAttachmentPermissions()
@@ -1445,6 +1463,7 @@ class WhiteNoiseAppState private constructor(
     /** Clears only the runtime that failed and immediately fences its permission callbacks. */
     private fun clearMarmotRuntime(runtime: AppMarmotRuntime) {
         if (marmotRuntime !== runtime) return
+        hostPerformance.clearEmitter(runtime)
         marmotRuntime = null
         nativeAttachmentPermissions.invalidate(null)
     }
@@ -2286,8 +2305,26 @@ class WhiteNoiseAppState private constructor(
     private val profileRefreshFanoutGate = Semaphore(PROFILE_REFRESH_FANOUT)
     internal val mutationsScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
+    private val hostPerformance =
+        HostPerformanceRecorder(generation = { runtimeGeneration }).also { recorder ->
+            initialMarmotRuntime?.let { runtime ->
+                recorder.publishEmitter(runtime, runtimeGeneration, runtimeHostPerformanceEmitter(runtime))
+            }
+        }
+    private val hostPreferenceCommitMutex = Mutex()
     private val inFlightAttachmentAcquisitions =
         InFlightAttachmentAcquisitions(mutationsScope, attachmentDownloadGate::promote)
+
+    /** Captures one runtime so later replacement cannot receive an older owner's sample. */
+    private fun runtimeHostPerformanceEmitter(runtime: AppMarmotRuntime): HostPerformanceEmitter =
+        HostPerformanceEmitter { operation, durationMs, outcome ->
+            mutationsScope.launch(Dispatchers.IO) {
+                runCatching {
+                    runtime.marmot.recordHostPerformance(operation, durationMs.toULong(), outcome)
+                }
+            }
+        }
+
     internal val attachmentOpens =
         AttachmentOpenCoordinator(
             intentStore = attachmentDownloadIntents,
@@ -2368,9 +2405,22 @@ class WhiteNoiseAppState private constructor(
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
     private val notificationFirstPostContentCoordinator =
         NotificationFirstPostContentCoordinator(notificationScope, notificationDispatcher, SystemClock::elapsedRealtime)
-
     private val notificationContentResolution by lazy {
         createNotificationContentResolutionServices(appContext, NotificationContentReads())
+    }
+    private val notificationNicknameRefresh by lazy {
+        NotificationNicknameRefreshCoordinator(
+            notificationScope,
+            notificationContentResolution.identity,
+            localNotificationPresenter,
+        )
+    }
+    private val conversationOpenDismissals by lazy {
+        ConversationOpenNotificationDismissalCoordinator(
+            notificationScope,
+            notificationCardCancellationDispatcher,
+            localNotificationPresenter,
+        )
     }
 
     /** Delegates live notification reads without creating a callback class for each dependency. */
@@ -2414,7 +2464,8 @@ class WhiteNoiseAppState private constructor(
                 ::notificationMessageRecord,
             )
 
-        override fun signedInAccountCount(): Int = accounts.count { it.isSignedInSigningAccount() }
+        /** Projects only identities that can currently sign notification actions. */
+        override fun signedInAccountIds(): Set<String> = accounts.signedInSigningAccountIds()
     }
 
     private val notificationAvatarCoordinator by lazy {
@@ -2725,14 +2776,6 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
     ): MessageDraftMutationResult = composerDraftExpansionBridge.deleteBeforeGroupRemoval(accountRef, groupIdHex)
 
-    /** Drops UI-only composer geometry when its owning conversation is explicitly removed. */
-    internal fun removeComposerExpansionForGroup(
-        accountRef: String,
-        groupIdHex: String,
-    ) {
-        composerExpansionStateRetention.removeGroup(accountRef, groupIdHex)
-    }
-
     /** Refreshes draft summaries behind account, request, and local-fingerprint fences. */
     internal fun refreshDraftSummaries(accountRef: String) {
         val refresh = draftSummaryRefreshLifetime.advance()
@@ -2759,6 +2802,61 @@ class WhiteNoiseAppState private constructor(
         marmotAccessObserver?.invoke()
         return requireNotNull(marmotRuntime) { "Marmot is not initialized" }.marmot
     }
+
+    /** Starts one generation-fenced MDK host performance attempt. */
+    internal fun beginHostPerformance(
+        operation: HostPerformanceOperationFfi,
+        startedAtElapsedMs: Long = SystemClock.elapsedRealtime(),
+    ): HostPerformanceAttempt = hostPerformance.begin(operation, startedAtElapsedMs)
+
+    /** Records a completed host stage measured from an existing monotonic boundary. */
+    internal fun recordHostPerformanceSince(
+        operation: HostPerformanceOperationFfi,
+        startedAtElapsedMs: Long,
+        outcome: HostPerformanceOutcomeFfi = HostPerformanceOutcomeFfi.SUCCESS,
+    ) {
+        hostPerformance.record(
+            operation = operation,
+            durationMs = SystemClock.elapsedRealtime() - startedAtElapsedMs,
+            outcome = outcome,
+        )
+    }
+
+    /** Records an already measured closed-schema host duration. */
+    internal fun recordHostPerformance(
+        operation: HostPerformanceOperationFfi,
+        durationMs: Long,
+        outcome: HostPerformanceOutcomeFfi,
+    ) {
+        hostPerformance.record(operation, durationMs, outcome)
+    }
+
+    /** Captures the current runtime for an Activity-owned frame reporter. */
+    internal fun captureHostPerformanceRuntimeOwner(): HostPerformanceRuntimeOwner? =
+        marmotRuntime
+            ?.let { HostPerformanceRuntimeOwner(it, runtimeGeneration) }
+
+    /** Checks that a frame reporter still belongs to the current runtime identity. */
+    internal fun ownsHostPerformanceRuntimeOwner(owner: HostPerformanceRuntimeOwner): Boolean =
+        marmotRuntime === owner.runtime && runtimeGeneration == owner.generation
+
+    /** Records a frame sample only while its captured runtime owner remains current. */
+    internal fun recordHostPerformance(
+        owner: HostPerformanceRuntimeOwner,
+        operation: HostPerformanceOperationFfi,
+        durationMs: Long,
+        outcome: HostPerformanceOutcomeFfi,
+    ): Boolean {
+        if (!ownsHostPerformanceRuntimeOwner(owner)) return false
+        hostPerformance.record(operation, durationMs, outcome)
+        return true
+    }
+
+    /** Measures a suspending Android-owned stage without changing its failure semantics. */
+    internal suspend fun <T> measureHostPerformance(
+        operation: HostPerformanceOperationFfi,
+        block: suspend () -> T,
+    ): T = hostPerformance.measure(operation, block)
 
     /**
      * Launches a group/account mutation on a process-lifetime scope so it
@@ -4090,12 +4188,27 @@ class WhiteNoiseAppState private constructor(
     ): Deferred<AttachmentAcquisitionOutcome> =
         inFlightAttachmentAcquisitions.acquire(cacheKey, priority) {
             val owner = this
-            attachmentDownloadGate.withPermit(cacheKey, request.accountRef, priority) {
-                val cached =
-                    cachedMediaPlaintext(cacheKey)
-                        ?: withContext(Dispatchers.IO) { diskMediaCache.getIfSmall(cacheKey) }
-                        ?: cachedMediaPlaintext(cacheKey)
-                cached?.let(AttachmentAcquisitionOutcome::LegacyBytes) ?: owner.block()
+            val queueAttempt = beginHostPerformance(HostPerformanceOperationFfi.MEDIA_QUEUE_WAIT)
+            try {
+                attachmentDownloadGate.withPermit(cacheKey, request.accountRef, priority) {
+                    queueAttempt.success()
+                    val cached =
+                        cachedMediaPlaintext(cacheKey)
+                            ?: withContext(Dispatchers.IO) { diskMediaCache.getIfSmall(cacheKey) }
+                            ?: cachedMediaPlaintext(cacheKey)
+                    cached?.let(AttachmentAcquisitionOutcome::LegacyBytes) ?: owner.block()
+                }
+            } catch (timeout: TimeoutCancellationException) {
+                queueAttempt.timeout()
+                throw timeout
+            } catch (cancellation: CancellationException) {
+                queueAttempt.cancel()
+                throw cancellation
+            } catch (throwable: Throwable) {
+                queueAttempt.failure()
+                throw throwable
+            } finally {
+                queueAttempt.unavailable()
             }
         }
 
@@ -4290,6 +4403,7 @@ class WhiteNoiseAppState private constructor(
             }
             startBootstrapRuntime()
             val refreshedAccounts = startupPerformance.stage(PerformancePhase.ACCOUNT_REFRESH, ::refreshAccountSnapshot)
+            schedulePendingLocalGroupDeleteCleanup()
             prepareStartupUnreadRefresh(refreshedAccounts)
             migrateLegacyDrafts()
             migrateLegacyMutePreferences()
@@ -4366,46 +4480,72 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** Binds the consent projection before configuring and starting the process-owned native runtime. */
+    @Suppress("LongMethod", "ThrowsCount") // Native startup stages share one terminal telemetry boundary.
     private suspend fun startBootstrapRuntime(): AppMarmotRuntime {
-        val opened =
-            bootstrapRuntime.open(
-                construct = {
-                    startupPerformance.stage(PerformancePhase.CLIENT_CONSTRUCTION) {
-                        withContext(Dispatchers.IO) {
-                            marmotRuntimeFactory(appContext).also { runtime ->
-                                // Publish before start so lifecycle consumers
-                                // and later listener retries can resolve Marmot.
-                                publishMarmotRuntime(runtime)
-                                diagnostics.bind(runtime.marmot)
-                                AvatarImageLoader.attachProfileImageFetcher { url, maxBytes ->
-                                    runtime.marmot.downloadProfileImage(url, maxBytes)
+        val startedAtElapsedMs = SystemClock.elapsedRealtime()
+        return try {
+            val opened =
+                bootstrapRuntime.open(
+                    construct = {
+                        startupPerformance.stage(PerformancePhase.CLIENT_CONSTRUCTION) {
+                            withContext(Dispatchers.IO) {
+                                marmotRuntimeFactory(appContext).also { runtime ->
+                                    // Publish before start so lifecycle consumers
+                                    // and later listener retries can resolve Marmot.
+                                    publishMarmotRuntime(runtime)
+                                    diagnostics.bind(runtime.marmot)
+                                    AvatarImageLoader.attachProfileImageFetcher { url, maxBytes ->
+                                        runtime.marmot.downloadProfileImage(url, maxBytes)
+                                    }
                                 }
                             }
                         }
-                    }
-                },
-                configure = { runtime ->
-                    appStateDebug { "bootstrap root=${runtime.rootPath}" }
-                    startupPerformance.stage(PerformancePhase.PRIVACY_RUNTIME_CONFIGURATION) {
-                        withContext(Dispatchers.IO) {
-                            runtime.marmot.configurePrivacyRuntime()
-                            runtime.marmot.enforceAppOwnedAttachmentAcquisitionForKnownAccounts()
+                    },
+                    configure = { runtime ->
+                        appStateDebug { "bootstrap root=${runtime.rootPath}" }
+                        startupPerformance.stage(PerformancePhase.PRIVACY_RUNTIME_CONFIGURATION) {
+                            withContext(Dispatchers.IO) {
+                                runtime.marmot.configurePrivacyRuntime()
+                                runtime.marmot.enforceAppOwnedAttachmentAcquisitionForKnownAccounts()
+                            }
                         }
-                    }
-                },
-                start = { runtime ->
-                    startMarmotWithNotificationListener(runtime)
-                    appStateDebug { "marmot started" }
-                },
-                closeAfterFailure = { runtime ->
-                    startupPerformance.stage(PerformancePhase.FAILED_RUNTIME_CLOSE) {
-                        withContext(Dispatchers.IO) { runtime.marmot.shutdownAndClose() }
-                    }
-                    clearMarmotRuntime(runtime)
-                },
+                    },
+                    start = { runtime ->
+                        startMarmotWithNotificationListener(runtime)
+                        appStateDebug { "marmot started" }
+                    },
+                    closeAfterFailure = { runtime ->
+                        startupPerformance.stage(PerformancePhase.FAILED_RUNTIME_CLOSE) {
+                            withContext(Dispatchers.IO) { runtime.marmot.shutdownAndClose() }
+                        }
+                        clearMarmotRuntime(runtime)
+                    },
+                )
+            publishMarmotRuntime(opened)
+            recordHostPerformanceSince(HostPerformanceOperationFfi.RUNTIME_INIT, startedAtElapsedMs)
+            opened
+        } catch (timeout: TimeoutCancellationException) {
+            recordHostPerformanceSince(
+                HostPerformanceOperationFfi.RUNTIME_INIT,
+                startedAtElapsedMs,
+                HostPerformanceOutcomeFfi.TIMEOUT,
             )
-        publishMarmotRuntime(opened)
-        return opened
+            throw timeout
+        } catch (cancel: CancellationException) {
+            recordHostPerformanceSince(
+                HostPerformanceOperationFfi.RUNTIME_INIT,
+                startedAtElapsedMs,
+                HostPerformanceOutcomeFfi.CANCELLED,
+            )
+            throw cancel
+        } catch (throwable: Throwable) {
+            recordHostPerformanceSince(
+                HostPerformanceOperationFfi.RUNTIME_INIT,
+                startedAtElapsedMs,
+                HostPerformanceOutcomeFfi.FAILURE,
+            )
+            throw throwable
+        }
     }
 
     /**
@@ -4444,6 +4584,7 @@ class WhiteNoiseAppState private constructor(
 
     private suspend fun resumeCompletedBootstrap(): Boolean {
         if (!bootstrapCompleted) return false
+        schedulePendingLocalGroupDeleteCleanup()
         if (accounts.isNotEmpty() && activeAccountRef != null) phase = AppPhase.Ready
         val receiverReady = awaitNotificationReceiverForStartupWithin(notificationReceiverTimeoutMillis())
         appStateDebug { "bootstrap resumed; notification receiver active=$receiverReady" }
@@ -4708,6 +4849,23 @@ class WhiteNoiseAppState private constructor(
             ::warmProfile,
         ) { phase = AppPhase.Ready }
 
+    /** Process-owned resume receipt and coordinator for the Developer Tools conversation demo. */
+    internal val appReviewDemo: AppReviewDemo by lazy {
+        AppReviewDemo(
+            backend = AppReviewDemoNative(this),
+            store =
+                SecureReviewDemoStore(
+                    KeystoreSecureStore(
+                        context,
+                        "review_demo_receipt_secure_v1",
+                        AndroidKeystoreSecretKeyProvider("white-noise-review-demo-receipt-v1"),
+                    ),
+                    preferences,
+                ),
+            scope = mutationsScope,
+        )
+    }
+
     /** Process-owned receipt survives recreation while native creation or profile publication runs. */
     internal val pendingProfileSignUp: SignUpController?
         get() = profileSignUp.pending
@@ -4951,37 +5109,39 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** Publishes the newest engine account snapshot and rejects older list reads. */
-    private suspend fun refreshAccountSnapshot(): List<AccountSummaryFfi> {
-        val requestToken = accountListLifetime.advance()
-        val refreshedAccounts = marmotIo(MarmotTraceSection.ACCOUNT_LIST) { listAccountsWithAppAttachmentPolicy() }
-        val setupAccounts = accountSetup.accountsState(refreshedAccounts)
-        val bubbleColorMigrationSucceeded =
-            withContext(Dispatchers.IO) {
-                LegacyBubbleColorMigration.migrate(
-                    preferences = preferences,
-                    accountRefs = refreshedAccounts.map(AccountSummaryFfi::label),
-                )
+    private suspend fun refreshAccountSnapshot(): List<AccountSummaryFfi> =
+        measureHostPerformance(HostPerformanceOperationFfi.ACCOUNT_LOAD) {
+            val requestToken = accountListLifetime.advance()
+            val refreshedAccounts = marmotIo(MarmotTraceSection.ACCOUNT_LIST) { listAccountsWithAppAttachmentPolicy() }
+            val setupAccounts = accountSetup.accountsState(refreshedAccounts)
+            val bubbleColorMigrationSucceeded =
+                withContext(Dispatchers.IO) {
+                    LegacyBubbleColorMigration.migrate(
+                        preferences = preferences,
+                        accountRefs = refreshedAccounts.map(AccountSummaryFfi::label),
+                    )
+                }
+            if (bubbleColorMigrationSucceeded) {
+                // A getter may have cached null while bootstrap was still loading
+                // accounts. Re-read migrated slots now so the copied color appears
+                // in this process instead of waiting for a restart.
+                globalBubbleColors.clear()
             }
-        if (bubbleColorMigrationSucceeded) {
-            // A getter may have cached null while bootstrap was still loading
-            // accounts. Re-read migrated slots now so the copied color appears
-            // in this process instead of waiting for a restart.
-            globalBubbleColors.clear()
+            var publishedAccounts = accounts
+            accountListLifetime.runIfCurrent(requestToken) {
+                accountSetup.acceptAccounts(setupAccounts)
+                accounts = refreshedAccounts
+                refreshNativeAttachmentPermissions()
+                releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
+                publishedAccounts = refreshedAccounts
+            }
+            publishedAccounts
         }
-        var publishedAccounts = accounts
-        accountListLifetime.runIfCurrent(requestToken) {
-            accountSetup.acceptAccounts(setupAccounts)
-            accounts = refreshedAccounts
-            refreshNativeAttachmentPermissions()
-            releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
-            publishedAccounts = refreshedAccounts
-        }
-        return publishedAccounts
-    }
 
     /** Publishes the newest account snapshot, then refreshes unread state for that accepted set. */
     suspend fun refreshAccounts() {
         val refreshedAccounts = refreshAccountSnapshot()
+        schedulePendingLocalGroupDeleteCleanup()
         refreshAccountUnreadCounts(refreshedAccounts)
     }
 
@@ -5449,7 +5609,12 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** Publishes a generation-fenced account switch and releases activation intent on every exit path. */
-    @Suppress("ReturnCount") // Sign-in failure and supersession are distinct non-activation outcomes.
+    @Suppress(
+        "ReturnCount",
+        "LongMethod",
+        "CyclomaticComplexMethod",
+        "ThrowsCount",
+    ) // Sign-in failure, supersession, and telemetry outcomes share one atomic activation boundary.
     suspend fun setActiveAccount(
         label: String,
         deferUnreadRefresh: Boolean = false,
@@ -5459,6 +5624,13 @@ class WhiteNoiseAppState private constructor(
         onActivated: () -> Unit = {},
     ): Boolean {
         if (routePendingAccountSetup(label)) return false
+        val accountSwitchAttempt =
+            if (label != activeAccountRef) {
+                beginHostPerformance(HostPerformanceOperationFfi.ACCOUNT_SWITCH)
+            } else {
+                null
+            }
+        var accountSwitchOutcome = HostPerformanceOutcomeFfi.UNAVAILABLE
         val requestGeneration = accountSwitchHandoff.beginRequest(label)
         try {
             val switchingAccounts = label != activeAccountRef
@@ -5514,8 +5686,19 @@ class WhiteNoiseAppState private constructor(
                 reconcileNotificationDelivery =
                     preloadPolicy != AccountSwitchPreloadPolicy.STARTUP_RESTORATION || appInForeground,
             )
+            accountSwitchOutcome = HostPerformanceOutcomeFfi.SUCCESS
             return true
+        } catch (timeout: TimeoutCancellationException) {
+            accountSwitchOutcome = HostPerformanceOutcomeFfi.TIMEOUT
+            throw timeout
+        } catch (cancel: CancellationException) {
+            accountSwitchOutcome = HostPerformanceOutcomeFfi.CANCELLED
+            throw cancel
+        } catch (throwable: Throwable) {
+            accountSwitchOutcome = HostPerformanceOutcomeFfi.FAILURE
+            throw throwable
         } finally {
+            accountSwitchAttempt?.complete(accountSwitchOutcome)
             accountSwitchHandoff.finishRequest(requestGeneration)
         }
     }
@@ -6292,24 +6475,47 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Commits one host preference transaction off-main and times actual durable completion. */
+    @Suppress("TooGenericExceptionCaught") // Editor creation/configuration can throw provider-specific failures.
+    private fun persistHostSetting(edit: SharedPreferences.Editor.() -> Unit) {
+        val attempt = beginHostPerformance(HostPerformanceOperationFfi.SETTINGS_SAVE)
+        val editor =
+            try {
+                preferences.edit().apply(edit)
+            } catch (throwable: Throwable) {
+                attempt.failure()
+                throw throwable
+            }
+        mutationsScope
+            .launch {
+                hostPreferenceCommitMutex.withLock {
+                    withContext(Dispatchers.IO) {
+                        completeHostPreferenceCommit(attempt, editor::commit)
+                    }
+                }
+            }.invokeOnCompletion { cause ->
+                if (cause is CancellationException) attempt.cancel()
+            }
+    }
+
     fun updateDeveloperMode(enabled: Boolean) {
         developerMode = enabled
-        preferences.edit().putBoolean(DEVELOPER_MODE_KEY, enabled).apply()
+        persistHostSetting { putBoolean(DEVELOPER_MODE_KEY, enabled) }
     }
 
     fun updateStreamingDebugMode(enabled: Boolean) {
         streamingDebugMode = enabled
-        preferences.edit().putBoolean(STREAMING_DEBUG_MODE_KEY, enabled).apply()
+        persistHostSetting { putBoolean(STREAMING_DEBUG_MODE_KEY, enabled) }
     }
 
     fun updateForceIncognitoKeyboard(enabled: Boolean) {
         forceIncognitoKeyboard = enabled
-        preferences.edit().putBoolean(FORCE_INCOGNITO_KEYBOARD_KEY, enabled).apply()
+        persistHostSetting { putBoolean(FORCE_INCOGNITO_KEYBOARD_KEY, enabled) }
     }
 
     fun updateAllowChatScreenshotsInChats(enabled: Boolean) {
         allowChatScreenshotsInChats = enabled
-        ChatScreenshotPreferences.writeAllowChatScreenshots(preferences, enabled)
+        persistHostSetting { ChatScreenshotPreferences.editAllowChatScreenshots(this, enabled) }
         onAllowChatScreenshotsChanged?.invoke(enabled)
     }
 
@@ -6327,12 +6533,12 @@ class WhiteNoiseAppState private constructor(
         refreshAppLockCredentialAvailability()
         if (enabled && !appLockCredentialAvailable) {
             requireAppUnlock = false
-            preferences.edit().putBoolean(REQUIRE_APP_UNLOCK_KEY, false).apply()
+            persistHostSetting { putBoolean(REQUIRE_APP_UNLOCK_KEY, false) }
             present(R.string.toast_app_lock_screen_lock_required)
             return
         }
         requireAppUnlock = enabled
-        preferences.edit().putBoolean(REQUIRE_APP_UNLOCK_KEY, enabled).apply()
+        persistHostSetting { putBoolean(REQUIRE_APP_UNLOCK_KEY, enabled) }
         if (enabled) {
             requestAppUnlock()
         } else {
@@ -6345,7 +6551,7 @@ class WhiteNoiseAppState private constructor(
 
     fun updateAppLockDelay(delay: AppLockDelay) {
         appLockDelay = delay
-        preferences.edit().putString(APP_LOCK_DELAY_KEY, delay.preferenceValue).apply()
+        persistHostSetting { putString(APP_LOCK_DELAY_KEY, delay.preferenceValue) }
     }
 
     fun requestAppUnlock() {
@@ -6611,17 +6817,17 @@ class WhiteNoiseAppState private constructor(
 
     fun updateThemeMode(mode: AppThemeMode) {
         themeMode = mode
-        preferences.edit().putString(THEME_MODE_KEY, mode.preferenceValue).apply()
+        persistHostSetting { putString(THEME_MODE_KEY, mode.preferenceValue) }
     }
 
     fun updateFontScale(scale: AppFontScale) {
         fontScale = scale
-        preferences.edit().putString(FONT_SCALE_KEY, scale.preferenceValue).apply()
+        persistHostSetting { putString(FONT_SCALE_KEY, scale.preferenceValue) }
     }
 
     fun updateAppFont(font: AppFont) {
         appFont = font
-        preferences.edit().putString(APP_FONT_KEY, font.preferenceValue).apply()
+        persistHostSetting { putString(APP_FONT_KEY, font.preferenceValue) }
     }
 
     internal fun globalBubbleColorArgb(
@@ -7163,13 +7369,13 @@ class WhiteNoiseAppState private constructor(
         // value. The in-memory matrix still updates so the UI reflects the toggle;
         // a later toggle once the account resolves persists it to the right bucket.
         val key = mediaAutoDownloadPrefKeyOrNull(activeAccountRef) ?: return
-        persistMediaAutoDownloadMatrix(preferences, key, updated)
+        persistHostSetting { editMediaAutoDownloadMatrix(this, key, updated) }
         refreshNativeAttachmentPermissions()
     }
 
     fun updateEnterKeyBehavior(behavior: EnterKeyBehavior) {
         enterKeyBehavior = behavior
-        preferences.edit().putString(ENTER_KEY_BEHAVIOR_KEY, behavior.preferenceValue).apply()
+        persistHostSetting { putString(ENTER_KEY_BEHAVIOR_KEY, behavior.preferenceValue) }
     }
 
     /**
@@ -7179,7 +7385,7 @@ class WhiteNoiseAppState private constructor(
      */
     fun updateMediaQuality(quality: MediaQuality) {
         mediaQuality = quality
-        preferences.edit().putString(MEDIA_QUALITY_KEY, quality.preferenceValue).apply()
+        persistHostSetting { putString(MEDIA_QUALITY_KEY, quality.preferenceValue) }
     }
 
     /**
@@ -7637,7 +7843,7 @@ class WhiteNoiseAppState private constructor(
     fun updateLanguageTag(tag: String) {
         val normalized = tag.trim()
         languageTag = normalized
-        preferences.edit().putString(APP_LANGUAGE_TAG_KEY, normalized).apply()
+        persistHostSetting { putString(APP_LANGUAGE_TAG_KEY, normalized) }
         applyApplicationLanguageTag(normalized)
     }
 
@@ -7756,10 +7962,8 @@ class WhiteNoiseAppState private constructor(
         accountRef: String?,
         groupIdHex: String?,
     ) {
-        // Notification routing can render a conversation under its pinned
-        // account before that account becomes active. Keep suppression and
-        // dismissal tied to the account that owns the visible controller;
-        // closing (null) clears both halves via the transition.
+        conversationOpenDismissals.invalidate()
+        // Keep notification routing suppression and dismissal tied to the pinned conversation owner.
         updateNotificationSuppression(
             suppression.onActiveConversation(groupIdHex, accountRef = if (groupIdHex != null) accountRef else null),
         )
@@ -7796,11 +8000,13 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
     ) {
         val target = conversationOpenDismissalTarget(accountRef, groupIdHex) ?: return
-        withContext(notificationCardCancellationDispatcher) {
-            runCatchingCancellable {
-                localNotificationPresenter.dismissConversationMessagesImmediately(target.accountRef, target.groupIdHex)
-            }.onFailure { appStateDebug { "notification route dismiss failed group=${target.groupIdHex.take(8)}" } }
-        }
+        runCatchingCancellable {
+            localNotificationPresenter.dismissConversationMessages(
+                target.accountRef,
+                target.groupIdHex,
+                dispatcher = notificationCardCancellationDispatcher,
+            )
+        }.onFailure { appStateDebug { "notification route dismiss failed group=${target.groupIdHex.take(8)}" } }
     }
 
     /** Publish Compose ownership immediately, then dismiss existing cards off the main thread. */
@@ -7811,18 +8017,7 @@ class WhiteNoiseAppState private constructor(
         // Publish ownership first so suppression is authoritative for the
         // visible route even if a platform cancellation call fails.
         applyActiveConversationTransition(accountRef, groupIdHex)
-        conversationOpenDismissalTarget(accountRef, groupIdHex)?.let { target ->
-            notificationScope.launch(notificationCardCancellationDispatcher) {
-                runCatching {
-                    localNotificationPresenter.dismissConversationMessagesImmediately(
-                        target.accountRef,
-                        target.groupIdHex,
-                    )
-                }.onFailure {
-                    appStateDebug { "notification dismiss failed group=${target.groupIdHex.take(8)}" }
-                }
-            }
-        }
+        conversationOpenDismissals.dismiss(accountRef, groupIdHex)
         appStateDebug {
             "active conversation=${groupIdHex?.take(8) ?: "<none>"} account=${activeConversationAccountRef?.take(8) ?: "<none>"}"
         }
@@ -9442,6 +9637,7 @@ class WhiteNoiseAppState private constructor(
 
     fun contactNickname(accountIdHex: String): String? = contactNicknameFor(activeAccountRef, accountIdHex)
 
+    /** Stores an account-scoped nickname and silently reconciles active notification sender lines. */
     fun setContactNickname(
         accountIdHex: String,
         nickname: String,
@@ -9453,6 +9649,7 @@ class WhiteNoiseAppState private constructor(
         if (ContactNicknamePreferences.writeNickname(preferences, account, accountIdHex, nickname)) {
             contactNicknameRevision += 1
             bumpProfileAccountRevision(accountIdHex)
+            notificationNicknameRefresh.refresh(account, accountIdHex)
         }
     }
 
@@ -9629,10 +9826,25 @@ class WhiteNoiseAppState private constructor(
     }
 
     suspend fun loadUserProfile(accountIdHex: String): UserProfileMetadataFfi? {
+        val hostAttempt = beginHostPerformance(HostPerformanceOperationFfi.PROFILE_READ)
         val profile =
-            runCatchingCancellable {
-                marmotIo(MarmotTraceSection.PROFILE_READ) { userProfile(accountIdHex) }
-            }.getOrNull()
+            try {
+                runCatchingCancellable {
+                    marmotIo(MarmotTraceSection.PROFILE_READ) { userProfile(accountIdHex) }
+                }.fold(
+                    onSuccess = { value ->
+                        if (value == null) hostAttempt.unavailable() else hostAttempt.success()
+                        value
+                    },
+                    onFailure = {
+                        hostAttempt.failure()
+                        null
+                    },
+                )
+            } catch (cancel: CancellationException) {
+                hostAttempt.cancel()
+                throw cancel
+            }
         if (profile == null) requestProfile(accountIdHex)
         return profile
     }
@@ -10999,13 +11211,9 @@ class WhiteNoiseAppState private constructor(
                     if (redactContent) {
                         null
                     } else {
-                        LocalNotificationFormatter.recipientAccountSubtext(
-                            signedInAccountCount = accounts.count { it.isSignedInSigningAccount() },
-                            recipientLabel =
-                                notificationContentResolution.identity.recipientName(
-                                    update.accountRef,
-                                    localOnly = false,
-                                ),
+                        notificationContentResolution.firstPost.recipientAccountSubtext(
+                            update,
+                            localOnly = false,
                         )
                     },
                 redactContent = redactContent,
@@ -11257,26 +11465,6 @@ class WhiteNoiseAppState private constructor(
         private const val DEFAULT_NOTIFICATIONS_ENABLE_ATTEMPTED_KEY = "default_notifications_enable_attempted"
         private const val DISAPPEARING_TOOLTIP_SHOWN_KEY = "disappearing_tooltip_shown"
 
-        // 24 MiB cap on decrypted attachment bytes resident in memory —
-        // roughly ten 1920px JPEGs. Persists across conversation re-entry.
-        private const val MEDIA_PLAINTEXT_CACHE_MAX_BYTES: Long = 24L * 1024L * 1024L
-
-        // Admit ordinary photos while keeping large documents on the file-lease path.
-        private const val MEDIA_PLAINTEXT_CACHE_MAX_ENTRY_BYTES: Long = 8L * 1024L * 1024L
-
-        // ~48 MiB of decoded thumbnails (sampled to <=1280px). Enough to keep
-        // visible bubbles spinner-free; bounded so it can't grow unbounded.
-        private const val MEDIA_THUMBNAIL_CACHE_MAX_BYTES: Long = 48L * 1024L * 1024L
-
-        // ~256 MiB of persistent decrypted media on disk. Big enough to keep
-        // typical chat history through OS cache reaps; OS may still trim
-        // earlier if device-wide cache pressure hits.
-        private const val DISK_MEDIA_CACHE_MAX_BYTES: Long = 256L * 1024L * 1024L
-
-        // Match MDK's current encrypted receive ceiling. L1 remains capped at
-        // 24 MiB so large documents are durable without being retained on the
-        // JVM heap after the active open/download operation finishes.
-        private const val DISK_MEDIA_CACHE_MAX_ENTRY_BYTES: Long = 64L * 1024L * 1024L
         private const val PROFILE_REFRESH_RETRY_COOLDOWN_MILLIS = 60_000L
         private const val PROFILE_PRESENTATION_WARM_FANOUT = 6
         private const val PROFILE_REFRESH_FANOUT = 6

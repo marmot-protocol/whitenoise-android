@@ -462,6 +462,7 @@ class ConversationMediaSendReconciliationIntegrationTest {
         mediaJson = null,
         media = MessageAttachments.acceptedOutcomes(listOf(reference)),
         agentTextStreamJson = null,
+        poll = null,
         groupSystem = null,
         hasReports = false,
         edit = null,

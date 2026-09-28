@@ -7,6 +7,15 @@
 /.idea/workspace.xml
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
+# Android Studio rewrites these per machine (JDK, device, module sync, UI state).
+/.idea/.name
+/.idea/compiler.xml
+/.idea/deploymentTargetSelector.xml
+/.idea/deviceManager.xml
+/.idea/gradle.xml
+/.idea/kotlinc.xml
+/.idea/markdown.xml
+/.idea/misc.xml
 .DS_Store
 /build
 /benchmark/build

@@ -4,7 +4,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MediaBubbleAspectRatioTest {
@@ -46,5 +48,16 @@ class MediaBubbleAspectRatioTest {
         assertEquals(256f to 256f, singleMediaSizeDp(ratio = 1f, sourceShortSidePx = 1200))
         assertEquals(minOf(320, 180), sourceShortSideFromDim("320x180"))
         assertNull(sourceShortSideFromDim("0x180"))
+    }
+
+    /** Only captioned portrait media widens; warning-only and wider cards keep their prototype size. */
+    @Test
+    fun onlyCaptionedPortraitMediaUsesStandardWidth() {
+        assertTrue(shouldExpandCaptionedPortrait(hasCaption = true, dim = "600x1200"))
+        assertFalse(shouldExpandCaptionedPortrait(hasCaption = false, dim = "600x1200"))
+        assertFalse(shouldExpandCaptionedPortrait(hasCaption = true, dim = "1200x1200"))
+        assertFalse(shouldExpandCaptionedPortrait(hasCaption = true, dim = "1200x600"))
+        assertFalse(shouldExpandCaptionedPortrait(hasCaption = true, dim = null))
+        assertFalse(shouldExpandCaptionedPortrait(hasCaption = true, dim = "invalid"))
     }
 }

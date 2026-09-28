@@ -16,15 +16,18 @@ import kotlinx.coroutines.withContext
  */
 internal enum class WindowApplyMode {
     /**
-     * The window is a new place in history: open, jump, reconnect, or a return to the live tail.
-     * Every index is cleared first, so nothing from the old position can survive into the new one.
+     * The window is a new place in history with nothing in common with the rows held: open,
+     * reconnect, a far jump, or a whole-window refresh. Every index is cleared first, so nothing
+     * from the old position can survive into the new one.
      */
     REPLACE,
 
     /**
-     * The window slid by one page while the reader stayed where they were. Rows the new window still
-     * holds keep their projected items, so paging costs the rows that actually changed rather than a
-     * full rebuild of a list the reader is looking at.
+     * The window shares at least one row with what the timeline holds — it slid by a page, came
+     * back to the live tail, or a new arrival grew it. Rows the window still holds keep their
+     * projected items, rows it slid past are retained (see `ConversationTimelineRetention.kt`),
+     * rows it proves gone depart, and the page's rows take ordinals aligned to a shared row, so
+     * the reader's list only ever grows or changes the rows that actually changed.
      */
     EXTEND,
 }
@@ -36,13 +39,15 @@ internal val WindowApplyMode.reconcilesOptimistic: Boolean get() = this == Windo
 internal data class WindowApplySnapshot(
     val heldRecords: List<TimelineMessageRecordFfi>,
     val pendingProjectionIds: Set<String>,
+    val heldOrder: Map<String, ULong> = emptyMap(),
 )
 
-/** Copies mutable record and bridge indexes before suspending on the preparation dispatcher. */
+/** Copies mutable record, bridge and ordinal indexes before suspending on the preparation dispatcher. */
 internal fun currentWindowApplySnapshot(
     heldRecords: Collection<TimelineMessageRecordFfi>,
     pendingProjectionIds: Collection<String>,
-) = WindowApplySnapshot(heldRecords.toList(), pendingProjectionIds.toSet())
+    heldOrder: Map<String, ULong> = emptyMap(),
+) = WindowApplySnapshot(heldRecords.toList(), pendingProjectionIds.toSet(), heldOrder.toMap())
 
 /** Resolves the display index key off-main so commit validation never projects a record. */
 private fun preparedProjectedItemId(
@@ -79,13 +84,9 @@ internal fun PreparedWindowApply.planCommit(
     pendingProjectionIds: Set<String>,
 ): WindowApplyCommitPlan {
     val snapshotById = snapshot.heldRecords.associateBy(TimelineMessageRecordFfi::messageIdHex)
-    val pageIds = rows.mapTo(HashSet(rows.size)) { it.record.messageIdHex }
-    val departedIds =
-        if (mode == WindowApplyMode.EXTEND) {
-            liveRecords.keys.filterTo(HashSet()) { it !in pageIds && it !in pendingProjectionIds }
-        } else {
-            emptySet()
-        }
+    // Only rows the page proved gone depart (see `departedRetainedIds`), and only while a concurrent
+    // writer has not already removed them; rows the window merely slid past are retained.
+    val departedIds = this.departedIds.filterTo(HashSet()) { it in liveRecords }
     val projectIds =
         buildSet {
             rows.forEach { row ->
@@ -110,7 +111,6 @@ internal data class PreparedWindowApply(
     val mode: WindowApplyMode,
     val departedIds: Set<String>,
     val authoritativeOrder: Map<String, ULong>,
-    val touchedIds: Set<String>,
     val profileIds: Set<String>,
 )
 
@@ -151,8 +151,12 @@ internal suspend fun prepareWindowApplyOn(
 ): TimedPreparedWindowApply =
     withContext(dispatcher) {
         val startedAt = nanoTime()
+        val prepared =
+            tracedPagingSection(ConversationPagingTraceSection.PREPARE) {
+                prepareWindowApply(page, snapshot, replaceWindow, reconcileNewExtendedRecords)
+            }
         TimedPreparedWindowApply(
-            value = prepareWindowApply(page, snapshot, replaceWindow, reconcileNewExtendedRecords),
+            value = prepared,
             durationNanos = (nanoTime() - startedAt).coerceAtLeast(0L),
         )
     }
@@ -176,16 +180,23 @@ internal fun prepareWindowApply(
     replaceWindow: Boolean,
     reconcileNewExtendedRecords: Boolean = false,
 ): PreparedWindowApply {
-    val mode = if (replaceWindow) WindowApplyMode.REPLACE else WindowApplyMode.EXTEND
     val heldBefore = snapshot.heldRecords.associateBy(TimelineMessageRecordFfi::messageIdHex)
     val retainedIds = page.messages.mapTo(linkedSetOf()) { it.messageIdHex }
+    val orderShift = if (replaceWindow) null else windowOrderShift(page, snapshot.heldOrder)
+    // A window that shares no ordered row with the held ones is a new place in history, whatever
+    // the caller asked for; one that does extends the held rows and keeps the ones it dropped.
+    val mode = if (orderShift == null) WindowApplyMode.REPLACE else WindowApplyMode.EXTEND
+    val authoritativeOrder =
+        buildMap {
+            page.messages.forEachIndexed { index, record ->
+                if (record.usesAuthoritativePageOrder()) {
+                    put(record.messageIdHex, shiftedOrder(index, orderShift))
+                }
+            }
+        }
     val departedIds =
         if (mode == WindowApplyMode.EXTEND) {
-            snapshot.heldRecords
-                .asSequence()
-                .map(TimelineMessageRecordFfi::messageIdHex)
-                .filter { it !in retainedIds && it !in snapshot.pendingProjectionIds }
-                .toCollection(linkedSetOf())
+            departedRetainedIds(page, snapshot.heldOrder, authoritativeOrder, snapshot.pendingProjectionIds)
         } else {
             emptySet()
         }
@@ -213,22 +224,6 @@ internal fun prepareWindowApply(
                         (reconcileNewExtendedRecords && record.messageIdHex !in heldBefore),
             )
         }
-    val touchedIds =
-        buildSet {
-            addAll(departedIds)
-            rows
-                .asSequence()
-                .filter(PreparedWindowRow::needsProjection)
-                .mapTo(this) { it.record.messageIdHex }
-        }
-    val authoritativeOrder =
-        buildMap {
-            page.messages.forEachIndexed { index, record ->
-                if (record.usesAuthoritativePageOrder()) {
-                    put(record.messageIdHex, index.toULong())
-                }
-            }
-        }
     val profileIds =
         buildSet {
             rows.forEach { row ->
@@ -244,7 +239,6 @@ internal fun prepareWindowApply(
         mode = mode,
         departedIds = departedIds,
         authoritativeOrder = authoritativeOrder,
-        touchedIds = touchedIds,
         profileIds = profileIds,
     )
 }
@@ -282,3 +276,39 @@ private fun ConversationController.timelineItemHoldsMessage(
     itemId: String,
     messageIdHex: String,
 ): Boolean = timelineItemsById[itemId]?.record?.messageIdHex == messageIdHex
+
+/**
+ * How far the page's ordinals must move to line up with the rows the timeline already holds, or
+ * null when the page must be applied as a replacement: it shares no ordered row, the shared rows
+ * disagree on the shift (a row was inserted or removed inside the span, so the rows after it
+ * moved), or a new row at an edge would land on an ordinal a row outside the page still holds.
+ * Any of those would stamp page rows over retained rows, so the retained ordinals are only trusted
+ * when every shared row sits exactly where the shift puts it.
+ */
+internal fun windowOrderShift(
+    page: TimelinePageFfi,
+    heldOrder: Map<String, ULong>,
+): Long? {
+    val indexed = page.messages.withIndex()
+    val shared = indexed.filter { (_, record) -> record.messageIdHex in heldOrder }
+    val shift =
+        shared.firstOrNull()?.let { (index, record) -> heldOrder.getValue(record.messageIdHex).toLong() - index }
+            ?: return null
+    val aligned = shared.all { (index, record) -> heldOrder.getValue(record.messageIdHex).toLong() - index == shift }
+    val pageIds = page.messages.mapTo(HashSet(page.messages.size)) { it.messageIdHex }
+    val retainedOrdinals = heldOrder.entries.filter { it.key !in pageIds }.mapTo(HashSet()) { it.value.toLong() }
+    val collides =
+        indexed.any { (index, record) -> record.messageIdHex !in heldOrder && index + shift in retainedOrdinals }
+    return shift.takeIf { aligned && !collides }
+}
+
+/** A page row's ordinal: aligned to the held rows when extending, counted from the base when replacing. */
+internal fun shiftedOrder(
+    index: Int,
+    shift: Long?,
+): ULong =
+    if (shift == null) {
+        AUTHORITATIVE_ORDER_BASE + index.toULong()
+    } else {
+        (index.toLong() + shift).coerceAtLeast(0L).toULong()
+    }

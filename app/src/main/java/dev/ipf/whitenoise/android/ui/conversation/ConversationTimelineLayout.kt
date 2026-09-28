@@ -7,6 +7,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
+import dev.ipf.whitenoise.android.state.isLoadingOlder
 
 /** The one resting interval between the final timeline row and the composer. */
 internal val CONVERSATION_TIMELINE_TAIL_GAP = 8.dp

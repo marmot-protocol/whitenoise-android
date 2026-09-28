@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.HostPerformanceOperationFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
@@ -40,7 +41,10 @@ internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintext(
     }
 
 /** Returns bounded memory or an owner-private file lease that the caller must close. */
-@Suppress("UnusedParameter") // Existing consumers supply a reference; native source identity owns acquisition.
+@Suppress(
+    "UnusedParameter",
+    "LongMethod",
+) // Cache, acquisition, and telemetry spans intentionally share one retained-source ownership boundary.
 internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
     request: AttachmentTransferRequest,
     reference: MediaAttachmentReferenceFfi,
@@ -55,24 +59,28 @@ internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
         resolveAttachmentPlaintext(
             loadMemory = {
                 val startedAtMs = diagnostics?.startSpan()
-                withContext(Dispatchers.Main.immediate) { cachedMediaPlaintext(cacheKey) }.also { cached ->
-                    diagnostics?.phase(
-                        phase = PerformancePhase.ATTACHMENT_MEMORY_LOOKUP,
-                        result = if (cached == null) PerformanceResult.PENDING else PerformanceResult.SUCCESS,
-                        layer = PerformanceLayer.STORAGE,
-                        durationMs = startedAtMs?.let { diagnostics.startSpan() - it } ?: 0L,
-                    )
+                measureHostPerformance(HostPerformanceOperationFfi.MEDIA_CACHE_READ) {
+                    withContext(Dispatchers.Main.immediate) { cachedMediaPlaintext(cacheKey) }.also { cached ->
+                        diagnostics?.phase(
+                            phase = PerformancePhase.ATTACHMENT_MEMORY_LOOKUP,
+                            result = if (cached == null) PerformanceResult.PENDING else PerformanceResult.SUCCESS,
+                            layer = PerformanceLayer.STORAGE,
+                            durationMs = startedAtMs?.let { diagnostics.startSpan() - it } ?: 0L,
+                        )
+                    }
                 }
             },
             loadDisk = { cancellationCheck, onAcquired ->
                 val startedAtMs = diagnostics?.startSpan()
-                loadAttachmentDiskPlaintext(cacheKey, cancellationCheck, onAcquired).also { cached ->
-                    diagnostics?.phase(
-                        phase = PerformancePhase.ATTACHMENT_DISK_LOOKUP,
-                        result = if (cached == null) PerformanceResult.PENDING else PerformanceResult.SUCCESS,
-                        layer = PerformanceLayer.STORAGE,
-                        durationMs = startedAtMs?.let { diagnostics.startSpan() - it } ?: 0L,
-                    )
+                measureHostPerformance(HostPerformanceOperationFfi.MEDIA_CACHE_READ) {
+                    loadAttachmentDiskPlaintext(cacheKey, cancellationCheck, onAcquired).also { cached ->
+                        diagnostics?.phase(
+                            phase = PerformancePhase.ATTACHMENT_DISK_LOOKUP,
+                            result = if (cached == null) PerformanceResult.PENDING else PerformanceResult.SUCCESS,
+                            layer = PerformanceLayer.STORAGE,
+                            durationMs = startedAtMs?.let { diagnostics.startSpan() - it } ?: 0L,
+                        )
+                    }
                 }
             },
             cacheMemory = { bytes ->
@@ -87,14 +95,16 @@ internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
                     result = PerformanceResult.PENDING,
                     layer = PerformanceLayer.MDK,
                 )
-                acquireAttachmentPlaintextSource(
-                    cacheKey = cacheKey,
-                    request = request,
-                    priority = priority,
-                    persistInteractiveIntent = persistInteractiveIntent,
-                    allowExplicitRetry = allowExplicitRetry,
-                    diagnostics = diagnostics,
-                )
+                measureHostPerformance(HostPerformanceOperationFfi.MEDIA_LOAD) {
+                    acquireAttachmentPlaintextSource(
+                        cacheKey = cacheKey,
+                        request = request,
+                        priority = priority,
+                        persistInteractiveIntent = persistInteractiveIntent,
+                        allowExplicitRetry = allowExplicitRetry,
+                        diagnostics = diagnostics,
+                    )
+                }
             },
         ).also {
             diagnostics?.phase(

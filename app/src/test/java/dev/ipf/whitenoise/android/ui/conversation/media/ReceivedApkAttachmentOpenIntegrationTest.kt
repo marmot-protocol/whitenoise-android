@@ -279,6 +279,32 @@ class ReceivedApkAttachmentOpenIntegrationTest {
         }
 
     @Test
+    fun generalDocumentOpensWithAViewerAndReportsMissingViewer() =
+        runTest {
+            val source = artifact("report.pdf").also { it.writeBytes(byteArrayOf(1, 2, 3)) }
+            val viewer = RecordingContext(applicationContext())
+            val opened =
+                openAttachmentExternally(
+                    context = viewer,
+                    source = source,
+                    mediaType = "application/pdf; charset=binary",
+                    fileName = "report.pdf",
+                )
+            val noViewer =
+                openAttachmentExternally(
+                    context = RecordingContext(applicationContext(), ActivityNotFoundException()),
+                    source = source,
+                    mediaType = "application/pdf",
+                    fileName = "report.pdf",
+                )
+
+            assertEquals(OpenAttachmentResult.Opened, opened)
+            assertEquals(Intent.ACTION_VIEW, viewer.startedIntent?.action)
+            assertEquals("application/pdf", viewer.startedIntent?.type)
+            assertEquals(OpenAttachmentResult.NoHandler, noViewer)
+        }
+
+    @Test
     fun navigationChangeDuringApkPreparationSuppressesTheInstallerAtDispatch() =
         runTest {
             val source = validApkArtifact("stale-destination.apk")

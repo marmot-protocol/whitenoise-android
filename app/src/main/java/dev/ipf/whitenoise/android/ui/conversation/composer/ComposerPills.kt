@@ -41,6 +41,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.contextmenu.data.TextContextMenuKeys
+import androidx.compose.foundation.text.contextmenu.modifier.filterTextContextMenuComponents
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Key
@@ -412,6 +414,8 @@ internal fun ComposerPill(
     compactOuterEndInset: Dp = 0.dp,
     forceEditingLayout: Boolean = false,
     accessoryContent: (@Composable () -> Unit)? = null,
+    // Sits in the bottom action row directly before the trailing Send slot.
+    sendAccessoryContent: (@Composable () -> Unit)? = null,
     voiceReviewContent: (@Composable () -> Unit)? = null,
     inputContentVisible: Boolean = true,
     inputFocusEnabled: Boolean = true,
@@ -1009,7 +1013,10 @@ internal fun ComposerPill(
                                     // commits can follow the real selection, not merely
                                     // the final text line or the conversation tail.
                                     .verticalScroll(composerScrollState)
-                                    .focusProperties { canFocus = inputFocusEnabled }
+                                    .filterTextContextMenuComponents { component ->
+                                        textFieldValue.text.isNotEmpty() ||
+                                            component.key !== TextContextMenuKeys.AutofillKey
+                                    }.focusProperties { canFocus = inputFocusEnabled }
                                     .contentReceiver(pasteImageReceiver)
                                     .onPreInterceptKeyBeforeSoftKeyboard { event ->
                                         when (
@@ -1207,6 +1214,19 @@ internal fun ComposerPill(
                                     modifier = Modifier.size(24.dp),
                                 )
                             }
+                        }
+                        if (sendAccessoryContent != null && inputContentVisible) {
+                            Box(
+                                Modifier.layout { measurable, constraints ->
+                                    // Stays clear of the leading tools; the label ellipsizes first.
+                                    val reserved =
+                                        (leadingControlsWidth + reservedTrailingWidth + dictationControlWidth)
+                                            .roundToPx()
+                                    val available = (constraints.maxWidth - reserved).coerceAtLeast(0)
+                                    val child = measurable.measure(constraints.copy(minWidth = 0, maxWidth = available))
+                                    layout(child.width, child.height) { child.placeRelative(0, 0) }
+                                },
+                            ) { sendAccessoryContent() }
                         }
                         if (expandedTrailingActionInset > 0.dp) {
                             Spacer(

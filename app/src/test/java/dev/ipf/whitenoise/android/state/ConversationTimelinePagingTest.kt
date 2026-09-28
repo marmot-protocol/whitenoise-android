@@ -14,6 +14,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.time.Duration
 
 /**
  * A page that the engine never answers must leave the reader a retry affordance rather than a
@@ -296,6 +297,120 @@ class ConversationTimelinePagingTest {
         }
 
     /**
+     * An automatic older page the engine answers with the rows already held stands the prefetch
+     * down after one ask, without arming the failure banner, so the viewport parked on the oldest
+     * row cannot re-issue it the moment it finishes (#2727).
+     */
+    @Test
+    fun automaticOlderPageWithoutNewRowsStandsThePrefetchDown() =
+        runBlocking {
+            val subscription = subscriptionWith(sameWindow(), sameWindow())
+            withController(subscription) { controller ->
+                settle()
+
+                val first = controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC)
+                val second = controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC)
+
+                assertEquals(ConversationPageLoad.NO_PROGRESS, first)
+                assertEquals(ConversationPageLoad.NO_PROGRESS, second)
+                assertTrue(controller.automaticOlderPagingBlocked)
+                assertFalse("no older rows is an answer, not a failure to answer", controller.olderPageBlocked)
+                assertFalse(controller.isLoadingOlder)
+                assertEquals("a stood-down prefetch stops asking the engine", 1, subscription.backwardsCallCount)
+            }
+        }
+
+    /** The reader's own ask from the header proceeds while the prefetch stands down, and rows release it. */
+    @Test
+    fun explicitOlderPageProceedsWhileThePrefetchStandsDownAndRowsReleaseIt() =
+        runBlocking {
+            val subscription = subscriptionWith(sameWindow(), olderPage())
+            withController(subscription) { controller ->
+                settle()
+                controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC)
+                assertTrue(controller.automaticOlderPagingBlocked)
+
+                val load = controller.loadOlderPageInternal()
+
+                assertEquals(ConversationPageLoad.ADVANCED, load)
+                assertEquals(2, subscription.backwardsCallCount)
+                assertFalse("rows that arrived release the block", controller.automaticOlderPagingBlocked)
+            }
+        }
+
+    /** A deadline on an automatic older page keeps arming the visible retry row rather than the quiet guard. */
+    @Test
+    fun automaticOlderDeadlineStillArmsTheRetryRow() =
+        runBlocking {
+            val subscription = subscriptionWith(outcome(ConversationWindowUnchangedReason.TIMED_OUT))
+            withController(subscription) { controller ->
+                settle()
+
+                val load = controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC)
+
+                assertEquals(ConversationPageLoad.TIMED_OUT, load)
+                assertTrue(controller.olderPageBlocked)
+                assertFalse(controller.automaticOlderPagingBlocked)
+            }
+        }
+
+    /** A superseded window is a live replacement owning the answer, not the engine saying there is nothing older. */
+    @Test
+    fun supersededAutomaticOlderPageDoesNotStandThePrefetchDown() =
+        runBlocking {
+            val subscription = subscriptionWith(outcome(ConversationWindowUnchangedReason.SUPERSEDED), olderPage())
+            withController(subscription) { controller ->
+                settle()
+
+                val load = controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC)
+
+                assertEquals(ConversationPageLoad.NO_PROGRESS, load)
+                assertFalse(controller.automaticOlderPagingBlocked)
+                val retried = controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC)
+                assertEquals("the next automatic ask still reaches the engine", ConversationPageLoad.ADVANCED, retried)
+            }
+        }
+
+    /** A rebuilt window is a new place in history, so the prefetch may ask again from there. */
+    @Test
+    fun windowReplacementReleasesTheOlderPrefetch() =
+        runBlocking {
+            val subscription = subscriptionWith(sameWindow(), olderPage())
+            withController(subscription) { controller ->
+                settle()
+                controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC)
+                assertTrue(controller.automaticOlderPagingBlocked)
+
+                controller.testRefreshCurrentTimeline(ConversationTimelineTestIds.ACCOUNT_REF) {
+                    page(listOf(record(TARGET_ID, timelineAt = 150uL)), hasMoreBefore = true)
+                }
+                settle()
+
+                assertFalse("a replaced window releases the prefetch", controller.automaticOlderPagingBlocked)
+            }
+        }
+
+    /** An authoritative live window is recovery for the older prefetch too. */
+    @Test
+    fun liveWindowReplacementReleasesTheOlderPrefetch() =
+        runBlocking {
+            val subscription = subscriptionWith(sameWindow())
+            withController(subscription) { controller ->
+                settle()
+                controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC)
+                assertTrue(controller.automaticOlderPagingBlocked)
+
+                awaitConversationCondition { subscription.nextWindowCallCount >= 1 }
+                subscription.emitWindow(page(listOf(record(OLDER_ID)), hasMoreBefore = true))
+                awaitConversationCondition { subscription.nextWindowCallCount >= 2 }
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(10))
+
+                awaitConversationCondition(timeoutMs = 15_000) { !controller.automaticOlderPagingBlocked }
+                assertFalse(controller.automaticOlderPagingBlocked)
+            }
+        }
+
+    /**
      * Every phase a history page can emit is part of the closed WNPerf vocabulary, so a diagnostics
      * session on a tester's device cannot be asked to log a name the schema does not define.
      */
@@ -326,6 +441,12 @@ class ConversationTimelinePagingTest {
 
     /** One older row arriving as a newly installed window. */
     private fun olderPage() = TimelinePageOutcome.Advanced(page(listOf(record(OLDER_ID)), hasMoreBefore = true))
+
+    /** The window the handle already holds, answered again with older history still claimed. */
+    private fun sameWindow(): TimelinePageOutcome {
+        val heldRows = listOf(record(SEED_ID, timelineAt = 200uL))
+        return TimelinePageOutcome.Advanced(page(heldRows, hasMoreBefore = true))
+    }
 
     /** An unchanged outcome that keeps whatever window the handle already holds. */
     private fun outcome(reason: ConversationWindowUnchangedReason) = TimelinePageOutcome.Unchanged(reason, null)

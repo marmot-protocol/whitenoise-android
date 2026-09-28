@@ -29,7 +29,11 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
+import dev.ipf.marmotkit.HostPerformanceOperationFfi
+import dev.ipf.marmotkit.HostPerformanceOutcomeFfi
 import dev.ipf.whitenoise.android.amber.AmberActivityCoordinator
+import dev.ipf.whitenoise.android.diagnostics.AndroidFramePerformanceReporter
+import dev.ipf.whitenoise.android.diagnostics.FramePerformanceCallbackGuard
 import dev.ipf.whitenoise.android.notifications.InboundIntentRouting
 import dev.ipf.whitenoise.android.notifications.NotificationNavigation
 import dev.ipf.whitenoise.android.notifications.NotificationRouteTrace
@@ -45,6 +49,8 @@ import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.AppThemeMode
 import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.state.ChatScreenshotPreferences
+import dev.ipf.whitenoise.android.state.HostPerformanceAttemptSlot
+import dev.ipf.whitenoise.android.state.HostPerformanceRuntimeOwner
 import dev.ipf.whitenoise.android.state.WarmResumeTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.shouldReattachAppUnlockPrompt
@@ -60,6 +66,7 @@ import java.util.concurrent.atomic.AtomicLong
 import javax.crypto.Cipher
 
 class MainActivity : AppCompatActivity() {
+    private val activityCreatedAtElapsedMs = SystemClock.elapsedRealtime()
     private var inboundProfilePayload by mutableStateOf<String?>(null)
     private var inboundNotificationTarget by mutableStateOf<NotificationTarget?>(null)
     private var inboundNotificationRequestId by mutableLongStateOf(0L)
@@ -83,6 +90,11 @@ class MainActivity : AppCompatActivity() {
     private var warmResumeEpoch by mutableIntStateOf(0)
     private var warmResumeLifecycleClass = WarmResumeLifecycleClass.ColdProcessStart
     private var mainShellHolderCreatedForActivity = false
+    private var splashHostReadyRecorded = false
+    private var fontsHostReadyRecorded = false
+    private val foregroundHostReady = HostPerformanceAttemptSlot()
+    private var framePerformanceReporter: AndroidFramePerformanceReporter? = null
+    private var framePerformanceCallbackGuard: FramePerformanceCallbackGuard<HostPerformanceRuntimeOwner>? = null
     private val mainShellStateHolder: MainShellStateHolder by viewModels {
         MainShellStateHolder.Factory(
             appState = appState,
@@ -153,6 +165,33 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         applyPreComposeWindowBackground(appState.themeMode, initialSystemDarkTheme)
         installComposeContent()
+        appState.recordHostPerformanceSince(
+            HostPerformanceOperationFfi.WINDOW_INIT,
+            activityCreatedAtElapsedMs,
+        )
+        startFramePerformanceReporter()
+    }
+
+    /** Starts frame sampling with one Activity lifetime and one lazily captured runtime owner. */
+    private fun startFramePerformanceReporter() {
+        val frameCallbackGuard =
+            FramePerformanceCallbackGuard(
+                captureOwner = appState::captureHostPerformanceRuntimeOwner,
+                isCurrent = appState::ownsHostPerformanceRuntimeOwner,
+            ).also { framePerformanceCallbackGuard = it }
+        framePerformanceReporter =
+            AndroidFramePerformanceReporter(window = window, emit = { operation, durationMs ->
+                window.decorView.post {
+                    frameCallbackGuard.runIfCurrent { owner ->
+                        appState.recordHostPerformance(
+                            owner = owner,
+                            operation = operation,
+                            durationMs = durationMs,
+                            outcome = HostPerformanceOutcomeFfi.SUCCESS,
+                        )
+                    }
+                }
+            }).also(AndroidFramePerformanceReporter::start)
     }
 
     private fun installComposeContent() {
@@ -173,6 +212,16 @@ class MainActivity : AppCompatActivity() {
                 val controller = WindowCompat.getInsetsController(window, window.decorView)
                 controller.isAppearanceLightStatusBars = !darkTheme
                 controller.isAppearanceLightNavigationBars = !darkTheme
+                if (!fontsHostReadyRecorded) {
+                    fontsHostReadyRecorded = true
+                    state.recordHostPerformanceSince(
+                        HostPerformanceOperationFfi.FONTS_INIT,
+                        activityCreatedAtElapsedMs,
+                    )
+                }
+                if (state.phase == AppPhase.Ready) {
+                    foregroundHostReady.success()
+                }
             }
             WhiteNoiseTheme(
                 darkTheme = darkTheme,
@@ -285,6 +334,13 @@ class MainActivity : AppCompatActivity() {
                 )
             if (!retain) {
                 appState.recordStartupSystemSplashHandoff()
+                if (!splashHostReadyRecorded) {
+                    splashHostReadyRecorded = true
+                    appState.recordHostPerformanceSince(
+                        HostPerformanceOperationFfi.SPLASH_READY,
+                        installedAtMs,
+                    )
+                }
                 schedulePeriodicWorkAfterFirstFrame()
             }
             retain
@@ -372,6 +428,9 @@ class MainActivity : AppCompatActivity() {
             activityClass = warmResumeLifecycleClass,
         )
         if (::appState.isInitialized) {
+            foregroundHostReady.replace(
+                appState.beginHostPerformance(HostPerformanceOperationFfi.FOREGROUND_LOCAL_READY),
+            )
             // A stopped Activity receives onStart before onNewIntent when a
             // notification brings its existing task forward. Defer the
             // retained-conversation dismissal until onResume has observed
@@ -383,6 +442,9 @@ class MainActivity : AppCompatActivity() {
                 foreground = true,
                 dismissRetainedVisibleConversation = false,
             )
+            // A warm process already has usable local content and may not recompose merely because
+            // the Activity restarted, so settle directly at the lifecycle boundary in that case.
+            foregroundHostReady.successIf(appState.phase == AppPhase.Ready)
             applyRecentsPreferenceSecureFlag(appState.allowChatScreenshotsInChats)
             if (!appState.appLockScreenVisible) releaseAppLockBackgroundSecureFlag()
         }
@@ -408,6 +470,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStop() {
         if (::appState.isInitialized) {
+            foregroundHostReady.cancel()
             retainAppLockBackgroundSecureFlagIfNeeded()
             appState.setAppInForeground(false)
         }
@@ -423,6 +486,10 @@ class MainActivity : AppCompatActivity() {
             appState.onAllowChatScreenshotsChanged = null
         }
         releaseRecentsPreferenceSecureFlag()
+        framePerformanceCallbackGuard?.invalidate()
+        framePerformanceCallbackGuard = null
+        framePerformanceReporter?.close()
+        framePerformanceReporter = null
         super.onDestroy()
     }
 

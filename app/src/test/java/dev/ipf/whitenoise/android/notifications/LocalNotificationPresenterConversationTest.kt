@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.net.Uri
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import androidx.core.content.pm.ShortcutInfoCompat
@@ -42,6 +43,9 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+
+private const val DEFAULT_NOTIFICATION_SENDER_ID =
+    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -1289,6 +1293,110 @@ class LocalNotificationPresenterConversationTest {
         assertEquals(1, postAttempts)
         assertTrue(!posted)
         assertTrue(manager.activeNotifications.isEmpty())
+    }
+
+    /** Nickname refresh rewrites every matching sender while preserving message payload metadata. */
+    @Test
+    fun nicknameRefreshRenamesEveryMatchingSenderWithoutDroppingMessageMetadata() {
+        presenter.ensureChannels()
+        val conversation = LocalNotificationFormatter.conversationDismissalKey("account-a", "group-a")
+        val alice =
+            Person
+                .Builder()
+                .setName("Alice")
+                .setKey(DEFAULT_NOTIFICATION_SENDER_ID)
+                .setUri("nostr:$DEFAULT_NOTIFICATION_SENDER_ID")
+                .build()
+        val bob =
+            Person
+                .Builder()
+                .setName("Bob")
+                .setKey("bob-id")
+                .build()
+        val attachment = Uri.parse("content://whitenoise/image-a")
+        val style = NotificationCompat.MessagingStyle(Person.Builder().setName("Me").build())
+        style.addMessage(
+            NotificationCompat.MessagingStyle
+                .Message("photo", 1_000L, alice)
+                .setData("image/png", attachment),
+        )
+        style.addMessage("again", 2_000L, alice)
+        style.addMessage("other", 3_000L, bob)
+        manager.notify(
+            conversation.tag,
+            conversation.id,
+            NotificationCompat
+                .Builder(context, NotificationChannelSpec.GROUP_MESSAGES.id)
+                .setSmallIcon(R.drawable.ic_stat_whitenoise)
+                .setStyle(style)
+                .build(),
+        )
+        val originalGroup =
+            manager.activeNotifications
+                .single()
+                .notification.group
+
+        assertEquals(
+            1,
+            runBlocking {
+                presenter.refreshContactSenderName("account-a", DEFAULT_NOTIFICATION_SENDER_ID, "Ally")
+            },
+        )
+
+        val refreshedNotification = manager.activeNotifications.single().notification
+        assertEquals(originalGroup, refreshedNotification.group)
+        val messages =
+            checkNotNull(
+                NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(
+                    refreshedNotification,
+                ),
+            ).messages
+        assertEquals(listOf("Ally", "Ally", "Bob"), messages.map { it.person?.name.toString() })
+        assertEquals(listOf(1_000L, 2_000L, 3_000L), messages.map { it.timestamp })
+        assertEquals("image/png", messages.first().dataMimeType)
+        assertEquals(attachment, messages.first().dataUri)
+        assertEquals("nostr:$DEFAULT_NOTIFICATION_SENDER_ID", messages.first().person?.uri)
+    }
+
+    /** Nickname refresh updates the expanded single-message bridge before it gains history. */
+    @Test
+    fun nicknameRefreshUpdatesExpandedSingleMessageBeforeItBecomesHistory() {
+        presenter.ensureChannels()
+        val longBody = "A detailed notification message. ".repeat(20)
+        runBlocking {
+            presenter.show(
+                update(isMention = false, messageIdHex = "long-message"),
+                senderNameOverride = "Alice",
+                previewTextOverride = longBody,
+                shortNpub = { "npub1test" },
+            )
+            assertEquals(
+                1,
+                presenter.refreshContactSenderName("account-a", DEFAULT_NOTIFICATION_SENDER_ID, "Ally"),
+            )
+            assertEquals(
+                context.getString(R.string.notification_sender_in_group, "Ally", "General"),
+                manager.activeNotifications
+                    .single()
+                    .notification.extras
+                    .getCharSequence(Notification.EXTRA_TITLE),
+            )
+            presenter.show(
+                update(isMention = false, messageIdHex = "next-message"),
+                senderNameOverride = "Ally",
+                previewTextOverride = "next",
+                shortNpub = { "npub1test" },
+            )
+        }
+
+        val messages =
+            checkNotNull(
+                NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(
+                    manager.activeNotifications.single().notification,
+                ),
+            ).messages
+        assertEquals(listOf("Ally", "Ally"), messages.map { it.person?.name.toString() })
+        assertEquals(listOf(longBody.trim(), "next"), messages.map { it.text.toString() })
     }
 
     @Test

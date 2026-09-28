@@ -40,7 +40,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.isTransferInProgress
@@ -148,7 +147,7 @@ internal fun FileBubbleContent(
             modifier = Modifier.weight(1f).heightIn(min = FileTransferControlSize),
         ) {
             Text(
-                text = MediaPipeline.safeDisplayName(fileName),
+                text = safeDocumentDisplayName(fileName),
                 style = MaterialTheme.typography.titleSmall.copy(textDirection = TextDirection.ContentOrLtr),
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
