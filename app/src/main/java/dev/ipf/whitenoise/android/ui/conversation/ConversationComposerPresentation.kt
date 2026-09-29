@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.state.BlockListMirror
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.dmPeerAccount
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.conversationComposerGate
 

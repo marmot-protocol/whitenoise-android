@@ -6668,19 +6668,6 @@ class ConversationController(
     val dmNicknamePeerAccount: String?
         get() = avatarAccount?.takeIf { isDm && !group.pendingConfirmation }
 
-    /** The counterparty of a direct conversation, including one with a custom group title. */
-    val dmPeerAccount: String?
-        get() =
-            if (isDm && !group.pendingConfirmation) {
-                conversationIdentityProjection(
-                    members = members,
-                    activeAccountIdHex = conversationAccountIdHex,
-                    acceptedInvitePeerAccount = acceptedInvitePeerAccount,
-                ).otherMemberAccount
-            } else {
-                null
-            }
-
     /**
      * Avatar URL for the conversation top bar. A group's own avatar wins; a 1:1
      * DM falls back to the peer's profile picture so the top bar matches the

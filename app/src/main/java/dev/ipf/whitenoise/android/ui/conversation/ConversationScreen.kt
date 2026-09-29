@@ -129,6 +129,7 @@ import dev.ipf.whitenoise.android.state.chatCreateOpenConversationTimingStage
 import dev.ipf.whitenoise.android.state.conversationWindowCanReportVisible
 import dev.ipf.whitenoise.android.state.createPoll
 import dev.ipf.whitenoise.android.state.currentTtsConversationDestination
+import dev.ipf.whitenoise.android.state.dmPeerAccount
 import dev.ipf.whitenoise.android.state.hasKnownTranscriptPresentation
 import dev.ipf.whitenoise.android.state.isLoadingOlder
 import dev.ipf.whitenoise.android.state.isLoadingPage
