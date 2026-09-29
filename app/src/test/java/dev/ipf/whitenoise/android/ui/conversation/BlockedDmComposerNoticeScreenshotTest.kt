@@ -29,6 +29,7 @@ class BlockedDmComposerNoticeScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** The light notice exposes an actionable Unblock control. */
     @Test
     fun blockedNoticeLightOffersUnblock() {
         var clicks = 0
@@ -42,6 +43,7 @@ class BlockedDmComposerNoticeScreenshotTest {
         assertEquals(1, clicks)
     }
 
+    /** Pending unblock disables a second request in dark theme. */
     @Test
     fun blockedNoticeDarkDisablesRepeatedUnblock() {
         composeRule.setContent {
@@ -53,6 +55,7 @@ class BlockedDmComposerNoticeScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/blocked_dm_composer_dark_busy.png")
     }
 
+    /** The Unblock control remains reachable at large text size in RTL. */
     @Test
     fun blockedNoticeLargeTextRtlKeepsUnblockReachable() {
         composeRule.setContent {

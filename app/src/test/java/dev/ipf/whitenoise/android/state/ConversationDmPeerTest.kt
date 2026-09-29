@@ -36,5 +36,6 @@ class ConversationDmPeerTest {
         assertNull(resolvedDirectPeerAccount(true, false, emptyList(), "self", null))
     }
 
+    /** Builds one local or remote roster member for peer-resolution cases. */
     private fun member(account: String) = AppGroupMemberRecordFfi(account, null, account == "self")
 }

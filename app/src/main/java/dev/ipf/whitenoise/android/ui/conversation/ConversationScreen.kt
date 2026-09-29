@@ -1357,6 +1357,7 @@ internal fun ConversationScreen(
             blocked = dmBlocked,
         )
 
+    /** Commits an unblock for the current account and peer, ignoring a later route's result. */
     fun unblockBlockedDm() {
         val account = conversationAccountRef
         val peer = dmPeerAccount
