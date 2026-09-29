@@ -9056,6 +9056,12 @@
         "test_ids": ["MSG-021"]
       },
       {
+        "surface": "string:poll_add_two_options",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_add_two_options",
+        "test_ids": ["MSG-021"]
+      },
+      {
         "surface": "string:poll_create",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
         "anchor": "R.string.poll_create",
@@ -9065,6 +9071,18 @@
         "surface": "string:poll_deadline",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
         "anchor": "R.string.poll_deadline",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_duplicate_option",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_duplicate_option",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_enter_question",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_enter_question",
         "test_ids": ["MSG-021"]
       },
       {
@@ -9086,9 +9104,21 @@
         "test_ids": ["MSG-021"]
       },
       {
+        "surface": "string:poll_option_too_long",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_option_too_long",
+        "test_ids": ["MSG-021"]
+      },
+      {
         "surface": "string:poll_question",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
         "anchor": "R.string.poll_question",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_question_too_long",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_question_too_long",
         "test_ids": ["MSG-021"]
       },
       {
