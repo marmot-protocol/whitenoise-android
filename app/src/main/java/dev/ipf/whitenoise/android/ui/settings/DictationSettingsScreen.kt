@@ -83,19 +83,7 @@ internal fun DictationSettingsScreen(
 
     SettingsScaffold(title = stringResource(R.string.dictation_settings_title), onBack = onBack) {
         SettingsList {
-            if (providerResolved) {
-                item {
-                    SettingsExplainer(
-                        stringResource(
-                            if (selectedProviderPackage == OFFLINE_SPEECH_TO_TEXT_PACKAGE) {
-                                R.string.dictation_settings_explainer_offline
-                            } else {
-                                R.string.dictation_settings_explainer
-                            },
-                        ),
-                    )
-                }
-            }
+            item { DictationProviderExplainer(providerResolved, selectedProviderPackage) }
             if (!osttInstalled) {
                 item {
                     SettingsGroup(modifier = Modifier.testTag("dictation.ostt_recommendation.group")) {
@@ -247,6 +235,23 @@ internal fun DictationSettingsScreen(
             )
         null -> Unit
     }
+}
+
+/** Shows provider-specific privacy copy only after the effective provider is known. */
+@Suppress("FunctionNaming")
+@Composable
+private fun DictationProviderExplainer(
+    providerResolved: Boolean,
+    selectedProviderPackage: String?,
+) {
+    if (!providerResolved) return
+    val message =
+        if (selectedProviderPackage == OFFLINE_SPEECH_TO_TEXT_PACKAGE) {
+            R.string.dictation_settings_explainer_offline
+        } else {
+            R.string.dictation_settings_explainer
+        }
+    SettingsExplainer(stringResource(message))
 }
 
 /** "Finish manually", or the silence threshold in whole seconds. */
