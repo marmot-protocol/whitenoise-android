@@ -118,6 +118,22 @@ class AttachmentPlaintextCacheTest {
     }
 
     @Test
+    fun sharedFileHandoffAdmitsLargeApksWithoutRemovingTheByteCeiling() {
+        val sharedFile = File(File(root, MediaCacheDirs.SHARED), "release.apk")
+        val arm64ApkBytes = 143_162_216L
+        val universalApkBytes = 261_046_818L
+
+        AttachmentPlaintextCache.requireEntryWithinLimit(sharedFile, arm64ApkBytes)
+        AttachmentPlaintextCache.requireEntryWithinLimit(sharedFile, universalApkBytes)
+        assertThrows(IOException::class.java) {
+            AttachmentPlaintextCache.requireEntryWithinLimit(
+                sharedFile,
+                AttachmentPlaintextCache.SHARED_MAX_DIRECTORY_BYTES + 1L,
+            )
+        }
+    }
+
+    @Test
     fun finishingPublicationAtomicallyReleasesItAndTrimsOlderEntries() {
         val directory = File(root, MediaCacheDirs.SHARED).apply { mkdirs() }
         val older = cacheFile(directory, "older.bin", 8, 1_000L)

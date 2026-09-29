@@ -27389,6 +27389,24 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScrollCoordinator.kt",
         "anchor": "suspend fun animateScrollToTail(",
         "test_ids": ["CON-003"]
+      },
+      {
+        "surface": "Received large APK handoff remains within the bounded shared-file cache",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/AttachmentPlaintextCache.kt",
+        "anchor": "internal const val SHARED_MAX_DIRECTORY_BYTES",
+        "test_ids": ["MED-018"]
+      },
+      {
+        "surface": "Explicit APK MIME still requires package archive validation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaIo.kt",
+        "anchor": "normalizedMime == ANDROID_PACKAGE_MIME ->",
+        "test_ids": ["MED-018"]
+      },
+      {
+        "surface": "Outbound multi-file sharing retains its separate aggregate size limit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MessageOutboundShare.kt",
+        "anchor": "internal const val OUTBOUND_SHARE_MAX_BYTES",
+        "test_ids": ["MED-016"]
       }
     ],
     "notification_content_contracts": [
