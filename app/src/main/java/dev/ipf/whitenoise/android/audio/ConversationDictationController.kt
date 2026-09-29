@@ -62,6 +62,7 @@ internal data class ConversationDictationTarget(
     val replyToMessageIdHex: String? = null,
     val finishAfterSilenceMillis: Long? = null,
     val silenceDeliveryMode: ConversationDictationDeliveryMode = ConversationDictationDeliveryMode.PasteIntoDraft,
+    val pauseOtherAudio: Boolean = true,
 ) {
     /** Compares the stable account and group identifiers without changing the captured target. */
     fun matchesConversation(
@@ -117,6 +118,7 @@ internal enum class ConversationDictationFailure {
     PermissionPermanentlyDenied,
     MicrophoneMuted,
     MicrophoneInUse,
+    AudioFocusUnavailable,
     NoSpeech,
     Network,
     ProviderDisconnected,
@@ -126,6 +128,9 @@ internal enum class ConversationDictationFailure {
     DeliveryUnknown,
     Unknown,
 }
+
+/** The enabled external-media policy cannot be honored, so capture must not begin. */
+internal class ConversationDictationAudioFocusDenied : RuntimeException()
 
 /** PII-free provider readiness phases emitted for local diagnostics and tests. */
 internal enum class ConversationDictationReadinessPhase {
@@ -411,7 +416,7 @@ internal class ConversationDictationController internal constructor(
         suspend (accountRef: String, groupIdHex: String) -> ConversationDictationTargetValidation
     )? = null,
     private val targetValidationScope: CoroutineScope? = null,
-    private val onBeforeRecognition: () -> Unit = {},
+    private val onBeforeRecognition: (ConversationDictationTarget) -> Unit = {},
     private val onAfterAudioCapture: () -> Unit = {},
     private val tryAcquireMicrophone: () -> Boolean = { true },
     private val releaseMicrophone: () -> Unit = {},
@@ -430,6 +435,7 @@ internal class ConversationDictationController internal constructor(
     private val scheduleTimeout: (delayMillis: Long, callback: () -> Unit) -> ConversationDictationTimeoutHandle =
         ::scheduleConversationDictationTimeout,
     private val finishAfterSilenceMillis: () -> Long? = { null },
+    private val pauseOtherAudio: () -> Boolean = { true },
     private val onReadinessEvent: (ConversationDictationReadinessEvent) -> Unit = {},
 ) {
     constructor(
@@ -446,11 +452,12 @@ internal class ConversationDictationController internal constructor(
             { _, _, _ -> true },
         targetValidator: suspend (accountRef: String, groupIdHex: String) -> ConversationDictationTargetValidation,
         targetValidationScope: CoroutineScope,
-        onBeforeRecognition: () -> Unit,
+        onBeforeRecognition: (ConversationDictationTarget) -> Unit,
         onAfterAudioCapture: () -> Unit,
         tryAcquireMicrophone: () -> Boolean,
         releaseMicrophone: () -> Unit,
         finishAfterSilenceMillis: () -> Long? = { null },
+        pauseOtherAudio: () -> Boolean = { true },
         silenceDeliveryMode: () -> ConversationDictationDeliveryMode = {
             ConversationDictationDeliveryMode.PasteIntoDraft
         },
@@ -472,6 +479,7 @@ internal class ConversationDictationController internal constructor(
         },
         stopDurableSession = { ConversationDictationForegroundService.stop(context.applicationContext) },
         finishAfterSilenceMillis = finishAfterSilenceMillis,
+        pauseOtherAudio = pauseOtherAudio,
         silenceDeliveryMode = silenceDeliveryMode,
         sendTranscriptIfOriginUnchanged = sendTranscriptIfOriginUnchanged,
         disclosureAccepted = {
@@ -508,6 +516,7 @@ internal class ConversationDictationController internal constructor(
     private var nextCallerAudioProbeId = 0L
     private var pendingCallerAudioProbeId: Long? = null
     private var microphoneHeld = false
+    private var activeCaptureSessionId: Long? = null
     private var durableSession = false
     private var durableSessionReady by mutableStateOf(false)
     private var durableStartAccepted = false
@@ -700,6 +709,7 @@ internal class ConversationDictationController internal constructor(
                 mode = mode,
                 finishAfterSilenceMillis = finishAfterSilenceMillis()?.takeIf { it > 0L },
                 silenceDeliveryMode = silenceDeliveryMode(),
+                pauseOtherAudio = pauseOtherAudio(),
             )
         if (!targetAvailable(target)) return false
         if (!runCatching(platform::prepareProviderSelection).getOrDefault(false)) {
@@ -866,7 +876,7 @@ internal class ConversationDictationController internal constructor(
                 runCatching {
                     recognitionSession?.stop {
                         if (owns(sessionId, generationId)) {
-                            finishPlaybackInterruption()
+                            finishPlaybackInterruption(sessionId)
                         }
                     }
                 }.onFailure {
@@ -895,7 +905,7 @@ internal class ConversationDictationController internal constructor(
         ) {
             clearRecognitionGeneration(
                 cancel = true,
-                onAudioCaptureFinished = ::finishPlaybackInterruption,
+                onAudioCaptureFinished = { finishPlaybackInterruption(sessionId) },
             )
             finalizeAccumulatedTranscript(sessionId, target)
             return
@@ -907,7 +917,7 @@ internal class ConversationDictationController internal constructor(
         runCatching {
             recognitionSession?.stop {
                 if (owns(sessionId, generationId)) {
-                    finishPlaybackInterruption()
+                    finishPlaybackInterruption(sessionId)
                 }
             }
         }.onFailure { failOrRetainTranscript(sessionId, target, ConversationDictationFailure.Unknown) }
@@ -926,7 +936,7 @@ internal class ConversationDictationController internal constructor(
                     if (state !is ConversationDictationState.Processing || state.sessionId != sessionId) {
                         return@finishCallerAudioCapture
                     }
-                    finishPlaybackInterruption()
+                    finishPlaybackInterruption(sessionId)
                     if (platform.callerAudioHasPending()) {
                         startRecognition(sessionId, target)
                     } else {
@@ -935,7 +945,7 @@ internal class ConversationDictationController internal constructor(
                 }
             }.getOrDefault(false)
         if (!platformOwnsClosure) {
-            finishPlaybackInterruption()
+            finishPlaybackInterruption(sessionId)
             continueOrFinalizeCallerAudioDrain(sessionId, target)
         }
     }
@@ -1512,6 +1522,12 @@ internal class ConversationDictationController internal constructor(
         }
         clearRecognitionGeneration(cancel = false)
         if (!ensureDurableSession(sessionId, target)) return
+        if (microphoneHeld && activeCaptureSessionId != sessionId) {
+            // A replaced session's asynchronous recorder close has not returned yet.
+            // Never reuse its microphone or focus lease for a different target.
+            fail(sessionId, target, ConversationDictationFailure.MicrophoneInUse)
+            return
+        }
         // Drain generations use sealed PCM; reacquiring capture would replace their drain deadline.
         if (!microphoneHeld && !finishRequested) {
             val acquired = tryAcquireMicrophone()
@@ -1521,9 +1537,19 @@ internal class ConversationDictationController internal constructor(
                 return
             }
             microphoneHeld = true
+            activeCaptureSessionId = sessionId
             playbackInterruptedForCapture = true
-            if (runCatching(onBeforeRecognition).isFailure) {
-                fail(sessionId, target, ConversationDictationFailure.Unknown)
+            val preparationFailure = runCatching { onBeforeRecognition(target) }.exceptionOrNull()
+            if (preparationFailure != null) {
+                fail(
+                    sessionId,
+                    target,
+                    if (preparationFailure is ConversationDictationAudioFocusDenied) {
+                        ConversationDictationFailure.AudioFocusUnavailable
+                    } else {
+                        ConversationDictationFailure.Unknown
+                    },
+                )
                 return
             }
             val captureDeadline =
@@ -2175,7 +2201,7 @@ internal class ConversationDictationController internal constructor(
                 cancelPendingRestart()
                 clearRecognitionGeneration(
                     cancel = true,
-                    onAudioCaptureFinished = ::finishPlaybackInterruption,
+                    onAudioCaptureFinished = { finishPlaybackInterruption(sessionId) },
                 )
                 finalizeAccumulatedTranscript(sessionId, target)
             }
@@ -2327,11 +2353,13 @@ internal class ConversationDictationController internal constructor(
         silenceTimeoutHandle?.cancel()
         silenceTimeoutHandle = null
         silenceDeadlineElapsedMillis = null
+        val captureSessionId = activeCaptureSessionId
+        val onCaptureFinished: () -> Unit = { captureSessionId?.let(::finishPlaybackInterruption) }
         val platformOwnsCaptureClosure =
-            runCatching { platform.discardCallerAudio(::finishPlaybackInterruption) }.getOrDefault(false)
+            runCatching { platform.discardCallerAudio(onCaptureFinished) }.getOrDefault(false)
         clearRecognitionGeneration(
             cancel = cancel,
-            onAudioCaptureFinished = if (platformOwnsCaptureClosure) ({}) else ::finishPlaybackInterruption,
+            onAudioCaptureFinished = if (platformOwnsCaptureClosure) ({}) else onCaptureFinished,
         )
         if (durableSession && releaseDurableSession) {
             durableSession = false
@@ -2346,9 +2374,10 @@ internal class ConversationDictationController internal constructor(
     }
 
     /** Restores only playback that this recognition session interrupted, at most once. */
-    private fun finishPlaybackInterruption() {
-        if (!playbackInterruptedForCapture) return
+    private fun finishPlaybackInterruption(sessionId: Long) {
+        if (!playbackInterruptedForCapture || activeCaptureSessionId != sessionId) return
         playbackInterruptedForCapture = false
+        activeCaptureSessionId = null
         if (microphoneHeld) {
             microphoneHeld = false
             conversationDictationDiagnostic("event=microphone_lease_released")

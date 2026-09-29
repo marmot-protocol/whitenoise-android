@@ -17,6 +17,7 @@ internal data class ConversationDictationPreferenceState(
     val silenceDeliveryMode: ConversationDictationDeliveryMode = ConversationDictationDeliveryMode.PasteIntoDraft,
     val recognitionServiceOverride: ComponentName? = null,
     val providerSelection: ConversationDictationProviderChoice? = null,
+    val pauseOtherAudio: Boolean = true,
 )
 
 /** Local-only endpointing and result behavior for composer dictation. */
@@ -57,6 +58,12 @@ internal class ConversationDictationPreferences(
         update(current().copy(silenceDeliveryMode = value))
     }
 
+    /** Controls cooperative external media only; White Noise playback always pauses for capture safety. */
+    fun setPauseOtherAudio(value: Boolean) {
+        if (current().pauseOtherAudio == value) return
+        update(current().copy(pauseOtherAudio = value))
+    }
+
     /** Persists an explicit service identity, or clears it to follow Android's system default. */
     fun setRecognitionServiceOverride(value: ComponentName?) {
         val selection =
@@ -84,6 +91,7 @@ internal class ConversationDictationPreferences(
             .edit()
             .putLong(KEY_FINISH_AFTER_SILENCE, value.finishAfterSilenceMillis ?: MANUAL_FINISH)
             .putString(KEY_SILENCE_DELIVERY_MODE, value.silenceDeliveryMode.name)
+            .putBoolean(KEY_PAUSE_OTHER_AUDIO, value.pauseOtherAudio)
             // The old key governed every completion, including the ones a person ended by hand.
             // Dropping it on the first write keeps an upgrade from acting on a choice made under
             // those wider rules, so the narrower setting above starts from paste.
@@ -110,7 +118,14 @@ internal class ConversationDictationPreferences(
                 ?.let { stored -> ConversationDictationDeliveryMode.entries.firstOrNull { it.name == stored } }
                 ?: ConversationDictationDeliveryMode.PasteIntoDraft
         val selection = decodeSelection(preferences.getString(KEY_PROVIDER_SELECTION, null))
-        return ConversationDictationPreferenceState(silence, silenceDelivery, selection?.service, selection)
+        val pauseOtherAudio = runCatching { preferences.getBoolean(KEY_PAUSE_OTHER_AUDIO, true) }.getOrDefault(true)
+        return ConversationDictationPreferenceState(
+            silence,
+            silenceDelivery,
+            selection?.service,
+            selection,
+            pauseOtherAudio,
+        )
     }
 
     private fun encodeSelection(value: ConversationDictationProviderChoice): String =
@@ -161,6 +176,7 @@ internal class ConversationDictationPreferences(
         private const val KEY_FINISH_AFTER_SILENCE = "finishAfterSilenceMillis"
         private const val KEY_DELIVERY_MODE = "deliveryMode"
         private const val KEY_SILENCE_DELIVERY_MODE = "silenceDeliveryMode"
+        private const val KEY_PAUSE_OTHER_AUDIO = "pauseOtherAudio"
         private const val KEY_PROVIDER_SELECTION = "providerSelection"
         private const val KEY_RECOGNITION_SERVICE_OVERRIDE = "recognitionServiceOverride"
         private const val MANUAL_FINISH = -1L

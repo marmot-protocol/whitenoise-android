@@ -2105,4 +2105,7 @@
     <string name="export_audit_logs_confirm_action">Continuar</string>
     <string name="toast_couldnt_export_audit_logs">Não foi possível preparar os logs de diagnóstico para exportação</string>
     <string name="toast_no_audit_logs_to_export">Não há logs de diagnóstico para exportar</string>
+    <string name="dictation_pause_other_audio_title">Pausar outro áudio</string>
+    <string name="dictation_pause_other_audio_subtitle">Pausa música e podcasts durante o ditado; podem retomar quando a gravação terminar. A leitura em voz alta e as mensagens de voz do White Noise são sempre pausadas por segurança.</string>
+    <string name="dictation_audio_focus_unavailable">Não foi possível pausar outro áudio. Tenta novamente ou desativa esta opção nas definições de ditado.</string>
 </resources>

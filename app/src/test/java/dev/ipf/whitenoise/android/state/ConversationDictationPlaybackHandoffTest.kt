@@ -1,8 +1,14 @@
 package dev.ipf.whitenoise.android.state
 
+import androidx.compose.ui.text.input.TextFieldValue
+import dev.ipf.whitenoise.android.audio.ConversationDictationAudioFocusDenied
+import dev.ipf.whitenoise.android.audio.ConversationDictationAudioFocusLease
+import dev.ipf.whitenoise.android.audio.ConversationDictationMode
+import dev.ipf.whitenoise.android.audio.ConversationDictationTarget
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConversationDictationPlaybackHandoffTest {
@@ -145,6 +151,109 @@ class ConversationDictationPlaybackHandoffTest {
 
         assertEquals(0, resumes)
     }
+
+    /** Opting out of external focus does not opt out of White Noise playback safety. */
+    @Test
+    fun disabledExternalFocusStillPausesAndResumesAppSpeech() {
+        var tts: TtsState = speakingTts(7L)
+        val events = mutableListOf<String>()
+        val media =
+            ConversationDictationMediaHandoff(
+                playback =
+                    handoff(
+                        ttsState = { tts },
+                        pauseTts = {
+                            tts = pausedTts(7L)
+                            events += "pause"
+                        },
+                        resumeTts = { events += "resume" },
+                    ),
+                externalFocus = focusLease(events),
+            )
+
+        media.beforeRecognition(target(pauseOtherAudio = false))
+        media.afterAudioCapture()
+
+        assertEquals(listOf("pause", "resume"), events)
+    }
+
+    /** A failed focus request still lets controller cleanup restore the exact retained app speech. */
+    @Test
+    fun deniedFocusLeavesAppPlaybackRestorable() {
+        var tts: TtsState = speakingTts(7L)
+        val events = mutableListOf<String>()
+        val media =
+            ConversationDictationMediaHandoff(
+                playback =
+                    handoff(
+                        ttsState = { tts },
+                        pauseTts = {
+                            tts = pausedTts(7L)
+                            events += "pause"
+                        },
+                        resumeTts = { events += "resume" },
+                    ),
+                externalFocus = focusLease(events, grant = false),
+            )
+
+        val failure = runCatching { media.beforeRecognition(target(pauseOtherAudio = true)) }.exceptionOrNull()
+        assertTrue(failure is ConversationDictationAudioFocusDenied)
+        media.afterAudioCapture()
+
+        assertEquals(listOf("pause", "request", "resume"), events)
+    }
+
+    /** Even a platform abandon exception must not leave app-owned speech paused. */
+    @Test
+    fun abandonExceptionStillRestoresAppSpeech() {
+        var tts: TtsState = speakingTts(7L)
+        val events = mutableListOf<String>()
+        val media =
+            ConversationDictationMediaHandoff(
+                playback =
+                    handoff(
+                        ttsState = { tts },
+                        pauseTts = {
+                            tts = pausedTts(7L)
+                            events += "pause"
+                        },
+                        resumeTts = { events += "resume" },
+                    ),
+                externalFocus = focusLease(events, abandonThrows = true),
+            )
+
+        media.beforeRecognition(target(pauseOtherAudio = true))
+        assertTrue(runCatching(media::afterAudioCapture).isFailure)
+
+        assertEquals(listOf("pause", "request", "abandon", "resume"), events)
+    }
+
+    private fun focusLease(
+        events: MutableList<String>,
+        grant: Boolean = true,
+        abandonThrows: Boolean = false,
+    ) = ConversationDictationAudioFocusLease(
+        requestFocus = { _, _ ->
+            events += "request"
+            grant
+        },
+        abandonFocus = {
+            events += "abandon"
+            if (abandonThrows) error("platform abandon failed")
+        },
+        postToMain = { it() },
+        endCapture = {},
+    )
+
+    private fun target(pauseOtherAudio: Boolean) =
+        ConversationDictationTarget(
+            accountRef = "account",
+            groupIdHex = "group",
+            capturedDraft = TextFieldValue(""),
+            capturedDraftRevision = 0,
+            mode = ConversationDictationMode.InApp,
+            pauseOtherAudio = pauseOtherAudio,
+        )
 
     /** Builds a handoff with independently controlled speech sources. */
     private fun handoff(

@@ -2103,4 +2103,7 @@
     <string name="export_audit_logs_confirm_action">Devam</string>
     <string name="toast_couldnt_export_audit_logs">Tanılama günlükleri dışa aktarmaya hazırlanamadı</string>
     <string name="toast_no_audit_logs_to_export">Dışa aktarılacak tanılama günlüğü yok</string>
+    <string name="dictation_pause_other_audio_title">Diğer sesleri duraklat</string>
+    <string name="dictation_pause_other_audio_subtitle">Dikte sırasında müzik ve podcast yayınlarını duraklatır; kayıt bittiğinde devam edebilirler. White Noise sesli okuma ve sesli mesajları güvenlik için her zaman duraklatılır.</string>
+    <string name="dictation_audio_focus_unavailable">Diğer sesler duraklatılamadı. Tekrar deneyin veya Dikte ayarlarında bu seçeneği kapatın.</string>
 </resources>

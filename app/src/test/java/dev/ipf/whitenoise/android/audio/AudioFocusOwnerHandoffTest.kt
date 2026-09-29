@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.audio
 
 import android.media.AudioAttributes
+import android.media.AudioFocusRequest
 import android.media.AudioManager
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -33,6 +34,7 @@ class AudioFocusOwnerHandoffTest {
     fun tearDown() {
         AudioFocusOwner.release(AudioFocusOwner.Owner.Voice)
         AudioFocusOwner.releaseTts()
+        AudioFocusOwner.release(AudioFocusOwner.Owner.Dictation)
         setField("audioManager", null)
         setField("focusRequest", null)
         setField("currentOwner", null)
@@ -64,6 +66,30 @@ class AudioFocusOwnerHandoffTest {
         )
 
         assertTrue(voiceSurrendered)
+    }
+
+    /** Dictation asks cooperative media to pause rather than merely duck during microphone capture. */
+    @Test
+    fun dictationRequestsTransientExclusiveSpeechFocusAndReleasesIt() {
+        attachAudioManager()
+        assertTrue(
+            AudioFocusOwner.acquireWithFocusChanges(
+                owner = AudioFocusOwner.Owner.Dictation,
+                audioAttributes = AudioFocusOwner.ttsSpeechAttributes,
+                focusGain = AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE,
+                onFocusChange = {},
+                onOwnerSurrender = {},
+            ),
+        )
+        val request = field("focusRequest") as AudioFocusRequest
+        assertEquals(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE, request.focusGain)
+        assertEquals(AudioAttributes.USAGE_MEDIA, request.audioAttributes.usage)
+        assertEquals(AudioAttributes.CONTENT_TYPE_SPEECH, request.audioAttributes.contentType)
+        assertEquals(AudioFocusOwner.Owner.Dictation, field("currentOwner"))
+
+        AudioFocusOwner.release(AudioFocusOwner.Owner.Dictation)
+        assertNull(field("focusRequest"))
+        assertNull(field("currentOwner"))
     }
 
     @Test
