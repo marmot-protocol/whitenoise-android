@@ -4,6 +4,7 @@ package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,13 +29,18 @@ internal fun SystemPasteIconButton(
 ) {
     val toolbar = LocalTextToolbar.current
     val latestOnPaste by rememberUpdatedState(onPaste)
+    val latestEnabled by rememberUpdatedState(enabled)
     var bounds by remember { mutableStateOf(Rect.Zero) }
+
+    DisposableEffect(toolbar) {
+        onDispose { toolbar.hide() }
+    }
 
     IconButton(
         onClick = {
             toolbar.showMenu(
                 rect = bounds,
-                onPasteRequested = { latestOnPaste() },
+                onPasteRequested = { if (latestEnabled) latestOnPaste() },
             )
         },
         modifier = modifier.onGloballyPositioned { bounds = it.boundsInWindow() },
