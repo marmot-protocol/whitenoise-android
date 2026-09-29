@@ -1535,11 +1535,14 @@
     <string name="open_app_settings">Open app settings</string>
     <string name="dictation_disclosure_title">External speech recognition</string>
     <string name="dictation_disclosure_message">The speech service installed on this device processes what you say and may send the audio to its provider. White Noise keeps the text it returns only until you paste or send it. Sending automatically is off unless you turn it on in Dictation settings.</string>
+    <string name="dictation_disclosure_offline_title">Offline speech recognition</string>
+    <string name="dictation_disclosure_offline_message">Offline Speech to Text processes what you say on this device. White Noise keeps the text it returns only until you paste or send it. Sending automatically is off unless you turn it on in Dictation settings.</string>
     <string name="dictation_continue">Continue</string>
     <string name="dictation_settings_title">Dictation</string>
     <string name="dictation_pause_other_audio_title">Pause other audio</string>
     <string name="dictation_pause_other_audio_subtitle">Pause music and podcasts during dictation; they can resume when recording stops. White Noise speech and voice messages always pause for safety.</string>
     <string name="dictation_settings_explainer">The speech service installed on this device processes the audio and may send it to its provider. White Noise keeps the text it returns only until you paste or send it.</string>
+    <string name="dictation_settings_explainer_offline">Offline Speech to Text processes dictation on this device. White Noise keeps the text it returns only until you paste or send it.</string>
     <string name="dictation_ostt_recommendation_title">Get Offline Speech to Text</string>
     <string name="dictation_ostt_recommendation_summary">Recommended transcription app for private, on-device dictation. Available from Zapstore, not Google Play.</string>
     <string name="dictation_ostt_recommendation_open_failed">Couldn’t open the Offline Speech to Text page on Zapstore.</string>

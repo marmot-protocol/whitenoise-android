@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.audio.OFFLINE_SPEECH_TO_TEXT_PACKAGE
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

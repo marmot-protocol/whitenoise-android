@@ -3,6 +3,36 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "Offline speech disclosure title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "R.string.dictation_disclosure_offline_title",
+        "test_ids": ["DIC-001"]
+      },
+      {
+        "surface": "Offline speech disclosure message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "R.string.dictation_disclosure_offline_message",
+        "test_ids": ["DIC-001"]
+      },
+      {
+        "surface": "Speech disclosure title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "R.string.dictation_disclosure_title",
+        "test_ids": ["DIC-001"]
+      },
+      {
+        "surface": "Speech disclosure message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "R.string.dictation_disclosure_message",
+        "test_ids": ["DIC-001"]
+      },
+      {
+        "surface": "Offline dictation settings explainer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "R.string.dictation_settings_explainer_offline",
+        "test_ids": ["DIC-001", "SET-027"]
+      },
+      {
         "surface": "Empty document send feedback",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
         "anchor": "R.string.media_file_empty",

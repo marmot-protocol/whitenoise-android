@@ -26,6 +26,10 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationDeliveryMode
+import dev.ipf.whitenoise.android.audio.OFFLINE_SPEECH_TO_TEXT_PACKAGE
+import dev.ipf.whitenoise.android.audio.VOICE_RECOGNITION_SERVICE_SETTING
+import dev.ipf.whitenoise.android.audio.conversationDictationRecognitionServiceComponent
+import dev.ipf.whitenoise.android.audio.resolveConversationDictationProvider
 import dev.ipf.whitenoise.android.state.ConversationDictationPreferences
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.SpeechChoice
@@ -46,6 +50,7 @@ internal fun DictationSettingsScreen(
     onBack: () -> Unit,
     isOfflineSpeechToTextInstalled: (Context) -> Boolean = ::offlineSpeechToTextInstalled,
     openOfflineSpeechToTextListing: (Context) -> Boolean = ::openOfflineSpeechToTextListing,
+    resolveProviderPackage: suspend (Context, WhiteNoiseAppState) -> String? = ::resolveDictationProviderPackage,
 ) {
     val context = LocalContext.current
     val preferences by appState.conversationDictationPreferences.state.collectAsState()
@@ -55,6 +60,8 @@ internal fun DictationSettingsScreen(
     var providerSheetOpen by remember { mutableStateOf(false) }
     var settingsFailed by remember { mutableStateOf(false) }
     var osttOpenFailed by remember { mutableStateOf(false) }
+    var selectedProviderPackage by remember { mutableStateOf<String?>(null) }
+    var providerResolved by remember { mutableStateOf(false) }
     val osttInstalled =
         remember(context, refreshToken, isOfflineSpeechToTextInstalled) {
             isOfflineSpeechToTextInstalled(context)
@@ -68,11 +75,27 @@ internal fun DictationSettingsScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
-    LaunchedEffect(appState, refreshToken) { appState.discoverDictationProviders() }
+    LaunchedEffect(appState, refreshToken, preferences.providerSelection) {
+        providerResolved = false
+        selectedProviderPackage = runCatching { resolveProviderPackage(context, appState) }.getOrNull()
+        providerResolved = true
+    }
 
     SettingsScaffold(title = stringResource(R.string.dictation_settings_title), onBack = onBack) {
         SettingsList {
-            item { SettingsExplainer(stringResource(R.string.dictation_settings_explainer)) }
+            if (providerResolved) {
+                item {
+                    SettingsExplainer(
+                        stringResource(
+                            if (selectedProviderPackage == OFFLINE_SPEECH_TO_TEXT_PACKAGE) {
+                                R.string.dictation_settings_explainer_offline
+                            } else {
+                                R.string.dictation_settings_explainer
+                            },
+                        ),
+                    )
+                }
+            }
             if (!osttInstalled) {
                 item {
                     SettingsGroup(modifier = Modifier.testTag("dictation.ostt_recommendation.group")) {
@@ -268,6 +291,17 @@ internal fun offlineSpeechToTextInstalled(context: Context): Boolean =
         false
     }
 
+/** Mirrors the provider precedence used when a new dictation session starts. */
+private suspend fun resolveDictationProviderPackage(context: Context, appState: WhiteNoiseAppState): String? {
+    val choices = appState.discoverDictationProviders().flatMap { it.choices }
+    val androidSelected =
+        conversationDictationRecognitionServiceComponent(
+            Settings.Secure.getString(context.contentResolver, VOICE_RECOGNITION_SERVICE_SETTING),
+        )
+    val saved = appState.conversationDictationPreferences.current().providerSelection
+    return resolveConversationDictationProvider(androidSelected, saved, choices)?.packageName
+}
+
 /** Prefer the Zapstore app, then let Android open the same listing in a browser. */
 internal fun openOfflineSpeechToTextListing(
     context: Context,
@@ -282,7 +316,6 @@ internal fun openOfflineSpeechToTextListing(
 }
 
 private const val MILLIS_PER_SECOND = 1_000L
-internal const val OFFLINE_SPEECH_TO_TEXT_PACKAGE = "app.offlinespeechtotext"
 internal const val ZAPSTORE_PACKAGE = "dev.zapstore.app"
 internal const val OSTT_ZAPSTORE_URL =
     "https://zapstore.dev/apps/naddr1qqtkzurs9ehkvenvd9hx2umsv4jkx6r5da6x27r5qyv8wumn8ghj7un9d3shjtn6v9c8xar0wfjjuer9wcpzpys5pkhzxd9dqp4ger8du6p5f6y43tcnzqktjzmwvahq5vumtay4qvzqqqr7pv8t57pf"

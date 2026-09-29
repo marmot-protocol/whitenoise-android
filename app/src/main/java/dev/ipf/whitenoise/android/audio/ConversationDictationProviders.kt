@@ -13,6 +13,8 @@ import androidx.core.content.pm.PackageInfoCompat
 
 internal enum class ConversationDictationSurfaceKind { Service, Activity, Keyboard }
 
+internal const val OFFLINE_SPEECH_TO_TEXT_PACKAGE = "app.offlinespeechtotext"
+
 internal enum class ConversationDictationProviderCapability { InApp, Activity, KeyboardOnly, Unknown }
 
 internal data class ConversationDictationSurface(

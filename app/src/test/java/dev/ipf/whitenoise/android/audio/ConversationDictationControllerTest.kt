@@ -862,11 +862,103 @@ class ConversationDictationControllerTest {
             assertEquals(listOf("pause", "resume", "validate"), events)
         }
 
+    /** Provider-owned capture has ended before result processing; the next generation pauses media again. */
+    @Test
+    fun providerEndOfSpeechResumesMediaDuringProcessingAndRepausesOnRestart() {
+        val events = mutableListOf<String>()
+        val fixture =
+            fixture(
+                draft = TextFieldValue(""),
+                onBeforeRecognition = { events += "pause" },
+                onAfterAudioCapture = { events += "resume" },
+            )
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onEndOfSpeech()
+
+        assertTrue(fixture.controller.state is ConversationDictationState.Processing)
+        assertFalse(fixture.controller.ownsMicrophone)
+        assertEquals(listOf("pause", "resume"), events)
+
+        fixture.platform.listener.onResult("first phrase")
+        fixture.scheduler.runDelay(250L)
+        assertEquals(listOf("pause", "resume", "pause"), events)
+        assertTrue(fixture.controller.ownsMicrophone)
+    }
+
+    /** A provider may return a final result without an end-of-speech callback. */
+    @Test
+    fun providerResultWithoutEndOfSpeechResumesMediaBeforeRestart() {
+        val events = mutableListOf<String>()
+        val fixture =
+            fixture(
+                draft = TextFieldValue(""),
+                onBeforeRecognition = { events += "pause" },
+                onAfterAudioCapture = { events += "resume" },
+            )
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onResult("first phrase")
+
+        assertEquals(listOf("pause", "resume"), events)
+        assertFalse(fixture.controller.ownsMicrophone)
+        fixture.scheduler.runDelay(250L)
+        assertEquals(listOf("pause", "resume", "pause"), events)
+    }
+
+    /** Terminal provider errors also close their microphone before retry decisions. */
+    @Test
+    fun providerErrorWithoutEndOfSpeechResumesMedia() {
+        val events = mutableListOf<String>()
+        val fixture =
+            fixture(
+                draft = TextFieldValue(""),
+                onBeforeRecognition = { events += "pause" },
+                onAfterAudioCapture = { events += "resume" },
+            )
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+
+        assertEquals(listOf("pause", "resume"), events)
+        assertFalse(fixture.controller.ownsMicrophone)
+    }
+
+    /** Provider callbacks cannot release media while White Noise still owns the recorder. */
+    @Test
+    fun callerOwnedCaptureWaitsForRecorderClosureDespiteProviderResult() {
+        val platform =
+            FakePlatform(deferCaptureCompletion = true).apply {
+                sessionCallerAudioOwnedOverride = true
+                pendingCallerAudio = true
+                deferCallerAudioFinish = true
+            }
+        val events = mutableListOf<String>()
+        val fixture =
+            fixture(
+                draft = TextFieldValue(""),
+                platform = platform,
+                onBeforeRecognition = { events += "pause" },
+                onAfterAudioCapture = { events += "resume" },
+            )
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        platform.listener.onEndOfSpeech()
+        platform.listener.onResult("first phrase")
+
+        assertEquals(listOf("pause"), events)
+        assertTrue(fixture.controller.ownsMicrophone)
+        fixture.controller.stop()
+        assertEquals(listOf("pause"), events)
+        platform.callerAudioFinishCallback?.invoke()
+        assertEquals(listOf("pause", "resume"), events)
+    }
+
     /** Verifies provider end-of-speech cannot bypass caller-owned capture closure. */
     @Test
     fun stopAfterProviderEndWaitsForCallerOwnedCaptureToClose() =
         runTest {
-            val platform = FakePlatform(deferCaptureCompletion = true)
+            val platform = FakePlatform(deferCaptureCompletion = true).apply { sessionCallerAudioOwnedOverride = true }
             var resumes = 0
             val fixture =
                 fixture(
@@ -1024,6 +1116,36 @@ class ConversationDictationControllerTest {
         controller.onPermissionResult(true)
         assertTrue(controller.state is ConversationDictationState.Starting)
         assertTrue(platform.session.started)
+    }
+
+    @Test
+    fun acceptingOfflineDisclosureDoesNotApproveACloudProvider() {
+        val platform = FakePlatform(providerPackage = OFFLINE_SPEECH_TO_TEXT_PACKAGE)
+        var offlineAccepted = false
+        var externalAccepted = false
+        val controller =
+            ConversationDictationController(
+                platform = platform,
+                readDraft = { _, _ -> ConversationDictationDraftSnapshot(TextFieldValue(), 0) },
+                writeDraft = { _, _, _, _ -> true },
+                disclosureAccepted = { externalAccepted },
+                markDisclosureAccepted = { externalAccepted = true },
+                offlineDisclosureAccepted = { offlineAccepted },
+                markOfflineDisclosureAccepted = { offlineAccepted = true },
+            )
+
+        controller.requestStart(ACCOUNT, GROUP, TextFieldValue())
+        assertTrue((controller.state as ConversationDictationState.DisclosureRequired).usesOfflineSpeechToText)
+        controller.acceptDisclosure()
+        assertTrue(offlineAccepted)
+        assertFalse(externalAccepted)
+
+        controller.cancel()
+        platform.providerPackage = "com.example.cloud"
+        controller.requestStart(ACCOUNT, GROUP, TextFieldValue())
+        assertFalse((controller.state as ConversationDictationState.DisclosureRequired).usesOfflineSpeechToText)
+        controller.acceptDisclosure()
+        assertTrue(externalAccepted)
     }
 
     /** A missing runtime grant must reach Android before provider discovery can fail closed. */
@@ -4515,6 +4637,7 @@ class ConversationDictationControllerTest {
 
     @Suppress("MaxLineLength")
     private class FakePlatform(
+        var providerPackage: String? = null,
         var pinnedProviderPresent: Boolean = true,
         var needsProviderChoice: Boolean = false,
         var hasPermission: Boolean = true,
@@ -4567,6 +4690,8 @@ class ConversationDictationControllerTest {
         override fun pinnedProviderStillAvailable(): Boolean = pinnedProviderPresent
 
         override fun prepareProviderSelection(): Boolean = !needsProviderChoice
+
+        override fun speechProviderPackage(): String? = providerPackage
 
         override fun hasRecordAudioPermission(): Boolean = hasPermission
 
