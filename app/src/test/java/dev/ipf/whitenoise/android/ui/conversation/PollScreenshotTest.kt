@@ -19,6 +19,7 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.PollOptionResultFfi
 import dev.ipf.marmotkit.PollProjectionFfi
 import dev.ipf.marmotkit.PollTypeFfi
+import dev.ipf.whitenoise.android.state.POLL_FIVE_MINUTES_SECONDS
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -68,7 +69,7 @@ class PollScreenshotTest {
                         question = "Where should we meet?",
                         options = listOf("Coffee shop", "Library"),
                         multiple = false,
-                        deadlineDurationSeconds = 86_400L,
+                        deadlineDurationSeconds = POLL_FIVE_MINUTES_SECONDS,
                         enabled = true,
                         onQuestionChange = {},
                         onOptionChange = { _, _ -> },

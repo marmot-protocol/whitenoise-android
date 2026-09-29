@@ -5985,6 +5985,7 @@ internal fun isTerminalOpenFailure(throwable: Throwable): Boolean = throwable is
 /** Retry cadence while MarmotKit reports a documented not-ready state; well under the connectivity backoff. */
 internal const val NOT_READY_RETRY_DELAY_MS = 2_000L
 internal const val MAX_POLL_OPTIONS = 10
+internal const val POLL_FIVE_MINUTES_SECONDS = 5L * 60L
 internal const val POLL_HOUR_SECONDS = 60L * 60L
 internal const val POLL_DAY_SECONDS = 24L * POLL_HOUR_SECONDS
 internal const val POLL_WEEK_SECONDS = 7L * POLL_DAY_SECONDS

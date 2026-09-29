@@ -13,10 +13,11 @@ class PollDeadlineTest {
         assertNull(pollDeadlineEpochSeconds(null, 1_700_000_000_000L))
     }
 
-    /** The maximum preset is anchored to submission time in Unix seconds. */
+    /** Short and maximum presets are anchored to submission time in Unix seconds. */
     @Test
     fun thirtyDayDeadlineUsesSendTime() {
         assertEquals(1_702_592_000uL, pollDeadlineEpochSeconds(MAX_POLL_DEADLINE_SECONDS, 1_700_000_000_999L))
+        assertEquals(1_700_000_300uL, pollDeadlineEpochSeconds(POLL_FIVE_MINUTES_SECONDS, 1_700_000_000_999L))
     }
 
     /** Invalid or overlong choices never reach the native poll API. */

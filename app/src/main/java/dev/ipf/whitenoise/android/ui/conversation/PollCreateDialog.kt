@@ -35,6 +35,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.MAX_POLL_DEADLINE_SECONDS
 import dev.ipf.whitenoise.android.state.MAX_POLL_OPTIONS
 import dev.ipf.whitenoise.android.state.POLL_DAY_SECONDS
+import dev.ipf.whitenoise.android.state.POLL_FIVE_MINUTES_SECONDS
 import dev.ipf.whitenoise.android.state.POLL_HOUR_SECONDS
 import dev.ipf.whitenoise.android.state.POLL_WEEK_SECONDS
 
@@ -183,6 +184,7 @@ private fun PollDeadlineChoices(
     ) {
         listOf(
             null to R.string.poll_no_deadline,
+            POLL_FIVE_MINUTES_SECONDS to R.string.disappearing_5_minutes,
             POLL_HOUR_SECONDS to R.string.mute_duration_1_hour,
             POLL_DAY_SECONDS to R.string.mute_duration_1_day,
             POLL_WEEK_SECONDS to R.string.mute_duration_1_week,
