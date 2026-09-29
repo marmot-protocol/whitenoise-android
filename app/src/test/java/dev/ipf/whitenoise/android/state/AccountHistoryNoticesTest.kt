@@ -63,7 +63,11 @@ class AccountHistoryNoticesTest {
                 ArrayDeque(
                     listOf(
                         MarmotEventFfi.HistoryNoticesChanged(accountIdHex = "other-id", accountLabel = "other"),
-                        MarmotEventFfi.GroupStateUpdated(accountIdHex = "id", accountLabel = ACCOUNT, groupIdHex = "group"),
+                        MarmotEventFfi.GroupStateUpdated(
+                            accountIdHex = "id",
+                            accountLabel = ACCOUNT,
+                            groupIdHex = "group",
+                        ),
                         MarmotEventFfi.HistoryNoticesChanged(accountIdHex = "id", accountLabel = ACCOUNT),
                     ),
                 )

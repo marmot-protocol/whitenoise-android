@@ -100,16 +100,7 @@ internal fun GroupRecoveryCard(
             )
         }
         if (status?.historyMayBeIncomplete == true) {
-            Text(
-                stringResource(R.string.group_history_may_be_incomplete),
-                style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center),
-            )
-            // Only the user may accept that this history may stay incomplete.
-            if (status.historyNoticeIds.isNotEmpty()) {
-                TextButton(onClick = onDismissHistoryNotices, enabled = !busy) {
-                    Text(stringResource(R.string.dismiss))
-                }
-            }
+            GroupHistoryNotice(status.historyNoticeIds.isNotEmpty(), busy, onDismissHistoryNotices)
         }
         status?.rejoinInvitations.orEmpty().forEach { invitation ->
             WhiteNoiseOutlinedButton(
@@ -146,6 +137,24 @@ internal fun GroupRecoveryCard(
             onConfirm = onConfirm,
             onDecline = onDecline,
         )
+    }
+}
+
+@Composable
+private fun GroupHistoryNotice(
+    canDismiss: Boolean,
+    busy: Boolean,
+    onDismiss: () -> Unit,
+) {
+    Text(
+        stringResource(R.string.group_history_may_be_incomplete),
+        style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center),
+    )
+    // Only the user may accept that this history may stay incomplete.
+    if (canDismiss) {
+        TextButton(onClick = onDismiss, enabled = !busy) {
+            Text(stringResource(R.string.dismiss))
+        }
     }
 }
 

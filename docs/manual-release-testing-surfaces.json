@@ -2627,6 +2627,12 @@
         ]
       },
       {
+        "surface": "GroupHistoryNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
+        "anchor": "fun GroupHistoryNotice(",
+        "test_ids": ["GRP-024"]
+      },
+      {
         "surface": "AccountHistoryNoticeBanner",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/AccountHistoryNoticeBanner.kt",
         "anchor": "fun AccountHistoryNoticeBanner(",
