@@ -862,11 +862,103 @@ class ConversationDictationControllerTest {
             assertEquals(listOf("pause", "resume", "validate"), events)
         }
 
+    /** Provider-owned capture has ended before result processing; the next generation pauses media again. */
+    @Test
+    fun providerEndOfSpeechResumesMediaDuringProcessingAndRepausesOnRestart() {
+        val events = mutableListOf<String>()
+        val fixture =
+            fixture(
+                draft = TextFieldValue(""),
+                onBeforeRecognition = { events += "pause" },
+                onAfterAudioCapture = { events += "resume" },
+            )
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onEndOfSpeech()
+
+        assertTrue(fixture.controller.state is ConversationDictationState.Processing)
+        assertFalse(fixture.controller.ownsMicrophone)
+        assertEquals(listOf("pause", "resume"), events)
+
+        fixture.platform.listener.onResult("first phrase")
+        fixture.scheduler.runDelay(250L)
+        assertEquals(listOf("pause", "resume", "pause"), events)
+        assertTrue(fixture.controller.ownsMicrophone)
+    }
+
+    /** A provider may return a final result without an end-of-speech callback. */
+    @Test
+    fun providerResultWithoutEndOfSpeechResumesMediaBeforeRestart() {
+        val events = mutableListOf<String>()
+        val fixture =
+            fixture(
+                draft = TextFieldValue(""),
+                onBeforeRecognition = { events += "pause" },
+                onAfterAudioCapture = { events += "resume" },
+            )
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onResult("first phrase")
+
+        assertEquals(listOf("pause", "resume"), events)
+        assertFalse(fixture.controller.ownsMicrophone)
+        fixture.scheduler.runDelay(250L)
+        assertEquals(listOf("pause", "resume", "pause"), events)
+    }
+
+    /** Terminal provider errors also close their microphone before retry decisions. */
+    @Test
+    fun providerErrorWithoutEndOfSpeechResumesMedia() {
+        val events = mutableListOf<String>()
+        val fixture =
+            fixture(
+                draft = TextFieldValue(""),
+                onBeforeRecognition = { events += "pause" },
+                onAfterAudioCapture = { events += "resume" },
+            )
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+
+        assertEquals(listOf("pause", "resume"), events)
+        assertFalse(fixture.controller.ownsMicrophone)
+    }
+
+    /** Provider callbacks cannot release media while White Noise still owns the recorder. */
+    @Test
+    fun callerOwnedCaptureWaitsForRecorderClosureDespiteProviderResult() {
+        val platform =
+            FakePlatform(deferCaptureCompletion = true).apply {
+                sessionCallerAudioOwnedOverride = true
+                pendingCallerAudio = true
+                deferCallerAudioFinish = true
+            }
+        val events = mutableListOf<String>()
+        val fixture =
+            fixture(
+                draft = TextFieldValue(""),
+                platform = platform,
+                onBeforeRecognition = { events += "pause" },
+                onAfterAudioCapture = { events += "resume" },
+            )
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        platform.listener.onEndOfSpeech()
+        platform.listener.onResult("first phrase")
+
+        assertEquals(listOf("pause"), events)
+        assertTrue(fixture.controller.ownsMicrophone)
+        fixture.controller.stop()
+        assertEquals(listOf("pause"), events)
+        platform.callerAudioFinishCallback?.invoke()
+        assertEquals(listOf("pause", "resume"), events)
+    }
+
     /** Verifies provider end-of-speech cannot bypass caller-owned capture closure. */
     @Test
     fun stopAfterProviderEndWaitsForCallerOwnedCaptureToClose() =
         runTest {
-            val platform = FakePlatform(deferCaptureCompletion = true)
+            val platform = FakePlatform(deferCaptureCompletion = true).apply { sessionCallerAudioOwnedOverride = true }
             var resumes = 0
             val fixture =
                 fixture(
@@ -1024,6 +1116,36 @@ class ConversationDictationControllerTest {
         controller.onPermissionResult(true)
         assertTrue(controller.state is ConversationDictationState.Starting)
         assertTrue(platform.session.started)
+    }
+
+    @Test
+    fun acceptingOfflineDisclosureDoesNotApproveACloudProvider() {
+        val platform = FakePlatform(providerPackage = OFFLINE_SPEECH_TO_TEXT_PACKAGE)
+        var offlineAccepted = false
+        var externalAccepted = false
+        val controller =
+            ConversationDictationController(
+                platform = platform,
+                readDraft = { _, _ -> ConversationDictationDraftSnapshot(TextFieldValue(), 0) },
+                writeDraft = { _, _, _, _ -> true },
+                disclosureAccepted = { externalAccepted },
+                markDisclosureAccepted = { externalAccepted = true },
+                offlineDisclosureAccepted = { offlineAccepted },
+                markOfflineDisclosureAccepted = { offlineAccepted = true },
+            )
+
+        controller.requestStart(ACCOUNT, GROUP, TextFieldValue())
+        assertTrue((controller.state as ConversationDictationState.DisclosureRequired).usesOfflineSpeechToText)
+        controller.acceptDisclosure()
+        assertTrue(offlineAccepted)
+        assertFalse(externalAccepted)
+
+        controller.cancel()
+        platform.providerPackage = "com.example.cloud"
+        controller.requestStart(ACCOUNT, GROUP, TextFieldValue())
+        assertFalse((controller.state as ConversationDictationState.DisclosureRequired).usesOfflineSpeechToText)
+        controller.acceptDisclosure()
+        assertTrue(externalAccepted)
     }
 
     /** A missing runtime grant must reach Android before provider discovery can fail closed. */
@@ -1258,12 +1380,13 @@ class ConversationDictationControllerTest {
 
         assertTrue(fixture.controller.state is ConversationDictationState.Starting)
         assertEquals(0L, fixture.controller.providerActivityRequestId)
-        assertTrue(fixture.controller.ownsMicrophone)
+        assertFalse(fixture.controller.ownsMicrophone)
         assertTrue(fixture.controller.hasDurableSession)
         assertTrue(rejectedSession.destroyed)
         assertEquals(1, fixture.platform.recognitionConfigurationChecks)
         fixture.scheduler.runDelay(500L)
         assertEquals(2, fixture.platform.sessions.size)
+        assertTrue(fixture.controller.ownsMicrophone)
 
         fixture.platform.listener.onError(ConversationDictationFailure.PermissionDenied)
 
@@ -1272,7 +1395,7 @@ class ConversationDictationControllerTest {
             (fixture.controller.state as ConversationDictationState.Failed).reason,
         )
         assertEquals(0L, fixture.controller.providerActivityRequestId)
-        assertEquals(1, microphoneReleases)
+        assertEquals(2, microphoneReleases)
         assertEquals(1, durableStops)
     }
 
@@ -1827,18 +1950,19 @@ class ConversationDictationControllerTest {
 
         assertEquals("Draft", fixture.drafts.getValue(key()).text)
         assertEquals(0, fixture.writes)
-        assertEquals(0, releases)
+        assertEquals(1, releases)
         assertTrue(firstSession.destroyed)
         fixture.scheduler.runDelay(250L)
         assertEquals(2, fixture.platform.sessions.size)
         assertTrue(fixture.controller.state is ConversationDictationState.Starting)
+        assertTrue(fixture.controller.ownsMicrophone)
 
         firstListener.onResult("stale duplicate")
         fixture.controller.stop()
 
         assertEquals("Draft early segment", fixture.drafts.getValue(key()).text)
         assertEquals(1, fixture.writes)
-        assertEquals(1, releases)
+        assertEquals(2, releases)
     }
 
     /** Verifies that manual completion never treats an ordinary pause as implicit consent to finish. */
@@ -2842,9 +2966,9 @@ class ConversationDictationControllerTest {
         assertTrue(fixture.platform.session.stopped)
     }
 
-    /** Verifies that recognizer churn retains one microphone lease and releases it only at logical teardown. */
+    /** Each provider-owned capture releases its microphone lease during the processing gap. */
     @Test
-    fun microphoneLeaseSurvivesGenerationsAndReleasesOnceAtLogicalTeardown() {
+    fun microphoneLeaseTracksProviderCaptureGenerationsAndTeardown() {
         var acquisitions = 0
         var releases = 0
         val fixture =
@@ -2863,8 +2987,8 @@ class ConversationDictationControllerTest {
         fixture.platform.listener.onResult("second")
         fixture.scheduler.runDelay(250L)
 
-        assertEquals(1, acquisitions)
-        assertEquals(0, releases)
+        assertEquals(3, acquisitions)
+        assertEquals(2, releases)
         assertEquals(3, fixture.platform.sessions.size)
         assertTrue(
             fixture.platform.sessions
@@ -2875,7 +2999,7 @@ class ConversationDictationControllerTest {
         fixture.controller.cancel()
         fixture.controller.cancel()
 
-        assertEquals(1, releases)
+        assertEquals(3, releases)
         assertEquals(
             1,
             fixture.platform.sessions
@@ -4515,6 +4639,7 @@ class ConversationDictationControllerTest {
 
     @Suppress("MaxLineLength")
     private class FakePlatform(
+        var providerPackage: String? = null,
         var pinnedProviderPresent: Boolean = true,
         var needsProviderChoice: Boolean = false,
         var hasPermission: Boolean = true,
@@ -4567,6 +4692,8 @@ class ConversationDictationControllerTest {
         override fun pinnedProviderStillAvailable(): Boolean = pinnedProviderPresent
 
         override fun prepareProviderSelection(): Boolean = !needsProviderChoice
+
+        override fun speechProviderPackage(): String? = providerPackage
 
         override fun hasRecordAudioPermission(): Boolean = hasPermission
 

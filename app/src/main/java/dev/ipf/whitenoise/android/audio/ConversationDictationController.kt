@@ -165,6 +165,7 @@ internal sealed interface ConversationDictationState {
     data class DisclosureRequired(
         override val sessionId: Long,
         override val target: ConversationDictationTarget,
+        val usesOfflineSpeechToText: Boolean = false,
     ) : ConversationDictationState
 
     data class PermissionRequired(
@@ -431,6 +432,8 @@ internal class ConversationDictationController internal constructor(
     private val sendTranscriptIfOriginUnchanged: suspend (ConversationDictationSendRequest) -> Boolean = { false },
     private val disclosureAccepted: () -> Boolean,
     private val markDisclosureAccepted: () -> Unit,
+    private val offlineDisclosureAccepted: () -> Boolean = { false },
+    private val markOfflineDisclosureAccepted: () -> Unit = {},
     private val elapsedRealtime: () -> Long = SystemClock::elapsedRealtime,
     private val scheduleTimeout: (delayMillis: Long, callback: () -> Unit) -> ConversationDictationTimeoutHandle =
         ::scheduleConversationDictationTimeout,
@@ -494,6 +497,20 @@ internal class ConversationDictationController internal constructor(
                 .getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
                 .edit()
                 .putBoolean(DISCLOSURE_ACCEPTED_KEY, true)
+                .apply()
+        },
+        offlineDisclosureAccepted = {
+            context
+                .applicationContext
+                .getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+                .getBoolean(OFFLINE_DISCLOSURE_ACCEPTED_KEY, false)
+        },
+        markOfflineDisclosureAccepted = {
+            context
+                .applicationContext
+                .getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(OFFLINE_DISCLOSURE_ACCEPTED_KEY, true)
                 .apply()
         },
     )
@@ -716,8 +733,11 @@ internal class ConversationDictationController internal constructor(
             state = ConversationDictationState.ProviderSelectionRequired(sessionId, target)
             return true
         }
-        if (!disclosureAccepted()) {
-            state = ConversationDictationState.DisclosureRequired(sessionId, target)
+        val usesOfflineSpeechToText = speechProviderPackage == OFFLINE_SPEECH_TO_TEXT_PACKAGE
+        val disclosureAcceptedForProvider =
+            if (usesOfflineSpeechToText) offlineDisclosureAccepted() else disclosureAccepted()
+        if (!disclosureAcceptedForProvider) {
+            state = ConversationDictationState.DisclosureRequired(sessionId, target, usesOfflineSpeechToText)
             return true
         }
         startTarget(sessionId, target)
@@ -773,7 +793,11 @@ internal class ConversationDictationController internal constructor(
     /** Records the first-use disclosure and resumes its exact pending target. */
     fun acceptDisclosure() {
         val pending = state as? ConversationDictationState.DisclosureRequired ?: return
-        markDisclosureAccepted()
+        if (pending.usesOfflineSpeechToText) {
+            markOfflineDisclosureAccepted()
+        } else {
+            markDisclosureAccepted()
+        }
         startTarget(pending.sessionId, pending.target)
     }
 
@@ -1614,6 +1638,7 @@ internal class ConversationDictationController internal constructor(
                 override fun onEndOfSpeech() {
                     conversationDictationDiagnostic("event=callback_end_of_speech generation=$generationId")
                     if (!owns(sessionId, generationId)) return
+                    finishProviderOwnedCapture(sessionId)
                     when {
                         state is ConversationDictationState.Starting ||
                             state is ConversationDictationState.Listening -> {
@@ -1631,6 +1656,9 @@ internal class ConversationDictationController internal constructor(
                         "event=callback_result generation=$generationId has_text=${!transcript.isNullOrBlank()}",
                     )
                     if (!owns(sessionId, generationId)) return
+                    // Some providers skip onEndOfSpeech. A terminal result still ends their
+                    // microphone capture before the next generation or transcript delivery.
+                    finishProviderOwnedCapture(sessionId)
                     if (!runCatching(platform::pinnedProviderStillAvailable).getOrDefault(false)) {
                         failOrRetainTranscript(sessionId, target, ConversationDictationFailure.ProviderUnavailable)
                         return
@@ -1689,6 +1717,7 @@ internal class ConversationDictationController internal constructor(
                         "event=callback_error generation=$generationId failure=${error.name}",
                     )
                     if (!owns(sessionId, generationId)) return
+                    finishProviderOwnedCapture(sessionId)
                     val readyAt = generationReadyAtElapsedMillis
                     val failure =
                         if (error == ConversationDictationFailure.PermissionDenied) {
@@ -2373,6 +2402,14 @@ internal class ConversationDictationController internal constructor(
         }
     }
 
+    /** Ends provider-owned microphone focus without racing White Noise-owned PCM capture. */
+    private fun finishProviderOwnedCapture(sessionId: Long) {
+        // White Noise-owned PCM remains paused until its recorder reports physical closure.
+        val callerOwnsCapture =
+            runCatching { recognitionSession?.usesCallerAudioCapture() ?: true }.getOrDefault(true)
+        if (!callerOwnsCapture) finishPlaybackInterruption(sessionId)
+    }
+
     /** Restores only playback that this recognition session interrupted, at most once. */
     private fun finishPlaybackInterruption(sessionId: Long) {
         if (!playbackInterruptedForCapture || activeCaptureSessionId != sessionId) return
@@ -2874,6 +2911,7 @@ internal class ConversationDictationController internal constructor(
     private companion object {
         const val PREFERENCES_NAME = CONVERSATION_DICTATION_PREFERENCES_NAME
         const val DISCLOSURE_ACCEPTED_KEY = "composer_dictation_external_provider_disclosed"
+        const val OFFLINE_DISCLOSURE_ACCEPTED_KEY = "composer_dictation_offline_provider_disclosed"
         const val STARTING_TIMEOUT_MILLIS = 10_000L
         const val FOREGROUND_READINESS_TIMEOUT_MILLIS = 3_000L
         const val PROVIDER_READINESS_TIMEOUT_MILLIS = 1_500L

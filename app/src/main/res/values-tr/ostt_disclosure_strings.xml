@@ -1,0 +1,5 @@
+<resources>
+    <string name="dictation_disclosure_offline_title">Çevrimdışı konuşma tanıma</string>
+    <string name="dictation_disclosure_offline_message">Offline Speech to Text söylediklerinizi bu cihazda işler. White Noise, döndürülen metni yalnızca siz yapıştırana veya gönderene kadar saklar. Dikte ayarlarından açmadığınız sürece otomatik gönderme kapalıdır.</string>
+    <string name="dictation_settings_explainer_offline">Offline Speech to Text dikteyi bu cihazda işler. White Noise, döndürülen metni yalnızca siz yapıştırana veya gönderene kadar saklar.</string>
+</resources>

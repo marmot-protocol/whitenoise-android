@@ -698,9 +698,22 @@ internal fun WhiteNoiseApp(
         DictationProviderChooser(appState, onSelected = dictation::onProviderSelected, onDismiss = dictation::cancel)
     }
     if (!appState.appLockScreenVisible && dictationState is ConversationDictationState.DisclosureRequired) {
+        val offlineSpeechToTextSelected = dictationState.usesOfflineSpeechToText
+        val disclosureTitle =
+            if (offlineSpeechToTextSelected) {
+                R.string.dictation_disclosure_offline_title
+            } else {
+                R.string.dictation_disclosure_title
+            }
+        val disclosureMessage =
+            if (offlineSpeechToTextSelected) {
+                R.string.dictation_disclosure_offline_message
+            } else {
+                R.string.dictation_disclosure_message
+            }
         ConfirmDialog(
-            title = stringResource(R.string.dictation_disclosure_title),
-            message = stringResource(R.string.dictation_disclosure_message),
+            title = stringResource(disclosureTitle),
+            message = stringResource(disclosureMessage),
             confirmLabel = stringResource(R.string.dictation_continue),
             onConfirm = dictation::acceptDisclosure,
             onDismiss = dictation::cancel,
