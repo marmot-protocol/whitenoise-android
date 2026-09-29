@@ -147,7 +147,8 @@ class SettingsScreenScreenshotTest {
             }
         }
 
-        composeRule.onNodeWithText("The speech service installed on this device processes the audio", substring = true)
+        composeRule
+            .onNodeWithText("The speech service installed on this device processes the audio", substring = true)
             .assertExists()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_settings_default_light.png")
     }
@@ -170,7 +171,8 @@ class SettingsScreenScreenshotTest {
         }
 
         composeRule.onNodeWithText("Get Offline Speech to Text").assertDoesNotExist()
-        composeRule.onNodeWithText("Offline Speech to Text processes dictation on this device.", substring = true)
+        composeRule
+            .onNodeWithText("Offline Speech to Text processes dictation on this device.", substring = true)
             .assertExists()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_settings_ostt_installed_light.png")
     }
@@ -239,7 +241,10 @@ class SettingsScreenScreenshotTest {
                     appState = appState,
                     onBack = {},
                     isOfflineSpeechToTextInstalled = { false },
-                    openOfflineSpeechToTextListing = { opened++; true },
+                    openOfflineSpeechToTextListing = {
+                        opened++
+                        true
+                    },
                 )
             }
         }
