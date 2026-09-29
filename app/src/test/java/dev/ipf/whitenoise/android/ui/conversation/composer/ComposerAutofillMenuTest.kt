@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
+import android.widget.Magnifier
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -19,9 +20,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -42,6 +47,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.annotation.Implementation
+import org.robolectric.annotation.Implements
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -55,6 +62,8 @@ class ComposerAutofillMenuTest {
     @Test
     fun emptyComposerLongPressHidesAutofillButKeepsPaste() {
         render("")
+        composeRule.onNode(hasSetTextAction()).performTouchInput { click() }
+        composeRule.onNode(hasSetTextAction()).assertIsFocused()
         longPressEditor()
 
         val keys = menuKeys()
@@ -62,6 +71,64 @@ class ComposerAutofillMenuTest {
         assertTrue(keys.contains(TextContextMenuKeys.PasteKey))
         composeRule.onNodeWithText("Paste").assertIsDisplayed()
         composeRule.onNodeWithTag(ROOT_TAG).captureRoboImage("src/test/snapshots/composer_empty_long_press_menu.png")
+    }
+
+    @Test
+    fun unfocusedLongPressDoesNotEnterEditingModeButTapDoes() {
+        render("")
+        val editor = composeRule.onNode(hasSetTextAction())
+        editor.assertIsNotFocused()
+        editor.performTouchInput {
+            down(center)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            up()
+        }
+        editor.assertIsNotFocused()
+        assertEquals(null, menuProvider.dataProvider)
+        composeRule.onNodeWithTag(ROOT_TAG).captureRoboImage("src/test/snapshots/composer_unfocused_long_press.png")
+        editor.performTouchInput {
+            down(center)
+            moveBy(Offset(2f, 2f))
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            up()
+        }
+        editor.assertIsNotFocused()
+        assertEquals(null, menuProvider.dataProvider)
+        editor.performTouchInput {
+            down(center)
+            moveBy(Offset(0f, -40f))
+            up()
+        }
+        editor.assertIsNotFocused()
+        editor.performTouchInput { click() }
+        editor.assertIsFocused()
+    }
+
+    @Test
+    @Config(shadows = [ComposerMagnifierShadow::class])
+    fun focusedDraftLongPressKeepsTheTextMenu() {
+        render("Draft message")
+        val editor = composeRule.onNode(hasSetTextAction())
+        editor.performTouchInput {
+            down(center)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            up()
+        }
+        editor.assertIsNotFocused()
+        editor.performTouchInput { click() }
+        editor.assertIsFocused()
+        longPressEditor()
+        assertTrue(menuKeys().contains(TextContextMenuKeys.PasteKey))
+    }
+
+    @Test
+    fun tapIntoUnfocusedDraftPlacesCaretAtTappedText() {
+        render("Draft message")
+        val editor = composeRule.onNode(hasSetTextAction())
+        editor.assertIsNotFocused()
+        editor.performTouchInput { click(Offset(width - 8f, center.y)) }
+        editor.assertIsFocused()
+        composeRule.runOnIdle { assertEquals(value.text.length, value.selection.start) }
     }
 
     @Test
@@ -155,4 +222,11 @@ class ComposerAutofillMenuTest {
     private companion object {
         const val ROOT_TAG = "composer-autofill-menu-root"
     }
+}
+
+/** Robolectric has no Surface for the platform magnifier's dismiss animation. */
+@Implements(Magnifier::class)
+class ComposerMagnifierShadow {
+    @Implementation
+    fun dismiss() = Unit
 }

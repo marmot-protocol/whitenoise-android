@@ -90,6 +90,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -103,6 +104,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -438,13 +440,22 @@ internal fun ComposerPill(
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val resizeComposerDescription = stringResource(R.string.composer_resize)
     val latestOnPasteImageUris by rememberUpdatedState(onPasteImageUris)
+    val latestOnValueChange by rememberUpdatedState(onValueChange)
     val latestOnPreImeBack by rememberUpdatedState(onPreImeBack)
     val latestOnHeightDragStarted by rememberUpdatedState(onHeightDragStarted)
     val latestOnHeightDrag by rememberUpdatedState(onHeightDrag)
     val latestOnHeightDragStopped by rememberUpdatedState(onHeightDragStopped)
     var composerFocused by remember { mutableStateOf(false) }
+    var showKeyboardAfterTouchTap by remember { mutableStateOf(false) }
+    LaunchedEffect(composerFocused, showKeyboardAfterTouchTap) {
+        if (composerFocused && showKeyboardAfterTouchTap) {
+            keyboardController?.show()
+            showKeyboardAfterTouchTap = false
+        }
+    }
     // Gesture/predictive Back reaches the IME before the activity's ordinary
     // BackHandler. While this field owns focus, register ahead of the IME so an
     // explicit Back clears focus; IME-only geometry changes (including a
@@ -893,8 +904,8 @@ internal fun ComposerPill(
                                 // lives here, covering the whole editor viewport:
                                 // early vertical drags and wheel/trackpad ticks drive
                                 // composerScrollState directly and arm reading
-                                // intent, while taps and long-press selection pass
-                                // through untouched.
+                                // intent, while focused taps and long-press selection
+                                // pass through untouched.
                                 .pointerInput(Unit) {
                                     composerEditorReadingScrollGestures(
                                         scrollBy = { delta ->
@@ -1013,6 +1024,30 @@ internal fun ComposerPill(
                                     // commits can follow the real selection, not merely
                                     // the final text line or the conversation tail.
                                     .verticalScroll(composerScrollState)
+                                    .pointerInput(composerFocused, inputContentVisible, inputFocusEnabled) {
+                                        if (!composerFocused && inputContentVisible && inputFocusEnabled) {
+                                            composerUnfocusedTouchFocusGestures { position ->
+                                                val value = latestTextFieldValue
+                                                textLayoutSnapshot
+                                                    ?.takeIf { it.sourceText == value.text }
+                                                    ?.let { snapshot ->
+                                                        val transformedOffset = snapshot.result.getOffsetForPosition(position)
+                                                        val originalOffset =
+                                                            snapshot.transformedText.offsetMapping
+                                                                .transformedToOriginal(transformedOffset)
+                                                                .coerceIn(0, value.text.length)
+                                                        if (value.selection.start != originalOffset ||
+                                                            value.selection.end != originalOffset
+                                                        ) {
+                                                            latestOnValueChange(
+                                                                value.copy(selection = TextRange(originalOffset)),
+                                                            )
+                                                        }
+                                                    }
+                                                showKeyboardAfterTouchTap = composerFocus.requestFocus()
+                                            }
+                                        }
+                                    }
                                     .filterTextContextMenuComponents { component ->
                                         textFieldValue.text.isNotEmpty() ||
                                             component.key !== TextContextMenuKeys.AutofillKey
