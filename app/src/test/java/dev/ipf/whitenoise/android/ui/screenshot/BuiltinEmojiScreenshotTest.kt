@@ -50,11 +50,13 @@ class BuiltinEmojiScreenshotTest {
     private fun capture(mode: Variant) {
         val dark = mode == Variant.Dark
         val rtl = mode == Variant.LargeRtl
+        val repeatedEmoji = MarkdownInlineFfi.Text(":marmot::wn: :marmot::marmot: :wn::wn:")
+        val malformedFence = "```\n``` trailing text\n:marmot: :wn:\n```\n:wn:"
         val document =
             MarkdownDocumentFfi(
                 blocks =
                     listOf(
-                        MarkdownBlockFfi.Paragraph(listOf(MarkdownInlineFfi.Text(":marmot::wn: :marmot::marmot: :wn::wn:"))),
+                        MarkdownBlockFfi.Paragraph(listOf(repeatedEmoji)),
                         MarkdownBlockFfi.Paragraph(
                             listOf(
                                 MarkdownInlineFfi.Strong(listOf(MarkdownInlineFfi.Text("Bold :marmot:"))),
@@ -85,7 +87,7 @@ class BuiltinEmojiScreenshotTest {
                             MarkdownMessageBody(document)
                             Text("Plain fallback")
                             ReaderSelectablePlainText(":marmot: :wn: `:wn:`", { _, _, _ -> })
-                            ReaderSelectablePlainText("```\n``` trailing text\n:marmot: :wn:\n```\n:wn:", { _, _, _ -> })
+                            ReaderSelectablePlainText(malformedFence, { _, _, _ -> })
                             Text("Chat preview")
                             ChatRowPreviewLine(rememberMarkdownPreviewText(document), FontStyle.Normal)
                         }

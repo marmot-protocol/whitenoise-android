@@ -30,6 +30,7 @@ data class EmojiEntry(
 object EmojiData {
     const val GroupCount = 9
     private const val SearchResultLimit = 96
+    private const val SymbolsGroup = 7
 
     @Volatile private var cache: List<EmojiEntry>? = null
 
@@ -72,7 +73,7 @@ object EmojiData {
             for (shortcode in BuiltinEmoji.shortcodes) {
                 val name = shortcode.trim(':')
                 val keywords = if (name == "wn") listOf(shortcode, "white noise", "whitenoise") else listOf(shortcode)
-                add(EmojiEntry(shortcode, name, 7, keywords))
+                add(EmojiEntry(shortcode, name, SymbolsGroup, keywords))
             }
         }
     }

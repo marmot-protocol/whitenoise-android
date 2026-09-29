@@ -49,7 +49,8 @@ class BuiltinEmojiTest {
         assertEquals(source.text, rendered.text)
         assertEquals(source.spanStyles, rendered.spanStyles)
         assertEquals(source.getLinkAnnotations(0, source.length), rendered.getLinkAnnotations(0, rendered.length))
-        assertEquals(listOf(0 to 8, 8 to 12, 12 to 16), rendered.getStringAnnotations(0, rendered.length).map { it.start to it.end })
+        val shortcodeRanges = rendered.getStringAnnotations(0, rendered.length).map { it.start to it.end }
+        assertEquals(listOf(0 to 8, 8 to 12, 12 to 16), shortcodeRanges)
         assertEquals(rendered, BuiltinEmoji.annotate(rendered))
     }
 
@@ -70,7 +71,8 @@ class BuiltinEmojiTest {
         val source = ":wn: `:wn:`\n```\n:marmot:\n```\n:wn:\n~~~\n:wn:\n~~~"
         val rendered = BuiltinEmoji.annotate(AnnotatedString(source))
         assertEquals(source, rendered.text)
-        assertEquals(listOf(0, source.indexOf(":wn:\n~~~")), rendered.getStringAnnotations(0, rendered.length).map { it.start })
+        val shortcodeStarts = rendered.getStringAnnotations(0, rendered.length).map { it.start }
+        assertEquals(listOf(0, source.indexOf(":wn:\n~~~")), shortcodeStarts)
         assertTrue(BuiltinEmoji.annotate(AnnotatedString("```\n:wn:")).getStringAnnotations(0, 8).isEmpty())
     }
 }

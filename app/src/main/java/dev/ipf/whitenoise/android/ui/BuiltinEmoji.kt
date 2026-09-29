@@ -55,11 +55,17 @@ internal object BuiltinEmoji {
             for (match in matches) {
                 val start = match.range.first
                 val end = match.range.last + 1
-                if (codeRanges.any { start <= it.last && end > it.first } ||
-                    text.getStringAnnotations(LITERAL_TAG, start, end).isNotEmpty() ||
-                    text.getStringAnnotations(start, end).any { it.item == match.value } ||
-                    text.spanStyles.any { it.item.fontFamily == FontFamily.Monospace && start < it.end && end > it.start }
-                ) {
+                val literal =
+                    when {
+                        codeRanges.any { start <= it.last && end > it.first } -> true
+                        text.getStringAnnotations(LITERAL_TAG, start, end).isNotEmpty() -> true
+                        text.getStringAnnotations(start, end).any { it.item == match.value } -> true
+                        else ->
+                            text.spanStyles.any {
+                                it.item.fontFamily == FontFamily.Monospace && start < it.end && end > it.start
+                            }
+                    }
+                if (literal) {
                     continue
                 }
                 // appendInlineContent uses the full shortcode as alternate text, never U+FFFC.
