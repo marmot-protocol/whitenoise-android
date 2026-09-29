@@ -120,10 +120,12 @@ internal open class NamecoinTransport(
             withTimeout(timeoutMillis) {
                 awaitReply(server, url, requestJson, wantId)
             }
+        } catch (timeout: TimeoutCancellationException) {
+            // The per-call deadline expired with no matching reply; the
+            // resolver treats this server as unavailable and falls back.
+            null
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (e: TimeoutCancellationException) {
-            null
         } catch (e: Exception) {
             null
         }
