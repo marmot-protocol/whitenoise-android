@@ -210,9 +210,18 @@ class AttachmentDownloadWorker : CoroutineWorker {
                 Result.success()
             } else {
                 if (priority == AttachmentDownloadPriority.Interactive) {
-                    setForeground(
-                        ForegroundInfo(attachmentJobId(request), attachmentDownloadNotification(applicationContext)),
-                    )
+                    try {
+                        setForeground(
+                            ForegroundInfo(
+                                attachmentJobId(request),
+                                attachmentDownloadNotification(applicationContext),
+                            ),
+                        )
+                    } catch (failure: IllegalStateException) {
+                        // A background retry may be denied foreground-service startup.
+                        // WorkManager can still run this durable request as ordinary work.
+                        Log.w(TAG, "attachment_foreground_unavailable type=${failure.javaClass.simpleName}")
+                    }
                 }
                 performDownload(application, request, priority, intentStore)
             }

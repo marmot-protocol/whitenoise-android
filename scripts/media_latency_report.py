@@ -55,7 +55,7 @@ STATUS_PREFIX = "INSTRUMENTATION_STATUS: "
 STATUS_CODE = "INSTRUMENTATION_CODE: -1"
 SUCCESS_RESULT = re.compile(r"OK \([1-9][0-9]* tests?\)\Z")
 FAILURE_MARKERS = ("FAILURES!!!", "INSTRUMENTATION_FAILED", "INSTRUMENTATION_ABORTED", "Process crashed")
-KEY_VALUE = re.compile(r"([a-z][a-z0-9_]*)=([0-9.]+|[a-z_]+)")
+KEY_VALUE = re.compile(r"([a-z][a-z0-9_]*)=((?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?|[a-z_]+)")
 HEX40 = re.compile(r"[0-9a-f]{40}\Z")
 HEX64 = re.compile(r"[0-9a-f]{64}\Z")
 
@@ -100,8 +100,13 @@ def _validate_aggregate(record: object) -> dict:
 
 def _parse_fixed_fields(line: str, allowed: set[str]) -> dict:
     """Reject unrecognized status tokens before any log text reaches a report."""
-    fields = dict(KEY_VALUE.findall(line))
-    if not fields or len(fields) != len(line.split()) or not set(fields) <= allowed:
+    fields = {}
+    for token in line.split():
+        match = KEY_VALUE.fullmatch(token)
+        if match is None or match.group(1) in fields:
+            raise ValueError("unrecognized media probe status fields")
+        fields[match.group(1)] = match.group(2)
+    if not fields or not set(fields) <= allowed:
         raise ValueError("unrecognized media probe status fields")
     return fields
 
@@ -129,13 +134,21 @@ def parse_status(output: str) -> dict:
             fields = _parse_fixed_fields(status.partition("=")[2], {"phase", "count", "p50", "p95", "max"})
             if fields.get("phase") not in COMPONENT_PHASES:
                 raise ValueError("unknown component phase")
-            components.append({key: value if key == "phase" else float(value) for key, value in fields.items()})
+            component = {key: value if key == "phase" else float(value) for key, value in fields.items()}
+            if any(not _nonnegative_number(value) for key, value in component.items() if key != "phase"):
+                raise ValueError("component metric must be finite and nonnegative")
+            components.append(component)
     lines = output.splitlines()
     complete = (
         STATUS_CODE in lines
         and any(SUCCESS_RESULT.fullmatch(line.strip()) for line in lines)
         and not any(marker in output for marker in FAILURE_MARKERS)
     )
+    if aggregates:
+        pairs = {(record["operation"], record["size"]) for record in aggregates}
+        expected_sizes = SIZES if any(record["size"] == "near_limit" for record in aggregates) else SIZES - {"near_limit"}
+        expected_pairs = {(operation, size) for operation in OPERATIONS for size in expected_sizes}
+        complete = complete and pairs == expected_pairs and len(pairs) == len(aggregates)
     if complete and not (aggregates or native or components):
         raise ValueError("completed instrumentation contained no media measurements")
     return {
@@ -176,7 +189,7 @@ def main() -> int:
         "network_profile": args.network_profile,
         **parse_status(args.input.read_text()),
     }
-    args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+    args.output.write_text(json.dumps(report, indent=2, sort_keys=True, allow_nan=False) + "\n")
     return 0 if report["complete"] else 1
 
 
