@@ -98,17 +98,42 @@ class ConversationTimelinePagingTest {
             }
         }
 
-    /** A superseded window is not the engine failing to answer, so it leaves no retry affordance. */
+    /** One stale revision retries inside the same gesture and reaches the newly installed window. */
     @Test
-    fun supersededOlderPageReportsNoProgressWithoutBlocking() =
+    fun supersededOlderPageRetriesAndAdvances() =
         runBlocking {
-            val subscription = subscriptionWith(outcome(ConversationWindowUnchangedReason.SUPERSEDED))
+            val subscription =
+                subscriptionWith(outcome(ConversationWindowUnchangedReason.SUPERSEDED), olderPage())
             withController(subscription) { controller ->
                 settle()
 
                 val load = controller.loadOlderPageInternal()
 
-                assertEquals(ConversationPageLoad.NO_PROGRESS, load)
+                assertEquals(ConversationPageLoad.ADVANCED, load)
+                assertEquals(2, subscription.backwardsCallCount)
+                assertFalse(controller.olderPageBlocked)
+            }
+        }
+
+    /** A persistently stale window is bounded and offers the reader a retry. */
+    @Test
+    fun supersededOlderPageExhaustsBudgetAndArmsRetry() =
+        runBlocking {
+            val stale =
+                Array(CONVERSATION_PAGE_SUPERSEDED_ATTEMPTS) {
+                    outcome(ConversationWindowUnchangedReason.SUPERSEDED)
+                }
+            val subscription = subscriptionWith(*stale, olderPage())
+            withController(subscription) { controller ->
+                settle()
+
+                val load = controller.loadOlderPageInternal()
+
+                assertEquals(ConversationPageLoad.FAILED, load)
+                assertTrue(controller.olderPageBlocked)
+                assertEquals(CONVERSATION_PAGE_SUPERSEDED_ATTEMPTS, subscription.backwardsCallCount)
+                controller.retryLoadFailure()
+                settle()
                 assertFalse(controller.olderPageBlocked)
             }
         }
@@ -354,9 +379,9 @@ class ConversationTimelinePagingTest {
             }
         }
 
-    /** A superseded window is a live replacement owning the answer, not the engine saying there is nothing older. */
+    /** A stale automatic page also retries within the gesture and can advance history. */
     @Test
-    fun supersededAutomaticOlderPageDoesNotStandThePrefetchDown() =
+    fun supersededAutomaticOlderPageRetriesAndAdvances() =
         runBlocking {
             val subscription = subscriptionWith(outcome(ConversationWindowUnchangedReason.SUPERSEDED), olderPage())
             withController(subscription) { controller ->
@@ -364,10 +389,28 @@ class ConversationTimelinePagingTest {
 
                 val load = controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC)
 
-                assertEquals(ConversationPageLoad.NO_PROGRESS, load)
+                assertEquals(ConversationPageLoad.ADVANCED, load)
+                assertEquals(2, subscription.backwardsCallCount)
                 assertFalse(controller.automaticOlderPagingBlocked)
-                val retried = controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC)
-                assertEquals("the next automatic ask still reaches the engine", ConversationPageLoad.ADVANCED, retried)
+            }
+        }
+
+    /** Persistent revision churn stops automatic paging and shows the existing retry row. */
+    @Test
+    fun exhaustedSupersededAutomaticOlderPageArmsRetry() =
+        runBlocking {
+            val stale =
+                Array(CONVERSATION_PAGE_SUPERSEDED_ATTEMPTS) {
+                    outcome(ConversationWindowUnchangedReason.SUPERSEDED)
+                }
+            val subscription = subscriptionWith(*stale)
+            withController(subscription) { controller ->
+                settle()
+
+                val load = controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC)
+                assertEquals(ConversationPageLoad.FAILED, load)
+                assertTrue(controller.olderPageBlocked)
+                assertEquals(CONVERSATION_PAGE_SUPERSEDED_ATTEMPTS, subscription.backwardsCallCount)
             }
         }
 
