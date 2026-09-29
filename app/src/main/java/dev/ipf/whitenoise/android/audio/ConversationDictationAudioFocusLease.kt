@@ -56,7 +56,9 @@ internal class ConversationDictationAudioFocusLease(
     fun release() {
         val owned =
             synchronized(lock) {
-                if (activeGeneration == null) false else {
+                if (activeGeneration == null) {
+                    false
+                } else {
                     activeGeneration = null
                     true
                 }
@@ -67,7 +69,9 @@ internal class ConversationDictationAudioFocusLease(
     private fun requestCaptureEnd(generation: Long) {
         val shouldPost =
             synchronized(lock) {
-                if (activeGeneration != generation || captureEndRequested) false else {
+                if (activeGeneration != generation || captureEndRequested) {
+                    false
+                } else {
                     captureEndRequested = true
                     true
                 }

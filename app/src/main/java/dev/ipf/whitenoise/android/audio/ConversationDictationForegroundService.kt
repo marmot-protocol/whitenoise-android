@@ -12,8 +12,8 @@ import android.content.pm.ServiceInfo
 import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Build
-import android.os.IBinder
 import android.os.Handler
+import android.os.IBinder
 import android.os.Looper
 import android.widget.RemoteViews
 import androidx.compose.runtime.snapshotFlow
@@ -291,21 +291,20 @@ class ConversationDictationForegroundService : Service() {
     companion object {
         internal const val CHANNEL_ID = "composer_dictation"
         private const val NOTIFICATION_ID = BackgroundConnectionNotification.NOTIFICATION_ID
-        @Volatile private var activeService: ConversationDictationForegroundService? = null
+
+        @Volatile
+        private var activeService: ConversationDictationForegroundService? = null
 
         /** Lets a background-connection refresh preserve active dictation controls. */
         internal fun activeNotificationOrNull(): Notification? =
             activeService?.let { service ->
                 val controller = service.promotedController
                 val token = service.promotedSessionToken
-                if (controller != null && token != null && controller.hasDurableSession &&
-                    controller.notificationSessionToken == token
-                ) {
-                    service.buildNotification(controller)
-                } else {
-                    null
-                }
+                controller
+                    ?.takeIf { token != null && it.hasDurableSession && it.notificationSessionToken == token }
+                    ?.let(service::buildNotification)
             }
+
         internal const val ACTION_CANCEL = "dev.ipf.whitenoise.android.dictation.CANCEL"
         internal const val ACTION_PASTE = "dev.ipf.whitenoise.android.dictation.PASTE"
         internal const val ACTION_SEND = "dev.ipf.whitenoise.android.dictation.SEND"

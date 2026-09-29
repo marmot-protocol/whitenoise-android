@@ -139,10 +139,7 @@ class ConversationDictationForegroundServiceTest {
         assertEquals(listOf("Cancel", "Paste", "Send"), notification.actions.map { it.title.toString() })
         assertNotNull(notification.contentView)
         assertNotNull(notification.bigContentView)
-        val compact = notification.contentView.apply(service, FrameLayout(service))
-        assertTrue(compact.findViewById<Button>(R.id.dictation_notification_cancel).isEnabled)
-        assertTrue(compact.findViewById<Button>(R.id.dictation_notification_paste).isEnabled)
-        assertTrue(compact.findViewById<Button>(R.id.dictation_notification_send).isEnabled)
+        assertCompactButtonsEnabled(service, notification)
         assertEquals("Starting dictation…", notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString())
         assertFalse(notification.extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE))
         assertExplicitNotificationDestinations(service, notification)
@@ -241,6 +238,17 @@ class ConversationDictationForegroundServiceTest {
                 shadowOf(action.actionIntent).savedIntent.component,
             )
         }
+    }
+
+    /** Inflates the actual collapsed RemoteViews, including its enable-state actions. */
+    private fun assertCompactButtonsEnabled(
+        service: ConversationDictationForegroundService,
+        notification: Notification,
+    ) {
+        val compact = notification.contentView.apply(service, FrameLayout(service))
+        assertTrue(compact.findViewById<Button>(R.id.dictation_notification_cancel).isEnabled)
+        assertTrue(compact.findViewById<Button>(R.id.dictation_notification_paste).isEnabled)
+        assertTrue(compact.findViewById<Button>(R.id.dictation_notification_send).isEnabled)
     }
 
     /** Real notification intents produce the selected outcome regardless of the stored default. */

@@ -12,12 +12,12 @@ import android.content.pm.ServiceInfo
 import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import dev.ipf.whitenoise.android.audio.ConversationDictationForegroundService
 import androidx.core.content.ContextCompat
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
+import dev.ipf.whitenoise.android.audio.ConversationDictationForegroundService
 import dev.ipf.whitenoise.android.state.RecoveryTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import kotlinx.coroutines.CoroutineScope
@@ -613,6 +613,7 @@ internal object BackgroundConnectionNotification {
 
     @Volatile
     private var channelEnsured = false
+
     @Volatile
     private var foregroundActive = false
 
@@ -627,7 +628,8 @@ internal object BackgroundConnectionNotification {
     /** Reuses the foreground-services' shared ID without overwriting dictation controls. */
     fun restoreIfForeground(context: Context) {
         if (!foregroundActive) return
-        context.getSystemService(NotificationManager::class.java)
+        context
+            .getSystemService(NotificationManager::class.java)
             ?.notify(NOTIFICATION_ID, build(context))
     }
 
