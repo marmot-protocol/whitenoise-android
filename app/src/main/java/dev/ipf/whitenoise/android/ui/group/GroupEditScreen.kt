@@ -283,7 +283,10 @@ internal fun GroupEditScreen(
     IdentityImageCropFlow(
         uri = pendingCropUri,
         shape = IdentityImageCropShape.RoundedSquare,
-        onDismiss = { pendingCropUri = null },
+        onDismiss = {
+            imageFailureScope.clear()
+            pendingCropUri = null
+        },
         onUnreadable = { picked ->
             uploadPublicAvatar { GroupImageDraftProcessor.fromContentUri(context.contentResolver, picked) }
         },
@@ -348,7 +351,10 @@ internal fun GroupEditScreen(
                 if (imageSaving) LinearProgressIndicator(Modifier.fillMaxWidth())
                 Box {
                     WhiteNoiseFilledTonalButton(
-                        onClick = { photoMenuOpen = true },
+                        onClick = {
+                            imageFailureScope.clear()
+                            photoMenuOpen = true
+                        },
                         enabled = canEdit && !imageSaving,
                         modifier = Modifier.testTag("group_edit.photoAction"),
                     ) {
@@ -357,7 +363,10 @@ internal fun GroupEditScreen(
                     GroupEditPhotoMenu(
                         expanded = photoMenuOpen,
                         hasImage = hasGroupImage,
-                        onDismiss = { photoMenuOpen = false },
+                        onDismiss = {
+                            imageFailureScope.clear()
+                            photoMenuOpen = false
+                        },
                         onChoosePhoto = {
                             imageFailureScope.clear()
                             photoPicker.launch(
@@ -451,7 +460,12 @@ internal fun GroupEditScreen(
                 showImageSearch = false
                 showGroupEmojiImagePicker = true
             },
-            onDismiss = { showImageSearch = false },
+            onDismiss = {
+                if (!imageSaving && !controller.mutationInFlight) {
+                    imageFailureScope.clear()
+                    showImageSearch = false
+                }
+            },
         )
     }
 
@@ -461,7 +475,12 @@ internal fun GroupEditScreen(
             recentEmojis = recentEmojiRecentsOwner.recents,
             onEmojiUsed = recentEmojiRecentsOwner::onEmojiUsed,
             onApply = { draft -> updateImage { draft } },
-            onDismiss = { if (!imageSaving && !controller.mutationInFlight) showGroupEmojiImagePicker = false },
+            onDismiss = {
+                if (!imageSaving && !controller.mutationInFlight) {
+                    imageFailureScope.clear()
+                    showGroupEmojiImagePicker = false
+                }
+            },
         )
     }
 

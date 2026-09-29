@@ -484,7 +484,13 @@ private fun NewGroupSetupAccountScreen(
                     }
                 },
                 create = { create(retryLoadGroupIdHex = retryGroupIdHex) },
-                photo = { if (detailsEditableNow()) showPhotoMenu = true },
+                photo = {
+                    if (detailsEditableNow()) {
+                        imageFailureScope.clear()
+                        imageError = false
+                        showPhotoMenu = true
+                    }
+                },
                 retention = { if (detailsEditableNow()) showRetentionPicker = true },
                 emoji = { if (detailsEditableNow()) showEmojiPicker = true },
             ),
@@ -492,7 +498,11 @@ private fun NewGroupSetupAccountScreen(
             NewGroupPhotoMenu(
                 expanded = showPhotoMenu && detailsEditable,
                 hasImage = imageDraft != null || draft.imageNeedsReselection,
-                onDismiss = { showPhotoMenu = false },
+                onDismiss = {
+                    imageFailureScope.clear()
+                    imageError = false
+                    showPhotoMenu = false
+                },
                 onPhotos = {
                     if (detailsEditableNow()) {
                         imageFailureScope.clear()
@@ -578,13 +588,23 @@ private fun NewGroupSetupAccountScreen(
                 showImagePicker = false
                 showGroupEmojiImagePicker = true
             },
-            onDismiss = { if (!imagePreparing) showImagePicker = false },
+            onDismiss = {
+                if (!imagePreparing) {
+                    imageFailureScope.clear()
+                    imageError = false
+                    showImagePicker = false
+                }
+            },
         )
     }
     IdentityImageCropFlow(
         uri = pendingCropUri,
         shape = IdentityImageCropShape.RoundedSquare,
-        onDismiss = { pendingCropUri = null },
+        onDismiss = {
+            imageFailureScope.clear()
+            imageError = false
+            pendingCropUri = null
+        },
         onUnreadable = { uri ->
             prepareImage { GroupImageDraftProcessor.fromContentUri(context.contentResolver, uri) }
         },
@@ -607,7 +627,13 @@ private fun NewGroupSetupAccountScreen(
                 imageError = false
                 showGroupEmojiImagePicker = false
             },
-            onDismiss = { if (!imagePreparing) showGroupEmojiImagePicker = false },
+            onDismiss = {
+                if (!imagePreparing) {
+                    imageFailureScope.clear()
+                    imageError = false
+                    showGroupEmojiImagePicker = false
+                }
+            },
         )
     }
 
