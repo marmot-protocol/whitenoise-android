@@ -116,7 +116,8 @@ class ChatFolderOwnershipTest {
         composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag("folder.delete"))
         composeRule.onNodeWithTag("folder.delete").performClick()
         val confirm =
-            composeRule.onNodeWithTag("folder.delete_confirm")
+            composeRule
+                .onNodeWithTag("folder.delete_confirm")
                 .fetchSemanticsNode()
                 .config[SemanticsActions.OnClick]
                 .action!!

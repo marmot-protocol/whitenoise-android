@@ -79,16 +79,19 @@ class ChatFolderEditScreenScreenshotTest {
         )
 
     @Test
-    fun folderDeleteActionLight() =
+    fun folderDeleteActionLight() {
         capture("chat_folder_editor_delete_light", dark = false, amoled = false, deleteAction = true)
+    }
 
     @Test
-    fun folderDeleteConfirmationLight() =
+    fun folderDeleteConfirmationLight() {
         capture("chat_folder_editor_delete_confirm_light", dark = false, amoled = false, showDeleteDialog = true)
+    }
 
     @Test
-    fun folderDeleteConfirmationAmoled() =
+    fun folderDeleteConfirmationAmoled() {
         capture("chat_folder_editor_delete_confirm_amoled", dark = true, amoled = true, showDeleteDialog = true)
+    }
 
     @Test
     @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h1100dp-mdpi")

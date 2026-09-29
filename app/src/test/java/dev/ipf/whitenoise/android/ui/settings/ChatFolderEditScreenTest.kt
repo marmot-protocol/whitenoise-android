@@ -98,9 +98,11 @@ class ChatFolderEditScreenTest {
         composeRule.onNodeWithText(app.getString(R.string.folder_delete_detail)).assertExists()
         composeRule.onNodeWithText(app.getString(R.string.cancel)).performClick()
         composeRule.onNodeWithText("Unsaved name").assertExists()
-        assertTrue(appState.chatFolderPreferences.foldersFor(ACCOUNT_REF).any {
-            it.id == ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID
-        })
+        val folderStillExists =
+            appState.chatFolderPreferences.foldersFor(ACCOUNT_REF).any {
+                it.id == ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID
+            }
+        assertTrue(folderStillExists)
 
         composeRule.onNodeWithTag("folder.delete").performClick()
         composeRule.onNodeWithTag("folder.delete_confirm").performClick()
@@ -128,9 +130,11 @@ class ChatFolderEditScreenTest {
         composeRule.onNodeWithTag("folder.delete_dialog").assertDoesNotExist()
         composeRule.onNodeWithText("Unsaved name").assertExists()
         assertTrue(!closed)
-        assertTrue(appState.chatFolderPreferences.foldersFor(ACCOUNT_REF).any {
-            it.id == ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID
-        })
+        val folderStillExists =
+            appState.chatFolderPreferences.foldersFor(ACCOUNT_REF).any {
+                it.id == ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID
+            }
+        assertTrue(folderStillExists)
     }
 
     private fun renderEditor(
