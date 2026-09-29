@@ -23,17 +23,20 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36], qualifiers = "en")
 class ClipboardFocusTest {
     @get:Rule val composeRule = createComposeRule()
-    private val clipboard = ApplicationProvider.getApplicationContext<Context>()
-        .getSystemService(ClipboardManager::class.java)
+    private val clipboard =
+        ApplicationProvider
+            .getApplicationContext<Context>()
+            .getSystemService(ClipboardManager::class.java)
 
     @After fun clearClipboard() = clipboard.clearPrimaryClip()
 
     @Test fun focusReturnRefreshesPasteAffordanceWithoutClipCallback() {
         clipboard.clearPrimaryClip()
         val focused = mutableStateOf(false)
-        val windowInfo = object : WindowInfo {
-            override val isWindowFocused: Boolean get() = focused.value
-        }
+        val windowInfo =
+            object : WindowInfo {
+                override val isWindowFocused: Boolean get() = focused.value
+            }
         composeRule.setContent {
             CompositionLocalProvider(LocalWindowInfo provides windowInfo) {
                 if (rememberClipboardCanOfferPaste(clipboard)) Text("Paste available")
