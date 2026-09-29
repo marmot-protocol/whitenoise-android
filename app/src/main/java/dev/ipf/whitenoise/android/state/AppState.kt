@@ -4270,9 +4270,7 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** Bridges scheduler registration until its first observable work state. */
-    internal fun hasInteractiveAttachmentDownloadIntent(request: AttachmentTransferRequest): Boolean {
-        return attachmentDownloadIntents.isInteractive(request)
-    }
+    internal fun hasInteractiveAttachmentDownloadIntent(request: AttachmentTransferRequest): Boolean = attachmentDownloadIntents.isInteractive(request)
 
     /**
      * Revokes one attachment's durable download so a cancel survives both a
