@@ -115,6 +115,29 @@ class ConversationTimelinePagingTest {
             }
         }
 
+    /** A not-ready streak cannot consume the separate superseded retry budget. */
+    @Test
+    fun mixedNotReadyAndSupersededPagesStillAdvance() =
+        runBlocking {
+            val subscription =
+                subscriptionWith(
+                    *Array(CONVERSATION_PAGE_NOT_READY_ATTEMPTS - 1) {
+                        outcome(ConversationWindowUnchangedReason.NOT_READY)
+                    },
+                    outcome(ConversationWindowUnchangedReason.SUPERSEDED),
+                    olderPage(),
+                )
+            withController(subscription) { controller ->
+                settle()
+
+                val load = controller.loadOlderPageInternal()
+
+                assertEquals(ConversationPageLoad.ADVANCED, load)
+                assertEquals(CONVERSATION_PAGE_NOT_READY_ATTEMPTS + 1, subscription.backwardsCallCount)
+                assertFalse(controller.olderPageBlocked)
+            }
+        }
+
     /** A persistently stale window is bounded and offers the reader a retry. */
     @Test
     fun supersededOlderPageExhaustsBudgetAndArmsRetry() =
