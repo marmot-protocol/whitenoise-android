@@ -136,9 +136,13 @@ internal suspend fun retryConversationWindowJump(
                         if (!retry || attempt == CONVERSATION_JUMP_RETRY_ATTEMPTS - 1) {
                             return ConversationWindowJumpResult.RETRYABLE
                         }
-                        if (outcome.reason == ConversationWindowUnchangedReason.NOT_READY) {
-                            delay(CONVERSATION_WINDOW_NOT_READY_RETRY_MS)
-                        }
+                        delay(
+                            if (outcome.reason == ConversationWindowUnchangedReason.NOT_READY) {
+                                CONVERSATION_WINDOW_NOT_READY_RETRY_MS
+                            } else {
+                                CONVERSATION_WINDOW_SUPERSEDED_RETRY_MS
+                            },
+                        )
                     }
                 }
         }

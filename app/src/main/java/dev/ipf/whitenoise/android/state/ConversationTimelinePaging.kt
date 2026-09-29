@@ -10,6 +10,7 @@ import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import dev.ipf.whitenoise.android.diagnostics.PerformanceTrace
 import dev.ipf.whitenoise.android.state.ConversationWindowUnchangedReason.NOT_READY
+import dev.ipf.whitenoise.android.state.ConversationWindowUnchangedReason.SUPERSEDED
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -30,6 +31,12 @@ internal typealias PagingOrigin = ConversationPagingOrigin
  * at most a second of the reader's time, after which a retry affordance is better than more waiting.
  */
 internal const val CONVERSATION_PAGE_NOT_READY_ATTEMPTS = 4
+
+/** Bounds one page gesture while a newer window revision replaces its quoted revision. */
+internal const val CONVERSATION_PAGE_SUPERSEDED_ATTEMPTS = 4
+
+/** Gives the receive loop time to install the replacement before retrying a superseded command. */
+internal const val CONVERSATION_WINDOW_SUPERSEDED_RETRY_MS = 50L
 
 /** What one page attempt did, from the reader's point of view. */
 internal enum class ConversationPageLoad {
@@ -162,9 +169,7 @@ internal suspend fun ConversationController.loadOlderPageInternal(
 /**
  * Feeds one older page to the automatic prefetch guard: rows that arrived release it in every
  * case, while an automatic page the engine answered with a window holding nothing older counts
- * against it. Only an answered window counts, [answeredAutomatically] is false for a superseded or
- * closed window whose live replacement owns the answer, and deadline and not-ready outcomes are
- * left to the visible retry row that already blocks the prefetch.
+ * against it. A superseded page that exhausted its retries arms the visible retry row instead.
  */
 private fun ConversationController.settleOlderPrefetchGuard(
     load: ConversationPageLoad,
@@ -339,7 +344,7 @@ private suspend fun ConversationController.pageOlderIfActive(
         // Time the window command from here, not from the caller's start: page_window is documented
         // as the engine answering, and anchoring is already its own phase.
         timedWindowCommand(trace) {
-            pageWithNotReadyBudget(handle) { it.paginateBackwards(ConversationTimelinePageLimit) }
+            pageWithRetryBudget(handle) { it.paginateBackwards(ConversationTimelinePageLimit) }
         }
     }
 
@@ -351,31 +356,45 @@ private suspend fun ConversationController.pageNewerIfActive(
     timelineSubscriptionActiveCallMutex.withLock {
         if (!retainsSubscription(handle)) return@withLock null
         timedWindowCommand(trace) {
-            pageWithNotReadyBudget(handle) { it.paginateForwards(ConversationTimelinePageLimit) }
+            pageWithRetryBudget(handle) { it.paginateForwards(ConversationTimelinePageLimit) }
         }
     }
 
 /**
- * Runs one page, waiting out a not-ready window for a bounded budget.
+ * Runs one page, waiting out not-ready and superseded windows for bounded budgets.
  *
  * Not-ready is MDK repairing itself in the background, so asking again shortly usually succeeds; the
  * budget is what keeps that from becoming the scroll-frame retry loop this replaces. Teardown is
  * re-checked between attempts so a closing account does not wait out the whole budget.
  */
-private suspend fun ConversationController.pageWithNotReadyBudget(
+private suspend fun ConversationController.pageWithRetryBudget(
     handle: PagingHandle,
     page: suspend (PagingHandle) -> TimelinePageOutcome,
 ): TimelinePageOutcome? {
     var outcome = withContext(Dispatchers.IO) { page(handle) }
-    var attempt = 1
-    while (outcome is TimelinePageOutcome.Unchanged &&
-        outcome.reason == NOT_READY &&
-        attempt < CONVERSATION_PAGE_NOT_READY_ATTEMPTS
-    ) {
-        delay(CONVERSATION_WINDOW_NOT_READY_RETRY_MS)
+    var notReadyAttempts = 0
+    var supersededAttempts = 0
+    while (outcome is TimelinePageOutcome.Unchanged) {
+        val retryDelayMs =
+            when (outcome.reason) {
+                NOT_READY -> {
+                    notReadyAttempts += 1
+                    CONVERSATION_WINDOW_NOT_READY_RETRY_MS.takeIf {
+                        notReadyAttempts < CONVERSATION_PAGE_NOT_READY_ATTEMPTS
+                    }
+                }
+                SUPERSEDED -> {
+                    supersededAttempts += 1
+                    CONVERSATION_WINDOW_SUPERSEDED_RETRY_MS.takeIf {
+                        supersededAttempts < CONVERSATION_PAGE_SUPERSEDED_ATTEMPTS
+                    }
+                }
+                else -> null
+            }
+        if (retryDelayMs == null) break
+        delay(retryDelayMs)
         if (!retainsSubscription(handle)) return null
         outcome = withContext(Dispatchers.IO) { page(handle) }
-        attempt += 1
     }
     return outcome
 }

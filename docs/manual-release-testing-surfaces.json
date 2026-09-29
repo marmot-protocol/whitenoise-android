@@ -24052,6 +24052,23 @@
         ]
       },
       {
+        "surface": "A superseded page retries the replacement window within a bounded gesture",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationTimelinePaging.kt",
+        "anchor": "fun ConversationController.pageWithRetryBudget(",
+        "test_ids": [
+          "CON-003"
+        ]
+      },
+      {
+        "surface": "A reply jump retries a superseded window before reporting the target unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationMessageAvailability.kt",
+        "anchor": "fun retryConversationWindowJump(",
+        "test_ids": [
+          "CON-003",
+          "CON-012"
+        ]
+      },
+      {
         "surface": "An upward page reports the reader's oldest visible row as the window anchor before paging",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationTimelinePaging.kt",
         "anchor": "fun ConversationController.pageOlderIfActive(",

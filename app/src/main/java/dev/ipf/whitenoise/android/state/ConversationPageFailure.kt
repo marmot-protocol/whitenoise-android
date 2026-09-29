@@ -3,15 +3,15 @@ package dev.ipf.whitenoise.android.state
 import android.util.Log
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ConversationWindowUnchangedReason.NOT_READY
+import dev.ipf.whitenoise.android.state.ConversationWindowUnchangedReason.SUPERSEDED
 import dev.ipf.whitenoise.android.state.ConversationWindowUnchangedReason.TIMED_OUT
 
 /**
- * Turns an unchanged window into a page outcome, leaving the reader a retry affordance for the two
- * reasons that are worth telling them about.
+ * Turns an unchanged window into a page outcome, leaving the reader a retry affordance for
+ * recoverable reasons.
  *
- * A deadline and an exhausted retry budget are the engine failing to answer, not the end of history,
- * so they set the same error the throwing path does. Superseded and terminal outcomes mean a newer
- * revision or the reconnect loop already owns the answer, and a banner would only be noise.
+ * A deadline or an exhausted retry budget is not the end of history, so it sets the same retry
+ * affordance as a thrown failure. Terminal outcomes leave the reconnect loop to recover.
  */
 internal fun ConversationController.unchangedPageLoad(
     outcome: TimelinePageOutcome.Unchanged,
@@ -26,6 +26,10 @@ internal fun ConversationController.unchangedPageLoad(
         NOT_READY -> {
             reportPageFailure(direction, MarmotWindowNotReady(direction), origin)
             ConversationPageLoad.NOT_READY
+        }
+        SUPERSEDED -> {
+            reportPageFailure(direction, MarmotWindowSuperseded(direction), origin)
+            ConversationPageLoad.FAILED
         }
         else -> ConversationPageLoad.NO_PROGRESS
     }
@@ -73,3 +77,8 @@ private class MarmotWindowDeadline(
 private class MarmotWindowNotReady(
     direction: ConversationSearchPageDirection,
 ) : Exception("window not ready paging ${direction.name.lowercase()}")
+
+/** A newer window kept superseding every command in one bounded gesture. */
+private class MarmotWindowSuperseded(
+    direction: ConversationSearchPageDirection,
+) : Exception("window superseded paging ${direction.name.lowercase()}")
