@@ -14,6 +14,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
 
 /**
@@ -33,10 +34,27 @@ internal suspend fun PointerInputScope.composerUnfocusedTouchFocusGestures(
     awaitPointerEventScope {
         var trackedPointer: PointerId? = null
         var downAtMillis = 0L
+        var lastEventAtMillis = 0L
         var downPosition = Offset.Zero
         var cancelled = false
+        var longPressDispatched = false
         while (true) {
-            val event = awaitPointerEvent(PointerEventPass.Initial)
+            val remaining = longPressTimeoutMillis - (lastEventAtMillis - downAtMillis)
+            val event =
+                if (trackedPointer != null && !cancelled && !longPressDispatched && remaining > 0) {
+                    withTimeoutOrNull(remaining) { awaitPointerEvent(PointerEventPass.Initial) }
+                } else {
+                    awaitPointerEvent(PointerEventPass.Initial)
+                }
+            if (event == null) {
+                // A still, held finger produces no Move event. The timeout must open Paste
+                // without waiting for the finger to lift.
+                if (trackedPointer != null && !cancelled) {
+                    longPressDispatched = true
+                    onLongPress()
+                }
+                continue
+            }
             when (event.type) {
                 PointerEventType.Press -> {
                     val change = event.changes.firstOrNull { it.pressed && it.type == PointerType.Touch }
@@ -44,8 +62,10 @@ internal suspend fun PointerInputScope.composerUnfocusedTouchFocusGestures(
                         if (trackedPointer == null) {
                             trackedPointer = change.id
                             downAtMillis = change.uptimeMillis
+                            lastEventAtMillis = downAtMillis
                             downPosition = change.position
                             cancelled = false
+                            longPressDispatched = false
                         } else {
                             cancelled = true
                         }
@@ -55,6 +75,7 @@ internal suspend fun PointerInputScope.composerUnfocusedTouchFocusGestures(
                 PointerEventType.Move, PointerEventType.Release -> {
                     val change = event.changes.firstOrNull { it.id == trackedPointer }
                     if (change != null) {
+                        lastEventAtMillis = change.uptimeMillis
                         val movedBeyondSlop = (change.position - downPosition).getDistance() > touchSlop
                         cancelled = cancelled || change.isConsumed || movedBeyondSlop
                         val elapsed = change.uptimeMillis - downAtMillis
@@ -62,9 +83,12 @@ internal suspend fun PointerInputScope.composerUnfocusedTouchFocusGestures(
                         change.consume()
                         if (!change.pressed) {
                             trackedPointer = null
-                            if (released) {
+                            if (released && !longPressDispatched) {
                                 if (elapsed >= longPressTimeoutMillis) onLongPress() else onTap(change.position)
                             }
+                        } else if (!cancelled && !longPressDispatched && elapsed >= longPressTimeoutMillis) {
+                            longPressDispatched = true
+                            onLongPress()
                         }
                     }
                 }

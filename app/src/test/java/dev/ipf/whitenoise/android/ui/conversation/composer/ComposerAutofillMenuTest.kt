@@ -67,7 +67,8 @@ class ComposerAutofillMenuTest {
 
     private val menuProvider = CapturingTextContextMenuProvider()
     private val unfocusedToolbar = CapturingTextToolbar()
-    private val clipboard = ApplicationProvider.getApplicationContext<Context>().getSystemService(ClipboardManager::class.java)
+    private val clipboard =
+        ApplicationProvider.getApplicationContext<Context>().getSystemService(ClipboardManager::class.java)
     private var value by mutableStateOf(TextFieldValue())
 
     @Test
@@ -93,10 +94,12 @@ class ComposerAutofillMenuTest {
         editor.performTouchInput {
             down(center)
             advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
-            up()
+            moveBy(Offset(1f, 0f))
         }
         editor.assertIsNotFocused()
         assertEquals(null, menuProvider.dataProvider)
+        assertEquals(TextToolbarStatus.Shown, unfocusedToolbar.status)
+        editor.performTouchInput { up() }
         assertEquals(TextToolbarStatus.Shown, unfocusedToolbar.status)
         composeRule.onNodeWithTag(ROOT_TAG).captureRoboImage("src/test/snapshots/composer_unfocused_long_press.png")
         composeRule.runOnIdle { unfocusedToolbar.selectPaste() }
