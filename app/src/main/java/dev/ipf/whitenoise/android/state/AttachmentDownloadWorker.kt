@@ -248,7 +248,9 @@ class AttachmentDownloadWorker : CoroutineWorker {
             Log.w(TAG, "attachment_work_stopped reason=$reason")
             throw cancel
         } catch (expectedFailure: Throwable) {
-            Log.w(TAG, "durable_attachment_download_failed")
+            // Exception class is safe to log; attachment identity, URLs and
+            // decrypted metadata are deliberately excluded from logcat.
+            Log.w(TAG, "durable_attachment_download_failed type=${expectedFailure.javaClass.simpleName}")
             if (shouldRetryAttachmentDownloadWork(runAttemptCount, expectedFailure)) {
                 Result.retry()
             } else {
