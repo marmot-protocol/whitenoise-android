@@ -185,27 +185,41 @@ private fun ChatFoldersAccountScreen(
     )
 
     folders.firstOrNull { it.id == pendingDelete }?.let { folder ->
-        WhiteNoiseAlertDialog(
-            modifier = Modifier.testTag("folder.delete_dialog"),
-            onDismissRequest = { pendingDelete = null },
-            title = { Text(stringResource(R.string.folder_delete_title, chatFolderDisplayName(folder))) },
-            text = { Text(stringResource(R.string.folder_delete_detail)) },
-            confirmButton = {
-                TextButton(
-                    modifier = Modifier.testTag("folder.delete_confirm"),
-                    onClick = {
-                        pendingDelete = null
-                        if (canMutate()) {
-                            accountRef?.let { store.deleteFolder(it, folder.id) }
-                        }
-                    },
-                ) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingDelete = null }) { Text(stringResource(R.string.cancel)) }
+        ChatFolderDeleteDialog(
+            folderName = chatFolderDisplayName(folder),
+            onDismiss = { pendingDelete = null },
+            onConfirm = {
+                pendingDelete = null
+                if (canMutate()) {
+                    accountRef?.let { store.deleteFolder(it, folder.id) }
+                }
             },
         )
     }
+}
+
+/** The list and editor use the same folder-specific confirmation. */
+@Composable
+internal fun ChatFolderDeleteDialog(
+    folderName: String,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    WhiteNoiseAlertDialog(
+        modifier = Modifier.testTag("folder.delete_dialog"),
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.folder_delete_title, folderName)) },
+        text = { Text(stringResource(R.string.folder_delete_detail)) },
+        confirmButton = {
+            TextButton(
+                modifier = Modifier.testTag("folder.delete_confirm"),
+                onClick = onConfirm,
+            ) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        },
+    )
 }
 
 /** The list without any state ownership, so tests can render every folder arrangement. */

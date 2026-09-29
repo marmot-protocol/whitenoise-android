@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -14,6 +15,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.settings.CHAT_FOLDER_EDIT_CONTENT_TAG
+import dev.ipf.whitenoise.android.ui.settings.ChatFolderDeleteDialog
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditContent
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditFormState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -76,6 +78,29 @@ class ChatFolderEditScreenScreenshotTest {
             rules = true,
         )
 
+    @Test
+    fun folderDeleteActionLight() =
+        capture("chat_folder_editor_delete_light", dark = false, amoled = false, deleteAction = true)
+
+    @Test
+    fun folderDeleteConfirmationLight() =
+        capture("chat_folder_editor_delete_confirm_light", dark = false, amoled = false, showDeleteDialog = true)
+
+    @Test
+    fun folderDeleteConfirmationAmoled() =
+        capture("chat_folder_editor_delete_confirm_amoled", dark = true, amoled = true, showDeleteDialog = true)
+
+    @Test
+    @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h1100dp-mdpi")
+    fun folderDeleteActionRtlLarge() =
+        capture(
+            "chat_folder_editor_delete_rtl_large",
+            dark = true,
+            amoled = false,
+            largeRtl = true,
+            deleteAction = true,
+        )
+
     /** Renders the form for one fixed draft and records the window. */
     private fun capture(
         name: String,
@@ -84,6 +109,8 @@ class ChatFolderEditScreenScreenshotTest {
         unavailable: Boolean = false,
         largeRtl: Boolean = false,
         rules: Boolean = false,
+        deleteAction: Boolean = false,
+        showDeleteDialog: Boolean = false,
     ) {
         val context = ApplicationProvider.getApplicationContext<Context>()
         composeRule.setContent {
@@ -95,6 +122,7 @@ class ChatFolderEditScreenScreenshotTest {
                         state =
                             previewState().copy(
                                 canSave = !unavailable,
+                                canDelete = !unavailable,
                                 error = if (unavailable) context.getString(R.string.folder_unavailable) else null,
                             ),
                         onUnreadOnlyChange = {},
@@ -105,8 +133,12 @@ class ChatFolderEditScreenScreenshotTest {
                         onOpenPeople = {},
                         onOpenPreview = {},
                         onSave = {},
+                        onDelete = {},
                         onBack = {},
                     )
+                    if (showDeleteDialog) {
+                        ChatFolderDeleteDialog(folderName = "Work", onDismiss = {}, onConfirm = {})
+                    }
                 }
             }
         }
@@ -114,6 +146,11 @@ class ChatFolderEditScreenScreenshotTest {
             composeRule
                 .onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)
                 .performScrollToNode(hasText(context.getString(R.string.folder_preview)))
+        }
+        if (deleteAction) {
+            composeRule
+                .onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)
+                .performScrollToNode(hasTestTag("folder.delete"))
         }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
