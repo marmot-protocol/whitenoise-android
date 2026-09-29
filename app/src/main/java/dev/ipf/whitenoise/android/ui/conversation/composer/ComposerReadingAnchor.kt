@@ -17,13 +17,17 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 
 /**
- * Let a short finger tap enter the unfocused editor, but keep its press and hold away from
- * BasicTextField's focus and selection handlers. Once focused, the modifier is removed and
- * the platform owns caret placement, selection and paste again. Mouse and stylus input pass
- * through unchanged. The outer reading-scroll owner still sees early vertical drags first.
+ * Let a short finger tap enter the unfocused editor and a stationary hold open Paste, while
+ * keeping both gestures away from BasicTextField's focus and selection handlers. Once focused,
+ * the modifier is removed and the platform owns caret placement, selection and paste again.
+ * Mouse and stylus input pass through unchanged. The outer reading-scroll owner still sees
+ * early vertical drags first.
  */
 @Suppress("CyclomaticComplexMethod")
-internal suspend fun PointerInputScope.composerUnfocusedTouchFocusGestures(onTap: (Offset) -> Unit) {
+internal suspend fun PointerInputScope.composerUnfocusedTouchFocusGestures(
+    onTap: (Offset) -> Unit,
+    onLongPress: (Offset) -> Unit = {},
+) {
     val touchSlop = viewConfiguration.touchSlop
     val longPressTimeoutMillis = viewConfiguration.longPressTimeoutMillis
     awaitPointerEventScope {
@@ -54,11 +58,13 @@ internal suspend fun PointerInputScope.composerUnfocusedTouchFocusGestures(onTap
                         val movedBeyondSlop = (change.position - downPosition).getDistance() > touchSlop
                         cancelled = cancelled || change.isConsumed || movedBeyondSlop
                         val elapsed = change.uptimeMillis - downAtMillis
-                        val tapped = !change.pressed && !cancelled && elapsed < longPressTimeoutMillis
+                        val released = !change.pressed && !cancelled
                         change.consume()
                         if (!change.pressed) {
                             trackedPointer = null
-                            if (tapped) onTap(change.position)
+                            if (released) {
+                                if (elapsed >= longPressTimeoutMillis) onLongPress(change.position) else onTap(change.position)
+                            }
                         }
                     }
                 }

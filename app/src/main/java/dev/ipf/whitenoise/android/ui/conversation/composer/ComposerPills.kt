@@ -72,6 +72,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.compositeOver
@@ -85,12 +86,14 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -126,6 +129,8 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.ui.common.TextEntryEmojiAction
+import dev.ipf.whitenoise.android.ui.common.primaryClipPlainText
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
 import dev.ipf.whitenoise.android.ui.conversation.ComposerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.composerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.media.receiveContentImageUriOrNull
@@ -441,6 +446,12 @@ internal fun ComposerPill(
     val context = LocalContext.current
     val density = LocalDensity.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val textToolbar = LocalTextToolbar.current
+    val clipboardManager = remember(context) { context.getSystemService(android.content.ClipboardManager::class.java) }
+    val canOfferPaste = rememberClipboardCanOfferPaste(clipboardManager)
+    val latestCanOfferPaste by rememberUpdatedState(canOfferPaste)
+    var editorBounds by remember { mutableStateOf(Rect.Zero) }
+    DisposableEffect(textToolbar) { onDispose { textToolbar.hide() } }
     val resizeComposerDescription = stringResource(R.string.composer_resize)
     val latestOnPasteImageUris by rememberUpdatedState(onPasteImageUris)
     val latestOnValueChange by rememberUpdatedState(onValueChange)
@@ -1025,31 +1036,59 @@ internal fun ComposerPill(
                                     // commits can follow the real selection, not merely
                                     // the final text line or the conversation tail.
                                     .verticalScroll(composerScrollState)
+                                    .onGloballyPositioned { editorBounds = it.boundsInWindow() }
                                     .pointerInput(composerFocused, inputContentVisible, inputFocusEnabled) {
                                         if (!composerFocused && inputContentVisible && inputFocusEnabled) {
-                                            composerUnfocusedTouchFocusGestures { position ->
-                                                val value = latestTextFieldValue
-                                                textLayoutSnapshot
-                                                    ?.takeIf {
-                                                        it.sourceText == value.text &&
-                                                            it.transformedText == latestTransformedText
-                                                    }?.let { snapshot ->
-                                                        val transformedOffset =
-                                                            snapshot.result.getOffsetForPosition(position)
-                                                        val originalOffset =
-                                                            snapshot.transformedText.offsetMapping
-                                                                .transformedToOriginal(transformedOffset)
-                                                                .coerceIn(0, value.text.length)
-                                                        if (value.selection.start != originalOffset ||
-                                                            value.selection.end != originalOffset
-                                                        ) {
-                                                            latestOnValueChange(
-                                                                value.copy(selection = TextRange(originalOffset)),
-                                                            )
+                                            composerUnfocusedTouchFocusGestures(
+                                                onTap = { position ->
+                                                    textToolbar.hide()
+                                                    val value = latestTextFieldValue
+                                                    textLayoutSnapshot
+                                                        ?.takeIf {
+                                                            it.sourceText == value.text &&
+                                                                it.transformedText == latestTransformedText
+                                                        }?.let { snapshot ->
+                                                            val transformedOffset =
+                                                                snapshot.result.getOffsetForPosition(position)
+                                                            val originalOffset =
+                                                                snapshot.transformedText.offsetMapping
+                                                                    .transformedToOriginal(transformedOffset)
+                                                                    .coerceIn(0, value.text.length)
+                                                            if (value.selection.start != originalOffset ||
+                                                                value.selection.end != originalOffset
+                                                            ) {
+                                                                latestOnValueChange(
+                                                                    value.copy(selection = TextRange(originalOffset)),
+                                                                )
+                                                            }
                                                         }
+                                                    showKeyboardAfterTouchTap = composerFocus.requestFocus()
+                                                },
+                                                onLongPress = {
+                                                    if (latestCanOfferPaste) {
+                                                        textToolbar.showMenu(
+                                                            rect = editorBounds,
+                                                            onPasteRequested = {
+                                                                val pastedText = clipboardManager?.primaryClipPlainText(context)
+                                                                if (!pastedText.isNullOrBlank()) {
+                                                                    val value = latestTextFieldValue
+                                                                    val start = value.selection.min.coerceIn(0, value.text.length)
+                                                                    val end = value.selection.max.coerceIn(start, value.text.length)
+                                                                    val updated = value.text.replaceRange(start, end, pastedText)
+                                                                    latestOnValueChange(
+                                                                        value.copy(
+                                                                            text = updated,
+                                                                            selection = TextRange(start + pastedText.length),
+                                                                            composition = null,
+                                                                        ),
+                                                                    )
+                                                                }
+                                                                textToolbar.hide()
+                                                            },
+                                                        )
                                                     }
-                                                showKeyboardAfterTouchTap = composerFocus.requestFocus()
-                                            }
+                                                },
+                                            )
                                         }
                                     }.filterTextContextMenuComponents { component ->
                                         textFieldValue.text.isNotEmpty() ||
