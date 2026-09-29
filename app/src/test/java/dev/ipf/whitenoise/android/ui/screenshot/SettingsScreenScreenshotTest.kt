@@ -8,8 +8,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasScrollToNodeAction
@@ -197,41 +195,24 @@ class SettingsScreenScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_settings_pause_other_audio_rtl_large.png")
     }
 
-    /** The missing-app recommendation opens the same canonical Zapstore page in every build flavor. */
+    /** The missing-app recommendation invokes the shared listing opener. */
     @Test
-    fun dictationSettingsMissingOsttOpensCanonicalZapstoreListing() {
-        val openedUris = mutableListOf<String>()
+    fun dictationSettingsMissingOsttOpensListing() {
+        var opened = 0
         val appState = dictationAppState()
         composeRule.setContent {
-            CompositionLocalProvider(
-                LocalUriHandler provides
-                    object : UriHandler {
-                        override fun openUri(uri: String) {
-                            openedUris += uri
-                        }
-                    },
-            ) {
-                WhiteNoiseTheme {
-                    DictationSettingsScreen(
-                        appState = appState,
-                        onBack = {},
-                        isOfflineSpeechToTextInstalled = { false },
-                    )
-                }
+            WhiteNoiseTheme {
+                DictationSettingsScreen(
+                    appState = appState,
+                    onBack = {},
+                    isOfflineSpeechToTextInstalled = { false },
+                    openOfflineSpeechToTextListing = { opened++; true },
+                )
             }
         }
 
         composeRule.onNodeWithText("Get Offline Speech to Text").performClick()
-        composeRule.runOnIdle {
-            assertEquals(
-                listOf(
-                    "https://zapstore.dev/apps/" +
-                        "naddr1qqtkzurs9ehkvenvd9hx2umsv4jkx6r5da6x27r5qyv8wumn8ghj7un9d3shjtn6v9c8xar0wfjjuer9wcp" +
-                        "zpys5pkhzxd9dqp4ger8du6p5f6y43tcnzqktjzmwvahq5vumtay4qvzqqqr7pv8t57pf",
-                ),
-                openedUris,
-            )
-        }
+        composeRule.runOnIdle { assertEquals(1, opened) }
     }
 
     /**

@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.settings
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.provider.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
@@ -17,7 +18,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -45,9 +45,9 @@ internal fun DictationSettingsScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
     isOfflineSpeechToTextInstalled: (Context) -> Boolean = ::offlineSpeechToTextInstalled,
+    openOfflineSpeechToTextListing: (Context) -> Boolean = ::openOfflineSpeechToTextListing,
 ) {
     val context = LocalContext.current
-    val uriHandler = LocalUriHandler.current
     val preferences by appState.conversationDictationPreferences.state.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
     var refreshToken by remember { mutableIntStateOf(0) }
@@ -82,8 +82,7 @@ internal fun DictationSettingsScreen(
                                 title = stringResource(R.string.dictation_ostt_recommendation_title),
                                 subtitle = stringResource(R.string.dictation_ostt_recommendation_summary),
                                 onClick = {
-                                    osttOpenFailed =
-                                        runCatching { uriHandler.openUri(OSTT_ZAPSTORE_URL) }.isFailure
+                                    osttOpenFailed = !openOfflineSpeechToTextListing(context)
                                 },
                                 leading = {
                                     Icon(painterResource(R.drawable.ic_download), contentDescription = null)
@@ -269,7 +268,21 @@ internal fun offlineSpeechToTextInstalled(context: Context): Boolean =
         false
     }
 
+/** Prefer the Zapstore app, then let Android open the same listing in a browser. */
+internal fun openOfflineSpeechToTextListing(
+    context: Context,
+    startActivity: (Intent) -> Unit = context::startActivity,
+): Boolean {
+    val listingUri = Uri.parse(OSTT_ZAPSTORE_URL)
+    return runCatching {
+        startActivity(Intent(Intent.ACTION_VIEW, listingUri).setPackage(ZAPSTORE_PACKAGE))
+    }.recoverCatching {
+        startActivity(Intent(Intent.ACTION_VIEW, listingUri))
+    }.isSuccess
+}
+
 private const val MILLIS_PER_SECOND = 1_000L
 internal const val OFFLINE_SPEECH_TO_TEXT_PACKAGE = "app.offlinespeechtotext"
+internal const val ZAPSTORE_PACKAGE = "dev.zapstore.app"
 internal const val OSTT_ZAPSTORE_URL =
     "https://zapstore.dev/apps/naddr1qqtkzurs9ehkvenvd9hx2umsv4jkx6r5da6x27r5qyv8wumn8ghj7un9d3shjtn6v9c8xar0wfjjuer9wcpzpys5pkhzxd9dqp4ger8du6p5f6y43tcnzqktjzmwvahq5vumtay4qvzqqqr7pv8t57pf"
