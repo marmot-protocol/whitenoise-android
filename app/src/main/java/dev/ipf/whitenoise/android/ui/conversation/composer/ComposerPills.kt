@@ -1031,7 +1031,8 @@ internal fun ComposerPill(
                                                 textLayoutSnapshot
                                                     ?.takeIf { it.sourceText == value.text }
                                                     ?.let { snapshot ->
-                                                        val transformedOffset = snapshot.result.getOffsetForPosition(position)
+                                                        val transformedOffset =
+                                                            snapshot.result.getOffsetForPosition(position)
                                                         val originalOffset =
                                                             snapshot.transformedText.offsetMapping
                                                                 .transformedToOriginal(transformedOffset)
