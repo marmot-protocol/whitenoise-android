@@ -1,6 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">White Noise</string>
+    <string name="poll_preview">Enquete</string>
+    <string name="poll_unsupported">Não é possível exibir esta enquete</string>
+    <string name="poll_closed">Enquete encerrada</string>
+    <string name="poll_vote_failed">Não foi possível enviar o voto</string>
+    <string name="poll_create_failed">Não foi possível criar a enquete</string>
+    <string name="poll_create">Criar enquete</string>
+    <string name="poll_question">Pergunta</string>
+    <string name="poll_option">Opção %1$d</string>
+    <string name="poll_add_option">Adicionar opção</string>
+    <string name="poll_remove_option">Remover opção %1$d</string>
+    <string name="poll_single_choice">Escolha única</string>
+    <string name="poll_multiple_choice">Múltipla escolha</string>
+    <string name="poll_submit">Publicar enquete</string>
+    <plurals name="poll_option_votes">
+        <item quantity="one">%1$d voto</item>
+        <item quantity="other">%1$d votos</item>
+    </plurals>
+    <plurals name="poll_participants">
+        <item quantity="one">%1$d participante</item>
+        <item quantity="other">%1$d participantes</item>
+    </plurals>
     <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">Não foi possível iniciar o White Noise</string>
     <string name="startup_taking_too_long">A inicialização está demorando mais do que o esperado. Tente novamente.</string>

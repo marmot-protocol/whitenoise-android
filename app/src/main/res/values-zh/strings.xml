@@ -1,6 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">White Noise</string>
+    <string name="poll_preview">投票</string>
+    <string name="poll_unsupported">无法显示此投票</string>
+    <string name="poll_closed">投票已结束</string>
+    <string name="poll_vote_failed">无法提交投票</string>
+    <string name="poll_create_failed">无法创建投票</string>
+    <string name="poll_create">创建投票</string>
+    <string name="poll_question">问题</string>
+    <string name="poll_option">选项 %1$d</string>
+    <string name="poll_add_option">添加选项</string>
+    <string name="poll_remove_option">移除选项 %1$d</string>
+    <string name="poll_single_choice">单选</string>
+    <string name="poll_multiple_choice">多选</string>
+    <string name="poll_submit">发布投票</string>
+    <plurals name="poll_option_votes">
+        <item quantity="other">%1$d 票</item>
+    </plurals>
+    <plurals name="poll_participants">
+        <item quantity="other">%1$d 人参与</item>
+    </plurals>
     <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">White Noise 无法启动</string>
     <string name="startup_taking_too_long">启动时间超出预期。请重试。</string>

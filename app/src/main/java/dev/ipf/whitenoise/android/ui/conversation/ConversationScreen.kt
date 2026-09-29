@@ -1750,6 +1750,7 @@ internal fun ConversationScreen(
     // Reuses the recipient picker; the selection sends a `nostr:npub…` reference
     // the recipient can tap to open that profile.
     var shareUserPickerOpen by remember(chat.id) { mutableStateOf(false) }
+    var pollCreateOpen by remember(chat.id) { mutableStateOf(false) }
     val shareUserSelection = remember(chat.id) { mutableStateListOf<RecipientSearch.Candidate>() }
     val contactPickerLauncher =
         rememberLauncherForActivityResult(PickContactPhoneRow()) { contactUri ->
@@ -3737,6 +3738,12 @@ internal fun ConversationScreen(
                 },
                 onShareUser = { shareUserPickerOpen = true },
                 onShareContact = { contactPickerLauncher.launch(Unit) },
+                onCreatePoll =
+                    if (!controller.isDirectConversation) {
+                        { pollCreateOpen = true }
+                    } else {
+                        null
+                    },
                 onPasteImageUris = { uris ->
                     val openSlots = (MEDIA_PICKER_MAX_ITEMS - pendingMediaSlots.size).coerceAtLeast(0)
                     val pasteCandidates = uris.take(openSlots)
@@ -4405,6 +4412,15 @@ internal fun ConversationScreen(
             onSend = { selected ->
                 pendingContactShare = null
                 mediaSender.sendSharedContact(selected)
+            },
+        )
+    }
+
+    if (pollCreateOpen) {
+        PollCreateDialog(
+            onDismiss = { pollCreateOpen = false },
+            onSubmit = { question, options, type, onResult ->
+                appState.launchMutation { onResult(controller.createPoll(question, options, type)) }
             },
         )
     }

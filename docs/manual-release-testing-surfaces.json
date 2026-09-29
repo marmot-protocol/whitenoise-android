@@ -8940,6 +8940,42 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
         "anchor": "R.string.close",
         "test_ids": ["SET-020"]
+      },
+      {
+        "surface": "PollCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
+        "anchor": "internal fun PollCard(",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "PollTimelineRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
+        "anchor": "internal fun PollTimelineRow(",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "PollCreateDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "internal fun PollCreateDialog(",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "PollCreateForm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "internal fun PollCreateForm(",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "Group poll composer action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAttachmentMenu.kt",
+        "anchor": "R.string.poll_create",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "MDK v5 audit runtime destination",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AuditRuntimeReadiness.kt",
+        "anchor": "internal fun auditOtlpConfigV5(",
+        "test_ids": ["SEC-015"]
       }
     ],
     "settings_controls": [

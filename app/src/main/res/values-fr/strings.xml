@@ -1,6 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">White Noise</string>
+    <string name="poll_preview">Sondage</string>
+    <string name="poll_unsupported">Impossible d\'afficher ce sondage</string>
+    <string name="poll_closed">Sondage terminé</string>
+    <string name="poll_vote_failed">Impossible d\'envoyer le vote</string>
+    <string name="poll_create_failed">Impossible de créer le sondage</string>
+    <string name="poll_create">Créer un sondage</string>
+    <string name="poll_question">Question</string>
+    <string name="poll_option">Option %1$d</string>
+    <string name="poll_add_option">Ajouter une option</string>
+    <string name="poll_remove_option">Supprimer l\'option %1$d</string>
+    <string name="poll_single_choice">Choix unique</string>
+    <string name="poll_multiple_choice">Choix multiples</string>
+    <string name="poll_submit">Publier le sondage</string>
+    <plurals name="poll_option_votes">
+        <item quantity="one">%1$d vote</item>
+        <item quantity="other">%1$d votes</item>
+    </plurals>
+    <plurals name="poll_participants">
+        <item quantity="one">%1$d participant</item>
+        <item quantity="other">%1$d participants</item>
+    </plurals>
     <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">White Noise n’a pas pu démarrer</string>
     <string name="startup_taking_too_long">Le démarrage prend plus de temps que prévu. Veuillez réessayer.</string>

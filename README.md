@@ -141,8 +141,8 @@ secrets:
 - `WHITENOISE_STAGING_KEY_PASSWORD`
 - `WHITENOISE_OTLP_ENDPOINT`
 - `WHITENOISE_STAGING_OTLP_AUTH_TOKEN`
-- `WHITENOISE_AUDIT_LOG_ENDPOINT`
-- `WHITENOISE_AUDIT_LOG_AUTH_TOKEN`
+- `WHITENOISE_AUDIT_OTLP_ENDPOINT`
+- `WHITENOISE_AUDIT_OTLP_AUTH_TOKEN`
 - `WHITENOISE_STAGING_PUSH_SERVER_PUBKEY_HEX`
 - `WHITENOISE_PUSH_RELAY_HINT`
 
@@ -253,8 +253,9 @@ Runtime configuration is also read from `local.properties` or environment variab
 **Shared runtime values:**
 
 - `WHITENOISE_OTLP_ENDPOINT` — shared by dev, staging, and production.
-- `WHITENOISE_AUDIT_LOG_ENDPOINT` — shared by staging and production.
-- `WHITENOISE_AUDIT_LOG_AUTH_TOKEN` — shared by staging and production, separate from OTLP auth.
+- `WHITENOISE_AUDIT_OTLP_ENDPOINT` — shared HTTPS `/v1/logs` destination for v5 audit batches in staging and production.
+- `WHITENOISE_AUDIT_OTLP_AUTH_TOKEN` — shared ingest-only v5 audit token, separate from metrics auth.
+- `WHITENOISE_AUDIT_LOG_ENDPOINT` and `WHITENOISE_AUDIT_LOG_AUTH_TOKEN` — optional legacy v4 route. When configured, v4 uploads continue alongside v5 until this route is removed.
 - `WHITENOISE_PUSH_RELAY_HINT` — shared by staging and production (production defaults to `wss://relay.eu.whitenoise.chat`).
 
 **Flavor-specific OTLP tokens:**
@@ -287,6 +288,8 @@ identities. Explicit dev configuration remains available:
 
 - `WHITENOISE_DEV_AUDIT_LOG_ENDPOINT`
 - `WHITENOISE_DEV_AUDIT_LOG_AUTH_TOKEN`
+- `WHITENOISE_DEV_AUDIT_OTLP_ENDPOINT`
+- `WHITENOISE_DEV_AUDIT_OTLP_AUTH_TOKEN`
 - `WHITENOISE_DEV_PUSH_SERVER_PUBKEY_HEX`
 - `WHITENOISE_DEV_PUSH_RELAY_HINT`
 

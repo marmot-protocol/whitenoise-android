@@ -82,11 +82,15 @@ The protected `android-release-signing` environment contains:
   `WHITENOISE_PLAY_UPLOAD_KEY_ALIAS`, `WHITENOISE_PLAY_UPLOAD_KEY_PASSWORD`.
 
 The workflow reads the existing repository secrets using the same names Gradle
-uses: shared `WHITENOISE_OTLP_ENDPOINT`, `WHITENOISE_AUDIT_LOG_ENDPOINT`,
-`WHITENOISE_AUDIT_LOG_AUTH_TOKEN`, and `WHITENOISE_PUSH_RELAY_HINT`, plus
+uses: shared `WHITENOISE_OTLP_ENDPOINT`, `WHITENOISE_AUDIT_OTLP_ENDPOINT`,
+`WHITENOISE_AUDIT_OTLP_AUTH_TOKEN`, and `WHITENOISE_PUSH_RELAY_HINT`, plus
 flavor-specific `WHITENOISE_PRODUCTION_OTLP_AUTH_TOKEN` and
 `WHITENOISE_PRODUCTION_PUSH_SERVER_PUBKEY_HEX`. The compatibility tenant remains
 fixed in Gradle. Old production-prefixed endpoint/audit variables are unused.
+The legacy `WHITENOISE_AUDIT_LOG_ENDPOINT` and `WHITENOISE_AUDIT_LOG_AUTH_TOKEN`
+remain optional. If supplied, v4 uploads continue alongside v5; removing them
+is a separate collector cutover decision, after disclosure and backlog handling
+are agreed with the audit operator.
 
 Firebase client configuration, MIP-05 push identity/relay, and opt-in telemetry
 are independent systems. Production builds enforce the Firebase/push guards.

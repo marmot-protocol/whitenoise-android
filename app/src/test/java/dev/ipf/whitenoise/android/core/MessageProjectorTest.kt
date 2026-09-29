@@ -253,6 +253,14 @@ class MessageProjectorTest {
         assertEquals(copy.mediaVideo, MessageProjector.previewText(typedFallback, copy))
     }
 
+    /** Poll previews must not expose their wire payload as chat-list text. */
+    @Test
+    fun pollPreviewDoesNotExposeRawEventBody() {
+        val poll = message(id = "poll", plaintext = "[\"poll\",\"private question\"]", kind = 1068uL)
+        assertEquals("Poll", MessageProjector.previewText(poll, MessageTextCopy.Default))
+        assertFalse(MessageProjector.rendersRawBodyPreview(poll.kind))
+    }
+
     @Test
     fun previewTextRecognizesStreamStartAndFinalMessages() {
         val start =

@@ -362,6 +362,16 @@ android {
                 "WHITENOISE_AUDIT_LOG_AUTH_TOKEN",
                 environmentRuntimeConfigProperty("dev", "AUDIT_LOG_AUTH_TOKEN").asBuildConfigString(),
             )
+            buildConfigField(
+                "String",
+                "WHITENOISE_AUDIT_OTLP_ENDPOINT",
+                environmentRuntimeConfigProperty("dev", "AUDIT_OTLP_ENDPOINT").asBuildConfigString(),
+            )
+            buildConfigField(
+                "String",
+                "WHITENOISE_AUDIT_OTLP_AUTH_TOKEN",
+                environmentRuntimeConfigProperty("dev", "AUDIT_OTLP_AUTH_TOKEN").asBuildConfigString(),
+            )
             buildConfigField("String", "WHITENOISE_DEPLOYMENT_ENVIRONMENT", "dev".asBuildConfigString())
             buildConfigField("boolean", "ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS", "true")
             // Compatibility metadata required by MarmotKit. Tenant routing is
@@ -395,6 +405,8 @@ android {
             buildConfigField("String", "WHITENOISE_OTLP_AUTH_TOKEN", "".asBuildConfigString())
             buildConfigField("String", "WHITENOISE_AUDIT_LOG_ENDPOINT", "".asBuildConfigString())
             buildConfigField("String", "WHITENOISE_AUDIT_LOG_AUTH_TOKEN", "".asBuildConfigString())
+            buildConfigField("String", "WHITENOISE_AUDIT_OTLP_ENDPOINT", "".asBuildConfigString())
+            buildConfigField("String", "WHITENOISE_AUDIT_OTLP_AUTH_TOKEN", "".asBuildConfigString())
             buildConfigField("String", "WHITENOISE_DEPLOYMENT_ENVIRONMENT", "preview".asBuildConfigString())
             buildConfigField("boolean", "ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS", "true")
             buildConfigField("String", "WHITENOISE_TELEMETRY_TENANT", "whitenoise-android-preview".asBuildConfigString())
@@ -460,6 +472,16 @@ android {
                 "WHITENOISE_AUDIT_LOG_AUTH_TOKEN",
                 runtimeConfigProperty("WHITENOISE_AUDIT_LOG_AUTH_TOKEN").asBuildConfigString(),
             )
+            buildConfigField(
+                "String",
+                "WHITENOISE_AUDIT_OTLP_ENDPOINT",
+                runtimeConfigProperty("WHITENOISE_AUDIT_OTLP_ENDPOINT").asBuildConfigString(),
+            )
+            buildConfigField(
+                "String",
+                "WHITENOISE_AUDIT_OTLP_AUTH_TOKEN",
+                runtimeConfigProperty("WHITENOISE_AUDIT_OTLP_AUTH_TOKEN").asBuildConfigString(),
+            )
             buildConfigField("String", "WHITENOISE_DEPLOYMENT_ENVIRONMENT", "production".asBuildConfigString())
             // Compatibility metadata required by MarmotKit. Tenant routing is
             // selected by the OTLP bearer token, not this fixed resource value.
@@ -521,6 +543,16 @@ android {
                 "String",
                 "WHITENOISE_AUDIT_LOG_AUTH_TOKEN",
                 runtimeConfigProperty("WHITENOISE_AUDIT_LOG_AUTH_TOKEN").asBuildConfigString(),
+            )
+            buildConfigField(
+                "String",
+                "WHITENOISE_AUDIT_OTLP_ENDPOINT",
+                runtimeConfigProperty("WHITENOISE_AUDIT_OTLP_ENDPOINT").asBuildConfigString(),
+            )
+            buildConfigField(
+                "String",
+                "WHITENOISE_AUDIT_OTLP_AUTH_TOKEN",
+                runtimeConfigProperty("WHITENOISE_AUDIT_OTLP_AUTH_TOKEN").asBuildConfigString(),
             )
             buildConfigField(
                 "boolean",

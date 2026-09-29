@@ -1,6 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">White Noise</string>
+    <string name="poll_preview">Опрос</string>
+    <string name="poll_unsupported">Не удалось показать этот опрос</string>
+    <string name="poll_closed">Опрос закрыт</string>
+    <string name="poll_vote_failed">Не удалось отправить голос</string>
+    <string name="poll_create_failed">Не удалось создать опрос</string>
+    <string name="poll_create">Создать опрос</string>
+    <string name="poll_question">Вопрос</string>
+    <string name="poll_option">Вариант %1$d</string>
+    <string name="poll_add_option">Добавить вариант</string>
+    <string name="poll_remove_option">Удалить вариант %1$d</string>
+    <string name="poll_single_choice">Один вариант</string>
+    <string name="poll_multiple_choice">Несколько вариантов</string>
+    <string name="poll_submit">Опубликовать опрос</string>
+    <plurals name="poll_option_votes">
+        <item quantity="one">%1$d голос</item>
+        <item quantity="few">%1$d голоса</item>
+        <item quantity="many">%1$d голосов</item>
+        <item quantity="other">%1$d голоса</item>
+    </plurals>
+    <plurals name="poll_participants">
+        <item quantity="one">%1$d участник</item>
+        <item quantity="few">%1$d участника</item>
+        <item quantity="many">%1$d участников</item>
+        <item quantity="other">%1$d участника</item>
+    </plurals>
     <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">Не удалось запустить White Noise</string>
     <string name="startup_taking_too_long">Запуск занимает больше времени, чем ожидалось. Повторите попытку.</string>

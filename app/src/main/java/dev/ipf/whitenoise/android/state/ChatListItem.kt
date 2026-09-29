@@ -368,6 +368,7 @@ data class ChatListItem(
         val preview = projection?.lastMessage ?: return MessageProjector.previewText(latest, copy, empty)
         return when {
             preview.deleted -> copy.deleted
+            MessageProjector.isPollKind(preview.kind) -> copy.poll
             preview.kind == 1200uL -> preview.plaintext.ifBlank { copy.agentStreamStarted }
             // Kind-1009 edits are an in-place mutation of an existing
             // message body; they must not bump the chat-list preview to

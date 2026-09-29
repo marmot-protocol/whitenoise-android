@@ -23,6 +23,16 @@ class PreviewAuditCredentialIsolationTest {
         )
         assertTrue(
             previewBlock.contains(
+                "buildConfigField(\"String\", \"WHITENOISE_AUDIT_OTLP_ENDPOINT\", \"\".asBuildConfigString())",
+            ),
+        )
+        assertTrue(
+            previewBlock.contains(
+                "buildConfigField(\"String\", \"WHITENOISE_AUDIT_OTLP_AUTH_TOKEN\", \"\".asBuildConfigString())",
+            ),
+        )
+        assertTrue(
+            previewBlock.contains(
                 "buildConfigField(\"String\", \"WHITENOISE_OTLP_ENDPOINT\", \"\".asBuildConfigString())",
             ),
         )

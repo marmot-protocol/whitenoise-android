@@ -1,6 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">White Noise</string>
+    <string name="poll_preview">Poll</string>
+    <string name="poll_unsupported">This poll cannot be displayed</string>
+    <string name="poll_closed">Poll closed</string>
+    <string name="poll_vote_failed">Couldn\'t submit vote</string>
+    <string name="poll_create_failed">Couldn\'t create poll</string>
+    <string name="poll_create">Create poll</string>
+    <string name="poll_question">Question</string>
+    <string name="poll_option">Option %1$d</string>
+    <string name="poll_add_option">Add option</string>
+    <string name="poll_remove_option">Remove option %1$d</string>
+    <string name="poll_single_choice">Single choice</string>
+    <string name="poll_multiple_choice">Multiple choice</string>
+    <string name="poll_submit">Post poll</string>
+    <plurals name="poll_option_votes">
+        <item quantity="one">%1$d vote</item>
+        <item quantity="other">%1$d votes</item>
+    </plurals>
+    <plurals name="poll_participants">
+        <item quantity="one">%1$d participant</item>
+        <item quantity="other">%1$d participants</item>
+    </plurals>
     <!-- In-app brand wordmark (onboarding landing). Always the product name and
          deliberately NOT app_name: the debug build type overrides app_name to
          "White Noise Dev" for the launcher label, but the in-app brand stays

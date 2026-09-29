@@ -46,6 +46,7 @@ import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
 import dev.ipf.marmotkit.MessageTagFfi
+import dev.ipf.marmotkit.PollTypeFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
 import dev.ipf.marmotkit.SelectedChatPreviewFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
@@ -5983,6 +5984,7 @@ internal fun isTerminalOpenFailure(throwable: Throwable): Boolean = throwable is
 
 /** Retry cadence while MarmotKit reports a documented not-ready state; well under the connectivity backoff. */
 internal const val NOT_READY_RETRY_DELAY_MS = 2_000L
+internal const val MAX_POLL_OPTIONS = 10
 
 /**
  * The sentence shown for a failed conversation load. A bounded-read timeout keeps its restart guidance;
@@ -6769,6 +6771,59 @@ class ConversationController(
                 !group.disbanding &&
                 !group.disbanded &&
                 window.allowsSend
+
+    /** Publish a group poll through MDK, leaving the engine to own its event and projection. */
+    suspend fun createPoll(
+        question: String,
+        options: List<String>,
+        pollType: PollTypeFfi,
+    ): Boolean {
+        val account = conversationAccountRef ?: return false
+        val cleanQuestion = question.trim()
+        val cleanOptions = options.map(String::trim)
+        val canPublish = canSendMessages && !isDirectConversation
+        val validDraft =
+            cleanQuestion.isNotEmpty() &&
+                cleanOptions.size in 2..MAX_POLL_OPTIONS &&
+                cleanOptions.none(String::isEmpty)
+        return if (!canPublish || !validDraft) {
+            false
+        } else {
+            try {
+                appState.marmotIo {
+                    createPoll(account, group.groupIdHex, cleanQuestion, cleanOptions, pollType, null)
+                }
+                true
+            } catch (throwable: Throwable) {
+                throwable.rethrowIfCancellation()
+                appState.presentFailure(R.string.poll_create_failed, "POLL_CREATE", throwable)
+                false
+            }
+        }
+    }
+
+    /** Replace the account's selection using option ids from the current native projection. */
+    suspend fun castPollVote(
+        pollEventId: String,
+        optionIds: List<String>,
+    ): Boolean {
+        val account = conversationAccountRef ?: return false
+        val canVote = canSendMessages && pollEventId.isNotBlank() && optionIds.isNotEmpty()
+        return if (!canVote) {
+            false
+        } else {
+            try {
+                appState.marmotIo {
+                    castPollVote(account, group.groupIdHex, pollEventId, optionIds)
+                }
+                true
+            } catch (throwable: Throwable) {
+                throwable.rethrowIfCancellation()
+                appState.presentFailure(R.string.poll_vote_failed, "POLL_VOTE", throwable)
+                false
+            }
+        }
+    }
 
     val canLeaveGroup: Boolean
         get() = GroupProjector.canLeaveGroup(group, conversationAccountIdHex, memberCount)

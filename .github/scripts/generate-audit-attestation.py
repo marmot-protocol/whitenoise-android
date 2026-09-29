@@ -8,6 +8,7 @@ import os
 import re
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 HEX40 = re.compile(r"[0-9a-f]{40}")
 PACKAGE_NAME = "dev.ipf.whitenoise.android.staging"
@@ -59,8 +60,12 @@ def build_attestation() -> dict[str, object]:
     if not HEX40.fullmatch(source_revision):
         raise ValueError("GITHUB_SHA must be a lowercase 40-character revision")
 
-    endpoint_configured = bool(require("WHITENOISE_AUDIT_LOG_ENDPOINT").strip())
-    auth_configured = bool(require("WHITENOISE_AUDIT_LOG_AUTH_TOKEN").strip())
+    endpoint = require("WHITENOISE_AUDIT_OTLP_ENDPOINT").strip()
+    parsed_endpoint = urlparse(endpoint)
+    if parsed_endpoint.scheme != "https" or not parsed_endpoint.netloc or parsed_endpoint.path != "/v1/logs":
+        raise ValueError("staging audit OTLP endpoint must be HTTPS /v1/logs")
+    endpoint_configured = True
+    auth_configured = bool(require("WHITENOISE_AUDIT_OTLP_AUTH_TOKEN").strip())
     if not endpoint_configured or not auth_configured:
         raise ValueError("authenticated staging audit upload must be configured")
 

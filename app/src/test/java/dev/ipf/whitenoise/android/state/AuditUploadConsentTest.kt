@@ -277,6 +277,7 @@ class AuditUploadConsentTest {
                 arrayOf(MarmotInterface::class.java),
             ) { _, method, args ->
                 when (method.name) {
+                    "setAuditOtlpConfigV5" -> args!!.first()
                     "setAuditLogTrackerConfig" ->
                         (args!![0] as AuditLogTrackerConfigV4Ffi).also {
                             mutations += if (it.authorizationBearerToken == null) "clear-upload" else "allow-upload"

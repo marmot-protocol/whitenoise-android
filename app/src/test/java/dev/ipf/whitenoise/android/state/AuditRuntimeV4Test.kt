@@ -44,6 +44,7 @@ class AuditRuntimeV4Test {
         val marmot =
             Proxy.newProxyInstance(type.classLoader, arrayOf(type)) { _, method, arguments ->
                 when (method.name) {
+                    "setAuditOtlpConfigV5" -> arguments!!.first()
                     "setAuditLogTrackerConfig" -> {
                         config = arguments!![0] as AuditLogTrackerConfigV4Ffi
                         config
