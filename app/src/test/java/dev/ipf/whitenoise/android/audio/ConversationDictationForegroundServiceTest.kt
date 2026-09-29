@@ -214,7 +214,8 @@ class ConversationDictationForegroundServiceTest {
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
         val restored =
-            service.getSystemService(NotificationManager::class.java)
+            service
+                .getSystemService(NotificationManager::class.java)
                 .activeNotifications
                 .single { it.id == BackgroundConnectionNotification.NOTIFICATION_ID }
                 .notification

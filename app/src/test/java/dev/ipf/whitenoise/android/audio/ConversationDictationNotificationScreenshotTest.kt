@@ -47,8 +47,9 @@ class ConversationDictationNotificationScreenshotTest {
             val activity = controller.get()
             val parent = FrameLayout(activity)
             activity.setContentView(parent, ViewGroup.LayoutParams(360, ViewGroup.LayoutParams.WRAP_CONTENT))
-            val content = RemoteViews(activity.packageName, R.layout.notification_dictation_compact)
-                .apply(activity, parent)
+            val content =
+                RemoteViews(activity.packageName, R.layout.notification_dictation_compact)
+                    .apply(activity, parent)
             if (rtl) content.layoutDirection = View.LAYOUT_DIRECTION_RTL
             parent.addView(content)
             parent.measure(

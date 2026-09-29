@@ -743,8 +743,14 @@ class ConversationDictationControllerTest {
         val fixture =
             fixture(
                 draft = TextFieldValue("typed"),
-                tryAcquireMicrophone = { events += "lease"; true },
-                onBeforeRecognition = { events += "pause"; throw ConversationDictationAudioFocusDenied() },
+                tryAcquireMicrophone = {
+                    events += "lease"
+                    true
+                },
+                onBeforeRecognition = {
+                    events += "pause"
+                    throw ConversationDictationAudioFocusDenied()
+                },
                 releaseMicrophone = { events += "release" },
                 onAfterAudioCapture = { events += "restore" },
             )
@@ -771,13 +777,19 @@ class ConversationDictationControllerTest {
             fixture(
                 draft = TextFieldValue(""),
                 pauseOtherAudio = { pauseOtherAudio },
-                startDurableSession = { _, callback -> ready = callback; true },
+                startDurableSession = { _, callback ->
+                    ready = callback
+                    true
+                },
                 onBeforeRecognition = { observed = it.pauseOtherAudio },
             )
 
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         pauseOtherAudio = false
-        assertTrue(fixture.controller.state.target?.pauseOtherAudio == true)
+        assertTrue(
+            fixture.controller.state.target
+                ?.pauseOtherAudio == true,
+        )
         ready?.invoke()
 
         assertEquals(true, observed)
