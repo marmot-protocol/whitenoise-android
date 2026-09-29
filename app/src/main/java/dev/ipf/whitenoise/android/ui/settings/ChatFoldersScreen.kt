@@ -200,6 +200,7 @@ private fun ChatFoldersAccountScreen(
 
 /** The list and editor use the same folder-specific confirmation. */
 @Composable
+@Suppress("FunctionNaming")
 internal fun ChatFolderDeleteDialog(
     folderName: String,
     onDismiss: () -> Unit,

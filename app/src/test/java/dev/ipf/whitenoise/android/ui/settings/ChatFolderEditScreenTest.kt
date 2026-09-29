@@ -89,7 +89,9 @@ class ChatFolderEditScreenTest {
         var closed = false
         renderEditor(appState, onClose = { closed = true })
 
-        composeRule.onNodeWithText(app.getString(R.string.chat_list_filter_unread)).performTextReplacement("Unsaved name")
+        composeRule
+            .onNodeWithText(app.getString(R.string.chat_list_filter_unread))
+            .performTextReplacement("Unsaved name")
         composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag("folder.delete"))
         composeRule.onNodeWithTag("folder.delete").performClick()
         composeRule.onNodeWithText(app.getString(R.string.folder_delete_title, "Unread")).assertExists()
@@ -115,7 +117,9 @@ class ChatFolderEditScreenTest {
         appState.chatFolderPreferences.foldersFor(ACCOUNT_REF)
         var closed = false
         renderEditor(appState, onClose = { closed = true })
-        composeRule.onNodeWithText(app.getString(R.string.chat_list_filter_unread)).performTextReplacement("Unsaved name")
+        composeRule
+            .onNodeWithText(app.getString(R.string.chat_list_filter_unread))
+            .performTextReplacement("Unsaved name")
         composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag("folder.delete"))
         composeRule.onNodeWithTag("folder.delete").performClick()
 
