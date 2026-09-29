@@ -242,9 +242,10 @@ internal fun NewGroupSetupScreen(
     onCreateSubmitted: () -> Long = { 0L },
     initialRetryGroupIdHex: String? = null,
     draft: NewGroupDraft? = null,
+    prepareRemoteImage: suspend (String) -> ImageUploadDraft = GroupImageDraftProcessor::fromRemoteUrl,
 ) {
     if (appState.signOutInProgress || appState.wipeInProgress) return
-    key(appState.activeAccountRef, appState.runtimeGeneration) {
+    key(appState, appState.activeAccountRef, appState.runtimeGeneration) {
         NewGroupSetupAccountScreen(
             appState,
             members,
@@ -260,6 +261,7 @@ internal fun NewGroupSetupScreen(
                         0L
                     },
             ),
+            prepareRemoteImage,
         )
     }
 }
@@ -274,6 +276,7 @@ private fun NewGroupSetupAccountScreen(
     onCreateCompletedOpen: (ChatListItem, Long) -> Unit,
     onCreateSubmitted: () -> Long,
     draft: NewGroupDraft,
+    prepareRemoteImage: suspend (String) -> ImageUploadDraft,
 ) {
     val accountRef = appState.activeAccountRef
     val runtime = remember { appState.runtimeGeneration }
@@ -573,7 +576,7 @@ private fun NewGroupSetupAccountScreen(
                     imageError = false
                     showImagePicker = false
                 } else {
-                    prepareImage { GroupImageDraftProcessor.fromRemoteUrl(picked) }
+                    prepareImage { prepareRemoteImage(picked) }
                 }
             },
             onPickPhoto = { uri ->

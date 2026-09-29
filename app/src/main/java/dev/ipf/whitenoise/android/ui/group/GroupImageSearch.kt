@@ -469,7 +469,7 @@ internal fun ImageSearchSheet(
                     label = { Text(urlLabel) },
                     placeholder = { Text("https://example.com/image.jpg") },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().testTag("image_search.url"),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                 )
                 Row(

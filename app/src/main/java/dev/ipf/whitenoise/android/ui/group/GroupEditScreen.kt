@@ -46,6 +46,7 @@ import dev.ipf.whitenoise.android.media.ImageUploadDraft
 import dev.ipf.whitenoise.android.media.renderIdentityImageDraft
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaQuality
+import dev.ipf.whitenoise.android.state.ScopedGroupImageMutation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
@@ -160,9 +161,12 @@ internal fun GroupEditScreen(
         appState.launchMutation {
             try {
                 val draft = prepare()
-                if (controller.updateGroupImage(draft)) {
+                val change = ScopedGroupImageMutation(draft) { imageFailureScope.isCurrent(failureAttempt) }
+                if (controller.updateGroupImage(change)) {
                     showImageSearch = false
                     showGroupEmojiImagePicker = false
+                } else if (controller.lastMutationError != null) {
+                    imageFailureScope.captureFailure(failureAttempt)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -197,7 +201,12 @@ internal fun GroupEditScreen(
         controller.clearLastMutationError()
         appState.launchMutation {
             try {
-                if (controller.updateGroupAvatarUrl(safeUrl)) showImageSearch = false
+                val change = ScopedGroupImageMutation(safeUrl) { imageFailureScope.isCurrent(failureAttempt) }
+                if (controller.updateGroupAvatarUrl(change)) {
+                    showImageSearch = false
+                } else if (controller.lastMutationError != null) {
+                    imageFailureScope.captureFailure(failureAttempt)
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -240,8 +249,15 @@ internal fun GroupEditScreen(
                     appState.marmotIo {
                         uploadProfileImage(accountRef, draft.plaintext, draft.mediaType, null)
                     }
-                if (controller.updateGroupAvatarUrl(safeAvatarUploadUrl(uploaded))) {
+                val change =
+                    ScopedGroupImageMutation(safeAvatarUploadUrl(uploaded)) {
+                        imageFailureScope.isCurrent(failureAttempt)
+                    }
+                val updated = controller.updateGroupAvatarUrl(change)
+                if (updated) {
                     showImageSearch = false
+                } else if (controller.lastMutationError != null) {
+                    imageFailureScope.captureFailure(failureAttempt)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
