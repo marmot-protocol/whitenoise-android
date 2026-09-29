@@ -5,6 +5,7 @@ import org.junit.Test
 import java.io.File
 
 class AuditRuntimeIntegrationContractTest {
+    /** The readiness marker is emitted after startup and uses persisted upload consent. */
     @Test
     fun readinessMarkerFollowsSuccessfulRuntimeStart() {
         val source = appStateSource()

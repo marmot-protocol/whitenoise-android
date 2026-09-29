@@ -76,11 +76,13 @@ class GenerateAuditAttestationTest(unittest.TestCase):
         self.assertEqual("", payload)
 
     def test_rejects_v4_endpoint(self) -> None:
+        """A v4 upload path cannot stand in for the v5 OTLP logs endpoint."""
         result, payload = self.run_generator({"WHITENOISE_AUDIT_OTLP_ENDPOINT": "https://audit.invalid/upload"})
         self.assertNotEqual(0, result.returncode)
         self.assertEqual("", payload)
 
     def test_rejects_v5_endpoint_with_unusable_authority_or_extra_url_parts(self) -> None:
+        """Attestation rejects URL forms that the Android sender also disables."""
         for endpoint in (
             "https://audit.invalid/v1/logs?key=1",
             "https://audit.invalid/v1/logs?",

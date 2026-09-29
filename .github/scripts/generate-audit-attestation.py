@@ -39,6 +39,7 @@ def require(name: str) -> str:
 
 
 def build_attestation() -> dict[str, object]:
+    """Attest only trusted staging builds with a usable authenticated v5 route."""
     if require("GITHUB_ACTIONS") != "true":
         raise ValueError("attestation generation is restricted to GitHub Actions")
     if require("GITHUB_REPOSITORY") != EXPECTED_REPOSITORY:
