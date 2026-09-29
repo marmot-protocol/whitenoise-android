@@ -13,12 +13,16 @@ import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Build
 import android.os.IBinder
+import android.os.Handler
+import android.os.Looper
+import android.widget.RemoteViews
 import androidx.compose.runtime.snapshotFlow
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
+import dev.ipf.whitenoise.android.notifications.BackgroundConnectionNotification
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -90,6 +94,7 @@ class ConversationDictationForegroundService : Service() {
                 }
                 promotedController = controller
                 promotedSessionToken = sessionToken
+                activeService = this
                 controller.onDurableServiceReady(sessionToken)
                 if (controller.hasDurableSession && controller.notificationSessionToken == sessionToken) {
                     observeNotification(controller, sessionToken)
@@ -145,6 +150,12 @@ class ConversationDictationForegroundService : Service() {
         promotedController = null
         promotedSessionToken = null
         super.onDestroy()
+        if (activeService === this) activeService = null
+        // Both foreground services share one notification ID. Restore the connection's
+        // presentation after the dictation service releases its claim on that ID.
+        Handler(Looper.getMainLooper()).post {
+            BackgroundConnectionNotification.restoreIfForeground(applicationContext)
+        }
     }
 
     /** Builds a public but metadata-free notification with the only actions valid off-screen. */
@@ -154,16 +165,16 @@ class ConversationDictationForegroundService : Service() {
             .setSmallIcon(R.drawable.ic_stat_whitenoise)
             .setContentTitle(getString(R.string.dictation_notification_title))
             .setContentText(getString(notificationStatus(controller)))
-            .setProgress(
-                0,
-                0,
-                controller.state is ConversationDictationState.Starting ||
-                    controller.state is ConversationDictationState.Processing,
-            ).setContentIntent(openAppIntent())
+            // An indeterminate progress bar made the notification look stuck during
+            // normal recognizer restarts; the status text already names the phase.
+            .setContentIntent(openAppIntent())
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setShowWhen(false)
+            .setStyle(Notification.DecoratedCustomViewStyle())
+            .setCustomContentView(compactControls(controller))
+            .setCustomBigContentView(expandedStatus(controller))
             .addAction(
                 action(
                     android.R.drawable.ic_menu_close_clear_cancel,
@@ -189,6 +200,31 @@ class ConversationDictationForegroundService : Service() {
                     controller.completionActionsEnabled,
                 ),
             ).build()
+
+    /** Keeps safe actions on the compact surface even when Android chooses not to expand a notification. */
+    private fun compactControls(controller: ConversationDictationController): RemoteViews {
+        val token = requireNotNull(controller.notificationSessionToken)
+        return RemoteViews(packageName, R.layout.notification_dictation_compact).apply {
+            val cancelEnabled = !controller.deliveryInProgress
+            val completionEnabled = controller.completionActionsEnabled
+            setBoolean(R.id.dictation_notification_cancel, "setEnabled", cancelEnabled)
+            setBoolean(R.id.dictation_notification_paste, "setEnabled", completionEnabled)
+            setBoolean(R.id.dictation_notification_send, "setEnabled", completionEnabled)
+            if (cancelEnabled) {
+                setOnClickPendingIntent(R.id.dictation_notification_cancel, actionIntent(ACTION_CANCEL, token))
+            }
+            if (completionEnabled) {
+                setOnClickPendingIntent(R.id.dictation_notification_paste, actionIntent(ACTION_PASTE, token))
+                setOnClickPendingIntent(R.id.dictation_notification_send, actionIntent(ACTION_SEND, token))
+            }
+        }
+    }
+
+    /** The expanded system actions remain the same intents; only phase text occupies custom content. */
+    private fun expandedStatus(controller: ConversationDictationController): RemoteViews =
+        RemoteViews(packageName, R.layout.notification_dictation_expanded).apply {
+            setTextViewText(R.id.dictation_notification_status, getString(notificationStatus(controller)))
+        }
 
     /** Describes actual readiness/finalization, never a model download or invented percentage. */
     private fun notificationStatus(controller: ConversationDictationController): Int =
@@ -269,7 +305,20 @@ class ConversationDictationForegroundService : Service() {
 
     companion object {
         internal const val CHANNEL_ID = "composer_dictation"
-        private const val NOTIFICATION_ID = 0x77D1
+        private const val NOTIFICATION_ID = BackgroundConnectionNotification.NOTIFICATION_ID
+        @Volatile private var activeService: ConversationDictationForegroundService? = null
+
+        /** Lets a background-connection refresh preserve active dictation controls. */
+        internal fun activeNotificationOrNull(): Notification? {
+            val service = activeService ?: return null
+            val controller = service.promotedController ?: return null
+            val token = service.promotedSessionToken ?: return null
+            return if (controller.hasDurableSession && controller.notificationSessionToken == token) {
+                service.buildNotification(controller)
+            } else {
+                null
+            }
+        }
         internal const val ACTION_CANCEL = "dev.ipf.whitenoise.android.dictation.CANCEL"
         internal const val ACTION_PASTE = "dev.ipf.whitenoise.android.dictation.PASTE"
         internal const val ACTION_SEND = "dev.ipf.whitenoise.android.dictation.SEND"

@@ -736,6 +736,54 @@ class ConversationDictationControllerTest {
         assertTrue(fixture.platform.session.started)
     }
 
+    /** A denied enabled audio-focus policy must never start a recognizer or retain the microphone lease. */
+    @Test
+    fun deniedAudioFocusRestoresPlaybackAndFailsBeforeCapture() {
+        val events = mutableListOf<String>()
+        val fixture =
+            fixture(
+                draft = TextFieldValue("typed"),
+                tryAcquireMicrophone = { events += "lease"; true },
+                onBeforeRecognition = { events += "pause"; throw ConversationDictationAudioFocusDenied() },
+                releaseMicrophone = { events += "release" },
+                onAfterAudioCapture = { events += "restore" },
+            )
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+
+        assertEquals(listOf("lease", "pause", "release", "restore"), events)
+        assertEquals(
+            ConversationDictationFailure.AudioFocusUnavailable,
+            (fixture.controller.state as ConversationDictationState.Failed).reason,
+        )
+        assertFalse(fixture.controller.ownsMicrophone)
+        assertTrue(fixture.platform.sessions.isEmpty())
+        assertEquals("typed", fixture.drafts.getValue(key()).text)
+    }
+
+    /** A settings change after the gesture cannot silently change the active attempt's media policy. */
+    @Test
+    fun pauseOtherAudioIsCapturedBeforeDeferredServiceReadiness() {
+        var pauseOtherAudio = true
+        var ready: (() -> Unit)? = null
+        var observed: Boolean? = null
+        val fixture =
+            fixture(
+                draft = TextFieldValue(""),
+                pauseOtherAudio = { pauseOtherAudio },
+                startDurableSession = { _, callback -> ready = callback; true },
+                onBeforeRecognition = { observed = it.pauseOtherAudio },
+            )
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        pauseOtherAudio = false
+        assertTrue(fixture.controller.state.target?.pauseOtherAudio == true)
+        ready?.invoke()
+
+        assertEquals(true, observed)
+        assertTrue(fixture.platform.session.started)
+    }
+
     @Test
     fun grantedRuntimePermissionStartsRecognizerWithoutTreatingEffectivePrivacyDenialAsAppDenial() {
         val platform = FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted)
@@ -4345,7 +4393,7 @@ class ConversationDictationControllerTest {
         targetReplyAvailable: (String?) -> Boolean? = { true },
         targetValidator: (suspend (String, String) -> ConversationDictationTargetValidation)? = null,
         targetValidationScope: CoroutineScope? = null,
-        onBeforeRecognition: () -> Unit = {},
+        onBeforeRecognition: (ConversationDictationTarget) -> Unit = {},
         onAfterAudioCapture: () -> Unit = {},
         platform: FakePlatform = FakePlatform(),
         tryAcquireMicrophone: () -> Boolean = { true },
@@ -4356,6 +4404,7 @@ class ConversationDictationControllerTest {
         },
         stopDurableSession: () -> Unit = {},
         finishAfterSilenceMillis: () -> Long? = { null },
+        pauseOtherAudio: () -> Boolean = { true },
         silenceDeliveryMode: () -> ConversationDictationDeliveryMode = {
             ConversationDictationDeliveryMode.PasteIntoDraft
         },
@@ -4401,6 +4450,7 @@ class ConversationDictationControllerTest {
                 elapsedRealtime = scheduler::now,
                 scheduleTimeout = scheduler::schedule,
                 finishAfterSilenceMillis = finishAfterSilenceMillis,
+                pauseOtherAudio = pauseOtherAudio,
                 silenceDeliveryMode = silenceDeliveryMode,
                 sendTranscriptIfOriginUnchanged = sendTranscriptIfOriginUnchanged,
                 onReadinessEvent = onReadinessEvent,

@@ -1490,6 +1490,7 @@
     <string name="dictation_microphone_muted">Microphone access is off</string>
     <string name="dictation_microphone_muted_help">Turn on microphone access in Android privacy settings or Quick Settings, then try dictation again.</string>
     <string name="dictation_microphone_in_use">The microphone is already in use</string>
+    <string name="dictation_audio_focus_unavailable">Could not pause other audio. Try again or turn off Pause other audio in Dictation settings.</string>
     <string name="dictation_no_speech">No speech was recognized</string>
     <string name="dictation_network_error">Speech service couldn’t connect</string>
     <string name="dictation_recognizer_busy">Speech service is busy</string>
@@ -1502,6 +1503,8 @@
     <string name="dictation_disclosure_message">The speech service installed on this device processes what you say and may send the audio to its provider. White Noise keeps the text it returns only until you paste or send it. Sending automatically is off unless you turn it on in Dictation settings.</string>
     <string name="dictation_continue">Continue</string>
     <string name="dictation_settings_title">Dictation</string>
+    <string name="dictation_pause_other_audio_title">Pause other audio</string>
+    <string name="dictation_pause_other_audio_subtitle">Pause music and podcasts during dictation; they can resume when recording stops. White Noise speech and voice messages always pause for safety.</string>
     <string name="dictation_settings_explainer">The speech service installed on this device processes the audio and may send it to its provider. White Noise keeps the text it returns only until you paste or send it.</string>
     <string name="dictation_ostt_recommendation_title">Get Offline Speech to Text</string>
     <string name="dictation_ostt_recommendation_summary">Recommended transcription app for private, on-device dictation. Available from Zapstore, not Google Play.</string>

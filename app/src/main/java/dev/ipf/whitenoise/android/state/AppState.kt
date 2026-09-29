@@ -58,6 +58,8 @@ import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.RuntimePolicyHooks
 import dev.ipf.whitenoise.android.amber.AmberSignerController
+import dev.ipf.whitenoise.android.audio.ConversationDictationAudioFocusDenied
+import dev.ipf.whitenoise.android.audio.ConversationDictationAudioFocusLease
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationProvider
@@ -1217,6 +1219,9 @@ class WhiteNoiseAppState private constructor(
     internal val conversationDictationPreferences = ConversationDictationPreferences(appContext)
     internal val microphoneCaptureCoordinator = MicrophoneCaptureCoordinator()
     private val dictationMicrophoneOwner = Any()
+    private val dictationAudioFocus by lazy {
+        ConversationDictationAudioFocusLease.android(appContext) { conversationDictation.cancel() }
+    }
     internal val conversationDictation: ConversationDictationController by lazy {
         ConversationDictationController(
             context = appContext,
@@ -1251,10 +1256,14 @@ class WhiteNoiseAppState private constructor(
                 }
             },
             targetValidationScope = mutationsScope,
-            onBeforeRecognition = {
+            onBeforeRecognition = { target ->
                 conversationDictationPlaybackHandoff.pauseActivePlayback()
+                if (target.pauseOtherAudio && !dictationAudioFocus.acquire()) {
+                    throw ConversationDictationAudioFocusDenied()
+                }
             },
             onAfterAudioCapture = {
+                dictationAudioFocus.release()
                 conversationDictationPlaybackHandoff.resumeInterruptedPlayback()
             },
             tryAcquireMicrophone = { microphoneCaptureCoordinator.tryAcquire(dictationMicrophoneOwner) },
@@ -1262,6 +1271,7 @@ class WhiteNoiseAppState private constructor(
             finishAfterSilenceMillis = {
                 conversationDictationPreferences.current().finishAfterSilenceMillis
             },
+            pauseOtherAudio = { conversationDictationPreferences.current().pauseOtherAudio },
             silenceDeliveryMode = {
                 conversationDictationPreferences.current().silenceDeliveryMode
             },

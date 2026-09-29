@@ -162,6 +162,33 @@ class SettingsScreenScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_settings_ostt_installed_light.png")
     }
 
+    /** The external-media switch is accessible and does not clip in the large-font RTL layout. */
+    @Test
+    fun dictationPauseOtherAudioSwitchRtlLargeFont() {
+        val appState = dictationAppState()
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(density.density, 2f),
+                LocalLayoutDirection provides LayoutDirection.Rtl,
+            ) {
+                WhiteNoiseTheme(darkTheme = false) {
+                    Surface(modifier = Modifier.fillMaxSize()) {
+                        DictationSettingsScreen(
+                            appState = appState,
+                            onBack = {},
+                            isOfflineSpeechToTextInstalled = { true },
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag("dictation.pause_other_audio").assertIsDisplayed().performClick()
+        assertEquals(false, appState.conversationDictationPreferences.current().pauseOtherAudio)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_settings_pause_other_audio_rtl_large.png")
+    }
+
     /** The missing-app recommendation opens the same canonical Zapstore page in every build flavor. */
     @Test
     fun dictationSettingsMissingOsttOpensCanonicalZapstoreListing() {

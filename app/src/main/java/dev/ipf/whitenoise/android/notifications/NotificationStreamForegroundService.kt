@@ -12,6 +12,7 @@ import android.content.pm.ServiceInfo
 import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import dev.ipf.whitenoise.android.audio.ConversationDictationForegroundService
 import androidx.core.content.ContextCompat
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.MainActivity
@@ -93,6 +94,7 @@ class NotificationStreamForegroundService : Service() {
         if (syncNativePushRegistration) pendingNativePushRegistrationSync = true
         val recordPendingPushWakeCatchUp = shouldRecordPendingPushWakeCatchUp(trigger, startedForeground)
         if (startedForeground) {
+            BackgroundConnectionNotification.markForegroundActive()
             application.notifyCapabilityFallbackStarted(readyCapabilityFallbacks)
         } else {
             application.notifyCapabilityFallbackUnavailable(
@@ -341,6 +343,7 @@ class NotificationStreamForegroundService : Service() {
     }
 
     override fun onDestroy() {
+        BackgroundConnectionNotification.markForegroundStopped()
         application.notifyCapabilityFallbackUnavailable(capabilityFallbackRequests.onRuntimeUnavailable())
         (application as? WhiteNoiseApplication)
             ?.initializedAppState()
@@ -378,7 +381,7 @@ class NotificationStreamForegroundService : Service() {
     }
 
     companion object {
-        private const val NOTIFICATION_ID = 1001
+        private const val NOTIFICATION_ID = BackgroundConnectionNotification.NOTIFICATION_ID
 
         /** Queues one typed foreground start and optionally carries an opaque fallback generation. */
         internal fun start(
@@ -605,12 +608,31 @@ private const val PUSH_WAKE_BOOTSTRAP_BUDGET_MS = 5_000L
 private const val PUSH_WAKE_NATIVE_PUSH_SYNC_BUDGET_MS = 15_000L
 
 internal object BackgroundConnectionNotification {
+    internal const val NOTIFICATION_ID = 1001
     internal const val CHANNEL_ID = "whitenoise.background_connection.v1"
 
     @Volatile
     private var channelEnsured = false
+    @Volatile
+    private var foregroundActive = false
+
+    fun markForegroundActive() {
+        foregroundActive = true
+    }
+
+    fun markForegroundStopped() {
+        foregroundActive = false
+    }
+
+    /** Reuses the foreground-services' shared ID without overwriting dictation controls. */
+    fun restoreIfForeground(context: Context) {
+        if (!foregroundActive) return
+        context.getSystemService(NotificationManager::class.java)
+            ?.notify(NOTIFICATION_ID, build(context))
+    }
 
     fun build(context: Context): Notification {
+        ConversationDictationForegroundService.activeNotificationOrNull()?.let { return it }
         ensureChannel(context)
         val pendingIntent =
             PendingIntent.getActivity(

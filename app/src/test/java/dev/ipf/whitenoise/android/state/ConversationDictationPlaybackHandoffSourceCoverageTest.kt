@@ -22,6 +22,8 @@ class ConversationDictationPlaybackHandoffSourceCoverageTest {
                 ),
         )
         assertTrue(!wiring.contains("stopSpeaking()"))
+        assertTrue(wiring.indexOf("pauseActivePlayback()") < wiring.indexOf("dictationAudioFocus.acquire()"))
+        assertTrue(wiring.indexOf("dictationAudioFocus.release()") < wiring.indexOf("resumeInterruptedPlayback()"))
     }
 
     /** Verifies voice restoration validates both the retained player and interruption token. */

@@ -7740,7 +7740,8 @@
         "anchor": "fun DictationSettingsScreen(",
         "test_ids": [
           "DIC-002",
-          "DIC-004"
+          "DIC-004",
+          "DIC-007"
         ]
       },
       {
@@ -11505,6 +11506,14 @@
         "test_ids": [
           "DIC-001",
           "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:dictation_audio_focus_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.dictation_audio_focus_unavailable",
+        "test_ids": [
+          "DIC-007"
         ]
       },
       {
@@ -19770,6 +19779,22 @@
         "anchor": "R.string.dictation_ostt_recommendation_title",
         "test_ids": [
           "SET-027"
+        ]
+      },
+      {
+        "surface": "setting:dictation_pause_other_audio_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "R.string.dictation_pause_other_audio_title",
+        "test_ids": [
+          "DIC-007"
+        ]
+      },
+      {
+        "surface": "setting:dictation_pause_other_audio_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "R.string.dictation_pause_other_audio_subtitle",
+        "test_ids": [
+          "DIC-007"
         ]
       },
       {

@@ -4,7 +4,9 @@ import android.content.ComponentName
 import android.content.Context
 import dev.ipf.whitenoise.android.audio.ConversationDictationDeliveryMode
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -30,6 +32,18 @@ class ConversationDictationPreferencesTest {
         assertNull(state.finishAfterSilenceMillis)
         assertEquals(ConversationDictationDeliveryMode.PasteIntoDraft, state.silenceDeliveryMode)
         assertNull(state.recognitionServiceOverride)
+        assertTrue(state.pauseOtherAudio)
+    }
+
+    /** External media policy is local, opt-out, and malformed legacy values restore the safe default. */
+    @Test
+    fun pauseOtherAudioPersistsAndMalformedValueDefaultsOn() {
+        val original = ConversationDictationPreferences(context, preferences())
+        original.setPauseOtherAudio(false)
+        assertFalse(ConversationDictationPreferences(context, preferences()).current().pauseOtherAudio)
+
+        preferences().edit().putString("pauseOtherAudio", "invalid").commit()
+        assertTrue(ConversationDictationPreferences(context, preferences()).current().pauseOtherAudio)
     }
 
     /** Verifies only supported endpointing values persist and send mode requires explicit selection. */
