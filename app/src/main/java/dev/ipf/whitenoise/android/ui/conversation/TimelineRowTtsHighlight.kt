@@ -96,6 +96,8 @@ internal fun TimelineRowMessageBubble(
     onQuickReactionsSave: (List<String>) -> Unit,
     onReplyPreviewClick: (TimelineMessage) -> Unit,
     composerGate: ComposerGate,
+    blockedDmUnblockInFlight: Boolean = false,
+    onUnblockBlockedDm: () -> Unit = {},
     onBack: () -> Unit,
     mentionCandidates: List<MentionComposer.Candidate>,
     mentionPickerEnabled: Boolean,
@@ -147,6 +149,8 @@ internal fun TimelineRowMessageBubble(
         onQuickReactionsSave = onQuickReactionsSave,
         onReplyPreviewClick = onReplyPreviewClick,
         composerGate = composerGate,
+        blockedDmUnblockInFlight = blockedDmUnblockInFlight,
+        onUnblockBlockedDm = onUnblockBlockedDm,
         groupDisbanded = controller.group.disbanded,
         inviteMutationInFlight = controller.mutationInFlight,
         onJoinInvite = {

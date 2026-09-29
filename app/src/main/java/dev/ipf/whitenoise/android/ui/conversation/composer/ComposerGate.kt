@@ -13,6 +13,9 @@ internal enum class ComposerGate {
     /** Active composer — self is (believed to be) a member. */
     COMPOSER,
 
+    /** The direct-message peer is blocked by the conversation's account. */
+    BLOCKED,
+
     /** "You are no longer a member of this group" notice. */
     NOTICE,
 
