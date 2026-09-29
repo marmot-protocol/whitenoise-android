@@ -373,31 +373,30 @@ private suspend fun ConversationController.pageWithRetryBudget(
 ): TimelinePageOutcome? {
     var outcome = withContext(Dispatchers.IO) { page(handle) }
     var attempt = 1
-    while (outcome is TimelinePageOutcome.Unchanged && shouldRetryPage(outcome.reason, attempt)) {
-        delay(
-            if (outcome.reason == NOT_READY) {
-                CONVERSATION_WINDOW_NOT_READY_RETRY_MS
-            } else {
-                CONVERSATION_WINDOW_SUPERSEDED_RETRY_MS
-            },
-        )
+    while (outcome is TimelinePageOutcome.Unchanged) {
+        val retryDelayMs =
+            when (outcome.reason) {
+                NOT_READY ->
+                    if (attempt < CONVERSATION_PAGE_NOT_READY_ATTEMPTS) {
+                        CONVERSATION_WINDOW_NOT_READY_RETRY_MS
+                    } else {
+                        break
+                    }
+                SUPERSEDED ->
+                    if (attempt < CONVERSATION_PAGE_SUPERSEDED_ATTEMPTS) {
+                        CONVERSATION_WINDOW_SUPERSEDED_RETRY_MS
+                    } else {
+                        break
+                    }
+                else -> break
+            }
+        delay(retryDelayMs)
         if (!retainsSubscription(handle)) return null
         outcome = withContext(Dispatchers.IO) { page(handle) }
         attempt += 1
     }
     return outcome
 }
-
-/** Each recoverable answer has its own bounded budget; all other answers leave the gesture. */
-private fun shouldRetryPage(
-    reason: ConversationWindowUnchangedReason,
-    attempt: Int,
-): Boolean =
-    when (reason) {
-        NOT_READY -> attempt < CONVERSATION_PAGE_NOT_READY_ATTEMPTS
-        SUPERSEDED -> attempt < CONVERSATION_PAGE_SUPERSEDED_ATTEMPTS
-        else -> false
-    }
 
 /** Whether this subscription is still the controller's live one and the account is not tearing down. */
 private fun ConversationController.retainsSubscription(handle: PagingHandle): Boolean =
