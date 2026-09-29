@@ -40,15 +40,14 @@ class ConversationForwardPrefetchOriginTest {
             }
         }
 
-    /** A newer page in flight reads as loading newer, not older, and blocks an older page until it clears. */
+    /** A newer page in flight blocks an older page until it clears. */
     @Test
-    fun aNewerPageInFlightBlocksAnOlderPageAndReadsAsLoadingNewer() =
+    fun aNewerPageInFlightBlocksAnOlderPage() =
         runBlocking {
             val subscription = subscriptionWith()
             withController(subscription) { controller ->
                 controller.pageLoadInFlight = ConversationSearchPageDirection.NEWER
 
-                assertTrue(controller.isLoadingNewer)
                 assertTrue(controller.isLoadingPage)
                 assertFalse(controller.isLoadingOlder)
                 assertEquals(ConversationPageLoad.NO_PROGRESS, controller.loadOlderPageInternal())

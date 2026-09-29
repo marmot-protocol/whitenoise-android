@@ -207,6 +207,40 @@ class ConversationGroupRecoveryPresentationTest {
         assertEquals(2u, controller.groupRecoveryStatus?.failedReinvites)
     }
 
+    /** A failed dismissal stays actionable and keeps the mutation busy through the status re-read. */
+    @Test
+    fun failedHistoryNoticeDismissalRefreshesAndReportsTheFailure() =
+        runTest {
+            val appState = testAppState()
+            val noticeIds = listOf("notice-1")
+            var reads = 0
+            var dismissals = 0
+            lateinit var controller: ConversationController
+            controller =
+                controller(
+                    appState,
+                    dismiss = { account, id ->
+                        assertEquals(ACCOUNT_REF, account)
+                        assertEquals("notice-1", id)
+                        dismissals += 1
+                        throw MarmotKitException.TransportClosed()
+                    },
+                ) {
+                    reads += 1
+                    if (reads == 2) assertTrue(controller.groupRecoveryMutationInFlight)
+                    recoveryStatus(noticeIds = noticeIds)
+                }
+
+            controller.retryGroupRecoveryStatus()
+            controller.dismissGroupHistoryNotices()
+
+            assertEquals(2, reads)
+            assertEquals(1, dismissals)
+            assertEquals(noticeIds, controller.groupRecoveryStatus?.historyNoticeIds)
+            assertFalse(controller.groupRecoveryMutationInFlight)
+            assertTrue(controller.lastMutationError != null)
+        }
+
     /** Freshness belongs to one account, one group and one runtime, and only the newest creation. */
     @Test
     fun freshnessIsScopedByAccountGroupRuntimeAndSupersession() {
@@ -259,22 +293,27 @@ class ConversationGroupRecoveryPresentationTest {
         automaticRecoveryFailed: Boolean = false,
         pendingReinvites: UInt = 0u,
         failedReinvites: UInt = 0u,
+        noticeIds: List<String> = emptyList(),
     ) = GroupRecoveryStatusFfi(
         groupIdHex = groupIdHex(),
         automaticRecoveryFailed = automaticRecoveryFailed,
         pendingReinvites = pendingReinvites,
         failedReinvites = failedReinvites,
         rejoinInvitations = emptyList(),
+        historyMayBeIncomplete = noticeIds.isNotEmpty(),
+        historyNoticeIds = noticeIds,
     )
 
     /** A conversation controller whose only injected behaviour is the advisory recovery read. */
     private fun controller(
         appState: WhiteNoiseAppState,
+        dismiss: suspend (String, String) -> Boolean = { _, _ -> true },
         read: () -> GroupRecoveryStatusFfi,
     ) = ConversationController(
         appState = appState,
         initialGroup = conversationTimelineTestGroup(),
         groupRecoveryStatusReader = { _, _ -> read() },
+        historyNoticeDismisser = dismiss,
     )
 
     /** One signed-in account, with no live subscriptions to start. */

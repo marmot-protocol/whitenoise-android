@@ -1134,6 +1134,9 @@
     <string name="group_recovery_failed_reinvites">Some invitations could not be restored. Invite those people again from Group Details.</string>
     <string name="group_recovery_review_invitation_from">Review invitation from %1$s · epoch %2$s</string>
     <string name="group_recovery_check_failed">Couldn’t check group recovery. Try again.</string>
+    <string name="group_history_may_be_incomplete">Some earlier messages in this chat may be missing.</string>
+    <string name="account_history_may_be_incomplete">Some messages may be missing from this account. White Noise couldn’t confirm that every message arrived.</string>
+    <string name="history_notice_dismiss_failed">Couldn\'t dismiss the history notice. Try again.</string>
     <string name="group_rejoin_title">Rejoin group?</string>
     <string name="group_rejoin_invited_by">Invited by %1$s\n%2$s</string>
     <string name="group_rejoin_replaces_state">Rejoining replaces this device’s encryption data for the group. Your message history stays.</string>
@@ -2220,5 +2223,4 @@
     <string name="diagnostics_clear_confirm_action">Clear Logs</string>
     <string name="usage_diagnostics_prompt_intro">Help us understand how White Noise is used and make messaging more reliable.</string>
     <string name="donate_open_failed">Couldn’t open the donation page. Try again or return to Settings.</string>
-    <string name="conversation_loading_newer">Loading newer messages</string>
 </resources>

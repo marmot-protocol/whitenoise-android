@@ -1806,6 +1806,9 @@
     <string name="group_recovery_failed_reinvites">部分邀請無法復原。請從「群組詳細資料」重新邀請這些成員。</string>
     <string name="group_recovery_review_invitation_from">檢視 %1$s 的邀請 · 時期 %2$s</string>
     <string name="group_recovery_check_failed">無法檢查群組復原狀態，請再試一次。</string>
+    <string name="group_history_may_be_incomplete">此聊天中可能缺少部分較早的訊息。</string>
+    <string name="account_history_may_be_incomplete">此帳戶可能缺少部分訊息。White Noise 無法確認所有訊息都已送達。</string>
+    <string name="history_notice_dismiss_failed">無法忽略歷史記錄提示，請再試一次。</string>
     <string name="group_rejoin_title">重新加入群組？</string>
     <string name="group_rejoin_invited_by">邀請者：%1$s\n%2$s</string>
     <string name="group_rejoin_replaces_state">重新加入會取代此裝置上該群組的加密資料。你的訊息記錄會保留。</string>
@@ -2040,5 +2043,4 @@
     <string name="export_audit_logs_confirm_action">繼續</string>
     <string name="toast_couldnt_export_audit_logs">無法準備要匯出的診斷日誌</string>
     <string name="toast_no_audit_logs_to_export">沒有可匯出的診斷日誌</string>
-    <string name="conversation_loading_newer">正在載入較新的訊息</string>
 </resources>

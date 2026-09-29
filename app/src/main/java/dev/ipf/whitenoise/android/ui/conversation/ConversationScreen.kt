@@ -128,7 +128,6 @@ import dev.ipf.whitenoise.android.state.chatCreateOpenConversationTimingStage
 import dev.ipf.whitenoise.android.state.conversationWindowCanReportVisible
 import dev.ipf.whitenoise.android.state.currentTtsConversationDestination
 import dev.ipf.whitenoise.android.state.hasKnownTranscriptPresentation
-import dev.ipf.whitenoise.android.state.isLoadingNewer
 import dev.ipf.whitenoise.android.state.isLoadingOlder
 import dev.ipf.whitenoise.android.state.isLoadingPage
 import dev.ipf.whitenoise.android.state.loadMessageAvailability
@@ -4166,13 +4165,7 @@ internal fun ConversationScreen(
                                     horizontalAlignment = Alignment.End,
                                     verticalArrangement = Arrangement.spacedBy(8.dp),
                                 ) {
-                                    // A newer page that takes longer than a moment shows here, beside the
-                                    // jump button, so the list's bottom edge never moves for it.
-                                    if (rememberNewerPageIndicatorVisible(controller.isLoadingNewer)) {
-                                        ConversationNewerPageIndicator()
-                                    }
-                                    // Selection hides the controls below; the newer-page indicator above stays,
-                                    // since a page can be in flight when selection starts or start during it.
+                                    // Selection hides these controls; paging progress never covers message rows.
                                     if (!selectionMode && ttsFollowHandle.showResumeAction) {
                                         TtsResumeFollowButton(
                                             onClick = ttsFollowHandle::resumeFollow,

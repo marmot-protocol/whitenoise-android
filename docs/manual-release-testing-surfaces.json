@@ -1141,7 +1141,8 @@
         "anchor": "fun ChatsScreen(",
         "test_ids": [
           "CHL-001",
-          "SEC-012"
+          "SEC-012",
+          "CHL-018"
         ]
       },
       {
@@ -2480,18 +2481,6 @@
         "test_ids": ["CON-003"]
       },
       {
-        "surface": "ConversationNewerPageIndicator",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationNewerPageIndicator.kt",
-        "anchor": "fun ConversationNewerPageIndicator(",
-        "test_ids": ["CON-003"]
-      },
-      {
-        "surface": "string:conversation_loading_newer",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationNewerPageIndicator.kt",
-        "anchor": "R.string.conversation_loading_newer",
-        "test_ids": ["CON-003"]
-      },
-      {
         "surface": "ConversationLoadErrorContent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "anchor": "fun ConversationLoadErrorContent(",
@@ -2612,7 +2601,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
         "anchor": "fun ConversationGroupRecoveryCard(",
         "test_ids": [
-          "GRP-021"
+          "GRP-021",
+          "GRP-024"
         ]
       },
       {
@@ -2620,8 +2610,75 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
         "anchor": "fun GroupRecoveryCard(",
         "test_ids": [
-          "GRP-021"
+          "GRP-021",
+          "GRP-024"
         ]
+      },
+      {
+        "surface": "GroupHistoryNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
+        "anchor": "fun GroupHistoryNotice(",
+        "test_ids": ["GRP-024"]
+      },
+      {
+        "surface": "AccountHistoryNoticeBanner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/AccountHistoryNoticeBanner.kt",
+        "anchor": "fun AccountHistoryNoticeBanner(",
+        "test_ids": [
+          "CHL-018"
+        ]
+      },
+      {
+        "surface": "Account history incomplete notice text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/AccountHistoryNoticeBanner.kt",
+        "anchor": "R.string.account_history_may_be_incomplete",
+        "test_ids": ["CHL-018"]
+      },
+      {
+        "surface": "Account history notice dismiss action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/AccountHistoryNoticeBanner.kt",
+        "anchor": "R.string.dismiss",
+        "test_ids": ["CHL-018"]
+      },
+      {
+        "surface": "Account history notice dismiss failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/AccountHistoryNoticeBanner.kt",
+        "anchor": "R.string.history_notice_dismiss_failed",
+        "test_ids": ["CHL-018"]
+      },
+      {
+        "surface": "Group history incomplete notice text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
+        "anchor": "R.string.group_history_may_be_incomplete",
+        "test_ids": ["GRP-024"]
+      },
+      {
+        "surface": "Group history notice dismiss action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
+        "anchor": "R.string.dismiss",
+        "test_ids": ["GRP-024"]
+      },
+      {
+        "surface": "Account history notice owner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AccountHistoryNotices.kt",
+        "anchor": "class AccountHistoryNotices(",
+        "test_ids": [
+          "CHL-018"
+        ]
+      },
+      {
+        "surface": "Group history notice dismissal",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "suspend fun dismissGroupHistoryNotices(",
+        "test_ids": [
+          "GRP-024"
+        ]
+      },
+      {
+        "surface": "Group history notice dismiss failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.history_notice_dismiss_failed",
+        "test_ids": ["GRP-024"]
       },
       {
         "surface": "Fresh group creation recovery-read policy",

@@ -1848,6 +1848,9 @@
     <string name="group_recovery_failed_reinvites">Einige Einladungen konnten nicht wiederhergestellt werden. Lade diese Personen in den Gruppendetails erneut ein.</string>
     <string name="group_recovery_review_invitation_from">Einladung von %1$s prüfen · Epoche %2$s</string>
     <string name="group_recovery_check_failed">Die Gruppenwiederherstellung konnte nicht geprüft werden. Versuche es erneut.</string>
+    <string name="group_history_may_be_incomplete">In diesem Chat fehlen möglicherweise einige ältere Nachrichten.</string>
+    <string name="account_history_may_be_incomplete">Möglicherweise fehlen in diesem Konto einige Nachrichten. White Noise konnte nicht bestätigen, dass alle Nachrichten angekommen sind.</string>
+    <string name="history_notice_dismiss_failed">Der Hinweis zum Nachrichtenverlauf konnte nicht geschlossen werden. Versuche es erneut.</string>
     <string name="group_rejoin_title">Gruppe erneut beitreten?</string>
     <string name="group_rejoin_invited_by">Eingeladen von %1$s\n%2$s</string>
     <string name="group_rejoin_replaces_state">Beim erneuten Beitritt werden die Verschlüsselungsdaten dieses Geräts für die Gruppe ersetzt. Dein Nachrichtenverlauf bleibt erhalten.</string>
@@ -2085,5 +2088,4 @@
     <string name="export_audit_logs_confirm_action">Weiter</string>
     <string name="toast_couldnt_export_audit_logs">Diagnoseprotokolle konnten nicht für den Export vorbereitet werden</string>
     <string name="toast_no_audit_logs_to_export">Keine Diagnoseprotokolle zum Exportieren vorhanden</string>
-    <string name="conversation_loading_newer">Neuere Nachrichten werden geladen</string>
 </resources>

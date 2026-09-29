@@ -56,10 +56,6 @@ internal enum class ConversationPageLoad {
 internal val ConversationController.isLoadingOlder: Boolean
     get() = pageLoadInFlight == ConversationSearchPageDirection.OLDER
 
-/** Whether a newer page is in flight; the overlay indicator beside the jump button shows for this. */
-internal val ConversationController.isLoadingNewer: Boolean
-    get() = pageLoadInFlight == ConversationSearchPageDirection.NEWER
-
 /** Whether any page is in flight. Pages are serialized, so a second one waits for this to clear. */
 internal val ConversationController.isLoadingPage: Boolean
     get() = pageLoadInFlight != null

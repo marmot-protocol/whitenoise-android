@@ -1831,6 +1831,9 @@
     <string name="group_recovery_failed_reinvites">Não foi possível restaurar alguns convites. Volte a convidar essas pessoas nos Detalhes do grupo.</string>
     <string name="group_recovery_review_invitation_from">Revisar convite de %1$s · época %2$s</string>
     <string name="group_recovery_check_failed">Não foi possível verificar a recuperação do grupo. Tente novamente.</string>
+    <string name="group_history_may_be_incomplete">Algumas mensagens anteriores desta conversa podem estar faltando.</string>
+    <string name="account_history_may_be_incomplete">Algumas mensagens desta conta podem estar faltando. O White Noise não conseguiu confirmar que todas as mensagens chegaram.</string>
+    <string name="history_notice_dismiss_failed">Não foi possível dispensar o aviso do histórico. Tente novamente.</string>
     <string name="group_rejoin_title">Voltar a entrar no grupo?</string>
     <string name="group_rejoin_invited_by">Convite de %1$s\n%2$s</string>
     <string name="group_rejoin_replaces_state">Voltar a entrar substitui os dados de criptografia deste dispositivo para o grupo. Seu histórico de mensagens é mantido.</string>
@@ -2068,5 +2071,4 @@
     <string name="export_audit_logs_confirm_action">Continuar</string>
     <string name="toast_couldnt_export_audit_logs">Não foi possível preparar os logs de diagnóstico para exportação</string>
     <string name="toast_no_audit_logs_to_export">Não há logs de diagnóstico para exportar</string>
-    <string name="conversation_loading_newer">Carregando mensagens mais recentes</string>
 </resources>

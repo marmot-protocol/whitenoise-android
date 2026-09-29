@@ -1831,6 +1831,9 @@
     <string name="group_recovery_failed_reinvites">Certaines invitations n’ont pas pu être restaurées. Réinvitez ces personnes depuis les détails du groupe.</string>
     <string name="group_recovery_review_invitation_from">Examiner l’invitation de %1$s · époque %2$s</string>
     <string name="group_recovery_check_failed">Impossible de vérifier la récupération du groupe. Réessayez.</string>
+    <string name="group_history_may_be_incomplete">Certains messages plus anciens de cette discussion sont peut-être manquants.</string>
+    <string name="account_history_may_be_incomplete">Certains messages de ce compte sont peut-être manquants. White Noise n’a pas pu confirmer que tous les messages sont arrivés.</string>
+    <string name="history_notice_dismiss_failed">Impossible de fermer cet avis sur l’historique. Réessayez.</string>
     <string name="group_rejoin_title">Rejoindre à nouveau le groupe ?</string>
     <string name="group_rejoin_invited_by">Invitation de %1$s\n%2$s</string>
     <string name="group_rejoin_replaces_state">Rejoindre à nouveau remplace les données de chiffrement de cet appareil pour ce groupe. Votre historique de messages est conservé.</string>
@@ -2068,5 +2071,4 @@
     <string name="export_audit_logs_confirm_action">Continuer</string>
     <string name="toast_couldnt_export_audit_logs">Impossible de préparer les journaux de diagnostic pour l’exportation</string>
     <string name="toast_no_audit_logs_to_export">Aucun journal de diagnostic à exporter</string>
-    <string name="conversation_loading_newer">Chargement des messages plus récents</string>
 </resources>

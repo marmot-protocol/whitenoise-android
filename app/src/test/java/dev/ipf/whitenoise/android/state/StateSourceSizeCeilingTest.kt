@@ -61,7 +61,14 @@ class StateSourceSizeCeilingTest {
         // The pending-message edit handoff adds native confirmation, retry, and
         // edit-target switch settlement paths;
         // keep the combined source ceiling exact and recheck coverage in CI.
-        const val CONTROLLERS_MAX_LINES = 13406
+        // History-notice dismissal adds 16 lines for the conversation's dismiss action
+        // and seven for guarded post-suspension refresh; the account-wide notice owner
+        // lives in AccountHistoryNotices.kt.
+        // PR #2869 adds 17 net lines to keep dismissal busy through refresh and
+        // report native failures; per-id failure handling lives in HistoryNoticeDismissal.kt.
+        // Dev Zapstore Kover covers 5,049 / 6,821 controller lines, including this
+        // dismissal path, and all six executable helper lines.
+        const val CONTROLLERS_MAX_LINES = 13446
 
         // Master includes the covered draft lifecycle and host-timing changes. PR #2534
         // adds 38 lines for the async prepared-speech handoff while keeping preparation
