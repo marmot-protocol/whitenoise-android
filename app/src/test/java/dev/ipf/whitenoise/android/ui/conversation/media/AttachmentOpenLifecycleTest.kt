@@ -21,6 +21,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -353,6 +354,8 @@ class AttachmentOpenLifecycleTest {
                             },
                             durableAvailabilityExpected = true,
                             awaitNextDurableAvailability = { freshAvailability.receive() },
+                            awaitDurableWorkFinished = { awaitCancellation() },
+                            isCachedAfterDurableWork = { false },
                             onWaitingForDurableAvailability = { waitingForWorker = true },
                             onTerminalFailure = { failureCount++ },
                         ) ?: return@async false
@@ -409,6 +412,8 @@ class AttachmentOpenLifecycleTest {
                         },
                         durableAvailabilityExpected = true,
                         awaitNextDurableAvailability = { freshAvailability.receive() },
+                        awaitDurableWorkFinished = { awaitCancellation() },
+                        isCachedAfterDurableWork = { false },
                         onWaitingForDurableAvailability = {},
                         onTerminalFailure = {},
                     )
@@ -426,6 +431,70 @@ class AttachmentOpenLifecycleTest {
             withTimeout(1_000) { thirdAttempt.await() }
             assertEquals("cached-file", opening.await())
             assertEquals(3, materializeAttempts)
+        }
+
+    @Test
+    fun terminalDurableFailureSettlesPendingOpenInsteadOfWaitingForUnavailableBytes() =
+        runBlocking {
+            val neverAvailable = CompletableDeferred<Unit>()
+            val workerFinished = CompletableDeferred<Unit>()
+            var materializeAttempts = 0
+            var failureCount = 0
+            var openIntentPending = true
+            val opening =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    materializePersistedAttachmentOpen<String>(
+                        materialize = {
+                            materializeAttempts++
+                            null
+                        },
+                        durableAvailabilityExpected = true,
+                        awaitNextDurableAvailability = { neverAvailable.await() },
+                        awaitDurableWorkFinished = { workerFinished.await() },
+                        isCachedAfterDurableWork = { false },
+                        onWaitingForDurableAvailability = {},
+                        onTerminalFailure = {
+                            failureCount++
+                            openIntentPending = false
+                        },
+                    )
+                }
+
+            assertFalse(opening.isCompleted)
+            workerFinished.complete(Unit)
+            assertNull(opening.await())
+            assertEquals(1, materializeAttempts)
+            assertEquals(1, failureCount)
+            assertFalse(openIntentPending)
+        }
+
+    @Test
+    fun terminalWorkEventRechecksCacheBeforeReportingFailure() =
+        runBlocking {
+            val neverAvailable = CompletableDeferred<Unit>()
+            val workerFinished = CompletableDeferred<Unit>()
+            var materializeAttempts = 0
+            var failureCount = 0
+            val opening =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    materializePersistedAttachmentOpen(
+                        materialize = {
+                            materializeAttempts++
+                            if (materializeAttempts == 2) "verified-apk" else null
+                        },
+                        durableAvailabilityExpected = true,
+                        awaitNextDurableAvailability = { neverAvailable.await() },
+                        awaitDurableWorkFinished = { workerFinished.await() },
+                        isCachedAfterDurableWork = { true },
+                        onWaitingForDurableAvailability = {},
+                        onTerminalFailure = { failureCount++ },
+                    )
+                }
+
+            workerFinished.complete(Unit)
+            assertEquals("verified-apk", opening.await())
+            assertEquals(2, materializeAttempts)
+            assertEquals(0, failureCount)
         }
 
     @Test

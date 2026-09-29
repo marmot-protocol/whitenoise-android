@@ -28,6 +28,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
+import dev.ipf.whitenoise.android.state.AttachmentDownloadWorkState
 import dev.ipf.whitenoise.android.state.AttachmentOpenPhase
 import dev.ipf.whitenoise.android.state.AttachmentOpenTrace
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
@@ -35,6 +36,8 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.attachmentDownloadWorkState
+import dev.ipf.whitenoise.android.state.attachmentTransferRequest
 import dev.ipf.whitenoise.android.state.automaticAttachmentDownloadSuppressed
 import dev.ipf.whitenoise.android.state.cancelAttachmentTransfer
 import dev.ipf.whitenoise.android.state.hasAttachmentInstallerHandoff
@@ -43,6 +46,7 @@ import dev.ipf.whitenoise.android.state.refreshAttachmentTransferState
 import dev.ipf.whitenoise.android.state.requestAttachmentInstallerHandoff
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
 import dev.ipf.whitenoise.android.ui.conversation.messages.RetentionIndicatorInput
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
@@ -222,13 +226,28 @@ internal fun MediaFileBubble(
                         controller.awaitNextAttachmentAvailability(messageIdHex, attachmentIndex)
                         AttachmentOpenTrace.phase(request, AttachmentOpenPhase.DurableAvailabilityObserved)
                     },
+                    awaitDurableWorkFinished = {
+                        controller.attachmentTransferRequest(messageIdHex, attachmentIndex)?.let { transfer ->
+                            attachmentDownloadWorkState(context, transfer) {
+                                appState.hasInteractive(transfer)
+                            }.first { it == AttachmentDownloadWorkState.Finished }
+                        }
+                    },
+                    isCachedAfterDurableWork = {
+                        controller.hasCachedAttachmentAfterHydration(messageIdHex, attachmentIndex)
+                    },
                     onWaitingForDurableAvailability = {
                         AttachmentOpenTrace.phase(request, AttachmentOpenPhase.WaitingForDurableAvailability)
                         // Keep one visible pending state. Repeated taps still
                         // ripple but remain idempotent while the durable
                         // transfer/cache publication continues independently.
                     },
-                    onTerminalFailure = { appState.present(couldntLoadMessage) },
+                    onTerminalFailure = {
+                        if (appState.attachmentOpens.consume(request)) {
+                            AttachmentOpenTrace.finish(request, "download_failed")
+                            appState.present(couldntLoadMessage)
+                        }
+                    },
                 ) ?: return@LaunchedEffect
             AttachmentOpenTrace.phase(request, AttachmentOpenPhase.CacheArtifactReady)
             openRequested = true

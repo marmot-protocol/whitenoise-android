@@ -4269,6 +4269,9 @@ class WhiteNoiseAppState private constructor(
         attachmentDownloadIntents.setInteractive(request, interactive = false)
     }
 
+    /** Bridges scheduler registration until its first observable work state. */
+    internal fun hasInteractive(request: AttachmentTransferRequest) = attachmentDownloadIntents.isInteractive(request)
+
     /**
      * Revokes one attachment's durable download so a cancel survives both a
      * worker retry and process death, and so recreating the card cannot let the
