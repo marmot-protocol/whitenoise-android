@@ -13,12 +13,14 @@ import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasScrollToNodeAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -160,6 +162,39 @@ class SettingsScreenScreenshotTest {
 
         composeRule.onNodeWithText("Get Offline Speech to Text").assertDoesNotExist()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_settings_ostt_installed_light.png")
+    }
+
+    /** The external-media switch is accessible and does not clip in the large-font RTL layout. */
+    @Test
+    fun dictationPauseOtherAudioSwitchRtlLargeFont() {
+        val appState = dictationAppState()
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(density.density, 2f),
+                LocalLayoutDirection provides LayoutDirection.Rtl,
+            ) {
+                WhiteNoiseTheme(darkTheme = false) {
+                    Surface(modifier = Modifier.fillMaxSize()) {
+                        DictationSettingsScreen(
+                            appState = appState,
+                            onBack = {},
+                            isOfflineSpeechToTextInstalled = { true },
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasTestTag("dictation.pause_other_audio"))
+        composeRule.onNodeWithTag("dictation.pause_other_audio").assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("Pause other audio").assertExists()
+        composeRule
+            .onNodeWithText("Pause music and podcasts during dictation", substring = true)
+            .assertExists()
+            .performScrollTo()
+        assertEquals(false, appState.conversationDictationPreferences.current().pauseOtherAudio)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_settings_pause_other_audio_rtl_large.png")
     }
 
     /** The missing-app recommendation opens the same canonical Zapstore page in every build flavor. */

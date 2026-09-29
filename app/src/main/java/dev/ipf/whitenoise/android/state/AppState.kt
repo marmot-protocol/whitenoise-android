@@ -1251,17 +1251,14 @@ class WhiteNoiseAppState private constructor(
                 }
             },
             targetValidationScope = mutationsScope,
-            onBeforeRecognition = {
-                conversationDictationPlaybackHandoff.pauseActivePlayback()
-            },
-            onAfterAudioCapture = {
-                conversationDictationPlaybackHandoff.resumeInterruptedPlayback()
-            },
+            onBeforeRecognition = conversationDictationMediaHandoff::beforeRecognition,
+            onAfterAudioCapture = conversationDictationMediaHandoff::afterAudioCapture,
             tryAcquireMicrophone = { microphoneCaptureCoordinator.tryAcquire(dictationMicrophoneOwner) },
             releaseMicrophone = { microphoneCaptureCoordinator.release(dictationMicrophoneOwner) },
             finishAfterSilenceMillis = {
                 conversationDictationPreferences.current().finishAfterSilenceMillis
             },
+            pauseOtherAudio = { conversationDictationPreferences.current().pauseOtherAudio },
             silenceDeliveryMode = {
                 conversationDictationPreferences.current().silenceDeliveryMode
             },
@@ -1516,8 +1513,8 @@ class WhiteNoiseAppState private constructor(
     // Process-wide read-aloud playback: survives navigation between chats and
     // back to the chat list, matching VoicePlaybackController's lifetime.
     val ttsController = createAppTtsController(appContext, ttsRatePreferences, ttsMediaMixPreferences)
-    private val conversationDictationPlaybackHandoff by lazy {
-        createConversationDictationPlaybackHandoff(ttsController)
+    private val conversationDictationMediaHandoff by lazy {
+        createConversationDictationMediaHandoff(ttsController, appContext) { conversationDictation.cancel() }
     }
     var ttsResolution by mutableStateOf<TtsResolutionResult?>(null)
         private set
@@ -4578,7 +4575,7 @@ class WhiteNoiseAppState private constructor(
             "notification listener unavailable before Marmot startup"
         }
         runtimeStartResult.await().getOrThrowAtStartupStage(BootstrapStage.RUNTIME_START)
-        runtime.marmot.emitAuditRuntimeReadinessAfterStart()
+        runtime.marmot.emitAuditRuntimeReadinessAfterStart(auditUploadConsent.readyForStartupMarker)
         runtimeMirrors.attention.start(this, runtime.marmot)
     }
 

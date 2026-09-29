@@ -1,6 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">White Noise</string>
+    <string name="poll_preview">Enquete</string>
+    <string name="poll_unsupported">Não é possível exibir esta enquete</string>
+    <string name="poll_closed">Enquete encerrada</string>
+    <string name="poll_vote_failed">Não foi possível enviar o voto</string>
+    <string name="poll_create_failed">Não foi possível criar a enquete</string>
+    <string name="poll_enter_question">Insira uma pergunta.</string>
+    <string name="poll_question_too_long">Esta pergunta é muito longa.</string>
+    <string name="poll_add_two_options">Adicione pelo menos duas opções.</string>
+    <string name="poll_option_too_long">Uma das opções é muito longa.</string>
+    <string name="poll_duplicate_option">Cada opção deve ser diferente.</string>
+    <string name="poll_create">Criar enquete</string>
+    <string name="poll_question">Pergunta</string>
+    <string name="poll_option">Opção %1$d</string>
+    <string name="poll_add_option">Adicionar opção</string>
+    <string name="poll_remove_option">Remover opção %1$d</string>
+    <string name="poll_single_choice">Escolha única</string>
+    <string name="poll_multiple_choice">Múltipla escolha</string>
+    <string name="poll_submit">Publicar enquete</string>
+    <string name="poll_deadline">A enquete termina</string>
+    <string name="poll_no_deadline">Sem prazo</string>
+    <string name="poll_30_days">30 dias</string>
+    <string name="poll_duration_5_minutes">5 minutos</string>
+    <string name="poll_duration_1_hour">1 hora</string>
+    <string name="poll_duration_1_day">1 dia</string>
+    <string name="poll_duration_1_week">1 semana</string>
+    <string name="poll_ends_at">Encerra em %1$s</string>
+    <plurals name="poll_option_votes">
+        <item quantity="one">%1$d voto</item>
+        <item quantity="other">%1$d votos</item>
+    </plurals>
+    <plurals name="poll_participants">
+        <item quantity="one">%1$d participante</item>
+        <item quantity="other">%1$d participantes</item>
+    </plurals>
     <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">Não foi possível iniciar o White Noise</string>
     <string name="startup_taking_too_long">A inicialização está demorando mais do que o esperado. Tente novamente.</string>
@@ -2045,7 +2079,7 @@
     <string name="audit_upload_title">Compartilhar logs de diagnóstico de grupos</string>
     <string name="audit_upload_subtitle">Compartilha os logs de diagnóstico de grupos de todos os perfis neste dispositivo.</string>
     <string name="audit_upload_confirm_title">Compartilhar logs de diagnóstico de grupos com o White Noise?</string>
-    <string name="audit_upload_disclosure">O White Noise grava logs de diagnóstico de grupos de todos os perfis neste dispositivo e os envia ao Goggles, operado pela Internet Privacy Foundation. Os logs já armazenados aqui também podem ser enviados. Os logs podem incluir identificadores de grupos e mensagens, endereços de relays, datas e horários, referências pseudônimas de contas, um identificador de instalação, o modelo do seu dispositivo e a versão do aplicativo. Eles nunca incluem o conteúdo das mensagens nem chaves privadas. Esses logs são sensíveis e os usamos para investigar problemas de confiabilidade. Eles são separados do compartilhamento de dados de uso e telemetria. Desativar o compartilhamento interrompe novas gravações e novos envios, embora um envio já em andamento possa ser concluído. Os logs neste dispositivo e os já enviados permanecem onde estão. Cancelar mantém o compartilhamento desativado.</string>
+    <string name="audit_upload_disclosure">O White Noise grava logs de diagnóstico de grupos de todos os perfis neste dispositivo e os envia ao coletor de auditoria do White Noise, operado pela Internet Privacy Foundation. Os logs já armazenados aqui também podem ser enviados. Os logs podem incluir identificadores de grupos e mensagens, endereços de relays, datas e horários, referências pseudônimas de contas, um identificador de instalação, o modelo do seu dispositivo e a versão do aplicativo. Eles nunca incluem o conteúdo das mensagens nem chaves privadas. Esses logs são sensíveis e os usamos para investigar problemas de confiabilidade. Eles são separados do compartilhamento de dados de uso e telemetria. Desativar o compartilhamento interrompe novas gravações e novos envios, embora um envio já em andamento possa ser concluído. Os logs neste dispositivo e os já enviados permanecem onde estão. Cancelar mantém o compartilhamento desativado.</string>
     <string name="audit_upload_confirm">Ativar envio automático</string>
     <string name="audit_upload_renew">Os detalhes do compartilhamento mudaram. Revise-os antes de reativar os logs de diagnóstico de grupos.</string>
     <string name="diagnostics_group_disclosure">Os logs de diagnóstico de grupos ajudam a investigar problemas de confiabilidade. Eles se referem aos membros por referências hash. Cada log pode conter identificadores técnicos e alterações de membros com data e hora. Eles nunca incluem o conteúdo das mensagens, nomes de perfis, nomes de grupos ou chaves privadas.</string>
@@ -2071,4 +2105,7 @@
     <string name="export_audit_logs_confirm_action">Continuar</string>
     <string name="toast_couldnt_export_audit_logs">Não foi possível preparar os logs de diagnóstico para exportação</string>
     <string name="toast_no_audit_logs_to_export">Não há logs de diagnóstico para exportar</string>
+    <string name="dictation_pause_other_audio_title">Pausar outro áudio</string>
+    <string name="dictation_pause_other_audio_subtitle">Pausa música e podcasts durante o ditado; podem retomar quando a gravação terminar. A leitura em voz alta e as mensagens de voz do White Noise são sempre pausadas por segurança.</string>
+    <string name="dictation_audio_focus_unavailable">Não foi possível pausar outro áudio. Tenta novamente ou desativa esta opção nas definições de ditado.</string>
 </resources>

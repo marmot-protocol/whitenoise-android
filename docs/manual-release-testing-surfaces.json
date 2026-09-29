@@ -7740,7 +7740,8 @@
         "anchor": "fun DictationSettingsScreen(",
         "test_ids": [
           "DIC-002",
-          "DIC-004"
+          "DIC-004",
+          "DIC-007"
         ]
       },
       {
@@ -8940,6 +8941,234 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
         "anchor": "R.string.close",
         "test_ids": ["SET-020"]
+      },
+      {
+        "surface": "PollCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
+        "anchor": "internal fun PollCard(",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "PollOptionRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
+        "anchor": "private fun PollOptionRow(",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "PollSenderAvatar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
+        "anchor": "private fun PollSenderAvatar(",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "PollTimelineRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
+        "anchor": "internal fun PollTimelineRow(",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "PollCreateDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "fun PollCreateDialog(",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "PollCreateForm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "internal fun PollCreateForm(",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "PollDeadlineChoices",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "private fun PollDeadlineChoices(",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "Group poll composer action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAttachmentMenu.kt",
+        "anchor": "R.string.poll_create",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "MDK v5 audit runtime destination",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AuditRuntimeReadiness.kt",
+        "anchor": "internal fun auditOtlpConfigV5(",
+        "test_ids": ["SEC-015"]
+      },
+      {
+        "surface": "string:poll_create_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/PollConversationActions.kt",
+        "anchor": "R.string.poll_create_failed",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_vote_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/PollConversationActions.kt",
+        "anchor": "R.string.poll_vote_failed",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_preview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/CopyBundles.kt",
+        "anchor": "R.string.poll_preview",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_duration_5_minutes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_duration_5_minutes",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_duration_1_day",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_duration_1_day",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_duration_1_hour",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_duration_1_hour",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_duration_1_week",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_duration_1_week",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_30_days",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_30_days",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_add_option",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_add_option",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_add_two_options",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_add_two_options",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_create",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_create",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_deadline",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_deadline",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_duplicate_option",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_duplicate_option",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_enter_question",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_enter_question",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_multiple_choice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_multiple_choice",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_no_deadline",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_no_deadline",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_option",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_option",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_option_too_long",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_option_too_long",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_question",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_question",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_question_too_long",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_question_too_long",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_remove_option",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_remove_option",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_single_choice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_single_choice",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_submit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_submit",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_closed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
+        "anchor": "R.string.poll_closed",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_ends_at",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
+        "anchor": "R.string.poll_ends_at",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_multiple_choice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
+        "anchor": "R.string.poll_multiple_choice",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_single_choice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
+        "anchor": "R.string.poll_single_choice",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "string:poll_preview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
+        "anchor": "R.string.poll_preview",
+        "test_ids": ["MSG-021"]
       }
     ],
     "settings_controls": [
@@ -11505,6 +11734,14 @@
         "test_ids": [
           "DIC-001",
           "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:dictation_audio_focus_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.dictation_audio_focus_unavailable",
+        "test_ids": [
+          "DIC-007"
         ]
       },
       {
@@ -19773,6 +20010,22 @@
         ]
       },
       {
+        "surface": "setting:dictation_pause_other_audio_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "R.string.dictation_pause_other_audio_title",
+        "test_ids": [
+          "DIC-007"
+        ]
+      },
+      {
+        "surface": "setting:dictation_pause_other_audio_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "R.string.dictation_pause_other_audio_subtitle",
+        "test_ids": [
+          "DIC-007"
+        ]
+      },
+      {
         "surface": "setting:dictation_finish_manual",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
         "anchor": "R.string.dictation_finish_manual",
@@ -23845,6 +24098,23 @@
         "anchor": "fun ConversationController.loadOlderPageInternal(",
         "test_ids": [
           "CON-003"
+        ]
+      },
+      {
+        "surface": "A superseded page retries the replacement window within a bounded gesture",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationTimelinePaging.kt",
+        "anchor": "fun ConversationController.pageWithRetryBudget(",
+        "test_ids": [
+          "CON-003"
+        ]
+      },
+      {
+        "surface": "A reply jump retries a superseded window before reporting the target unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationMessageAvailability.kt",
+        "anchor": "fun retryConversationWindowJump(",
+        "test_ids": [
+          "CON-003",
+          "CON-012"
         ]
       },
       {

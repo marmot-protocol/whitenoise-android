@@ -126,6 +126,7 @@ import dev.ipf.whitenoise.android.state.advanceConversationReadAnchor
 import dev.ipf.whitenoise.android.state.attachmentsFor
 import dev.ipf.whitenoise.android.state.chatCreateOpenConversationTimingStage
 import dev.ipf.whitenoise.android.state.conversationWindowCanReportVisible
+import dev.ipf.whitenoise.android.state.createPoll
 import dev.ipf.whitenoise.android.state.currentTtsConversationDestination
 import dev.ipf.whitenoise.android.state.hasKnownTranscriptPresentation
 import dev.ipf.whitenoise.android.state.isLoadingOlder
@@ -1750,6 +1751,7 @@ internal fun ConversationScreen(
     // Reuses the recipient picker; the selection sends a `nostr:npub…` reference
     // the recipient can tap to open that profile.
     var shareUserPickerOpen by remember(chat.id) { mutableStateOf(false) }
+    var pollCreateOpen by remember(chat.id) { mutableStateOf(false) }
     val shareUserSelection = remember(chat.id) { mutableStateListOf<RecipientSearch.Candidate>() }
     val contactPickerLauncher =
         rememberLauncherForActivityResult(PickContactPhoneRow()) { contactUri ->
@@ -3737,6 +3739,12 @@ internal fun ConversationScreen(
                 },
                 onShareUser = { shareUserPickerOpen = true },
                 onShareContact = { contactPickerLauncher.launch(Unit) },
+                onCreatePoll =
+                    if (!controller.isDirectConversation) {
+                        { pollCreateOpen = true }
+                    } else {
+                        null
+                    },
                 onPasteImageUris = { uris ->
                     val openSlots = (MEDIA_PICKER_MAX_ITEMS - pendingMediaSlots.size).coerceAtLeast(0)
                     val pasteCandidates = uris.take(openSlots)
@@ -4405,6 +4413,22 @@ internal fun ConversationScreen(
             onSend = { selected ->
                 pendingContactShare = null
                 mediaSender.sendSharedContact(selected)
+            },
+        )
+    }
+
+    if (pollCreateOpen) {
+        PollCreateDialog(
+            onDismiss = { pollCreateOpen = false },
+            onSubmit = { question, options, type, deadlineDurationSeconds, onResult ->
+                appState.launchMutation {
+                    var created = false
+                    try {
+                        created = controller.createPoll(question, options, type, deadlineDurationSeconds)
+                    } finally {
+                        onResult(created)
+                    }
+                }
             },
         )
     }

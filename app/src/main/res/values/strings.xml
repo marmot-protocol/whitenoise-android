@@ -1,6 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">White Noise</string>
+    <string name="poll_preview">Poll</string>
+    <string name="poll_unsupported">This poll cannot be displayed</string>
+    <string name="poll_closed">Poll closed</string>
+    <string name="poll_vote_failed">Couldn\'t submit vote</string>
+    <string name="poll_create_failed">Couldn\'t create poll</string>
+    <string name="poll_enter_question">Enter a question.</string>
+    <string name="poll_question_too_long">This question is too long.</string>
+    <string name="poll_add_two_options">Add at least two options.</string>
+    <string name="poll_option_too_long">One of the options is too long.</string>
+    <string name="poll_duplicate_option">Each option must be different.</string>
+    <string name="poll_create">Create poll</string>
+    <string name="poll_question">Question</string>
+    <string name="poll_option">Option %1$d</string>
+    <string name="poll_add_option">Add option</string>
+    <string name="poll_remove_option">Remove option %1$d</string>
+    <string name="poll_single_choice">Single choice</string>
+    <string name="poll_multiple_choice">Multiple choice</string>
+    <string name="poll_submit">Post poll</string>
+    <string name="poll_deadline">Poll closes</string>
+    <string name="poll_no_deadline">No deadline</string>
+    <string name="poll_30_days">30 days</string>
+    <string name="poll_duration_5_minutes">5 minutes</string>
+    <string name="poll_duration_1_hour">1 Hour</string>
+    <string name="poll_duration_1_day">1 Day</string>
+    <string name="poll_duration_1_week">1 Week</string>
+    <string name="poll_ends_at">Closes %1$s</string>
+    <plurals name="poll_option_votes">
+        <item quantity="one">%1$d vote</item>
+        <item quantity="other">%1$d votes</item>
+    </plurals>
+    <plurals name="poll_participants">
+        <item quantity="one">%1$d participant</item>
+        <item quantity="other">%1$d participants</item>
+    </plurals>
     <!-- In-app brand wordmark (onboarding landing). Always the product name and
          deliberately NOT app_name: the debug build type overrides app_name to
          "White Noise Dev" for the launcher label, but the in-app brand stays
@@ -1490,6 +1524,7 @@
     <string name="dictation_microphone_muted">Microphone access is off</string>
     <string name="dictation_microphone_muted_help">Turn on microphone access in Android privacy settings or Quick Settings, then try dictation again.</string>
     <string name="dictation_microphone_in_use">The microphone is already in use</string>
+    <string name="dictation_audio_focus_unavailable">Could not pause other audio. Try again or turn off Pause other audio in Dictation settings.</string>
     <string name="dictation_no_speech">No speech was recognized</string>
     <string name="dictation_network_error">Speech service couldn’t connect</string>
     <string name="dictation_recognizer_busy">Speech service is busy</string>
@@ -1502,6 +1537,8 @@
     <string name="dictation_disclosure_message">The speech service installed on this device processes what you say and may send the audio to its provider. White Noise keeps the text it returns only until you paste or send it. Sending automatically is off unless you turn it on in Dictation settings.</string>
     <string name="dictation_continue">Continue</string>
     <string name="dictation_settings_title">Dictation</string>
+    <string name="dictation_pause_other_audio_title">Pause other audio</string>
+    <string name="dictation_pause_other_audio_subtitle">Pause music and podcasts during dictation; they can resume when recording stops. White Noise speech and voice messages always pause for safety.</string>
     <string name="dictation_settings_explainer">The speech service installed on this device processes the audio and may send it to its provider. White Noise keeps the text it returns only until you paste or send it.</string>
     <string name="dictation_ostt_recommendation_title">Get Offline Speech to Text</string>
     <string name="dictation_ostt_recommendation_summary">Recommended transcription app for private, on-device dictation. Available from Zapstore, not Google Play.</string>
@@ -2210,7 +2247,7 @@
     <string name="audit_upload_title">Share group diagnostic logs</string>
     <string name="audit_upload_subtitle">Shares group diagnostic logs for every profile on this device.</string>
     <string name="audit_upload_confirm_title">Share group diagnostic logs with White Noise?</string>
-    <string name="audit_upload_disclosure">White Noise records group diagnostic logs for every profile on this device and uploads them to Goggles, operated by the Internet Privacy Foundation. Logs already stored here may be uploaded too. Logs can include group and message IDs, relay addresses, timestamps, pseudonymous account references, an installation ID, your device model, and the app version. They never include message contents or private keys. These logs are sensitive, and we use them to investigate reliability problems. They stay separate from usage and telemetry sharing. Turning sharing off stops new recording and new uploads, though an upload already under way may finish. Logs on this device and logs already uploaded stay where they are. Cancel leaves sharing off.</string>
+    <string name="audit_upload_disclosure">White Noise records group diagnostic logs for every profile on this device and uploads them to the White Noise audit collector, operated by the Internet Privacy Foundation. Logs already stored here may be uploaded too. Logs can include group and message IDs, relay addresses, timestamps, pseudonymous account references, an installation ID, your device model, and the app version. They never include message contents or private keys. These logs are sensitive, and we use them to investigate reliability problems. They stay separate from usage and telemetry sharing. Turning sharing off stops new recording and new uploads, though an upload already under way may finish. Logs on this device and logs already uploaded stay where they are. Cancel leaves sharing off.</string>
     <string name="audit_upload_confirm">Enable automatic sharing</string>
     <string name="audit_upload_renew">The sharing details have changed. Review them before turning group diagnostic logs back on.</string>
     <string name="diagnostics_group_disclosure">Group diagnostic logs help investigate reliability problems. They refer to members by hashed references. Each log can carry technical identifiers and timestamped membership changes. They never include message contents, profile names, group names, or private keys.</string>

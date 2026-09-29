@@ -5,23 +5,23 @@ import org.junit.Test
 import java.io.File
 
 class ConversationDictationPlaybackHandoffSourceCoverageTest {
-    /** Verifies AppState wires paired playback pause and resume hooks into dictation. */
+    /** Verifies AppState wires paired capture hooks through the app and external-media handoff. */
     @Test
     fun appStateUsesPairedPauseAndResumeCallbacksForDictationCapture() {
-        val source = source("state/AppState.kt")
-        val wiring =
-            source.substring(
-                source.indexOf("onBeforeRecognition = {"),
-                source.indexOf("tryAcquireMicrophone =", source.indexOf("onBeforeRecognition = {")),
-            )
+        val appState = source("state/AppState.kt")
+        assertTrue(appState.contains("onBeforeRecognition = conversationDictationMediaHandoff::beforeRecognition"))
+        assertTrue(appState.contains("onAfterAudioCapture = conversationDictationMediaHandoff::afterAudioCapture"))
 
-        assertTrue(
-            wiring.contains("conversationDictationPlaybackHandoff.pauseActivePlayback()") &&
-                wiring.contains(
-                    "conversationDictationPlaybackHandoff.resumeInterruptedPlayback()",
-                ),
-        )
-        assertTrue(!wiring.contains("stopSpeaking()"))
+        val source = source("state/ConversationDictationPlaybackHandoff.kt")
+        val capture =
+            source.substring(
+                source.indexOf("internal class ConversationDictationMediaHandoff"),
+                source.indexOf("internal class ConversationDictationPlaybackHandoff"),
+            )
+        assertTrue(capture.indexOf("playback.pauseActivePlayback()") < capture.indexOf("externalFocus.acquire()"))
+        assertTrue(capture.indexOf("externalFocus.release()") < capture.indexOf("playback.resumeInterruptedPlayback()"))
+        assertTrue(capture.contains("target.pauseOtherAudio && !externalFocus.acquire()"))
+        assertTrue(!capture.contains("stopSpeaking()"))
     }
 
     /** Verifies voice restoration validates both the retained player and interruption token. */

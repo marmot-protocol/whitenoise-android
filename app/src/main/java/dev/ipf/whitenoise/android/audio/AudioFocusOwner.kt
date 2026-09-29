@@ -15,6 +15,7 @@ object AudioFocusOwner {
     enum class Owner {
         Voice,
         Tts,
+        Dictation,
     }
 
     val ttsSpeechAttributes: AudioAttributes =

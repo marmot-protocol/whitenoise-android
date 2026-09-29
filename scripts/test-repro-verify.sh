@@ -68,8 +68,8 @@ export JAVA_HOME="$fake_jdk"
 export ANDROID_HOME="$fake_sdk"
 export ANDROID_SDK_ROOT="$fake_sdk"
 export WHITENOISE_PRODUCTION_KEYSTORE_PATH=must-not-leak
-export WHITENOISE_PRODUCTION_OTLP_AUTH_TOKEN=must-not-leak
-export WHITENOISE_STAGING_AUDIT_LOG_AUTH_TOKEN=must-not-leak
+export WHITENOISE_OTLP_AUTH_TOKEN=must-not-leak
+export WHITENOISE_AUDIT_OTLP_AUTH_TOKEN=must-not-leak
 export JAVA_TOOL_OPTIONS=must-not-leak
 fake_work="$FIXTURE_DIR/fake-work"
 fake_gradle_home="$FIXTURE_DIR/gradle-home"
@@ -87,8 +87,8 @@ repro_verify_write_jvm_report_init_script "$fake_init"
 repro_verify_build "$fake_tree" deadbeefdeadbeefdeadbeefdeadbeefdeadbeef \
   "$fake_gradle_home" "$fake_jvm_report" "$fake_init" "$fake_expected_jvm_report"
 repro_verify_assert_build_jvm "$fake_jvm_report" "$fake_expected_jvm_report" tree1
-unset WHITENOISE_PRODUCTION_KEYSTORE_PATH WHITENOISE_PRODUCTION_OTLP_AUTH_TOKEN
-unset WHITENOISE_STAGING_AUDIT_LOG_AUTH_TOKEN JAVA_TOOL_OPTIONS
+unset WHITENOISE_PRODUCTION_KEYSTORE_PATH WHITENOISE_OTLP_AUTH_TOKEN
+unset WHITENOISE_AUDIT_OTLP_AUTH_TOKEN JAVA_TOOL_OPTIONS
 
 distribution_source="$FIXTURE_DIR/distribution-source"
 distribution_destination="$FIXTURE_DIR/distribution-destination"
@@ -107,7 +107,7 @@ if repro_verify_seed_gradle_distribution "$FIXTURE_DIR/missing-distribution" \
   exit 1
 fi
 
-if grep -Eq 'must-not-leak|WHITENOISE_PRODUCTION_KEYSTORE_PATH|WHITENOISE_PRODUCTION_OTLP_AUTH_TOKEN|WHITENOISE_STAGING_AUDIT_LOG_AUTH_TOKEN|JAVA_TOOL_OPTIONS' "$fake_tree/captured-env"; then
+if grep -Eq 'must-not-leak|WHITENOISE_PRODUCTION_KEYSTORE_PATH|WHITENOISE_OTLP_AUTH_TOKEN|WHITENOISE_AUDIT_OTLP_AUTH_TOKEN|JAVA_TOOL_OPTIONS' "$fake_tree/captured-env"; then
   echo 'error: build inherited non-canonical environment variables' >&2
   exit 1
 fi

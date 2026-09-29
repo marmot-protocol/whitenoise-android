@@ -9,6 +9,8 @@ import re
 import sys
 from pathlib import Path
 
+from audit_otlp_endpoint import android_usable_audit_otlp_endpoint
+
 HEX40 = re.compile(r"[0-9a-f]{40}")
 PACKAGE_NAME = "dev.ipf.whitenoise.android.staging"
 WORKFLOW_NAME = "Android Staging APK"
@@ -38,6 +40,7 @@ def require(name: str) -> str:
 
 
 def build_attestation() -> dict[str, object]:
+    """Attest only trusted staging builds with a usable authenticated v5 route."""
     if require("GITHUB_ACTIONS") != "true":
         raise ValueError("attestation generation is restricted to GitHub Actions")
     if require("GITHUB_REPOSITORY") != EXPECTED_REPOSITORY:
@@ -59,8 +62,11 @@ def build_attestation() -> dict[str, object]:
     if not HEX40.fullmatch(source_revision):
         raise ValueError("GITHUB_SHA must be a lowercase 40-character revision")
 
-    endpoint_configured = bool(require("WHITENOISE_AUDIT_LOG_ENDPOINT").strip())
-    auth_configured = bool(require("WHITENOISE_AUDIT_LOG_AUTH_TOKEN").strip())
+    endpoint = require("WHITENOISE_AUDIT_OTLP_ENDPOINT").strip()
+    if not android_usable_audit_otlp_endpoint(endpoint):
+        raise ValueError("staging audit OTLP endpoint must be HTTPS /v1/logs")
+    endpoint_configured = True
+    auth_configured = bool(require("WHITENOISE_AUDIT_OTLP_AUTH_TOKEN").strip())
     if not endpoint_configured or not auth_configured:
         raise ValueError("authenticated staging audit upload must be configured")
 

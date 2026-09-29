@@ -114,6 +114,16 @@ internal fun DictationSettingsScreen(
                                     ?: stringResource(R.string.dictation_provider_automatic),
                         )
                     }
+                    row("pause_other_audio") { context ->
+                        SettingsSwitch(
+                            context = context,
+                            title = stringResource(R.string.dictation_pause_other_audio_title),
+                            checked = preferences.pauseOtherAudio,
+                            onCheckedChange = appState.conversationDictationPreferences::setPauseOtherAudio,
+                            modifier = Modifier.testTag("dictation.pause_other_audio"),
+                            subtitle = stringResource(R.string.dictation_pause_other_audio_subtitle),
+                        )
+                    }
                     row("finish") { context ->
                         SettingsLink(
                             context = context,

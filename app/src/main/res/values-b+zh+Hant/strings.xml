@@ -1,6 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">White Noise</string>
+    <string name="poll_preview">投票</string>
+    <string name="poll_unsupported">無法顯示此投票</string>
+    <string name="poll_closed">投票已結束</string>
+    <string name="poll_vote_failed">無法提交投票</string>
+    <string name="poll_create_failed">無法建立投票</string>
+    <string name="poll_enter_question">輸入問題。</string>
+    <string name="poll_question_too_long">這個問題太長。</string>
+    <string name="poll_add_two_options">請至少新增兩個選項。</string>
+    <string name="poll_option_too_long">其中一個選項太長。</string>
+    <string name="poll_duplicate_option">每個選項必須不同。</string>
+    <string name="poll_create">建立投票</string>
+    <string name="poll_question">問題</string>
+    <string name="poll_option">選項 %1$d</string>
+    <string name="poll_add_option">新增選項</string>
+    <string name="poll_remove_option">移除選項 %1$d</string>
+    <string name="poll_single_choice">單選</string>
+    <string name="poll_multiple_choice">多選</string>
+    <string name="poll_submit">發佈投票</string>
+    <string name="poll_deadline">投票結束時間</string>
+    <string name="poll_no_deadline">不設截止時間</string>
+    <string name="poll_30_days">30 天</string>
+    <string name="poll_duration_5_minutes">5 分鐘</string>
+    <string name="poll_duration_1_hour">1 小時</string>
+    <string name="poll_duration_1_day">1 天</string>
+    <string name="poll_duration_1_week">1 週</string>
+    <string name="poll_ends_at">%1$s 結束</string>
+    <plurals name="poll_option_votes">
+        <item quantity="other">%1$d 票</item>
+    </plurals>
+    <plurals name="poll_participants">
+        <item quantity="other">%1$d 人參與</item>
+    </plurals>
     <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">White Noise 無法啟動</string>
     <string name="startup_taking_too_long">啟動時間超出預期。請再試一次。</string>
@@ -2017,7 +2049,7 @@
     <string name="audit_upload_title">分享群組診斷日誌</string>
     <string name="audit_upload_subtitle">分享此裝置上所有個人檔案的群組診斷日誌。</string>
     <string name="audit_upload_confirm_title">與 White Noise 分享群組診斷日誌？</string>
-    <string name="audit_upload_disclosure">White Noise 會記錄此裝置上所有個人檔案的群組診斷日誌，並上傳至由 Internet Privacy Foundation 營運的 Goggles。已儲存在此裝置上的日誌也可能被上傳。日誌可能包含群組與訊息 ID、中繼站位址、時間戳記、化名帳戶參照、安裝 ID、你的裝置型號及應用程式版本，但絕不包含訊息內容或私密金鑰。這些日誌屬於敏感資料，我們會用來調查可靠性問題。它們與使用情況和遙測分享相互獨立。關閉分享會停止新的記錄和新的上傳，但已在進行的上傳可能會完成。此裝置上的日誌和已上傳的日誌都會維持原樣。選擇「取消」則維持分享關閉。</string>
+    <string name="audit_upload_disclosure">White Noise 會記錄此裝置上所有個人檔案的群組診斷日誌，並上傳至由 Internet Privacy Foundation 營運的 White Noise 稽核資料收集服務。已儲存在此裝置上的日誌也可能被上傳。日誌可能包含群組與訊息 ID、中繼站位址、時間戳記、化名帳戶參照、安裝 ID、你的裝置型號及應用程式版本，但絕不包含訊息內容或私密金鑰。這些日誌屬於敏感資料，我們會用來調查可靠性問題。它們與使用情況和遙測分享相互獨立。關閉分享會停止新的記錄和新的上傳，但已在進行的上傳可能會完成。此裝置上的日誌和已上傳的日誌都會維持原樣。選擇「取消」則維持分享關閉。</string>
     <string name="audit_upload_confirm">啟用自動分享</string>
     <string name="audit_upload_renew">分享說明已變更。請先查看，再重新開啟群組診斷日誌。</string>
     <string name="diagnostics_group_disclosure">群組診斷日誌有助於調查可靠性問題。日誌以雜湊參照來指稱成員，可能包含技術識別碼以及附時間戳記的成員變動記錄，但絕不包含訊息內容、個人檔案名稱、群組名稱或私密金鑰。</string>
@@ -2043,4 +2075,7 @@
     <string name="export_audit_logs_confirm_action">繼續</string>
     <string name="toast_couldnt_export_audit_logs">無法準備要匯出的診斷日誌</string>
     <string name="toast_no_audit_logs_to_export">沒有可匯出的診斷日誌</string>
+    <string name="dictation_pause_other_audio_title">暫停其他音訊</string>
+    <string name="dictation_pause_other_audio_subtitle">聽寫期間暫停音樂和播客；錄音結束後可繼續播放。為安全起見，White Noise 的朗讀和語音訊息一律會暫停。</string>
+    <string name="dictation_audio_focus_unavailable">無法暫停其他音訊。請重試，或在聽寫設定中關閉「暫停其他音訊」。</string>
 </resources>
