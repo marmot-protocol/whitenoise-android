@@ -4,8 +4,10 @@ import android.content.Context
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
@@ -62,6 +64,7 @@ class EmojiPickerScreenshotTest {
     val composeRule = createComposeRule()
 
     private val context: Context = ApplicationProvider.getApplicationContext()
+    private lateinit var focusManager: FocusManager
 
     /** Resolves a string resource in the test context. */
     private fun string(resId: Int): String = context.getString(resId)
@@ -232,6 +235,7 @@ class EmojiPickerScreenshotTest {
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled, fontScale = appFontScale) {
+                focusManager = LocalFocusManager.current
                 val base = LocalDensity.current
                 CompositionLocalProvider(
                     LocalDensity provides Density(base.density, fontScale = osFontScale),
@@ -276,7 +280,11 @@ class EmojiPickerScreenshotTest {
                     .onNodeWithTag(emojiPickerHeaderTestTag(EmojiCategory.Recent), useUnmergedTree = true)
                     .assertDoesNotExist()
                 composeRule.onNodeWithText(FIRST_SEARCH_EMOJI).assertIsDisplayed()
-            }.onSuccess { return }
+            }.onSuccess {
+                // Search results, not the text cursor's blink phase, are the screenshot subject.
+                composeRule.runOnIdle { focusManager.clearFocus() }
+                return
+            }
             Thread.sleep(20)
         }
         error("Emoji search results did not load for query=$query")
