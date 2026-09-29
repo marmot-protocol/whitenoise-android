@@ -23633,6 +23633,14 @@
         ]
       },
       {
+        "surface": "Interactive attachment WorkManager foreground fallback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentWorkForegroundInfo.kt",
+        "anchor": "ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC",
+        "test_ids": [
+          "MED-022"
+        ]
+      },
+      {
         "surface": "source:app/src/main/java/dev/ipf/whitenoise/android/MainActivity.kt",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/MainActivity.kt",
         "anchor": "WhiteNoiseApp",
