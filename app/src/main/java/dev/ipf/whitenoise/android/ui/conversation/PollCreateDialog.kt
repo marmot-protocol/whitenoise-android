@@ -17,6 +17,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -41,7 +42,7 @@ import dev.ipf.whitenoise.android.state.POLL_WEEK_SECONDS
 
 /** Edits a short poll draft; MDK remains the only owner of published poll state. */
 @Composable
-@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
+@Suppress("FunctionNaming", "LongMethod") // Dialog owns the draft and submit callback.
 internal fun PollCreateDialog(
     onDismiss: () -> Unit,
     onSubmit: (String, List<String>, PollTypeFfi, Long?, (Boolean) -> Unit) -> Unit,
@@ -51,7 +52,7 @@ internal fun PollCreateDialog(
     var multiple by rememberSaveable { mutableStateOf(false) }
     var deadlineDurationSeconds by rememberSaveable { mutableStateOf<Long?>(null) }
     var submitting by remember { mutableStateOf(false) }
-    val valid = question.isNotBlank() && options.size in 2..MAX_POLL_OPTIONS && options.all { it.isNotBlank() }
+    var issue by remember { mutableStateOf<PollDraftIssue?>(null) }
     AlertDialog(
         onDismissRequest = { if (!submitting) onDismiss() },
         title = { Text(stringResource(R.string.poll_create)) },
@@ -62,22 +63,38 @@ internal fun PollCreateDialog(
                 multiple = multiple,
                 deadlineDurationSeconds = deadlineDurationSeconds,
                 enabled = !submitting,
-                onQuestionChange = { question = it },
-                onOptionChange = { index, value -> options = options.toMutableList().also { it[index] = value } },
-                onRemoveOption = { index -> options = options.filterIndexed { i, _ -> i != index } },
-                onAddOption = { options = options + "" },
+                issue = issue,
+                onQuestionChange = {
+                    question = it
+                    issue = null
+                },
+                onOptionChange = { index, value ->
+                    options = options.toMutableList().also { it[index] = value }
+                    issue = null
+                },
+                onRemoveOption = { index ->
+                    options = options.filterIndexed { i, _ -> i != index }
+                    issue = null
+                },
+                onAddOption = {
+                    options = options + ""
+                    issue = null
+                },
                 onMultipleChange = { multiple = it },
                 onDeadlineChange = { deadlineDurationSeconds = it },
             )
         },
         confirmButton = {
             Button(
-                enabled = valid && !submitting,
+                enabled = !submitting,
                 onClick = {
+                    val draft = validatePollDraft(question, options)
+                    issue = draft.issue
+                    if (draft.issue != null) return@Button
                     submitting = true
                     onSubmit(
-                        question,
-                        options,
+                        draft.question,
+                        draft.options,
                         if (multiple) PollTypeFfi.MULTIPLE_CHOICE else PollTypeFfi.SINGLE_CHOICE,
                         deadlineDurationSeconds,
                     ) { created ->
@@ -96,13 +113,14 @@ internal fun PollCreateDialog(
 /** Keeps the poll draft controls scrollable inside the dialog and in compact windows. */
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
-@Suppress("FunctionNaming", "LongParameterList") // Form callbacks keep draft state in the dialog.
+@Suppress("FunctionNaming", "LongParameterList", "LongMethod") // Form keeps all draft fields in one scrollable panel.
 internal fun PollCreateForm(
     question: String,
     options: List<String>,
     multiple: Boolean,
     deadlineDurationSeconds: Long?,
     enabled: Boolean,
+    issue: PollDraftIssue? = null,
     onQuestionChange: (String) -> Unit,
     onOptionChange: (Int, String) -> Unit,
     onRemoveOption: (Int) -> Unit,
@@ -121,7 +139,21 @@ internal fun PollCreateForm(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             enabled = enabled,
+            isError = issue == PollDraftIssue.MISSING_QUESTION || issue == PollDraftIssue.QUESTION_TOO_LONG,
         )
+        val questionIssue =
+            when (issue) {
+                PollDraftIssue.MISSING_QUESTION -> R.string.poll_enter_question
+                PollDraftIssue.QUESTION_TOO_LONG -> R.string.poll_question_too_long
+                else -> null
+            }
+        if (questionIssue != null) {
+            Text(
+                stringResource(questionIssue),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
         options.forEachIndexed { index, value ->
             Row {
                 OutlinedTextField(
@@ -141,6 +173,20 @@ internal fun PollCreateForm(
                     }
                 }
             }
+        }
+        val optionIssue =
+            when (issue) {
+                PollDraftIssue.TOO_FEW_OPTIONS -> R.string.poll_add_two_options
+                PollDraftIssue.OPTION_TOO_LONG -> R.string.poll_option_too_long
+                PollDraftIssue.DUPLICATE_OPTION -> R.string.poll_duplicate_option
+                else -> null
+            }
+        if (optionIssue != null) {
+            Text(
+                stringResource(optionIssue),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
         if (options.size < MAX_POLL_OPTIONS) {
             TextButton(onClick = onAddOption, enabled = enabled) {

@@ -6,22 +6,12 @@ import org.junit.Test
 import java.io.File
 
 class PreviewAuditCredentialIsolationTest {
-    /** Preview builds must never inherit either v4 or v5 production audit credentials. */
+    /** Preview builds must never inherit production v5 audit credentials. */
     @Test
     fun previewFlavorKeepsAuditEndpointAndTokenEmpty() {
         val source = buildGradleSource()
         val previewBlock = source.substringAfter("create(\"preview\") {").substringBefore("create(\"production\") {")
 
-        assertTrue(
-            previewBlock.contains(
-                "buildConfigField(\"String\", \"WHITENOISE_AUDIT_LOG_ENDPOINT\", \"\".asBuildConfigString())",
-            ),
-        )
-        assertTrue(
-            previewBlock.contains(
-                "buildConfigField(\"String\", \"WHITENOISE_AUDIT_LOG_AUTH_TOKEN\", \"\".asBuildConfigString())",
-            ),
-        )
         assertTrue(
             previewBlock.contains(
                 "buildConfigField(\"String\", \"WHITENOISE_AUDIT_OTLP_ENDPOINT\", \"\".asBuildConfigString())",
@@ -44,8 +34,8 @@ class PreviewAuditCredentialIsolationTest {
         )
         assertFalse(previewBlock.contains("environmentRuntimeConfigProperty"))
         assertFalse(previewBlock.contains("runtimeConfigProperty"))
-        assertFalse(previewBlock.contains("AUDIT_LOG_ENDPOINT)"))
-        assertFalse(previewBlock.contains("AUDIT_LOG_AUTH_TOKEN)"))
+        assertFalse(source.contains("WHITENOISE_AUDIT_LOG_ENDPOINT"))
+        assertFalse(source.contains("WHITENOISE_AUDIT_LOG_AUTH_TOKEN"))
     }
 
     private fun buildGradleSource(): String =

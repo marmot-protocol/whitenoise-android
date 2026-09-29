@@ -49,11 +49,8 @@ internal class AuditRuntimeReadinessMarker(
 private val processAuditRuntimeReadinessMarker =
     AuditRuntimeReadinessMarker { marker -> Log.i("WhiteNoiseAudit", marker) }
 
-/** Keeps historical v4 drain metadata and configures the current v5 sender on every runtime. */
+/** Configures v5 delivery and keeps source metadata without a legacy v4 upload destination. */
 internal suspend fun MarmotInterface.configureAuditRuntime(uploadConsentGranted: Boolean = false) {
-    val auditEndpoint = BuildConfig.WHITENOISE_AUDIT_LOG_ENDPOINT.trim().takeIf(String::isNotEmpty)
-    val auditAuthorizationBearerToken =
-        BuildConfig.WHITENOISE_AUDIT_LOG_AUTH_TOKEN.trim().takeIf(String::isNotEmpty)
     setAuditOtlpConfigV5(
         auditOtlpConfigV5(
             uploadConsentGranted = uploadConsentGranted,
@@ -64,8 +61,8 @@ internal suspend fun MarmotInterface.configureAuditRuntime(uploadConsentGranted:
     )
     setAuditLogTrackerConfig(
         AuditLogTrackerConfigV4Ffi(
-            endpoint = auditEndpoint,
-            authorizationBearerToken = auditAuthorizationBearerToken.takeIf { uploadConsentGranted },
+            endpoint = null,
+            authorizationBearerToken = null,
             source =
                 AuditLogUploadSourceV4Ffi(
                     hardwareModel = Build.MODEL.trim().takeIf(String::isNotEmpty),

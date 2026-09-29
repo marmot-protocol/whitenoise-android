@@ -13,10 +13,11 @@ import kotlinx.coroutines.withContext
 internal class AuditUploadConsent(
     private val preferences: SharedPreferences,
 ) {
+    private val currentDisclosureRevision = 2
     private val revisionKey = "audit_upload_disclosure_revision"
     private val renewalKey = "audit_upload_disclosure_pending"
 
-    val granted: Boolean get() = preferences.getInt(revisionKey, 0) == 1
+    val granted: Boolean get() = preferences.getInt(revisionKey, 0) == currentDisclosureRevision
     var requiresChoice by mutableStateOf(preferences.getBoolean(renewalKey, false))
         private set
 
@@ -24,7 +25,7 @@ internal class AuditUploadConsent(
         check(
             preferences
                 .edit()
-                .putInt(revisionKey, if (enabled) 1 else 0)
+                .putInt(revisionKey, if (enabled) currentDisclosureRevision else 0)
                 .putBoolean(renewalKey, false)
                 .commit(),
         ) {

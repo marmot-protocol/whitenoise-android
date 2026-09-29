@@ -6,6 +6,11 @@
     <string name="poll_closed">Anket kapandı</string>
     <string name="poll_vote_failed">Oy gönderilemedi</string>
     <string name="poll_create_failed">Anket oluşturulamadı</string>
+    <string name="poll_enter_question">Bir soru girin.</string>
+    <string name="poll_question_too_long">Bu soru çok uzun.</string>
+    <string name="poll_add_two_options">En az iki seçenek ekleyin.</string>
+    <string name="poll_option_too_long">Seçeneklerden biri çok uzun.</string>
+    <string name="poll_duplicate_option">Her seçenek farklı olmalıdır.</string>
     <string name="poll_create">Anket oluştur</string>
     <string name="poll_question">Soru</string>
     <string name="poll_option">Seçenek %1$d</string>
@@ -2068,7 +2073,7 @@
     <string name="audit_upload_title">Grup tanılama günlüklerini paylaş</string>
     <string name="audit_upload_subtitle">Bu cihazdaki tüm profiller için grup tanılama günlüklerini paylaşır.</string>
     <string name="audit_upload_confirm_title">Grup tanılama günlükleri White Noise ile paylaşılsın mı?</string>
-    <string name="audit_upload_disclosure">White Noise, bu cihazdaki tüm profiller için grup tanılama günlüklerini kaydeder ve Internet Privacy Foundation tarafından işletilen Goggles’a yükler. Burada zaten saklanan günlükler de yüklenebilir. Günlükler grup ve mesaj kimliklerini, röle adreslerini, zaman damgalarını, takma adlı hesap referanslarını, bir kurulum kimliğini, cihaz modelinizi ve uygulama sürümünü içerebilir. Mesaj içeriklerini veya özel anahtarları asla içermez. Bu günlükler hassastır; güvenilirlik sorunlarını araştırmak için kullanırız. Kullanım ve telemetri paylaşımından ayrı tutulur. Paylaşımı kapatmak yeni kayıtları ve yeni yüklemeleri durdurur; ancak sürmekte olan bir yükleme tamamlanabilir. Bu cihazdaki günlükler ve daha önce yüklenmiş günlükler olduğu yerde kalır. İptal, paylaşımı kapalı bırakır.</string>
+    <string name="audit_upload_disclosure">White Noise, bu cihazdaki tüm profiller için grup tanılama günlüklerini kaydeder ve Internet Privacy Foundation tarafından işletilen White Noise denetim toplayıcısına yükler. Burada zaten saklanan günlükler de yüklenebilir. Günlükler grup ve mesaj kimliklerini, röle adreslerini, zaman damgalarını, takma adlı hesap referanslarını, bir kurulum kimliğini, cihaz modelinizi ve uygulama sürümünü içerebilir. Mesaj içeriklerini veya özel anahtarları asla içermez. Bu günlükler hassastır; güvenilirlik sorunlarını araştırmak için kullanırız. Kullanım ve telemetri paylaşımından ayrı tutulur. Paylaşımı kapatmak yeni kayıtları ve yeni yüklemeleri durdurur; ancak sürmekte olan bir yükleme tamamlanabilir. Bu cihazdaki günlükler ve daha önce yüklenmiş günlükler olduğu yerde kalır. İptal, paylaşımı kapalı bırakır.</string>
     <string name="audit_upload_confirm">Otomatik paylaşımı etkinleştir</string>
     <string name="audit_upload_renew">Paylaşım ayrıntıları değişti. Grup tanılama günlüklerini yeniden açmadan önce bunları inceleyin.</string>
     <string name="diagnostics_group_disclosure">Grup tanılama günlükleri, güvenilirlik sorunlarını araştırmaya yardımcı olur. Üyelere karma referanslarla atıfta bulunur. Her günlük teknik tanımlayıcılar ve zaman damgalı üyelik değişiklikleri içerebilir. Mesaj içeriklerini, profil adlarını, grup adlarını veya özel anahtarları asla içermez.</string>

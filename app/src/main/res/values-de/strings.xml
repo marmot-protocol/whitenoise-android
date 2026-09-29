@@ -6,9 +6,14 @@
     <string name="poll_closed">Umfrage geschlossen</string>
     <string name="poll_vote_failed">Stimme konnte nicht abgegeben werden</string>
     <string name="poll_create_failed">Umfrage konnte nicht erstellt werden</string>
+    <string name="poll_enter_question">Gib eine Frage ein.</string>
+    <string name="poll_question_too_long">Diese Frage ist zu lang.</string>
+    <string name="poll_add_two_options">Füge mindestens zwei Optionen hinzu.</string>
+    <string name="poll_option_too_long">Eine der Optionen ist zu lang.</string>
+    <string name="poll_duplicate_option">Jede Option muss unterschiedlich sein.</string>
     <string name="poll_create">Umfrage erstellen</string>
     <string name="poll_question">Frage</string>
-    <string name="poll_option">Option %1$d</string>
+    <string name="poll_option">Antwort %1$d</string>
     <string name="poll_add_option">Option hinzufügen</string>
     <string name="poll_remove_option">Option %1$d entfernen</string>
     <string name="poll_single_choice">Einfachauswahl</string>
@@ -2087,7 +2092,7 @@
     <string name="audit_upload_title">Gruppendiagnoseprotokolle teilen</string>
     <string name="audit_upload_subtitle">Teilt Gruppen-Diagnoseprotokolle für alle Profile auf diesem Gerät.</string>
     <string name="audit_upload_confirm_title">Gruppen-Diagnoseprotokolle mit White Noise teilen?</string>
-    <string name="audit_upload_disclosure">White Noise zeichnet Gruppen-Diagnoseprotokolle für alle Profile auf diesem Gerät auf und lädt sie zu Goggles hoch, betrieben von der Internet Privacy Foundation. Bereits hier gespeicherte Protokolle können ebenfalls hochgeladen werden. Protokolle können Gruppen- und Nachrichten-IDs, Relay-Adressen, Zeitstempel, pseudonyme Kontoverweise, eine Installations-ID, dein Gerätemodell und die App-Version enthalten. Nachrichteninhalte oder private Schlüssel enthalten sie nie. Diese Protokolle sind sensibel; wir nutzen sie, um Zuverlässigkeitsprobleme zu untersuchen. Sie bleiben von der Nutzungs- und Telemetriefreigabe getrennt. Wenn du die Freigabe deaktivierst, werden keine neuen Protokolle aufgezeichnet und keine neuen hochgeladen; ein bereits laufender Upload kann noch abgeschlossen werden. Protokolle auf diesem Gerät und bereits hochgeladene Protokolle bleiben, wo sie sind. Mit „Abbrechen“ bleibt die Freigabe aus.</string>
+    <string name="audit_upload_disclosure">White Noise zeichnet Gruppen-Diagnoseprotokolle für alle Profile auf diesem Gerät auf und lädt sie zum White-Noise-Auditdienst hoch, betrieben von der Internet Privacy Foundation. Bereits hier gespeicherte Protokolle können ebenfalls hochgeladen werden. Protokolle können Gruppen- und Nachrichten-IDs, Relay-Adressen, Zeitstempel, pseudonyme Kontoverweise, eine Installations-ID, dein Gerätemodell und die App-Version enthalten. Nachrichteninhalte oder private Schlüssel enthalten sie nie. Diese Protokolle sind sensibel; wir nutzen sie, um Zuverlässigkeitsprobleme zu untersuchen. Sie bleiben von der Nutzungs- und Telemetriefreigabe getrennt. Wenn du die Freigabe deaktivierst, werden keine neuen Protokolle aufgezeichnet und keine neuen hochgeladen; ein bereits laufender Upload kann noch abgeschlossen werden. Protokolle auf diesem Gerät und bereits hochgeladene Protokolle bleiben, wo sie sind. Mit „Abbrechen“ bleibt die Freigabe aus.</string>
     <string name="audit_upload_confirm">Automatisches Teilen aktivieren</string>
     <string name="audit_upload_renew">Die Angaben zur Freigabe haben sich geändert. Sieh sie dir an, bevor du Gruppen-Diagnoseprotokolle wieder aktivierst.</string>
     <string name="diagnostics_group_disclosure">Gruppen-Diagnoseprotokolle helfen, Zuverlässigkeitsprobleme zu untersuchen. Mitglieder werden darin nur über gehashte Referenzen benannt. Jedes Protokoll kann technische Kennungen und Änderungen der Mitgliedschaft mit Zeitstempel enthalten. Nachrichteninhalte, Profilnamen, Gruppennamen oder private Schlüssel enthalten sie nie.</string>

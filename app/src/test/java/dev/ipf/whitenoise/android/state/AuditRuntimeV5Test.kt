@@ -8,7 +8,7 @@ import org.junit.Test
 
 /** Covers consent and environment isolation at the v5 destination boundary. */
 class AuditRuntimeV5Test {
-    /** One shared token can route safely when the destination identity names staging. */
+    /** The local delivery cursor has a stable identity for each app flavor. */
     @Test
     fun consentedStagingUsesDedicatedLogsDestination() {
         val config =

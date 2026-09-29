@@ -6,6 +6,11 @@
     <string name="poll_closed">Poll closed</string>
     <string name="poll_vote_failed">Couldn\'t submit vote</string>
     <string name="poll_create_failed">Couldn\'t create poll</string>
+    <string name="poll_enter_question">Enter a question.</string>
+    <string name="poll_question_too_long">This question is too long.</string>
+    <string name="poll_add_two_options">Add at least two options.</string>
+    <string name="poll_option_too_long">One of the options is too long.</string>
+    <string name="poll_duplicate_option">Each option must be different.</string>
     <string name="poll_create">Create poll</string>
     <string name="poll_question">Question</string>
     <string name="poll_option">Option %1$d</string>
@@ -2235,7 +2240,7 @@
     <string name="audit_upload_title">Share group diagnostic logs</string>
     <string name="audit_upload_subtitle">Shares group diagnostic logs for every profile on this device.</string>
     <string name="audit_upload_confirm_title">Share group diagnostic logs with White Noise?</string>
-    <string name="audit_upload_disclosure">White Noise records group diagnostic logs for every profile on this device and uploads them to Goggles, operated by the Internet Privacy Foundation. Logs already stored here may be uploaded too. Logs can include group and message IDs, relay addresses, timestamps, pseudonymous account references, an installation ID, your device model, and the app version. They never include message contents or private keys. These logs are sensitive, and we use them to investigate reliability problems. They stay separate from usage and telemetry sharing. Turning sharing off stops new recording and new uploads, though an upload already under way may finish. Logs on this device and logs already uploaded stay where they are. Cancel leaves sharing off.</string>
+    <string name="audit_upload_disclosure">White Noise records group diagnostic logs for every profile on this device and uploads them to the White Noise audit collector, operated by the Internet Privacy Foundation. Logs already stored here may be uploaded too. Logs can include group and message IDs, relay addresses, timestamps, pseudonymous account references, an installation ID, your device model, and the app version. They never include message contents or private keys. These logs are sensitive, and we use them to investigate reliability problems. They stay separate from usage and telemetry sharing. Turning sharing off stops new recording and new uploads, though an upload already under way may finish. Logs on this device and logs already uploaded stay where they are. Cancel leaves sharing off.</string>
     <string name="audit_upload_confirm">Enable automatic sharing</string>
     <string name="audit_upload_renew">The sharing details have changed. Review them before turning group diagnostic logs back on.</string>
     <string name="diagnostics_group_disclosure">Group diagnostic logs help investigate reliability problems. They refer to members by hashed references. Each log can carry technical identifiers and timestamped membership changes. They never include message contents, profile names, group names, or private keys.</string>

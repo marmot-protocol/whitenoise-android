@@ -25,6 +25,24 @@ class AuditUploadConsentTest {
             .getApplicationContext<Context>()
             .getSharedPreferences("audit-consent-test", Context.MODE_PRIVATE)
 
+    /** Consent given for the former collector does not authorize the new v5 receiver. */
+    @Test
+    fun previousDisclosureRequiresNewChoiceBeforeUploading() =
+        runTest {
+            preferences
+                .edit()
+                .clear()
+                .putInt("audit_upload_disclosure_revision", 1)
+                .commit()
+            val native = Native(enabled = true)
+            val consent = AuditUploadConsent(preferences)
+            consent.prepare(native.runtime)
+            assertFalse(consent.granted)
+            assertTrue(consent.requiresChoice)
+            assertFalse(native.enabled)
+            assertEquals(listOf("clear-upload", "disable"), native.mutations)
+        }
+
     @Test
     fun oldLocalLoggingChoiceIsDisabledBeforeStartupAndRenewalSurvivesRestart() =
         runTest {

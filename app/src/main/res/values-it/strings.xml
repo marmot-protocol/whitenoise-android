@@ -6,6 +6,11 @@
     <string name="poll_closed">Sondaggio chiuso</string>
     <string name="poll_vote_failed">Impossibile inviare il voto</string>
     <string name="poll_create_failed">Impossibile creare il sondaggio</string>
+    <string name="poll_enter_question">Inserisci una domanda.</string>
+    <string name="poll_question_too_long">Questa domanda è troppo lunga.</string>
+    <string name="poll_add_two_options">Aggiungi almeno due opzioni.</string>
+    <string name="poll_option_too_long">Una delle opzioni è troppo lunga.</string>
+    <string name="poll_duplicate_option">Ogni opzione deve essere diversa.</string>
     <string name="poll_create">Crea sondaggio</string>
     <string name="poll_question">Domanda</string>
     <string name="poll_option">Opzione %1$d</string>
@@ -2070,7 +2075,7 @@
     <string name="audit_upload_title">Condividi i log diagnostici dei gruppi</string>
     <string name="audit_upload_subtitle">Condivide i log diagnostici dei gruppi per tutti i profili su questo dispositivo.</string>
     <string name="audit_upload_confirm_title">Condividere i log diagnostici dei gruppi con White Noise?</string>
-    <string name="audit_upload_disclosure">White Noise registra i log diagnostici dei gruppi per tutti i profili su questo dispositivo e li carica su Goggles, gestito da Internet Privacy Foundation. Possono essere caricati anche i log già salvati qui. I log possono includere identificatori di gruppi e messaggi, indirizzi dei relay, marcature temporali, riferimenti pseudonimi agli account, un identificatore di installazione, il modello del tuo dispositivo e la versione dell’app. Non includono mai il contenuto dei messaggi né chiavi private. Questi log sono sensibili e li usiamo per indagare sui problemi di affidabilità. Restano separati dalla condivisione dei dati di utilizzo e telemetria. Disattivare la condivisione interrompe nuove registrazioni e nuovi caricamenti, anche se un caricamento già avviato può concludersi. I log su questo dispositivo e quelli già caricati restano dove sono. Annulla lascia la condivisione disattivata.</string>
+    <string name="audit_upload_disclosure">White Noise registra i log diagnostici dei gruppi per tutti i profili su questo dispositivo e li carica al servizio di raccolta audit di White Noise, gestito da Internet Privacy Foundation. Possono essere caricati anche i log già salvati qui. I log possono includere identificatori di gruppi e messaggi, indirizzi dei relay, marcature temporali, riferimenti pseudonimi agli account, un identificatore di installazione, il modello del tuo dispositivo e la versione dell’app. Non includono mai il contenuto dei messaggi né chiavi private. Questi log sono sensibili e li usiamo per indagare sui problemi di affidabilità. Restano separati dalla condivisione dei dati di utilizzo e telemetria. Disattivare la condivisione interrompe nuove registrazioni e nuovi caricamenti, anche se un caricamento già avviato può concludersi. I log su questo dispositivo e quelli già caricati restano dove sono. Annulla lascia la condivisione disattivata.</string>
     <string name="audit_upload_confirm">Attiva condivisione automatica</string>
     <string name="audit_upload_renew">I dettagli sulla condivisione sono cambiati. Controllali prima di riattivare i log diagnostici dei gruppi.</string>
     <string name="diagnostics_group_disclosure">I log diagnostici dei gruppi aiutano a indagare sui problemi di affidabilità. Fanno riferimento ai membri tramite riferimenti hash. Ogni log può contenere identificatori tecnici e modifiche all’appartenenza con marcatura temporale. Non contengono mai contenuti dei messaggi, nomi dei profili, nomi dei gruppi o chiavi private.</string>

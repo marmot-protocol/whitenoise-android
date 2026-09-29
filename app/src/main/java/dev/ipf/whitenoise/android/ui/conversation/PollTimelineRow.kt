@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -52,6 +53,38 @@ import java.util.Date
 private const val POLL_ROW_MAX_WIDTH_FRACTION = 0.95f
 private const val POLL_MILLIS_PER_SECOND = 1_000L
 
+/** Applies an in-flight replacement vote to MDK's last projection for immediate feedback. */
+internal fun optimisticPollProjection(
+    poll: PollProjectionFfi,
+    selection: List<String>,
+): PollProjectionFfi {
+    val previous = poll.localSelection.toSet()
+    val next = selection.toSet()
+    if (previous == next) return poll
+    return poll.copy(
+        options =
+            poll.options.map { option ->
+                option.copy(
+                    votes =
+                        when {
+                            option.id in previous && option.id !in next ->
+                                if (option.votes > 0uL) option.votes - 1uL else 0uL
+                            option.id !in previous && option.id in next -> option.votes + 1uL
+                            else -> option.votes
+                        },
+                )
+            },
+        participants = if (previous.isEmpty() && next.isNotEmpty()) poll.participants + 1uL else poll.participants,
+        localSelection = selection,
+    )
+}
+
+/** Fraction of participants who selected an option, bounded for stale projections. */
+internal fun pollResultFraction(
+    votes: ULong,
+    participants: ULong,
+): Float = if (participants == 0uL) 0f else (votes.toDouble() / participants.toDouble()).toFloat().coerceIn(0f, 1f)
+
 /** Checks expiry before the first frame and again when a vote is tapped. */
 internal fun pollDeadlineReached(
     endsAt: ULong?,
@@ -82,7 +115,7 @@ internal fun replacementPollSelection(
 
 /** Shows MDK's poll projection and submits replacement selections through its native vote API. */
 @Composable
-@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
+@Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
 internal fun PollTimelineRow(
     item: TimelineMessage,
     controller: ConversationController,
@@ -95,6 +128,11 @@ internal fun PollTimelineRow(
         return
     }
     var voting by remember(item.record.messageIdHex) { mutableStateOf(false) }
+    var pendingSelection by remember(item.record.messageIdHex) { mutableStateOf<List<String>?>(null) }
+    LaunchedEffect(poll.localSelection, poll.open) {
+        if (!poll.open || pendingSelection?.toSet() == poll.localSelection.toSet()) pendingSelection = null
+    }
+    val displayedPoll = pendingSelection?.let { optimisticPollProjection(poll, it) } ?: poll
     var deadlineReached by remember(poll.endsAt) {
         mutableStateOf(pollDeadlineReached(poll.endsAt, System.currentTimeMillis()))
     }
@@ -125,16 +163,19 @@ internal fun PollTimelineRow(
                     )
                 }
                 PollCard(
-                    poll = poll,
+                    poll = displayedPoll,
                     canVote = open && controller.canSendMessages && !selectionMode && !voting,
                     onVote = { optionId ->
-                        val replacement = replacementPollSelection(poll, optionId)
+                        val replacement = replacementPollSelection(displayedPoll, optionId)
                         if (replacement != null && pollVoteAllowed(poll, System.currentTimeMillis())) {
                             voting = true
+                            pendingSelection = replacement
                             appState.launchMutation {
+                                var accepted = false
                                 try {
-                                    controller.castPollVote(item.record.messageIdHex, replacement)
+                                    accepted = controller.castPollVote(item.record.messageIdHex, replacement)
                                 } finally {
+                                    if (!accepted) pendingSelection = null
                                     voting = false
                                 }
                             }
@@ -202,7 +243,13 @@ internal fun PollCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             poll.options.forEach { option ->
-                PollOptionRow(option, selected = option.id in poll.localSelection, canVote = canVote, onVote = onVote)
+                PollOptionRow(
+                    option,
+                    selected = option.id in poll.localSelection,
+                    fraction = pollResultFraction(option.votes, poll.participants),
+                    canVote = canVote,
+                    onVote = onVote,
+                )
             }
             Text(
                 pluralStringResource(R.plurals.poll_participants, poll.participants.toInt(), poll.participants.toInt()),
@@ -227,11 +274,12 @@ internal fun PollCard(
 private fun PollOptionRow(
     option: PollOptionResultFfi,
     selected: Boolean,
+    fraction: Float,
     canVote: Boolean,
     onVote: (String) -> Unit,
 ) {
     val shape = RoundedCornerShape(24.dp)
-    Row(
+    Column(
         modifier =
             Modifier
                 .fillMaxWidth()
@@ -241,19 +289,26 @@ private fun PollOptionRow(
                 .clickable(enabled = canVote, role = Role.Button) { onVote(option.id) }
                 .semantics { this.selected = selected }
                 .padding(horizontal = 12.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Text(
-            (if (selected) "✓  " else "") + option.label,
-            modifier = Modifier.weight(1f),
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            style = MaterialTheme.typography.labelLarge.copy(textDirection = TextDirection.Content),
-        )
-        Text(
-            pluralStringResource(R.plurals.poll_option_votes, option.votes.toInt(), option.votes.toInt()),
-            style = MaterialTheme.typography.labelSmall.copy(textDirection = TextDirection.Content),
-        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                (if (selected) "✓  " else "") + option.label,
+                modifier = Modifier.weight(1f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.labelLarge.copy(textDirection = TextDirection.Content),
+            )
+            Text(
+                pluralStringResource(R.plurals.poll_option_votes, option.votes.toInt(), option.votes.toInt()),
+                style = MaterialTheme.typography.labelSmall.copy(textDirection = TextDirection.Content),
+            )
+        }
+        Box(
+            Modifier.fillMaxWidth().height(4.dp).clip(CircleShape),
+        ) {
+            Surface(Modifier.fillMaxWidth().height(4.dp), color = MaterialTheme.colorScheme.outlineVariant) {}
+            Surface(Modifier.fillMaxWidth(fraction).height(4.dp), color = MaterialTheme.colorScheme.primary) {}
+        }
     }
 }

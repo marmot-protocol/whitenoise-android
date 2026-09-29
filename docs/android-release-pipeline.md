@@ -82,22 +82,21 @@ The protected `android-release-signing` environment contains:
   `WHITENOISE_PLAY_UPLOAD_KEY_ALIAS`, `WHITENOISE_PLAY_UPLOAD_KEY_PASSWORD`.
 
 The workflow reads the existing repository secrets using the same names Gradle
-uses: shared `WHITENOISE_OTLP_ENDPOINT`, `WHITENOISE_AUDIT_OTLP_ENDPOINT`,
+uses: shared `WHITENOISE_OTLP_AUTH_TOKEN`,
 `WHITENOISE_AUDIT_OTLP_AUTH_TOKEN`, and `WHITENOISE_PUSH_RELAY_HINT`, plus
-flavor-specific `WHITENOISE_PRODUCTION_OTLP_AUTH_TOKEN` and
+flavor-specific
 `WHITENOISE_PRODUCTION_PUSH_SERVER_PUBKEY_HEX`. The compatibility tenant remains
-fixed in Gradle. Old production-prefixed endpoint/audit variables are unused.
-The legacy `WHITENOISE_AUDIT_LOG_ENDPOINT` and `WHITENOISE_AUDIT_LOG_AUTH_TOKEN`
-remain optional. If supplied, v4 uploads continue alongside v5; removing them
-is a separate collector cutover decision, after disclosure and backlog handling
-are agreed with the audit operator.
+fixed in Gradle. The release workflow fixes metrics and audit URLs to the shared
+collector; the old endpoint and production-prefixed audit variables are unused.
+The app does not configure a v4 upload destination. Native v4 records may still
+remain locally for export, while consented upload uses only the v5 OTLP receiver.
 
 Firebase client configuration, MIP-05 push identity/relay, and opt-in telemetry
 are independent systems. Production builds enforce the Firebase/push guards.
 Telemetry credentials are ingest-only and compiled into the app; never put a
 privileged service credential in a BuildConfig field.
 
-Aptabase product analytics is a separate destination from OTLP and Goggles.
+Aptabase product analytics is a separate destination from OTLP metrics and v5 audit delivery.
 For a release intended to include it, provision the environment-specific
 `PRODUCT_EVENTS_ENDPOINT`, `PRODUCT_APP_KEY`, and `PRODUCT_OPERATOR` fields documented in
 [`product-analytics.md`](product-analytics.md). Run

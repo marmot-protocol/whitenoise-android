@@ -18,12 +18,14 @@ import java.lang.reflect.Proxy
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class AuditRuntimeV4Test {
-    /** The system model, platform, and app version are the only host-supplied source metadata. */
+    /** Source metadata is preserved while the v4 upload route is disabled. */
     @Test
     fun auditSourceUsesSystemHardwareModel() =
         runTest {
             ShadowBuild.setModel("  Synthetic Model  ")
             val config = captureConfiguration()
+            assertNull(config.endpoint)
+            assertNull(config.authorizationBearerToken)
             assertEquals("Synthetic Model", config.source.hardwareModel)
             assertEquals("android", config.source.platform)
             assertEquals(BuildConfig.VERSION_NAME, config.source.appVersion)

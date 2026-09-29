@@ -84,6 +84,33 @@ class PollScreenshotTest {
         composeRule.onNodeWithTag("poll-create-form").captureRoboImage("src/test/snapshots/poll_create_form_light.png")
     }
 
+    /** A rejected duplicate option shows the reason without hiding the form controls. */
+    @Test fun createFormDuplicateOptionError() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                Surface(Modifier.width(320.dp).testTag("poll-create-form")) {
+                    PollCreateForm(
+                        question = "Where should we meet?",
+                        options = listOf("Cafe", "café"),
+                        multiple = false,
+                        deadlineDurationSeconds = null,
+                        enabled = true,
+                        issue = PollDraftIssue.DUPLICATE_OPTION,
+                        onQuestionChange = {},
+                        onOptionChange = { _, _ -> },
+                        onRemoveOption = {},
+                        onAddOption = {},
+                        onMultipleChange = {},
+                        onDeadlineChange = {},
+                    )
+                }
+            }
+        }
+        composeRule
+            .onNodeWithTag("poll-create-form")
+            .captureRoboImage("src/test/snapshots/poll_create_form_duplicate_error.png")
+    }
+
     /** Large text and RTL keep both choice controls reachable on a narrow window. */
     @Test fun createFormLargeRtl() {
         composeRule.setContent {

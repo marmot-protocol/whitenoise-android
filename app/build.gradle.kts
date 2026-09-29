@@ -141,8 +141,8 @@ fun runtimeConfigProperty(
 
 fun String.asBuildConfigString(): String = "\"" + replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
-// Endpoints and Goggles credentials are shared; OTLP tokens and push identities
-// are flavor-specific. Preview deliberately receives none of these inputs.
+// Release metrics and v5 audit credentials are shared. Development may use its
+// own metrics token; push identities stay flavor-specific. Preview receives none.
 fun environmentRuntimeConfigProperty(
     environment: String,
     suffix: String,
@@ -354,16 +354,6 @@ android {
             )
             buildConfigField(
                 "String",
-                "WHITENOISE_AUDIT_LOG_ENDPOINT",
-                environmentRuntimeConfigProperty("dev", "AUDIT_LOG_ENDPOINT").asBuildConfigString(),
-            )
-            buildConfigField(
-                "String",
-                "WHITENOISE_AUDIT_LOG_AUTH_TOKEN",
-                environmentRuntimeConfigProperty("dev", "AUDIT_LOG_AUTH_TOKEN").asBuildConfigString(),
-            )
-            buildConfigField(
-                "String",
                 "WHITENOISE_AUDIT_OTLP_ENDPOINT",
                 environmentRuntimeConfigProperty("dev", "AUDIT_OTLP_ENDPOINT").asBuildConfigString(),
             )
@@ -403,8 +393,6 @@ android {
             buildConfigField("String", "WHITENOISE_DEEP_LINK_SCHEME", "whitenoise-preview".asBuildConfigString())
             buildConfigField("String", "WHITENOISE_OTLP_ENDPOINT", "".asBuildConfigString())
             buildConfigField("String", "WHITENOISE_OTLP_AUTH_TOKEN", "".asBuildConfigString())
-            buildConfigField("String", "WHITENOISE_AUDIT_LOG_ENDPOINT", "".asBuildConfigString())
-            buildConfigField("String", "WHITENOISE_AUDIT_LOG_AUTH_TOKEN", "".asBuildConfigString())
             buildConfigField("String", "WHITENOISE_AUDIT_OTLP_ENDPOINT", "".asBuildConfigString())
             buildConfigField("String", "WHITENOISE_AUDIT_OTLP_AUTH_TOKEN", "".asBuildConfigString())
             buildConfigField("String", "WHITENOISE_DEPLOYMENT_ENVIRONMENT", "preview".asBuildConfigString())
@@ -447,35 +435,19 @@ android {
             buildConfigField(
                 "String",
                 "WHITENOISE_OTLP_ENDPOINT",
-                runtimeConfigProperty("WHITENOISE_OTLP_ENDPOINT").asBuildConfigString(),
+                runtimeConfigProperty("WHITENOISE_OTLP_ENDPOINT", "https://otlp.whitenoise.chat/v1/metrics")
+                    .asBuildConfigString(),
             )
             buildConfigField(
                 "String",
                 "WHITENOISE_OTLP_AUTH_TOKEN",
-                environmentRuntimeConfigProperty(
-                    environment = "production",
-                    suffix = "OTLP_AUTH_TOKEN",
-                    extraKeys = listOf("OTLP_TOKEN_WHITENOISE_ANDROID"),
-                ).asBuildConfigString(),
-            )
-            buildConfigField(
-                "String",
-                "WHITENOISE_AUDIT_LOG_ENDPOINT",
-                runtimeConfigProperty("WHITENOISE_AUDIT_LOG_ENDPOINT").asBuildConfigString(),
-            )
-            // Deliberately no OTLP fallback: the audit-log tracker (Goggles) is a
-            // separate service from the OTLP metrics collector. If the dedicated
-            // audit token is unset, leave it empty so uploads skip rather than
-            // authenticating against the wrong API with the OTLP token.
-            buildConfigField(
-                "String",
-                "WHITENOISE_AUDIT_LOG_AUTH_TOKEN",
-                runtimeConfigProperty("WHITENOISE_AUDIT_LOG_AUTH_TOKEN").asBuildConfigString(),
+                runtimeConfigProperty("WHITENOISE_OTLP_AUTH_TOKEN").asBuildConfigString(),
             )
             buildConfigField(
                 "String",
                 "WHITENOISE_AUDIT_OTLP_ENDPOINT",
-                runtimeConfigProperty("WHITENOISE_AUDIT_OTLP_ENDPOINT").asBuildConfigString(),
+                runtimeConfigProperty("WHITENOISE_AUDIT_OTLP_ENDPOINT", "https://otlp.whitenoise.chat/v1/logs")
+                    .asBuildConfigString(),
             )
             buildConfigField(
                 "String",
@@ -483,8 +455,8 @@ android {
                 runtimeConfigProperty("WHITENOISE_AUDIT_OTLP_AUTH_TOKEN").asBuildConfigString(),
             )
             buildConfigField("String", "WHITENOISE_DEPLOYMENT_ENVIRONMENT", "production".asBuildConfigString())
-            // Compatibility metadata required by MarmotKit. Tenant routing is
-            // selected by the OTLP bearer token, not this fixed resource value.
+            // MarmotKit requires a tenant resource value; deploymentEnvironment
+            // carries the actual flavor for the shared metrics token.
             buildConfigField(
                 "String",
                 "WHITENOISE_TELEMETRY_TENANT",
@@ -523,31 +495,19 @@ android {
             buildConfigField(
                 "String",
                 "WHITENOISE_OTLP_ENDPOINT",
-                runtimeConfigProperty("WHITENOISE_OTLP_ENDPOINT").asBuildConfigString(),
+                runtimeConfigProperty("WHITENOISE_OTLP_ENDPOINT", "https://otlp.whitenoise.chat/v1/metrics")
+                    .asBuildConfigString(),
             )
             buildConfigField(
                 "String",
                 "WHITENOISE_OTLP_AUTH_TOKEN",
-                environmentRuntimeConfigProperty(
-                    environment = "staging",
-                    suffix = "OTLP_AUTH_TOKEN",
-                    extraKeys = listOf("OTLP_TOKEN_WHITENOISE_ANDROID_STAGING"),
-                ).asBuildConfigString(),
-            )
-            buildConfigField(
-                "String",
-                "WHITENOISE_AUDIT_LOG_ENDPOINT",
-                runtimeConfigProperty("WHITENOISE_AUDIT_LOG_ENDPOINT").asBuildConfigString(),
-            )
-            buildConfigField(
-                "String",
-                "WHITENOISE_AUDIT_LOG_AUTH_TOKEN",
-                runtimeConfigProperty("WHITENOISE_AUDIT_LOG_AUTH_TOKEN").asBuildConfigString(),
+                runtimeConfigProperty("WHITENOISE_OTLP_AUTH_TOKEN").asBuildConfigString(),
             )
             buildConfigField(
                 "String",
                 "WHITENOISE_AUDIT_OTLP_ENDPOINT",
-                runtimeConfigProperty("WHITENOISE_AUDIT_OTLP_ENDPOINT").asBuildConfigString(),
+                runtimeConfigProperty("WHITENOISE_AUDIT_OTLP_ENDPOINT", "https://otlp.whitenoise.chat/v1/logs")
+                    .asBuildConfigString(),
             )
             buildConfigField(
                 "String",
@@ -566,12 +526,12 @@ android {
             )
             buildConfigField("String", "WHITENOISE_DEPLOYMENT_ENVIRONMENT", "staging".asBuildConfigString())
             buildConfigField("boolean", "ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS", "true")
-            // Compatibility metadata required by MarmotKit. Tenant routing is
-            // selected by the OTLP bearer token, not this fixed resource value.
+            // MarmotKit requires a tenant resource value; deploymentEnvironment
+            // carries the actual flavor for the shared metrics token.
             buildConfigField(
                 "String",
                 "WHITENOISE_TELEMETRY_TENANT",
-                "whitenoise-android-staging".asBuildConfigString(),
+                "whitenoise-android".asBuildConfigString(),
             )
             buildConfigField(
                 "String",

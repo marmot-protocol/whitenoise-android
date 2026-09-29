@@ -55,4 +55,23 @@ class PollSelectionTest {
         val expired = poll(PollTypeFfi.SINGLE_CHOICE, emptyList()).copy(endsAt = 1_700_000_001uL)
         assertFalse(pollVoteAllowed(expired, 1_700_000_001_000L))
     }
+
+    /** The first local vote updates the visible count while MDK confirms it. */
+    @Test
+    fun optimisticFirstVoteAddsParticipant() {
+        val result = optimisticPollProjection(poll(PollTypeFfi.SINGLE_CHOICE, emptyList()), listOf("b"))
+        assertEquals(listOf(1uL, 1uL), result.options.map { it.votes })
+        assertEquals(2uL, result.participants)
+        assertEquals(listOf("b"), result.localSelection)
+    }
+
+    /** Replacing a vote moves the count without double-counting the participant. */
+    @Test
+    fun optimisticReplacementClampsStaleCounts() {
+        val result = optimisticPollProjection(poll(PollTypeFfi.SINGLE_CHOICE, listOf("b")), listOf("a"))
+        assertEquals(listOf(2uL, 0uL), result.options.map { it.votes })
+        assertEquals(1uL, result.participants)
+        assertEquals(1f, pollResultFraction(3uL, 1uL))
+        assertEquals(0f, pollResultFraction(1uL, 0uL))
+    }
 }

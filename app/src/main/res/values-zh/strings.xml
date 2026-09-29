@@ -6,6 +6,11 @@
     <string name="poll_closed">投票已结束</string>
     <string name="poll_vote_failed">无法提交投票</string>
     <string name="poll_create_failed">无法创建投票</string>
+    <string name="poll_enter_question">输入问题。</string>
+    <string name="poll_question_too_long">这个问题太长。</string>
+    <string name="poll_add_two_options">请至少添加两个选项。</string>
+    <string name="poll_option_too_long">其中一个选项太长。</string>
+    <string name="poll_duplicate_option">每个选项必须不同。</string>
     <string name="poll_create">创建投票</string>
     <string name="poll_question">问题</string>
     <string name="poll_option">选项 %1$d</string>
@@ -2040,7 +2045,7 @@
     <string name="audit_upload_title">分享群组诊断日志</string>
     <string name="audit_upload_subtitle">分享此设备上所有个人资料的群组诊断日志。</string>
     <string name="audit_upload_confirm_title">与 White Noise 分享群组诊断日志？</string>
-    <string name="audit_upload_disclosure">White Noise 会记录此设备上所有个人资料的群组诊断日志，并上传到由 Internet Privacy Foundation 运营的 Goggles。已保存在此设备上的日志也可能被上传。日志可能包含群组和消息 ID、中继地址、时间戳、假名化的账户引用、安装 ID、你的设备型号和应用版本，但绝不包含消息内容或私钥。这些日志属于敏感数据，我们用它们来调查可靠性问题。它们与使用情况和遥测分享相互独立。关闭分享会停止新的记录和新的上传，但已在进行的上传可能会完成。此设备上的日志和已上传的日志都会保持原样。选择“取消”则保持分享关闭。</string>
+    <string name="audit_upload_disclosure">White Noise 会记录此设备上所有个人资料的群组诊断日志，并上传到由 Internet Privacy Foundation 运营的 White Noise 审计收集服务。已保存在此设备上的日志也可能被上传。日志可能包含群组和消息 ID、中继地址、时间戳、假名化的账户引用、安装 ID、你的设备型号和应用版本，但绝不包含消息内容或私钥。这些日志属于敏感数据，我们用它们来调查可靠性问题。它们与使用情况和遥测分享相互独立。关闭分享会停止新的记录和新的上传，但已在进行的上传可能会完成。此设备上的日志和已上传的日志都会保持原样。选择“取消”则保持分享关闭。</string>
     <string name="audit_upload_confirm">启用自动分享</string>
     <string name="audit_upload_renew">分享说明已更新。请先查看，再重新开启群组诊断日志。</string>
     <string name="diagnostics_group_disclosure">群组诊断日志有助于调查可靠性问题。日志使用哈希引用来指代成员，可能包含技术标识符以及带时间戳的成员变动记录，但绝不包含消息内容、个人资料名称、群组名称或私钥。</string>
