@@ -23720,6 +23720,12 @@
         ]
       },
       {
+        "surface": "User-initiated attachment job restart keeps cancellation and completion ownership",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadJobRuns.kt",
+        "anchor": "internal class AttachmentDownloadJobRuns(",
+        "test_ids": ["MED-022"]
+      },
+      {
         "surface": "Interactive attachment WorkManager foreground fallback",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentWorkForegroundInfo.kt",
         "anchor": "ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC",
