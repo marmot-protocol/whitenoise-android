@@ -4753,7 +4753,6 @@ class WhiteNoiseAppState private constructor(
     private suspend fun ensureNotificationReceiverForNetworkReconnect(): Boolean {
         if (!bootstrapCompleted) bootstrap()
         if (!bootstrapCompleted || networkNotificationRecoverySuppressed) return false
-
         localNotificationPresenter.ensureChannels()
         refreshLocalNotificationPermission()
         val receiverReady =
