@@ -229,7 +229,7 @@ internal fun MediaFileBubble(
                     awaitDurableWorkFinished = {
                         controller.attachmentTransferRequest(messageIdHex, attachmentIndex)?.let { transfer ->
                             attachmentDownloadWorkState(context, transfer) {
-                                appState.hasInteractiveAttachmentDownloadIntent(transfer)
+                                appState.hasInteractive(transfer)
                             }.first { it == AttachmentDownloadWorkState.Finished }
                         }
                     },
