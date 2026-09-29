@@ -7,6 +7,7 @@ test creates an identity and a private group under the isolated
 the configured media service, downloads them, verifies byte equality, then
 removes its local store. Encrypted remote fixtures follow the service's normal
 retention policy. Run it on a disposable emulator or dedicated test device.
+The first emulator results are in [the preliminary baseline](media-latency-preliminary-baseline.md).
 
 ## Matrix and boundaries
 

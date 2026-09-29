@@ -1,0 +1,35 @@
+{
+  "aggregates": [],
+  "app_apk_sha256": "d8440fbc932712bbcf09b721686b18036e1d7cb8a705702c676b7c8d9e4b67bb",
+  "complete": true,
+  "component_metrics": [
+    {
+      "count": 20.0,
+      "max": 23.895875,
+      "p50": 4.911208,
+      "p95": 5.3755,
+      "phase": "encrypted_cache_write_ms"
+    },
+    {
+      "count": 20.0,
+      "max": 4.388083,
+      "p50": 3.760958,
+      "p95": 4.217417,
+      "phase": "encrypted_cache_read_ms"
+    },
+    {
+      "count": 20.0,
+      "max": 2.948583,
+      "p50": 0.284083,
+      "p95": 0.327791,
+      "phase": "image_decode_ms"
+    }
+  ],
+  "device_class": "emulator",
+  "mdk_sha": "946e0547485c9a2c393c2048ec3a968fd50fb441",
+  "native_phases": [],
+  "network_profile": "unknown",
+  "schema": 1,
+  "source_sha": "212528dd27ad8c6d59a9840f8292f2dcf7fe0485",
+  "test_apk_sha256": "ec2867eaf7a757aa2c8691123a0d260a546dd15ec13cc1bb1df8e6089890d02d"
+}
