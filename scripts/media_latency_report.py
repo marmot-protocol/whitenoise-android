@@ -53,6 +53,8 @@ COMPONENT_PHASES = {
 }
 STATUS_PREFIX = "INSTRUMENTATION_STATUS: "
 STATUS_CODE = "INSTRUMENTATION_CODE: -1"
+SUCCESS_RESULT = re.compile(r"OK \([1-9][0-9]* tests?\)\Z")
+FAILURE_MARKERS = ("FAILURES!!!", "INSTRUMENTATION_FAILED", "INSTRUMENTATION_ABORTED", "Process crashed")
 KEY_VALUE = re.compile(r"([a-z][a-z0-9_]*)=([0-9.]+|[a-z_]+)")
 HEX40 = re.compile(r"[0-9a-f]{40}\Z")
 HEX64 = re.compile(r"[0-9a-f]{64}\Z")
@@ -128,7 +130,12 @@ def parse_status(output: str) -> dict:
             if fields.get("phase") not in COMPONENT_PHASES:
                 raise ValueError("unknown component phase")
             components.append({key: value if key == "phase" else float(value) for key, value in fields.items()})
-    complete = STATUS_CODE in output.splitlines()
+    lines = output.splitlines()
+    complete = (
+        STATUS_CODE in lines
+        and any(SUCCESS_RESULT.fullmatch(line.strip()) for line in lines)
+        and not any(marker in output for marker in FAILURE_MARKERS)
+    )
     if complete and not (aggregates or native or components):
         raise ValueError("completed instrumentation contained no media measurements")
     return {

@@ -27,6 +27,7 @@ class MediaLatencyReportTest(unittest.TestCase):
                 f"INSTRUMENTATION_STATUS: media_probe_json={json.dumps(aggregate)}",
                 "INSTRUMENTATION_STATUS: media_probe_native=size=small phase=body_transfer attempts=2 successes=2 failures=0 duration_sum_ms=30 overflow_count=0",
                 "INSTRUMENTATION_STATUS: media_probe=phase=image_decode_ms count=2 p50=1.0 p95=2.0 max=2.0",
+                "OK (1 test)",
                 "INSTRUMENTATION_CODE: -1",
             ]
         )
@@ -60,6 +61,18 @@ class MediaLatencyReportTest(unittest.TestCase):
     def test_failed_instrumentation_is_not_complete(self):
         """A non-success instrumentation code remains visibly incomplete."""
         self.assertFalse(parse_status("INSTRUMENTATION_CODE: 0")["complete"])
+
+    def test_success_code_alone_does_not_hide_instrumentation_failure(self):
+        """The runner's code cannot turn a crash or failed assertion into a complete probe."""
+        sample = "INSTRUMENTATION_STATUS: media_probe=phase=image_decode_ms count=1 p50=1 p95=1 max=1"
+        for ending in (
+            "INSTRUMENTATION_CODE: -1",
+            "OK (0 tests)\nINSTRUMENTATION_CODE: -1",
+            "OK (1 test)\nFAILURES!!!\nINSTRUMENTATION_CODE: -1",
+            "OK (1 test)\nINSTRUMENTATION_ABORTED: Process crashed\nINSTRUMENTATION_CODE: -1",
+        ):
+            with self.subTest(ending=ending):
+                self.assertFalse(parse_status(f"{sample}\n{ending}")["complete"])
 
 
 if __name__ == "__main__":
