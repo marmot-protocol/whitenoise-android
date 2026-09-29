@@ -1149,13 +1149,14 @@ internal class ConversationDictationController internal constructor(
             validateAndDeliverTranscript(failed.sessionId, failed.target, transcript)
             return
         }
-        val accepted = requestStart(
-            accountRef = failed.target.accountRef,
-            groupIdHex = failed.target.groupIdHex,
-            draft = readDraft(failed.target.accountRef, failed.target.groupIdHex).value,
-            replyToMessageIdHex = failed.target.replyToMessageIdHex,
-            mode = failed.target.mode,
-        )
+        val accepted =
+            requestStart(
+                accountRef = failed.target.accountRef,
+                groupIdHex = failed.target.groupIdHex,
+                draft = readDraft(failed.target.accountRef, failed.target.groupIdHex).value,
+                replyToMessageIdHex = failed.target.replyToMessageIdHex,
+                mode = failed.target.mode,
+            )
         conversationDictationDiagnostic("event=retry path=fresh_start accepted=$accepted")
     }
 
