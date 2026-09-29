@@ -36,6 +36,5 @@ class ConversationDmPeerTest {
         assertNull(resolvedDirectPeerAccount(true, false, emptyList(), "self", null))
     }
 
-    private fun member(account: String): AppGroupMemberRecordFfi =
-        AppGroupMemberRecordFfi(memberIdHex = account, account = null, local = account == "self")
+    private fun member(account: String) = AppGroupMemberRecordFfi(account, null, account == "self")
 }
