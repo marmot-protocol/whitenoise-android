@@ -868,6 +868,9 @@
     <string name="native_push_missing_server_subtitle">Push is unavailable because this build has no push server configured.</string>
     <string name="native_push_google_play_unavailable_subtitle">Push requires compatible Google Play services on this device.</string>
     <string name="native_push_firebase_unavailable_subtitle">Push is unavailable because Firebase is not configured or could not initialize.</string>
+    <string name="namecoin_lookup_resolving">Looking up the Namecoin name.</string>
+    <string name="namecoin_resolve_failed">Couldn\'t resolve %1$s on Namecoin. Double-check it and try again.</string>
+    <string name="namecoin_resolvers_unavailable">Couldn\'t reach the Namecoin resolvers. Please try again.</string>
     <string name="notification_categories">Notification categories</string>
     <string name="notification_scope_default_all_chats">Use global default</string>
     <string name="notification_scope_custom_chat">Custom for this chat</string>
@@ -1799,7 +1802,7 @@
     <string name="next">Next</string>
     <string name="no_matches">No matches</string>
     <string name="new_message">New Message</string>
-    <string name="search_people_hint">Name, Nostr address, or npub</string>
+    <string name="search_people_hint">Name, Nostr address, npub, or .bit</string>
     <string name="user_search_searching">Searching the network…</string>
     <string name="user_search_incomplete">Some network results may be missing.</string>
     <string name="user_search_failed">Couldn’t search the network. Check your connection and try again.</string>
@@ -2350,7 +2353,7 @@
     <string name="folder_included_chats">Included Chats</string>
     <string name="chats">Chats</string>
     <string name="manage_folders">Manage folders</string>
-    <string name="new_message_name_or_npub">Name or npub</string>
+    <string name="new_message_name_or_npub">Name, npub, or .bit</string>
     <string name="new_message_connect_qr">Connect with QR</string>
     <string name="new_message_invite_friend">Invite a friend</string>
     <string name="new_message_talk_to_agent">Talk to your agent</string>

@@ -54,7 +54,7 @@ import kotlin.coroutines.resume
  *    filter notifications before the Odin-side re-parse;
  *  - every call is bounded by an overall coroutine timeout.
  */
-internal class NamecoinTransport(
+internal open class NamecoinTransport(
     private val clientFor: (NamecoinServer) -> OkHttpClient = ::defaultClientFor,
 ) {
     /** A pinned ElectrumX endpoint. [pinBase64] is the base64 SHA-256 of the leaf SPKI. */
@@ -109,7 +109,7 @@ internal class NamecoinTransport(
      * matching reply. Server pushes (subscription notifications, replies with
      * other ids) are skipped until the call deadline.
      */
-    suspend fun call(
+    open suspend fun call(
         server: NamecoinServer,
         url: String,
         requestJson: String,

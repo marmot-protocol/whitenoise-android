@@ -64,11 +64,12 @@ internal object NamecoinRecord {
      * [fetch] retrieves an imported name's parsed value tree, or null when the
      * name is unavailable / not found — sub-import failures collapse to an
      * empty imported object (the import contributes nothing), matching the
-     * gitworkshop semantics the Odin port follows.
+     * gitworkshop semantics the Odin port follows. Suspending: fetching an
+     * import is a network round trip through the resolver's server fallback.
      */
-    fun resolveValueWithImports(
+    suspend fun resolveValueWithImports(
         root: JSONObject,
-        fetch: (String) -> JSONObject?,
+        fetch: suspend (String) -> JSONObject?,
         maxDepth: Int = IMPORT_MAX_DEPTH,
     ): JSONObject {
         val visited = mutableSetOf<String>()
@@ -81,9 +82,9 @@ internal object NamecoinRecord {
      * clones of either [obj]'s non-import entries or of the sub-object
      * selected out of an imported record.
      */
-    private fun expandImports(
+    private suspend fun expandImports(
         obj: JSONObject,
-        fetch: (String) -> JSONObject?,
+        fetch: suspend (String) -> JSONObject?,
         budget: Int,
         visited: MutableSet<String>,
     ): JSONObject {
@@ -201,7 +202,9 @@ internal object NamecoinRecord {
     /**
      * Merge [imported] underneath [importer] with importer-wins semantics:
      * keys the importer already holds are kept, everything else is copied in.
-     * Top-level only, matching `nc_merge_importer_wins`.
+     * Top-level only, matching `nc_merge_importer_wins`. The values are moved
+     * by reference out of freshly-cloned trees only, so no source object is
+     * ever shared into the result.
      */
     private fun mergeImporterWins(
         importer: JSONObject,

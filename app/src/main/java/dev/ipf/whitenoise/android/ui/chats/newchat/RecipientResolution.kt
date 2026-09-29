@@ -6,11 +6,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
 import dev.ipf.whitenoise.android.core.Nip05Resolver
 import dev.ipf.whitenoise.android.core.ProfileFieldValidation
 import dev.ipf.whitenoise.android.core.RecipientReference
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.core.namecoin.NamecoinResolver
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_SEARCH_DEBOUNCE_MS
 import kotlinx.coroutines.currentCoroutineContext
@@ -40,17 +42,26 @@ internal fun rememberRecipientResolution(
         mutableStateOf(trimmed.isNotEmpty() && !isPlainNameQuery(trimmed, appState::accountIdHexForMention))
     }
     var resolvedHex by remember(trimmed, accountRef, runtimeGeneration, retryKey) { mutableStateOf<String?>(null) }
+    // Namecoin outcomes ride alongside the hex so the picker can tell
+    // "name doesn't exist" apart from "can't reach the resolvers" (upstream
+    // fail-closed tri-state); null for non-.bit inputs.
+    var namecoinResult by remember(trimmed, accountRef, runtimeGeneration, retryKey) {
+        mutableStateOf<NamecoinResolver.NamecoinResult?>(null)
+    }
 
     LaunchedEffect(trimmed, accountRef, runtimeGeneration, retryKey) {
         if (trimmed.isEmpty() || isPlainNameQuery(trimmed, appState::accountIdHexForMention)) {
             resolving = false
             resolvedHex = null
+            namecoinResult = null
             onStage(RecipientResolutionStage.Cleared)
             return@LaunchedEffect
         }
         onStage(RecipientResolutionStage.IdentifierStarted)
         resolving = true
         resolvedHex = null
+        namecoinResult = null
+        var pendingNamecoinResult: NamecoinResolver.NamecoinResult? = null
         val hex =
             appState.accountIdHexForMention(trimmed)
                 ?: when (val id = ChatListIdentifierSearch.classify(trimmed)) {
@@ -62,6 +73,15 @@ internal fun rememberRecipientResolution(
                         delay(CHAT_LIST_SEARCH_DEBOUNCE_MS)
                         Nip05Resolver.resolve(id.identifier)
                     }
+                    is ChatListIdentifierSearch.Identifier.NamecoinBit -> {
+                        // Same debounce rationale as NIP-05. The resolver's
+                        // tri-state outcome is kept for the not-found vs
+                        // resolvers-unreachable distinction below.
+                        delay(CHAT_LIST_SEARCH_DEBOUNCE_MS)
+                        val outcome = NamecoinResolver.resolve(id.identifier)
+                        pendingNamecoinResult = outcome
+                        (outcome as? NamecoinResolver.NamecoinResult.Resolved)?.pubkeyHex
+                    }
                     null -> appState.accountIdHex(trimmed)
                 }
         currentCoroutineContext().ensureActive()
@@ -72,6 +92,7 @@ internal fun rememberRecipientResolution(
         }
         resolvedHex = hex
         resolving = false
+        namecoinResult = pendingNamecoinResult
         if (hex == null) {
             onStage(RecipientResolutionStage.Invalid)
             return@LaunchedEffect
@@ -87,7 +108,29 @@ internal fun rememberRecipientResolution(
     }
 
     return resolvedRecipientResolution(trimmed, resolving, resolvedHex, appState)
+        .copy(namecoinResult = namecoinResult)
 }
+
+/**
+ * The label to show while an identifier resolves, and the not-found /
+ * unreachable message when a `.bit` input settles without a key. Null for
+ * non-Namecoin inputs so the caller falls back to its generic copy.
+ */
+internal fun namecoinResolvingLabel(query: String): Int? =
+    if (NamecoinResolver.isBit(query)) R.string.namecoin_lookup_resolving else null
+
+/**
+ * Map a settled (non-resolving, no-key) Namecoin outcome to the inline
+ * message the picker should show instead of the generic "no matches".
+ * [NamecoinResolver.NamecoinResult.Resolved] can't reach here (the resolved
+ * row renders instead) and maps to null defensively.
+ */
+internal fun namecoinFailureLabel(result: NamecoinResolver.NamecoinResult?): Int? =
+    when (result) {
+        is NamecoinResolver.NamecoinResult.NotFound -> R.string.namecoin_resolve_failed
+        is NamecoinResolver.NamecoinResult.Unavailable -> R.string.namecoin_resolvers_unavailable
+        else -> null
+    }
 
 /** Privacy-safe milestones; no query or identity value is recorded. */
 internal enum class RecipientResolutionStage {
@@ -256,10 +299,16 @@ internal fun recipientPreviewState(
  * create/invite fails with "valid npub/profile link/hex". The host submits
  * [resolvedHex] directly (the engine accepts a bare hex recipient ref, the
  * same way the card's own resolve calls `accountIdHex(hex)`).
+ *
+ * [namecoinResult] carries the Namecoin resolver's tri-state outcome when the
+ * input was a `.bit` / `d/` / `id/` identifier (null otherwise), so the
+ * invite and new-chat surfaces can say "couldn't resolve on Namecoin" versus
+ * "couldn't reach the Namecoin resolvers" instead of a generic no-matches.
  */
 internal data class RecipientResolution(
     val state: RecipientPreviewState,
     val resolvedHex: String?,
+    val namecoinResult: NamecoinResolver.NamecoinResult? = null,
 ) {
     companion object {
         val Empty = RecipientResolution(RecipientPreviewState.Empty, null)

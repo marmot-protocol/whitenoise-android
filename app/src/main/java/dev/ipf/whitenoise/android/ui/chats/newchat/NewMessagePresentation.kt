@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.chats.newchat
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -104,6 +105,9 @@ internal fun NewMessageContent(
     addressFallback: Boolean = false,
     startingAs: StartingAccount? = null,
     inviteShareInProgress: Boolean = false,
+    @StringRes identifierSearchingLabelRes: Int? = null,
+    @StringRes identifierEmptyLabelRes: Int? = null,
+    identifierEmptyArg: String = "",
 ) {
     val query = queryState.text.toString()
     val busy = creatingHex != null
@@ -141,6 +145,9 @@ internal fun NewMessageContent(
                     onInvite = actions.invite,
                     retryableIdentifier = retryableIdentifier,
                     lookupFailed = identifierLookupFailed,
+                    searchingLabelRes = identifierSearchingLabelRes,
+                    identifierEmptyLabelRes = identifierEmptyLabelRes,
+                    identifierEmptyArg = identifierEmptyArg,
                 )
             }
             val groups =
@@ -284,6 +291,9 @@ internal fun NewMessageSearchFeedback(
     onInvite: () -> Unit,
     retryableIdentifier: Boolean = false,
     lookupFailed: Boolean = false,
+    @StringRes searchingLabelRes: Int? = null,
+    @StringRes identifierEmptyLabelRes: Int? = null,
+    identifierEmptyArg: String = "",
 ) {
     val hasStatus = searching || failed || incomplete || lookupFailed
     if (!hasStatus && !empty) return
@@ -300,15 +310,23 @@ internal fun NewMessageSearchFeedback(
         if (searching) LinearProgressIndicator(Modifier.fillMaxWidth())
         if (lookupFailed) Text(stringResource(R.string.user_search_address_unverified))
         when {
-            searching -> Text(stringResource(R.string.user_search_searching))
+            searching -> Text(stringResource(searchingLabelRes ?: R.string.user_search_searching))
             failed -> Text(stringResource(R.string.user_search_failed))
             incomplete -> Text(stringResource(R.string.user_search_incomplete))
             empty ->
-                WhiteNoiseEmptyState(
-                    stringResource(R.string.no_matches),
-                    stringResource(R.string.new_message_no_results_detail),
-                    Modifier.fillMaxWidth(),
-                )
+                if (identifierEmptyLabelRes != null) {
+                    Text(
+                        stringResource(identifierEmptyLabelRes, identifierEmptyArg),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    WhiteNoiseEmptyState(
+                        stringResource(R.string.no_matches),
+                        stringResource(R.string.new_message_no_results_detail),
+                        Modifier.fillMaxWidth(),
+                    )
+                }
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if ((!searching || lookupFailed) && retryAvailable) {

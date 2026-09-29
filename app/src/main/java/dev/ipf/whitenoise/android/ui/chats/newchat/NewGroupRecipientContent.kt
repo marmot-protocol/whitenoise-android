@@ -3,6 +3,7 @@
 
 package dev.ipf.whitenoise.android.ui.chats.newchat
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -55,6 +57,9 @@ internal fun NewGroupRecipientContent(
     isValidNpub: (String) -> Boolean,
     addressLookupFailed: Boolean = false,
     startingAs: StartingAccount? = null,
+    @StringRes searchingLabelRes: Int? = null,
+    @StringRes identifierEmptyLabelRes: Int? = null,
+    identifierEmptyArg: String = "",
 ) {
     SettingsScaffold(
         topBarActions = { StartingAccountIndicator(startingAs) },
@@ -104,7 +109,14 @@ internal fun NewGroupRecipientContent(
             }
             item { SettingsSection(stringResource(R.string.new_message_people)) }
             if (addressLookupFailed) item { RecipientAddressLookupFeedback(false, actions.retry) }
-            if (searching) item { UserSearchStatusRow(R.string.user_search_searching, showProgress = true) }
+            if (searching) {
+                item {
+                    UserSearchStatusRow(
+                        searchingLabelRes ?: R.string.user_search_searching,
+                        showProgress = true,
+                    )
+                }
+            }
             if (failed || incomplete) {
                 item {
                     UserSearchStatusRow(if (failed) R.string.user_search_failed else R.string.user_search_incomplete)
@@ -116,16 +128,25 @@ internal fun NewGroupRecipientContent(
             val searchComplete = !searching && !failed && !incomplete
             if (people.isEmpty() && searchComplete) {
                 item {
-                    WhiteNoiseEmptyState(
-                        stringResource(R.string.no_matches),
-                        stringResource(
-                            if (query.text.isBlank()) {
-                                R.string.recipient_search_empty_hint
-                            } else {
-                                R.string.search_people_hint
-                            },
-                        ),
-                    )
+                    if (identifierEmptyLabelRes != null) {
+                        Text(
+                            stringResource(identifierEmptyLabelRes, identifierEmptyArg),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+                        )
+                    } else {
+                        WhiteNoiseEmptyState(
+                            stringResource(R.string.no_matches),
+                            stringResource(
+                                if (query.text.isBlank()) {
+                                    R.string.recipient_search_empty_hint
+                                } else {
+                                    R.string.search_people_hint
+                                },
+                            ),
+                        )
+                    }
                 }
             }
             itemsIndexed(people, key = { _, person -> person.candidate.accountIdHex }) { index, person ->

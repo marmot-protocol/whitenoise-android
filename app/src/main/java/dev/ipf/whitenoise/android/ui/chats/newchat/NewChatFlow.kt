@@ -734,9 +734,15 @@ private fun NewMessageAccountScreen(
             connectQrEnabled = myQrContent != null,
             creatingHex = creatingHex,
             error = startChatError,
-            retryableIdentifier = addressQuery,
+            retryableIdentifier =
+                addressQuery ||
+                    ChatListIdentifierSearch.classify(query) is ChatListIdentifierSearch.Identifier.NamecoinBit,
             identifierLookupFailed = recipientAddressLookupFailed(query, resolution.state),
             addressFallback = addressQuery && resolution.resolvedHex == null,
+            identifierSearchingLabelRes = namecoinResolvingLabel(query),
+            identifierEmptyLabelRes =
+                if (identifierQuery) namecoinFailureLabel(resolution.namecoinResult) else null,
+            identifierEmptyArg = query.trim(),
             actions =
                 NewMessageActions(
                     back = { leaveScreen(onBack) },

@@ -89,6 +89,7 @@ import dev.ipf.whitenoise.android.core.canonicalChatListBodyMatches
 import dev.ipf.whitenoise.android.core.canonicalChatListGroupId
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.core.localeInvariantFold
+import dev.ipf.whitenoise.android.core.namecoin.NamecoinResolver
 import dev.ipf.whitenoise.android.core.projectChatListSearchSections
 import dev.ipf.whitenoise.android.core.unreadMemberCandidateIds
 import dev.ipf.whitenoise.android.state.AccountWideForwardTargets
@@ -792,6 +793,30 @@ internal fun ChatsScreen(
                             id.identifier,
                         )
                     }
+            }
+            is ChatListIdentifierSearch.Identifier.NamecoinBit -> {
+                identifierResolution = IdentifierResolution.Resolving
+                // Same debounce rationale as the NIP-05 branch; the resolver
+                // distinguishes not-found from resolvers-unreachable so the
+                // inline error can say which.
+                delay(CHAT_LIST_SEARCH_DEBOUNCE_MS)
+                when (val outcome = NamecoinResolver.resolve(id.identifier)) {
+                    is NamecoinResolver.NamecoinResult.Resolved -> {
+                        val npub = presentableIdentifierNpub(outcome.pubkeyHex, appState::npubForDisplay)
+                        identifierResolution =
+                            if (npub != null) {
+                                IdentifierResolution.Resolved(npub)
+                            } else {
+                                IdentifierResolution.Failed(R.string.namecoin_resolve_failed, id.identifier)
+                            }
+                    }
+                    NamecoinResolver.NamecoinResult.NotFound ->
+                        identifierResolution =
+                            IdentifierResolution.Failed(R.string.namecoin_resolve_failed, id.identifier)
+                    NamecoinResolver.NamecoinResult.Unavailable ->
+                        identifierResolution =
+                            IdentifierResolution.Failed(R.string.namecoin_resolvers_unavailable)
+                }
             }
         }
     }

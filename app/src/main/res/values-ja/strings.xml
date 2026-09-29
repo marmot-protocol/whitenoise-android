@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Partial Japanese locale seeded by the Namecoin `.bit` NIP-05 port.
+     The app has no full ja catalog yet; these entries cover only the
+     Namecoin resolution UI and the recipient-field hints that mention
+     `.bit`. Every other string falls back to the default catalog.
+     Translations adapted from the upstream whitenoise-linux ja .po entries
+     (commits 28ba1938d8, a3e2b4760f). -->
+<resources>
+    <string name="namecoin_lookup_resolving">Namecoin名を検索しています。</string>
+    <string name="namecoin_resolve_failed">Namecoinで%1$sを解決できませんでした。確認して、もう一度お試しください。</string>
+    <string name="namecoin_resolvers_unavailable">Namecoinリゾルバーに接続できませんでした。もう一度お試しください。</string>
+    <string name="search_people_hint">名前、Nostrアドレス、npub、または .bit</string>
+    <string name="new_message_name_or_npub">名前、npub、または .bit</string>
+</resources>

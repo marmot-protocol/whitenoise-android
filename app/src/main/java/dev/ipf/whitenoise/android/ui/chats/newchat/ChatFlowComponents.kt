@@ -251,7 +251,10 @@ internal fun SelectionIndicator(
 }
 
 @Composable
-internal fun ResolvingContactRow(modifier: Modifier = Modifier) {
+internal fun ResolvingContactRow(
+    modifier: Modifier = Modifier,
+    label: String = stringResource(R.string.recipient_preview_resolving),
+) {
     Row(
         modifier =
             modifier
@@ -263,7 +266,7 @@ internal fun ResolvingContactRow(modifier: Modifier = Modifier) {
     ) {
         CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
         Text(
-            stringResource(R.string.recipient_preview_resolving),
+            label,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

@@ -283,7 +283,13 @@ internal fun ContactPickerScreen(
                 val resolvedHex =
                     resolution.resolvedHex?.takeUnless { it.equals(activeHex, ignoreCase = true) }
                 if (identifierQuery && resolution.state == RecipientPreviewState.Resolving && matches.isEmpty()) {
-                    item { ResolvingContactRow() }
+                    item {
+                        ResolvingContactRow(
+                            label =
+                                namecoinResolvingLabel(query)?.let { stringResource(it) }
+                                    ?: stringResource(R.string.recipient_preview_resolving),
+                        )
+                    }
                 } else if (identifierQuery && resolvedHex != null) {
                     item {
                         val alreadyMember =
@@ -331,8 +337,19 @@ internal fun ContactPickerScreen(
                     }
                 } else if (matches.isEmpty()) {
                     item {
+                        val namecoinFailure = namecoinFailureLabel(resolution.namecoinResult)
                         if (userSearch.isSearching) {
                             UserSearchStatusRow(R.string.user_search_searching, showProgress = true)
+                        } else if (identifierQuery && namecoinFailure != null) {
+                            // A settled .bit lookup says why: the name doesn't
+                            // exist, or the resolvers can't be reached — never
+                            // the generic "no matches".
+                            Text(
+                                stringResource(namecoinFailure, query.trim()),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
+                            )
                         } else {
                             Text(
                                 stringResource(

@@ -601,6 +601,9 @@
     <string name="native_push_missing_server_subtitle">Le notifiche push non sono disponibili perché questa build non ha un server push configurato.</string>
     <string name="native_push_google_play_unavailable_subtitle">Le notifiche push richiedono servizi Google Play compatibili su questo dispositivo.</string>
     <string name="native_push_firebase_unavailable_subtitle">Le notifiche push non sono disponibili perché Firebase non è configurato o non è stato inizializzato.</string>
+    <string name="namecoin_lookup_resolving">Ricerca del nome Namecoin in corso.</string>
+    <string name="namecoin_resolve_failed">Impossibile risolvere %1$s su Namecoin. Controlla e riprova.</string>
+    <string name="namecoin_resolvers_unavailable">Impossibile raggiungere i resolver Namecoin. Riprova.</string>
     <string name="notification_categories">Categorie di notifiche</string>
     <string name="notification_scope_default_all_chats">Usa impostazione globale</string>
     <string name="notification_scope_custom_chat">Personalizzata per questa chat</string>
@@ -1526,7 +1529,7 @@
     <string name="next">Avanti</string>
     <string name="no_matches">Nessun risultato</string>
     <string name="new_message">Nuovo messaggio</string>
-    <string name="search_people_hint">Nome, indirizzo Nostr o npub</string>
+    <string name="search_people_hint">Nome, indirizzo Nostr, npub o .bit</string>
     <string name="user_search_searching">Ricerca nella rete…</string>
     <string name="user_search_incomplete">Alcuni risultati della rete potrebbero mancare.</string>
     <string name="user_search_failed">Impossibile cercare nella rete. Controlla la connessione e riprova.</string>
@@ -2177,7 +2180,7 @@
     <string name="folder_included_chats">Chat incluse</string>
     <string name="chats">Conversazioni</string>
     <string name="manage_folders">Gestisci cartelle</string>
-    <string name="new_message_name_or_npub">Nome o npub</string>
+    <string name="new_message_name_or_npub">Nome, npub o .bit</string>
     <string name="new_message_connect_qr">Connetti con QR</string>
     <string name="new_message_invite_friend">Invita un amico</string>
     <string name="new_message_talk_to_agent">Parla con il tuo agente</string>

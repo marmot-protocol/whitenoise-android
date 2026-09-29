@@ -169,6 +169,11 @@ private fun NewGroupRecipientAccountScreen(
             searching = resolution.state == RecipientPreviewState.Resolving || search.isSearching,
             failed = search.failed,
             incomplete = search.isIncomplete,
+            searchingLabelRes =
+                if (identifier) namecoinResolvingLabel(query) else null,
+            identifierEmptyLabelRes =
+                if (identifier) namecoinFailureLabel(resolution.namecoinResult) else null,
+            identifierEmptyArg = query.trim(),
             actions =
                 NewGroupRecipientActions(
                     back = { leave(onBack) },

@@ -126,9 +126,6 @@ object NamecoinResolver {
     /** Per-call request budget: connect + handshake + one JSON-RPC round trip. */
     internal const val REQUEST_TIMEOUT_MILLIS = 8_000L
 
-    /** A name is treated as expired this many blocks after its last update. */
-    private const val NAME_EXPIRE_DEPTH = 36_000L
-
     private val core by lazy {
         NamecoinResolverCore(
             servers = DEFAULT_SERVERS,
@@ -202,6 +199,9 @@ object NamecoinResolver {
      */
     suspend fun resolve(identifier: String): NamecoinResult = core.resolve(identifier)
 }
+
+/** A name is treated as expired this many blocks after its last update. */
+private const val NAME_EXPIRE_DEPTH = 36_000L
 
 /**
  * The stateful resolver behind [NamecoinResolver]: session caches, in-flight
@@ -297,9 +297,9 @@ internal class NamecoinResolverCore(
         // to "empty imported object" — only the root's availability drives the
         // top-level tri-state signal.
         val merged =
-            NamecoinRecord.resolveValueWithImports(root) { importedName ->
+            NamecoinRecord.resolveValueWithImports(root, fetch = { importedName ->
                 fetchImport(importedName)
-            }
+            })
 
         return when (val extraction = NamecoinRecord.extractNostr(merged, parsed)) {
             is NamecoinRecord.Extraction.Resolved ->
