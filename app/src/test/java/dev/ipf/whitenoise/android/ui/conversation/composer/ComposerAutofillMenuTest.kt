@@ -143,6 +143,20 @@ class ComposerAutofillMenuTest {
     }
 
     @Test
+    fun unfocusedLongPressPastesWhitespaceOnlyText() {
+        clipboard.setPrimaryClip(ClipData.newPlainText("test", "  \n"))
+        render("")
+        composeRule.onNode(hasSetTextAction()).performTouchInput {
+            down(center)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            up()
+        }
+        composeRule.runOnIdle { unfocusedToolbar.selectPaste() }
+        composeRule.runOnIdle { assertEquals("  \n", value.text) }
+        composeRule.onNode(hasSetTextAction()).assertIsNotFocused()
+    }
+
+    @Test
     @Config(shadows = [ComposerMagnifierShadow::class])
     fun focusedDraftLongPressKeepsTheTextMenu() {
         render("Draft message")

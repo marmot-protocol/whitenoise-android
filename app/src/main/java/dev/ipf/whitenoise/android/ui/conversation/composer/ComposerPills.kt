@@ -1070,7 +1070,7 @@ internal fun ComposerPill(
                                                             rect = editorBounds,
                                                             onPasteRequested = {
                                                                 val pastedText = clipboardManager?.primaryClipPlainText(context)
-                                                                if (!pastedText.isNullOrBlank()) {
+                                                                if (!pastedText.isNullOrEmpty()) {
                                                                     val value = latestTextFieldValue
                                                                     val start = value.selection.min.coerceIn(0, value.text.length)
                                                                     val end = value.selection.max.coerceIn(start, value.text.length)

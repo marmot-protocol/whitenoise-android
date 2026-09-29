@@ -2984,6 +2984,15 @@
         ]
       },
       {
+        "surface": "Collapsed composer Paste toolbar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "onLongPress = {",
+        "test_ids": [
+          "CON-013",
+          "CON-021"
+        ]
+      },
+      {
         "surface": "ComposerUnfocusedTouchFocusGestures",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerReadingAnchor.kt",
         "anchor": "fun PointerInputScope.composerUnfocusedTouchFocusGestures(",

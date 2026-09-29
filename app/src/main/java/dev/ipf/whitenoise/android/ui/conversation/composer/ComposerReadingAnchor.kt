@@ -26,7 +26,7 @@ import kotlin.math.abs
 @Suppress("CyclomaticComplexMethod")
 internal suspend fun PointerInputScope.composerUnfocusedTouchFocusGestures(
     onTap: (Offset) -> Unit,
-    onLongPress: (Offset) -> Unit = {},
+    onLongPress: () -> Unit,
 ) {
     val touchSlop = viewConfiguration.touchSlop
     val longPressTimeoutMillis = viewConfiguration.longPressTimeoutMillis
@@ -63,7 +63,7 @@ internal suspend fun PointerInputScope.composerUnfocusedTouchFocusGestures(
                         if (!change.pressed) {
                             trackedPointer = null
                             if (released) {
-                                if (elapsed >= longPressTimeoutMillis) onLongPress(change.position) else onTap(change.position)
+                                if (elapsed >= longPressTimeoutMillis) onLongPress() else onTap(change.position)
                             }
                         }
                     }
