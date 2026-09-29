@@ -1380,12 +1380,13 @@ class ConversationDictationControllerTest {
 
         assertTrue(fixture.controller.state is ConversationDictationState.Starting)
         assertEquals(0L, fixture.controller.providerActivityRequestId)
-        assertTrue(fixture.controller.ownsMicrophone)
+        assertFalse(fixture.controller.ownsMicrophone)
         assertTrue(fixture.controller.hasDurableSession)
         assertTrue(rejectedSession.destroyed)
         assertEquals(1, fixture.platform.recognitionConfigurationChecks)
         fixture.scheduler.runDelay(500L)
         assertEquals(2, fixture.platform.sessions.size)
+        assertTrue(fixture.controller.ownsMicrophone)
 
         fixture.platform.listener.onError(ConversationDictationFailure.PermissionDenied)
 
@@ -1394,7 +1395,7 @@ class ConversationDictationControllerTest {
             (fixture.controller.state as ConversationDictationState.Failed).reason,
         )
         assertEquals(0L, fixture.controller.providerActivityRequestId)
-        assertEquals(1, microphoneReleases)
+        assertEquals(2, microphoneReleases)
         assertEquals(1, durableStops)
     }
 
@@ -1949,18 +1950,19 @@ class ConversationDictationControllerTest {
 
         assertEquals("Draft", fixture.drafts.getValue(key()).text)
         assertEquals(0, fixture.writes)
-        assertEquals(0, releases)
+        assertEquals(1, releases)
         assertTrue(firstSession.destroyed)
         fixture.scheduler.runDelay(250L)
         assertEquals(2, fixture.platform.sessions.size)
         assertTrue(fixture.controller.state is ConversationDictationState.Starting)
+        assertTrue(fixture.controller.ownsMicrophone)
 
         firstListener.onResult("stale duplicate")
         fixture.controller.stop()
 
         assertEquals("Draft early segment", fixture.drafts.getValue(key()).text)
         assertEquals(1, fixture.writes)
-        assertEquals(1, releases)
+        assertEquals(2, releases)
     }
 
     /** Verifies that manual completion never treats an ordinary pause as implicit consent to finish. */
@@ -2964,9 +2966,9 @@ class ConversationDictationControllerTest {
         assertTrue(fixture.platform.session.stopped)
     }
 
-    /** Verifies that recognizer churn retains one microphone lease and releases it only at logical teardown. */
+    /** Each provider-owned capture releases its microphone lease during the processing gap. */
     @Test
-    fun microphoneLeaseSurvivesGenerationsAndReleasesOnceAtLogicalTeardown() {
+    fun microphoneLeaseTracksProviderCaptureGenerationsAndTeardown() {
         var acquisitions = 0
         var releases = 0
         val fixture =
@@ -2985,8 +2987,8 @@ class ConversationDictationControllerTest {
         fixture.platform.listener.onResult("second")
         fixture.scheduler.runDelay(250L)
 
-        assertEquals(1, acquisitions)
-        assertEquals(0, releases)
+        assertEquals(3, acquisitions)
+        assertEquals(2, releases)
         assertEquals(3, fixture.platform.sessions.size)
         assertTrue(
             fixture.platform.sessions
@@ -2997,7 +2999,7 @@ class ConversationDictationControllerTest {
         fixture.controller.cancel()
         fixture.controller.cancel()
 
-        assertEquals(1, releases)
+        assertEquals(3, releases)
         assertEquals(
             1,
             fixture.platform.sessions
