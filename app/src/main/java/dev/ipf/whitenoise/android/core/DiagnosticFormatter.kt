@@ -87,6 +87,10 @@ object DiagnosticFormatter {
                 "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] welcome pending for ${identity.publicIdentity(
                     event.recipientHex,
                 )} in group ${IdentityFormatter.short(event.groupIdHex)}"
+            is MarmotEventFfi.HistoryNoticesChanged ->
+                // Notices carry no relay, message or key identities; the list
+                // itself is re-read from the runtime, never copied here.
+                "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] history notices changed"
         }
 
     private const val MAX_ERROR_LEN = 80
