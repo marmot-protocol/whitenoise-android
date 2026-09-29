@@ -581,9 +581,10 @@ internal fun ComposerPill(
     // is a plain value check readable during measure — which preserves the
     // paste/dictation/bulk-replacement first-frame caret guarantees.
     var readingScrollAnchor by remember { mutableStateOf<ComposerReadingAnchor?>(null) }
-    // The gesture owner below lives in a pointerInput(Unit) block, so it must
-    // read the live field value at arm time rather than a stale capture.
+    // Gesture handlers below outlive recomposition, so read the live field and
+    // visual transformation instead of values captured when a handler started.
     val latestTextFieldValue by rememberUpdatedState(textFieldValue)
+    val latestTransformedText by rememberUpdatedState(transformedText)
     val caretFollowSuspended =
         readingScrollAnchor?.matches(textFieldValue) == true
     SideEffect {
@@ -1029,7 +1030,10 @@ internal fun ComposerPill(
                                             composerUnfocusedTouchFocusGestures { position ->
                                                 val value = latestTextFieldValue
                                                 textLayoutSnapshot
-                                                    ?.takeIf { it.sourceText == value.text }
+                                                    ?.takeIf {
+                                                        it.sourceText == value.text &&
+                                                            it.transformedText == latestTransformedText
+                                                    }
                                                     ?.let { snapshot ->
                                                         val transformedOffset =
                                                             snapshot.result.getOffsetForPosition(position)
