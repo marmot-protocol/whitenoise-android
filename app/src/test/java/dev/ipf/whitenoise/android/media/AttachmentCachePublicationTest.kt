@@ -5,6 +5,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -12,6 +13,7 @@ import org.junit.Test
 import java.io.File
 import java.io.IOException
 import java.io.OutputStream
+import java.io.RandomAccessFile
 import java.nio.file.Files
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -76,6 +78,29 @@ class AttachmentCachePublicationTest {
             assertTrue(published)
             assertArrayEquals(byteArrayOf(4, 5, 6), finalFile.readBytes())
             assertFalse("the copy path must close and delete its source lease", sourceFile.exists())
+        }
+
+    /** A native-retained APK larger than the former 128 MiB cap reaches a complete FileProvider source. */
+    @Test
+    fun publishSourceAfterLoad_movesLargeApkLeaseWithoutTruncation() =
+        runBlocking {
+            dir = Files.createTempDirectory("large-apk-source").toFile()
+            val leaseDirectory = File(dir, MediaCacheDirs.NATIVE_ATTACHMENT_LEASES).apply { mkdirs() }
+            val source = File(leaseDirectory, "release.lease")
+            val apkBytes = 143_162_216L
+            RandomAccessFile(source, "rw").use { it.setLength(apkBytes) }
+            val finalFile = File(File(dir, MediaCacheDirs.SHARED), "release.apk")
+            val key = AttachmentCachePublication.attachmentKey("large-apk", 0, 1uL)
+
+            val published =
+                AttachmentCachePublication.publishSourceAfterLoad(key, finalFile) {
+                    AttachmentPlaintext.Lease(DiskByteCacheLease(source))
+                }
+
+            assertTrue(published)
+            assertEquals(apkBytes, finalFile.length())
+            assertFalse(source.exists())
+            assertTrue(finalFile.isFile)
         }
 
     /** Proves a wipe between permit capture and source loading rejects publication. */

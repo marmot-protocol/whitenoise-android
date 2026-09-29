@@ -167,7 +167,7 @@ class ReceivedApkAttachmentOpenIntegrationTest {
 
     /** Rejects filename-inferred APKs whose verified payload is not an Android package. */
     @Test
-    fun genericApkNameWithNonApkArtifactIsRejectedBeforeDispatch() =
+    fun declaredOrInferredApkWithNonApkArtifactIsRejectedBeforeDispatch() =
         runTest {
             val context = RecordingContext(applicationContext())
             val invalidArtifacts =
@@ -181,16 +181,18 @@ class ReceivedApkAttachmentOpenIntegrationTest {
                 )
 
             invalidArtifacts.forEach { source ->
-                val result =
-                    openAttachmentExternally(
-                        context = context,
-                        source = source,
-                        mediaType = GENERIC_BINARY_MIME,
-                        fileName = "release.apk",
-                        selfUpdateEnabled = true,
-                        canRequestPackageInstalls = { true },
-                    )
-                assertEquals(OpenAttachmentResult.InvalidPackage, result)
+                listOf(GENERIC_BINARY_MIME, ANDROID_PACKAGE_MIME).forEach { advertisedMime ->
+                    val result =
+                        openAttachmentExternally(
+                            context = context,
+                            source = source,
+                            mediaType = advertisedMime,
+                            fileName = if (advertisedMime == ANDROID_PACKAGE_MIME) "payload.bin" else "release.apk",
+                            selfUpdateEnabled = true,
+                            canRequestPackageInstalls = { true },
+                        )
+                    assertEquals(OpenAttachmentResult.InvalidPackage, result)
+                }
             }
             assertNull(context.startedIntent)
         }

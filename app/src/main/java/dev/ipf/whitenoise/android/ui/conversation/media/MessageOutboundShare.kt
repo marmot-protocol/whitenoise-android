@@ -214,12 +214,16 @@ internal fun safeOutboundFileName(untrustedName: String): String =
         },
     )
 
+// Keep the multi-file share budget independent of the larger single-document
+// cache allowance needed for received APK handoff.
+internal const val OUTBOUND_SHARE_MAX_BYTES: Long = 128L * 1024L * 1024L
+
 internal fun boundedShareTotal(
     currentBytes: Long,
     nextBytes: Long,
 ): Long {
     val total = if (nextBytes > Long.MAX_VALUE - currentBytes) Long.MAX_VALUE else currentBytes + nextBytes
-    if (total > AttachmentPlaintextCache.SHARED_MAX_DIRECTORY_BYTES) {
+    if (total > OUTBOUND_SHARE_MAX_BYTES) {
         throw IOException("outbound share exceeds bounded cache limit")
     }
     return total
