@@ -377,19 +377,12 @@ private suspend fun ConversationController.pageWithRetryBudget(
         val retryDelayMs =
             when (outcome.reason) {
                 NOT_READY ->
-                    if (attempt < CONVERSATION_PAGE_NOT_READY_ATTEMPTS) {
-                        CONVERSATION_WINDOW_NOT_READY_RETRY_MS
-                    } else {
-                        break
-                    }
+                    CONVERSATION_WINDOW_NOT_READY_RETRY_MS.takeIf { attempt < CONVERSATION_PAGE_NOT_READY_ATTEMPTS }
                 SUPERSEDED ->
-                    if (attempt < CONVERSATION_PAGE_SUPERSEDED_ATTEMPTS) {
-                        CONVERSATION_WINDOW_SUPERSEDED_RETRY_MS
-                    } else {
-                        break
-                    }
-                else -> break
+                    CONVERSATION_WINDOW_SUPERSEDED_RETRY_MS.takeIf { attempt < CONVERSATION_PAGE_SUPERSEDED_ATTEMPTS }
+                else -> null
             }
+        if (retryDelayMs == null) break
         delay(retryDelayMs)
         if (!retainsSubscription(handle)) return null
         outcome = withContext(Dispatchers.IO) { page(handle) }
