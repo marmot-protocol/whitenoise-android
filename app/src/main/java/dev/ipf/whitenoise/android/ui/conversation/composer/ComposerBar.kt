@@ -367,6 +367,7 @@ internal fun ComposerBar(
     onShareLocation: (() -> Unit)? = null,
     onShareUser: (() -> Unit)? = null,
     onShareContact: (() -> Unit)? = null,
+    onCreatePoll: (() -> Unit)? = null,
     onPasteImageUris: ((List<Uri>) -> Unit)? = null,
     voiceRecordingController: dev.ipf.whitenoise.android.audio.VoiceRecordingController? = null,
     voiceReview: VoiceRecordingReview? = null,
@@ -1295,6 +1296,7 @@ internal fun ComposerBar(
                                 onLocation = onShareLocation,
                                 onUser = onShareUser,
                                 onContact = onShareContact,
+                                onPoll = onCreatePoll,
                             )
                         },
                         preImeBackEnabled = !composerEmojiPickerOpen && !attachmentSheetState.isOpen,

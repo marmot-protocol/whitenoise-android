@@ -106,7 +106,7 @@ internal fun privacyMarmot(
                     exportEnabled = false,
                     exportIntervalSeconds = 60uL,
                 )
-            "setAuditLogTrackerConfig" -> arguments!!.first()
+            "setAuditLogTrackerConfig", "setAuditOtlpConfigV5" -> arguments!!.first()
             "auditLogSettings" -> auditSettings
             "setAuditLogSettings" -> {
                 beforeSave()

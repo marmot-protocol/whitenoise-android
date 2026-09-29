@@ -64,6 +64,7 @@ data class MessageTextCopy(
     val mediaAlbum: String = "Album",
     val mediaCountedFormat: String = "%1\$s (%2\$d)",
     val message: String,
+    val poll: String = "Poll",
     val giphyMedia: String = "GIF via GIPHY",
     val groupSystem: GroupSystemCopy = GroupSystemCopy.Default,
 ) {
@@ -150,6 +151,7 @@ object MessageProjector {
     private val KindReaction = 7uL
     private val KindChat = 9uL
     private val KindEdit = 1009uL
+    private const val KindPoll = 1068uL
     private val KindAgentStreamStart = 1200uL
     private const val KindAgentOperation = 1202uL
     private val KindGroupSystem = 1210uL
@@ -163,6 +165,7 @@ object MessageProjector {
     private const val StreamHashTag = "stream-hash"
     private val RestrictedMediaForwardingTags = setOf("view_once", "view-once")
 
+    /** Returns safe bubble copy for special records, including projected polls and system events. */
     fun displayBody(
         message: AppMessageRecordFfi,
         copy: MessageTextCopy = MessageTextCopy.Default,
@@ -170,6 +173,7 @@ object MessageProjector {
         when {
             isReaction(message) -> copy.reacted(message.plaintext.ifBlank { copy.reactionFallback })
             isDelete(message) -> copy.deleted
+            isPollKind(message.kind) -> copy.poll
             isStreamStart(message) -> message.plaintext.ifBlank { copy.agentStreamStarted }
             // Never the raw JSON: kind-1210 content must not render as a chat
             // body. The conversation row builds the name-resolved summary;
@@ -180,6 +184,7 @@ object MessageProjector {
             else -> message.plaintext
         }
 
+    /** Builds chat-list copy without exposing raw poll, system-event, or media envelope payloads. */
     fun previewText(
         message: AppMessageRecordFfi?,
         copy: MessageTextCopy = MessageTextCopy.Default,
@@ -189,6 +194,7 @@ object MessageProjector {
         return when {
             isReaction(message) -> copy.reacted(message.plaintext.ifBlank { copy.reactionFallback })
             isDelete(message) -> copy.deleted
+            isPollKind(message.kind) -> copy.poll
             isStreamStart(message) -> copy.agentStreamStarted
             isGroupSystem(message) -> GroupSystemEvents.previewText(message.plaintext, copy.groupSystem)
             isStreamFinal(message) -> message.plaintext.ifBlank { copy.streamFinished }
@@ -296,12 +302,15 @@ object MessageProjector {
      */
     fun isChatKind(kind: ULong): Boolean = kind == KindChat
 
+    /** A native kind-1068 projection supplies the options and votes separately from plaintext. */
+    fun isPollKind(kind: ULong): Boolean = kind == KindPoll
+
     /**
      * True when a chat-list row's displayed preview line is the message's raw
      * plaintext itself, rather than derived/fallback copy. This is the exact
      * complement of the special-cased arms in
      * [ChatListItem.projectedPreviewText]: edit records (kind-1009),
-     * agent-stream starts (kind-1200) and group-system events (kind-1210)
+     * polls (kind-1068), agent-stream starts (kind-1200) and group-system events (kind-1210)
      * surface synthetic copy, so they are excluded; every other kind falls
      * through to the verbatim `preview.plaintext` arm. Naming the predicate
      * here keeps the markdown parse gate
@@ -315,6 +324,7 @@ object MessageProjector {
      */
     fun rendersRawBodyPreview(kind: ULong): Boolean =
         kind != KindEdit &&
+            kind != KindPoll &&
             kind != KindAgentStreamStart &&
             !isGroupSystemKind(kind)
 

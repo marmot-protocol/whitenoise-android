@@ -269,7 +269,7 @@ internal class NotificationBootstrapTestFixture(
                 }
                 "setProductAnalyticsRuntimeConfig" -> Unit
                 "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
-                "setAuditLogTrackerConfig" -> arguments?.first()
+                "setAuditLogTrackerConfig", "setAuditOtlpConfigV5" -> arguments?.first()
                 "usageDiagnosticsSettings" -> {
                     emitAtFirstPostStartFfiBoundary()
                     UsageDiagnosticsSettingsFfi(

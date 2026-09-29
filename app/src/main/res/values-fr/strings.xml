@@ -1,6 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">White Noise</string>
+    <string name="poll_preview">Sondage</string>
+    <string name="poll_unsupported">Impossible d\'afficher ce sondage</string>
+    <string name="poll_closed">Sondage terminé</string>
+    <string name="poll_vote_failed">Impossible d\'envoyer le vote</string>
+    <string name="poll_create_failed">Impossible de créer le sondage</string>
+    <string name="poll_enter_question">Saisissez une question.</string>
+    <string name="poll_question_too_long">Cette question est trop longue.</string>
+    <string name="poll_add_two_options">Ajoutez au moins deux options.</string>
+    <string name="poll_option_too_long">Une des options est trop longue.</string>
+    <string name="poll_duplicate_option">Chaque option doit être différente.</string>
+    <string name="poll_create">Créer un sondage</string>
+    <string name="poll_question">Votre question</string>
+    <string name="poll_option">Réponse %1$d</string>
+    <string name="poll_add_option">Ajouter une option</string>
+    <string name="poll_remove_option">Supprimer l\'option %1$d</string>
+    <string name="poll_single_choice">Choix unique</string>
+    <string name="poll_multiple_choice">Choix multiples</string>
+    <string name="poll_submit">Publier le sondage</string>
+    <string name="poll_deadline">Fin du sondage</string>
+    <string name="poll_no_deadline">Sans limite</string>
+    <string name="poll_30_days">30 jours</string>
+    <string name="poll_duration_5_minutes">5 min</string>
+    <string name="poll_duration_1_hour">1 heure</string>
+    <string name="poll_duration_1_day">1 jour</string>
+    <string name="poll_duration_1_week">1 semaine</string>
+    <string name="poll_ends_at">Se termine le %1$s</string>
+    <plurals name="poll_option_votes">
+        <item quantity="one">%1$d suffrage</item>
+        <item quantity="other">%1$d suffrages</item>
+    </plurals>
+    <plurals name="poll_participants">
+        <item quantity="one">%1$d votant</item>
+        <item quantity="other">%1$d votants</item>
+    </plurals>
     <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">White Noise n’a pas pu démarrer</string>
     <string name="startup_taking_too_long">Le démarrage prend plus de temps que prévu. Veuillez réessayer.</string>
@@ -2045,7 +2079,7 @@
     <string name="audit_upload_title">Partager les journaux de diagnostic des groupes</string>
     <string name="audit_upload_subtitle">Partage les journaux de diagnostic des groupes pour tous les profils de cet appareil.</string>
     <string name="audit_upload_confirm_title">Partager les journaux de diagnostic des groupes avec White Noise ?</string>
-    <string name="audit_upload_disclosure">White Noise enregistre les journaux de diagnostic des groupes pour tous les profils de cet appareil et les envoie à Goggles, exploité par Internet Privacy Foundation. Les journaux déjà stockés ici peuvent aussi être envoyés. Ils peuvent contenir des identifiants de groupes et de messages, des adresses de relais, des horodatages, des références de comptes pseudonymes, un identifiant d’installation, le modèle de votre appareil et la version de l’application. Ils ne contiennent jamais le contenu des messages ni de clés privées. Ces journaux sont sensibles et nous les utilisons pour analyser les problèmes de fiabilité. Ils restent distincts du partage des données d’utilisation et de télémétrie. Désactiver le partage arrête les nouveaux enregistrements et les nouveaux envois, mais un envoi déjà en cours peut se terminer. Les journaux présents sur cet appareil et ceux déjà envoyés restent en place. Annuler laisse le partage désactivé.</string>
+    <string name="audit_upload_disclosure">White Noise enregistre les journaux de diagnostic des groupes pour tous les profils de cet appareil et les envoie au collecteur d’audit White Noise, exploité par Internet Privacy Foundation. Les journaux déjà stockés ici peuvent aussi être envoyés. Ils peuvent contenir des identifiants de groupes et de messages, des adresses de relais, des horodatages, des références de comptes pseudonymes, un identifiant d’installation, le modèle de votre appareil et la version de l’application. Ils ne contiennent jamais le contenu des messages ni de clés privées. Ces journaux sont sensibles et nous les utilisons pour analyser les problèmes de fiabilité. Ils restent distincts du partage des données d’utilisation et de télémétrie. Désactiver le partage arrête les nouveaux enregistrements et les nouveaux envois, mais un envoi déjà en cours peut se terminer. Les journaux présents sur cet appareil et ceux déjà envoyés restent en place. Annuler laisse le partage désactivé.</string>
     <string name="audit_upload_confirm">Activer le partage automatique</string>
     <string name="audit_upload_renew">Les informations sur le partage ont changé. Consultez-les avant de réactiver les journaux de diagnostic des groupes.</string>
     <string name="diagnostics_group_disclosure">Les journaux de diagnostic des groupes aident à analyser les problèmes de fiabilité. Ils désignent les membres par des références hachées. Chaque journal peut contenir des identifiants techniques et des changements de membres horodatés. Ils ne contiennent jamais le contenu des messages, les noms de profil, les noms de groupe ni les clés privées.</string>
