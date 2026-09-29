@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -118,6 +119,34 @@ class ChatFolderEditContentTest {
         composeRule.onNodeWithText(app.getString(R.string.folder_save_failed)).assertExists()
     }
 
+    @Test
+    fun deleteActionIsHiddenForNewFolders() {
+        render(state = editState(name = "New", isNew = true))
+        composeRule.onNodeWithTag("folder.delete").assertDoesNotExist()
+    }
+
+    @Test
+    fun deleteActionIsAvailableForExistingFolders() {
+        var deleteRequested = false
+        render(state = editState(name = "Work", isNew = false), onDelete = { deleteRequested = true })
+        composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag("folder.delete"))
+        composeRule.onNodeWithTag("folder.delete").assertIsEnabled().performClick()
+        assertEquals(true, deleteRequested)
+    }
+
+    @Test
+    fun deleteFailureShowsErrorAndKeepsRetryAvailable() {
+        var retryRequested = false
+        render(
+            state = editState(name = "Work", isNew = false, error = app.getString(R.string.folder_delete_failed)),
+            onDelete = { retryRequested = true },
+        )
+        composeRule.onNodeWithText(app.getString(R.string.folder_delete_failed)).assertExists()
+        composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag("folder.delete"))
+        composeRule.onNodeWithTag("folder.delete").assertIsEnabled().performClick()
+        assertEquals(true, retryRequested)
+    }
+
     /** Edit state. */
     private fun editState(
         name: String,
@@ -155,6 +184,7 @@ class ChatFolderEditContentTest {
         onOpenPeople: () -> Unit = {},
         onOpenPreview: () -> Unit = {},
         onSave: () -> Unit = {},
+        onDelete: () -> Unit = {},
         onBack: () -> Unit = {},
     ) {
         composeRule.setContent {
@@ -170,6 +200,7 @@ class ChatFolderEditContentTest {
                         onOpenPeople = onOpenPeople,
                         onOpenPreview = onOpenPreview,
                         onSave = onSave,
+                        onDelete = onDelete,
                         onBack = onBack,
                     )
                 }

@@ -1218,8 +1218,10 @@
     <string name="folder_none_detail">Erstelle einen Ordner, um deine Chats zu ordnen.</string>
     <string name="folder_restore_hint">Stellt fehlende Ordner „Ungelesen“, „Archiviert“ und „Gruppen“ wieder her. Vorhandene Ordner behalten deine Änderungen.</string>
     <string name="folder_edit">Ordner bearbeiten</string>
+    <string name="folder_delete_action">Ordner löschen</string>
     <string name="folder_delete_title">„%1$s“ löschen?</string>
     <string name="folder_delete_detail">Diesen Ordner löschen? Deine Chats bleiben, wo sie sind.</string>
+    <string name="folder_delete_failed">Dieser Ordner konnte nicht gelöscht werden. Bitte erneut versuchen.</string>
     <string name="actions_for">Aktionen für %1$s</string>
     <string name="chat_folder_name">Ordnername</string>
     <string name="folder_manual_hint">Hier hinzugefügte Chats bleiben enthalten, auch wenn sie nicht zu den automatischen Regeln passen.</string>

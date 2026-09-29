@@ -1220,8 +1220,10 @@
     <string name="folder_none_detail">Créez un dossier pour organiser vos discussions.</string>
     <string name="folder_restore_hint">Rétablit les dossiers Non lus, Archivés et Groupes manquants. Les dossiers existants conservent vos modifications.</string>
     <string name="folder_edit">Modifier le dossier</string>
+    <string name="folder_delete_action">Supprimer le dossier</string>
     <string name="folder_delete_title">Supprimer « %1$s » ?</string>
     <string name="folder_delete_detail">Supprimer ce dossier ? Vos discussions resteront où elles sont.</string>
+    <string name="folder_delete_failed">Impossible de supprimer ce dossier. Réessayez.</string>
     <string name="actions_for">Actions pour %1$s</string>
     <string name="chat_folder_name">Nom du dossier</string>
     <string name="folder_manual_hint">Les discussions ajoutées ici restent incluses, même si elles ne correspondent pas aux règles automatiques.</string>

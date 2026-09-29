@@ -7481,6 +7481,15 @@
         ]
       },
       {
+        "surface": "ChatFolderDeleteDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFoldersScreen.kt",
+        "anchor": "fun ChatFolderDeleteDialog(",
+        "test_ids": [
+          "SET-009",
+          "ACC-017"
+        ]
+      },
+      {
         "surface": "ChatFolderManageItem.displayName",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFoldersScreen.kt",
         "anchor": "fun ChatFolderManageItem.displayName(",
@@ -18424,6 +18433,15 @@
         ]
       },
       {
+        "surface": "setting:folder_delete_action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
+        "anchor": "R.string.folder_delete_action",
+        "test_ids": [
+          "SET-009",
+          "ACC-017"
+        ]
+      },
+      {
         "surface": "setting:folder_delete_detail",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFoldersScreen.kt",
         "anchor": "R.string.folder_delete_detail",
@@ -18432,6 +18450,14 @@
           "FLD-001",
           "FLD-002",
           "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:folder_delete_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
+        "anchor": "R.string.folder_delete_failed",
+        "test_ids": [
+          "SET-009"
         ]
       },
       {
