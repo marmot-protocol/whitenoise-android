@@ -5,23 +5,22 @@ import android.content.Context
 import android.os.Build
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalWindowInfo
 import dev.ipf.whitenoise.android.core.ClipboardPasteAffordance
 
 @Composable
 internal fun rememberClipboardCanOfferPaste(clipboardManager: android.content.ClipboardManager?): Boolean {
-    val lifecycleOwner = LocalLifecycleOwner.current
+    val windowFocused = LocalWindowInfo.current.isWindowFocused
     var canOfferPaste by remember(clipboardManager) {
         mutableStateOf(clipboardManager.canOfferTextPaste())
     }
 
-    DisposableEffect(clipboardManager, lifecycleOwner) {
+    DisposableEffect(clipboardManager) {
         if (clipboardManager == null) {
             onDispose { }
         } else {
@@ -30,19 +29,14 @@ internal fun rememberClipboardCanOfferPaste(clipboardManager: android.content.Cl
                 android.content.ClipboardManager.OnPrimaryClipChangedListener {
                     refresh()
                 }
-            // Clipboard callbacks can be missed while this app is in the background.
-            val lifecycleObserver =
-                LifecycleEventObserver { _, event ->
-                    if (event == Lifecycle.Event.ON_RESUME) refresh()
-                }
             clipboardManager.addPrimaryClipChangedListener(listener)
-            lifecycleOwner.lifecycle.addObserver(lifecycleObserver)
             refresh()
-            onDispose {
-                clipboardManager.removePrimaryClipChangedListener(listener)
-                lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
-            }
+            onDispose { clipboardManager.removePrimaryClipChangedListener(listener) }
         }
+    }
+    // Background clipboard callbacks can be missed; query again once Android gives this window focus.
+    LaunchedEffect(clipboardManager, windowFocused) {
+        if (windowFocused) canOfferPaste = clipboardManager.canOfferTextPaste()
     }
 
     return canOfferPaste
