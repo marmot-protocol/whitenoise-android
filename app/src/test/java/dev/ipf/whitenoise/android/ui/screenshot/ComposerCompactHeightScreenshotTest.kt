@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -131,6 +132,7 @@ class ComposerCompactHeightScreenshotTest {
         }
         composeRule.waitForIdle()
         composeRule.onNode(hasSetTextAction()).performClick()
+        composeRule.onNode(hasSetTextAction()).assertIsFocused()
         composeRule.waitForIdle()
         composeRule
             .onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG, useUnmergedTree = true)
