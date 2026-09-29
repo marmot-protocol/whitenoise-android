@@ -5,6 +5,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class MediaProbeAggregateTest {
+    /** Locks nearest-rank percentiles, byte accounting, and the closed report schema. */
     @Test
     fun reportsNearestRankAndVerifiedBytesWithoutDynamicLabels() {
         val samples =
@@ -22,6 +23,7 @@ class MediaProbeAggregateTest {
         )
     }
 
+    /** A failed transfer keeps its outcome without fabricating elapsed time or network bytes. */
     @Test
     fun failureOnlyReportDoesNotInventLatencyOrNetworkBytes() {
         assertEquals(
@@ -34,6 +36,7 @@ class MediaProbeAggregateTest {
         )
     }
 
+    /** Invalid samples and failure counts cannot enter the report. */
     @Test
     fun rejectsNonFiniteAndNegativeInputs() {
         assertThrows(IllegalArgumentException::class.java) {

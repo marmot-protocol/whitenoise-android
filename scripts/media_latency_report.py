@@ -59,10 +59,12 @@ HEX64 = re.compile(r"[0-9a-f]{64}\Z")
 
 
 def _nonnegative_number(value: object) -> bool:
+    """Accept finite nonnegative JSON numbers while rejecting Boolean values."""
     return type(value) in (int, float) and math.isfinite(value) and value >= 0
 
 
 def _validate_aggregate(record: object) -> dict:
+    """Enforce the closed aggregate schema and cross-check its outcome totals."""
     if not isinstance(record, dict) or set(record) != AGGREGATE_KEYS:
         raise ValueError("media aggregate has unexpected keys")
     if record["schema"] != 1 or record["operation"] not in OPERATIONS or record["size"] not in SIZES:
@@ -95,6 +97,7 @@ def _validate_aggregate(record: object) -> dict:
 
 
 def _parse_fixed_fields(line: str, allowed: set[str]) -> dict:
+    """Reject unrecognized status tokens before any log text reaches a report."""
     fields = dict(KEY_VALUE.findall(line))
     if not fields or len(fields) != len(line.split()) or not set(fields) <= allowed:
         raise ValueError("unrecognized media probe status fields")
@@ -137,6 +140,7 @@ def parse_status(output: str) -> dict:
 
 
 def main() -> int:
+    """Write a provenance-bound report and fail the command for incomplete runs."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("input", type=Path, help="raw am instrument output")
     parser.add_argument("--source-sha", required=True)

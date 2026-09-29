@@ -5,7 +5,10 @@ from scripts.media_latency_report import parse_status
 
 
 class MediaLatencyReportTest(unittest.TestCase):
+    """Keep the report parser closed to identifiers and honest about failed runs."""
+
     def test_parses_bounded_aggregate_and_native_phase(self):
+        """Known aggregate, native, and component records survive conversion."""
         aggregate = {
             "schema": 1,
             "operation": "download",
@@ -34,6 +37,7 @@ class MediaLatencyReportTest(unittest.TestCase):
         self.assertEqual("image_decode_ms", report["component_metrics"][0]["phase"])
 
     def test_rejects_identifiers_and_false_network_byte_claims(self):
+        """Unexpected identities and unmeasured network bytes are rejected."""
         bad = "INSTRUMENTATION_STATUS: media_probe_native=phase=download account=secret attempts=1"
         with self.assertRaises(ValueError):
             parse_status(bad)
@@ -54,6 +58,7 @@ class MediaLatencyReportTest(unittest.TestCase):
             parse_status(f"INSTRUMENTATION_STATUS: media_probe_json={json.dumps(record)}")
 
     def test_failed_instrumentation_is_not_complete(self):
+        """A non-success instrumentation code remains visibly incomplete."""
         self.assertFalse(parse_status("INSTRUMENTATION_CODE: 0")["complete"])
 
 
