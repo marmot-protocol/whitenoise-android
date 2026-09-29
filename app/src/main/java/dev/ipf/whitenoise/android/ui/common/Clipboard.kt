@@ -9,25 +9,39 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.core.ClipboardPasteAffordance
 
 @Composable
 internal fun rememberClipboardCanOfferPaste(clipboardManager: android.content.ClipboardManager?): Boolean {
+    val lifecycleOwner = LocalLifecycleOwner.current
     var canOfferPaste by remember(clipboardManager) {
         mutableStateOf(clipboardManager.canOfferTextPaste())
     }
 
-    DisposableEffect(clipboardManager) {
+    DisposableEffect(clipboardManager, lifecycleOwner) {
         if (clipboardManager == null) {
             onDispose { }
         } else {
+            val refresh = { canOfferPaste = clipboardManager.canOfferTextPaste() }
             val listener =
                 android.content.ClipboardManager.OnPrimaryClipChangedListener {
-                    canOfferPaste = clipboardManager.canOfferTextPaste()
+                    refresh()
+                }
+            // Clipboard callbacks can be missed while this app is in the background.
+            val lifecycleObserver =
+                LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_RESUME) refresh()
                 }
             clipboardManager.addPrimaryClipChangedListener(listener)
-            canOfferPaste = clipboardManager.canOfferTextPaste()
-            onDispose { clipboardManager.removePrimaryClipChangedListener(listener) }
+            lifecycleOwner.lifecycle.addObserver(lifecycleObserver)
+            refresh()
+            onDispose {
+                clipboardManager.removePrimaryClipChangedListener(listener)
+                lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
+            }
         }
     }
 
