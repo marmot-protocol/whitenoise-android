@@ -7,6 +7,7 @@ private const val MAX_QUESTION_BYTES = 1_024
 private const val MAX_OPTION_BYTES = 256
 private const val MAX_OPTIONS = 10
 
+/** Specific draft rule to explain beside the creator's input. */
 internal enum class PollDraftIssue {
     MISSING_QUESTION,
     QUESTION_TOO_LONG,
@@ -15,6 +16,7 @@ internal enum class PollDraftIssue {
     DUPLICATE_OPTION,
 }
 
+/** Cleaned question and options when the draft satisfies native poll limits. */
 internal data class ValidatedPollDraft(
     val question: String,
     val options: List<String>,
@@ -37,7 +39,7 @@ internal fun normalizePollText(value: String): String =
 private fun Char.isPollBidiControl(): Boolean =
     this == '\u061c' || this == '\u200e' || this == '\u200f' || this in '\u202a'..'\u202e' || this in '\u2066'..'\u2069'
 
-/** Validates the same question, option count, byte limits and duplicate rules as the iOS composer. */
+/** Validates the question, option count, byte limits and duplicate choices before publication. */
 internal fun validatePollDraft(
     question: String,
     options: List<String>,
