@@ -22843,6 +22843,14 @@
         ]
       },
       {
+        "surface": "permission:android.permission.BIND_JOB_SERVICE",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.permission.BIND_JOB_SERVICE",
+        "test_ids": [
+          "MED-022"
+        ]
+      },
+      {
         "surface": "permission:android.permission.CAMERA",
         "source": "app/src/main/AndroidManifest.xml",
         "anchor": "android.permission.CAMERA",
@@ -22858,6 +22866,14 @@
           "DIC-001",
           "NTF-014",
           "TTS-001"
+        ]
+      },
+      {
+        "surface": "permission:android.permission.FOREGROUND_SERVICE_DATA_SYNC",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.permission.FOREGROUND_SERVICE_DATA_SYNC",
+        "test_ids": [
+          "MED-022"
         ]
       },
       {
@@ -22926,6 +22942,14 @@
         "test_ids": [
           "DIC-001",
           "MED-008"
+        ]
+      },
+      {
+        "surface": "permission:android.permission.RUN_USER_INITIATED_JOBS",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.permission.RUN_USER_INITIATED_JOBS",
+        "test_ids": [
+          "MED-022"
         ]
       },
       {
@@ -27098,6 +27122,22 @@
       }
     ],
     "notification_content_contracts": [
+      {
+        "surface": "Generic attachment download notification title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentUserInitiatedDownloadService.kt",
+        "anchor": "R.string.media_downloading",
+        "test_ids": [
+          "MED-022"
+        ]
+      },
+      {
+        "surface": "Generic attachment download notification body",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentUserInitiatedDownloadService.kt",
+        "anchor": "R.string.media_attachment",
+        "test_ids": [
+          "MED-022"
+        ]
+      },
       {
         "surface": "conversation-specific signed-in recipient relevance",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationRecipientRelevance.kt",
