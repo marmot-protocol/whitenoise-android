@@ -2697,6 +2697,24 @@
         "test_ids": ["GRP-024"]
       },
       {
+        "surface": "Group avatar update failure notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_couldnt_update_group",
+        "test_ids": ["GRP-025"]
+      },
+      {
+        "surface": "Group image cleanup failure notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_group_image_uploaded_cleanup_failed",
+        "test_ids": ["GRP-025"]
+      },
+      {
+        "surface": "Group image mutation failure owner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "internal suspend fun updateGroupImage(",
+        "test_ids": ["GRP-025"]
+      },
+      {
         "surface": "Fresh group creation recovery-read policy",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/FreshGroupCreation.kt",
         "anchor": "fun groupRecoveryReadFailureIsPresentable(",
