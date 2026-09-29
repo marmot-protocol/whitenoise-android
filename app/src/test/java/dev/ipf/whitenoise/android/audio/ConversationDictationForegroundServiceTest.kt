@@ -9,9 +9,12 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.widget.Button
+import android.widget.FrameLayout
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.text.input.TextFieldValue
 import dev.ipf.whitenoise.android.MainActivity
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.BackgroundConnectionNotification
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -136,6 +139,10 @@ class ConversationDictationForegroundServiceTest {
         assertEquals(listOf("Cancel", "Paste", "Send"), notification.actions.map { it.title.toString() })
         assertNotNull(notification.contentView)
         assertNotNull(notification.bigContentView)
+        val compact = notification.contentView.apply(service, FrameLayout(service))
+        assertTrue(compact.findViewById<Button>(R.id.dictation_notification_cancel).isEnabled)
+        assertTrue(compact.findViewById<Button>(R.id.dictation_notification_paste).isEnabled)
+        assertTrue(compact.findViewById<Button>(R.id.dictation_notification_send).isEnabled)
         assertEquals("Starting dictation…", notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString())
         assertFalse(notification.extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE))
         assertExplicitNotificationDestinations(service, notification)
@@ -191,7 +198,7 @@ class ConversationDictationForegroundServiceTest {
         service.onStartCommand(startIntent(service, harness), 0, 1)
 
         val backgroundRefresh = BackgroundConnectionNotification.build(service)
-        assertEquals("Dictation", backgroundRefresh.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
+        assertEquals("Dictation active", backgroundRefresh.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
         assertEquals(listOf("Cancel", "Paste", "Send"), backgroundRefresh.actions.map { it.title.toString() })
         assertNotNull(backgroundRefresh.actions[2].actionIntent)
         lifecycle.destroy()

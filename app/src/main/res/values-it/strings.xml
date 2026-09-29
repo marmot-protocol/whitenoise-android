@@ -2071,4 +2071,7 @@
     <string name="export_audit_logs_confirm_action">Continua</string>
     <string name="toast_couldnt_export_audit_logs">Impossibile preparare i log diagnostici per l’esportazione</string>
     <string name="toast_no_audit_logs_to_export">Nessun log diagnostico da esportare</string>
+    <string name="dictation_pause_other_audio_title">Metti in pausa gli altri audio</string>
+    <string name="dictation_pause_other_audio_subtitle">Metti in pausa musica e podcast durante la dettatura; possono riprendere quando la registrazione termina. La lettura vocale e i messaggi vocali di White Noise vengono sempre messi in pausa per sicurezza.</string>
+    <string name="dictation_audio_focus_unavailable">Impossibile mettere in pausa gli altri audio. Riprova oppure disattiva questa opzione nelle impostazioni della dettatura.</string>
 </resources>

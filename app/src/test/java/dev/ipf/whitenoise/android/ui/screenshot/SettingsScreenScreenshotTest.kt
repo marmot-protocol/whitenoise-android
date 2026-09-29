@@ -13,12 +13,14 @@ import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasScrollToNodeAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -184,7 +186,13 @@ class SettingsScreenScreenshotTest {
             }
         }
 
+        composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasTestTag("dictation.pause_other_audio"))
         composeRule.onNodeWithTag("dictation.pause_other_audio").assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("Pause other audio").assertExists()
+        composeRule
+            .onNodeWithText("Pause music and podcasts during dictation", substring = true)
+            .assertExists()
+            .performScrollTo()
         assertEquals(false, appState.conversationDictationPreferences.current().pauseOtherAudio)
         composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_settings_pause_other_audio_rtl_large.png")
     }

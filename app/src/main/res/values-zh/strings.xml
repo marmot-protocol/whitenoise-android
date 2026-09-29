@@ -2043,4 +2043,7 @@
     <string name="export_audit_logs_confirm_action">继续</string>
     <string name="toast_couldnt_export_audit_logs">无法准备要导出的诊断日志</string>
     <string name="toast_no_audit_logs_to_export">没有可导出的诊断日志</string>
+    <string name="dictation_pause_other_audio_title">暂停其他音频</string>
+    <string name="dictation_pause_other_audio_subtitle">听写期间暂停音乐和播客；录音结束后可继续播放。为安全起见，White Noise 的朗读和语音消息始终会暂停。</string>
+    <string name="dictation_audio_focus_unavailable">无法暂停其他音频。请重试，或在听写设置中关闭“暂停其他音频”。</string>
 </resources>

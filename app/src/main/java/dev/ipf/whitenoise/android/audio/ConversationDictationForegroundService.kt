@@ -164,7 +164,7 @@ class ConversationDictationForegroundService : Service() {
             .Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_whitenoise)
             .setContentTitle(getString(R.string.dictation_notification_title))
-            .setContentText(getString(notificationStatus(controller)))
+            .setContentText(getString(dictationNotificationStatus(controller)))
             // An indeterminate progress bar made the notification look stuck during
             // normal recognizer restarts; the status text already names the phase.
             .setContentIntent(openAppIntent())
@@ -174,7 +174,7 @@ class ConversationDictationForegroundService : Service() {
             .setShowWhen(false)
             .setStyle(Notification.DecoratedCustomViewStyle())
             .setCustomContentView(compactControls(controller))
-            .setCustomBigContentView(expandedStatus(controller))
+            .setCustomBigContentView(dictationExpandedStatus(controller))
             .addAction(
                 action(
                     android.R.drawable.ic_menu_close_clear_cancel,
@@ -219,21 +219,6 @@ class ConversationDictationForegroundService : Service() {
             }
         }
     }
-
-    /** The expanded system actions remain the same intents; only phase text occupies custom content. */
-    private fun expandedStatus(controller: ConversationDictationController): RemoteViews =
-        RemoteViews(packageName, R.layout.notification_dictation_expanded).apply {
-            setTextViewText(R.id.dictation_notification_status, getString(notificationStatus(controller)))
-        }
-
-    /** Describes actual readiness/finalization, never a model download or invented percentage. */
-    private fun notificationStatus(controller: ConversationDictationController): Int =
-        when {
-            controller.deliveryInProgress -> R.string.message_status_pending
-            controller.state is ConversationDictationState.Starting -> R.string.dictation_starting
-            controller.state is ConversationDictationState.Processing -> R.string.dictation_processing
-            else -> R.string.dictation_notification_text
-        }
 
     /** Keeps system controls truthful when capture becomes finalization or an irrevocable dispatch. */
     private fun observeNotification(
@@ -309,16 +294,18 @@ class ConversationDictationForegroundService : Service() {
         @Volatile private var activeService: ConversationDictationForegroundService? = null
 
         /** Lets a background-connection refresh preserve active dictation controls. */
-        internal fun activeNotificationOrNull(): Notification? {
-            val service = activeService ?: return null
-            val controller = service.promotedController ?: return null
-            val token = service.promotedSessionToken ?: return null
-            return if (controller.hasDurableSession && controller.notificationSessionToken == token) {
-                service.buildNotification(controller)
-            } else {
-                null
+        internal fun activeNotificationOrNull(): Notification? =
+            activeService?.let { service ->
+                val controller = service.promotedController
+                val token = service.promotedSessionToken
+                if (controller != null && token != null && controller.hasDurableSession &&
+                    controller.notificationSessionToken == token
+                ) {
+                    service.buildNotification(controller)
+                } else {
+                    null
+                }
             }
-        }
         internal const val ACTION_CANCEL = "dev.ipf.whitenoise.android.dictation.CANCEL"
         internal const val ACTION_PASTE = "dev.ipf.whitenoise.android.dictation.PASTE"
         internal const val ACTION_SEND = "dev.ipf.whitenoise.android.dictation.SEND"
@@ -394,6 +381,21 @@ class ConversationDictationForegroundService : Service() {
         }
     }
 }
+
+/** The expanded system actions remain the same intents; only phase text occupies custom content. */
+private fun Context.dictationExpandedStatus(controller: ConversationDictationController): RemoteViews =
+    RemoteViews(packageName, R.layout.notification_dictation_expanded).apply {
+        setTextViewText(R.id.dictation_notification_status, getString(dictationNotificationStatus(controller)))
+    }
+
+/** Describes actual readiness/finalization, never a model download or invented percentage. */
+private fun dictationNotificationStatus(controller: ConversationDictationController): Int =
+    when {
+        controller.deliveryInProgress -> R.string.message_status_pending
+        controller.state is ConversationDictationState.Starting -> R.string.dictation_starting
+        controller.state is ConversationDictationState.Processing -> R.string.dictation_processing
+        else -> R.string.dictation_notification_text
+    }
 
 /** Recognizes API 31+'s explicit foreground-start rejection without resolving that class on older Android. */
 private fun Throwable.isForegroundServiceStartRejection(): Boolean =

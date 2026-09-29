@@ -2088,4 +2088,7 @@
     <string name="export_audit_logs_confirm_action">Weiter</string>
     <string name="toast_couldnt_export_audit_logs">Diagnoseprotokolle konnten nicht für den Export vorbereitet werden</string>
     <string name="toast_no_audit_logs_to_export">Keine Diagnoseprotokolle zum Exportieren vorhanden</string>
+    <string name="dictation_pause_other_audio_title">Andere Audioinhalte pausieren</string>
+    <string name="dictation_pause_other_audio_subtitle">Musik und Podcasts während des Diktierens pausieren; nach der Aufnahme können sie weiterlaufen. Sprachausgabe und Sprachnachrichten in White Noise werden aus Sicherheitsgründen immer pausiert.</string>
+    <string name="dictation_audio_focus_unavailable">Andere Audioinhalte konnten nicht pausiert werden. Versuche es erneut oder deaktiviere diese Option in den Diktiereinstellungen.</string>
 </resources>

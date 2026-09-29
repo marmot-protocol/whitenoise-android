@@ -58,8 +58,6 @@ import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.RuntimePolicyHooks
 import dev.ipf.whitenoise.android.amber.AmberSignerController
-import dev.ipf.whitenoise.android.audio.ConversationDictationAudioFocusDenied
-import dev.ipf.whitenoise.android.audio.ConversationDictationAudioFocusLease
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationProvider
@@ -1219,9 +1217,6 @@ class WhiteNoiseAppState private constructor(
     internal val conversationDictationPreferences = ConversationDictationPreferences(appContext)
     internal val microphoneCaptureCoordinator = MicrophoneCaptureCoordinator()
     private val dictationMicrophoneOwner = Any()
-    private val dictationAudioFocus by lazy {
-        ConversationDictationAudioFocusLease.android(appContext) { conversationDictation.cancel() }
-    }
     internal val conversationDictation: ConversationDictationController by lazy {
         ConversationDictationController(
             context = appContext,
@@ -1256,16 +1251,8 @@ class WhiteNoiseAppState private constructor(
                 }
             },
             targetValidationScope = mutationsScope,
-            onBeforeRecognition = { target ->
-                conversationDictationPlaybackHandoff.pauseActivePlayback()
-                if (target.pauseOtherAudio && !dictationAudioFocus.acquire()) {
-                    throw ConversationDictationAudioFocusDenied()
-                }
-            },
-            onAfterAudioCapture = {
-                dictationAudioFocus.release()
-                conversationDictationPlaybackHandoff.resumeInterruptedPlayback()
-            },
+            onBeforeRecognition = conversationDictationMediaHandoff::beforeRecognition,
+            onAfterAudioCapture = conversationDictationMediaHandoff::afterAudioCapture,
             tryAcquireMicrophone = { microphoneCaptureCoordinator.tryAcquire(dictationMicrophoneOwner) },
             releaseMicrophone = { microphoneCaptureCoordinator.release(dictationMicrophoneOwner) },
             finishAfterSilenceMillis = {
@@ -1526,8 +1513,8 @@ class WhiteNoiseAppState private constructor(
     // Process-wide read-aloud playback: survives navigation between chats and
     // back to the chat list, matching VoicePlaybackController's lifetime.
     val ttsController = createAppTtsController(appContext, ttsRatePreferences, ttsMediaMixPreferences)
-    private val conversationDictationPlaybackHandoff by lazy {
-        createConversationDictationPlaybackHandoff(ttsController)
+    private val conversationDictationMediaHandoff by lazy {
+        createConversationDictationMediaHandoff(ttsController, appContext) { conversationDictation.cancel() }
     }
     var ttsResolution by mutableStateOf<TtsResolutionResult?>(null)
         private set

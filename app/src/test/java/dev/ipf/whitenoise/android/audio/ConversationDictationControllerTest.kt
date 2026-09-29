@@ -784,6 +784,28 @@ class ConversationDictationControllerTest {
         assertTrue(fixture.platform.session.started)
     }
 
+    /** Opting out of external focus never disables the app-owned playback safety handoff. */
+    @Test
+    fun disabledExternalFocusStillPausesAndRestoresAppPlayback() {
+        val events = mutableListOf<String>()
+        val fixture =
+            fixture(
+                draft = TextFieldValue(""),
+                pauseOtherAudio = { false },
+                onBeforeRecognition = { target ->
+                    assertFalse(target.pauseOtherAudio)
+                    events += "pause_app_playback"
+                },
+                onAfterAudioCapture = { events += "restore_app_playback" },
+            )
+
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        assertTrue(fixture.platform.session.started)
+        fixture.controller.cancel()
+
+        assertEquals(listOf("pause_app_playback", "restore_app_playback"), events)
+    }
+
     @Test
     fun grantedRuntimePermissionStartsRecognizerWithoutTreatingEffectivePrivacyDenialAsAppDenial() {
         val platform = FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted)

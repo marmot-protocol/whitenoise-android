@@ -2071,4 +2071,7 @@
     <string name="export_audit_logs_confirm_action">Continuer</string>
     <string name="toast_couldnt_export_audit_logs">Impossible de préparer les journaux de diagnostic pour l’exportation</string>
     <string name="toast_no_audit_logs_to_export">Aucun journal de diagnostic à exporter</string>
+    <string name="dictation_pause_other_audio_title">Mettre les autres contenus audio en pause</string>
+    <string name="dictation_pause_other_audio_subtitle">Met la musique et les podcasts en pause pendant la dictée ; ils peuvent reprendre lorsque l’enregistrement se termine. La lecture vocale et les messages vocaux de White Noise sont toujours mis en pause par sécurité.</string>
+    <string name="dictation_audio_focus_unavailable">Impossible de mettre les autres contenus audio en pause. Réessayez ou désactivez cette option dans les paramètres de dictée.</string>
 </resources>

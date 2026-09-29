@@ -28,7 +28,7 @@ class ConversationDictationNotificationScreenshotTest {
     }
 
     @Test
-    @Config(qualifiers = "en-rUS-w360dp-h780dp-mdpi-night")
+    @Config(qualifiers = "en-rUS-w360dp-h780dp-night-mdpi")
     fun compactActionsDark() {
         capture("dictation_notification_compact_dark")
     }
