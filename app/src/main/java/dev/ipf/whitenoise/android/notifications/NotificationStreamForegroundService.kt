@@ -627,10 +627,12 @@ internal object BackgroundConnectionNotification {
 
     /** Restores the shared ID only while a connection foreground service owns it. */
     fun restoreIfForeground(context: Context): Boolean {
-        if (!foregroundActive) return false
-        val manager = context.getSystemService(NotificationManager::class.java) ?: return false
-        manager.notify(NOTIFICATION_ID, build(context))
-        return true
+        val manager = context.getSystemService(NotificationManager::class.java)
+        if (foregroundActive && manager != null) {
+            manager.notify(NOTIFICATION_ID, build(context))
+            return true
+        }
+        return false
     }
 
     fun build(context: Context): Notification {

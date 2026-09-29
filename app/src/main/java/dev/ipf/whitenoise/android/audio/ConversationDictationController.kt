@@ -708,9 +708,8 @@ internal class ConversationDictationController internal constructor(
                 pendingCompletedTranscript.isNotBlank() ||
                 (state as? ConversationDictationState.Failed)?.retainedTranscript?.isNotBlank() == true
         if (blocksNewRequest && (hasSameTarget(accountRef, groupIdHex, mode) || retainsTranscript)) {
-            conversationDictationDiagnostic(
-                "event=request_start accepted=false reason=${if (retainsTranscript) "transcript_pending" else "session_active"}",
-            )
+            val reason = if (retainsTranscript) "transcript_pending" else "session_active"
+            conversationDictationDiagnostic("event=request_start accepted=false reason=$reason")
             return false
         }
 
