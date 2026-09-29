@@ -297,7 +297,10 @@ internal fun offlineSpeechToTextInstalled(context: Context): Boolean =
     }
 
 /** Mirrors the provider precedence used when a new dictation session starts. */
-private suspend fun resolveDictationProviderPackage(context: Context, appState: WhiteNoiseAppState): String? {
+private suspend fun resolveDictationProviderPackage(
+    context: Context,
+    appState: WhiteNoiseAppState,
+): String? {
     val choices = appState.discoverDictationProviders().flatMap { it.choices }
     val androidSelected =
         conversationDictationRecognitionServiceComponent(
