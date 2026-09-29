@@ -90,6 +90,10 @@ class GenerateAuditAttestationTest(unittest.TestCase):
             "https://user:pass@audit.invalid/v1/logs",
             "https://audit.invalid:bad/v1/logs",
             "https:///v1/logs",
+            "https://audit*.invalid/v1/logs",
+            "https://audit..invalid/v1/logs",
+            "https://audit_invalid/v1/logs",
+            "https://256.256.256.256/v1/logs",
         ):
             with self.subTest(endpoint=endpoint):
                 result, payload = self.run_generator({"WHITENOISE_AUDIT_OTLP_ENDPOINT": endpoint})

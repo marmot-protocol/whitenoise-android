@@ -4421,7 +4421,12 @@ internal fun ConversationScreen(
             onDismiss = { pollCreateOpen = false },
             onSubmit = { question, options, type, deadlineDurationSeconds, onResult ->
                 appState.launchMutation {
-                    onResult(controller.createPoll(question, options, type, deadlineDurationSeconds))
+                    var created = false
+                    try {
+                        created = controller.createPoll(question, options, type, deadlineDurationSeconds)
+                    } finally {
+                        onResult(created)
+                    }
                 }
             },
         )
