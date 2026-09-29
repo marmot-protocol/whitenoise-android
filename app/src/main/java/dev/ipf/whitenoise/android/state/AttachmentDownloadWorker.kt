@@ -8,7 +8,6 @@ import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
-import androidx.work.ForegroundInfo
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
@@ -195,6 +194,7 @@ class AttachmentDownloadWorker : CoroutineWorker {
         this.performDownloadOverride = performDownloadOverride
     }
 
+    /** Resumes a durable download, promoting explicit work to a typed foreground service. */
     override suspend fun doWork(): Result {
         val request = AttachmentDownloadWorkData.decode(inputData)
         val application = applicationContext as? WhiteNoiseApplication
@@ -212,10 +212,7 @@ class AttachmentDownloadWorker : CoroutineWorker {
                 if (priority == AttachmentDownloadPriority.Interactive) {
                     try {
                         setForeground(
-                            ForegroundInfo(
-                                attachmentJobId(request),
-                                attachmentDownloadNotification(applicationContext),
-                            ),
+                            attachmentWorkForegroundInfo(applicationContext, request),
                         )
                     } catch (failure: IllegalStateException) {
                         // A background retry may be denied foreground-service startup.
