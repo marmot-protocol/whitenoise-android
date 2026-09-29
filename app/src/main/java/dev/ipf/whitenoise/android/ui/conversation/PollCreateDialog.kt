@@ -230,10 +230,10 @@ private fun PollDeadlineChoices(
     ) {
         listOf(
             null to R.string.poll_no_deadline,
-            POLL_FIVE_MINUTES_SECONDS to R.string.disappearing_5_minutes,
-            POLL_HOUR_SECONDS to R.string.mute_duration_1_hour,
-            POLL_DAY_SECONDS to R.string.mute_duration_1_day,
-            POLL_WEEK_SECONDS to R.string.mute_duration_1_week,
+            POLL_FIVE_MINUTES_SECONDS to R.string.poll_duration_5_minutes,
+            POLL_HOUR_SECONDS to R.string.poll_duration_1_hour,
+            POLL_DAY_SECONDS to R.string.poll_duration_1_day,
+            POLL_WEEK_SECONDS to R.string.poll_duration_1_week,
             MAX_POLL_DEADLINE_SECONDS to R.string.poll_30_days,
         ).forEach { (duration, label) ->
             FilterChip(

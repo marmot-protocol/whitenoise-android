@@ -17,7 +17,7 @@ class AuditRuntimeIntegrationContractTest {
             startBody.indexOf(
                 "runtimeStartResult.await().getOrThrowAtStartupStage(BootstrapStage.RUNTIME_START)",
             )
-        val marker = startBody.indexOf("runtime.marmot.emitAuditRuntimeReadinessAfterStart(auditUploadConsent.granted)")
+        val marker = startBody.indexOf("auditUploadConsent.readyForStartupMarker")
 
         assertTrue(started >= 0)
         assertTrue(marker > started)

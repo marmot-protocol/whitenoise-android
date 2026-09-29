@@ -102,12 +102,12 @@ internal fun auditOtlpConfigV5(
     )
 }
 
-/** Emits readiness only when the consented v5 sender and recorder can actually run. */
-internal suspend fun MarmotInterface.emitAuditRuntimeReadinessAfterStart(uploadConsentGranted: Boolean) {
+/** Emits readiness only when native accepted the consented v5 sender and the recorder started. */
+internal suspend fun MarmotInterface.emitAuditRuntimeReadinessAfterStart(uploadConfigAccepted: Boolean) {
     if (!BuildConfig.WHITENOISE_AUDIT_RUNTIME_REQUIRED) return
     val uploadConfig =
         auditOtlpConfigV5(
-            uploadConsentGranted = uploadConsentGranted,
+            uploadConsentGranted = uploadConfigAccepted,
             endpoint = BuildConfig.WHITENOISE_AUDIT_OTLP_ENDPOINT,
             authorizationBearerToken = BuildConfig.WHITENOISE_AUDIT_OTLP_AUTH_TOKEN,
             deploymentEnvironment = BuildConfig.WHITENOISE_DEPLOYMENT_ENVIRONMENT,

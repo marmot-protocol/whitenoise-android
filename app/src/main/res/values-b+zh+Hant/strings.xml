@@ -22,6 +22,10 @@
     <string name="poll_deadline">投票結束時間</string>
     <string name="poll_no_deadline">不設截止時間</string>
     <string name="poll_30_days">30 天</string>
+    <string name="poll_duration_5_minutes">5 分鐘</string>
+    <string name="poll_duration_1_hour">1 小時</string>
+    <string name="poll_duration_1_day">1 天</string>
+    <string name="poll_duration_1_week">1 週</string>
     <string name="poll_ends_at">%1$s 結束</string>
     <plurals name="poll_option_votes">
         <item quantity="other">%1$d 票</item>

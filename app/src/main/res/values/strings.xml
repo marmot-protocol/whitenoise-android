@@ -22,6 +22,10 @@
     <string name="poll_deadline">Poll closes</string>
     <string name="poll_no_deadline">No deadline</string>
     <string name="poll_30_days">30 days</string>
+    <string name="poll_duration_5_minutes">5 minutes</string>
+    <string name="poll_duration_1_hour">1 Hour</string>
+    <string name="poll_duration_1_day">1 Day</string>
+    <string name="poll_duration_1_week">1 Week</string>
     <string name="poll_ends_at">Closes %1$s</string>
     <plurals name="poll_option_votes">
         <item quantity="one">%1$d vote</item>

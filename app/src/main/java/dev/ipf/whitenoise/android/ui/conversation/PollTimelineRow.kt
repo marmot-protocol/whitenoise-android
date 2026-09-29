@@ -44,6 +44,7 @@ import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.castPollVote
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import kotlinx.coroutines.delay
@@ -124,7 +125,7 @@ internal fun PollTimelineRow(
 ) {
     val poll = item.projected?.poll
     if (poll == null) {
-        Text(stringResource(R.string.poll_unsupported), Modifier.padding(16.dp))
+        Text(stringResource(R.string.poll_preview), Modifier.padding(16.dp))
         return
     }
     var voting by remember(item.record.messageIdHex) { mutableStateOf(false) }

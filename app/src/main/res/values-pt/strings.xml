@@ -22,6 +22,10 @@
     <string name="poll_deadline">A enquete termina</string>
     <string name="poll_no_deadline">Sem prazo</string>
     <string name="poll_30_days">30 dias</string>
+    <string name="poll_duration_5_minutes">5 minutos</string>
+    <string name="poll_duration_1_hour">1 hora</string>
+    <string name="poll_duration_1_day">1 dia</string>
+    <string name="poll_duration_1_week">1 semana</string>
     <string name="poll_ends_at">Encerra em %1$s</string>
     <plurals name="poll_option_votes">
         <item quantity="one">%1$d voto</item>

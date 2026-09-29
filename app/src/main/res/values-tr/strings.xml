@@ -22,6 +22,10 @@
     <string name="poll_deadline">Anket bitişi</string>
     <string name="poll_no_deadline">Bitiş tarihi yok</string>
     <string name="poll_30_days">30 gün</string>
+    <string name="poll_duration_5_minutes">5 dakika</string>
+    <string name="poll_duration_1_hour">1 saat</string>
+    <string name="poll_duration_1_day">1 gün</string>
+    <string name="poll_duration_1_week">1 hafta</string>
     <string name="poll_ends_at">Bitiş: %1$s</string>
     <plurals name="poll_option_votes">
         <item quantity="one">%1$d oy</item>

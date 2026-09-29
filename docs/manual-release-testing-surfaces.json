@@ -8997,13 +8997,13 @@
       },
       {
         "surface": "string:poll_create_failed",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/PollConversationActions.kt",
         "anchor": "R.string.poll_create_failed",
         "test_ids": ["MSG-021"]
       },
       {
         "surface": "string:poll_vote_failed",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/PollConversationActions.kt",
         "anchor": "R.string.poll_vote_failed",
         "test_ids": ["MSG-021"]
       },
@@ -9020,27 +9020,27 @@
         "test_ids": ["MSG-021"]
       },
       {
-        "surface": "string:disappearing_5_minutes",
+        "surface": "string:poll_duration_5_minutes",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
-        "anchor": "R.string.disappearing_5_minutes",
+        "anchor": "R.string.poll_duration_5_minutes",
         "test_ids": ["MSG-021"]
       },
       {
-        "surface": "string:mute_duration_1_day",
+        "surface": "string:poll_duration_1_day",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
-        "anchor": "R.string.mute_duration_1_day",
+        "anchor": "R.string.poll_duration_1_day",
         "test_ids": ["MSG-021"]
       },
       {
-        "surface": "string:mute_duration_1_hour",
+        "surface": "string:poll_duration_1_hour",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
-        "anchor": "R.string.mute_duration_1_hour",
+        "anchor": "R.string.poll_duration_1_hour",
         "test_ids": ["MSG-021"]
       },
       {
-        "surface": "string:mute_duration_1_week",
+        "surface": "string:poll_duration_1_week",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
-        "anchor": "R.string.mute_duration_1_week",
+        "anchor": "R.string.poll_duration_1_week",
         "test_ids": ["MSG-021"]
       },
       {
@@ -9164,9 +9164,9 @@
         "test_ids": ["MSG-021"]
       },
       {
-        "surface": "string:poll_unsupported",
+        "surface": "string:poll_preview",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
-        "anchor": "R.string.poll_unsupported",
+        "anchor": "R.string.poll_preview",
         "test_ids": ["MSG-021"]
       }
     ],

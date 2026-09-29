@@ -22,6 +22,10 @@
     <string name="poll_deadline">Il sondaggio termina</string>
     <string name="poll_no_deadline">Nessuna scadenza</string>
     <string name="poll_30_days">30 giorni</string>
+    <string name="poll_duration_5_minutes">5 minuti</string>
+    <string name="poll_duration_1_hour">1 ora</string>
+    <string name="poll_duration_1_day">1 giorno</string>
+    <string name="poll_duration_1_week">1 settimana</string>
     <string name="poll_ends_at">Termina il %1$s</string>
     <plurals name="poll_option_votes">
         <item quantity="one">%1$d voto</item>
