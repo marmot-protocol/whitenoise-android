@@ -155,6 +155,9 @@ uninstalling or clearing data.
 
 ### Isolated media component probe
 
+The expanded upload/download size matrix and machine-readable aggregate
+reporting are documented in [media-latency-matrix.md](media-latency-matrix.md).
+
 For a diagnostic breakdown of native image downloads, encrypted Android cache
 reads/writes, and platform decoding, use `MediaAttachmentLatencyProbe`. This is
 an opt-in **debug component probe**, not a release qualification or UI

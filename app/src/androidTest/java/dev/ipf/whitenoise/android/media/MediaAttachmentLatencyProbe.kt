@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.media
 import android.content.Context
 import android.graphics.Bitmap
 import android.os.Bundle
+import android.os.Debug
 import android.os.SystemClock
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -24,7 +25,11 @@ import dev.ipf.whitenoise.android.ui.conversation.media.decodeMessageAttachmentI
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -36,17 +41,174 @@ import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.security.KeyStore
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.ceil
 import kotlin.random.Random
 
 /** Opt-in component timings using generated images and a separate disposable native store. */
 @RunWith(AndroidJUnit4::class)
 class MediaAttachmentLatencyProbe {
+    /** Compares generated file preparation, upload, and verified cold downloads by payload size. */
+    @Test
+    fun measureSyntheticSizeMatrix() =
+        runBlocking {
+            val context = isolatedContext()
+            assumeTrue(InstrumentationRegistry.getArguments().getString("allowMediaSizeMatrix") == "true")
+            MarmotAndroid.initialize(context)
+            val root = File(context.cacheDir, "media-size-probe-${UUID.randomUUID()}").apply { mkdirs() }
+            val marmot = Marmot(File(root, "native").absolutePath, MarmotClient.bootstrapRelays)
+            try {
+                withTimeout(900_000L) {
+                    marmot.start()
+                    val account = marmot.createIdentity(MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays)
+                    val group = marmot.createGroup(account.label, "Media size measurement", emptyList(), null)
+                    val includeNearLimit = InstrumentationRegistry.getArguments().getString("allowNearLimitMediaProbe") == "true"
+                    MediaProbeSize.entries
+                        .filter { it != MediaProbeSize.NEAR_LIMIT || includeNearLimit }
+                        .forEach { size -> measureSize(marmot, account.label, group, size) }
+                }
+            } finally {
+                marmot.shutdownAndClose()
+                root.deleteRecursively()
+            }
+        }
+
+    /** Reports each operation even if one sample fails, then preserves the original failure. */
+    private suspend fun measureSize(
+        marmot: Marmot,
+        account: String,
+        group: String,
+        size: MediaProbeSize,
+    ) {
+        val preparation = mutableListOf<MediaProbeSample>()
+        val uploads = mutableListOf<MediaProbeSample>()
+        val downloads = mutableListOf<MediaProbeSample>()
+        var preparationFailures = 0
+        var uploadFailures = 0
+        var downloadFailures = 0
+        val before = marmot.appPerformanceSnapshot()
+        try {
+            repeat(size.repetitions) { index ->
+                val original = Random(size.ordinal * 10_000 + index).nextBytes(size.byteCount)
+                val (bytes, prepSample) =
+                    try {
+                        measureOperation(size.byteCount.toLong()) {
+                            withContext(Dispatchers.IO) {
+                                MediaPipeline.readBoundedBytes(ByteArrayInputStream(original), size.byteCount)
+                                    ?: error("Synthetic source exceeded its known size")
+                            }.also { assertArrayEquals(original, it) }
+                        }
+                    } catch (failure: Throwable) {
+                        preparationFailures += 1
+                        throw failure
+                    }
+                preparation += prepSample
+
+                val (reference, uploadSample) =
+                    try {
+                        measureOperation(size.byteCount.toLong()) {
+                            marmot
+                                .uploadMedia(
+                                    account,
+                                    group,
+                                    MediaUploadRequestFfi(
+                                        attachments =
+                                            listOf(
+                                                MediaUploadAttachmentRequestFfi(
+                                                    "sample-$index.bin",
+                                                    "application/octet-stream",
+                                                    bytes,
+                                                    null,
+                                                    null,
+                                                ),
+                                            ),
+                                        caption = null,
+                                        send = false,
+                                        blossomServer = null,
+                                    ),
+                                ).attachments
+                                .single()
+                                .reference
+                        }
+                    } catch (failure: Throwable) {
+                        uploadFailures += 1
+                        throw failure
+                    }
+                uploads += uploadSample
+
+                val (_, downloadSample) =
+                    try {
+                        measureOperation(size.byteCount.toLong()) {
+                            marmot.downloadMedia(account, group, reference).plaintext.also {
+                                assertArrayEquals(bytes, it)
+                            }
+                        }
+                    } catch (failure: Throwable) {
+                        downloadFailures += 1
+                        throw failure
+                    }
+                downloads += downloadSample
+            }
+        } finally {
+            reportAggregate(MediaProbeOperation.PREPARATION, size, preparation, preparationFailures)
+            reportAggregate(MediaProbeOperation.UPLOAD, size, uploads, uploadFailures)
+            reportAggregate(MediaProbeOperation.DOWNLOAD, size, downloads, downloadFailures)
+            reportNativeInterval(before, marmot.appPerformanceSnapshot(), size)
+        }
+    }
+
+    /** Samples both heaps during an operation; absolute peaks are diagnostic, not allocation deltas. */
+    private suspend fun <T> measureOperation(
+        payloadBytes: Long,
+        block: suspend () -> T,
+    ): Pair<T, MediaProbeSample> =
+        coroutineScope {
+            val peakJava = AtomicLong()
+            val peakNative = AtomicLong()
+
+            fun sampleMemory() {
+                val runtime = Runtime.getRuntime()
+                peakJava.updateAndGet { maxOf(it, runtime.totalMemory() - runtime.freeMemory()) }
+                peakNative.updateAndGet { maxOf(it, Debug.getNativeHeapAllocatedSize()) }
+            }
+            sampleMemory()
+            val sampler =
+                launch(Dispatchers.Default) {
+                    while (isActive) {
+                        sampleMemory()
+                        delay(50L)
+                    }
+                }
+            val started = SystemClock.elapsedRealtimeNanos()
+            try {
+                val value = block()
+                sampleMemory()
+                value to MediaProbeSample(elapsedMs(started), payloadBytes, peakJava.get(), peakNative.get())
+            } finally {
+                sampler.cancelAndJoin()
+            }
+        }
+
+    /** Exports one privacy-bounded JSON record per operation and size. */
+    private fun reportAggregate(
+        operation: MediaProbeOperation,
+        size: MediaProbeSize,
+        successes: List<MediaProbeSample>,
+        failures: Int,
+    ) {
+        val line = mediaProbeAggregateJson(operation, size, successes, failures)
+        InstrumentationRegistry.getInstrumentation().sendStatus(
+            0,
+            Bundle().apply { putString("media_probe_json", line) },
+        )
+    }
+
     /** Measures live native downloads and retains aggregate native phase evidence on failure. */
     @Test
     fun measureSyntheticImagePhases() =
@@ -253,13 +415,16 @@ class MediaAttachmentLatencyProbe {
     private fun reportNativeInterval(
         before: AppPerformanceSnapshotFfi,
         after: AppPerformanceSnapshotFfi,
+        size: MediaProbeSize? = null,
     ) {
         val previous = before.mediaPhases()
         after.mediaPhases().forEach { (phase, operation) ->
             mediaProbePhaseReport(phase, previous.getValue(phase), operation).forEach { line ->
                 InstrumentationRegistry.getInstrumentation().sendStatus(
                     0,
-                    Bundle().apply { putString("media_probe_native", line) },
+                    Bundle().apply {
+                        putString("media_probe_native", size?.let { "size=${it.wireName} $line" } ?: line)
+                    },
                 )
             }
         }
@@ -268,6 +433,7 @@ class MediaAttachmentLatencyProbe {
     /** Explicit mapping prevents new unrelated snapshot fields or free-form labels from being exported. */
     private fun AppPerformanceSnapshotFfi.mediaPhases() =
         mapOf(
+            MediaProbeNativePhase.UPLOAD to mediaUpload,
             MediaProbeNativePhase.DOWNLOAD to mediaDownload,
             MediaProbeNativePhase.QUEUE_WAIT to mediaDownloadQueueWait,
             MediaProbeNativePhase.PREPARATION to mediaDownloadPreparation,
