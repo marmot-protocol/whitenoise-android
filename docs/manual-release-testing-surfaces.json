@@ -1641,7 +1641,8 @@
         "test_ids": [
           "NCH-002",
           "ACC-017",
-          "SET-028"
+          "SET-028",
+          "GRP-025"
         ]
       },
       {
@@ -1873,7 +1874,16 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Snackbar.kt",
         "anchor": "fun SwipeDismissibleSnackbar(",
         "test_ids": [
-          "AXY-001"
+          "AXY-001",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "Diagnostic snackbar dismiss action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Snackbar.kt",
+        "anchor": "R.string.dismiss",
+        "test_ids": [
+          "GRP-025"
         ]
       },
       {
@@ -5632,7 +5642,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "fun GroupEditScreen(",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "GRP-025"
         ]
       },
       {

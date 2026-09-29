@@ -40,6 +40,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.conversation.composer.insertEmojiAtSelection
 import dev.ipf.whitenoise.android.ui.group.DisappearingMessagesPickerDialog
 import dev.ipf.whitenoise.android.ui.group.GroupEmojiImagePickerSheet
+import dev.ipf.whitenoise.android.ui.group.GroupImageFailureScope
 import dev.ipf.whitenoise.android.ui.group.ImageSearchSheet
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
@@ -290,6 +291,11 @@ private fun NewGroupSetupAccountScreen(
     val groupName = TextFieldValue(draft.name.text.toString(), draft.name.selection)
     var imageGeneration by remember { mutableIntStateOf(0) }
     var imageError by remember { mutableStateOf(false) }
+    val imageFailureScope =
+        remember(appState, accountRef, runtime) {
+            GroupImageFailureScope({ appState.toast }, { appState.clearToast(it) })
+        }
+    DisposableEffect(imageFailureScope) { onDispose { imageFailureScope.dispose() } }
     var showPhotoMenu by remember { mutableStateOf(false) }
     var retentionSecs by draft::retentionSecs
     var showRetentionPicker by remember { mutableStateOf(false) }
@@ -392,6 +398,7 @@ private fun NewGroupSetupAccountScreen(
     fun prepareImage(load: suspend () -> ImageUploadDraft) {
         if (!detailsEditableNow()) return
         val generation = ++imageGeneration
+        val failureAttempt = imageFailureScope.begin()
         imageError = false
         imagePreparing = true
         appState.launchMutation {
@@ -404,13 +411,20 @@ private fun NewGroupSetupAccountScreen(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                if (!owner.isCurrent() || generation != imageGeneration) return@launchMutation
+                val stillCurrent =
+                    owner.isCurrent() &&
+                        generation == imageGeneration &&
+                        imageFailureScope.isCurrent(failureAttempt)
+                if (!stillCurrent) {
+                    return@launchMutation
+                }
                 imageError = true
                 appState.presentFailure(
                     R.string.toast_couldnt_prepare_image,
                     "NEW_GROUP_IMAGE_PREPARE",
                     error,
                 )
+                imageFailureScope.captureFailure(failureAttempt)
             } finally {
                 if (generation == imageGeneration) imagePreparing = false
             }
@@ -481,14 +495,35 @@ private fun NewGroupSetupAccountScreen(
                 onDismiss = { showPhotoMenu = false },
                 onPhotos = {
                     if (detailsEditableNow()) {
+                        imageFailureScope.clear()
+                        imageError = false
                         photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }
                 },
-                onFiles = { if (detailsEditableNow()) filePicker.launch(arrayOf("image/*")) },
-                onWeb = { if (detailsEditableNow()) showImagePicker = true },
-                onEmoji = { if (detailsEditableNow()) showGroupEmojiImagePicker = true },
+                onFiles = {
+                    if (detailsEditableNow()) {
+                        imageFailureScope.clear()
+                        imageError = false
+                        filePicker.launch(arrayOf("image/*"))
+                    }
+                },
+                onWeb = {
+                    if (detailsEditableNow()) {
+                        imageFailureScope.clear()
+                        imageError = false
+                        showImagePicker = true
+                    }
+                },
+                onEmoji = {
+                    if (detailsEditableNow()) {
+                        imageFailureScope.clear()
+                        imageError = false
+                        showGroupEmojiImagePicker = true
+                    }
+                },
                 onRemove = {
                     if (detailsEditableNow()) {
+                        imageFailureScope.begin()
                         imageGeneration++
                         imageDraft = null
                         draft.imageNeedsReselection = false
@@ -522,6 +557,7 @@ private fun NewGroupSetupAccountScreen(
             onApply = { picked ->
                 if (!detailsEditableNow()) return@ImageSearchSheet
                 if (picked == null) {
+                    imageFailureScope.clear()
                     imageDraft = null
                     draft.imageNeedsReselection = false
                     imageError = false
@@ -530,9 +566,15 @@ private fun NewGroupSetupAccountScreen(
                     prepareImage { GroupImageDraftProcessor.fromRemoteUrl(picked) }
                 }
             },
-            onPickPhoto = { uri -> pendingCropUri = uri },
+            onPickPhoto = { uri ->
+                imageFailureScope.clear()
+                imageError = false
+                pendingCropUri = uri
+            },
             onPickEmoji = {
                 if (!detailsEditableNow()) return@ImageSearchSheet
+                imageFailureScope.clear()
+                imageError = false
                 showImagePicker = false
                 showGroupEmojiImagePicker = true
             },
@@ -559,6 +601,7 @@ private fun NewGroupSetupAccountScreen(
             onEmojiUsed = { if (detailsEditableNow()) recentEmojiRecentsOwner.onEmojiUsed(it) },
             onApply = { prepared ->
                 if (!detailsEditableNow()) return@GroupEmojiImagePickerSheet
+                imageFailureScope.clear()
                 imageDraft = prepared
                 draft.imageNeedsReselection = false
                 imageError = false
