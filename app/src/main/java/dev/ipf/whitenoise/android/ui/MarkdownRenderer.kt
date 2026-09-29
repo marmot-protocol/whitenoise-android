@@ -445,6 +445,7 @@ private fun MarkdownBodyText(
 
     Text(
         text = text,
+        inlineContent = BuiltinEmoji.content(),
         modifier =
             modifier
                 .then(accessibilityModifier)
@@ -1468,7 +1469,7 @@ private fun AnnotatedString.Builder.appendMarkdownInlines(
     if (markdownInlineDepthExceeded(depth)) return
     markdownVisibleSiblings(inlines).forEach { inline ->
         when (inline) {
-            is MarkdownInlineFfi.Text -> append(markdownSafeDisplayText(inline.content, Int.MAX_VALUE))
+            is MarkdownInlineFfi.Text -> append(BuiltinEmoji.annotate(AnnotatedString(markdownSafeDisplayText(inline.content, Int.MAX_VALUE))))
             // Chat keeps the author's line breaks: a soft break renders as a
             // newline (not the CommonMark collapse-to-space) to match how the
             // plaintext fallback has always displayed.
@@ -1866,19 +1867,24 @@ internal fun markdownDocumentToPreviewAnnotatedString(
     mentionDisplayName: ((String) -> String?)? = null,
 ): AnnotatedString {
     val projection = markdownDocumentToPreviewProjection(document, maxLength, mentionDisplayName, captureStyles = true)
-    return buildAnnotatedString {
-        append(projection.text)
-        projection.ranges.forEach { range ->
-            val style =
-                when (range.style) {
-                    MarkdownPreviewStyle.Code -> codeStyle
-                    MarkdownPreviewStyle.Bold -> SpanStyle(fontWeight = FontWeight.Bold)
-                    MarkdownPreviewStyle.Italic -> SpanStyle(fontStyle = FontStyle.Italic)
-                    MarkdownPreviewStyle.Strike -> SpanStyle(textDecoration = TextDecoration.LineThrough)
+    return BuiltinEmoji.annotate(
+        buildAnnotatedString {
+            append(projection.text)
+            projection.ranges.forEach { range ->
+                val style =
+                    when (range.style) {
+                        MarkdownPreviewStyle.Code -> codeStyle
+                        MarkdownPreviewStyle.Bold -> SpanStyle(fontWeight = FontWeight.Bold)
+                        MarkdownPreviewStyle.Italic -> SpanStyle(fontStyle = FontStyle.Italic)
+                        MarkdownPreviewStyle.Strike -> SpanStyle(textDecoration = TextDecoration.LineThrough)
+                    }
+                addStyle(style, range.start, range.end)
+                if (range.style == MarkdownPreviewStyle.Code) {
+                    addStringAnnotation(BuiltinEmoji.LITERAL_TAG, "", range.start, range.end)
                 }
-            addStyle(style, range.start, range.end)
-        }
-    }
+            }
+        },
+    )
 }
 
 internal fun markdownListMarker(

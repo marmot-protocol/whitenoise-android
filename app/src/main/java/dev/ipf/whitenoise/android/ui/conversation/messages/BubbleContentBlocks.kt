@@ -59,6 +59,7 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
+import dev.ipf.whitenoise.android.ui.BuiltinEmoji
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.TtsLeafHighlightResolver
 import dev.ipf.whitenoise.android.ui.TtsSentenceActions
@@ -734,7 +735,8 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                                 },
                             )
                         Text(
-                            bodyText,
+                            remember(bodyText) { BuiltinEmoji.annotate(AnnotatedString(bodyText)) },
+                            inlineContent = BuiltinEmoji.content(),
                             style = MaterialTheme.typography.bodyLarge,
                             // A tombstone is narration, not authored content, and
                             // the prototype italicises it to say so.

@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -33,7 +34,8 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.state.MessageStatus
-import dev.ipf.whitenoise.android.ui.markdownDocumentToPreviewText
+import dev.ipf.whitenoise.android.ui.BuiltinEmoji
+import dev.ipf.whitenoise.android.ui.markdownDocumentToPreviewAnnotatedString
 import dev.ipf.whitenoise.android.ui.markdownInlinesToAnnotatedString
 import dev.ipf.whitenoise.android.ui.previewTake
 import kotlin.math.ceil
@@ -45,7 +47,7 @@ internal fun focusedMessagePreviewText(
     mentionDisplayName: ((String) -> String?)? = null,
     isGroupMember: ((String) -> Boolean)? = null,
 ): AnnotatedString {
-    if (document == null || document.blocks.isEmpty()) return AnnotatedString(source)
+    if (document == null || document.blocks.isEmpty()) return BuiltinEmoji.annotate(AnnotatedString(source))
     val paragraph = document.blocks.singleOrNull() as? MarkdownBlockFfi.Paragraph
     return if (paragraph != null) {
         val styled =
@@ -63,22 +65,23 @@ internal fun focusedMessagePreviewText(
                     ?.style
                     ?.let { style -> AnnotatedString.Range(style, range.start, range.end) }
             }
-        AnnotatedString(styled.text, styled.spanStyles + inertLinkStyles)
+        BuiltinEmoji.annotate(AnnotatedString(styled.text, styled.spanStyles + inertLinkStyles))
     } else {
         // Multi-block excerpts follow the prototype's plain-text projection, preserving block separation.
         val text =
-            buildString {
+            buildAnnotatedString {
                 for (block in document.blocks) {
                     if (length >= FOCUSED_PREVIEW_TEXT_BUDGET) break
-                    if (isNotEmpty()) append("\n\n")
+                    if (length > 0) append("\n\n")
                     val remaining = (FOCUSED_PREVIEW_TEXT_BUDGET - length).coerceAtLeast(0)
                     append(
                         when (block) {
-                            is MarkdownBlockFfi.CodeBlock -> block.content.previewTake(remaining)
-                            is MarkdownBlockFfi.MathBlock -> block.content.previewTake(remaining)
+                            is MarkdownBlockFfi.CodeBlock -> AnnotatedString(block.content.previewTake(remaining))
+                            is MarkdownBlockFfi.MathBlock -> AnnotatedString(block.content.previewTake(remaining))
                             else ->
-                                markdownDocumentToPreviewText(
+                                markdownDocumentToPreviewAnnotatedString(
                                     document = document.copy(blocks = listOf(block)),
+                                    codeStyle = SpanStyle(fontFamily = FontFamily.Monospace),
                                     maxLength = remaining,
                                     mentionDisplayName = mentionDisplayName,
                                 )
@@ -86,7 +89,7 @@ internal fun focusedMessagePreviewText(
                     )
                 }
             }
-        AnnotatedString(text)
+        text
     }
 }
 
@@ -144,6 +147,7 @@ internal fun FocusedTextMessagePreview(
             Column {
                 Text(
                     text = excerpt,
+                    inlineContent = BuiltinEmoji.content(),
                     style = MaterialTheme.typography.bodyLarge,
                     maxLines = if (compact) 1 else FOCUSED_PREVIEW_TEXT_LINES,
                     overflow = TextOverflow.Ellipsis,

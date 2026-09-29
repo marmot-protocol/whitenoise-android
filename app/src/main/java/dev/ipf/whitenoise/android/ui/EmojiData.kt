@@ -25,7 +25,7 @@ data class EmojiEntry(
         }
 }
 
-// Single bundled emoji set at assets/emoji.json: categorized (group) for browsing
+// Bundled Unicode set at assets/emoji.json plus the built-in artwork: categorized for browsing
 // and keyworded (name + CLDR annotations) for search. Parsed once and cached.
 object EmojiData {
     const val GroupCount = 9
@@ -57,7 +57,7 @@ object EmojiData {
 
     private fun parseEmojiJson(text: String): List<EmojiEntry> {
         val array = JSONArray(text)
-        return buildList(array.length()) {
+        return buildList(array.length() + BuiltinEmoji.shortcodes.size) {
             for (i in 0 until array.length()) {
                 val obj = array.getJSONObject(i)
                 val codes = obj.getJSONArray("k")
@@ -68,6 +68,11 @@ object EmojiData {
                         }
                     }
                 add(EmojiEntry(obj.getString("e"), obj.getString("n"), obj.getInt("g"), keywords))
+            }
+            for (shortcode in BuiltinEmoji.shortcodes) {
+                val name = shortcode.trim(':')
+                val keywords = if (name == "wn") listOf(shortcode, "white noise", "whitenoise") else listOf(shortcode)
+                add(EmojiEntry(shortcode, name, 7, keywords))
             }
         }
     }

@@ -261,7 +261,7 @@ internal fun GroupEmojiImagePickerSheet(
                     selectedEmojis = update.emojis
                     limitReached = update.limitReached
                 },
-                purpose = EmojiPickerPurpose.USE,
+                purpose = EmojiPickerPurpose.GROUP_IMAGE,
                 recentEmojis = recentEmojis,
                 selectionEnabled = !applyInFlight,
                 modifier = Modifier.fillMaxWidth().weight(1f),
