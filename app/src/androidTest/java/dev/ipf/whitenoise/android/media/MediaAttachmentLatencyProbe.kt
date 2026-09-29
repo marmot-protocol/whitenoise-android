@@ -68,7 +68,8 @@ class MediaAttachmentLatencyProbe {
                     marmot.start()
                     val account = marmot.createIdentity(MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays)
                     val group = marmot.createGroup(account.label, "Media size measurement", emptyList(), null)
-                    val includeNearLimit = InstrumentationRegistry.getArguments().getString("allowNearLimitMediaProbe") == "true"
+                    val includeNearLimit =
+                        InstrumentationRegistry.getArguments().getString("allowNearLimitMediaProbe") == "true"
                     MediaProbeSize.entries
                         .filter { it != MediaProbeSize.NEAR_LIMIT || includeNearLimit }
                         .forEach { size -> measureSize(marmot, account.label, group, size) }
@@ -79,6 +80,27 @@ class MediaAttachmentLatencyProbe {
             }
         }
 
+    /** Keeps successful samples and a failure count for one operation. */
+    private class OperationSamples {
+        val completed = mutableListOf<MediaProbeSample>()
+        var failures = 0
+    }
+
+    /** Records a successful operation or increments its failure count before rethrowing. */
+    private suspend fun <T> recordOperation(
+        size: MediaProbeSize,
+        samples: OperationSamples,
+        block: suspend () -> T,
+    ): T =
+        try {
+            val (result, sample) = measureOperation(size.byteCount.toLong(), block)
+            samples.completed += sample
+            result
+        } catch (failure: Throwable) {
+            samples.failures += 1
+            throw failure
+        }
+
     /** Reports each operation even if one sample fails, then preserves the original failure. */
     private suspend fun measureSize(
         marmot: Marmot,
@@ -86,82 +108,68 @@ class MediaAttachmentLatencyProbe {
         group: String,
         size: MediaProbeSize,
     ) {
-        val preparation = mutableListOf<MediaProbeSample>()
-        val uploads = mutableListOf<MediaProbeSample>()
-        val downloads = mutableListOf<MediaProbeSample>()
-        var preparationFailures = 0
-        var uploadFailures = 0
-        var downloadFailures = 0
+        val preparation = OperationSamples()
+        val uploads = OperationSamples()
+        val downloads = OperationSamples()
         val before = marmot.appPerformanceSnapshot()
         try {
             repeat(size.repetitions) { index ->
                 val original = Random(size.ordinal * 10_000 + index).nextBytes(size.byteCount)
-                val (bytes, prepSample) =
-                    try {
-                        measureOperation(size.byteCount.toLong()) {
-                            withContext(Dispatchers.IO) {
-                                MediaPipeline.readBoundedBytes(ByteArrayInputStream(original), size.byteCount)
-                                    ?: error("Synthetic source exceeded its known size")
-                            }.also { assertArrayEquals(original, it) }
-                        }
-                    } catch (failure: Throwable) {
-                        preparationFailures += 1
-                        throw failure
+                val bytes =
+                    recordOperation(size, preparation) {
+                        withContext(Dispatchers.IO) {
+                            MediaPipeline.readBoundedBytes(ByteArrayInputStream(original), size.byteCount)
+                                ?: error("Synthetic source exceeded its known size")
+                        }.also { assertArrayEquals(original, it) }
                     }
-                preparation += prepSample
-
-                val (reference, uploadSample) =
-                    try {
-                        measureOperation(size.byteCount.toLong()) {
-                            marmot
-                                .uploadMedia(
-                                    account,
-                                    group,
-                                    MediaUploadRequestFfi(
-                                        attachments =
-                                            listOf(
-                                                MediaUploadAttachmentRequestFfi(
-                                                    "sample-$index.bin",
-                                                    "application/octet-stream",
-                                                    bytes,
-                                                    null,
-                                                    null,
-                                                ),
-                                            ),
-                                        caption = null,
-                                        send = false,
-                                        blossomServer = null,
-                                    ),
-                                ).attachments
-                                .single()
-                                .reference
-                        }
-                    } catch (failure: Throwable) {
-                        uploadFailures += 1
-                        throw failure
+                val reference =
+                    recordOperation(size, uploads) {
+                        uploadProbeAttachment(marmot, account, group, index, bytes)
                     }
-                uploads += uploadSample
-
-                val (_, downloadSample) =
-                    try {
-                        measureOperation(size.byteCount.toLong()) {
-                            marmot.downloadMedia(account, group, reference).plaintext.also {
-                                assertArrayEquals(bytes, it)
-                            }
-                        }
-                    } catch (failure: Throwable) {
-                        downloadFailures += 1
-                        throw failure
+                recordOperation(size, downloads) {
+                    marmot.downloadMedia(account, group, reference).plaintext.also {
+                        assertArrayEquals(bytes, it)
                     }
-                downloads += downloadSample
+                }
             }
         } finally {
-            reportAggregate(MediaProbeOperation.PREPARATION, size, preparation, preparationFailures)
-            reportAggregate(MediaProbeOperation.UPLOAD, size, uploads, uploadFailures)
-            reportAggregate(MediaProbeOperation.DOWNLOAD, size, downloads, downloadFailures)
+            reportAggregate(MediaProbeOperation.PREPARATION, size, preparation.completed, preparation.failures)
+            reportAggregate(MediaProbeOperation.UPLOAD, size, uploads.completed, uploads.failures)
+            reportAggregate(MediaProbeOperation.DOWNLOAD, size, downloads.completed, downloads.failures)
             reportNativeInterval(before, marmot.appPerformanceSnapshot(), size)
         }
     }
+
+    /** Uploads one generated payload without posting a message to the probe group. */
+    private suspend fun uploadProbeAttachment(
+        marmot: Marmot,
+        account: String,
+        group: String,
+        index: Int,
+        bytes: ByteArray,
+    ): MediaAttachmentReferenceFfi =
+        marmot
+            .uploadMedia(
+                account,
+                group,
+                MediaUploadRequestFfi(
+                    attachments =
+                        listOf(
+                            MediaUploadAttachmentRequestFfi(
+                                "sample-$index.bin",
+                                "application/octet-stream",
+                                bytes,
+                                null,
+                                null,
+                            ),
+                        ),
+                    caption = null,
+                    send = false,
+                    blossomServer = null,
+                ),
+            ).attachments
+            .single()
+            .reference
 
     /** Samples both heaps during an operation; absolute peaks are diagnostic, not allocation deltas. */
     private suspend fun <T> measureOperation(

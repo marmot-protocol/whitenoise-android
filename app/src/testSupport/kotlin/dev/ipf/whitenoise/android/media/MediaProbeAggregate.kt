@@ -3,6 +3,17 @@ package dev.ipf.whitenoise.android.media
 import java.util.Locale
 import kotlin.math.ceil
 
+private const val KIB = 1024
+private const val MIB = KIB * KIB
+private const val SMALL_BYTES = 64 * KIB
+private const val MEDIUM_BYTES = MIB
+private const val LARGE_BYTES = 8 * MIB
+private const val NEAR_LIMIT_BYTES = 30 * MIB
+private const val SMALL_SAMPLES = 20
+private const val MEDIUM_SAMPLES = 5
+private const val LARGE_SAMPLES = 3
+private const val NEAR_LIMIT_SAMPLES = 1
+
 /** Closed labels for synthetic media measurements; no fixture identity enters the report. */
 internal enum class MediaProbeOperation(
     val wireName: String,
@@ -18,10 +29,10 @@ internal enum class MediaProbeSize(
     val byteCount: Int,
     val repetitions: Int,
 ) {
-    SMALL("small", 64 * 1024, 20),
-    MEDIUM("medium", 1024 * 1024, 5),
-    LARGE("large", 8 * 1024 * 1024, 3),
-    NEAR_LIMIT("near_limit", 30 * 1024 * 1024, 1),
+    SMALL("small", SMALL_BYTES, SMALL_SAMPLES),
+    MEDIUM("medium", MEDIUM_BYTES, MEDIUM_SAMPLES),
+    LARGE("large", LARGE_BYTES, LARGE_SAMPLES),
+    NEAR_LIMIT("near_limit", NEAR_LIMIT_BYTES, NEAR_LIMIT_SAMPLES),
 }
 
 /** One successful operation's monotonic duration, verified payload and observed heap peaks. */
@@ -82,6 +93,9 @@ internal fun mediaProbeAggregateJson(
 }
 
 /** Nearest-rank percentile; null is explicit when no transfer completed. */
-private fun List<Double>.nearestRank(fraction: Double): Double? = if (isEmpty()) null else get(ceil(size * fraction).toInt() - 1)
+private fun List<Double>.nearestRank(fraction: Double): Double? {
+    if (isEmpty()) return null
+    return get(ceil(size * fraction).toInt() - 1)
+}
 
 private fun Double?.jsonNumber(): String = this?.let { String.format(Locale.US, "%.3f", it) } ?: "null"
