@@ -14,6 +14,28 @@ import org.junit.Test
 
 class BuiltinEmojiTest {
     @Test
+    fun closingFenceBoundaries() {
+        val fencedBodies =
+            listOf(
+                "```\n:wn:\n``` trailing text\n:marmot:\n```",
+                "````\n:wn:\n```\n:marmot:\n````",
+                "~~~~\n:wn:\n~~~\n:marmot:\n~~~~",
+                "~~~\n:wn:\n~~~ trailing text\n:marmot:\n~~~~~ \t",
+                "```\n:wn:\n~~~\n:marmot:\n`````\t",
+            )
+        for (body in fencedBodies) {
+            val source = "$body\n:wn:"
+            val rendered = BuiltinEmoji.annotate(AnnotatedString(source))
+            assertEquals(source, rendered.text)
+            assertEquals(
+                body,
+                listOf(source.length - 4),
+                rendered.getStringAnnotations(0, rendered.length).map { it.start },
+            )
+        }
+    }
+
+    @Test
     fun exactShortcodesKeepTextStylesLinksAndOffsets() {
         val source =
             buildAnnotatedString {

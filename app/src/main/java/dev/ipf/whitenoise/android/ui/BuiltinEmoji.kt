@@ -37,7 +37,12 @@ internal object BuiltinEmoji {
         }
 
     // Legacy plaintext surfaces have no AST. Keep raw code delimiters and their contents literal.
-    private val rawCodePattern = Regex("(?m)^ {0,3}(`{3,}|~{3,})[^\\n]*\\n[\\s\\S]*?(?:^ {0,3}\\1[^\\n]*(?:\\n|$)|\\z)|(`+)[\\s\\S]*?\\2")
+    private val rawCodePattern =
+        Regex(
+            """(?m)^ {0,3}((?>`{3,}))[^\n`]*(?:\n|\z)[\s\S]*?(?:^ {0,3}\1`*[ \t]*\r?$|\z)|""" +
+                """^ {0,3}((?>~{3,}))[^\n]*(?:\n|\z)[\s\S]*?(?:^ {0,3}\2~*[ \t]*\r?$|\z)|""" +
+                """(`+)[\s\S]*?\3""",
+        )
 
     fun annotate(text: AnnotatedString): AnnotatedString {
         val matches = shortcodePattern.findAll(text.text).iterator()

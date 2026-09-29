@@ -85,6 +85,7 @@ class BuiltinEmojiScreenshotTest {
                             MarkdownMessageBody(document)
                             Text("Plain fallback")
                             ReaderSelectablePlainText(":marmot: :wn: `:wn:`", { _, _, _ -> })
+                            ReaderSelectablePlainText("```\n``` trailing text\n:marmot: :wn:\n```\n:wn:", { _, _, _ -> })
                             Text("Chat preview")
                             ChatRowPreviewLine(rememberMarkdownPreviewText(document), FontStyle.Normal)
                         }
