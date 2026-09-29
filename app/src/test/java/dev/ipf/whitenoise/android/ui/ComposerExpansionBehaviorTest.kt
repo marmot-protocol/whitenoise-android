@@ -837,6 +837,24 @@ class ComposerExpansionBehaviorTest {
         assertEquals("drag selection must not change the draft", draft, editorText(editor))
     }
 
+    /** A finger can read an overflowing unfocused draft without opening the keyboard. */
+    @Test
+    fun unfocusedDraftDragScrollsWithoutEnteringEditingMode() {
+        val draft = (1..40).joinToString("\n") { "Draft line $it" }
+        render(draft)
+        val editor = composeRule.onNode(hasSetTextAction())
+        editor.assertIsNotFocused()
+        val before = editorScrollValue()
+
+        pillSurface().performTouchInput {
+            swipe(Offset(center.x, height * 0.8f), Offset(center.x, height * 0.3f), durationMillis = 320)
+        }
+        composeRule.waitForIdle()
+        assertTrue("the reader drag must advance the draft", editorScrollValue() > before)
+        editor.assertIsNotFocused()
+        assertEquals(draft, editorText(editor))
+    }
+
     /** Shrunk editor scrolls both ways without resizing or editing the draft. */
     @Test
     fun shrunkEditorScrollsBothWaysWithoutResizingOrEditingTheDraft() {

@@ -17,6 +17,58 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 
 /**
+ * Let a short finger tap enter the unfocused editor, but keep its press and hold away from
+ * BasicTextField's focus and selection handlers. Once focused, the modifier is removed and
+ * the platform owns caret placement, selection and paste again. Mouse and stylus input pass
+ * through unchanged. The outer reading-scroll owner still sees early vertical drags first.
+ */
+@Suppress("CyclomaticComplexMethod")
+internal suspend fun PointerInputScope.composerUnfocusedTouchFocusGestures(onTap: (Offset) -> Unit) {
+    val touchSlop = viewConfiguration.touchSlop
+    val longPressTimeoutMillis = viewConfiguration.longPressTimeoutMillis
+    awaitPointerEventScope {
+        var trackedPointer: PointerId? = null
+        var downAtMillis = 0L
+        var downPosition = Offset.Zero
+        var cancelled = false
+        while (true) {
+            val event = awaitPointerEvent(PointerEventPass.Initial)
+            when (event.type) {
+                PointerEventType.Press -> {
+                    val change = event.changes.firstOrNull { it.pressed && it.type == PointerType.Touch }
+                    if (change != null) {
+                        if (trackedPointer == null) {
+                            trackedPointer = change.id
+                            downAtMillis = change.uptimeMillis
+                            downPosition = change.position
+                            cancelled = false
+                        } else {
+                            cancelled = true
+                        }
+                        change.consume()
+                    }
+                }
+                PointerEventType.Move, PointerEventType.Release -> {
+                    val change = event.changes.firstOrNull { it.id == trackedPointer }
+                    if (change != null) {
+                        val movedBeyondSlop = (change.position - downPosition).getDistance() > touchSlop
+                        cancelled = cancelled || change.isConsumed || movedBeyondSlop
+                        val elapsed = change.uptimeMillis - downAtMillis
+                        val tapped = !change.pressed && !cancelled && elapsed < longPressTimeoutMillis
+                        change.consume()
+                        if (!change.pressed) {
+                            trackedPointer = null
+                            if (tapped) onTap(change.position)
+                        }
+                    }
+                }
+                else -> Unit
+            }
+        }
+    }
+}
+
+/**
  * The draft and selection a deliberate reader scroll was armed against.
  * Caret-following stays suspended only while the live field still matches, so
  * any edit, selection move, paste, or bulk replacement re-enables the caret
@@ -38,12 +90,11 @@ internal data class ComposerReadingAnchor(
  * clears touch slop before the long-press timeout is a scroll: its moves are
  * consumed on the initial pass (so the text field's cursor and selection
  * handlers never see them) and fed to [scrollBy]. A press that holds past the
- * long-press timeout without clearing slop belongs to selection and is left
- * alone for the rest of that gesture. Wheel and trackpad ticks scroll
+ * long-press timeout without clearing slop belongs to selection when the field is
+ * focused and is left alone for the rest of that gesture. Wheel and trackpad ticks scroll
  * directly. Every owned movement first reports [onReadingScroll] so
- * caret-following can suspend for the current draft. This is one gesture
- * state machine on purpose: splitting it would scatter the slop and
- * long-press yield rules across helpers.
+ * caret-following can suspend for the current draft. This remains the one
+ * reading-scroll owner; the unfocused touch gate only decides when to focus.
  */
 @Suppress("CyclomaticComplexMethod", "LongMethod")
 internal suspend fun PointerInputScope.composerEditorReadingScrollGestures(

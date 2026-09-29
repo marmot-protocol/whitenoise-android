@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityEntryInput
+import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButtonDefaults
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSecureTextField
@@ -112,22 +113,24 @@ internal fun SignInKeyField(
             trailingIcon = {
                 if (!busy && (key.text.isNotEmpty() || canPaste)) {
                     val empty = key.text.isEmpty()
-                    IconButton(
-                        onClick = {
-                            if (empty) {
+                    if (empty) {
+                        SystemPasteIconButton(
+                            onPaste = {
                                 IdentityEntryInput
                                     .pasteValue(clipboard?.primaryClipPlainText(context))
                                     ?.let(::replaceKey)
-                            } else {
-                                replaceKey("")
-                            }
-                        },
-                        modifier = Modifier.padding(horizontal = 4.dp),
-                    ) {
-                        Icon(
-                            painterResource(if (empty) R.drawable.ic_content_paste else R.drawable.ic_close),
-                            stringResource(if (empty) R.string.paste else R.string.clear),
-                        )
+                            },
+                            modifier = Modifier.padding(horizontal = 4.dp),
+                        ) {
+                            Icon(painterResource(R.drawable.ic_content_paste), stringResource(R.string.paste))
+                        }
+                    } else {
+                        IconButton(
+                            onClick = { replaceKey("") },
+                            modifier = Modifier.padding(horizontal = 4.dp),
+                        ) {
+                            Icon(painterResource(R.drawable.ic_close), stringResource(R.string.clear))
+                        }
                     }
                 }
             },

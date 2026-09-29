@@ -1218,8 +1218,10 @@
     <string name="folder_none_detail">Sohbetlerinizi düzenlemek için bir klasör oluşturun.</string>
     <string name="folder_restore_hint">Eksik Okunmamış, Arşivlenmiş ve Gruplar klasörlerini geri yükleyin. Mevcut klasörler değişikliklerinizi korur.</string>
     <string name="folder_edit">Klasörü Düzenle</string>
+    <string name="folder_delete_action">Klasörü sil</string>
     <string name="folder_delete_title">“%1$s” silinsin mi?</string>
     <string name="folder_delete_detail">Bu klasör silinsin mi? Sohbetleriniz oldukları yerde kalacak.</string>
+    <string name="folder_delete_failed">Bu klasör silinemedi. Tekrar deneyin.</string>
     <string name="actions_for">%1$s için eylemler</string>
     <string name="chat_folder_name">Klasör adı</string>
     <string name="folder_manual_hint">Buraya eklediğiniz sohbetler, otomatik kurallarla eşleşmese bile dahil olmaya devam eder.</string>

@@ -33,6 +33,12 @@
         "test_ids": ["DIC-001", "SET-027"]
       },
       {
+        "surface": "SystemPasteIconButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/SystemPasteIconButton.kt",
+        "anchor": "fun SystemPasteIconButton(",
+        "test_ids": ["ONB-005", "FIND-005", "FIND-006"]
+      },
+      {
         "surface": "Empty document send feedback",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
         "anchor": "R.string.media_file_empty",
@@ -3002,7 +3008,17 @@
           "CON-001",
           "CON-005",
           "CON-007",
+          "CON-013",
           "CON-020",
+          "CON-021"
+        ]
+      },
+      {
+        "surface": "ComposerUnfocusedTouchFocusGestures",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerReadingAnchor.kt",
+        "anchor": "fun PointerInputScope.composerUnfocusedTouchFocusGestures(",
+        "test_ids": [
+          "CON-013",
           "CON-021"
         ]
       },
@@ -3564,8 +3580,17 @@
         "test_ids": [
           "MED-001",
           "MED-009",
+          "MED-017",
           "MSG-013",
           "MSG-015"
+        ]
+      },
+      {
+        "surface": "Persisted file open terminal download settlement",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaFileAccess.kt",
+        "anchor": "internal suspend fun <T> materializePersistedAttachmentOpen(",
+        "test_ids": [
+          "MED-017"
         ]
       },
       {
@@ -7482,6 +7507,15 @@
           "SET-009",
           "FLD-001",
           "FLD-002",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "ChatFolderDeleteDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFoldersScreen.kt",
+        "anchor": "fun ChatFolderDeleteDialog(",
+        "test_ids": [
+          "SET-009",
           "ACC-017"
         ]
       },
@@ -18429,6 +18463,15 @@
         ]
       },
       {
+        "surface": "setting:folder_delete_action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
+        "anchor": "R.string.folder_delete_action",
+        "test_ids": [
+          "SET-009",
+          "ACC-017"
+        ]
+      },
+      {
         "surface": "setting:folder_delete_detail",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFoldersScreen.kt",
         "anchor": "R.string.folder_delete_detail",
@@ -18437,6 +18480,14 @@
           "FLD-001",
           "FLD-002",
           "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:folder_delete_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
+        "anchor": "R.string.folder_delete_failed",
+        "test_ids": [
+          "SET-009"
         ]
       },
       {

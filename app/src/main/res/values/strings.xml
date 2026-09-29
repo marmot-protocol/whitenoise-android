@@ -111,8 +111,10 @@
     <string name="folder_none_detail">Create a folder to organize your chats.</string>
     <string name="folder_restore_hint">Restore missing Unread, Archived and Groups folders. Existing folders keep your changes.</string>
     <string name="folder_edit">Edit Folder</string>
+    <string name="folder_delete_action">Delete folder</string>
     <string name="folder_delete_title">Delete “%1$s”?</string>
     <string name="folder_delete_detail">Delete this folder? Your chats will stay where they are.</string>
+    <string name="folder_delete_failed">Could not delete this folder. Try again.</string>
     <string name="actions_for">Actions for %1$s</string>
     <string name="chat_folder_name">Folder name</string>
     <string name="folder_manual_hint">Chats you add here stay included, even when they do not match the automatic rules.</string>

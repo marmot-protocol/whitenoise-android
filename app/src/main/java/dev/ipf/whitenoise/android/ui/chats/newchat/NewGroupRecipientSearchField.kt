@@ -37,6 +37,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 
@@ -118,7 +119,7 @@ internal fun NewGroupRecipientSearchField(
                             }
                         } else {
                             if (offerPaste) {
-                                IconButton({
+                                SystemPasteIconButton({
                                     dispatchRecipientPaste(
                                         state,
                                         clipboard?.primaryClip?.directRecipientPasteItems(),

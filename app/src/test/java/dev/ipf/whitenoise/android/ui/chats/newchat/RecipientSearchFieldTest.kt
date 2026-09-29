@@ -8,7 +8,12 @@ import android.net.Uri
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.platform.LocalTextToolbar
+import androidx.compose.ui.platform.TextToolbar
+import androidx.compose.ui.platform.TextToolbarStatus
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.StateRestorationTester
@@ -41,6 +46,7 @@ class RecipientSearchFieldTest {
 
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val clipboard: ClipboardManager = context.getSystemService(ClipboardManager::class.java)
+    private val textToolbar = TestTextToolbar()
 
     @Before
     fun clearClipboardBeforeTest() {
@@ -62,6 +68,8 @@ class RecipientSearchFieldTest {
         composeRule.onNodeWithContentDescription(context.getString(R.string.paste)).performClick()
 
         composeRule.runOnIdle {
+            assertEquals("", state.text.toString())
+            textToolbar.selectPaste()
             assertEquals(ALICE_NPUB, state.text.toString())
             assertEquals(TextRange(ALICE_NPUB.length), state.selection)
             assertEquals(0, rejections)
@@ -80,6 +88,7 @@ class RecipientSearchFieldTest {
         composeRule.onNodeWithContentDescription(context.getString(R.string.paste)).performClick()
 
         composeRule.runOnIdle {
+            textToolbar.selectPaste()
             assertEquals("", state.text.toString())
             assertEquals(1, rejections)
         }
@@ -129,6 +138,7 @@ class RecipientSearchFieldTest {
         composeRule.onNodeWithContentDescription(context.getString(R.string.paste)).performClick()
 
         composeRule.runOnIdle {
+            textToolbar.selectPaste()
             assertEquals("alice@example.com", state.text.toString())
             assertEquals(TextRange("alice@example.com".length), state.selection)
         }
@@ -230,17 +240,48 @@ class RecipientSearchFieldTest {
         onRejected: () -> Unit = {},
     ) {
         composeRule.setContent {
-            WhiteNoiseTheme {
-                Surface {
-                    RecipientSearchField(
-                        state = state,
-                        placeholder = "Search people",
-                        onPasteRejected = onRejected,
-                        modifier = Modifier.testTag(FIELD_TAG),
-                        isValidNpub = { true },
-                    )
+            CompositionLocalProvider(LocalTextToolbar provides textToolbar) {
+                WhiteNoiseTheme {
+                    Surface {
+                        RecipientSearchField(
+                            state = state,
+                            placeholder = "Search people",
+                            onPasteRejected = onRejected,
+                            modifier = Modifier.testTag(FIELD_TAG),
+                            isValidNpub = { true },
+                        )
+                    }
                 }
             }
+        }
+    }
+
+    private class TestTextToolbar : TextToolbar {
+        private var paste: (() -> Unit)? = null
+        override var status: TextToolbarStatus = TextToolbarStatus.Hidden
+            private set
+
+        override fun showMenu(
+            rect: Rect,
+            onCopyRequested: (() -> Unit)?,
+            onPasteRequested: (() -> Unit)?,
+            onCutRequested: (() -> Unit)?,
+            onSelectAllRequested: (() -> Unit)?,
+        ) {
+            paste = onPasteRequested
+            status = TextToolbarStatus.Shown
+        }
+
+        override fun hide() {
+            paste = null
+            status = TextToolbarStatus.Hidden
+        }
+
+        fun selectPaste() {
+            check(status == TextToolbarStatus.Shown && paste != null)
+            val action = paste
+            hide()
+            action?.invoke()
         }
     }
 

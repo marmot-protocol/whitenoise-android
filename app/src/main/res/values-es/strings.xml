@@ -1220,8 +1220,10 @@
     <string name="folder_none_detail">Crea una carpeta para organizar tus chats.</string>
     <string name="folder_restore_hint">Restaura las carpetas No leídos, Archivados y Grupos que falten. Las carpetas existentes conservan tus cambios.</string>
     <string name="folder_edit">Editar carpeta</string>
+    <string name="folder_delete_action">Eliminar carpeta</string>
     <string name="folder_delete_title">¿Eliminar “%1$s”?</string>
     <string name="folder_delete_detail">¿Eliminar esta carpeta? Tus chats se quedarán donde están.</string>
+    <string name="folder_delete_failed">No se pudo eliminar esta carpeta. Inténtalo de nuevo.</string>
     <string name="actions_for">Acciones para %1$s</string>
     <string name="chat_folder_name">Nombre de la carpeta</string>
     <string name="folder_manual_hint">Los chats que añadas aquí seguirán incluidos aunque no cumplan las reglas automáticas.</string>

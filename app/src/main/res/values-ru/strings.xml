@@ -1266,8 +1266,10 @@
     <string name="folder_none_detail">Создайте папку для организации своих чатов.</string>
     <string name="folder_restore_hint">Восстановите отсутствующие папки «Непрочитанные», «Архивированные» и «Группы». Существующие папки сохраняют ваши изменения.</string>
     <string name="folder_edit">Редактировать папку</string>
+    <string name="folder_delete_action">Удалить папку</string>
     <string name="folder_delete_title">Удалить «%1$s»?</string>
     <string name="folder_delete_detail">Удалить эту папку? Ваши чаты останутся там, где они есть.</string>
+    <string name="folder_delete_failed">Не удалось удалить эту папку. Попробуйте ещё раз.</string>
     <string name="actions_for">Действия для %1$s</string>
     <string name="chat_folder_name">Имя папки</string>
     <string name="folder_manual_hint">Чаты, которые вы сюда добавляете, остаются включенными, даже если они не соответствуют автоматическим правилам.</string>

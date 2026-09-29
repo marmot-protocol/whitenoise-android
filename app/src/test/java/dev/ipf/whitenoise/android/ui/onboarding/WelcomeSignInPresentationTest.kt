@@ -5,7 +5,12 @@ import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.platform.LocalTextToolbar
+import androidx.compose.ui.platform.TextToolbar
+import androidx.compose.ui.platform.TextToolbarStatus
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -189,28 +194,56 @@ class WelcomeSignInPresentationTest {
         composeRule.onNodeWithTag("onboarding.sign_in.action").assertIsNotEnabled()
     }
 
-    /** Pasting reads the actual local clipboard only after a tap, fills masked text and never starts import. */
+    /** Pasting reads the actual local clipboard only after choosing system Paste and never starts import. */
     @Test fun pasteFillsOnlyAfterTheUserRequestsIt() {
         val clipboard = context.getSystemService(ClipboardManager::class.java)
         clipboard.setPrimaryClip(ClipData.newPlainText("synthetic test key", SECRET))
         val key = TextFieldState()
         var imports = 0
+        var systemPaste: (() -> Unit)? = null
+        val toolbar =
+            object : TextToolbar {
+                override var status = TextToolbarStatus.Hidden
+
+                override fun showMenu(
+                    rect: Rect,
+                    onCopyRequested: (() -> Unit)?,
+                    onPasteRequested: (() -> Unit)?,
+                    onCutRequested: (() -> Unit)?,
+                    onSelectAllRequested: (() -> Unit)?,
+                ) {
+                    systemPaste = onPasteRequested
+                    status = TextToolbarStatus.Shown
+                }
+
+                override fun hide() {
+                    systemPaste = null
+                    status = TextToolbarStatus.Hidden
+                }
+            }
         composeRule.setContent {
-            WhiteNoiseTheme {
-                SignInContent(
-                    "",
-                    false,
-                    null,
-                    onIdentityChange = {},
-                    onErrorChange = {},
-                    onBack = {},
-                    onSignIn = { imports++ },
-                    privateKeyState = key,
-                )
+            CompositionLocalProvider(LocalTextToolbar provides toolbar) {
+                WhiteNoiseTheme {
+                    SignInContent(
+                        "",
+                        false,
+                        null,
+                        onIdentityChange = {},
+                        onErrorChange = {},
+                        onBack = {},
+                        onSignIn = { imports++ },
+                        privateKeyState = key,
+                    )
+                }
             }
         }
         composeRule.onNodeWithContentDescription(context.getString(R.string.paste)).performClick()
-        composeRule.runOnIdle { assertEquals(SECRET, key.text.toString()) }
+        composeRule.runOnIdle {
+            assertEquals("", key.text.toString())
+            check(toolbar.status == TextToolbarStatus.Shown)
+            systemPaste?.invoke()
+            assertEquals(SECRET, key.text.toString())
+        }
         assertEquals(0, imports)
         clipboard.clearPrimaryClip()
     }
