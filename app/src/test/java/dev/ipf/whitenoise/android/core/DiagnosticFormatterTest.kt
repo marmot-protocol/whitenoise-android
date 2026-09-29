@@ -141,6 +141,18 @@ class DiagnosticFormatterTest {
         assertEquals("[alice] group event", DiagnosticFormatter.describe(event, legacyShortHexIdentity))
     }
 
+    /** History-notice changes name only the account; the notices themselves stay in the runtime. */
+    @Test
+    fun historyNoticesChangedNamesOnlyTheAccount() {
+        val event =
+            MarmotEventFfi.HistoryNoticesChanged(
+                accountIdHex = "private-account",
+                accountLabel = "alice",
+            )
+
+        assertEquals("[alice] history notices changed", DiagnosticFormatter.describe(event, legacyShortHexIdentity))
+    }
+
     /** Redacts secrets before truncation so long native errors cannot expose their sensitive prefix. */
     @Test
     fun accountErrorsScrubSecretsBeforeTruncating() {
