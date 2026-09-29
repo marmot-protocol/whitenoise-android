@@ -42,6 +42,7 @@ import androidx.core.content.ContextCompat
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ClipboardPasteAffordance
 import dev.ipf.whitenoise.android.core.IdentityEntryInput
+import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
 import dev.ipf.whitenoise.android.ui.common.primaryClipPlainText
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
@@ -108,8 +109,8 @@ internal fun IdentityEntryForm(
                         }
                         else -> {
                             if (canOfferPaste) {
-                                IconButton(
-                                    onClick = {
+                                SystemPasteIconButton(
+                                    onPaste = {
                                         // Identity-specific paste: ClipboardPasteAffordance
                                         // is public-identifier-only and would reject an nsec.
                                         IdentityEntryInput
@@ -215,8 +216,8 @@ internal fun PublicIdentifierFieldTrailingAction(
             }
         }
         canOfferPaste -> {
-            IconButton(
-                onClick = {
+            SystemPasteIconButton(
+                onPaste = {
                     val pasteValue =
                         ClipboardPasteAffordance.pasteValue(
                             clipboardManager?.primaryClipPlainText(context),

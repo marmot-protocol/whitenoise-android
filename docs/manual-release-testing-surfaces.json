@@ -3,6 +3,12 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "SystemPasteIconButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/SystemPasteIconButton.kt",
+        "anchor": "fun SystemPasteIconButton(",
+        "test_ids": ["ONB-005", "FIND-005", "FIND-006"]
+      },
+      {
         "surface": "Empty document send feedback",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
         "anchor": "R.string.media_file_empty",
