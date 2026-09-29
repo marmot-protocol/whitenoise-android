@@ -596,6 +596,23 @@ internal fun ComposerPill(
     // visual transformation instead of values captured when a handler started.
     val latestTextFieldValue by rememberUpdatedState(textFieldValue)
     val latestTransformedText by rememberUpdatedState(transformedText)
+    val pasteFromClipboard: () -> Unit = {
+        val pastedText = clipboardManager?.primaryClipPlainText(context)
+        if (!pastedText.isNullOrEmpty()) {
+            val value = latestTextFieldValue
+            val start = value.selection.min.coerceIn(0, value.text.length)
+            val end = value.selection.max.coerceIn(start, value.text.length)
+            val updated = value.text.replaceRange(start, end, pastedText)
+            latestOnValueChange(
+                value.copy(
+                    text = updated,
+                    selection = TextRange(start + pastedText.length),
+                    composition = null,
+                ),
+            )
+        }
+        textToolbar.hide()
+    }
     val caretFollowSuspended =
         readingScrollAnchor?.matches(textFieldValue) == true
     SideEffect {
@@ -1068,23 +1085,7 @@ internal fun ComposerPill(
                                                     if (latestCanOfferPaste) {
                                                         textToolbar.showMenu(
                                                             rect = editorBounds,
-                                                            onPasteRequested = {
-                                                                val pastedText = clipboardManager?.primaryClipPlainText(context)
-                                                                if (!pastedText.isNullOrEmpty()) {
-                                                                    val value = latestTextFieldValue
-                                                                    val start = value.selection.min.coerceIn(0, value.text.length)
-                                                                    val end = value.selection.max.coerceIn(start, value.text.length)
-                                                                    val updated = value.text.replaceRange(start, end, pastedText)
-                                                                    latestOnValueChange(
-                                                                        value.copy(
-                                                                            text = updated,
-                                                                            selection = TextRange(start + pastedText.length),
-                                                                            composition = null,
-                                                                        ),
-                                                                    )
-                                                                }
-                                                                textToolbar.hide()
-                                                            },
+                                                            onPasteRequested = pasteFromClipboard,
                                                         )
                                                     }
                                                 },
