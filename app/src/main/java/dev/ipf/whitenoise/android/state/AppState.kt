@@ -4261,7 +4261,7 @@ class WhiteNoiseAppState private constructor(
         } else if (attachmentDownloadIntents.isAutomaticSuppressed(request)) {
             return
         }
-        AttachmentDownloadWorker.enqueue(appContext, request, priority)
+        AttachmentDownloadWorker.enqueue(appContext, request, priority, userVisible = appInForeground)
     }
 
     /** Clears a completed foreground request without changing its automatic-download policy. */

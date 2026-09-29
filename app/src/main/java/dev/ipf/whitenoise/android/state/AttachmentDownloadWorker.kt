@@ -1,12 +1,14 @@
 package dev.ipf.whitenoise.android.state
 
 import android.content.Context
+import android.os.Build
 import android.util.Log
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
+import androidx.work.ForegroundInfo
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
@@ -17,8 +19,8 @@ import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
@@ -155,7 +157,7 @@ internal fun attachmentDownloadWorkState(
     WorkManager
         .getInstance(context.applicationContext)
         .getWorkInfosForUniqueWorkFlow(attachmentDownloadWorkName(request))
-        .map { infos ->
+        .combine(AttachmentDownloadJobEvents.revision) { infos, _ ->
             if (hasInteractiveIntent() || infos.any { !it.state.isFinished }) {
                 AttachmentDownloadWorkState.Active
             } else {
@@ -207,6 +209,20 @@ class AttachmentDownloadWorker : CoroutineWorker {
             ) {
                 Result.success()
             } else {
+                if (priority == AttachmentDownloadPriority.Interactive) {
+                    try {
+                        setForeground(
+                            ForegroundInfo(
+                                attachmentJobId(request),
+                                attachmentDownloadNotification(applicationContext),
+                            ),
+                        )
+                    } catch (failure: IllegalStateException) {
+                        // A background retry may be denied foreground-service startup.
+                        // WorkManager can still run this durable request as ordinary work.
+                        Log.w(TAG, "attachment_foreground_unavailable type=${failure.javaClass.simpleName}")
+                    }
+                }
                 performDownload(application, request, priority, intentStore)
             }
         }
@@ -228,6 +244,8 @@ class AttachmentDownloadWorker : CoroutineWorker {
                 Result.success()
             }
         } catch (cancel: CancellationException) {
+            val reason = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) stopReason.toString() else "unavailable"
+            Log.w(TAG, "attachment_work_stopped reason=$reason")
             throw cancel
         } catch (expectedFailure: Throwable) {
             Log.w(TAG, "durable_attachment_download_failed")
@@ -271,6 +289,7 @@ class AttachmentDownloadWorker : CoroutineWorker {
             context: Context,
             request: AttachmentTransferRequest,
             priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Automatic,
+            userVisible: Boolean = false,
         ) {
             val intentStore = attachmentIntentStore(context.applicationContext)
             if (
@@ -282,6 +301,16 @@ class AttachmentDownloadWorker : CoroutineWorker {
             if (priority == AttachmentDownloadPriority.Interactive) {
                 intentStore.restoreAutomatic(request)
                 intentStore.setInteractive(request, interactive = true)
+                if (
+                    userVisible &&
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
+                    AttachmentUserInitiatedDownloads.schedule(context.applicationContext, request)
+                ) {
+                    WorkManager
+                        .getInstance(context.applicationContext)
+                        .cancelUniqueWork(attachmentDownloadWorkName(request))
+                    return
+                }
             }
             val work =
                 OneTimeWorkRequestBuilder<AttachmentDownloadWorker>()
@@ -327,6 +356,9 @@ class AttachmentDownloadWorker : CoroutineWorker {
             runCatching {
                 WorkManager.getInstance(appContext).cancelUniqueWork(attachmentDownloadWorkName(request))
             }.onFailure { Log.w(TAG, "attachment_download_cancel_failed") }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                AttachmentUserInitiatedDownloads.cancel(appContext, request)
+            }
         }
 
         internal suspend fun cancelQueuedAutomatic(
@@ -351,7 +383,7 @@ class AttachmentDownloadWorker : CoroutineWorker {
     }
 }
 
-private fun attachmentIntentStore(context: Context): AttachmentDownloadIntentStore =
+internal fun attachmentIntentStore(context: Context): AttachmentDownloadIntentStore =
     AttachmentDownloadIntentStore(
         context.getSharedPreferences(ATTACHMENT_PREFERENCES_NAME, Context.MODE_PRIVATE),
         EncryptedAttachmentInstallerHandoffRecordStore.create(context),
