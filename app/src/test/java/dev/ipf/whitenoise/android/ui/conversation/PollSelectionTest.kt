@@ -4,7 +4,9 @@ import dev.ipf.marmotkit.PollOptionResultFfi
 import dev.ipf.marmotkit.PollProjectionFfi
 import dev.ipf.marmotkit.PollTypeFfi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PollSelectionTest {
@@ -42,5 +44,15 @@ class PollSelectionTest {
     @Test
     fun rejectsUnprojectedOptionId() {
         assertNull(replacementPollSelection(poll(PollTypeFfi.SINGLE_CHOICE, emptyList()), "unknown"))
+    }
+
+    /** A deadline already reached at first render must never expose an active vote target. */
+    @Test
+    fun deadlineClosesAtItsUnixSecond() {
+        assertFalse(pollDeadlineReached(null, 1_700_000_000_000L))
+        assertFalse(pollDeadlineReached(1_700_000_001uL, 1_700_000_000_999L))
+        assertTrue(pollDeadlineReached(1_700_000_001uL, 1_700_000_001_000L))
+        val expired = poll(PollTypeFfi.SINGLE_CHOICE, emptyList()).copy(endsAt = 1_700_000_001uL)
+        assertFalse(pollVoteAllowed(expired, 1_700_000_001_000L))
     }
 }

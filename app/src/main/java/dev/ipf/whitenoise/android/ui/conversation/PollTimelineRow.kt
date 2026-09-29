@@ -50,6 +50,19 @@ import java.text.DateFormat
 import java.util.Date
 
 private const val POLL_ROW_MAX_WIDTH_FRACTION = 0.95f
+private const val POLL_MILLIS_PER_SECOND = 1_000L
+
+/** Checks expiry before the first frame and again when a vote is tapped. */
+internal fun pollDeadlineReached(
+    endsAt: ULong?,
+    nowMillis: Long,
+): Boolean = endsAt != null && endsAt <= (nowMillis / POLL_MILLIS_PER_SECOND).toULong()
+
+/** Rejects a tap against an expired projection even before Compose's deadline timer fires. */
+internal fun pollVoteAllowed(
+    poll: PollProjectionFfi,
+    nowMillis: Long,
+): Boolean = poll.open && !pollDeadlineReached(poll.endsAt, nowMillis)
 
 /** Computes the complete replacement vote from native option ids, never an empty selection. */
 internal fun replacementPollSelection(
@@ -82,7 +95,9 @@ internal fun PollTimelineRow(
         return
     }
     var voting by remember(item.record.messageIdHex) { mutableStateOf(false) }
-    var deadlineReached by remember(poll.endsAt) { mutableStateOf(false) }
+    var deadlineReached by remember(poll.endsAt) {
+        mutableStateOf(pollDeadlineReached(poll.endsAt, System.currentTimeMillis()))
+    }
     LaunchedEffect(poll.endsAt) {
         val deadline = poll.endsAt?.toLong()?.times(1000L) ?: return@LaunchedEffect
         val remaining = deadline - System.currentTimeMillis()
@@ -114,7 +129,7 @@ internal fun PollTimelineRow(
                     canVote = open && controller.canSendMessages && !selectionMode && !voting,
                     onVote = { optionId ->
                         val replacement = replacementPollSelection(poll, optionId)
-                        if (replacement != null) {
+                        if (replacement != null && pollVoteAllowed(poll, System.currentTimeMillis())) {
                             voting = true
                             appState.launchMutation {
                                 try {
