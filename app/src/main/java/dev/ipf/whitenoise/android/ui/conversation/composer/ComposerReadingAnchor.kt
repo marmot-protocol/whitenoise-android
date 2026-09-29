@@ -24,7 +24,7 @@ import kotlin.math.abs
  * Mouse and stylus input pass through unchanged. The outer reading-scroll owner still sees
  * early vertical drags first.
  */
-@Suppress("CyclomaticComplexMethod")
+@Suppress("CyclomaticComplexMethod", "LongMethod")
 internal suspend fun PointerInputScope.composerUnfocusedTouchFocusGestures(
     onTap: (Offset) -> Unit,
     onLongPress: () -> Unit,
@@ -40,8 +40,9 @@ internal suspend fun PointerInputScope.composerUnfocusedTouchFocusGestures(
         var longPressDispatched = false
         while (true) {
             val remaining = longPressTimeoutMillis - (lastEventAtMillis - downAtMillis)
+            val awaitingLongPress = trackedPointer != null && !cancelled && !longPressDispatched
             val event =
-                if (trackedPointer != null && !cancelled && !longPressDispatched && remaining > 0) {
+                if (awaitingLongPress && remaining > 0) {
                     withTimeoutOrNull(remaining) { awaitPointerEvent(PointerEventPass.Initial) }
                 } else {
                     awaitPointerEvent(PointerEventPass.Initial)
