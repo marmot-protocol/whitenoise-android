@@ -51,12 +51,17 @@ internal fun ConversationGroupRecoveryCard(
         },
         readFailed = controller.groupRecoveryReadFailed,
         onRetry = { appState.launchMutation { controller.retryGroupRecoveryStatus() } },
+        onDismissHistoryNotices = { appState.launchMutation { controller.dismissGroupHistoryNotices() } },
     )
 }
 
 /** Whether the engine status contains information that belongs in the conversation UI. */
 internal fun GroupRecoveryStatusFfi.hasVisibleRecoveryState(): Boolean =
-    automaticRecoveryFailed || pendingReinvites > 0u || failedReinvites > 0u || rejoinInvitations.isNotEmpty()
+    automaticRecoveryFailed ||
+        pendingReinvites > 0u ||
+        failedReinvites > 0u ||
+        rejoinInvitations.isNotEmpty() ||
+        historyMayBeIncomplete
 
 /** Presents engine-owned recovery state without interpreting it as membership evidence. */
 @Composable
@@ -70,6 +75,7 @@ internal fun GroupRecoveryCard(
     onDecline: (GroupRejoinInvitationFfi) -> Unit,
     readFailed: Boolean = false,
     onRetry: () -> Unit = {},
+    onDismissHistoryNotices: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     if (!readFailed && status?.hasVisibleRecoveryState() != true) return
@@ -92,6 +98,18 @@ internal fun GroupRecoveryCard(
                 stringResource(R.string.group_recovery_failed_reinvites),
                 style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center),
             )
+        }
+        if (status?.historyMayBeIncomplete == true) {
+            Text(
+                stringResource(R.string.group_history_may_be_incomplete),
+                style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center),
+            )
+            // Only the user may accept that this history may stay incomplete.
+            if (status.historyNoticeIds.isNotEmpty()) {
+                TextButton(onClick = onDismissHistoryNotices, enabled = !busy) {
+                    Text(stringResource(R.string.dismiss))
+                }
+            }
         }
         status?.rejoinInvitations.orEmpty().forEach { invitation ->
             WhiteNoiseOutlinedButton(

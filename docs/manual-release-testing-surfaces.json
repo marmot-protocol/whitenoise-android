@@ -1141,7 +1141,8 @@
         "anchor": "fun ChatsScreen(",
         "test_ids": [
           "CHL-001",
-          "SEC-012"
+          "SEC-012",
+          "CHL-018"
         ]
       },
       {
@@ -2612,7 +2613,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
         "anchor": "fun ConversationGroupRecoveryCard(",
         "test_ids": [
-          "GRP-021"
+          "GRP-021",
+          "GRP-024"
         ]
       },
       {
@@ -2620,7 +2622,32 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
         "anchor": "fun GroupRecoveryCard(",
         "test_ids": [
-          "GRP-021"
+          "GRP-021",
+          "GRP-024"
+        ]
+      },
+      {
+        "surface": "AccountHistoryNoticeBanner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/AccountHistoryNoticeBanner.kt",
+        "anchor": "fun AccountHistoryNoticeBanner(",
+        "test_ids": [
+          "CHL-018"
+        ]
+      },
+      {
+        "surface": "Account history notice owner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AccountHistoryNotices.kt",
+        "anchor": "class AccountHistoryNotices(",
+        "test_ids": [
+          "CHL-018"
+        ]
+      },
+      {
+        "surface": "Group history notice dismissal",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "suspend fun dismissGroupHistoryNotices(",
+        "test_ids": [
+          "GRP-024"
         ]
       },
       {

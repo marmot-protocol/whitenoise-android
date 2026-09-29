@@ -182,6 +182,80 @@ class GroupRecoveryCardScreenshotTest {
         )
     }
 
+    /** A group-scoped history notice explains the gap and lets only the user dismiss it. */
+    @Test
+    fun historyNoticeLight() = captureHistoryNotice(dark = false, amoled = false, largeRtl = false)
+
+    /** Wide RTL and large typography keep the history notice and its Dismiss action reachable. */
+    @Test
+    @Config(qualifiers = "en-w600dp-h900dp-mdpi")
+    fun historyNoticeAmoledLargeRtl() = captureHistoryNotice(dark = true, amoled = true, largeRtl = true)
+
+    /** Without a notice id there is nothing to dismiss, so no Dismiss action is offered. */
+    @Test
+    fun historyNoticeWithoutIdsOffersNoDismiss() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                GroupRecoveryCard(
+                    status = historyNoticeStatus(noticeIds = emptyList()),
+                    busy = false,
+                    inviterName = { it },
+                    inviterIdentity = { it },
+                    onConfirm = {},
+                    onDecline = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Some earlier messages in this chat may be missing.").assertExists()
+        composeRule.onNodeWithText("Dismiss").assertDoesNotExist()
+    }
+
+    /** Renders the group history notice and records its screenshot baseline. */
+    private fun captureHistoryNotice(
+        dark: Boolean,
+        amoled: Boolean,
+        largeRtl: Boolean,
+    ) {
+        var dismissals = 0
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (largeRtl) 2f else 1f) {
+                CompositionLocalProvider(
+                    LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                ) {
+                    GroupRecoveryCard(
+                        status = historyNoticeStatus(noticeIds = listOf("d".repeat(48))),
+                        busy = false,
+                        inviterName = { it },
+                        inviterIdentity = { it },
+                        onConfirm = {},
+                        onDecline = {},
+                        onDismissHistoryNotices = { dismissals++ },
+                        modifier = Modifier.width(if (largeRtl) 600.dp else 360.dp).testTag("group-recovery-card"),
+                    )
+                }
+            }
+        }
+        composeRule.onNodeWithText("Some earlier messages in this chat may be missing.").assertIsDisplayed()
+        val name = if (largeRtl) "amoled_large_rtl" else "light"
+        composeRule
+            .onNodeWithTag("group-recovery-card")
+            .captureRoboImage("src/test/snapshots/group_recovery_history_notice_$name.png")
+        composeRule.onNodeWithText("Dismiss").assertIsDisplayed().performClick()
+        composeRule.runOnIdle { assertEquals(1, dismissals) }
+    }
+
+    private fun historyNoticeStatus(noticeIds: List<String>) =
+        GroupRecoveryStatusFfi(
+            groupIdHex = "group",
+            automaticRecoveryFailed = false,
+            pendingReinvites = 0u,
+            failedReinvites = 0u,
+            rejoinInvitations = emptyList(),
+            historyMayBeIncomplete = true,
+            historyNoticeIds = noticeIds,
+        )
+
     /** Dark recovery keeps the native retry action visible within the prototype notice frame. */
     @Test
     fun recoveryRetryDark() = captureRetry(dark = true, amoled = false, largeRtl = false)

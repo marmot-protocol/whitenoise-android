@@ -668,8 +668,11 @@ internal fun ChatsScreen(
         remember(visibleItems, searchActive) {
             visibleItems.map(::visibleRowId)
         }
+    val historyNotices = rememberAccountHistoryNotices(appState)
+    val showHistoryNotice = !searchActive && historyNotices?.notices?.isNotEmpty() == true
     val leadingChatListItemCount =
-        if (controller.error != null && loadFailurePlacement == LoadFailurePlacement.Inline) 1 else 0
+        (if (showHistoryNotice) 1 else 0) +
+            (if (controller.error != null && loadFailurePlacement == LoadFailurePlacement.Inline) 1 else 0)
     val visiblePinnedOrder =
         remember(visibleItems, searchActive) {
             if (searchActive) emptyList() else visibleItems.filter { it.pinned() }.map { it.id }
@@ -1719,6 +1722,14 @@ internal fun ChatsScreen(
                             state = chatListState,
                             contentPadding = PaddingValues(bottom = snackbarContentInset.value),
                         ) {
+                            if (showHistoryNotice && historyNotices != null) {
+                                item(key = "account-history-notice") {
+                                    AccountHistoryNoticeBanner(
+                                        dismissing = historyNotices.dismissing,
+                                        onDismiss = { appState.launchMutation { historyNotices.dismissAll() } },
+                                    )
+                                }
+                            }
                             controller.error
                                 ?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }
                                 ?.let { failure ->

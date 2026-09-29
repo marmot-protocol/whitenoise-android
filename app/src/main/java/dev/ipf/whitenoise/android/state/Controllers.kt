@@ -7348,6 +7348,22 @@ class ConversationController(
     /** Explicit retry for an advisory recovery-status read failure. */
     suspend fun retryGroupRecoveryStatus() = refreshGroupRecoveryStatus()
 
+    /** Records the user's dismissal of this group's shown history notices; stale ids are already gone. */
+    suspend fun dismissGroupHistoryNotices() {
+        val accountRef = conversationAccountRef
+        val noticeIds = groupRecoveryStatus?.historyNoticeIds.orEmpty()
+        if (groupRecoveryMutationInFlight || accountRef == null || noticeIds.isEmpty()) return
+        groupRecoveryMutationInFlight = true
+        try {
+            noticeIds.forEach { id ->
+                runCatchingCancellable { appState.marmotIo { dismissHistoryNotice(accountRef, id) } }
+            }
+        } finally {
+            groupRecoveryMutationInFlight = false
+        }
+        refreshGroupRecoveryStatus()
+    }
+
     /** Accepts exactly the still-present invitation that the user confirmed. */
     suspend fun confirmGroupRejoin(invitation: GroupRejoinInvitationFfi) {
         if (groupRecoveryMutationInFlight) return

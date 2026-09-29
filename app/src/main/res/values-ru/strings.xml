@@ -1885,6 +1885,8 @@
     <string name="group_recovery_failed_reinvites">Некоторые приглашения не удалось восстановить. Пригласите этих людей снова в разделе сведений о группе.</string>
     <string name="group_recovery_review_invitation_from">Проверить приглашение от %1$s · эпоха %2$s</string>
     <string name="group_recovery_check_failed">Не удалось проверить восстановление группы. Повторите попытку.</string>
+    <string name="group_history_may_be_incomplete">В этом чате могут отсутствовать некоторые более ранние сообщения.</string>
+    <string name="account_history_may_be_incomplete">В этом аккаунте могут отсутствовать некоторые сообщения. White Noise не удалось подтвердить, что все сообщения были получены.</string>
     <string name="group_rejoin_title">Вернуться в группу?</string>
     <string name="group_rejoin_invited_by">Приглашение от %1$s\n%2$s</string>
     <string name="group_rejoin_replaces_state">При возвращении в группу данные шифрования группы на этом устройстве будут заменены. История сообщений сохранится.</string>
