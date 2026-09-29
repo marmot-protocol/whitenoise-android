@@ -287,7 +287,7 @@ internal fun ImageSearchSheet(
     var pendingAction by remember { mutableStateOf<GroupImageAction?>(null) }
     val photoPicker =
         rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-            if (uri != null) {
+            if (uri != null && !applyInFlight) {
                 pendingAction = GroupImageAction.PickPhoto
                 onPickPhoto?.invoke(uri)
             }

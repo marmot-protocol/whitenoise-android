@@ -452,6 +452,7 @@ internal fun GroupEditScreen(
                 if (picked == null) updateImage { null } else setPublicAvatarUrl(picked)
             },
             onPickPhoto = { uri ->
+                if (imageSaving || controller.mutationInFlight) return@ImageSearchSheet
                 imageFailureScope.clear()
                 pendingCropUri = uri
             },

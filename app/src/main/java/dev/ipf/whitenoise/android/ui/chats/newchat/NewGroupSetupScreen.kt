@@ -577,6 +577,7 @@ private fun NewGroupSetupAccountScreen(
                 }
             },
             onPickPhoto = { uri ->
+                if (!detailsEditableNow()) return@ImageSearchSheet
                 imageFailureScope.clear()
                 imageError = false
                 pendingCropUri = uri
