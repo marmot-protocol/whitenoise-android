@@ -165,7 +165,11 @@ class StalenessGuardCoverageTest {
                 "Controllers.kt:confirmGroupRejoin" to
                     listOf("groupRecoveryLifetime.capture", "groupRecoveryLifetime.runIfCurrent"),
                 "Controllers.kt:dismissGroupHistoryNotices" to
-                    listOf("groupRecoveryLifetime.capture", "groupRecoveryLifetime.runIfCurrent", "ownsGroupRecoveryGroup"),
+                    listOf(
+                        "groupRecoveryLifetime.capture",
+                        "groupRecoveryLifetime.runIfCurrent",
+                        "ownsGroupRecoveryGroup",
+                    ),
                 "Controllers.kt:declineGroupRejoin" to
                     listOf(
                         "groupRecoveryLifetime.capture",
