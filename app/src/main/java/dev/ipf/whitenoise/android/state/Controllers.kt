@@ -7353,15 +7353,22 @@ class ConversationController(
         val accountRef = conversationAccountRef
         val noticeIds = groupRecoveryStatus?.historyNoticeIds.orEmpty()
         if (groupRecoveryMutationInFlight || accountRef == null || noticeIds.isEmpty()) return
+        val groupIdHex = group.groupIdHex
+        val recoveryEpoch = groupRecoveryLifetime.capture()
         groupRecoveryMutationInFlight = true
+        var shouldRefresh = false
         try {
             noticeIds.forEach { id ->
                 runCatchingCancellable { appState.marmotIo { dismissHistoryNotice(accountRef, id) } }
             }
+            groupRecoveryLifetime.runIfCurrent(recoveryEpoch) {
+                shouldRefresh = ownsGroupRecoveryGroup(groupIdHex) && conversationAccountRef == accountRef
+            }
         } finally {
+            // Single-flight excludes another recovery mutation until this operation releases its slot.
             groupRecoveryMutationInFlight = false
         }
-        refreshGroupRecoveryStatus()
+        if (shouldRefresh) refreshGroupRecoveryStatus()
     }
 
     /** Accepts exactly the still-present invitation that the user confirmed. */
