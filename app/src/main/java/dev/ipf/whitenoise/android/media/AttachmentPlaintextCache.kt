@@ -8,6 +8,7 @@ import java.io.IOException
 internal object AttachmentPlaintextCache {
     internal const val VOICE_MAX_DIRECTORY_BYTES: Long = 64L * 1024L * 1024L
     internal const val VIDEO_MAX_DIRECTORY_BYTES: Long = 128L * 1024L * 1024L
+
     // MarmotKit accepts encrypted attachments up to 512 MiB. The shared-file
     // handoff must admit their (smaller) verified plaintext, including APKs;
     // the janitor still bounds the whole directory and evicts older files.
