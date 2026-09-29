@@ -51,12 +51,10 @@ internal suspend fun PointerInputScope.composerUnfocusedTouchFocusGestures(onTap
                 PointerEventType.Move, PointerEventType.Release -> {
                     val change = event.changes.firstOrNull { it.id == trackedPointer }
                     if (change != null) {
-                        cancelled =
-                            cancelled || change.isConsumed ||
-                                (change.position - downPosition).getDistance() > touchSlop
-                        val tapped =
-                            !change.pressed && !cancelled &&
-                                change.uptimeMillis - downAtMillis < longPressTimeoutMillis
+                        val movedBeyondSlop = (change.position - downPosition).getDistance() > touchSlop
+                        cancelled = cancelled || change.isConsumed || movedBeyondSlop
+                        val elapsed = change.uptimeMillis - downAtMillis
+                        val tapped = !change.pressed && !cancelled && elapsed < longPressTimeoutMillis
                         change.consume()
                         if (!change.pressed) {
                             trackedPointer = null

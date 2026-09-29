@@ -1048,8 +1048,7 @@ internal fun ComposerPill(
                                                 showKeyboardAfterTouchTap = composerFocus.requestFocus()
                                             }
                                         }
-                                    }
-                                    .filterTextContextMenuComponents { component ->
+                                    }.filterTextContextMenuComponents { component ->
                                         textFieldValue.text.isNotEmpty() ||
                                             component.key !== TextContextMenuKeys.AutofillKey
                                     }.focusProperties { canFocus = inputFocusEnabled }
