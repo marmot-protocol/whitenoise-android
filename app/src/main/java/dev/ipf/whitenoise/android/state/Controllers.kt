@@ -6039,6 +6039,9 @@ class ConversationController(
             groupRecoveryStatus(account, groupIdHex)
         }
     },
+    private val historyNoticeDismisser: suspend (String, String) -> Boolean = { account, noticeId ->
+        appState.marmotIo { dismissHistoryNotice(account, noticeId) }
+    },
     private val textPublisher: (suspend (String?, String, String, String) -> SendSummaryFfi)? = null,
     private val messageEditPublisher: suspend (String, String, String, String) -> Unit = { account, groupId, target, text ->
         appState.marmotIo(MarmotTraceSection.MESSAGE_EDIT) { editMessage(account, groupId, target, text) }
@@ -7348,7 +7351,7 @@ class ConversationController(
     /** Explicit retry for an advisory recovery-status read failure. */
     suspend fun retryGroupRecoveryStatus() = refreshGroupRecoveryStatus()
 
-    /** Records the user's dismissal of this group's shown history notices; stale ids are already gone. */
+    /** Dismisses this group's shown notice ids, keeping the action busy until refresh completes. */
     suspend fun dismissGroupHistoryNotices() {
         val accountRef = conversationAccountRef
         val noticeIds = groupRecoveryStatus?.historyNoticeIds.orEmpty()
@@ -7356,19 +7359,33 @@ class ConversationController(
         val groupIdHex = group.groupIdHex
         val recoveryEpoch = groupRecoveryLifetime.capture()
         groupRecoveryMutationInFlight = true
-        var shouldRefresh = false
         try {
-            noticeIds.forEach { id ->
-                runCatchingCancellable { appState.marmotIo { dismissHistoryNotice(accountRef, id) } }
-            }
+            val firstFailure =
+                dismissHistoryNoticeIds(noticeIds) { id ->
+                    historyNoticeDismisser(accountRef, id)
+                }
+            var shouldRefresh = false
             groupRecoveryLifetime.runIfCurrent(recoveryEpoch) {
                 shouldRefresh = ownsGroupRecoveryGroup(groupIdHex) && conversationAccountRef == accountRef
+            }
+            if (shouldRefresh) {
+                refreshGroupRecoveryStatus()
+                firstFailure?.let { failure ->
+                    groupRecoveryLifetime.runIfCurrent(recoveryEpoch) {
+                        if (ownsGroupRecoveryGroup(groupIdHex) && conversationAccountRef == accountRef) {
+                            recordMutationFailure(
+                                R.string.history_notice_dismiss_failed,
+                                "GROUP_HISTORY_NOTICE_DISMISS",
+                                failure,
+                            )
+                        }
+                    }
+                }
             }
         } finally {
             // Single-flight excludes another recovery mutation until this operation releases its slot.
             groupRecoveryMutationInFlight = false
         }
-        if (shouldRefresh) refreshGroupRecoveryStatus()
     }
 
     /** Accepts exactly the still-present invitation that the user confirmed. */

@@ -23,6 +23,7 @@ internal class AccountHistoryNotices(
     private val accountRef: String,
     private val readNotices: suspend (accountRef: String) -> List<HistoryNoticeFfi>,
     private val dismissNotice: suspend (accountRef: String, noticeId: String) -> Boolean,
+    private val reportDismissFailure: (Throwable) -> Unit = {},
 ) {
     var notices by mutableStateOf<List<HistoryNoticeFfi>>(emptyList())
         private set
@@ -50,7 +51,7 @@ internal class AccountHistoryNotices(
     }
 
     /** Reads once, then re-reads whenever the runtime reports this account's notices changed. */
-    @Suppress("TooGenericExceptionCaught") // A closed runtime ends observation; the next start reads again.
+    @Suppress("TooGenericExceptionCaught") // A closed subscription is retried by the lifecycle owner.
     suspend fun observe(nextEvent: suspend () -> MarmotEventFfi?) {
         refresh()
         try {
@@ -66,8 +67,8 @@ internal class AccountHistoryNotices(
     }
 
     /**
-     * Records the user's dismissal of every notice currently shown. A stale id is
-     * already gone, so the list is re-read afterwards either way.
+     * Records dismissal of the shown ids and refreshes before enabling the action.
+     * A false result means the id was already gone; native failures are reported.
      */
     suspend fun dismissAll() {
         if (dismissing) return
@@ -75,10 +76,11 @@ internal class AccountHistoryNotices(
         if (noticeIds.isEmpty()) return
         dismissing = true
         try {
-            noticeIds.forEach { noticeId -> runCatchingCancellable { dismissNotice(accountRef, noticeId) } }
+            val firstFailure = dismissHistoryNoticeIds(noticeIds) { noticeId -> dismissNotice(accountRef, noticeId) }
+            refresh()
+            firstFailure?.let(reportDismissFailure)
         } finally {
             dismissing = false
         }
-        refresh()
     }
 }

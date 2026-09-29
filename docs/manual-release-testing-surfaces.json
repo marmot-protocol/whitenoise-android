@@ -2653,6 +2653,12 @@
         "test_ids": ["CHL-018"]
       },
       {
+        "surface": "Account history notice dismiss failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/AccountHistoryNoticeBanner.kt",
+        "anchor": "R.string.history_notice_dismiss_failed",
+        "test_ids": ["CHL-018"]
+      },
+      {
         "surface": "Group history incomplete notice text",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
         "anchor": "R.string.group_history_may_be_incomplete",
@@ -2679,6 +2685,12 @@
         "test_ids": [
           "GRP-024"
         ]
+      },
+      {
+        "surface": "Group history notice dismiss failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.history_notice_dismiss_failed",
+        "test_ids": ["GRP-024"]
       },
       {
         "surface": "Fresh group creation recovery-read policy",

@@ -1831,6 +1831,7 @@
     <string name="group_recovery_check_failed">Grup kurtarma denetlenemedi. Tekrar deneyin.</string>
     <string name="group_history_may_be_incomplete">Bu sohbetteki bazı eski mesajlar eksik olabilir.</string>
     <string name="account_history_may_be_incomplete">Bu hesapta bazı mesajlar eksik olabilir. White Noise tüm mesajların ulaştığını doğrulayamadı.</string>
+    <string name="history_notice_dismiss_failed">Geçmiş bildirimi kapatılamadı. Yeniden deneyin.</string>
     <string name="group_rejoin_title">Gruba yeniden katılınsın mı?</string>
     <string name="group_rejoin_invited_by">Davet eden: %1$s\n%2$s</string>
     <string name="group_rejoin_replaces_state">Yeniden katılmak, bu cihazdaki grup şifreleme verilerini değiştirir. Mesaj geçmişiniz korunur.</string>

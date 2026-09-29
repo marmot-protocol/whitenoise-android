@@ -1833,6 +1833,7 @@
     <string name="group_recovery_check_failed">Impossible de vérifier la récupération du groupe. Réessayez.</string>
     <string name="group_history_may_be_incomplete">Certains messages plus anciens de cette discussion sont peut-être manquants.</string>
     <string name="account_history_may_be_incomplete">Certains messages de ce compte sont peut-être manquants. White Noise n’a pas pu confirmer que tous les messages sont arrivés.</string>
+    <string name="history_notice_dismiss_failed">Impossible de fermer cet avis sur l’historique. Réessayez.</string>
     <string name="group_rejoin_title">Rejoindre à nouveau le groupe ?</string>
     <string name="group_rejoin_invited_by">Invitation de %1$s\n%2$s</string>
     <string name="group_rejoin_replaces_state">Rejoindre à nouveau remplace les données de chiffrement de cet appareil pour ce groupe. Votre historique de messages est conservé.</string>

@@ -1833,6 +1833,7 @@
     <string name="group_recovery_check_failed">Impossibile verificare il recupero del gruppo. Riprova.</string>
     <string name="group_history_may_be_incomplete">Alcuni messaggi precedenti di questa chat potrebbero mancare.</string>
     <string name="account_history_may_be_incomplete">Alcuni messaggi di questo account potrebbero mancare. White Noise non è riuscito a confermare che tutti i messaggi siano arrivati.</string>
+    <string name="history_notice_dismiss_failed">Impossibile ignorare l’avviso sulla cronologia. Riprova.</string>
     <string name="group_rejoin_title">Rientrare nel gruppo?</string>
     <string name="group_rejoin_invited_by">Invito di %1$s\n%2$s</string>
     <string name="group_rejoin_replaces_state">Rientrare sostituisce i dati di crittografia di questo dispositivo per il gruppo. La cronologia dei messaggi resta.</string>

@@ -138,6 +138,7 @@ internal fun GroupRecoveryCard(
     }
 }
 
+/** Shows the group-scoped warning and offers dismissal only for active notice ids. */
 @Composable
 @Suppress("FunctionNaming")
 private fun GroupHistoryNotice(

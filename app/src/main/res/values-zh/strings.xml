@@ -1808,6 +1808,7 @@
     <string name="group_recovery_check_failed">无法检查群组恢复状态，请重试。</string>
     <string name="group_history_may_be_incomplete">此聊天中可能缺少部分较早的消息。</string>
     <string name="account_history_may_be_incomplete">此账户可能缺少部分消息。White Noise 无法确认所有消息都已送达。</string>
+    <string name="history_notice_dismiss_failed">无法忽略历史记录提示，请重试。</string>
     <string name="group_rejoin_title">重新加入群组？</string>
     <string name="group_rejoin_invited_by">邀请者：%1$s\n%2$s</string>
     <string name="group_rejoin_replaces_state">重新加入会替换此设备上该群组的加密数据。你的消息记录会保留。</string>

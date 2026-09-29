@@ -120,11 +120,17 @@ class AccountHistoryNoticesTest {
     fun failedDismissalStillRereadsAndClearsBusyState() =
         runTest {
             val reads = mutableListOf(listOf(ACCOUNT_WIDE), listOf(ACCOUNT_WIDE))
-            val owner =
+            val failures = mutableListOf<Throwable>()
+            lateinit var owner: AccountHistoryNotices
+            owner =
                 AccountHistoryNotices(
                     accountRef = ACCOUNT,
-                    readNotices = { reads.removeFirst() },
+                    readNotices = {
+                        if (reads.size == 1) assertEquals(true, owner.dismissing)
+                        reads.removeFirst()
+                    },
                     dismissNotice = { _, _ -> throw MarmotKitException.TransportClosed() },
+                    reportDismissFailure = { failures += it },
                 )
             owner.refresh()
 
@@ -132,6 +138,7 @@ class AccountHistoryNoticesTest {
 
             assertEquals(listOf(ACCOUNT_WIDE), owner.notices)
             assertFalse(owner.dismissing)
+            assertEquals(1, failures.size)
             assertEquals(emptyList<List<HistoryNoticeFfi>>(), reads)
         }
 

@@ -128,16 +128,18 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold as Scaffold
 
-/** Keeps the process-wide TTS transport in normal flow above every chat-list state. */
+/** Keeps TTS transport and account notices visible above every chat-list state. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun ChatListBodyFrame(
     ttsTransport: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    notice: @Composable () -> Unit = {},
     content: @Composable BoxScope.() -> Unit,
 ) {
     Column(modifier) {
         ttsTransport()
+        notice()
         Box(
             modifier =
                 Modifier
@@ -669,10 +671,9 @@ internal fun ChatsScreen(
             visibleItems.map(::visibleRowId)
         }
     val historyNotices = rememberAccountHistoryNotices(appState)
-    val showHistoryNotice = !searchActive && historyNotices?.notices?.isNotEmpty() == true
+    val showHistoryNotice = !searchActive && !browsingAttachments && historyNotices?.notices?.isNotEmpty() == true
     val leadingChatListItemCount =
-        (if (showHistoryNotice) 1 else 0) +
-            (if (controller.error != null && loadFailurePlacement == LoadFailurePlacement.Inline) 1 else 0)
+        if (controller.error != null && loadFailurePlacement == LoadFailurePlacement.Inline) 1 else 0
     val visiblePinnedOrder =
         remember(visibleItems, searchActive) {
             if (searchActive) emptyList() else visibleItems.filter { it.pinned() }.map { it.id }
@@ -1652,6 +1653,14 @@ internal fun ChatsScreen(
                         onBodyClick = onTtsTransportBodyClick,
                     )
                 },
+                notice = {
+                    historyNotices?.takeIf { showHistoryNotice }?.let { owner ->
+                        AccountHistoryNoticeBanner(
+                            dismissing = owner.dismissing,
+                            onDismiss = { appState.launchMutation { owner.dismissAll() } },
+                        )
+                    }
+                },
             ) {
                 when {
                     browsingAttachments ->
@@ -1722,14 +1731,6 @@ internal fun ChatsScreen(
                             state = chatListState,
                             contentPadding = PaddingValues(bottom = snackbarContentInset.value),
                         ) {
-                            if (showHistoryNotice && historyNotices != null) {
-                                item(key = "account-history-notice") {
-                                    AccountHistoryNoticeBanner(
-                                        dismissing = historyNotices.dismissing,
-                                        onDismiss = { appState.launchMutation { historyNotices.dismissAll() } },
-                                    )
-                                }
-                            }
                             controller.error
                                 ?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }
                                 ?.let { failure ->
