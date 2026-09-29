@@ -625,12 +625,12 @@ internal object BackgroundConnectionNotification {
         foregroundActive = false
     }
 
-    /** Reuses the foreground-services' shared ID without overwriting dictation controls. */
-    fun restoreIfForeground(context: Context) {
-        if (!foregroundActive) return
-        context
-            .getSystemService(NotificationManager::class.java)
-            ?.notify(NOTIFICATION_ID, build(context))
+    /** Restores the shared ID only while a connection foreground service owns it. */
+    fun restoreIfForeground(context: Context): Boolean {
+        if (!foregroundActive) return false
+        val manager = context.getSystemService(NotificationManager::class.java) ?: return false
+        manager.notify(NOTIFICATION_ID, build(context))
+        return true
     }
 
     fun build(context: Context): Notification {

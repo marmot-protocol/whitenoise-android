@@ -9,7 +9,6 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -147,14 +146,31 @@ class ConversationDictationForegroundService : Service() {
         notificationScope.cancel()
         conversationDictationDiagnostic("event=foreground_service_destroyed")
         promotedSessionToken?.let { token -> promotedController?.onDurableServiceDestroyed(token) }
+        if (promotedSessionToken != null) {
+            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        }
         promotedController = null
         promotedSessionToken = null
         super.onDestroy()
         if (activeService === this) activeService = null
-        // Both foreground services share one notification ID. Restore the connection's
-        // presentation after the dictation service releases its claim on that ID.
+        // notify() may have refreshed the shared ID after foreground promotion.
+        // A replacement dictation may also have claimed it before this callback.
         Handler(Looper.getMainLooper()).post {
-            BackgroundConnectionNotification.restoreIfForeground(applicationContext)
+            val replacement = activeNotificationOrNull()
+            val manager = getSystemService(NotificationManager::class.java)
+            when {
+                replacement != null -> {
+                    manager?.notify(NOTIFICATION_ID, replacement)
+                    conversationDictationDiagnostic("event=foreground_notification_closed outcome=replaced")
+                }
+                BackgroundConnectionNotification.restoreIfForeground(applicationContext) -> {
+                    conversationDictationDiagnostic("event=foreground_notification_closed outcome=connection_restored")
+                }
+                else -> {
+                    manager?.cancel(NOTIFICATION_ID)
+                    conversationDictationDiagnostic("event=foreground_notification_closed outcome=removed")
+                }
+            }
         }
     }
 
@@ -174,32 +190,7 @@ class ConversationDictationForegroundService : Service() {
             .setShowWhen(false)
             .setStyle(Notification.DecoratedCustomViewStyle())
             .setCustomContentView(compactControls(controller))
-            .setCustomBigContentView(dictationExpandedStatus(controller))
-            .addAction(
-                action(
-                    android.R.drawable.ic_menu_close_clear_cancel,
-                    R.string.cancel,
-                    ACTION_CANCEL,
-                    requireNotNull(controller.notificationSessionToken),
-                    !controller.deliveryInProgress,
-                ),
-            ).addAction(
-                action(
-                    android.R.drawable.ic_menu_edit,
-                    R.string.paste,
-                    ACTION_PASTE,
-                    requireNotNull(controller.notificationSessionToken),
-                    controller.completionActionsEnabled,
-                ),
-            ).addAction(
-                action(
-                    android.R.drawable.ic_menu_send,
-                    R.string.send,
-                    ACTION_SEND,
-                    requireNotNull(controller.notificationSessionToken),
-                    controller.completionActionsEnabled,
-                ),
-            ).build()
+            .build()
 
     /** Keeps safe actions on the compact surface even when Android chooses not to expand a notification. */
     private fun compactControls(controller: ConversationDictationController): RemoteViews {
@@ -239,23 +230,8 @@ class ConversationDictationForegroundService : Service() {
             }
     }
 
-    /** Creates one immutable foreground-service action without embedding conversation data. */
-    private fun action(
-        icon: Int,
-        labelRes: Int,
-        action: String,
-        sessionToken: String,
-        enabled: Boolean,
-    ): Notification.Action =
-        Notification.Action
-            .Builder(
-                Icon.createWithResource(this, icon),
-                getString(labelRes),
-                if (enabled) actionIntent(action, sessionToken) else null,
-            ).build()
-
     /** Returns a stable PendingIntent for a notification action owned by this service. */
-    private fun actionIntent(
+    internal fun actionIntent(
         action: String,
         sessionToken: String,
     ): PendingIntent =
@@ -358,9 +334,14 @@ class ConversationDictationForegroundService : Service() {
 
         /** Stops the service after the controller has released recognition ownership. */
         fun stop(context: Context) {
-            runCatching {
-                context.stopService(Intent(context, ConversationDictationForegroundService::class.java))
-            }
+            val result =
+                runCatching {
+                    context.stopService(Intent(context, ConversationDictationForegroundService::class.java))
+                }
+            conversationDictationDiagnostic(
+                "event=foreground_service_stop accepted=${result.getOrDefault(false)} " +
+                    "error=${result.exceptionOrNull()?.javaClass?.simpleName ?: "none"}",
+            )
         }
 
         /** Creates the low-importance, badge-free channel once per installation. */
@@ -380,12 +361,6 @@ class ConversationDictationForegroundService : Service() {
         }
     }
 }
-
-/** The expanded system actions remain the same intents; only phase text occupies custom content. */
-private fun Context.dictationExpandedStatus(controller: ConversationDictationController): RemoteViews =
-    RemoteViews(packageName, R.layout.notification_dictation_expanded).apply {
-        setTextViewText(R.id.dictation_notification_status, getString(dictationNotificationStatus(controller)))
-    }
 
 /** Describes actual readiness/finalization, never a model download or invented percentage. */
 private fun dictationNotificationStatus(controller: ConversationDictationController): Int =
