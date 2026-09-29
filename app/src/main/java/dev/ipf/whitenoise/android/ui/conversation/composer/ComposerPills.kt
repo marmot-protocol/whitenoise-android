@@ -1033,8 +1033,7 @@ internal fun ComposerPill(
                                                     ?.takeIf {
                                                         it.sourceText == value.text &&
                                                             it.transformedText == latestTransformedText
-                                                    }
-                                                    ?.let { snapshot ->
+                                                    }?.let { snapshot ->
                                                         val transformedOffset =
                                                             snapshot.result.getOffsetForPosition(position)
                                                         val originalOffset =
