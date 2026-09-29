@@ -8,6 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class PollSelectionTest {
+    /** Builds the native selection state used by replacement-vote cases. */
     private fun poll(
         type: PollTypeFfi,
         selection: List<String>,

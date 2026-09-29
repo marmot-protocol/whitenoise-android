@@ -14,6 +14,10 @@
     <string name="poll_single_choice">Escolha única</string>
     <string name="poll_multiple_choice">Múltipla escolha</string>
     <string name="poll_submit">Publicar enquete</string>
+    <string name="poll_deadline">A enquete termina</string>
+    <string name="poll_no_deadline">Sem prazo</string>
+    <string name="poll_30_days">30 dias</string>
+    <string name="poll_ends_at">Encerra em %1$s</string>
     <plurals name="poll_option_votes">
         <item quantity="one">%1$d voto</item>
         <item quantity="other">%1$d votos</item>

@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -45,6 +46,8 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import kotlinx.coroutines.delay
+import java.text.DateFormat
+import java.util.Date
 
 private const val POLL_ROW_MAX_WIDTH_FRACTION = 0.95f
 
@@ -157,6 +160,7 @@ internal fun PollCard(
     onVote: (String) -> Unit,
     open: Boolean = poll.open,
 ) {
+    val locale = LocalConfiguration.current.locales[0]
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -189,6 +193,14 @@ internal fun PollCard(
                 pluralStringResource(R.plurals.poll_participants, poll.participants.toInt(), poll.participants.toInt()),
                 style = MaterialTheme.typography.labelSmall,
             )
+            val endsAt = poll.endsAt
+            if (open && endsAt != null) {
+                val deadline =
+                    DateFormat
+                        .getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, locale)
+                        .format(Date(endsAt.toLong() * 1_000L))
+                Text(stringResource(R.string.poll_ends_at, deadline), style = MaterialTheme.typography.labelSmall)
+            }
             if (!open) Text(stringResource(R.string.poll_closed), style = MaterialTheme.typography.labelMedium)
         }
     }

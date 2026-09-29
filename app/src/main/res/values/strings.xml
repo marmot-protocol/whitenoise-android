@@ -14,6 +14,10 @@
     <string name="poll_single_choice">Single choice</string>
     <string name="poll_multiple_choice">Multiple choice</string>
     <string name="poll_submit">Post poll</string>
+    <string name="poll_deadline">Poll closes</string>
+    <string name="poll_no_deadline">No deadline</string>
+    <string name="poll_30_days">30 days</string>
+    <string name="poll_ends_at">Closes %1$s</string>
     <plurals name="poll_option_votes">
         <item quantity="one">%1$d vote</item>
         <item quantity="other">%1$d votes</item>

@@ -62,8 +62,17 @@ def build_attestation() -> dict[str, object]:
 
     endpoint = require("WHITENOISE_AUDIT_OTLP_ENDPOINT").strip()
     parsed_endpoint = urlparse(endpoint)
-    if parsed_endpoint.scheme != "https" or not parsed_endpoint.netloc or parsed_endpoint.path != "/v1/logs":
+    if (
+        parsed_endpoint.scheme != "https"
+        or not parsed_endpoint.hostname
+        or parsed_endpoint.path != "/v1/logs"
+        or "?" in endpoint
+        or "#" in endpoint
+        or parsed_endpoint.username is not None
+        or any(character.isspace() for character in endpoint)
+    ):
         raise ValueError("staging audit OTLP endpoint must be HTTPS /v1/logs")
+    parsed_endpoint.port  # Reject malformed authorities that Java URI would not accept as a host.
     endpoint_configured = True
     auth_configured = bool(require("WHITENOISE_AUDIT_OTLP_AUTH_TOKEN").strip())
     if not endpoint_configured or not auth_configured:

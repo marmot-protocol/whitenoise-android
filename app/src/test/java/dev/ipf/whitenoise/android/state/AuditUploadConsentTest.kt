@@ -257,6 +257,7 @@ class AuditUploadConsentTest {
             if (method.name == "commit") false else proxy
         } as SharedPreferences.Editor
 
+    /** Verifies a failed consent transition is surfaced instead of silently accepted. */
     private suspend fun expectFailure(action: suspend () -> Unit) {
         try {
             action()

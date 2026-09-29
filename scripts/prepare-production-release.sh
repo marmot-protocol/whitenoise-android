@@ -138,6 +138,32 @@ for runtime_name in \
     runtime_missing="$runtime_missing $runtime_name"
   fi
 done
+audit_otlp_endpoint="$(production_runtime_value WHITENOISE_AUDIT_OTLP_ENDPOINT)"
+if [[ -n "$audit_otlp_endpoint" ]] && ! python3 - "$audit_otlp_endpoint" <<'PY'
+import sys
+from urllib.parse import urlparse
+
+endpoint = sys.argv[1].strip()
+try:
+    parsed = urlparse(endpoint)
+    valid = (
+        parsed.scheme == "https"
+        and bool(parsed.hostname)
+        and parsed.path == "/v1/logs"
+        and "?" not in endpoint
+        and "#" not in endpoint
+        and parsed.username is None
+        and not any(character.isspace() for character in endpoint)
+    )
+    parsed.port  # Malformed ports are not valid Java URI hosts.
+except ValueError:
+    valid = False
+sys.exit(0 if valid else 1)
+PY
+then
+  echo "error: WHITENOISE_AUDIT_OTLP_ENDPOINT must be an HTTPS /v1/logs URL without user info, query, or fragment" >&2
+  exit 1
+fi
 push_pubkey="$(production_runtime_value WHITENOISE_PRODUCTION_PUSH_SERVER_PUBKEY_HEX)"
 if [[ -n "$push_pubkey" && ! "$push_pubkey" =~ ^[0-9a-fA-F]{64}$ ]]; then
   echo "error: WHITENOISE_PRODUCTION_PUSH_SERVER_PUBKEY_HEX must contain 64 hex characters" >&2

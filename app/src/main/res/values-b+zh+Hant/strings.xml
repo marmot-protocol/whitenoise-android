@@ -14,6 +14,10 @@
     <string name="poll_single_choice">單選</string>
     <string name="poll_multiple_choice">多選</string>
     <string name="poll_submit">發佈投票</string>
+    <string name="poll_deadline">投票結束時間</string>
+    <string name="poll_no_deadline">不設截止時間</string>
+    <string name="poll_30_days">30 天</string>
+    <string name="poll_ends_at">%1$s 結束</string>
     <plurals name="poll_option_votes">
         <item quantity="other">%1$d 票</item>
     </plurals>

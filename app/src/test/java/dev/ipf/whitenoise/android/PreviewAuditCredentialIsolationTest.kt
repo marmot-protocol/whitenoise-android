@@ -6,6 +6,7 @@ import org.junit.Test
 import java.io.File
 
 class PreviewAuditCredentialIsolationTest {
+    /** Preview builds must never inherit either v4 or v5 production audit credentials. */
     @Test
     fun previewFlavorKeepsAuditEndpointAndTokenEmpty() {
         val source = buildGradleSource()

@@ -14,6 +14,10 @@
     <string name="poll_single_choice">Один вариант</string>
     <string name="poll_multiple_choice">Несколько вариантов</string>
     <string name="poll_submit">Опубликовать опрос</string>
+    <string name="poll_deadline">Опрос завершится</string>
+    <string name="poll_no_deadline">Без срока</string>
+    <string name="poll_30_days">30 дней</string>
+    <string name="poll_ends_at">Завершится %1$s</string>
     <plurals name="poll_option_votes">
         <item quantity="one">%1$d голос</item>
         <item quantity="few">%1$d голоса</item>

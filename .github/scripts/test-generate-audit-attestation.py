@@ -80,6 +80,20 @@ class GenerateAuditAttestationTest(unittest.TestCase):
         self.assertNotEqual(0, result.returncode)
         self.assertEqual("", payload)
 
+    def test_rejects_v5_endpoint_with_unusable_authority_or_extra_url_parts(self) -> None:
+        for endpoint in (
+            "https://audit.invalid/v1/logs?key=1",
+            "https://audit.invalid/v1/logs?",
+            "https://audit.invalid/v1/logs#fragment",
+            "https://user:pass@audit.invalid/v1/logs",
+            "https://audit.invalid:bad/v1/logs",
+            "https:///v1/logs",
+        ):
+            with self.subTest(endpoint=endpoint):
+                result, payload = self.run_generator({"WHITENOISE_AUDIT_OTLP_ENDPOINT": endpoint})
+                self.assertNotEqual(0, result.returncode)
+                self.assertEqual("", payload)
+
     def test_rejects_untrusted_workflow_or_ref(self) -> None:
         for overrides in (
             {"GITHUB_WORKFLOW": "Android CI"},

@@ -68,12 +68,14 @@ class PollScreenshotTest {
                         question = "Where should we meet?",
                         options = listOf("Coffee shop", "Library"),
                         multiple = false,
+                        deadlineDurationSeconds = 86_400L,
                         enabled = true,
                         onQuestionChange = {},
                         onOptionChange = { _, _ -> },
                         onRemoveOption = {},
                         onAddOption = {},
                         onMultipleChange = {},
+                        onDeadlineChange = {},
                     )
                 }
             }
@@ -94,12 +96,14 @@ class PollScreenshotTest {
                             question = "Where should we meet?",
                             options = listOf("Coffee shop", "Library"),
                             multiple = true,
+                            deadlineDurationSeconds = null,
                             enabled = true,
                             onQuestionChange = {},
                             onOptionChange = { _, _ -> },
                             onRemoveOption = {},
                             onAddOption = {},
                             onMultipleChange = {},
+                            onDeadlineChange = {},
                         )
                     }
                 }
@@ -108,12 +112,13 @@ class PollScreenshotTest {
         composeRule
             .onNodeWithTag("poll-create-form")
             .captureRoboImage("src/test/snapshots/poll_create_form_large_rtl.png")
-        composeRule.onNodeWithText("Multiple choice").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("30 days").performScrollTo().assertIsDisplayed()
         composeRule
             .onNodeWithTag("poll-create-form")
             .captureRoboImage("src/test/snapshots/poll_create_form_large_rtl_choices.png")
     }
 
+    /** Shared native projection fixture with two options and a selected vote. */
     private fun poll() =
         PollProjectionFfi(
             question = "Where should we meet?",

@@ -18,19 +18,20 @@ internal class AuditRuntimeReadinessMarker(
 ) {
     private val emitted = AtomicBoolean(false)
 
+    /** Writes the one-time marker only for a started recorder with an enabled v5 upload route. */
     fun emitAfterRuntimeStarted(
         required: Boolean,
         packageName: String,
-        endpoint: String?,
-        authorizationBearerToken: String?,
+        uploadConfig: AuditOtlpConfigV5Ffi,
         dataMode: String,
         recorderStarted: Boolean,
     ): Boolean {
         val ready =
             required &&
                 recorderStarted &&
-                !endpoint.isNullOrBlank() &&
-                !authorizationBearerToken.isNullOrBlank() &&
+                uploadConfig.enabled &&
+                !uploadConfig.endpoint.isNullOrBlank() &&
+                !uploadConfig.authorizationBearerToken.isNullOrBlank() &&
                 dataMode == AUDIT_RUNTIME_DATA_MODE
         if (!ready || !emitted.compareAndSet(false, true)) return false
 
@@ -104,13 +105,20 @@ internal fun auditOtlpConfigV5(
     )
 }
 
-internal suspend fun MarmotInterface.emitAuditRuntimeReadinessAfterStart() {
+/** Emits readiness only when the consented v5 sender and recorder can actually run. */
+internal suspend fun MarmotInterface.emitAuditRuntimeReadinessAfterStart(uploadConsentGranted: Boolean) {
     if (!BuildConfig.WHITENOISE_AUDIT_RUNTIME_REQUIRED) return
+    val uploadConfig =
+        auditOtlpConfigV5(
+            uploadConsentGranted = uploadConsentGranted,
+            endpoint = BuildConfig.WHITENOISE_AUDIT_OTLP_ENDPOINT,
+            authorizationBearerToken = BuildConfig.WHITENOISE_AUDIT_OTLP_AUTH_TOKEN,
+            deploymentEnvironment = BuildConfig.WHITENOISE_DEPLOYMENT_ENVIRONMENT,
+        )
     processAuditRuntimeReadinessMarker.emitAfterRuntimeStarted(
         required = BuildConfig.WHITENOISE_AUDIT_RUNTIME_REQUIRED,
         packageName = BuildConfig.APPLICATION_ID,
-        endpoint = BuildConfig.WHITENOISE_AUDIT_OTLP_ENDPOINT.takeIf(String::isNotBlank),
-        authorizationBearerToken = BuildConfig.WHITENOISE_AUDIT_OTLP_AUTH_TOKEN.takeIf(String::isNotBlank),
+        uploadConfig = uploadConfig,
         dataMode = BuildConfig.WHITENOISE_AUDIT_DATA_MODE,
         recorderStarted = auditLogSettings().enabled,
     )

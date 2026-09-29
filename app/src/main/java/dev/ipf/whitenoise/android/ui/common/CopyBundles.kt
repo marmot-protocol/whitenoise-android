@@ -34,6 +34,7 @@ internal fun rememberGroupTitleCopy(): GroupTitleCopy =
         unavailableConversationTitle = stringResource(R.string.conversation_unavailable),
     )
 
+/** Resolves localized message labels once for both conversation and chat-list projections. */
 @Composable
 internal fun rememberMessageTextCopy(): MessageTextCopy =
     MessageTextCopy(

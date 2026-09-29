@@ -165,6 +165,7 @@ object MessageProjector {
     private const val StreamHashTag = "stream-hash"
     private val RestrictedMediaForwardingTags = setOf("view_once", "view-once")
 
+    /** Returns safe bubble copy for special records, including projected polls and system events. */
     fun displayBody(
         message: AppMessageRecordFfi,
         copy: MessageTextCopy = MessageTextCopy.Default,
@@ -183,6 +184,7 @@ object MessageProjector {
             else -> message.plaintext
         }
 
+    /** Builds chat-list copy without exposing raw poll, system-event, or media envelope payloads. */
     fun previewText(
         message: AppMessageRecordFfi?,
         copy: MessageTextCopy = MessageTextCopy.Default,

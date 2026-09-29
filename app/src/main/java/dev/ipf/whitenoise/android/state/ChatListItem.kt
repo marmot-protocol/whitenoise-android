@@ -361,6 +361,7 @@ data class ChatListItem(
     /** Projected conversation kind first, presentation headcount heuristic as fallback. */
     fun isDm(): Boolean = GroupProjector.isDm(projection?.conversationKind, presentationMemberCount, group.name)
 
+    /** Converts the latest native projection to chat-list copy without rendering poll wire data. */
     fun projectedPreviewText(
         copy: MessageTextCopy = MessageTextCopy.Default,
         empty: String = "No messages yet",

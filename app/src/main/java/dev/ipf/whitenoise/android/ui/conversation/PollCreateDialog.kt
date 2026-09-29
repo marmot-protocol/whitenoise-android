@@ -16,6 +16,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -27,21 +28,27 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.PollTypeFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.MAX_POLL_DEADLINE_SECONDS
 import dev.ipf.whitenoise.android.state.MAX_POLL_OPTIONS
+import dev.ipf.whitenoise.android.state.POLL_DAY_SECONDS
+import dev.ipf.whitenoise.android.state.POLL_HOUR_SECONDS
+import dev.ipf.whitenoise.android.state.POLL_WEEK_SECONDS
 
 /** Edits a short poll draft; MDK remains the only owner of published poll state. */
 @Composable
 @Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
 internal fun PollCreateDialog(
     onDismiss: () -> Unit,
-    onSubmit: (String, List<String>, PollTypeFfi, (Boolean) -> Unit) -> Unit,
+    onSubmit: (String, List<String>, PollTypeFfi, Long?, (Boolean) -> Unit) -> Unit,
 ) {
     var question by rememberSaveable { mutableStateOf("") }
     var options by rememberSaveable { mutableStateOf(listOf("", "")) }
     var multiple by rememberSaveable { mutableStateOf(false) }
+    var deadlineDurationSeconds by rememberSaveable { mutableStateOf<Long?>(null) }
     var submitting by remember { mutableStateOf(false) }
     val valid = question.isNotBlank() && options.size in 2..MAX_POLL_OPTIONS && options.all { it.isNotBlank() }
     AlertDialog(
@@ -52,12 +59,14 @@ internal fun PollCreateDialog(
                 question = question,
                 options = options,
                 multiple = multiple,
+                deadlineDurationSeconds = deadlineDurationSeconds,
                 enabled = !submitting,
                 onQuestionChange = { question = it },
                 onOptionChange = { index, value -> options = options.toMutableList().also { it[index] = value } },
                 onRemoveOption = { index -> options = options.filterIndexed { i, _ -> i != index } },
                 onAddOption = { options = options + "" },
                 onMultipleChange = { multiple = it },
+                onDeadlineChange = { deadlineDurationSeconds = it },
             )
         },
         confirmButton = {
@@ -69,6 +78,7 @@ internal fun PollCreateDialog(
                         question,
                         options,
                         if (multiple) PollTypeFfi.MULTIPLE_CHOICE else PollTypeFfi.SINGLE_CHOICE,
+                        deadlineDurationSeconds,
                     ) { created ->
                         submitting = false
                         if (created) onDismiss()
@@ -90,12 +100,14 @@ internal fun PollCreateForm(
     question: String,
     options: List<String>,
     multiple: Boolean,
+    deadlineDurationSeconds: Long?,
     enabled: Boolean,
     onQuestionChange: (String) -> Unit,
     onOptionChange: (Int, String) -> Unit,
     onRemoveOption: (Int) -> Unit,
     onAddOption: () -> Unit,
     onMultipleChange: (Boolean) -> Unit,
+    onDeadlineChange: (Long?) -> Unit,
 ) {
     Column(
         Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState()),
@@ -148,6 +160,43 @@ internal fun PollCreateForm(
                 selected = multiple,
                 onClick = { onMultipleChange(true) },
                 label = { Text(stringResource(R.string.poll_multiple_choice)) },
+                enabled = enabled,
+            )
+        }
+        PollDeadlineChoices(deadlineDurationSeconds, enabled, onDeadlineChange)
+    }
+}
+
+/** Lets the creator choose when a new poll will close, including no deadline. */
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
+private fun PollDeadlineChoices(
+    selectedDurationSeconds: Long?,
+    enabled: Boolean,
+    onSelect: (Long?) -> Unit,
+) {
+    Text(stringResource(R.string.poll_deadline))
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        listOf(
+            null to R.string.poll_no_deadline,
+            POLL_HOUR_SECONDS to R.string.mute_duration_1_hour,
+            POLL_DAY_SECONDS to R.string.mute_duration_1_day,
+            POLL_WEEK_SECONDS to R.string.mute_duration_1_week,
+            MAX_POLL_DEADLINE_SECONDS to R.string.poll_30_days,
+        ).forEach { (duration, label) ->
+            FilterChip(
+                selected = selectedDurationSeconds == duration,
+                onClick = { onSelect(duration) },
+                label = {
+                    Text(
+                        stringResource(label),
+                        style = LocalTextStyle.current.copy(textDirection = TextDirection.Content),
+                    )
+                },
                 enabled = enabled,
             )
         }
