@@ -22,6 +22,7 @@ import kotlin.math.abs
  * the platform owns caret placement, selection and paste again. Mouse and stylus input pass
  * through unchanged. The outer reading-scroll owner still sees early vertical drags first.
  */
+@Suppress("CyclomaticComplexMethod")
 internal suspend fun PointerInputScope.composerUnfocusedTouchFocusGestures(onTap: (Offset) -> Unit) {
     val touchSlop = viewConfiguration.touchSlop
     val longPressTimeoutMillis = viewConfiguration.longPressTimeoutMillis
