@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="poll_custom_time">自定义时间</string>
+    <string name="poll_custom_duration">时长</string>
+    <string name="poll_unit_seconds">秒</string>
+    <string name="poll_unit_minutes">分钟</string>
+    <string name="poll_unit_hours">小时</string>
+    <string name="poll_unit_days">天</string>
+    <string name="poll_custom_duration_error">请输入 1 秒至 30 天范围内的整数。</string>
+    <string name="poll_custom_preview">投票将在发布后 %1$s 结束。</string>
+    <string name="poll_cancel_custom_time">使用之前的截止时间</string>
     <string name="app_name">White Noise</string>
     <string name="poll_preview">投票</string>
     <string name="poll_unsupported">无法显示此投票</string>

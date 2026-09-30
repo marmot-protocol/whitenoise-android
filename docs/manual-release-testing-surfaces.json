@@ -9110,19 +9110,19 @@
         "surface": "PollCreateDialog",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
         "anchor": "fun PollCreateDialog(",
-        "test_ids": ["MSG-021"]
+        "test_ids": ["MSG-021", "MSG-023"]
       },
       {
         "surface": "PollCreateForm",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
         "anchor": "internal fun PollCreateForm(",
-        "test_ids": ["MSG-021"]
+        "test_ids": ["MSG-021", "MSG-023"]
       },
       {
         "surface": "PollDeadlineChoices",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
         "anchor": "private fun PollDeadlineChoices(",
-        "test_ids": ["MSG-021"]
+        "test_ids": ["MSG-021", "MSG-023"]
       },
       {
         "surface": "Group poll composer action",

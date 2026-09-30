@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="poll_custom_time">Özel süre</string>
+    <string name="poll_custom_duration">Süre</string>
+    <string name="poll_unit_seconds">Saniye</string>
+    <string name="poll_unit_minutes">Dakika</string>
+    <string name="poll_unit_hours">Saat</string>
+    <string name="poll_unit_days">Gün</string>
+    <string name="poll_custom_duration_error">1 saniye ile 30 gün arasında bir tam sayı girin.</string>
+    <string name="poll_custom_preview">Anket yayımlandıktan %1$s sonra kapanır.</string>
+    <string name="poll_cancel_custom_time">Önceki süreyi kullan</string>
     <string name="app_name">White Noise</string>
     <string name="poll_preview">Anket</string>
     <string name="poll_unsupported">Bu anket görüntülenemiyor</string>

@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="poll_custom_time">Custom time</string>
+    <string name="poll_custom_duration">Duration</string>
+    <string name="poll_unit_seconds">Seconds</string>
+    <string name="poll_unit_minutes">Minutes</string>
+    <string name="poll_unit_hours">Hours</string>
+    <string name="poll_unit_days">Days</string>
+    <string name="poll_custom_duration_error">Enter a whole number from 1 second to 30 days.</string>
+    <string name="poll_custom_preview">Poll closes %1$s after posting.</string>
+    <string name="poll_cancel_custom_time">Use previous deadline</string>
     <string name="app_name">White Noise</string>
     <string name="poll_preview">Poll</string>
     <string name="poll_unsupported">This poll cannot be displayed</string>

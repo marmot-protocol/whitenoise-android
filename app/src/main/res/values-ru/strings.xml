@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="poll_custom_time">Своя длительность</string>
+    <string name="poll_custom_duration">Длительность</string>
+    <string name="poll_unit_seconds">Секунды</string>
+    <string name="poll_unit_minutes">Минуты</string>
+    <string name="poll_unit_hours">Часы</string>
+    <string name="poll_unit_days">Дни</string>
+    <string name="poll_custom_duration_error">Введите целое число от 1 секунды до 30 дней.</string>
+    <string name="poll_custom_preview">Опрос завершится через %1$s после публикации.</string>
+    <string name="poll_cancel_custom_time">Вернуться к прежнему сроку</string>
     <string name="app_name">White Noise</string>
     <string name="poll_preview">Опрос</string>
     <string name="poll_unsupported">Не удалось показать этот опрос</string>

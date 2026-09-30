@@ -18,6 +18,8 @@ class PollDeadlineTest {
     fun thirtyDayDeadlineUsesSendTime() {
         assertEquals(1_702_592_000uL, pollDeadlineEpochSeconds(MAX_POLL_DEADLINE_SECONDS, 1_700_000_000_999L))
         assertEquals(1_700_000_300uL, pollDeadlineEpochSeconds(POLL_FIVE_MINUTES_SECONDS, 1_700_000_000_999L))
+        val customDuration = 37L * 60L
+        assertEquals(1_700_002_220uL, pollDeadlineEpochSeconds(customDuration, 1_700_000_000_999L))
     }
 
     /** Invalid or overlong choices never reach the native poll API. */
