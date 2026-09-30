@@ -24035,6 +24035,25 @@
         ]
       },
       {
+        "surface": "Chat-list retirement fences queued native commands and late replacements",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatListWindows.kt",
+        "anchor": "private suspend fun command(",
+        "test_ids": [
+          "CHL-016",
+          "CHL-005",
+          "NAV-006"
+        ]
+      },
+      {
+        "surface": "Chat-list native handles outlive admitted calls while receive workers cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatListWindowLifetime.kt",
+        "anchor": "internal class ChatListWindowLifetime(",
+        "test_ids": [
+          "CHL-016",
+          "NAV-006"
+        ]
+      },
+      {
         "surface": "Direct-message headers prefer the viewer's private contact nickname",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/core/ConversationHeaderTitle.kt",
         "anchor": "internal fun conversationHeaderTitle(",

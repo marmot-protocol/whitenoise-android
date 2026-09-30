@@ -41,7 +41,7 @@ internal interface ChatListWindowHandle {
     /** Returns the window to the top of the view and resumes following new activity. */
     suspend fun returnToTop(sequence: ULong): ChatListWindowSnapshotFfi
 
-    /** Releases this handle and unblocks any pending receive. */
+    /** Releases this wrapper. Its owner must cancel pending receives; native destruction alone may not wake them. */
     fun close()
 }
 
