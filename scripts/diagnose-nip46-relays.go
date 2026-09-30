@@ -37,6 +37,7 @@ type roundResult struct {
 	Error      string `json:"error,omitempty"`
 	Replies    int    `json:"replies_published"`
 	Stored     string `json:"replies_stored_on_relays,omitempty"`
+	Refusals   string `json:"relay_refusals,omitempty"`
 	ClientLogs string `json:"client_log"`
 }
 
@@ -144,6 +145,7 @@ func run(relays []string, roundsText, outputDir string) error {
 	// certainly listening before any client runs.
 	connected := make([]*nostr.Relay, 0, len(relays))
 	subs := make([]*nostr.Subscription, 0, len(relays))
+	var listening []string
 	now := nostr.Now()
 	for _, address := range relays {
 		relay, err := nostr.RelayConnect(ctx, address, nostr.WithNoticeHandler(func(notice string) {
@@ -160,15 +162,22 @@ func run(relays []string, roundsText, outputDir string) error {
 		select {
 		case <-sub.EndOfStoredEvents:
 		case reason := <-sub.ClosedReason:
-			return fmt.Errorf("%s closed the responder subscription: %s", address, reason)
+			// A refusal here is itself a finding; keep listening on the others.
+			fmt.Printf("responder: %s refused the subscription: %s\n", address, reason)
+			continue
 		case <-time.After(20 * time.Second):
-			return fmt.Errorf("%s did not confirm the responder subscription", address)
+			fmt.Printf("responder: %s did not confirm the subscription\n", address)
+			continue
 		}
 		connected = append(connected, relay)
 		subs = append(subs, sub)
+		listening = append(listening, address)
+	}
+	if len(subs) == 0 {
+		return fmt.Errorf("no relay accepted the responder subscription")
 	}
 	for i, sub := range subs {
-		go r.serve(ctx, relays[i], sub, signerKey, connected)
+		go r.serve(ctx, listening[i], sub, signerKey, connected)
 	}
 	// The go-nostr static signer accepts any secret; that is fine for a throwaway key.
 	query := url.Values{"secret": {"diagnostic"}}
@@ -195,6 +204,9 @@ func run(relays []string, roundsText, outputDir string) error {
 		}
 		fmt.Printf("round %02d: %-22s connect=%dms get_public_key=%dms sign=%dms replies_published=%d %s\n",
 			round, status, result.ConnectMS, result.PubkeyMS, result.SignMS, result.Replies, result.Stored)
+		if result.Refusals != "" {
+			fmt.Printf("          relay refusals seen by client: %s\n", result.Refusals)
+		}
 	}
 	summary, _ := json.MarshalIndent(results, "", "  ")
 	if err := os.WriteFile(filepath.Join(outputDir, "results.json"), summary, 0o644); err != nil {
@@ -289,7 +301,25 @@ func runClient(ctx context.Context, round int, bunkerURI, clientKey, logPath str
 		result.Error = "client produced no result"
 	}
 	result.Round, result.ClientLogs = round, filepath.Base(logPath)
+	result.Refusals = refusals(logPath)
 	return result
+}
+
+// refusals lists CLOSED and NOTICE frames from the client's relay log.
+func refusals(logPath string) string {
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		return ""
+	}
+	var found []string
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.Contains(line, `received ["CLOSED"`) || strings.Contains(line, `received ["NOTICE"`) {
+			if start := strings.Index(line, "{"); start >= 0 {
+				found = append(found, line[start:])
+			}
+		}
+	}
+	return strings.Join(found, "; ")
 }
 
 // storedReplies asks each relay, with a fresh connection and no limit, for
