@@ -220,9 +220,13 @@ gh workflow run android-release-distribute.yml --ref master \
 ```
 
 Record this separate distribution run ID, approve `google-play-internal` through
-the authorized reviewer, and wait for success. In Play Console, confirm the
-internal release's version code/name, **Available to internal testers** status,
-and attached mapping file; confirm the production track is unchanged. Retain
+the authorized reviewer, and wait for success. The workflow commits the edit
+without sending it for review, so the internal release waits in Play Console's
+**Publishing overview** under **Changes not yet sent for review**. Read that
+whole list first: **Send for review** submits every change in it, not only this
+internal release. After sending, confirm the internal release's version
+code/name, **Available to internal testers** status, and attached mapping file;
+confirm the production track is unchanged. Retain
 the build/distribution URLs, run attempts, manifest digest, artifact hashes, and
 Console readback with the release evidence. Keep receipts outside the candidate
 directory: its verified file inventory must remain exact.
@@ -289,11 +293,12 @@ candidate bytes are never replaced. Publishing the draft publicly remains a
 separate deliberate action after qualification.
 
 Play uploads the reviewed AAB and mapping, with release notes, to internal
-testing as a completed internal release. The workflow commits the edit with
-`changesNotSentForReview`, because Play rejects automatic submission while other
-changes await review. If Console shows the internal release under
-**Changes not yet sent for review**, send it from **Publishing overview**; testers
-receive it once it is live.
+testing as a completed internal release. The workflow always commits the edit
+with `changesNotSentForReview`, because Play rejects automatic submission while
+other changes await review. Every successful upload therefore stops under
+**Changes not yet sent for review**; testers receive it only after the operator
+sends it from **Publishing overview**. That send submits every listed change, so
+review the full list before sending.
 Verify the actual Play track/version and delivered signing lineage in Console.
 If upload fails or a version code was already used, inspect Play before retrying;
 this workflow does not automatically allocate a new code or promote any track.
