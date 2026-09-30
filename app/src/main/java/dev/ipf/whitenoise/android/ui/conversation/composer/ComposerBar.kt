@@ -857,9 +857,11 @@ internal fun ComposerBar(
     // onAccepted, so the pre-edit composer is restored instead.
     var attachmentSendInFlight by remember(draftKey) { mutableStateOf(false) }
     val submitMessage: () -> Unit = {
+        // An IME can commit text and request Send before the next composition.
+        // Eligibility and submission must use the same live editor content.
+        val acceptanceToken = textState.acceptanceToken()
         if (hasPendingAttachments && editingMessageId == null) {
             if (!attachmentsPreparing && !attachmentSendInFlight && onSendAttachments != null) {
-                val acceptanceToken = textState.acceptanceToken()
                 attachmentSendInFlight = true
                 var dispatched = false
                 try {
@@ -875,11 +877,8 @@ internal fun ComposerBar(
                     if (!dispatched) attachmentSendInFlight = false
                 }
             }
-        } else if (textState.valueState.value.text.isNotBlank()) {
-            // An IME can commit text and request Send before the next composition.
-            // Read the live editor state, just as the acceptance token does below.
+        } else if (acceptanceToken.text.isNotBlank()) {
             val sendingEdit = editingMessageId != null
-            val acceptanceToken = textState.acceptanceToken()
             onSend(acceptanceToken.text) {
                 if (!sendingEdit) {
                     // onAccepted can land after the user has started typing the
