@@ -352,7 +352,8 @@ internal fun GroupDetailsScreen(
         // record enables administration on the first frame; the invite commit
         // still requires the authoritative roster inside the controller.
         val canAdministerMembers =
-            !isDm && canEdit &&
+            !isDm &&
+                canEdit &&
                 memberAdministrationPresentable(controller.memberRosterState, controller.seededSelfMember)
         val mutationsBlocked = activeMutation != null || controller.mutationInFlight
         val detailsOpenedAtMs = remember(controller.group.groupIdHex) { SystemClock.elapsedRealtime() }

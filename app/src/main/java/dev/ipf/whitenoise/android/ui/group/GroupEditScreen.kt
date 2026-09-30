@@ -79,8 +79,7 @@ import kotlinx.coroutines.CancellationException
  * become the group's public avatar.
  */
 @Suppress("MaxLineLength")
-internal fun safeAvatarUploadUrl(url: String): String =
-    ProfileSanitizer.androidOwnedHttpsImageUrl(url) ?: error("unsafe upload URL")
+internal fun safeAvatarUploadUrl(url: String): String = ProfileSanitizer.androidOwnedHttpsImageUrl(url) ?: error("unsafe upload URL")
 
 /** The name field accepts emoji only for an admin while no save or mutation runs. */
 internal fun groupNameEmojiEditable(
