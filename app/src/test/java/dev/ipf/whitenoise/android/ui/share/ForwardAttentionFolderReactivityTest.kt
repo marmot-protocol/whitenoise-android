@@ -165,21 +165,20 @@ class ForwardAttentionFolderReactivityTest {
         appState: WhiteNoiseAppState,
         ownerRef: String,
         rule: ChatFolderRule,
-    ) =
-        appState.chatFolderPreferences.let { store ->
-            store.clearAllForAccount(ownerRef)
-            store.foldersFor(ownerRef)
-            requireNotNull(
-                store.commitFolderDraft(
-                    accountRef = ownerRef,
-                    folderId = null,
-                    name = "$ownerRef mentions",
-                    description = "",
-                    manualChatIds = emptySet(),
-                    rule = rule,
-                ),
-            )
-        }
+    ) = appState.chatFolderPreferences.let { store ->
+        store.clearAllForAccount(ownerRef)
+        store.foldersFor(ownerRef)
+        requireNotNull(
+            store.commitFolderDraft(
+                accountRef = ownerRef,
+                folderId = null,
+                name = "$ownerRef mentions",
+                description = "",
+                manualChatIds = emptySet(),
+                rule = rule,
+            ),
+        )
+    }
 
     private fun renderPicker(
         appState: WhiteNoiseAppState,
