@@ -245,7 +245,15 @@ internal fun rememberChatListConnectivityState(
         if (presentation != renderedPresentation) presentation = renderedPresentation
     }
     val foregroundEpoch = rememberConnectivityForegroundEpoch()
-    RelayConnectivityPollingEffect(appState, controller, renderedPresentation.displayed, foregroundEpoch)
+    RelayConnectivityPollingEffect(
+        effectOwner = controller,
+        displayed = renderedPresentation.displayed,
+        foregroundEpoch = foregroundEpoch,
+        connectivitySignals = { appState.connectivitySignals.value },
+        relaysConnectedFlow = appState.connectivitySignals.map { it.relaysConnected },
+        refreshRelayConnectivity = appState::refreshRelayConnectivity,
+        revalidateConnectionReadiness = controller::revalidateConnectionReadiness,
+    )
     ValidatedInternetRefreshEffect(appState, controller, activeAccountRef, runtimeGeneration)
     ConnectivityEdgeRefreshEffects(
         effectOwner = controller,
