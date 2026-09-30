@@ -183,10 +183,11 @@ class ChatFolderEditScreenTest {
         val label = app.getString(R.string.chat_folder_unread_mentions_only)
         composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasText(label))
         composeRule.onNodeWithText(label).performClick()
-        val original = appState.chatFolderPreferences.folderRule(
-            ACCOUNT_REF,
-            ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID,
-        )
+        val original =
+            appState.chatFolderPreferences.folderRule(
+                ACCOUNT_REF,
+                ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID,
+            )
         assertEquals(false, original?.unreadMentionsOnly)
         composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
         composeRule.onNodeWithText(app.getString(R.string.folder_keep_editing)).performClick()
