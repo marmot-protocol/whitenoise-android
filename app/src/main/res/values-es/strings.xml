@@ -601,6 +601,9 @@
     <string name="native_push_missing_server_subtitle">Las notificaciones push no están disponibles porque esta compilación no tiene un servidor push configurado.</string>
     <string name="native_push_google_play_unavailable_subtitle">Las notificaciones push requieren servicios de Google Play compatibles en este dispositivo.</string>
     <string name="native_push_firebase_unavailable_subtitle">Las notificaciones push no están disponibles porque Firebase no está configurado o no se pudo inicializar.</string>
+    <string name="namecoin_lookup_resolving">Buscando el nombre de Namecoin.</string>
+    <string name="namecoin_resolve_failed">No se pudo resolver %1$s en Namecoin. Compruébalo e inténtalo de nuevo.</string>
+    <string name="namecoin_resolvers_unavailable">No se pudieron alcanzar los resolutores de Namecoin. Inténtalo de nuevo.</string>
     <string name="notification_categories">Categorías de notificaciones</string>
     <string name="notification_scope_default_all_chats">Usar valor predeterminado global</string>
     <string name="notification_scope_custom_chat">Personalizado para este chat</string>
@@ -1513,7 +1516,7 @@
     <string name="next">Siguiente</string>
     <string name="no_matches">Sin coincidencias</string>
     <string name="new_message">Nuevo mensaje</string>
-    <string name="search_people_hint">Nombre, dirección de Nostr o npub</string>
+    <string name="search_people_hint">Nombre, dirección de Nostr, npub o .bit</string>
     <string name="user_search_searching">Buscando en la red…</string>
     <string name="user_search_incomplete">Puede que falten algunos resultados de la red.</string>
     <string name="user_search_failed">No se pudo buscar en la red. Comprueba tu conexión e inténtalo de nuevo.</string>
@@ -2177,7 +2180,7 @@
     <string name="folder_included_chats">Chats incluidos</string>
     <string name="chats">Conversaciones</string>
     <string name="manage_folders">Gestionar carpetas</string>
-    <string name="new_message_name_or_npub">Nombre o npub</string>
+    <string name="new_message_name_or_npub">Nombre, npub o .bit</string>
     <string name="new_message_connect_qr">Conectar con QR</string>
     <string name="new_message_invite_friend">Invitar a un amigo</string>
     <string name="new_message_talk_to_agent">Habla con tu agente</string>

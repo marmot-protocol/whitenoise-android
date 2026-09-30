@@ -588,6 +588,9 @@
     <string name="native_push_missing_server_subtitle">此构建版本未配置推送服务器，因此无法使用推送通知。</string>
     <string name="native_push_google_play_unavailable_subtitle">推送通知需要此设备提供兼容的 Google Play 服务。</string>
     <string name="native_push_firebase_unavailable_subtitle">Firebase 未配置或无法初始化，因此无法使用推送通知。</string>
+    <string name="namecoin_lookup_resolving">正在查找 Namecoin 名称。</string>
+    <string name="namecoin_resolve_failed">无法在 Namecoin 上解析 %1$s。请检查后重试。</string>
+    <string name="namecoin_resolvers_unavailable">无法连接到 Namecoin 解析器。请重试。</string>
     <string name="notification_categories">通知类别</string>
     <string name="notification_scope_default_all_chats">使用全局默认设置</string>
     <string name="notification_scope_custom_chat">为此聊天自定义</string>
@@ -1499,7 +1502,7 @@
     <string name="next">下一步</string>
     <string name="no_matches">无匹配结果</string>
     <string name="new_message">新消息</string>
-    <string name="search_people_hint">姓名、Nostr 地址或 npub</string>
+    <string name="search_people_hint">姓名、Nostr 地址、npub 或 .bit</string>
     <string name="user_search_searching">正在搜索网络…</string>
     <string name="user_search_incomplete">部分网络结果可能缺失。</string>
     <string name="user_search_failed">无法搜索网络。请检查网络连接后重试。</string>
@@ -2149,7 +2152,7 @@
     <string name="folder_included_chats">已包含的聊天</string>
     <string name="chats">聊天</string>
     <string name="manage_folders">管理文件夹</string>
-    <string name="new_message_name_or_npub">名称或 npub</string>
+    <string name="new_message_name_or_npub">名称、npub 或 .bit</string>
     <string name="new_message_connect_qr">通过二维码连接</string>
     <string name="new_message_invite_friend">邀请好友</string>
     <string name="new_message_talk_to_agent">与你的智能体交谈</string>

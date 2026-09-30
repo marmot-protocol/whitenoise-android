@@ -601,6 +601,9 @@
     <string name="native_push_missing_server_subtitle">Les notifications push sont indisponibles, car aucun serveur push n’est configuré dans cette version.</string>
     <string name="native_push_google_play_unavailable_subtitle">Les notifications push nécessitent des services Google Play compatibles sur cet appareil.</string>
     <string name="native_push_firebase_unavailable_subtitle">Les notifications push sont indisponibles, car Firebase n\'est pas configuré ou n\'a pas pu être initialisé.</string>
+    <string name="namecoin_lookup_resolving">Recherche du nom Namecoin en cours.</string>
+    <string name="namecoin_resolve_failed">Impossible de résoudre %1$s sur Namecoin. Vérifiez-le et réessayez.</string>
+    <string name="namecoin_resolvers_unavailable">Impossible de joindre les résolveurs Namecoin. Veuillez réessayer.</string>
     <string name="notification_categories">Catégories de notifications</string>
     <string name="notification_scope_default_all_chats">Utiliser le réglage global</string>
     <string name="notification_scope_custom_chat">Personnalisé pour cette discussion</string>
@@ -1526,7 +1529,7 @@
     <string name="next">Suivant</string>
     <string name="no_matches">Aucun résultat</string>
     <string name="new_message">Nouveau message</string>
-    <string name="search_people_hint">Nom, adresse Nostr ou npub</string>
+    <string name="search_people_hint">Nom, adresse Nostr, npub ou .bit</string>
     <string name="user_search_searching">Recherche sur le réseau…</string>
     <string name="user_search_incomplete">Certains résultats du réseau peuvent manquer.</string>
     <string name="user_search_failed">Impossible d’effectuer la recherche sur le réseau. Vérifiez votre connexion et réessayez.</string>
@@ -2177,7 +2180,7 @@
     <string name="folder_included_chats">Discussions incluses</string>
     <string name="chats">Discussions</string>
     <string name="manage_folders">Gérer les dossiers</string>
-    <string name="new_message_name_or_npub">Nom ou npub</string>
+    <string name="new_message_name_or_npub">Nom, npub ou .bit</string>
     <string name="new_message_connect_qr">Se connecter avec un QR</string>
     <string name="new_message_invite_friend">Inviter un ami</string>
     <string name="new_message_talk_to_agent">Parler à votre agent</string>

@@ -601,6 +601,9 @@
     <string name="native_push_missing_server_subtitle">As notificações push não estão disponíveis porque esta compilação não tem um servidor push configurado.</string>
     <string name="native_push_google_play_unavailable_subtitle">As notificações push requerem serviços Google Play compatíveis neste dispositivo.</string>
     <string name="native_push_firebase_unavailable_subtitle">As notificações push não estão disponíveis porque o Firebase não está configurado ou não pôde ser inicializado.</string>
+    <string name="namecoin_lookup_resolving">Procurando o nome Namecoin.</string>
+    <string name="namecoin_resolve_failed">Não foi possível resolver %1$s no Namecoin. Verifique e tente novamente.</string>
+    <string name="namecoin_resolvers_unavailable">Não foi possível alcançar os resolvedores de Namecoin. Tente novamente.</string>
     <string name="notification_categories">Categorias de notificações</string>
     <string name="notification_scope_default_all_chats">Usar padrão global</string>
     <string name="notification_scope_custom_chat">Personalizado para esta conversa</string>
@@ -1513,7 +1516,7 @@
     <string name="next">Avançar</string>
     <string name="no_matches">Sem resultados</string>
     <string name="new_message">Nova mensagem</string>
-    <string name="search_people_hint">Nome, endereço Nostr ou npub</string>
+    <string name="search_people_hint">Nome, endereço Nostr, npub ou .bit</string>
     <string name="user_search_searching">Pesquisando na rede…</string>
     <string name="user_search_incomplete">Alguns resultados da rede podem estar ausentes.</string>
     <string name="user_search_failed">Não foi possível pesquisar na rede. Verifique sua conexão e tente novamente.</string>
@@ -2177,7 +2180,7 @@
     <string name="folder_included_chats">Conversas incluídas</string>
     <string name="chats">Conversas</string>
     <string name="manage_folders">Gerir pastas</string>
-    <string name="new_message_name_or_npub">Nome ou npub</string>
+    <string name="new_message_name_or_npub">Nome, npub ou .bit</string>
     <string name="new_message_connect_qr">Conectar com QR</string>
     <string name="new_message_invite_friend">Convidar um amigo</string>
     <string name="new_message_talk_to_agent">Fale com seu agente</string>
