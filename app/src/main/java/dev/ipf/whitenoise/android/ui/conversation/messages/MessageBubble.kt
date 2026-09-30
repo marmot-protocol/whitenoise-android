@@ -2216,7 +2216,6 @@ internal fun MessageBubble(
                                     timestampColor = timestampColor,
                                     statusContainerColor = colorFromArgb(bubblePresentation.backgroundArgb),
                                     showStatus = showOutgoingStatus && !fileFooterInCard,
-                                    retentionOwnedByFileCard = fileFooterInCard,
                                     editedLabel = footerLabel,
                                     onEditedClick = onEditedClick,
                                     footerOnVisualMedia = footerOnVisualMedia,
@@ -2304,7 +2303,6 @@ internal fun MessageBubble(
                                     timestampColor = timestampColor,
                                     statusContainerColor = colorFromArgb(bubblePresentation.backgroundArgb),
                                     showStatus = showOutgoingStatus && !fileFooterInCard,
-                                    retentionOwnedByFileCard = fileFooterInCard,
                                     editedLabel = footerLabel,
                                     onEditedClick = onEditedClick,
                                     footerOnVisualMedia = footerOnVisualMedia,
@@ -2374,7 +2372,6 @@ internal fun MessageBubble(
                             timestampColor = timestampColor,
                             statusContainerColor = bubbleBackgroundColor,
                             showStatus = shouldShowMessageStatus(mine, deleted, invalidationPresentation),
-                            retentionOwnedByFileCard = false,
                             editedLabel = footerLabel,
                             onEditedClick = onEditedClick,
                             footerOnVisualMedia = footerOnVisualMedia,
@@ -2525,24 +2522,6 @@ internal fun MessageBubble(
                         },
                     previewReady = !hasMedia || focusedMediaReady,
                     preview = {
-                        val previewRetention =
-                            record
-                                .retentionIndicatorInput(
-                                    controllerKey = controller,
-                                    accountRef = controller.boundAccountRef,
-                                    deleted = deleted,
-                                    retentionAtSendSeconds = item.retentionAtSendSeconds,
-                                ).takeUnless { fileFooterInCard }
-                        val previewReserveRetention =
-                            !fileFooterInCard &&
-                                !deleted &&
-                                shouldReserveRetentionIndicatorSpace(
-                                    input = previewRetention,
-                                    projectedRetentionSeconds = record.retentionSeconds,
-                                    mine = mine,
-                                    status = item.status,
-                                    groupRetentionSeconds = controller.group.disappearingMessageSecs,
-                                )
                         val previewFooter: @Composable () -> Unit = {
                             MessageInlineFooter(
                                 timeText = rememberedMessageBubbleTime(record.recordedAt),
@@ -2551,8 +2530,6 @@ internal fun MessageBubble(
                                 status = item.status,
                                 editedLabel = footerLabel,
                                 onEditedClick = null,
-                                retention = previewRetention,
-                                reserveRetentionSpace = previewReserveRetention,
                                 showTime = !fileFooterInCard,
                                 statusContainerColor = colorFromArgb(bubblePresentation.backgroundArgb),
                             )
@@ -2630,13 +2607,6 @@ internal fun MessageBubble(
                                 footerContent = previewFooter,
                                 warning = outerInvalidationWarning,
                                 editedLabel = footerLabel,
-                                retention =
-                                    record.retentionIndicatorInput(
-                                        controllerKey = controller,
-                                        accountRef = controller.boundAccountRef,
-                                        deleted = deleted,
-                                        retentionAtSendSeconds = item.retentionAtSendSeconds,
-                                    ),
                                 mentionedSelf = mentionedSelf,
                                 mentionedYouLabel = mentionedYouLabel,
                                 reply =

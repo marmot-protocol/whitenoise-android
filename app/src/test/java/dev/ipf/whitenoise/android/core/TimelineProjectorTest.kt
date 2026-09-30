@@ -14,20 +14,11 @@ import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineReplyPreviewFfi
 import dev.ipf.whitenoise.android.core.MessageAttachments
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TimelineProjectorTest {
-    @Test
-    fun retentionIndicatorRequiresAPositiveDuration() {
-        assertTrue(retentionIndicatorVisible(60uL))
-        // An explicit zero means retention was disabled for the message.
-        assertFalse(retentionIndicatorVisible(0uL))
-        assertFalse(retentionIndicatorVisible(null))
-    }
-
     @Test
     fun projectedRecordCarriesRetentionMetadataThrough() {
         val record =

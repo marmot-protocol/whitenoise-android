@@ -337,7 +337,7 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
         composeRule.onAllNodesWithText(CONFIRMED_FAILED_TIME, useUnmergedTree = true).assertCountEquals(1)
         composeRule
             .onAllNodesWithContentDescription("Disappearing message", useUnmergedTree = true)
-            .assertCountEquals(1)
+            .assertCountEquals(0)
         composeRule.onAllNodesWithContentDescription("Sending", useUnmergedTree = true).assertCountEquals(0)
         composeRule.onAllNodesWithContentDescription("Sent", useUnmergedTree = true).assertCountEquals(1)
         composeRule.onAllNodesWithContentDescription("Send failed", useUnmergedTree = true).assertCountEquals(1)
@@ -345,13 +345,12 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
         val captionedCardTag = fileAttachmentCardTestTag(fixtures.captionedUnconfirmed.record.messageIdHex, 0)
         val mixedCardTag = fileAttachmentCardTestTag(fixtures.mixedDelivered.record.messageIdHex, 1)
         val failedCardTag = fileAttachmentCardTestTag(fixtures.confirmedFailed.record.messageIdHex, 0)
-        // The caption is the message's last line, so it carries the warning, the time and the
-        // retention glyph; the card itself names only the file.
+        // The caption is the message's last line, so it carries the warning and the time;
+        // the card itself names only the file. Retention is shown at the history boundary.
         assertAccessibleFileCardText(cardTag = captionedCardTag, CAPTIONED_UNCONFIRMED_FILE)
         assertNodeBelowCard(captionedCardTag, text = CAPTIONED_UNCONFIRMED_TEXT)
         assertNodeBelowCard(captionedCardTag, text = DELIVERY_NOT_CONFIRMED)
         assertNodeBelowCard(captionedCardTag, text = CAPTIONED_UNCONFIRMED_TIME)
-        assertDescriptionBelowCard(captionedCardTag, description = "Disappearing message")
         assertAccessibleFileCardText(mixedCardTag, MIXED_FILE, MIXED_DELIVERED_TIME)
         assertAccessibleFileCardDescriptions(mixedCardTag, "Sent")
         assertNodeInsideCard(mixedCardTag, text = MIXED_DELIVERED_TIME)
@@ -641,8 +640,8 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
         cardTag: String,
         vararg expectedDescriptions: String,
     ) {
-        // The footer's own nodes carry their descriptions; the card's merge boundary moved when
-        // the clock took the lead, so count across the card's subtree rather than its merged config.
+        // The footer's own nodes carry their descriptions, so count across the card's subtree
+        // rather than relying on its merged config.
         val cardDescriptions =
             composeRule
                 .onNodeWithTag(cardTag, useUnmergedTree = true)
@@ -682,18 +681,6 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
             composeRule.onNodeWithTag(cardTag, useUnmergedTree = true).getUnclippedBoundsInRoot()
         val nodeBounds = composeRule.onNodeWithText(text, useUnmergedTree = true).getUnclippedBoundsInRoot()
         assertTrue("'$text' must sit below the file card", nodeBounds.top >= cardBounds.bottom)
-    }
-
-    /** Verifies a caption-owned glyph sits under the file card rather than inside it. */
-    private fun assertDescriptionBelowCard(
-        cardTag: String,
-        description: String,
-    ) {
-        val cardBounds =
-            composeRule.onNodeWithTag(cardTag, useUnmergedTree = true).getUnclippedBoundsInRoot()
-        val nodeBounds =
-            composeRule.onNodeWithContentDescription(description, useUnmergedTree = true).getUnclippedBoundsInRoot()
-        assertTrue("'$description' must sit below the file card", nodeBounds.top >= cardBounds.bottom)
     }
 
     /** Verifies an icon announcement is spatially contained by the owning file card. */

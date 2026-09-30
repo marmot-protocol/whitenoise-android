@@ -174,8 +174,6 @@ class FocusedMediaCanvasTest {
                                     timeText = "12:34",
                                     showStatus = true,
                                     status = MessageStatus.Sent,
-                                    retention = null,
-                                    reserveRetentionSpace = false,
                                     focusedPreview = focused,
                                 ) {
                                     DisposableEffect(Unit) {

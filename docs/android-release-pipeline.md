@@ -373,16 +373,45 @@ This step makes the release public. Do not use it for a build rehearsal.
    job. Verify the candidate identity and that public exposure is intended.
 4. The job retrieves and rechecks the existing bundle, restores its listing,
    and signs a preflight using ZSP offline mode. That preflight can contact the
-   remote signer, but does not upload blobs or publish release events.
-5. Only after the publisher check passes does the online ZSP command run.
-6. Read back the public release events and APK, verify publisher, version,
-   hashes and signer, and exercise the shipped updater. A successful command
-   alone is not final public-receipt verification.
+   remote signer, but does not upload blobs or publish release events. Each
+   attempt is limited to 2 minutes and retried up to three times.
+5. Only after the publisher check passes, and the relay shows no release or
+   asset event for this version, does the online ZSP command run. Each attempt
+   is limited to 8 minutes.
+6. The job then reads back the app, release and asset events from
+   `ZAPSTORE_RELAY`, requires the pinned publisher and the candidate's version,
+   code, commit, APK hash and signing certificate, and downloads the blob from
+   `ZAPSTORE_BLOSSOM` to compare its hash. Exercise the shipped updater
+   separately; the readback does not prove updater behavior.
 
-A failed online command may have partially published. Inspect relay and Blossom
-state before retrying. There is no automatic retry, overwrite-release flag,
-withdrawal, or legacy-listing removal. `org.parres.whitenoise` is a different
-application and cannot migrate installed data by publishing this new package.
+ZSP signs every event before it publishes any release event, so a run stopped
+while waiting for the signer has at most uploaded the APK blob. After a failed
+or stalled online attempt, the job retries once only when the relay still has no
+release or asset event for this version. If any exist, or the relay cannot be
+read, the job stops: inspect relay and Blossom state before another dispatch.
+There is no overwrite-release flag, withdrawal, or legacy-listing removal.
+`org.parres.whitenoise` is a different application and cannot migrate installed
+data by publishing this new package.
+
+### Diagnose remote-signer reply delivery
+
+The signer's replies travel through the relays in the bunker URI. A reply can
+reach those relays yet never reach a new client process; the client then waits
+without error. In the 2026.9.30 release, Keycast answered every request, but
+the CI client missed its reply to the second connection of a run.
+
+**Android Zapstore - NIP-46 Relay Diagnostic (no secrets)** reproduces that
+path from a GitHub runner with throwaway keys and a local stand-in signer. It
+runs fresh client processes back to back, logs every relay frame, and reports,
+for any missed reply, whether the reply was stored on each relay. It reads no
+secrets and needs no environment approval.
+
+```bash
+gh workflow run android-zapstore-relay-diagnostic.yml --ref master \
+  -f relays='wss://relay.primal.net,wss://nos.lol' -f rounds=12
+```
+
+Retain the `nip46-relay-diagnostic` artifact with the investigation.
 
 ### Retire the legacy package
 

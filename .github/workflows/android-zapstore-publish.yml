@@ -51,7 +51,8 @@ jobs:
     needs: confirm-publication
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Signing preflight: 3 x 2 min; publication: 2 x 8 min; plus readback.
+    timeout-minutes: 40
     environment: zapstore-production
     steps:
       - name: Checkout trusted workflow tools
@@ -72,6 +73,12 @@ jobs:
           --manifest-sha256 "$MANIFEST_SHA256"
       - name: Install pinned ZSP
         run: ./scripts/install-zsp.sh "$RUNNER_TEMP/bin/zsp"
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.24.11'
+          cache: false
+      - name: Build Zapstore readback tool against pinned ZSP sources
+        run: bash scripts/build-zsp-go-tool.sh scripts/zapstore-readback.go "$RUNNER_TEMP/bin/zapstore-readback"
 
       - name: Publish reviewed candidate publicly to Zapstore
         env:
@@ -81,4 +88,4 @@ jobs:
           CONFIRMATION: ${{ inputs.confirmation }}
           EXPECTED_VERSION: ${{ inputs.expected_version }}
           MANIFEST_SHA256: ${{ inputs.manifest_sha256 }}
-        run: ./scripts/publish-zapstore.sh "$RUNNER_TEMP/bin/zsp"
+        run: ./scripts/publish-zapstore.sh "$RUNNER_TEMP/bin/zsp" "$RUNNER_TEMP/bin/zapstore-readback"

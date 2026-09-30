@@ -1,0 +1,53 @@
+name: Android Zapstore - NIP-46 Relay Diagnostic (no secrets)
+
+# Reproduces the remote-signer reply path from a GitHub runner with throwaway
+# keys. It reads no secrets, uses no environment, and publishes nothing but
+# disposable kind 24133 messages.
+on:
+  workflow_dispatch:
+    inputs:
+      relays:
+        description: Comma-separated relays from the bunker URI
+        required: true
+        default: wss://relay.primal.net,wss://nos.lol
+        type: string
+      rounds:
+        description: Back-to-back client processes to run (1-50)
+        required: true
+        default: '12'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.24.11'
+          cache: false
+      - name: Build diagnostic with go-nostr frame logging
+        run: bash scripts/build-zsp-go-tool.sh scripts/diagnose-nip46-relays.go "$RUNNER_TEMP/diagnose" debug
+      - name: Run back-to-back NIP-46 rounds
+        env:
+          RELAYS: ${{ inputs.relays }}
+          ROUNDS: ${{ inputs.rounds }}
+        run: |
+          set -o pipefail
+          [[ "$ROUNDS" =~ ^[0-9]{1,2}$ ]] || { echo 'rounds must be a number'; exit 1; }
+          mkdir -p build/reports
+          "$RUNNER_TEMP/diagnose" "$RELAYS" "$ROUNDS" build/reports/nip46-diagnostic | tee build/reports/nip46-summary.txt
+          { echo '```'; cat build/reports/nip46-summary.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain frame logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nip46-relay-diagnostic
+          path: build/reports/
+          retention-days: 14
