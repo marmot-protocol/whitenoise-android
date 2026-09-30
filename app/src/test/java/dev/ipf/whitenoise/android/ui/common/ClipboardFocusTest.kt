@@ -16,8 +16,9 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.Shadows
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowClipboardManager
+import org.robolectric.util.ReflectionHelpers
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
@@ -45,11 +46,13 @@ class ClipboardFocusTest {
         composeRule.onNodeWithText("Paste available").assertDoesNotExist()
 
         // Simulate an OS clipboard change while backgrounded for which no listener is delivered.
-        // The Robolectric shadow's backing clip is set directly, bypassing its listener dispatch.
-        val shadow = Shadows.shadowOf(clipboard)
-        val clipField = shadow.javaClass.getDeclaredField("clip")
-        clipField.isAccessible = true
-        clipField.set(shadow, ClipData.newPlainText("recipient", "npub1"))
+        // Robolectric 4.17 keeps the backing clip static. Set it without invoking
+        // setPrimaryClip(), so its listener dispatch cannot mask a missing focus refresh.
+        ReflectionHelpers.setStaticField(
+            ShadowClipboardManager::class.java,
+            "clip",
+            ClipData.newPlainText("recipient", "npub1"),
+        )
         composeRule.onNodeWithText("Paste available").assertDoesNotExist()
 
         composeRule.runOnIdle { focused.value = true }
