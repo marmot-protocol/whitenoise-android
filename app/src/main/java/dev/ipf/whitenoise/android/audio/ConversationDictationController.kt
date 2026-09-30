@@ -1676,7 +1676,9 @@ internal class ConversationDictationController internal constructor(
                     if (
                         !owns(sessionId, generationId, callback = true) ||
                         state !is ConversationDictationState.Starting
-                    ) return
+                    ) {
+                        return
+                    }
                     unresolvedRecognitionFailure = null
                     generationTimeoutHandle?.cancel()
                     generationTimeoutHandle = null
