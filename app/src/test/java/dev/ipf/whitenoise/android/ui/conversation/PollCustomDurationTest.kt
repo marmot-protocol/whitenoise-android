@@ -50,6 +50,7 @@ class PollCustomDurationTest {
         assertNull(validatePollDeadlineSelection(preset.copy(presetSeconds = null)).durationSeconds)
     }
 
+    /** Checks that malformed input has no duration that could reach poll submission. */
     private fun assertIssue(
         value: String,
         expected: PollDeadlineIssue,
@@ -60,6 +61,7 @@ class PollCustomDurationTest {
         assertEquals(expected, result.issue)
     }
 
+    /** Builds the selected editor state so conversion tests exercise the submit boundary. */
     private fun custom(
         value: String,
         unit: PollDurationUnit,
