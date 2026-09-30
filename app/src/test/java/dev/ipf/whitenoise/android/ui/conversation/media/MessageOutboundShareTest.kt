@@ -6,7 +6,6 @@ import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.whitenoise.android.FileProviderStrategyCacheRule
-import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import kotlinx.coroutines.CancellationException
@@ -233,8 +232,8 @@ class MessageOutboundShareTest {
 
     @Test
     fun aggregateShareSizeIsBoundedBeforePublication() {
-        val almostFull = AttachmentPlaintextCache.SHARED_MAX_DIRECTORY_BYTES - 8L
-        assertEquals(AttachmentPlaintextCache.SHARED_MAX_DIRECTORY_BYTES, boundedShareTotal(almostFull, 8L))
+        val almostFull = OUTBOUND_SHARE_MAX_BYTES - 8L
+        assertEquals(OUTBOUND_SHARE_MAX_BYTES, boundedShareTotal(almostFull, 8L))
         assertTrue(runCatching { boundedShareTotal(almostFull, 9L) }.exceptionOrNull() is IOException)
     }
 

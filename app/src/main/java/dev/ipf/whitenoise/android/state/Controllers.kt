@@ -6039,6 +6039,9 @@ class ConversationController(
             groupRecoveryStatus(account, groupIdHex)
         }
     },
+    private val historyNoticeDismisser: suspend (String, String) -> Boolean = { account, noticeId ->
+        appState.marmotIo { dismissHistoryNotice(account, noticeId) }
+    },
     private val textPublisher: (suspend (String?, String, String, String) -> SendSummaryFfi)? = null,
     private val messageEditPublisher: suspend (String, String, String, String) -> Unit = { account, groupId, target, text ->
         appState.marmotIo(MarmotTraceSection.MESSAGE_EDIT) { editMessage(account, groupId, target, text) }
@@ -7347,6 +7350,43 @@ class ConversationController(
 
     /** Explicit retry for an advisory recovery-status read failure. */
     suspend fun retryGroupRecoveryStatus() = refreshGroupRecoveryStatus()
+
+    /** Dismisses this group's shown notice ids, keeping the action busy until refresh completes. */
+    suspend fun dismissGroupHistoryNotices() {
+        val accountRef = conversationAccountRef
+        val noticeIds = groupRecoveryStatus?.historyNoticeIds.orEmpty()
+        if (groupRecoveryMutationInFlight || accountRef == null || noticeIds.isEmpty()) return
+        val groupIdHex = group.groupIdHex
+        val recoveryEpoch = groupRecoveryLifetime.capture()
+        groupRecoveryMutationInFlight = true
+        try {
+            val firstFailure =
+                dismissHistoryNoticeIds(noticeIds) { id ->
+                    historyNoticeDismisser(accountRef, id)
+                }
+            var shouldRefresh = false
+            groupRecoveryLifetime.runIfCurrent(recoveryEpoch) {
+                shouldRefresh = ownsGroupRecoveryGroup(groupIdHex) && conversationAccountRef == accountRef
+            }
+            if (shouldRefresh) {
+                refreshGroupRecoveryStatus()
+                firstFailure?.let { failure ->
+                    groupRecoveryLifetime.runIfCurrent(recoveryEpoch) {
+                        if (ownsGroupRecoveryGroup(groupIdHex) && conversationAccountRef == accountRef) {
+                            recordMutationFailure(
+                                R.string.history_notice_dismiss_failed,
+                                "GROUP_HISTORY_NOTICE_DISMISS",
+                                failure,
+                            )
+                        }
+                    }
+                }
+            }
+        } finally {
+            // Single-flight excludes another recovery mutation until this operation releases its slot.
+            groupRecoveryMutationInFlight = false
+        }
+    }
 
     /** Accepts exactly the still-present invitation that the user confirmed. */
     suspend fun confirmGroupRejoin(invitation: GroupRejoinInvitationFfi) {
@@ -10629,24 +10669,24 @@ class ConversationController(
         appState.applyLocalGroupUpdate(updated, account)
     }
 
-    suspend fun updateGroupAvatarUrl(url: String?): Boolean =
+    /** Updates the public avatar and reports failure only while [change] owns the attempt. */
+    internal suspend fun updateGroupAvatarUrl(change: ScopedGroupImageMutation<String?>): Boolean =
         withMutationLockResult(false) {
             lastMutationError = null
+            val report = change.isActive
             val account = conversationAccountRef ?: return@withMutationLockResult false
             // The Rust side validates + normalizes the URL (https-only, no
             // private hosts). We only set the URL here; dim/thumbhash are
             // optimization hints we don't compute on Android, so clear them.
-            val normalized = url?.trim()?.takeIf { it.isNotEmpty() }
+            val normalized = change.value?.trim()?.takeIf { it.isNotEmpty() }
             var encryptedImageCleared = group.imageHashHex == null || normalized == null
             runCatchingCancellable {
                 appState.withGroupCommitLock(account, group.groupIdHex) {
                     appState.marmotIo {
                         updateGroupAvatarUrl(account, group.groupIdHex, normalized, null, null)
                     }
-                    // A public avatar supersedes the encrypted member-only
-                    // component. Remove that component after the public URL is
-                    // durable so clearing the URL on another client cannot
-                    // resurrect an obsolete private image.
+                    // A public avatar supersedes the encrypted component. Clear it
+                    // after the URL is durable so another client cannot resurrect it.
                     if (normalized != null && group.imageHashHex != null) {
                         encryptedImageCleared =
                             runCatchingCancellable {
@@ -10664,15 +10704,16 @@ class ConversationController(
                 presentConversationTransient(R.string.toast_group_updated)
                 true
             }.onFailure {
-                recordMutationFailure(R.string.toast_couldnt_update_group, "GROUP_AVATAR_URL_UPDATE", it)
+                if (report()) recordMutationFailure(R.string.toast_couldnt_update_group, "GROUP_AVATAR_URL_UPDATE", it)
             }.getOrDefault(false)
         }
 
-    internal suspend fun updateGroupImage(draft: ImageUploadDraft?): Boolean {
+    /** Commits the encrypted image and reports failure only while [change] owns the attempt. */
+    internal suspend fun updateGroupImage(change: ScopedGroupImageMutation<ImageUploadDraft?>): Boolean {
+        val draft = change.value
         val requestedMutationKey =
-            draft?.let {
-                withContext(Dispatchers.Default) { it.mutationKey() }
-            } ?: REMOVE_GROUP_IMAGE_MUTATION_KEY
+            draft?.let { withContext(Dispatchers.Default) { it.mutationKey() } }
+                ?: REMOVE_GROUP_IMAGE_MUTATION_KEY
         return withMutationLockResult(false) {
             lastMutationError = null
             val account = conversationAccountRef ?: return@withMutationLockResult false
@@ -10701,9 +10742,8 @@ class ConversationController(
                         }
                     }
 
-                    // URL avatars win over encrypted images. Clear the legacy
-                    // component only after the encrypted mutation succeeds so
-                    // a partial failure never leaves the group image-less.
+                    // URL avatars win; clear the legacy URL only after the encrypted
+                    // mutation succeeds so a partial failure never removes both images.
                     if (!group.avatarUrl.isNullOrBlank() || pendingLegacyAvatarClearAfterImageMutationKey != null) {
                         pendingLegacyAvatarClearAfterImageMutationKey = requestedMutationKey
                         attemptedLegacyClear = true
@@ -10717,7 +10757,7 @@ class ConversationController(
                 presentConversationTransient(R.string.toast_group_updated)
                 true
             }.onFailure {
-                presentGroupImageMutationFailure(it, requestedMutationKey, attemptedLegacyClear)
+                if (change.isActive()) presentGroupImageMutationFailure(it, requestedMutationKey, attemptedLegacyClear)
             }.getOrDefault(false)
         }
     }
@@ -10734,10 +10774,9 @@ class ConversationController(
                 attemptedLegacyClear = attemptedLegacyClear,
             )
         val title =
-            if (failure == GroupImageMutationFailure.UploadCleanup) {
-                R.string.toast_group_image_uploaded_cleanup_failed
-            } else {
-                R.string.toast_couldnt_update_group
+            when (failure) {
+                GroupImageMutationFailure.UploadCleanup -> R.string.toast_group_image_uploaded_cleanup_failed
+                else -> R.string.toast_couldnt_update_group
             }
         recordMutationFailure(title, "GROUP_IMAGE_UPDATE", throwable)
     }

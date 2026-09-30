@@ -14,7 +14,90 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
+
+/**
+ * Let a short finger tap enter the unfocused editor and a stationary hold open Paste, while
+ * keeping both gestures away from BasicTextField's focus and selection handlers. Once focused,
+ * the modifier is removed and the platform owns caret placement, selection and paste again.
+ * Mouse and stylus input pass through unchanged. The outer reading-scroll owner still sees
+ * early vertical drags first.
+ */
+@Suppress("CyclomaticComplexMethod", "LongMethod")
+internal suspend fun PointerInputScope.composerUnfocusedTouchFocusGestures(
+    onTap: (Offset) -> Unit,
+    onLongPress: () -> Unit,
+) {
+    val touchSlop = viewConfiguration.touchSlop
+    val longPressTimeoutMillis = viewConfiguration.longPressTimeoutMillis
+    awaitPointerEventScope {
+        var trackedPointer: PointerId? = null
+        var downAtMillis = 0L
+        var lastEventAtMillis = 0L
+        var downPosition = Offset.Zero
+        var cancelled = false
+        var longPressDispatched = false
+        while (true) {
+            val remaining = longPressTimeoutMillis - (lastEventAtMillis - downAtMillis)
+            val awaitingLongPress = trackedPointer != null && !cancelled && !longPressDispatched
+            val event =
+                if (awaitingLongPress && remaining > 0) {
+                    withTimeoutOrNull(remaining) { awaitPointerEvent(PointerEventPass.Initial) }
+                } else {
+                    awaitPointerEvent(PointerEventPass.Initial)
+                }
+            if (event == null) {
+                // A still, held finger produces no Move event. The timeout must open Paste
+                // without waiting for the finger to lift.
+                if (trackedPointer != null && !cancelled) {
+                    longPressDispatched = true
+                    onLongPress()
+                }
+                continue
+            }
+            when (event.type) {
+                PointerEventType.Press -> {
+                    val change = event.changes.firstOrNull { it.pressed && it.type == PointerType.Touch }
+                    if (change != null) {
+                        if (trackedPointer == null) {
+                            trackedPointer = change.id
+                            downAtMillis = change.uptimeMillis
+                            lastEventAtMillis = downAtMillis
+                            downPosition = change.position
+                            cancelled = false
+                            longPressDispatched = false
+                        } else {
+                            cancelled = true
+                        }
+                        change.consume()
+                    }
+                }
+                PointerEventType.Move, PointerEventType.Release -> {
+                    val change = event.changes.firstOrNull { it.id == trackedPointer }
+                    if (change != null) {
+                        lastEventAtMillis = change.uptimeMillis
+                        val movedBeyondSlop = (change.position - downPosition).getDistance() > touchSlop
+                        cancelled = cancelled || change.isConsumed || movedBeyondSlop
+                        val elapsed = change.uptimeMillis - downAtMillis
+                        val released = !change.pressed && !cancelled
+                        change.consume()
+                        if (!change.pressed) {
+                            trackedPointer = null
+                            if (released && !longPressDispatched) {
+                                if (elapsed >= longPressTimeoutMillis) onLongPress() else onTap(change.position)
+                            }
+                        } else if (!cancelled && !longPressDispatched && elapsed >= longPressTimeoutMillis) {
+                            longPressDispatched = true
+                            onLongPress()
+                        }
+                    }
+                }
+                else -> Unit
+            }
+        }
+    }
+}
 
 /**
  * The draft and selection a deliberate reader scroll was armed against.
@@ -38,12 +121,11 @@ internal data class ComposerReadingAnchor(
  * clears touch slop before the long-press timeout is a scroll: its moves are
  * consumed on the initial pass (so the text field's cursor and selection
  * handlers never see them) and fed to [scrollBy]. A press that holds past the
- * long-press timeout without clearing slop belongs to selection and is left
- * alone for the rest of that gesture. Wheel and trackpad ticks scroll
+ * long-press timeout without clearing slop belongs to selection when the field is
+ * focused and is left alone for the rest of that gesture. Wheel and trackpad ticks scroll
  * directly. Every owned movement first reports [onReadingScroll] so
- * caret-following can suspend for the current draft. This is one gesture
- * state machine on purpose: splitting it would scatter the slop and
- * long-press yield rules across helpers.
+ * caret-following can suspend for the current draft. This remains the one
+ * reading-scroll owner; the unfocused touch gate only decides when to focus.
  */
 @Suppress("CyclomaticComplexMethod", "LongMethod")
 internal suspend fun PointerInputScope.composerEditorReadingScrollGestures(

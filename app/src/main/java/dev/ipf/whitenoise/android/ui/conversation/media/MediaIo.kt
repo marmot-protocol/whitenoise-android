@@ -423,7 +423,12 @@ internal fun classifyAttachmentOpen(
             .lowercase(java.util.Locale.ROOT)
     val openMime = normalizeDocumentMime(mediaType)
     return when {
-        normalizedMime == ANDROID_PACKAGE_MIME -> AttachmentOpenClassification.Ready(ANDROID_PACKAGE_MIME)
+        normalizedMime == ANDROID_PACKAGE_MIME ->
+            if (isValidAndroidPackage()) {
+                AttachmentOpenClassification.Ready(ANDROID_PACKAGE_MIME)
+            } else {
+                AttachmentOpenClassification.InvalidAndroidPackage
+            }
         (
             normalizedMime.isEmpty() ||
                 normalizedMime == GENERIC_BINARY_MIME ||

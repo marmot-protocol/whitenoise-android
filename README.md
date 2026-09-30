@@ -139,10 +139,8 @@ secrets:
 - `WHITENOISE_STAGING_KEYSTORE_PASSWORD`
 - `WHITENOISE_STAGING_KEY_ALIAS`
 - `WHITENOISE_STAGING_KEY_PASSWORD`
-- `WHITENOISE_OTLP_ENDPOINT`
-- `WHITENOISE_STAGING_OTLP_AUTH_TOKEN`
-- `WHITENOISE_AUDIT_LOG_ENDPOINT`
-- `WHITENOISE_AUDIT_LOG_AUTH_TOKEN`
+- `WHITENOISE_OTLP_AUTH_TOKEN`
+- `WHITENOISE_AUDIT_OTLP_AUTH_TOKEN`
 - `WHITENOISE_STAGING_PUSH_SERVER_PUBKEY_HEX`
 - `WHITENOISE_PUSH_RELAY_HINT`
 
@@ -261,26 +259,23 @@ Runtime configuration is also read from `local.properties` or environment variab
 
 **Shared runtime values:**
 
-- `WHITENOISE_OTLP_ENDPOINT` — shared by dev, staging, and production.
-- `WHITENOISE_AUDIT_LOG_ENDPOINT` — shared by staging and production.
-- `WHITENOISE_AUDIT_LOG_AUTH_TOKEN` — shared by staging and production, separate from OTLP auth.
+- `WHITENOISE_OTLP_ENDPOINT` — optional metrics override; staging and production default to `https://otlp.whitenoise.chat/v1/metrics`.
+- `WHITENOISE_OTLP_AUTH_TOKEN` — one shared metrics write token for staging and production.
+- `WHITENOISE_AUDIT_OTLP_ENDPOINT` — optional override for the shared v5 audit destination, which defaults to `https://otlp.whitenoise.chat/v1/logs` in staging and production.
+- `WHITENOISE_AUDIT_OTLP_AUTH_TOKEN` — shared ingest-only v5 audit token, separate from metrics auth.
 - `WHITENOISE_PUSH_RELAY_HINT` — shared by staging and production (production defaults to `wss://relay.eu.whitenoise.chat`).
 
-**Flavor-specific OTLP tokens:**
+**Development metrics token:**
 
 - `WHITENOISE_DEV_OTLP_AUTH_TOKEN`
-- `WHITENOISE_STAGING_OTLP_AUTH_TOKEN`
-- `WHITENOISE_PRODUCTION_OTLP_AUTH_TOKEN`
-
-The token selects the telemetry tenant. There is no shared token fallback.
-Legacy token aliases `OTLP_TOKEN_WHITENOISE_ANDROID_DEV`,
-`OTLP_TOKEN_WHITENOISE_ANDROID_STAGING`, and `OTLP_TOKEN_WHITENOISE_ANDROID`
-remain accepted for their respective flavors.
+The development flavor continues to accept `OTLP_TOKEN_WHITENOISE_ANDROID_DEV`.
+Staging and production use the same metrics write token and the deployment
+environment resource attribute identifies the flavor in the metrics data.
 
 No tenant secret is read. MarmotKit requires a nonempty tenant resource attribute,
-so Android supplies fixed compatibility values (`whitenoise-android`,
-`whitenoise-android-staging`, and `whitenoise-android-dev`). HTTP authentication
-and tenant routing use the bearer token. The separate deployment environment
+so staging and production both supply `whitenoise-android`; development supplies
+`whitenoise-android-dev`. HTTP authentication
+uses the bearer token. The separate deployment environment
 attribute remains `production`, `staging`, or `development`, respectively.
 
 **Push identities (MIP-05):**
@@ -291,11 +286,11 @@ attribute remains `production`, `staging`, or `development`, respectively.
 
 **Dev audit and push:**
 
-Dev does not inherit shared Goggles credentials or staging/production push
+Dev does not inherit shared audit credentials or staging/production push
 identities. Explicit dev configuration remains available:
 
-- `WHITENOISE_DEV_AUDIT_LOG_ENDPOINT`
-- `WHITENOISE_DEV_AUDIT_LOG_AUTH_TOKEN`
+- `WHITENOISE_DEV_AUDIT_OTLP_ENDPOINT`
+- `WHITENOISE_DEV_AUDIT_OTLP_AUTH_TOKEN`
 - `WHITENOISE_DEV_PUSH_SERVER_PUBKEY_HEX`
 - `WHITENOISE_DEV_PUSH_RELAY_HINT`
 

@@ -16,6 +16,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -91,6 +92,29 @@ class ChatFolderOwnershipTest {
                 ),
             ).performClick()
         composeRule.onNodeWithText(app.getString(R.string.delete)).performClick()
+        val confirm =
+            composeRule
+                .onNodeWithTag("folder.delete_confirm")
+                .fetchSemanticsNode()
+                .config[SemanticsActions.OnClick]
+                .action!!
+        composeRule.runOnIdle {
+            state.replaceActiveAccountForTest(B)
+            confirm()
+        }
+        composeRule.onNodeWithTag("folder.delete_dialog").assertDoesNotExist()
+        assertTrue(state.chatFolderPreferences.foldersFor(A).any { it.id == UNREAD })
+        assertTrue(state.chatFolderPreferences.foldersFor(B).any { it.id == UNREAD })
+    }
+
+    /** The editor's captured confirmation cannot delete after the account changes. */
+    @Test fun staleEditorDeleteCannotRemoveEitherAccountsFolder() {
+        val state = appState()
+        state.chatFolderPreferences.foldersFor(A)
+        state.chatFolderPreferences.foldersFor(B)
+        showEditor(state, UNREAD)
+        composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag("folder.delete"))
+        composeRule.onNodeWithTag("folder.delete").performClick()
         val confirm =
             composeRule
                 .onNodeWithTag("folder.delete_confirm")

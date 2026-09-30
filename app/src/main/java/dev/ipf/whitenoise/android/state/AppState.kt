@@ -1251,17 +1251,14 @@ class WhiteNoiseAppState private constructor(
                 }
             },
             targetValidationScope = mutationsScope,
-            onBeforeRecognition = {
-                conversationDictationPlaybackHandoff.pauseActivePlayback()
-            },
-            onAfterAudioCapture = {
-                conversationDictationPlaybackHandoff.resumeInterruptedPlayback()
-            },
+            onBeforeRecognition = conversationDictationMediaHandoff::beforeRecognition,
+            onAfterAudioCapture = conversationDictationMediaHandoff::afterAudioCapture,
             tryAcquireMicrophone = { microphoneCaptureCoordinator.tryAcquire(dictationMicrophoneOwner) },
             releaseMicrophone = { microphoneCaptureCoordinator.release(dictationMicrophoneOwner) },
             finishAfterSilenceMillis = {
                 conversationDictationPreferences.current().finishAfterSilenceMillis
             },
+            pauseOtherAudio = { conversationDictationPreferences.current().pauseOtherAudio },
             silenceDeliveryMode = {
                 conversationDictationPreferences.current().silenceDeliveryMode
             },
@@ -1516,8 +1513,8 @@ class WhiteNoiseAppState private constructor(
     // Process-wide read-aloud playback: survives navigation between chats and
     // back to the chat list, matching VoicePlaybackController's lifetime.
     val ttsController = createAppTtsController(appContext, ttsRatePreferences, ttsMediaMixPreferences)
-    private val conversationDictationPlaybackHandoff by lazy {
-        createConversationDictationPlaybackHandoff(ttsController)
+    private val conversationDictationMediaHandoff by lazy {
+        createConversationDictationMediaHandoff(ttsController, appContext) { conversationDictation.cancel() }
     }
     var ttsResolution by mutableStateOf<TtsResolutionResult?>(null)
         private set
@@ -4264,13 +4261,16 @@ class WhiteNoiseAppState private constructor(
         } else if (attachmentDownloadIntents.isAutomaticSuppressed(request)) {
             return
         }
-        AttachmentDownloadWorker.enqueue(appContext, request, priority)
+        AttachmentDownloadWorker.enqueue(appContext, request, priority, userVisible = appInForeground)
     }
 
     /** Clears a completed foreground request without changing its automatic-download policy. */
     internal fun clearInteractiveAttachmentDownloadIntent(request: AttachmentTransferRequest) {
         attachmentDownloadIntents.setInteractive(request, interactive = false)
     }
+
+    /** Bridges scheduler registration until its first observable work state. */
+    internal fun hasInteractive(request: AttachmentTransferRequest) = attachmentDownloadIntents.isInteractive(request)
 
     /**
      * Revokes one attachment's durable download so a cancel survives both a
@@ -4578,7 +4578,7 @@ class WhiteNoiseAppState private constructor(
             "notification listener unavailable before Marmot startup"
         }
         runtimeStartResult.await().getOrThrowAtStartupStage(BootstrapStage.RUNTIME_START)
-        runtime.marmot.emitAuditRuntimeReadinessAfterStart()
+        runtime.marmot.emitAuditRuntimeReadinessAfterStart(auditUploadConsent.readyForStartupMarker)
         runtimeMirrors.attention.start(this, runtime.marmot)
     }
 
@@ -4753,7 +4753,6 @@ class WhiteNoiseAppState private constructor(
     private suspend fun ensureNotificationReceiverForNetworkReconnect(): Boolean {
         if (!bootstrapCompleted) bootstrap()
         if (!bootstrapCompleted || networkNotificationRecoverySuppressed) return false
-
         localNotificationPresenter.ensureChannels()
         refreshLocalNotificationPermission()
         val receiverReady =
@@ -10423,8 +10422,9 @@ class WhiteNoiseAppState private constructor(
         presentTransient(AppText.Plain(title), detail?.let(AppText::Plain))
     }
 
-    fun clearToast() {
-        toast = null
+    /** Retire only the toast observed by the caller, preserving a newer notice. */
+    fun clearToast(notice: ToastMessage? = toast) {
+        if (toast === notice) toast = null
     }
 
     fun clearTransientNotice(notice: TransientNotice? = transientNotice) {

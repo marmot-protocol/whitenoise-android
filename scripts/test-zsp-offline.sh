@@ -43,6 +43,8 @@ python3 "$repo_dir/scripts/verify_apk_signature.py" "$apksigner_bin" \
 (
   cd "$temporary_dir/source"
   GOWORK=off go test "$repo_dir/scripts/test-zapstore-signer.go" "$repo_dir/scripts/test-zapstore-signer_test.go" >&2
+  GOWORK=off go test "$repo_dir/scripts/zapstore-readback.go" "$repo_dir/scripts/zapstore-readback_test.go" >&2
+  GOWORK=off go build -tags debug -o /dev/null "$repo_dir/scripts/diagnose-nip46-relays.go" >&2
   GOWORK=off go run "$repo_dir/scripts/rehearse-zsp.go" "$temporary_dir/zsp" "$temporary_dir/fixture.apk"
 ) > "$receipt"
 cat "$receipt"

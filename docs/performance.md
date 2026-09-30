@@ -155,6 +155,11 @@ uninstalling or clearing data.
 
 ### Isolated media component probe
 
+The expanded upload/download size matrix and machine-readable aggregate
+reporting are documented in [media-latency-matrix.md](media-latency-matrix.md).
+The first emulator results are in
+[media-latency-preliminary-baseline.md](media-latency-preliminary-baseline.md).
+
 For a diagnostic breakdown of native image downloads, encrypted Android cache
 reads/writes, and platform decoding, use `MediaAttachmentLatencyProbe`. This is
 an opt-in **debug component probe**, not a release qualification or UI
@@ -211,7 +216,7 @@ The opt-in run has a ten-minute outer guard and may take several minutes.
 
 After fixture upload, the live test snapshots the shipped native aggregate
 performance API before and after the download interval, including when a
-download fails. `media_probe_native` output contains only eleven fixed phase
+download fails. `media_probe_native` output contains only twelve fixed phase
 names, interval attempt/success/failure counts, duration sums, and numeric
 histogram buckets with an overflow count. It does not enable telemetry export
 or include unrelated snapshot fields. Native bucket counts are per-bucket, not

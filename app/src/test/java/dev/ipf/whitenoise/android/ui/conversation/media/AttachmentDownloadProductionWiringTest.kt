@@ -108,7 +108,12 @@ class AttachmentDownloadProductionWiringTest {
         assertFalse("materializeMediaFileOrNotify(" in file)
         assertTrue("materialize = { materializeMediaFile(" in file)
         assertTrue("awaitNextDurableAvailability = { controller.awaitNextAttachmentAvailability(" in file)
-        assertTrue("onTerminalFailure = { appState.present(couldntLoadMessage) }" in file)
+        assertTrue("awaitDurableWorkFinished = { controller.attachmentTransferRequest(" in file)
+        assertTrue("attachmentDownloadWorkState(context, transfer)" in file)
+        assertTrue("isCachedAfterDurableWork = { controller.hasCachedAttachmentAfterHydration(" in file)
+        assertTrue("onTerminalFailure = { if (appState.attachmentOpens.consume(request))" in file)
+        assertTrue("AttachmentOpenTrace.finish(request, \"download_failed\")" in file)
+        assertTrue("appState.present(couldntLoadMessage)" in file)
     }
 
     /** Guards foreground enqueueing, source single-flight, and terminal durable cleanup wiring. */

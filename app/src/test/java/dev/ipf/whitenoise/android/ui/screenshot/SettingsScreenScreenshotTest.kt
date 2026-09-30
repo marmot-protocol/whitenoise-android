@@ -8,28 +8,32 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasScrollToNodeAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationDeliveryMode
+import dev.ipf.whitenoise.android.audio.OFFLINE_SPEECH_TO_TEXT_PACKAGE
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.TransientNotice
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.ShellTransientNoticeLayout
+import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.settings.DictationSettingsScreen
 import dev.ipf.whitenoise.android.ui.settings.SETTINGS_HOME_CONTENT_TAG
 import dev.ipf.whitenoise.android.ui.settings.SettingsHomeAccount
@@ -90,8 +94,8 @@ class SettingsScreenScreenshotTest {
     /** Available Settings update row uses the requested green emblem and real release-version wording. */
     @Test
     fun settingsScreenAvailableUpdateLight() {
-        render(darkTheme = false, latestVersion = "2026.9.22")
-        composeRule.onNodeWithText("Version 2026.9.22 is available on Zapstore.").assertIsDisplayed()
+        render(darkTheme = false, latestVersion = "2026.10.1")
+        composeRule.onNodeWithText("Version 2026.10.1 is available on Zapstore.").assertIsDisplayed()
         capture("settings_screen_available_update_light")
     }
 
@@ -120,8 +124,8 @@ class SettingsScreenScreenshotTest {
         render(darkTheme = true)
         composeRule
             .onNode(hasScrollToNodeAction())
-            .performScrollToNode(hasText("Version 2026.9.21"))
-        composeRule.onNodeWithText("Version 2026.9.21").assertIsDisplayed()
+            .performScrollToNode(hasText("Version 2026.9.30"))
+        composeRule.onNodeWithText("Version 2026.9.30").assertIsDisplayed()
         composeRule
             .onNodeWithTag(SETTINGS_HOME_CONTENT_TAG)
             .captureRoboImage("src/test/snapshots/settings_screen_version_footer_dark.png")
@@ -134,11 +138,18 @@ class SettingsScreenScreenshotTest {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    DictationSettingsScreen(appState = appState, onBack = {})
+                    DictationSettingsScreen(
+                        appState = appState,
+                        onBack = {},
+                        resolveProviderPackage = { _, _ -> null },
+                    )
                 }
             }
         }
 
+        composeRule
+            .onNodeWithText("The speech service installed on this device processes the audio", substring = true)
+            .assertExists()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_settings_default_light.png")
     }
 
@@ -153,50 +164,93 @@ class SettingsScreenScreenshotTest {
                         appState = appState,
                         onBack = {},
                         isOfflineSpeechToTextInstalled = { true },
+                        resolveProviderPackage = { _, _ -> OFFLINE_SPEECH_TO_TEXT_PACKAGE },
                     )
                 }
             }
         }
 
         composeRule.onNodeWithText("Get Offline Speech to Text").assertDoesNotExist()
+        composeRule
+            .onNodeWithText("Offline Speech to Text processes dictation on this device.", substring = true)
+            .assertExists()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_settings_ostt_installed_light.png")
     }
 
-    /** The missing-app recommendation opens the same canonical Zapstore page in every build flavor. */
+    /** First use of the selected offline engine explains local processing without a cloud warning. */
     @Test
-    fun dictationSettingsMissingOsttOpensCanonicalZapstoreListing() {
-        val openedUris = mutableListOf<String>()
+    fun dictationOfflineDisclosureLight() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                ConfirmDialog(
+                    title = stringResource(R.string.dictation_disclosure_offline_title),
+                    message = stringResource(R.string.dictation_disclosure_offline_message),
+                    confirmLabel = stringResource(R.string.dictation_continue),
+                    onConfirm = {},
+                    onDismiss = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Offline speech recognition").assertIsDisplayed()
+        composeRule.onNodeWithText("may send the audio", substring = true).assertDoesNotExist()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_offline_disclosure_light.png")
+    }
+
+    /** The external-media switch is accessible and does not clip in the large-font RTL layout. */
+    @Test
+    fun dictationPauseOtherAudioSwitchRtlLargeFont() {
         val appState = dictationAppState()
         composeRule.setContent {
+            val density = LocalDensity.current
             CompositionLocalProvider(
-                LocalUriHandler provides
-                    object : UriHandler {
-                        override fun openUri(uri: String) {
-                            openedUris += uri
-                        }
-                    },
+                LocalDensity provides Density(density.density, 2f),
+                LocalLayoutDirection provides LayoutDirection.Rtl,
             ) {
-                WhiteNoiseTheme {
-                    DictationSettingsScreen(
-                        appState = appState,
-                        onBack = {},
-                        isOfflineSpeechToTextInstalled = { false },
-                    )
+                WhiteNoiseTheme(darkTheme = false) {
+                    Surface(modifier = Modifier.fillMaxSize()) {
+                        DictationSettingsScreen(
+                            appState = appState,
+                            onBack = {},
+                            isOfflineSpeechToTextInstalled = { true },
+                        )
+                    }
                 }
             }
         }
 
-        composeRule.onNodeWithText("Get Offline Speech to Text").performClick()
-        composeRule.runOnIdle {
-            assertEquals(
-                listOf(
-                    "https://zapstore.dev/apps/" +
-                        "naddr1qqtkzurs9ehkvenvd9hx2umsv4jkx6r5da6x27r5qyv8wumn8ghj7un9d3shjtn6v9c8xar0wfjjuer9wcp" +
-                        "zpys5pkhzxd9dqp4ger8du6p5f6y43tcnzqktjzmwvahq5vumtay4qvzqqqr7pv8t57pf",
-                ),
-                openedUris,
-            )
+        composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasTestTag("dictation.pause_other_audio"))
+        composeRule.onNodeWithTag("dictation.pause_other_audio").assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("Pause other audio").assertExists()
+        composeRule
+            .onNodeWithText("Pause music and podcasts during dictation", substring = true)
+            .assertExists()
+            .performScrollTo()
+        assertEquals(false, appState.conversationDictationPreferences.current().pauseOtherAudio)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_settings_pause_other_audio_rtl_large.png")
+    }
+
+    /** The missing-app recommendation invokes the shared listing opener. */
+    @Test
+    fun dictationSettingsMissingOsttOpensListing() {
+        var opened = 0
+        val appState = dictationAppState()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                DictationSettingsScreen(
+                    appState = appState,
+                    onBack = {},
+                    isOfflineSpeechToTextInstalled = { false },
+                    openOfflineSpeechToTextListing = {
+                        opened++
+                        true
+                    },
+                )
+            }
         }
+
+        composeRule.onNodeWithText("Get Offline Speech to Text").performClick()
+        composeRule.runOnIdle { assertEquals(1, opened) }
     }
 
     /**
@@ -245,7 +299,7 @@ class SettingsScreenScreenshotTest {
         // the fixture draw the prominent placement above an "Up to date" subtitle.
         val appUpdateInfo =
             AppUpdateInfo(
-                installedVersion = "2026.9.21",
+                installedVersion = "2026.9.30",
                 latestVersion = latestVersion,
                 checkedAtMillis = null,
                 dismissedVersion = null,
@@ -267,7 +321,7 @@ class SettingsScreenScreenshotTest {
                 ),
             profileCount = profileCount,
             appUpdateInfo = appUpdateInfo,
-            versionName = "2026.9.21",
+            versionName = "2026.9.30",
             onBack = {},
             onOpenShareConnect = {},
             onAddProfile = {},

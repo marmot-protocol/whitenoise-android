@@ -59,6 +59,7 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
+import dev.ipf.whitenoise.android.ui.BuiltinEmoji
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.TtsLeafHighlightResolver
 import dev.ipf.whitenoise.android.ui.TtsSentenceActions
@@ -126,8 +127,6 @@ internal fun VisualMediaFooterFrame(
     timeText: String,
     showStatus: Boolean,
     status: MessageStatus,
-    retention: RetentionIndicatorInput?,
-    reserveRetentionSpace: Boolean,
     focusedPreview: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
@@ -138,15 +137,13 @@ internal fun VisualMediaFooterFrame(
                 timeText = timeText,
                 showStatus = showStatus,
                 status = status,
-                retention = retention,
-                reserveRetentionSpace = reserveRetentionSpace,
             )
         }
     }
 }
 
 /**
- * Renders the message's media surfaces and assigns timestamp, status, retention, and warning
+ * Renders the message's media surfaces and assigns timestamp, status, and warning
  * metadata only to the footer owner selected by [fileCardOwnsFooter] or [visualMediaOwnsFooter].
  * Forwards visual-media open requests to the conversation owner, keeping full-screen state
  * outside this potentially lazy-disposed row.
@@ -173,26 +170,10 @@ internal fun ColumnScope.BubbleMediaBlocks(
     fileFooterWarning: String?,
     onMediaLongPress: () -> Unit,
     focusedPreview: Boolean = false,
-    // A caption carries the footer, so no file card may draw the time, state or retention glyph.
+    // A caption carries the footer, so no file card may draw the time or state.
     hasCaption: Boolean = false,
     expandNarrowVisualToStandardWidth: Boolean = false,
 ) {
-    val retentionInput =
-        record.retentionIndicatorInput(
-            controllerKey = controller,
-            accountRef = controller.boundAccountRef,
-            deleted = deleted,
-            retentionAtSendSeconds = item.retentionAtSendSeconds,
-        )
-    val reserveRetentionSpace =
-        !deleted &&
-            shouldReserveRetentionIndicatorSpace(
-                input = retentionInput,
-                projectedRetentionSeconds = record.retentionSeconds,
-                mine = mine,
-                status = item.status,
-                groupRetentionSeconds = controller.group.disappearingMessageSecs,
-            )
     if (sharedLocation != null) {
         val shareContext = LocalContext.current
         LocationMessageBubble(
@@ -242,8 +223,6 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 timeText = rememberedMessageBubbleTime(record.recordedAt),
                 showStatus = mine,
                 status = item.status,
-                retention = retentionInput,
-                reserveRetentionSpace = reserveRetentionSpace,
                 focusedPreview = focusedPreview,
             ) {
                 if (MediaReferenceSupport.isVideoMedia(entry.value)) {
@@ -288,8 +267,6 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 timeText = rememberedMessageBubbleTime(record.recordedAt),
                 showStatus = mine,
                 status = item.status,
-                retention = retentionInput,
-                reserveRetentionSpace = reserveRetentionSpace,
                 focusedPreview = focusedPreview,
             ) {
                 MediaVisualGridBubble(
@@ -347,8 +324,6 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 timestampText = fileTimestamp.takeIf { isFooterOwner },
                 showStatus = isFooterOwner && showStatus,
                 status = item.status,
-                retention = retentionInput.takeIf { isFooterOwner },
-                reserveRetentionSpace = isFooterOwner && reserveRetentionSpace,
                 footerWarningText = fileFooterWarning.takeIf { isFooterOwner },
             )
         }
@@ -402,8 +377,6 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 timeText = rememberedMessageBubbleTime(record.recordedAt),
                 showStatus = true,
                 status = item.status,
-                retention = retentionInput,
-                reserveRetentionSpace = reserveRetentionSpace,
                 focusedPreview = focusedPreview,
             ) {
                 if (MediaReferenceSupport.isVideoMedia(entry.value)) {
@@ -452,8 +425,6 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 timeText = rememberedMessageBubbleTime(record.recordedAt),
                 showStatus = true,
                 status = item.status,
-                retention = retentionInput,
-                reserveRetentionSpace = reserveRetentionSpace,
                 focusedPreview = focusedPreview,
             ) {
                 MediaVisualGridBubble(
@@ -483,8 +454,6 @@ internal fun ColumnScope.BubbleMediaBlocks(
             timestampText = rememberedMessageBubbleTime(record.recordedAt).takeIf { pendingFileOwnsFooter },
             showStatus = pendingFileOwnsFooter && showStatus,
             status = item.status,
-            retention = retentionInput.takeIf { pendingFileOwnsFooter },
-            reserveRetentionSpace = pendingFileOwnsFooter && reserveRetentionSpace,
             onRetry =
                 if (mine && item.status == MessageStatus.Failed) {
                     { appState.launchMutation { controller.retryFailedSend(item) } }
@@ -528,7 +497,6 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
     bubbleContentColor: Color,
     timestampColor: Color,
     showStatus: Boolean,
-    retentionOwnedByFileCard: Boolean = false,
     editedLabel: String?,
     onEditedClick: (() -> Unit)?,
     footerOnVisualMedia: Boolean,
@@ -539,32 +507,12 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
     onExpand: () -> Unit,
     statusContainerColor: Color? = null,
 ) {
-    val retentionInput =
-        record
-            .retentionIndicatorInput(
-                controllerKey = controller,
-                accountRef = controller.boundAccountRef,
-                deleted = deleted,
-                retentionAtSendSeconds = item.retentionAtSendSeconds,
-            ).takeUnless { retentionOwnedByFileCard }
-    val reserveRetentionSpace =
-        !retentionOwnedByFileCard &&
-            !deleted &&
-            shouldReserveRetentionIndicatorSpace(
-                input = retentionInput,
-                projectedRetentionSeconds = record.retentionSeconds,
-                mine = mine,
-                status = item.status,
-                groupRetentionSeconds = controller.group.disappearingMessageSecs,
-            )
     val inlineFooter: @Composable () -> Unit = {
         MessageInlineFooter(
             timeText = rememberedMessageBubbleTime(record.recordedAt),
             color = timestampColor,
             showStatus = showStatus,
             status = item.status,
-            retention = retentionInput,
-            reserveRetentionSpace = reserveRetentionSpace,
             editedLabel = editedLabel,
             onEditedClick = onEditedClick,
             showTime = showTimestamp,
@@ -572,7 +520,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
         )
     }
     val hasInlineFooter =
-        showTimestamp || showStatus || retentionInput != null || reserveRetentionSpace || editedLabel != null
+        showTimestamp || showStatus || editedLabel != null
     var lastLineLayout by
         remember(record.messageIdHex, bodyText) {
             mutableStateOf<TextLayoutResult?>(null)
@@ -734,7 +682,8 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                                 },
                             )
                         Text(
-                            bodyText,
+                            remember(bodyText) { BuiltinEmoji.annotate(AnnotatedString(bodyText)) },
+                            inlineContent = BuiltinEmoji.content(),
                             style = MaterialTheme.typography.bodyLarge,
                             // A tombstone is narration, not authored content, and
                             // the prototype italicises it to say so.

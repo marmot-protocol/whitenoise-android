@@ -28,6 +28,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
+import dev.ipf.whitenoise.android.state.AttachmentDownloadWorkState
 import dev.ipf.whitenoise.android.state.AttachmentOpenPhase
 import dev.ipf.whitenoise.android.state.AttachmentOpenTrace
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
@@ -35,6 +36,8 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.attachmentDownloadWorkState
+import dev.ipf.whitenoise.android.state.attachmentTransferRequest
 import dev.ipf.whitenoise.android.state.automaticAttachmentDownloadSuppressed
 import dev.ipf.whitenoise.android.state.cancelAttachmentTransfer
 import dev.ipf.whitenoise.android.state.hasAttachmentInstallerHandoff
@@ -42,7 +45,7 @@ import dev.ipf.whitenoise.android.state.hasCachedAttachmentInMemory
 import dev.ipf.whitenoise.android.state.refreshAttachmentTransferState
 import dev.ipf.whitenoise.android.state.requestAttachmentInstallerHandoff
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
-import dev.ipf.whitenoise.android.ui.conversation.messages.RetentionIndicatorInput
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
@@ -67,7 +70,7 @@ internal fun fileAttachmentCardTestTag(
  * in-app reader. Other files join any automatic/durable fetch already in
  * flight and open a reusable FileProvider artifact in an external viewer.
  * When selected as the message footer owner, the card also carries the timestamp,
- * delivery state, retention indicator, and invalidation warning as one contract.
+ * delivery state and invalidation warning as one contract.
  */
 @Composable
 internal fun MediaFileBubble(
@@ -83,8 +86,6 @@ internal fun MediaFileBubble(
     timestampText: String? = null,
     showStatus: Boolean = false,
     status: MessageStatus = MessageStatus.Received,
-    retention: RetentionIndicatorInput? = null,
-    reserveRetentionSpace: Boolean = false,
     footerWarningText: String? = null,
 ) {
     val context = LocalContext.current
@@ -222,13 +223,28 @@ internal fun MediaFileBubble(
                         controller.awaitNextAttachmentAvailability(messageIdHex, attachmentIndex)
                         AttachmentOpenTrace.phase(request, AttachmentOpenPhase.DurableAvailabilityObserved)
                     },
+                    awaitDurableWorkFinished = {
+                        controller.attachmentTransferRequest(messageIdHex, attachmentIndex)?.let { transfer ->
+                            attachmentDownloadWorkState(context, transfer) {
+                                appState.hasInteractive(transfer)
+                            }.first { it == AttachmentDownloadWorkState.Finished }
+                        }
+                    },
+                    isCachedAfterDurableWork = {
+                        controller.hasCachedAttachmentAfterHydration(messageIdHex, attachmentIndex)
+                    },
                     onWaitingForDurableAvailability = {
                         AttachmentOpenTrace.phase(request, AttachmentOpenPhase.WaitingForDurableAvailability)
                         // Keep one visible pending state. Repeated taps still
                         // ripple but remain idempotent while the durable
                         // transfer/cache publication continues independently.
                     },
-                    onTerminalFailure = { appState.present(couldntLoadMessage) },
+                    onTerminalFailure = {
+                        if (appState.attachmentOpens.consume(request)) {
+                            AttachmentOpenTrace.finish(request, "download_failed")
+                            appState.present(couldntLoadMessage)
+                        }
+                    },
                 ) ?: return@LaunchedEffect
             AttachmentOpenTrace.phase(request, AttachmentOpenPhase.CacheArtifactReady)
             openRequested = true
@@ -378,8 +394,6 @@ internal fun MediaFileBubble(
             timestampText = timestampText,
             showStatus = showStatus,
             status = status,
-            retention = retention,
-            reserveRetentionSpace = reserveRetentionSpace,
             footerWarningText = footerWarningText,
             openPending = opening,
             onCancelTransfer = { controller.cancelAttachmentTransfer(messageIdHex, attachmentIndex) },
@@ -525,8 +539,6 @@ internal fun PendingFilePill(
     timestampText: String? = null,
     showStatus: Boolean = false,
     status: MessageStatus = MessageStatus.Pending,
-    retention: RetentionIndicatorInput? = null,
-    reserveRetentionSpace: Boolean = false,
 ) {
     val presentation = remember(mediaType, fileName) { resolveAttachmentPresentation(mediaType, fileName) }
     Surface(
@@ -557,8 +569,6 @@ internal fun PendingFilePill(
             trailingMetadataText = timestampText ?: statusLabel,
             trailingMetadataIsError = failed && timestampText == null,
             trailingStatus = status.takeIf { showStatus },
-            retention = retention,
-            reserveRetentionSpace = reserveRetentionSpace,
             loadingDescription = statusLabel,
             transferDirection = FileTransferDirection.Upload,
         )

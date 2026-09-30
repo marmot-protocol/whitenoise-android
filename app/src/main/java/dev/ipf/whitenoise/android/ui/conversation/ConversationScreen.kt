@@ -108,6 +108,7 @@ import dev.ipf.whitenoise.android.core.timelineRowKind
 import dev.ipf.whitenoise.android.core.usesPersistedFailurePresentation
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.state.AppText
+import dev.ipf.whitenoise.android.state.BlockOutcome
 import dev.ipf.whitenoise.android.state.ChatCreateOpenConversationTimingEvent
 import dev.ipf.whitenoise.android.state.ChatCreateOpenConversationTimingState
 import dev.ipf.whitenoise.android.state.ChatListItem
@@ -126,11 +127,13 @@ import dev.ipf.whitenoise.android.state.advanceConversationReadAnchor
 import dev.ipf.whitenoise.android.state.attachmentsFor
 import dev.ipf.whitenoise.android.state.chatCreateOpenConversationTimingStage
 import dev.ipf.whitenoise.android.state.conversationWindowCanReportVisible
+import dev.ipf.whitenoise.android.state.createPoll
 import dev.ipf.whitenoise.android.state.currentTtsConversationDestination
+import dev.ipf.whitenoise.android.state.dmPeerAccount
 import dev.ipf.whitenoise.android.state.hasKnownTranscriptPresentation
-import dev.ipf.whitenoise.android.state.isLoadingNewer
 import dev.ipf.whitenoise.android.state.isLoadingOlder
 import dev.ipf.whitenoise.android.state.isLoadingPage
+import dev.ipf.whitenoise.android.state.isUserBlocked
 import dev.ipf.whitenoise.android.state.loadMessageAvailability
 import dev.ipf.whitenoise.android.state.loadUntilMessageAvailable
 import dev.ipf.whitenoise.android.state.logUnreadBadgeTransition
@@ -146,6 +149,7 @@ import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
 import dev.ipf.whitenoise.android.state.reportVisibleMessage
 import dev.ipf.whitenoise.android.state.returnToLatestWindow
+import dev.ipf.whitenoise.android.state.setUserBlocked
 import dev.ipf.whitenoise.android.state.transcriptPresentationNeedsRetry
 import dev.ipf.whitenoise.android.state.unreadCountDivergenceReport
 import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
@@ -226,6 +230,7 @@ import dev.ipf.whitenoise.android.ui.group.GroupDetailsScreen
 import dev.ipf.whitenoise.android.ui.medialibrary.rememberSharedMediaTiles
 import dev.ipf.whitenoise.android.ui.medialibrary.toConversationViewerPages
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
+import dev.ipf.whitenoise.android.ui.settings.blockOutcomeMessage
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import kotlinx.coroutines.CancellationException
@@ -1320,7 +1325,72 @@ internal fun ConversationScreen(
             batchDeleteRetryState = null
         }
     }
-    val composerGate = conversationControllerComposerGate(controller, notificationOpenRequestId)
+    val dmPeerAccount = controller.dmPeerAccount
+    val blockMirror = appState.runtimeMirrors.blocks
+    var dmBlocked by
+        remember(controller, conversationAccountRef, dmPeerAccount, appState.runtimeGeneration) {
+            mutableStateOf(blockedDmFromMirror(controller, blockMirror))
+        }
+    var blockedDmUnblockInFlight by
+        remember(controller, conversationAccountRef, dmPeerAccount, appState.runtimeGeneration) {
+            mutableStateOf(false)
+        }
+    LaunchedEffect(
+        controller,
+        conversationAccountRef,
+        dmPeerAccount,
+        appState.runtimeGeneration,
+        blockMirror.revision,
+        blockMirror.available,
+    ) {
+        dmBlocked =
+            if (conversationAccountRef != null && dmPeerAccount != null) {
+                appState.isUserBlocked(conversationAccountRef, dmPeerAccount)
+            } else {
+                null
+            }
+    }
+    val composerGate =
+        blockedDmComposerGate(
+            membershipGate = conversationControllerComposerGate(controller, notificationOpenRequestId),
+            directPeerAccount = dmPeerAccount,
+            blocked = dmBlocked,
+        )
+
+    /** Commits an unblock for the current account and peer, ignoring a later route's result. */
+    fun unblockBlockedDm() {
+        val account = conversationAccountRef
+        val peer = dmPeerAccount
+        val canUnblock = !blockedDmUnblockInFlight && composerGate == ComposerGate.BLOCKED
+        if (account != null && peer != null && canUnblock) {
+            val runtimeGeneration = appState.runtimeGeneration
+            blockedDmUnblockInFlight = true
+            appState.launchMutation {
+                try {
+                    val outcome = appState.setUserBlocked(account, peer, blocked = false)
+                    if (
+                        controller.boundAccountRef == account &&
+                        controller.dmPeerAccount == peer &&
+                        appState.runtimeGeneration == runtimeGeneration
+                    ) {
+                        if (outcome == BlockOutcome.Confirmed) {
+                            dmBlocked = false
+                        } else {
+                            blockOutcomeMessage(outcome)?.let(appState::present)
+                        }
+                    }
+                } finally {
+                    if (
+                        controller.boundAccountRef == account &&
+                        controller.dmPeerAccount == peer &&
+                        appState.runtimeGeneration == runtimeGeneration
+                    ) {
+                        blockedDmUnblockInFlight = false
+                    }
+                }
+            }
+        }
+    }
 
     fun canWave(): Boolean =
         controller.canSendMessages &&
@@ -1751,6 +1821,7 @@ internal fun ConversationScreen(
     // Reuses the recipient picker; the selection sends a `nostr:npub…` reference
     // the recipient can tap to open that profile.
     var shareUserPickerOpen by remember(chat.id) { mutableStateOf(false) }
+    var pollCreateOpen by remember(chat.id) { mutableStateOf(false) }
     val shareUserSelection = remember(chat.id) { mutableStateListOf<RecipientSearch.Candidate>() }
     val contactPickerLauncher =
         rememberLauncherForActivityResult(PickContactPhoneRow()) { contactUri ->
@@ -3626,6 +3697,8 @@ internal fun ConversationScreen(
                         navigationState.initialTimelineBackfillNoProgress ||
                         transcriptPresentationNeedsRetry,
                 composerGate = composerGate,
+                blockedDmUnblockInFlight = blockedDmUnblockInFlight,
+                onUnblockBlockedDm = ::unblockBlockedDm,
                 controller = controller,
                 appState = appState,
                 messageTextCopy = messageTextCopy,
@@ -3738,6 +3811,12 @@ internal fun ConversationScreen(
                 },
                 onShareUser = { shareUserPickerOpen = true },
                 onShareContact = { contactPickerLauncher.launch(Unit) },
+                onCreatePoll =
+                    if (!controller.isDirectConversation) {
+                        { pollCreateOpen = true }
+                    } else {
+                        null
+                    },
                 onPasteImageUris = { uris ->
                     val openSlots = (MEDIA_PICKER_MAX_ITEMS - pendingMediaSlots.size).coerceAtLeast(0)
                     val pasteCandidates = uris.take(openSlots)
@@ -4065,6 +4144,8 @@ internal fun ConversationScreen(
                                         onQuickReactionsSave = { saveQuickReactionEmojis(it) },
                                         onReplyPreviewClick = { navigateToReplyTarget(it) },
                                         composerGate = composerGate,
+                                        blockedDmUnblockInFlight = blockedDmUnblockInFlight,
+                                        onUnblockBlockedDm = ::unblockBlockedDm,
                                         onWave =
                                             if (composerGate == ComposerGate.COMPOSER && canWave()) {
                                                 wave@{ accountIdHex, onAccepted ->
@@ -4114,6 +4195,24 @@ internal fun ConversationScreen(
                                                 }
                                             }
                                         }
+                                    }
+                                }
+                                if (
+                                    retentionHistoryBoundaryVisible(
+                                        retentionSeconds = controller.group.disappearingMessageSecs,
+                                        hasMessages = renderedTimeline.isNotEmpty(),
+                                        initialLoadStarted = navigationState.initialTimelineLoadStarted,
+                                        hasMoreBefore = controller.hasMoreBefore,
+                                        isLoading = controller.isLoading,
+                                        isLoadingPage = controller.isLoadingPage,
+                                        isLoadingOlder = controller.isLoadingOlder,
+                                        olderLoadFailed =
+                                            controller.error != null &&
+                                                controller.errorEdge == ConversationLoadFailureEdge.TOP,
+                                    )
+                                ) {
+                                    item(key = "retention-history-boundary") {
+                                        ConversationHistoryBoundary(controller.group.disappearingMessageSecs)
                                     }
                                 }
                                 conversationLoadErrorItem(
@@ -4166,13 +4265,7 @@ internal fun ConversationScreen(
                                     horizontalAlignment = Alignment.End,
                                     verticalArrangement = Arrangement.spacedBy(8.dp),
                                 ) {
-                                    // A newer page that takes longer than a moment shows here, beside the
-                                    // jump button, so the list's bottom edge never moves for it.
-                                    if (rememberNewerPageIndicatorVisible(controller.isLoadingNewer)) {
-                                        ConversationNewerPageIndicator()
-                                    }
-                                    // Selection hides the controls below; the newer-page indicator above stays,
-                                    // since a page can be in flight when selection starts or start during it.
+                                    // Selection hides these controls; paging progress never covers message rows.
                                     if (!selectionMode && ttsFollowHandle.showResumeAction) {
                                         TtsResumeFollowButton(
                                             onClick = ttsFollowHandle::resumeFollow,
@@ -4412,6 +4505,22 @@ internal fun ConversationScreen(
             onSend = { selected ->
                 pendingContactShare = null
                 mediaSender.sendSharedContact(selected)
+            },
+        )
+    }
+
+    if (pollCreateOpen) {
+        PollCreateDialog(
+            onDismiss = { pollCreateOpen = false },
+            onSubmit = { question, options, type, deadlineDurationSeconds, onResult ->
+                appState.launchMutation {
+                    var created = false
+                    try {
+                        created = controller.createPoll(question, options, type, deadlineDurationSeconds)
+                    } finally {
+                        onResult(created)
+                    }
+                }
             },
         )
     }

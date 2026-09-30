@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.pm.ServiceInfo
 import androidx.test.core.app.ApplicationProvider
 import androidx.work.ListenableWorker
 import androidx.work.ListenableWorker.Result
@@ -92,6 +93,14 @@ class AttachmentDownloadWorkerClassTest {
 
             assertEquals(Result.success(), worker.doWork())
         }
+
+    /** Interactive WorkManager fallback must never start its service with type none. */
+    @Test
+    fun interactiveForegroundInfoUsesDataSyncServiceType() {
+        val info = attachmentWorkForegroundInfo(appContext, testRequest())
+
+        assertEquals(ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC, info.foregroundServiceType)
+    }
 
     @Test
     fun doWorkRetriesTransientDownloadFailuresOnce() =

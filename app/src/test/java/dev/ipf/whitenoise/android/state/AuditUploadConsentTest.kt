@@ -5,7 +5,9 @@ import android.content.SharedPreferences
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.AuditLogTrackerConfigV4Ffi
+import dev.ipf.marmotkit.AuditOtlpConfigV5Ffi
 import dev.ipf.marmotkit.MarmotInterface
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -24,6 +26,24 @@ class AuditUploadConsentTest {
         ApplicationProvider
             .getApplicationContext<Context>()
             .getSharedPreferences("audit-consent-test", Context.MODE_PRIVATE)
+
+    /** Consent given for the former collector does not authorize the new v5 receiver. */
+    @Test
+    fun previousDisclosureRequiresNewChoiceBeforeUploading() =
+        runTest {
+            preferences
+                .edit()
+                .clear()
+                .putInt("audit_upload_disclosure_revision", 1)
+                .commit()
+            val native = Native(enabled = true)
+            val consent = AuditUploadConsent(preferences)
+            consent.prepare(native.runtime)
+            assertFalse(consent.granted)
+            assertTrue(consent.requiresChoice)
+            assertFalse(native.enabled)
+            assertEquals(listOf("clear-upload", "disable"), native.mutations)
+        }
 
     @Test
     fun oldLocalLoggingChoiceIsDisabledBeforeStartupAndRenewalSurvivesRestart() =
@@ -67,6 +87,59 @@ class AuditUploadConsentTest {
             assertFalse(native.enabled)
             reopened.choose(false)
             assertFalse(AuditUploadConsent(preferences).granted)
+        }
+
+    /** Native rejection leaves a consented recorder local and cannot assert upload readiness. */
+    @Test
+    fun rejectedV5UploadDoesNotBlockStartupOrStopLocalRecording() =
+        runTest {
+            preferences.edit().clear().commit()
+            AuditUploadConsent(preferences).choose(true)
+            val native = Native(enabled = true, failSecondV5Set = true)
+            val consent = AuditUploadConsent(preferences)
+
+            consent.prepare(native.runtime)
+
+            assertTrue(native.enabled)
+            assertTrue(consent.granted)
+            assertFalse(consent.startupUploadConfigured)
+            assertEquals(3, native.auditUploadAttempts.size)
+        }
+
+    /** The failed enabled route is cleared before startup continues. */
+    @Test
+    fun rejectedStartupRouteClearsNativeAuthorization() =
+        runTest {
+            val attempts = mutableListOf<Boolean>()
+            val accepted =
+                tryEnableAuditUploadAtStartup(
+                    configureUpload = { enabled ->
+                        attempts += enabled
+                        if (enabled) error("Native rejected v5 route")
+                    },
+                    reportRejected = {},
+                )
+            assertFalse(accepted)
+            assertEquals(listOf(true, false), attempts)
+        }
+
+    /** A cancelled startup clears a partially configured route and still propagates cancellation. */
+    @Test
+    fun cancelledStartupRouteClearsNativeAuthorization() =
+        runTest {
+            val attempts = mutableListOf<Boolean>()
+            try {
+                tryEnableAuditUploadAtStartup(
+                    configureUpload = { enabled ->
+                        attempts += enabled
+                        if (enabled) throw CancellationException("Startup cancelled")
+                    },
+                    reportRejected = {},
+                )
+                fail("Cancellation must propagate")
+            } catch (_: CancellationException) {
+                assertEquals(listOf(true, false), attempts)
+            }
         }
 
     @Test
@@ -257,6 +330,7 @@ class AuditUploadConsentTest {
             if (method.name == "commit") false else proxy
         } as SharedPreferences.Editor
 
+    /** Verifies a failed consent transition is surfaced instead of silently accepted. */
     private suspend fun expectFailure(action: suspend () -> Unit) {
         try {
             action()
@@ -269,14 +343,21 @@ class AuditUploadConsentTest {
     private class Native(
         var enabled: Boolean,
         val failDisable: Boolean = false,
+        val failSecondV5Set: Boolean = false,
     ) {
         val mutations = mutableListOf<String>()
+        val auditUploadAttempts = mutableListOf<Boolean>()
         val runtime =
             Proxy.newProxyInstance(
                 MarmotInterface::class.java.classLoader,
                 arrayOf(MarmotInterface::class.java),
             ) { _, method, args ->
                 when (method.name) {
+                    "setAuditOtlpConfigV5" ->
+                        (args!!.first() as AuditOtlpConfigV5Ffi).also {
+                            auditUploadAttempts += it.enabled
+                            if (failSecondV5Set && auditUploadAttempts.size == 2) error("Native rejected v5 route")
+                        }
                     "setAuditLogTrackerConfig" ->
                         (args!![0] as AuditLogTrackerConfigV4Ffi).also {
                             mutations += if (it.authorizationBearerToken == null) "clear-upload" else "allow-upload"

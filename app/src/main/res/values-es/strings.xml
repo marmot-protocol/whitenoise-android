@@ -1,6 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">White Noise</string>
+    <string name="poll_preview">Encuesta</string>
+    <string name="poll_unsupported">No se puede mostrar esta encuesta</string>
+    <string name="poll_closed">Encuesta cerrada</string>
+    <string name="poll_vote_failed">No se pudo enviar el voto</string>
+    <string name="poll_create_failed">No se pudo crear la encuesta</string>
+    <string name="poll_enter_question">Escribe una pregunta.</string>
+    <string name="poll_question_too_long">Esta pregunta es demasiado larga.</string>
+    <string name="poll_add_two_options">Añade al menos dos opciones.</string>
+    <string name="poll_option_too_long">Una de las opciones es demasiado larga.</string>
+    <string name="poll_duplicate_option">Cada opción debe ser diferente.</string>
+    <string name="poll_create">Crear encuesta</string>
+    <string name="poll_question">Pregunta</string>
+    <string name="poll_option">Opción %1$d</string>
+    <string name="poll_add_option">Añadir opción</string>
+    <string name="poll_remove_option">Eliminar opción %1$d</string>
+    <string name="poll_single_choice">Una sola opción</string>
+    <string name="poll_multiple_choice">Varias opciones</string>
+    <string name="poll_submit">Publicar encuesta</string>
+    <string name="poll_deadline">La encuesta termina</string>
+    <string name="poll_no_deadline">Sin fecha límite</string>
+    <string name="poll_30_days">30 días</string>
+    <string name="poll_duration_5_minutes">5 minutos</string>
+    <string name="poll_duration_1_hour">1 hora</string>
+    <string name="poll_duration_1_day">1 día</string>
+    <string name="poll_duration_1_week">1 semana</string>
+    <string name="poll_ends_at">Termina el %1$s</string>
+    <plurals name="poll_option_votes">
+        <item quantity="one">%1$d voto</item>
+        <item quantity="other">%1$d votos</item>
+    </plurals>
+    <plurals name="poll_participants">
+        <item quantity="one">%1$d participante</item>
+        <item quantity="other">%1$d participantes</item>
+    </plurals>
     <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">No se pudo iniciar White Noise</string>
     <string name="startup_taking_too_long">El inicio está tardando más de lo esperado. Inténtalo de nuevo.</string>
@@ -167,6 +201,8 @@
     <string name="wave_hi">Saludar</string>
     <string name="conversation_empty_disappearing_title">No hay mensajes que mostrar</string>
     <string name="conversation_empty_disappearing_body">Los mensajes temporales están activados. Los mensajes nuevos de este chat desaparecen después de %1$s.</string>
+    <string name="conversation_history_may_have_expired">Es posible que los mensajes anteriores hayan caducado</string>
+    <string name="conversation_history_retention_description">%1$s. Mensajes temporales: %2$s.</string>
     <string name="group_empty_only_you_title">Solo estás tú en este grupo</string>
     <string name="group_empty_invite_members">Invita a otras personas cuando quieras.</string>
     <string name="you_are_no_longer_a_member">No puedes enviar mensajes a este grupo porque ya no eres miembro.</string>
@@ -1186,8 +1222,10 @@
     <string name="folder_none_detail">Crea una carpeta para organizar tus chats.</string>
     <string name="folder_restore_hint">Restaura las carpetas No leídos, Archivados y Grupos que falten. Las carpetas existentes conservan tus cambios.</string>
     <string name="folder_edit">Editar carpeta</string>
+    <string name="folder_delete_action">Eliminar carpeta</string>
     <string name="folder_delete_title">¿Eliminar “%1$s”?</string>
     <string name="folder_delete_detail">¿Eliminar esta carpeta? Tus chats se quedarán donde están.</string>
+    <string name="folder_delete_failed">No se pudo eliminar esta carpeta. Inténtalo de nuevo.</string>
     <string name="actions_for">Acciones para %1$s</string>
     <string name="chat_folder_name">Nombre de la carpeta</string>
     <string name="folder_manual_hint">Los chats que añadas aquí seguirán incluidos aunque no cumplan las reglas automáticas.</string>
@@ -1831,6 +1869,9 @@
     <string name="group_recovery_failed_reinvites">No se pudieron restaurar algunas invitaciones. Vuelve a invitar a esas personas desde Detalles del grupo.</string>
     <string name="group_recovery_review_invitation_from">Revisar invitación de %1$s · época %2$s</string>
     <string name="group_recovery_check_failed">No se pudo comprobar la recuperación del grupo. Inténtalo de nuevo.</string>
+    <string name="group_history_may_be_incomplete">Es posible que falten algunos mensajes anteriores en este chat.</string>
+    <string name="account_history_may_be_incomplete">Es posible que falten algunos mensajes en esta cuenta. White Noise no pudo confirmar que llegaran todos los mensajes.</string>
+    <string name="history_notice_dismiss_failed">No se pudo descartar el aviso del historial. Inténtalo de nuevo.</string>
     <string name="group_rejoin_title">¿Volver a unirse al grupo?</string>
     <string name="group_rejoin_invited_by">Invitación de %1$s\n%2$s</string>
     <string name="group_rejoin_replaces_state">Volver a unirte sustituye los datos de cifrado de este dispositivo para el grupo. Tu historial de mensajes se conserva.</string>
@@ -2042,7 +2083,7 @@
     <string name="audit_upload_title">Compartir registros de diagnóstico de grupos</string>
     <string name="audit_upload_subtitle">Comparte los registros de diagnóstico de grupos de todos los perfiles de este dispositivo.</string>
     <string name="audit_upload_confirm_title">¿Compartir registros de diagnóstico de grupos con White Noise?</string>
-    <string name="audit_upload_disclosure">White Noise graba registros de diagnóstico de grupos de todos los perfiles de este dispositivo y los sube a Goggles, operado por Internet Privacy Foundation. También pueden subirse los registros ya guardados aquí. Los registros pueden incluir identificadores de grupos y mensajes, direcciones de relays, marcas de tiempo, referencias seudónimas de cuentas, un identificador de instalación, el modelo de tu dispositivo y la versión de la app. Nunca incluyen el contenido de los mensajes ni claves privadas. Son datos sensibles y los usamos para investigar problemas de fiabilidad. Se mantienen separados del envío de datos de uso y telemetría. Desactivar el envío detiene las nuevas grabaciones y las nuevas subidas, aunque una subida en curso puede terminar. Los registros de este dispositivo y los ya subidos se quedan donde están. Cancelar mantiene desactivado el envío.</string>
+    <string name="audit_upload_disclosure">White Noise graba registros de diagnóstico de grupos de todos los perfiles de este dispositivo y los sube al colector de auditoría de White Noise, operado por Internet Privacy Foundation. También pueden subirse los registros ya guardados aquí. Los registros pueden incluir identificadores de grupos y mensajes, direcciones de relays, marcas de tiempo, referencias seudónimas de cuentas, un identificador de instalación, el modelo de tu dispositivo y la versión de la app. Nunca incluyen el contenido de los mensajes ni claves privadas. Son datos sensibles y los usamos para investigar problemas de fiabilidad. Se mantienen separados del envío de datos de uso y telemetría. Desactivar el envío detiene las nuevas grabaciones y las nuevas subidas, aunque una subida en curso puede terminar. Los registros de este dispositivo y los ya subidos se quedan donde están. Cancelar mantiene desactivado el envío.</string>
     <string name="audit_upload_confirm">Activar envío automático</string>
     <string name="audit_upload_renew">Los detalles del envío han cambiado. Revísalos antes de volver a activar los registros de diagnóstico de grupos.</string>
     <string name="diagnostics_group_disclosure">Los registros de diagnóstico de grupos ayudan a investigar problemas de fiabilidad. Se refieren a los miembros mediante referencias hash. Cada registro puede contener identificadores técnicos y cambios de miembros con marca de tiempo. Nunca incluyen el contenido de los mensajes, nombres de perfiles, nombres de grupos ni claves privadas.</string>
@@ -2068,5 +2109,7 @@
     <string name="export_audit_logs_confirm_action">Continuar</string>
     <string name="toast_couldnt_export_audit_logs">No se pudieron preparar los registros de diagnóstico para exportarlos</string>
     <string name="toast_no_audit_logs_to_export">No hay registros de diagnóstico para exportar</string>
-    <string name="conversation_loading_newer">Cargando mensajes más recientes</string>
+    <string name="dictation_pause_other_audio_title">Pausar otro audio</string>
+    <string name="dictation_pause_other_audio_subtitle">Pausa la música y los pódcasts mientras dictas; pueden reanudarse al terminar la grabación. La voz y los mensajes de voz de White Noise siempre se pausan por seguridad.</string>
+    <string name="dictation_audio_focus_unavailable">No se pudo pausar otro audio. Inténtalo de nuevo o desactiva esta opción en los ajustes de dictado.</string>
 </resources>

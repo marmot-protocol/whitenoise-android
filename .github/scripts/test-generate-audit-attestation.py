@@ -17,8 +17,8 @@ BASE_ENV = {
     "GITHUB_EVENT_NAME": "push",
     "GITHUB_ACTOR": "Datawav",
     "GITHUB_SHA": "1" * 40,
-    "WHITENOISE_AUDIT_LOG_ENDPOINT": "https://audit.invalid/upload",
-    "WHITENOISE_AUDIT_LOG_AUTH_TOKEN": "secret-test-token",
+    "WHITENOISE_AUDIT_OTLP_ENDPOINT": "https://audit.invalid/v1/logs",
+    "WHITENOISE_AUDIT_OTLP_AUTH_TOKEN": "secret-test-token",
 }
 EXPECTED_KEYS = {
     "schema_version",
@@ -62,18 +62,43 @@ class GenerateAuditAttestationTest(unittest.TestCase):
         self.assertIs(value["audit_auth_configured"], True)
         self.assertIs(value["runtime_audit_required"], True)
         self.assertEqual("obfuscated_sensitive_data", value["data_mode"])
-        self.assertNotIn(BASE_ENV["WHITENOISE_AUDIT_LOG_ENDPOINT"], payload)
-        self.assertNotIn(BASE_ENV["WHITENOISE_AUDIT_LOG_AUTH_TOKEN"], payload)
+        self.assertNotIn(BASE_ENV["WHITENOISE_AUDIT_OTLP_ENDPOINT"], payload)
+        self.assertNotIn(BASE_ENV["WHITENOISE_AUDIT_OTLP_AUTH_TOKEN"], payload)
 
     def test_rejects_missing_endpoint(self) -> None:
-        result, payload = self.run_generator({"WHITENOISE_AUDIT_LOG_ENDPOINT": ""})
+        result, payload = self.run_generator({"WHITENOISE_AUDIT_OTLP_ENDPOINT": ""})
         self.assertNotEqual(0, result.returncode)
         self.assertEqual("", payload)
 
     def test_rejects_missing_auth(self) -> None:
-        result, payload = self.run_generator({"WHITENOISE_AUDIT_LOG_AUTH_TOKEN": ""})
+        result, payload = self.run_generator({"WHITENOISE_AUDIT_OTLP_AUTH_TOKEN": ""})
         self.assertNotEqual(0, result.returncode)
         self.assertEqual("", payload)
+
+    def test_rejects_v4_endpoint(self) -> None:
+        """A v4 upload path cannot stand in for the v5 OTLP logs endpoint."""
+        result, payload = self.run_generator({"WHITENOISE_AUDIT_OTLP_ENDPOINT": "https://audit.invalid/upload"})
+        self.assertNotEqual(0, result.returncode)
+        self.assertEqual("", payload)
+
+    def test_rejects_v5_endpoint_with_unusable_authority_or_extra_url_parts(self) -> None:
+        """Attestation rejects URL forms that the Android sender also disables."""
+        for endpoint in (
+            "https://audit.invalid/v1/logs?key=1",
+            "https://audit.invalid/v1/logs?",
+            "https://audit.invalid/v1/logs#fragment",
+            "https://user:pass@audit.invalid/v1/logs",
+            "https://audit.invalid:bad/v1/logs",
+            "https:///v1/logs",
+            "https://audit*.invalid/v1/logs",
+            "https://audit..invalid/v1/logs",
+            "https://audit_invalid/v1/logs",
+            "https://256.256.256.256/v1/logs",
+        ):
+            with self.subTest(endpoint=endpoint):
+                result, payload = self.run_generator({"WHITENOISE_AUDIT_OTLP_ENDPOINT": endpoint})
+                self.assertNotEqual(0, result.returncode)
+                self.assertEqual("", payload)
 
     def test_rejects_untrusted_workflow_or_ref(self) -> None:
         for overrides in (

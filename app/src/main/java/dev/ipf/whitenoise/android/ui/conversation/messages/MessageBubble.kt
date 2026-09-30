@@ -132,6 +132,7 @@ import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutR
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutSink
 import dev.ipf.whitenoise.android.ui.conversation.InvitationActions
 import dev.ipf.whitenoise.android.ui.conversation.InviteAcceptanceResolutionStatus
+import dev.ipf.whitenoise.android.ui.conversation.composer.BlockedDmComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
@@ -347,6 +348,8 @@ internal fun MessageBubble(
     onQuickReactionsSave: (List<String>) -> Unit,
     onReplyPreviewClick: (TimelineMessage) -> Unit,
     composerGate: ComposerGate,
+    blockedDmUnblockInFlight: Boolean = false,
+    onUnblockBlockedDm: () -> Unit = {},
     groupDisbanded: Boolean = false,
     inviteMutationInFlight: Boolean,
     onJoinInvite: () -> Unit,
@@ -2213,7 +2216,6 @@ internal fun MessageBubble(
                                     timestampColor = timestampColor,
                                     statusContainerColor = colorFromArgb(bubblePresentation.backgroundArgb),
                                     showStatus = showOutgoingStatus && !fileFooterInCard,
-                                    retentionOwnedByFileCard = fileFooterInCard,
                                     editedLabel = footerLabel,
                                     onEditedClick = onEditedClick,
                                     footerOnVisualMedia = footerOnVisualMedia,
@@ -2301,7 +2303,6 @@ internal fun MessageBubble(
                                     timestampColor = timestampColor,
                                     statusContainerColor = colorFromArgb(bubblePresentation.backgroundArgb),
                                     showStatus = showOutgoingStatus && !fileFooterInCard,
-                                    retentionOwnedByFileCard = fileFooterInCard,
                                     editedLabel = footerLabel,
                                     onEditedClick = onEditedClick,
                                     footerOnVisualMedia = footerOnVisualMedia,
@@ -2371,7 +2372,6 @@ internal fun MessageBubble(
                             timestampColor = timestampColor,
                             statusContainerColor = bubbleBackgroundColor,
                             showStatus = shouldShowMessageStatus(mine, deleted, invalidationPresentation),
-                            retentionOwnedByFileCard = false,
                             editedLabel = footerLabel,
                             onEditedClick = onEditedClick,
                             footerOnVisualMedia = footerOnVisualMedia,
@@ -2522,24 +2522,6 @@ internal fun MessageBubble(
                         },
                     previewReady = !hasMedia || focusedMediaReady,
                     preview = {
-                        val previewRetention =
-                            record
-                                .retentionIndicatorInput(
-                                    controllerKey = controller,
-                                    accountRef = controller.boundAccountRef,
-                                    deleted = deleted,
-                                    retentionAtSendSeconds = item.retentionAtSendSeconds,
-                                ).takeUnless { fileFooterInCard }
-                        val previewReserveRetention =
-                            !fileFooterInCard &&
-                                !deleted &&
-                                shouldReserveRetentionIndicatorSpace(
-                                    input = previewRetention,
-                                    projectedRetentionSeconds = record.retentionSeconds,
-                                    mine = mine,
-                                    status = item.status,
-                                    groupRetentionSeconds = controller.group.disappearingMessageSecs,
-                                )
                         val previewFooter: @Composable () -> Unit = {
                             MessageInlineFooter(
                                 timeText = rememberedMessageBubbleTime(record.recordedAt),
@@ -2548,8 +2530,6 @@ internal fun MessageBubble(
                                 status = item.status,
                                 editedLabel = footerLabel,
                                 onEditedClick = null,
-                                retention = previewRetention,
-                                reserveRetentionSpace = previewReserveRetention,
                                 showTime = !fileFooterInCard,
                                 statusContainerColor = colorFromArgb(bubblePresentation.backgroundArgb),
                             )
@@ -2627,13 +2607,6 @@ internal fun MessageBubble(
                                 footerContent = previewFooter,
                                 warning = outerInvalidationWarning,
                                 editedLabel = footerLabel,
-                                retention =
-                                    record.retentionIndicatorInput(
-                                        controllerKey = controller,
-                                        accountRef = controller.boundAccountRef,
-                                        deleted = deleted,
-                                        retentionAtSendSeconds = item.retentionAtSendSeconds,
-                                    ),
                                 mentionedSelf = mentionedSelf,
                                 mentionedYouLabel = mentionedYouLabel,
                                 reply =
@@ -2759,6 +2732,11 @@ internal fun MessageBubble(
                                         )
                                     }
                                 ComposerGate.NOTICE -> RemovedMemberComposerNotice()
+                                ComposerGate.BLOCKED ->
+                                    BlockedDmComposerNotice(
+                                        unblockInFlight = blockedDmUnblockInFlight,
+                                        onUnblock = onUnblockBlockedDm,
+                                    )
                                 ComposerGate.FROZEN -> FrozenGroupComposerNotice()
                                 ComposerGate.DISBANDED -> DisbandedGroupComposerNotice(disbanded = groupDisbanded)
                                 ComposerGate.INVITE ->

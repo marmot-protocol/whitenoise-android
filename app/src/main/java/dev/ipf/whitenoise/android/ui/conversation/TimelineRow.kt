@@ -71,6 +71,8 @@ internal fun TimelineRow(
     onQuickReactionsSave: (List<String>) -> Unit,
     onReplyPreviewClick: (TimelineMessage) -> Unit,
     composerGate: ComposerGate,
+    blockedDmUnblockInFlight: Boolean = false,
+    onUnblockBlockedDm: () -> Unit = {},
     onBack: () -> Unit,
     mentionCandidates: List<MentionComposer.Candidate>,
     mentionPickerEnabled: Boolean,
@@ -129,6 +131,19 @@ internal fun TimelineRow(
                 if (appState.streamingDebugEnabled) {
                     StreamDebugEventRow(record = item.record)
                 }
+                return@Column
+            }
+            if (
+                MessageProjector.isPollKind(item.record.kind) &&
+                item.projected?.deleted != true &&
+                !MessageProjector.isDeleted(item.record.messageIdHex, controller.deletedMessageIds)
+            ) {
+                PollTimelineRow(
+                    item = item,
+                    controller = controller,
+                    appState = appState,
+                    selectionMode = selectionMode,
+                )
                 return@Column
             }
             when (timelineRowKind(item.record, appState.streamingDebugEnabled)) {
@@ -262,6 +277,8 @@ internal fun TimelineRow(
                         onQuickReactionsSave = onQuickReactionsSave,
                         onReplyPreviewClick = onReplyPreviewClick,
                         composerGate = composerGate,
+                        blockedDmUnblockInFlight = blockedDmUnblockInFlight,
+                        onUnblockBlockedDm = onUnblockBlockedDm,
                         onBack = onBack,
                         mentionCandidates = mentionCandidates,
                         mentionPickerEnabled = mentionPickerEnabled,

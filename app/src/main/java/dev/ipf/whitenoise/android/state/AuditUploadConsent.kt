@@ -1,11 +1,13 @@
 package dev.ipf.whitenoise.android.state
 
 import android.content.SharedPreferences
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.MarmotInterface
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 
@@ -13,18 +15,22 @@ import kotlinx.coroutines.withContext
 internal class AuditUploadConsent(
     private val preferences: SharedPreferences,
 ) {
+    private val currentDisclosureRevision = 2
     private val revisionKey = "audit_upload_disclosure_revision"
     private val renewalKey = "audit_upload_disclosure_pending"
 
-    val granted: Boolean get() = preferences.getInt(revisionKey, 0) == 1
+    val granted: Boolean get() = preferences.getInt(revisionKey, 0) == currentDisclosureRevision
     var requiresChoice by mutableStateOf(preferences.getBoolean(renewalKey, false))
         private set
+    var startupUploadConfigured = false
+        private set
+    val readyForStartupMarker: Boolean get() = granted && startupUploadConfigured
 
     fun choose(enabled: Boolean) {
         check(
             preferences
                 .edit()
-                .putInt(revisionKey, if (enabled) 1 else 0)
+                .putInt(revisionKey, if (enabled) currentDisclosureRevision else 0)
                 .putBoolean(renewalKey, false)
                 .commit(),
         ) {
@@ -85,6 +91,7 @@ internal class AuditUploadConsent(
      * An old local-log choice cannot authorize uploads.
      */
     suspend fun prepare(runtime: MarmotInterface) {
+        startupUploadConfigured = false
         runtime.configureAuditRuntime(uploadConsentGranted = false)
         if (!granted && runtime.auditLogSettings().enabled) {
             check(preferences.edit().putBoolean(renewalKey, true).commit()) {
@@ -93,6 +100,39 @@ internal class AuditUploadConsent(
             requiresChoice = true
             runtime.setAuditLogSettings(runtime.auditLogSettings().copy(enabled = false))
         }
-        if (granted) runtime.configureAuditRuntime(uploadConsentGranted = true)
+        if (granted) {
+            startupUploadConfigured =
+                tryEnableAuditUploadAtStartup(
+                    configureUpload = { runtime.configureAuditRuntime(uploadConsentGranted = it) },
+                    reportRejected = { Log.w("WhiteNoiseAudit", "v5 audit upload unavailable; retaining local logs") },
+                )
+        }
     }
 }
+
+/** Keeps startup usable with local recording if native validation rejects the consented route. */
+@Suppress("TooGenericExceptionCaught", "SwallowedException")
+internal suspend fun tryEnableAuditUploadAtStartup(
+    configureUpload: suspend (Boolean) -> Unit,
+    reportRejected: () -> Unit,
+): Boolean =
+    try {
+        configureUpload(true)
+        true
+    } catch (failure: CancellationException) {
+        withContext(NonCancellable) {
+            runCatching { configureUpload(false) }.exceptionOrNull()?.let(failure::addSuppressed)
+        }
+        throw failure
+    } catch (failure: Exception) {
+        // The route was cleared before this attempt. Clear again in case a
+        // later native metadata call failed after enabling v5 delivery.
+        try {
+            configureUpload(false)
+        } catch (clearFailure: Exception) {
+            clearFailure.addSuppressed(failure)
+            throw clearFailure
+        }
+        reportRejected()
+        false
+    }

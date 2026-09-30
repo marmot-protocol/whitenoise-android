@@ -1,6 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">White Noise</string>
+    <string name="poll_preview">Anket</string>
+    <string name="poll_unsupported">Bu anket görüntülenemiyor</string>
+    <string name="poll_closed">Anket kapandı</string>
+    <string name="poll_vote_failed">Oy gönderilemedi</string>
+    <string name="poll_create_failed">Anket oluşturulamadı</string>
+    <string name="poll_enter_question">Bir soru girin.</string>
+    <string name="poll_question_too_long">Bu soru çok uzun.</string>
+    <string name="poll_add_two_options">En az iki seçenek ekleyin.</string>
+    <string name="poll_option_too_long">Seçeneklerden biri çok uzun.</string>
+    <string name="poll_duplicate_option">Her seçenek farklı olmalıdır.</string>
+    <string name="poll_create">Anket oluştur</string>
+    <string name="poll_question">Soru</string>
+    <string name="poll_option">Seçenek %1$d</string>
+    <string name="poll_add_option">Seçenek ekle</string>
+    <string name="poll_remove_option">%1$d. seçeneği kaldır</string>
+    <string name="poll_single_choice">Tek seçim</string>
+    <string name="poll_multiple_choice">Çoklu seçim</string>
+    <string name="poll_submit">Anketi yayınla</string>
+    <string name="poll_deadline">Anket bitişi</string>
+    <string name="poll_no_deadline">Bitiş tarihi yok</string>
+    <string name="poll_30_days">30 gün</string>
+    <string name="poll_duration_5_minutes">5 dakika</string>
+    <string name="poll_duration_1_hour">1 saat</string>
+    <string name="poll_duration_1_day">1 gün</string>
+    <string name="poll_duration_1_week">1 hafta</string>
+    <string name="poll_ends_at">Bitiş: %1$s</string>
+    <plurals name="poll_option_votes">
+        <item quantity="one">%1$d oy</item>
+        <item quantity="other">%1$d oy</item>
+    </plurals>
+    <plurals name="poll_participants">
+        <item quantity="one">%1$d katılımcı</item>
+        <item quantity="other">%1$d katılımcı</item>
+    </plurals>
     <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">White Noise başlatılamadı</string>
     <string name="startup_taking_too_long">Başlatma beklenenden uzun sürüyor. Lütfen tekrar deneyin.</string>
@@ -167,6 +201,8 @@
     <string name="wave_hi">El salla</string>
     <string name="conversation_empty_disappearing_title">Gösterilecek mesaj yok</string>
     <string name="conversation_empty_disappearing_body">Kaybolan mesajlar açık. Bu sohbetteki yeni mesajlar %1$s sonra kaybolur.</string>
+    <string name="conversation_history_may_have_expired">Önceki mesajların süresi dolmuş olabilir</string>
+    <string name="conversation_history_retention_description">%1$s. Kaybolan mesajlar: %2$s.</string>
     <string name="group_empty_only_you_title">Bu grupta yalnızca sen varsın</string>
     <string name="group_empty_invite_members">Hazır olduğunda kişileri davet et.</string>
     <string name="you_are_no_longer_a_member">Artık bu grubun üyesi olmadığınız için bu gruba mesaj gönderemezsiniz.</string>
@@ -1184,8 +1220,10 @@
     <string name="folder_none_detail">Sohbetlerinizi düzenlemek için bir klasör oluşturun.</string>
     <string name="folder_restore_hint">Eksik Okunmamış, Arşivlenmiş ve Gruplar klasörlerini geri yükleyin. Mevcut klasörler değişikliklerinizi korur.</string>
     <string name="folder_edit">Klasörü Düzenle</string>
+    <string name="folder_delete_action">Klasörü sil</string>
     <string name="folder_delete_title">“%1$s” silinsin mi?</string>
     <string name="folder_delete_detail">Bu klasör silinsin mi? Sohbetleriniz oldukları yerde kalacak.</string>
+    <string name="folder_delete_failed">Bu klasör silinemedi. Tekrar deneyin.</string>
     <string name="actions_for">%1$s için eylemler</string>
     <string name="chat_folder_name">Klasör adı</string>
     <string name="folder_manual_hint">Buraya eklediğiniz sohbetler, otomatik kurallarla eşleşmese bile dahil olmaya devam eder.</string>
@@ -1829,6 +1867,9 @@
     <string name="group_recovery_failed_reinvites">Bazı davetler geri yüklenemedi. Bu kişileri Grup Ayrıntıları’ndan yeniden davet edin.</string>
     <string name="group_recovery_review_invitation_from">%1$s kişisinin davetini incele · dönem %2$s</string>
     <string name="group_recovery_check_failed">Grup kurtarma denetlenemedi. Tekrar deneyin.</string>
+    <string name="group_history_may_be_incomplete">Bu sohbetteki bazı eski mesajlar eksik olabilir.</string>
+    <string name="account_history_may_be_incomplete">Bu hesapta bazı mesajlar eksik olabilir. White Noise tüm mesajların ulaştığını doğrulayamadı.</string>
+    <string name="history_notice_dismiss_failed">Geçmiş bildirimi kapatılamadı. Yeniden deneyin.</string>
     <string name="group_rejoin_title">Gruba yeniden katılınsın mı?</string>
     <string name="group_rejoin_invited_by">Davet eden: %1$s\n%2$s</string>
     <string name="group_rejoin_replaces_state">Yeniden katılmak, bu cihazdaki grup şifreleme verilerini değiştirir. Mesaj geçmişiniz korunur.</string>
@@ -2040,7 +2081,7 @@
     <string name="audit_upload_title">Grup tanılama günlüklerini paylaş</string>
     <string name="audit_upload_subtitle">Bu cihazdaki tüm profiller için grup tanılama günlüklerini paylaşır.</string>
     <string name="audit_upload_confirm_title">Grup tanılama günlükleri White Noise ile paylaşılsın mı?</string>
-    <string name="audit_upload_disclosure">White Noise, bu cihazdaki tüm profiller için grup tanılama günlüklerini kaydeder ve Internet Privacy Foundation tarafından işletilen Goggles’a yükler. Burada zaten saklanan günlükler de yüklenebilir. Günlükler grup ve mesaj kimliklerini, röle adreslerini, zaman damgalarını, takma adlı hesap referanslarını, bir kurulum kimliğini, cihaz modelinizi ve uygulama sürümünü içerebilir. Mesaj içeriklerini veya özel anahtarları asla içermez. Bu günlükler hassastır; güvenilirlik sorunlarını araştırmak için kullanırız. Kullanım ve telemetri paylaşımından ayrı tutulur. Paylaşımı kapatmak yeni kayıtları ve yeni yüklemeleri durdurur; ancak sürmekte olan bir yükleme tamamlanabilir. Bu cihazdaki günlükler ve daha önce yüklenmiş günlükler olduğu yerde kalır. İptal, paylaşımı kapalı bırakır.</string>
+    <string name="audit_upload_disclosure">White Noise, bu cihazdaki tüm profiller için grup tanılama günlüklerini kaydeder ve Internet Privacy Foundation tarafından işletilen White Noise denetim toplayıcısına yükler. Burada zaten saklanan günlükler de yüklenebilir. Günlükler grup ve mesaj kimliklerini, röle adreslerini, zaman damgalarını, takma adlı hesap referanslarını, bir kurulum kimliğini, cihaz modelinizi ve uygulama sürümünü içerebilir. Mesaj içeriklerini veya özel anahtarları asla içermez. Bu günlükler hassastır; güvenilirlik sorunlarını araştırmak için kullanırız. Kullanım ve telemetri paylaşımından ayrı tutulur. Paylaşımı kapatmak yeni kayıtları ve yeni yüklemeleri durdurur; ancak sürmekte olan bir yükleme tamamlanabilir. Bu cihazdaki günlükler ve daha önce yüklenmiş günlükler olduğu yerde kalır. İptal, paylaşımı kapalı bırakır.</string>
     <string name="audit_upload_confirm">Otomatik paylaşımı etkinleştir</string>
     <string name="audit_upload_renew">Paylaşım ayrıntıları değişti. Grup tanılama günlüklerini yeniden açmadan önce bunları inceleyin.</string>
     <string name="diagnostics_group_disclosure">Grup tanılama günlükleri, güvenilirlik sorunlarını araştırmaya yardımcı olur. Üyelere karma referanslarla atıfta bulunur. Her günlük teknik tanımlayıcılar ve zaman damgalı üyelik değişiklikleri içerebilir. Mesaj içeriklerini, profil adlarını, grup adlarını veya özel anahtarları asla içermez.</string>
@@ -2066,5 +2107,7 @@
     <string name="export_audit_logs_confirm_action">Devam</string>
     <string name="toast_couldnt_export_audit_logs">Tanılama günlükleri dışa aktarmaya hazırlanamadı</string>
     <string name="toast_no_audit_logs_to_export">Dışa aktarılacak tanılama günlüğü yok</string>
-    <string name="conversation_loading_newer">Daha yeni mesajlar yükleniyor</string>
+    <string name="dictation_pause_other_audio_title">Diğer sesleri duraklat</string>
+    <string name="dictation_pause_other_audio_subtitle">Dikte sırasında müzik ve podcast yayınlarını duraklatır; kayıt bittiğinde devam edebilirler. White Noise sesli okuma ve sesli mesajları güvenlik için her zaman duraklatılır.</string>
+    <string name="dictation_audio_focus_unavailable">Diğer sesler duraklatılamadı. Tekrar deneyin veya Dikte ayarlarında bu seçeneği kapatın.</string>
 </resources>

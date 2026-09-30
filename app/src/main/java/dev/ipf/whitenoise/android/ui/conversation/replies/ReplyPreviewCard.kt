@@ -33,11 +33,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.BuiltinEmoji
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerAccessoryRemoveButton
 import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentPresentation
 import dev.ipf.whitenoise.android.ui.conversation.media.fileIconFor
@@ -200,7 +202,8 @@ internal fun ReplyPreviewCard(
                             )
                         }
                         Text(
-                            bodyText,
+                            remember(bodyText) { BuiltinEmoji.annotate(AnnotatedString(bodyText)) },
+                            inlineContent = BuiltinEmoji.content(),
                             style = MaterialTheme.typography.bodySmall,
                             color = resolvedContentColor,
                             maxLines = 2,

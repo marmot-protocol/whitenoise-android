@@ -1,6 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">White Noise</string>
+    <string name="poll_preview">Umfrage</string>
+    <string name="poll_unsupported">Diese Umfrage kann nicht angezeigt werden</string>
+    <string name="poll_closed">Umfrage geschlossen</string>
+    <string name="poll_vote_failed">Stimme konnte nicht abgegeben werden</string>
+    <string name="poll_create_failed">Umfrage konnte nicht erstellt werden</string>
+    <string name="poll_enter_question">Gib eine Frage ein.</string>
+    <string name="poll_question_too_long">Diese Frage ist zu lang.</string>
+    <string name="poll_add_two_options">Füge mindestens zwei Optionen hinzu.</string>
+    <string name="poll_option_too_long">Eine der Optionen ist zu lang.</string>
+    <string name="poll_duplicate_option">Jede Option muss unterschiedlich sein.</string>
+    <string name="poll_create">Umfrage erstellen</string>
+    <string name="poll_question">Frage</string>
+    <string name="poll_option">Antwort %1$d</string>
+    <string name="poll_add_option">Option hinzufügen</string>
+    <string name="poll_remove_option">Option %1$d entfernen</string>
+    <string name="poll_single_choice">Einfachauswahl</string>
+    <string name="poll_multiple_choice">Mehrfachauswahl</string>
+    <string name="poll_submit">Umfrage veröffentlichen</string>
+    <string name="poll_deadline">Umfrage endet</string>
+    <string name="poll_no_deadline">Kein Enddatum</string>
+    <string name="poll_30_days">30 Tage</string>
+    <string name="poll_duration_5_minutes">5 Minuten</string>
+    <string name="poll_duration_1_hour">1 Stunde</string>
+    <string name="poll_duration_1_day">1 Tag</string>
+    <string name="poll_duration_1_week">1 Woche</string>
+    <string name="poll_ends_at">Endet %1$s</string>
+    <plurals name="poll_option_votes">
+        <item quantity="one">%1$d Stimme</item>
+        <item quantity="other">%1$d Stimmen</item>
+    </plurals>
+    <plurals name="poll_participants">
+        <item quantity="one">%1$d Teilnehmer</item>
+        <item quantity="other">%1$d Teilnehmer</item>
+    </plurals>
     <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">White Noise konnte nicht gestartet werden</string>
     <string name="startup_taking_too_long">Der Start dauert länger als erwartet. Bitte versuche es erneut.</string>
@@ -167,6 +201,8 @@
     <string name="wave_hi">Zuwinken</string>
     <string name="conversation_empty_disappearing_title">Keine Nachrichten zum Anzeigen</string>
     <string name="conversation_empty_disappearing_body">Verschwindende Nachrichten sind aktiviert. Neue Nachrichten in diesem Chat verschwinden nach %1$s.</string>
+    <string name="conversation_history_may_have_expired">Frühere Nachrichten sind möglicherweise abgelaufen</string>
+    <string name="conversation_history_retention_description">%1$s. Verschwindende Nachrichten: %2$s.</string>
     <string name="group_empty_only_you_title">Diese Gruppe besteht nur aus dir</string>
     <string name="group_empty_invite_members">Lade Leute ein, wenn du bereit bist.</string>
     <string name="you_are_no_longer_a_member">Du kannst dieser Gruppe keine Nachrichten mehr senden, weil du kein Mitglied mehr bist.</string>
@@ -1184,8 +1220,10 @@
     <string name="folder_none_detail">Erstelle einen Ordner, um deine Chats zu ordnen.</string>
     <string name="folder_restore_hint">Stellt fehlende Ordner „Ungelesen“, „Archiviert“ und „Gruppen“ wieder her. Vorhandene Ordner behalten deine Änderungen.</string>
     <string name="folder_edit">Ordner bearbeiten</string>
+    <string name="folder_delete_action">Ordner löschen</string>
     <string name="folder_delete_title">„%1$s“ löschen?</string>
     <string name="folder_delete_detail">Diesen Ordner löschen? Deine Chats bleiben, wo sie sind.</string>
+    <string name="folder_delete_failed">Dieser Ordner konnte nicht gelöscht werden. Bitte erneut versuchen.</string>
     <string name="actions_for">Aktionen für %1$s</string>
     <string name="chat_folder_name">Ordnername</string>
     <string name="folder_manual_hint">Hier hinzugefügte Chats bleiben enthalten, auch wenn sie nicht zu den automatischen Regeln passen.</string>
@@ -1848,6 +1886,9 @@
     <string name="group_recovery_failed_reinvites">Einige Einladungen konnten nicht wiederhergestellt werden. Lade diese Personen in den Gruppendetails erneut ein.</string>
     <string name="group_recovery_review_invitation_from">Einladung von %1$s prüfen · Epoche %2$s</string>
     <string name="group_recovery_check_failed">Die Gruppenwiederherstellung konnte nicht geprüft werden. Versuche es erneut.</string>
+    <string name="group_history_may_be_incomplete">In diesem Chat fehlen möglicherweise einige ältere Nachrichten.</string>
+    <string name="account_history_may_be_incomplete">Möglicherweise fehlen in diesem Konto einige Nachrichten. White Noise konnte nicht bestätigen, dass alle Nachrichten angekommen sind.</string>
+    <string name="history_notice_dismiss_failed">Der Hinweis zum Nachrichtenverlauf konnte nicht geschlossen werden. Versuche es erneut.</string>
     <string name="group_rejoin_title">Gruppe erneut beitreten?</string>
     <string name="group_rejoin_invited_by">Eingeladen von %1$s\n%2$s</string>
     <string name="group_rejoin_replaces_state">Beim erneuten Beitritt werden die Verschlüsselungsdaten dieses Geräts für die Gruppe ersetzt. Dein Nachrichtenverlauf bleibt erhalten.</string>
@@ -2059,7 +2100,7 @@
     <string name="audit_upload_title">Gruppendiagnoseprotokolle teilen</string>
     <string name="audit_upload_subtitle">Teilt Gruppen-Diagnoseprotokolle für alle Profile auf diesem Gerät.</string>
     <string name="audit_upload_confirm_title">Gruppen-Diagnoseprotokolle mit White Noise teilen?</string>
-    <string name="audit_upload_disclosure">White Noise zeichnet Gruppen-Diagnoseprotokolle für alle Profile auf diesem Gerät auf und lädt sie zu Goggles hoch, betrieben von der Internet Privacy Foundation. Bereits hier gespeicherte Protokolle können ebenfalls hochgeladen werden. Protokolle können Gruppen- und Nachrichten-IDs, Relay-Adressen, Zeitstempel, pseudonyme Kontoverweise, eine Installations-ID, dein Gerätemodell und die App-Version enthalten. Nachrichteninhalte oder private Schlüssel enthalten sie nie. Diese Protokolle sind sensibel; wir nutzen sie, um Zuverlässigkeitsprobleme zu untersuchen. Sie bleiben von der Nutzungs- und Telemetriefreigabe getrennt. Wenn du die Freigabe deaktivierst, werden keine neuen Protokolle aufgezeichnet und keine neuen hochgeladen; ein bereits laufender Upload kann noch abgeschlossen werden. Protokolle auf diesem Gerät und bereits hochgeladene Protokolle bleiben, wo sie sind. Mit „Abbrechen“ bleibt die Freigabe aus.</string>
+    <string name="audit_upload_disclosure">White Noise zeichnet Gruppen-Diagnoseprotokolle für alle Profile auf diesem Gerät auf und lädt sie zum White-Noise-Auditdienst hoch, betrieben von der Internet Privacy Foundation. Bereits hier gespeicherte Protokolle können ebenfalls hochgeladen werden. Protokolle können Gruppen- und Nachrichten-IDs, Relay-Adressen, Zeitstempel, pseudonyme Kontoverweise, eine Installations-ID, dein Gerätemodell und die App-Version enthalten. Nachrichteninhalte oder private Schlüssel enthalten sie nie. Diese Protokolle sind sensibel; wir nutzen sie, um Zuverlässigkeitsprobleme zu untersuchen. Sie bleiben von der Nutzungs- und Telemetriefreigabe getrennt. Wenn du die Freigabe deaktivierst, werden keine neuen Protokolle aufgezeichnet und keine neuen hochgeladen; ein bereits laufender Upload kann noch abgeschlossen werden. Protokolle auf diesem Gerät und bereits hochgeladene Protokolle bleiben, wo sie sind. Mit „Abbrechen“ bleibt die Freigabe aus.</string>
     <string name="audit_upload_confirm">Automatisches Teilen aktivieren</string>
     <string name="audit_upload_renew">Die Angaben zur Freigabe haben sich geändert. Sieh sie dir an, bevor du Gruppen-Diagnoseprotokolle wieder aktivierst.</string>
     <string name="diagnostics_group_disclosure">Gruppen-Diagnoseprotokolle helfen, Zuverlässigkeitsprobleme zu untersuchen. Mitglieder werden darin nur über gehashte Referenzen benannt. Jedes Protokoll kann technische Kennungen und Änderungen der Mitgliedschaft mit Zeitstempel enthalten. Nachrichteninhalte, Profilnamen, Gruppennamen oder private Schlüssel enthalten sie nie.</string>
@@ -2085,5 +2126,7 @@
     <string name="export_audit_logs_confirm_action">Weiter</string>
     <string name="toast_couldnt_export_audit_logs">Diagnoseprotokolle konnten nicht für den Export vorbereitet werden</string>
     <string name="toast_no_audit_logs_to_export">Keine Diagnoseprotokolle zum Exportieren vorhanden</string>
-    <string name="conversation_loading_newer">Neuere Nachrichten werden geladen</string>
+    <string name="dictation_pause_other_audio_title">Andere Audioinhalte pausieren</string>
+    <string name="dictation_pause_other_audio_subtitle">Musik und Podcasts während des Diktierens pausieren; nach der Aufnahme können sie weiterlaufen. Sprachausgabe und Sprachnachrichten in White Noise werden aus Sicherheitsgründen immer pausiert.</string>
+    <string name="dictation_audio_focus_unavailable">Andere Audioinhalte konnten nicht pausiert werden. Versuche es erneut oder deaktiviere diese Option in den Diktiereinstellungen.</string>
 </resources>

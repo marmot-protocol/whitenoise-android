@@ -6,8 +6,9 @@ catalogue, and never persists its own consent receipt or delivery queue.
 
 ## Configuration
 
-Existing OTLP diagnostics use `WHITENOISE_OTLP_ENDPOINT` and the environment-specific
-`WHITENOISE_<ENV>_OTLP_AUTH_TOKEN`. The acceptance receipt enables this already
+Existing OTLP diagnostics use `WHITENOISE_OTLP_ENDPOINT` (defaulting to the shared
+metrics collector for staging and production) and `WHITENOISE_OTLP_AUTH_TOKEN`.
+The deployment environment resource attribute identifies the flavor. The acceptance receipt enables this already
 configured path independently of Aptabase readiness.
 
 For product analytics, provide these GitHub Actions secrets (the workflows forward them as environment

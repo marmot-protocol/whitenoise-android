@@ -37,13 +37,19 @@ private fun timelineRecordContentEqual(
         a.replyPreview == b.replyPreview &&
         a.mediaJson == b.mediaJson &&
         a.media == b.media &&
-        a.agentTextStreamJson == b.agentTextStreamJson &&
+        pollAndAgentContentEqual(a, b) &&
         a.deleted == b.deleted &&
         a.deletedByMessageIdHex == b.deletedByMessageIdHex &&
         a.invalidationStatus == b.invalidationStatus &&
         a.retentionSeconds == b.retentionSeconds &&
         a.retentionExpiresAt == b.retentionExpiresAt &&
         a.reactions == b.reactions
+
+/** Compares the structured poll and agent payloads that share the message content slot. */
+private fun pollAndAgentContentEqual(
+    a: TimelineMessageRecordFfi,
+    b: TimelineMessageRecordFfi,
+): Boolean = a.poll == b.poll && a.agentTextStreamJson == b.agentTextStreamJson
 
 /** Compares parsed Markdown while preserving byte-array content semantics for blank-line metadata. */
 private fun markdownDocumentsRenderEqual(

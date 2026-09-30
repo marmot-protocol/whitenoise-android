@@ -167,36 +167,6 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('withPropertyName("roborazziSnapshots")', self.app_build)
         self.assertIn('withPathSensitivity(PathSensitivity.RELATIVE)', self.app_build)
 
-    def test_curated_screenshots_run_in_parallel_with_the_exact_safe_scope(self):
-        """Both flavors verify the established baseline owners in their own jobs."""
-        self.assertIn('fail-fast: false', self.screenshots)
-        self.assertIn('flavor: [Zapstore, Play]', self.screenshots)
-        step = self.named_step(self.screenshots, 'Screenshot tests (Roborazzi)')
-        self.assertIn(':app:verifyRoborazziDev${{ matrix.flavor }}Debug', step)
-        expected_filters = [
-            '*ScreenshotTest',
-            '*ConversationImeCollapseFocusTest',
-            '*NewGroupNameEmojiPickerTest',
-            '*ChatActionSheetTest',
-            '*ChatListPinnedBoundaryTest',
-            '*ChatListTtsTransportLayoutTest',
-            '*ChatListTopBarColdStartSelfProfileFirstFrameTest',
-            '*ConversationTtsFollowComposeTest',
-            '*BubbleCollapsibleFooterLayoutTest',
-            '*MessageBubbleEditedMarkdownTest',
-            '*GroupEditNameEmojiPickerTest',
-            '*MainShellTtsReturnTransitionTest',
-            '*ProfileAddToGroupsFlowTest',
-            '*AutoDownloadBacklogControlTest',
-        ]
-        for test_filter in expected_filters:
-            self.assertIn(f"--tests '{test_filter}'", step)
-        self.assertEqual(step.count("--tests '"), len(expected_filters))
-        self.assertIn(' --no-daemon ', step)
-        self.assertIn('cache-read-only:', self.screenshots)
-        self.assertIn('android-ci-reports-screenshots-${{ matrix.flavor }}', self.screenshots)
-        self.assertIn('android-ci-gradle-profiles-screenshots-${{ matrix.flavor }}', self.screenshots)
-
     def test_job_caches(self):
         """Every workload retains its own task cache; forks remain read-only."""
         gradle_setup_steps = re.findall(

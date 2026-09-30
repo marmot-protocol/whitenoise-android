@@ -276,6 +276,7 @@ class NotificationStartupOrderingTest {
 
                     releaseFirstRead.countDown()
                     fixture.awaitNotificationBody("resolved after fallback")
+                    awaitWrites(writes, expected = 2)
 
                     val corrected = fixture.activeNotification()
                     assertTrue(corrected.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)

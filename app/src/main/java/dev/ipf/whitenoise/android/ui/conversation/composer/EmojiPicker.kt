@@ -30,6 +30,7 @@ import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 internal enum class EmojiPickerPurpose {
     USE,
     CONFIGURE_QUICK_REACTION,
+    GROUP_IMAGE,
 }
 
 internal const val EMOJI_PICKER_TEST_TAG = "emoji.picker"

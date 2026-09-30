@@ -287,7 +287,7 @@ internal fun ImageSearchSheet(
     var pendingAction by remember { mutableStateOf<GroupImageAction?>(null) }
     val photoPicker =
         rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-            if (uri != null) {
+            if (uri != null && !applyInFlight) {
                 pendingAction = GroupImageAction.PickPhoto
                 onPickPhoto?.invoke(uri)
             }
@@ -469,7 +469,7 @@ internal fun ImageSearchSheet(
                     label = { Text(urlLabel) },
                     placeholder = { Text("https://example.com/image.jpg") },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().testTag("image_search.url"),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                 )
                 Row(

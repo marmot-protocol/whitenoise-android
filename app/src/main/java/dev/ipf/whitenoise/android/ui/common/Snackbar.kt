@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -174,8 +175,8 @@ fun SwipeDismissibleSnackbar(data: SnackbarData) {
     ) {
         if (snackbarShowsCopyAffordance(data.visuals)) {
             // Error/diagnostic toasts flagged copyable at their emit site get
-            // a discoverable Copy affordance in the free action slot, plus a
-            // SelectionContainer for long-press copy (issues #543, #796).
+            // a discoverable Copy affordance and a separate Dismiss control.
+            // SelectionContainer still permits long-press copy (issues #543, #796).
             val clipboard = LocalClipboardManager.current
             val copyText = requireNotNull((data.visuals as ToastSnackbarVisuals).copyText)
             Snackbar(
@@ -186,6 +187,11 @@ fun SwipeDismissibleSnackbar(data: SnackbarData) {
                             Icons.Default.ContentCopy,
                             contentDescription = stringResource(R.string.copy),
                         )
+                    }
+                },
+                dismissAction = {
+                    IconButton(onClick = data::dismiss) {
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.dismiss))
                     }
                 },
             ) {

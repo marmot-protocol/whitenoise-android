@@ -4,8 +4,10 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -124,7 +126,9 @@ private fun ChatFolderEditSession(
     }
     var picker by rememberSaveable { mutableStateOf<FolderPicker?>(null) }
     var discard by rememberSaveable { mutableStateOf(false) }
+    var confirmDelete by rememberSaveable { mutableStateOf(false) }
     var failed by rememberSaveable { mutableStateOf(false) }
+    var deleteFailed by rememberSaveable { mutableStateOf(false) }
 
     val rule =
         ChatFolderRule(
@@ -149,7 +153,11 @@ private fun ChatFolderEditSession(
 
     /** Back confirms discarding a dirty draft. */
     fun back() {
-        if (dirty) discard = true else onClose()
+        when {
+            confirmDelete -> confirmDelete = false
+            dirty -> discard = true
+            else -> onClose()
+        }
     }
 
     BackHandler(onBack = ::back)
@@ -191,6 +199,25 @@ private fun ChatFolderEditSession(
         } else {
             submitted = false
             failed = true
+        }
+    }
+
+    /** Delete the exact folder opened by this session without committing the draft. */
+    fun delete() {
+        confirmDelete = false
+        if (!canMutate() || submitted || folderId == null) return
+        submitted = true
+        val deleted =
+            try {
+                store.deleteFolder(accountRef, folderId)
+            } catch (_: Exception) {
+                false
+            }
+        if (deleted) {
+            onClose()
+        } else {
+            submitted = false
+            deleteFailed = true
         }
     }
 
@@ -256,9 +283,11 @@ private fun ChatFolderEditSession(
                 peopleCount = memberHexes.size,
                 previewCount = previewRows.size,
                 canSave = name.text.isNotBlank() && !missing && !submitted && canMutate(),
+                canDelete = folderId != null && !missing && !submitted && canMutate(),
                 error =
                     when {
                         missing -> stringResource(R.string.folder_unavailable)
+                        deleteFailed -> stringResource(R.string.folder_delete_failed)
                         failed -> stringResource(R.string.folder_save_failed)
                         else -> null
                     },
@@ -271,8 +300,17 @@ private fun ChatFolderEditSession(
         onOpenPeople = { picker = FolderPicker.People },
         onOpenPreview = { picker = FolderPicker.Preview },
         onSave = ::save,
+        onDelete = { if (canMutate()) confirmDelete = true },
         onBack = ::back,
     )
+
+    if (confirmDelete && existing != null && canMutate()) {
+        ChatFolderDeleteDialog(
+            folderName = chatFolderDisplayName(existing),
+            onDismiss = { confirmDelete = false },
+            onConfirm = ::delete,
+        )
+    }
 
     if (discard) {
         WhiteNoiseAlertDialog(
@@ -331,6 +369,7 @@ internal data class ChatFolderEditFormState(
     val peopleCount: Int,
     val previewCount: Int,
     val canSave: Boolean,
+    val canDelete: Boolean = !isNew,
     val error: String? = null,
 )
 
@@ -347,6 +386,7 @@ internal fun ChatFolderEditContent(
     onOpenPeople: () -> Unit,
     onOpenPreview: () -> Unit,
     onSave: () -> Unit,
+    onDelete: () -> Unit,
     onBack: () -> Unit,
 ) {
     SettingsScaffold(
@@ -460,6 +500,23 @@ internal fun ChatFolderEditContent(
                                     state.previewCount,
                                 ),
                         )
+                    }
+                }
+            }
+            if (!state.isNew) {
+                item {
+                    Spacer(Modifier.height(WhiteNoiseSpacing.Section))
+                    SettingsGroup {
+                        row("delete") { context ->
+                            SettingsAction(
+                                context = context,
+                                title = stringResource(R.string.folder_delete_action),
+                                onClick = onDelete,
+                                modifier = Modifier.testTag("folder.delete"),
+                                enabled = state.canDelete,
+                                destructive = true,
+                            )
+                        }
                     }
                 }
             }

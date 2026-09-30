@@ -1,6 +1,44 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">White Noise</string>
+    <string name="poll_preview">Опрос</string>
+    <string name="poll_unsupported">Не удалось показать этот опрос</string>
+    <string name="poll_closed">Опрос закрыт</string>
+    <string name="poll_vote_failed">Не удалось отправить голос</string>
+    <string name="poll_create_failed">Не удалось создать опрос</string>
+    <string name="poll_enter_question">Введите вопрос.</string>
+    <string name="poll_question_too_long">Этот вопрос слишком длинный.</string>
+    <string name="poll_add_two_options">Добавьте не менее двух вариантов.</string>
+    <string name="poll_option_too_long">Один из вариантов слишком длинный.</string>
+    <string name="poll_duplicate_option">Все варианты должны отличаться.</string>
+    <string name="poll_create">Создать опрос</string>
+    <string name="poll_question">Вопрос</string>
+    <string name="poll_option">Вариант %1$d</string>
+    <string name="poll_add_option">Добавить вариант</string>
+    <string name="poll_remove_option">Удалить вариант %1$d</string>
+    <string name="poll_single_choice">Один вариант</string>
+    <string name="poll_multiple_choice">Несколько вариантов</string>
+    <string name="poll_submit">Опубликовать опрос</string>
+    <string name="poll_deadline">Опрос завершится</string>
+    <string name="poll_no_deadline">Без срока</string>
+    <string name="poll_30_days">30 дней</string>
+    <string name="poll_duration_5_minutes">5 минут</string>
+    <string name="poll_duration_1_hour">1 час</string>
+    <string name="poll_duration_1_day">1 день</string>
+    <string name="poll_duration_1_week">1 неделя</string>
+    <string name="poll_ends_at">Завершится %1$s</string>
+    <plurals name="poll_option_votes">
+        <item quantity="one">%1$d голос</item>
+        <item quantity="few">%1$d голоса</item>
+        <item quantity="many">%1$d голосов</item>
+        <item quantity="other">%1$d голоса</item>
+    </plurals>
+    <plurals name="poll_participants">
+        <item quantity="one">%1$d участник</item>
+        <item quantity="few">%1$d участника</item>
+        <item quantity="many">%1$d участников</item>
+        <item quantity="other">%1$d участника</item>
+    </plurals>
     <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">Не удалось запустить White Noise</string>
     <string name="startup_taking_too_long">Запуск занимает больше времени, чем ожидалось. Повторите попытку.</string>
@@ -183,6 +221,8 @@
     <string name="wave_hi">Помахать</string>
     <string name="conversation_empty_disappearing_title">Нет сообщений для показа</string>
     <string name="conversation_empty_disappearing_body">Исчезающие сообщения включены. Новые сообщения в этом чате исчезают через %1$s.</string>
+    <string name="conversation_history_may_have_expired">Более ранние сообщения могли исчезнуть</string>
+    <string name="conversation_history_retention_description">%1$s. Исчезающие сообщения: %2$s.</string>
     <string name="group_empty_only_you_title">В этой группе пока только вы</string>
     <string name="group_empty_invite_members">Пригласите людей, когда будете готовы.</string>
     <string name="you_are_no_longer_a_member">Вы не можете отправлять сообщения в эту группу, так как больше не являетесь её участником.</string>
@@ -1228,8 +1268,10 @@
     <string name="folder_none_detail">Создайте папку для организации своих чатов.</string>
     <string name="folder_restore_hint">Восстановите отсутствующие папки «Непрочитанные», «Архивированные» и «Группы». Существующие папки сохраняют ваши изменения.</string>
     <string name="folder_edit">Редактировать папку</string>
+    <string name="folder_delete_action">Удалить папку</string>
     <string name="folder_delete_title">Удалить «%1$s»?</string>
     <string name="folder_delete_detail">Удалить эту папку? Ваши чаты останутся там, где они есть.</string>
+    <string name="folder_delete_failed">Не удалось удалить эту папку. Попробуйте ещё раз.</string>
     <string name="actions_for">Действия для %1$s</string>
     <string name="chat_folder_name">Имя папки</string>
     <string name="folder_manual_hint">Чаты, которые вы сюда добавляете, остаются включенными, даже если они не соответствуют автоматическим правилам.</string>
@@ -1885,6 +1927,9 @@
     <string name="group_recovery_failed_reinvites">Некоторые приглашения не удалось восстановить. Пригласите этих людей снова в разделе сведений о группе.</string>
     <string name="group_recovery_review_invitation_from">Проверить приглашение от %1$s · эпоха %2$s</string>
     <string name="group_recovery_check_failed">Не удалось проверить восстановление группы. Повторите попытку.</string>
+    <string name="group_history_may_be_incomplete">В этом чате могут отсутствовать некоторые более ранние сообщения.</string>
+    <string name="account_history_may_be_incomplete">В этом аккаунте могут отсутствовать некоторые сообщения. White Noise не удалось подтвердить, что все сообщения были получены.</string>
+    <string name="history_notice_dismiss_failed">Не удалось закрыть уведомление об истории. Попробуйте ещё раз.</string>
     <string name="group_rejoin_title">Вернуться в группу?</string>
     <string name="group_rejoin_invited_by">Приглашение от %1$s\n%2$s</string>
     <string name="group_rejoin_replaces_state">При возвращении в группу данные шифрования группы на этом устройстве будут заменены. История сообщений сохранится.</string>
@@ -2102,7 +2147,7 @@
     <string name="audit_upload_title">Делиться диагностическими журналами групп</string>
     <string name="audit_upload_subtitle">Передаёт диагностические журналы групп для всех профилей на этом устройстве.</string>
     <string name="audit_upload_confirm_title">Отправлять диагностические журналы групп в White Noise?</string>
-    <string name="audit_upload_disclosure">White Noise записывает диагностические журналы групп для всех профилей на этом устройстве и загружает их в Goggles, которым управляет Internet Privacy Foundation. Уже сохранённые здесь журналы тоже могут быть загружены. Журналы могут содержать идентификаторы групп и сообщений, адреса реле, метки времени, псевдонимные ссылки на аккаунты, идентификатор установки, модель вашего устройства и версию приложения. Они никогда не содержат содержимое сообщений и закрытые ключи. Эти данные чувствительны, и мы используем их для изучения проблем надёжности. Они остаются отдельными от передачи данных об использовании и телеметрии. Отключение передачи останавливает новую запись и новые загрузки, хотя уже начавшаяся загрузка может завершиться. Журналы на этом устройстве и уже загруженные копии остаются на месте. Отмена оставляет передачу выключенной.</string>
+    <string name="audit_upload_disclosure">White Noise записывает диагностические журналы групп для всех профилей на этом устройстве и загружает их в аудиторский коллектор White Noise, которым управляет Internet Privacy Foundation. Уже сохранённые здесь журналы тоже могут быть загружены. Журналы могут содержать идентификаторы групп и сообщений, адреса реле, метки времени, псевдонимные ссылки на аккаунты, идентификатор установки, модель вашего устройства и версию приложения. Они никогда не содержат содержимое сообщений и закрытые ключи. Эти данные чувствительны, и мы используем их для изучения проблем надёжности. Они остаются отдельными от передачи данных об использовании и телеметрии. Отключение передачи останавливает новую запись и новые загрузки, хотя уже начавшаяся загрузка может завершиться. Журналы на этом устройстве и уже загруженные копии остаются на месте. Отмена оставляет передачу выключенной.</string>
     <string name="audit_upload_confirm">Включить автоматическую отправку</string>
     <string name="audit_upload_renew">Условия передачи изменились. Ознакомьтесь с ними, прежде чем снова включать диагностические журналы групп.</string>
     <string name="diagnostics_group_disclosure">Диагностические журналы групп помогают разбираться в проблемах надёжности. Участники обозначаются в них хешированными ссылками. Каждый журнал может содержать технические идентификаторы и изменения состава участников с метками времени. Они никогда не содержат содержимого сообщений, имён профилей, названий групп или закрытых ключей.</string>
@@ -2128,5 +2173,7 @@
     <string name="export_audit_logs_confirm_action">Продолжить</string>
     <string name="toast_couldnt_export_audit_logs">Не удалось подготовить диагностические журналы к экспорту</string>
     <string name="toast_no_audit_logs_to_export">Нет диагностических журналов для экспорта</string>
-    <string name="conversation_loading_newer">Загрузка более новых сообщений</string>
+    <string name="dictation_pause_other_audio_title">Приостанавливать другое аудио</string>
+    <string name="dictation_pause_other_audio_subtitle">Музыка и подкасты приостанавливаются во время диктовки и могут возобновиться после окончания записи. Озвучивание и голосовые сообщения в White Noise всегда приостанавливаются для безопасности.</string>
+    <string name="dictation_audio_focus_unavailable">Не удалось приостановить другое аудио. Повторите попытку или отключите этот параметр в настройках диктовки.</string>
 </resources>

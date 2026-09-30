@@ -1,6 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">White Noise</string>
+    <string name="poll_preview">投票</string>
+    <string name="poll_unsupported">无法显示此投票</string>
+    <string name="poll_closed">投票已结束</string>
+    <string name="poll_vote_failed">无法提交投票</string>
+    <string name="poll_create_failed">无法创建投票</string>
+    <string name="poll_enter_question">输入问题。</string>
+    <string name="poll_question_too_long">这个问题太长。</string>
+    <string name="poll_add_two_options">请至少添加两个选项。</string>
+    <string name="poll_option_too_long">其中一个选项太长。</string>
+    <string name="poll_duplicate_option">每个选项必须不同。</string>
+    <string name="poll_create">创建投票</string>
+    <string name="poll_question">问题</string>
+    <string name="poll_option">选项 %1$d</string>
+    <string name="poll_add_option">添加选项</string>
+    <string name="poll_remove_option">移除选项 %1$d</string>
+    <string name="poll_single_choice">单选</string>
+    <string name="poll_multiple_choice">多选</string>
+    <string name="poll_submit">发布投票</string>
+    <string name="poll_deadline">投票结束时间</string>
+    <string name="poll_no_deadline">不设截止时间</string>
+    <string name="poll_30_days">30 天</string>
+    <string name="poll_duration_5_minutes">5 分钟</string>
+    <string name="poll_duration_1_hour">1 小时</string>
+    <string name="poll_duration_1_day">1 天</string>
+    <string name="poll_duration_1_week">1 周</string>
+    <string name="poll_ends_at">%1$s 结束</string>
+    <plurals name="poll_option_votes">
+        <item quantity="other">%1$d 票</item>
+    </plurals>
+    <plurals name="poll_participants">
+        <item quantity="other">%1$d 人参与</item>
+    </plurals>
     <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">White Noise 无法启动</string>
     <string name="startup_taking_too_long">启动时间超出预期。请重试。</string>
@@ -159,6 +191,8 @@
     <string name="wave_hi">挥手打招呼</string>
     <string name="conversation_empty_disappearing_title">没有可显示的消息</string>
     <string name="conversation_empty_disappearing_body">已开启阅后即焚消息。此聊天中的新消息将在 %1$s 后消失。</string>
+    <string name="conversation_history_may_have_expired">更早的消息可能已过期</string>
+    <string name="conversation_history_retention_description">%1$s。阅后即焚消息：%2$s。</string>
     <string name="group_empty_only_you_title">这个群组目前只有你</string>
     <string name="group_empty_invite_members">准备好后邀请其他人。</string>
     <string name="you_are_no_longer_a_member">你无法向此群组发送消息，因为你已不再是成员。</string>
@@ -1167,8 +1201,10 @@
     <string name="folder_none_detail">创建文件夹来整理你的聊天。</string>
     <string name="folder_restore_hint">恢复缺失的“未读”“已归档”和“群组”文件夹。现有文件夹保留你的更改。</string>
     <string name="folder_edit">编辑文件夹</string>
+    <string name="folder_delete_action">删除文件夹</string>
     <string name="folder_delete_title">删除“%1$s”？</string>
     <string name="folder_delete_detail">删除此文件夹？你的聊天将保持原位。</string>
+    <string name="folder_delete_failed">无法删除此文件夹，请重试。</string>
     <string name="actions_for">%1$s 的操作</string>
     <string name="chat_folder_name">文件夹名称</string>
     <string name="folder_manual_hint">你在此添加的聊天会一直包含在内，即使它们不符合自动规则。</string>
@@ -1806,6 +1842,9 @@
     <string name="group_recovery_failed_reinvites">部分邀请无法恢复。请从“群组详情”重新邀请这些成员。</string>
     <string name="group_recovery_review_invitation_from">查看 %1$s 的邀请 · 轮次 %2$s</string>
     <string name="group_recovery_check_failed">无法检查群组恢复状态，请重试。</string>
+    <string name="group_history_may_be_incomplete">此聊天中可能缺少部分较早的消息。</string>
+    <string name="account_history_may_be_incomplete">此账户可能缺少部分消息。White Noise 无法确认所有消息都已送达。</string>
+    <string name="history_notice_dismiss_failed">无法忽略历史记录提示，请重试。</string>
     <string name="group_rejoin_title">重新加入群组？</string>
     <string name="group_rejoin_invited_by">邀请者：%1$s\n%2$s</string>
     <string name="group_rejoin_replaces_state">重新加入会替换此设备上该群组的加密数据。你的消息记录会保留。</string>
@@ -2014,7 +2053,7 @@
     <string name="audit_upload_title">分享群组诊断日志</string>
     <string name="audit_upload_subtitle">分享此设备上所有个人资料的群组诊断日志。</string>
     <string name="audit_upload_confirm_title">与 White Noise 分享群组诊断日志？</string>
-    <string name="audit_upload_disclosure">White Noise 会记录此设备上所有个人资料的群组诊断日志，并上传到由 Internet Privacy Foundation 运营的 Goggles。已保存在此设备上的日志也可能被上传。日志可能包含群组和消息 ID、中继地址、时间戳、假名化的账户引用、安装 ID、你的设备型号和应用版本，但绝不包含消息内容或私钥。这些日志属于敏感数据，我们用它们来调查可靠性问题。它们与使用情况和遥测分享相互独立。关闭分享会停止新的记录和新的上传，但已在进行的上传可能会完成。此设备上的日志和已上传的日志都会保持原样。选择“取消”则保持分享关闭。</string>
+    <string name="audit_upload_disclosure">White Noise 会记录此设备上所有个人资料的群组诊断日志，并上传到由 Internet Privacy Foundation 运营的 White Noise 审计收集服务。已保存在此设备上的日志也可能被上传。日志可能包含群组和消息 ID、中继地址、时间戳、假名化的账户引用、安装 ID、你的设备型号和应用版本，但绝不包含消息内容或私钥。这些日志属于敏感数据，我们用它们来调查可靠性问题。它们与使用情况和遥测分享相互独立。关闭分享会停止新的记录和新的上传，但已在进行的上传可能会完成。此设备上的日志和已上传的日志都会保持原样。选择“取消”则保持分享关闭。</string>
     <string name="audit_upload_confirm">启用自动分享</string>
     <string name="audit_upload_renew">分享说明已更新。请先查看，再重新开启群组诊断日志。</string>
     <string name="diagnostics_group_disclosure">群组诊断日志有助于调查可靠性问题。日志使用哈希引用来指代成员，可能包含技术标识符以及带时间戳的成员变动记录，但绝不包含消息内容、个人资料名称、群组名称或私钥。</string>
@@ -2040,5 +2079,7 @@
     <string name="export_audit_logs_confirm_action">继续</string>
     <string name="toast_couldnt_export_audit_logs">无法准备要导出的诊断日志</string>
     <string name="toast_no_audit_logs_to_export">没有可导出的诊断日志</string>
-    <string name="conversation_loading_newer">正在加载更新的消息</string>
+    <string name="dictation_pause_other_audio_title">暂停其他音频</string>
+    <string name="dictation_pause_other_audio_subtitle">听写期间暂停音乐和播客；录音结束后可继续播放。为安全起见，White Noise 的朗读和语音消息始终会暂停。</string>
+    <string name="dictation_audio_focus_unavailable">无法暂停其他音频。请重试，或在听写设置中关闭“暂停其他音频”。</string>
 </resources>

@@ -128,16 +128,18 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold as Scaffold
 
-/** Keeps the process-wide TTS transport in normal flow above every chat-list state. */
+/** Keeps TTS transport and account notices visible above every chat-list state. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun ChatListBodyFrame(
     ttsTransport: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    notice: @Composable () -> Unit = {},
     content: @Composable BoxScope.() -> Unit,
 ) {
     Column(modifier) {
         ttsTransport()
+        notice()
         Box(
             modifier =
                 Modifier
@@ -668,6 +670,8 @@ internal fun ChatsScreen(
         remember(visibleItems, searchActive) {
             visibleItems.map(::visibleRowId)
         }
+    val historyNotices = rememberAccountHistoryNotices(appState)
+    val showHistoryNotice = !searchActive && !browsingAttachments && historyNotices?.notices?.isNotEmpty() == true
     val leadingChatListItemCount =
         if (controller.error != null && loadFailurePlacement == LoadFailurePlacement.Inline) 1 else 0
     val visiblePinnedOrder =
@@ -1648,6 +1652,14 @@ internal fun ChatsScreen(
                         appState = appState,
                         onBodyClick = onTtsTransportBodyClick,
                     )
+                },
+                notice = {
+                    historyNotices?.takeIf { showHistoryNotice }?.let { owner ->
+                        AccountHistoryNoticeBanner(
+                            dismissing = owner.dismissing,
+                            onDismiss = { appState.launchMutation { owner.dismissAll() } },
+                        )
+                    }
                 },
             ) {
                 when {
