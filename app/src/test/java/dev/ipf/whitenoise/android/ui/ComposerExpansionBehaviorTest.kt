@@ -1256,16 +1256,20 @@ class ComposerExpansionBehaviorTest {
 
     private var statusBarInsetPx = 0
 
+    /** Finds the accessible control used to exercise explicit height changes. */
     private fun resizeHandle() = composeRule.onNodeWithContentDescription(app.getString(R.string.composer_resize))
 
+    /** Reads the outer composer height in root coordinates after layout settles. */
     private fun composerHeight() = composerBounds().height
 
+    /** Uses the outer semantics bounds so height assertions include the full bottom cluster. */
     private fun composerBounds(): Rect =
         composeRule
             .onNodeWithTag(TAG)
             .fetchSemanticsNode()
             .boundsInRoot
 
+    /** Captures outer, pill, and editor bounds in the same root coordinate space. */
     private fun composerGeometry() =
         ComposerGeometry(
             composer = composerBounds(),
@@ -1319,6 +1323,7 @@ class ComposerExpansionBehaviorTest {
         }
     }
 
+    /** Samples each animation frame and optionally checks that growth stays bottom anchored. */
     private fun sampleComposerHeights(
         frameCount: Int = 20,
         expectedBottom: Float? = null,
@@ -1338,6 +1343,7 @@ class ComposerExpansionBehaviorTest {
             }
         }
 
+    /** Allows a pixel of layout rounding while asserting the bottom edge stays fixed. */
     private fun assertComposerBottom(expectedBottom: Float) {
         val actualBottom = composerBounds().bottom
         assertTrue(
@@ -1346,6 +1352,7 @@ class ComposerExpansionBehaviorTest {
         )
     }
 
+    /** Restores automatic frame advancement even when a frame assertion fails. */
     private fun <T> withManualClock(block: () -> T): T {
         composeRule.mainClock.autoAdvance = false
         return try {
@@ -1355,6 +1362,7 @@ class ComposerExpansionBehaviorTest {
         }
     }
 
+    /** Rejects a reverse jump across sampled resize frames, allowing one pixel of rounding. */
     private fun assertMonotonic(
         heights: List<Float>,
         increasing: Boolean,
@@ -1368,6 +1376,7 @@ class ComposerExpansionBehaviorTest {
         }
     }
 
+    /** Checks focus, draft text, and selection together after a resize or send transition. */
     private fun assertEditorState(
         editor: androidx.compose.ui.test.SemanticsNodeInteraction,
         draft: String,

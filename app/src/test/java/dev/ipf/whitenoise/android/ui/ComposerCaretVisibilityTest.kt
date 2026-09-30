@@ -56,6 +56,7 @@ class ComposerCaretVisibilityTest {
 
     private val app = ApplicationProvider.getApplicationContext<android.app.Application>()
 
+    /** A settled bulk replacement must scroll its final selection into view. */
     @Test
     fun clipboardStyleBulkReplacementKeepsTheFinalCaretVisible() {
         val harness = render(TextFieldValue("Short"))

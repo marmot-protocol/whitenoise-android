@@ -95,6 +95,17 @@ class ConversationCompactHeightTest {
         assertEquals(560.dp, resolveAutomaticComposerCeiling(800.dp, measuredEditorLineHeight = 32.dp))
     }
 
+    /** At the same viewport height, each extra rendered line-height dp adds five dp before the reading cap. */
+    @Test
+    fun largerMeasuredLineHeightAddsFiveTimesTheDifference() {
+        val normal = resolveAutomaticComposerCeiling(800.dp, measuredEditorLineHeight = 20.dp)
+        val scaled = resolveAutomaticComposerCeiling(800.dp, measuredEditorLineHeight = 28.dp)
+
+        assertEquals(500.dp, normal)
+        assertEquals(540.dp, scaled)
+        assertEquals(40.dp, scaled - normal)
+    }
+
     /** Small windows keep a reading area and ramp growth smoothly from compact mode. */
     @Test
     fun narrowAndImeViewportsLimitExtraLines() {
