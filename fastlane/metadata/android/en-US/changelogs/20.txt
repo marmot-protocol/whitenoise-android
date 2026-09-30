@@ -1,0 +1,1 @@
+Adds group polls, folder deletion, per-account disappearing-message defaults, focal cropping for profile and group images, and Wave hi for new members. Improves conversation history paging, dictation, attachments, paste and composer actions, notifications, push recovery, and Amber signing. Shows when history may be incomplete. Log sharing now asks for a fresh choice.
