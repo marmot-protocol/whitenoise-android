@@ -122,6 +122,12 @@ class ConversationDictationForegroundServiceTest {
         assertFalse(ConversationDictationForegroundService.notificationControlsAvailable(context))
     }
 
+    private fun assertCorrelatedServiceTrace() {
+        val trace = ShadowLog.getLogsForTag("WNDictation").mapNotNull { DictationDiagnosticSchema.fields(it.msg) }
+        assertTrue(trace.any { it["event"] == "foreground_service_on_start" && it["callback_session"] == 1L })
+        assertTrue(trace.any { it["event"] == "foreground_service_promoted" && it["callback_session"] == 1L })
+    }
+
     /** Verifies active capture uses a metadata-free notification whose actions reach the controller. */
     @Test
     fun activeSessionUsesGenericForegroundNotificationAndRoutesActions() {
@@ -132,9 +138,7 @@ class ConversationDictationForegroundServiceTest {
 
         service.onStartCommand(startIntent(service, harness), 0, 1)
 
-        val trace = ShadowLog.getLogsForTag("WNDictation").mapNotNull { DictationDiagnosticSchema.fields(it.msg) }
-        assertTrue(trace.any { it["event"] == "foreground_service_on_start" && it["callback_session"] == 1L })
-        assertTrue(trace.any { it["event"] == "foreground_service_promoted" && it["callback_session"] == 1L })
+        assertCorrelatedServiceTrace()
 
         val notification = shadowOf(service as Service).lastForegroundNotification
         assertNotNull(notification)
