@@ -36,9 +36,14 @@ import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import dev.ipf.whitenoise.android.core.MessageAttachments
+import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollCoordinator
+import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollMode
+import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollWriter
+import dev.ipf.whitenoise.android.ui.conversation.revealSentAtLiveTail
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -52,6 +57,101 @@ import java.lang.reflect.Proxy
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class ConversationMediaSendReconciliationIntegrationTest {
+    /** Both a file and a multi-image album reveal after durable acceptance, including a canonical echo. */
+    @Test
+    fun acceptedFileAndAlbumFromHistorySnapAfterCanonicalReplacement() =
+        runTest {
+            for (count in listOf(1, 2)) {
+                val reference =
+                    if (count == 1) {
+                        mediaReference().copy(mediaType = "application/pdf", fileName = "file.pdf")
+                    } else {
+                        mediaReference()
+                    }
+                val controller =
+                    ConversationController(
+                        appState = appState(),
+                        initialGroup = group(),
+                        initialMemberSnapshot = memberSnapshot(),
+                        groupRosterReader = { _, _ -> authoritativeRoster() },
+                        mediaUploader = { _, _, _ ->
+                            uploadResult(reference).copy(
+                                attachments = List(count) { MediaUploadAttachmentResultFfi(reference, 4uL) },
+                                sent = null,
+                            )
+                        },
+                        mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
+                        mediaPublisher = { _, _, _, _ -> acceptedPendingSummary() },
+                    )
+                controller.retryMembers()
+                try {
+                    assertMediaHistoryReveal(controller, count, reference)
+                } finally {
+                    controller.onCleared()
+                }
+            }
+        }
+
+    /** Uses the production queue/upload callback and replaces its row during the first layout frame. */
+    private suspend fun kotlinx.coroutines.CoroutineScope.assertMediaHistoryReveal(
+        controller: ConversationController,
+        count: Int,
+        reference: MediaAttachmentReferenceFfi,
+    ) {
+        val snaps = mutableListOf<Int>()
+        val writer = recordingMediaWriter(snaps)
+        val coordinator = ConversationScrollCoordinator(writer, ConversationScrollMode.ReadingHistory("old", 0))
+        val queued =
+            checkNotNull(
+                controller.queueAttachments(
+                    List(count) { PendingAttachment(byteArrayOf(1, 2, 3, 4), reference.mediaType, reference.fileName) },
+                    "hello",
+                ),
+            )
+        var reveal: kotlinx.coroutines.Job? = null
+        controller.uploadQueued(queued, onDurablyAccepted = {
+            reveal =
+                launch {
+                    assertTrue(
+                        coordinator.revealSentAtLiveTail(controller, awaitFrame = {
+                            val pending = controller.timeline.single().record
+                            applyProjection(
+                                controller,
+                                projectedMediaMessage(pending.recordedAt, reference).copy(
+                                    media = MessageAttachments.acceptedOutcomes(List(count) { reference }),
+                                ),
+                            )
+                        }),
+                    )
+                }
+        })
+        checkNotNull(reveal).join()
+        assertEquals(listOf(0), snaps)
+        assertTrue(coordinator.isFollowingTail)
+        assertEquals(
+            CONFIRMED_MESSAGE_ID,
+            controller.timeline
+                .single()
+                .record.messageIdHex,
+        )
+    }
+
+    /** Rejects animation so an intermediate glide cannot masquerade as a correct final position. */
+    private fun recordingMediaWriter(snaps: MutableList<Int>): ConversationScrollWriter =
+        object : ConversationScrollWriter {
+            override suspend fun scrollToItem(
+                index: Int,
+                scrollOffset: Int,
+            ) {
+                snaps += index
+            }
+
+            override suspend fun animateScrollToItem(
+                index: Int,
+                scrollOffset: Int,
+            ) = error("send must snap")
+        }
+
     @Test
     fun cancellationBeforeNativeMediaAdmissionSkipsMarmotCall() =
         assertDraftlessMediaUsesTokenBoundNativeAdmission(

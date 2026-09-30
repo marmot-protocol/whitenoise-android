@@ -50,6 +50,68 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class ConversationSendOptimisticPublicationTest {
+    /** A reply uses the same accepted-send owner and snaps rather than gliding across older history. */
+    @Test
+    fun acceptedReplyFromHistorySnapsToItsPublishedTail() =
+        runBlocking {
+            var expectedReply: String? = null
+            val controller =
+                controller(textPublisher = { reply, _, _, _ ->
+                    assertEquals(expectedReply, reply)
+                    sentSummary(if (expectedReply == null) CONFIRMED_MESSAGE_ID else "reply-confirmed")
+                })
+            try {
+                controller.send("original")
+                controller.replyingTo = controller.timeline.single().record
+                expectedReply = CONFIRMED_MESSAGE_ID
+                controller.send("a reply")
+                assertAcceptedHistoryReveal(controller)
+                assertEquals(null, controller.replyingTo)
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    /** Exercises the mounted dictation handoff, preserving its captured draft before revealing the tail. */
+    @Test
+    fun acceptedDictationFromHistorySnapsToItsPublishedTail() =
+        runBlocking {
+            val appState = testAppState()
+            val controller = controller(appState = appState, textPublisher = { _, _, _, _ -> sentSummary() })
+            appState.attachConversationController(controller)
+            val request =
+                ConversationDictationSendRequest(
+                    accountRef = ACCOUNT_REF,
+                    groupIdHex = GROUP_ID,
+                    expectedDraftRevision = appState.composerDraftGeneration(ACCOUNT_REF, GROUP_ID),
+                    expectedDraftText = "",
+                    payload = "dictated from history",
+                )
+            try {
+                assertTrue(appState.sendDictationTranscriptIfOriginUnchanged(request))
+                assertAcceptedHistoryReveal(controller)
+                assertEquals(
+                    "dictated from history",
+                    controller.timeline
+                        .single()
+                        .record.plaintext,
+                )
+            } finally {
+                appState.detachConversationController(controller)
+                controller.onCleared()
+            }
+        }
+
+    /** Checks the live controller overload rather than a payload-independent simulated tail. */
+    private suspend fun assertAcceptedHistoryReveal(controller: ConversationController) {
+        val writer = RecordingSendRevealWriter()
+        val coordinator = ConversationScrollCoordinator(writer, ConversationScrollMode.ReadingHistory("old-row", 0))
+        assertTrue(coordinator.revealSentAtLiveTail(controller, awaitFrame = {}))
+        assertEquals(listOf(0), writer.snappedIndexes)
+        assertTrue(writer.animatedIndexes.isEmpty())
+        assertTrue(coordinator.isFollowingTail)
+    }
+
     /** Keeps the pending bubble visible while Markdown hydration is deliberately held. */
     @Test
     fun bubblePublishesAndAcceptsBeforeTheMarkdownParseHopCompletes() =

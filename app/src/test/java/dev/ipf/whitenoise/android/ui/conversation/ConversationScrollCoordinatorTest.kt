@@ -646,6 +646,94 @@ class ConversationScrollCoordinatorTest {
 
     /** No stale-window snap is allowed when authoritative newest preparation fails. */
     @Test
+    fun historySendWaitsForDelayedNewestPublicationBeforeResolvingTail() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer, ConversationScrollMode.ReadingHistory("old", 20))
+            val releaseNewest = CompletableDeferred<Unit>()
+            var newestPublished = false
+            val reveal =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    assertTrue(
+                        coordinator.revealSentAtLiveTail(
+                            prepareLatest = {
+                                releaseNewest.await()
+                                newestPublished = true
+                                true
+                            },
+                            resolveTailIndex = {
+                                check(newestPublished)
+                                0
+                            },
+                            awaitFrame = {},
+                        ),
+                    )
+                }
+            assertTrue(writer.writes.isEmpty())
+            releaseNewest.complete(Unit)
+            reveal.join()
+            assertEquals(listOf(ScrollWrite.Snap(0, 0)), writer.writes)
+        }
+
+    /** The latest accepted send owns the snap; a suspended earlier preparation cannot scroll later. */
+    @Test
+    fun rapidAcceptedSendsCancelTheOlderDelayedHistoryReveal() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer, ConversationScrollMode.ReadingHistory("old", 20))
+            val firstPrepared = CompletableDeferred<Unit>()
+            var firstResult = true
+            val first =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    firstResult =
+                        coordinator.revealSentAtLiveTail(
+                            prepareLatest = {
+                                firstPrepared.await()
+                                true
+                            },
+                            resolveTailIndex = { 7 },
+                            awaitFrame = {},
+                        )
+                }
+            assertTrue(coordinator.revealSentAtLiveTail(resolveTailIndex = { 0 }, awaitFrame = {}))
+            firstPrepared.complete(Unit)
+            first.join()
+            assertFalse(firstResult)
+            assertEquals(listOf(ScrollWrite.Snap(0, 0)), writer.writes)
+            assertTrue(coordinator.isFollowingTail)
+        }
+
+    /** Reply/search navigation retires a suspended send rather than allowing a late return to newest. */
+    @Test
+    fun newerNavigationCancelsHistorySendPreparation() =
+        runTest {
+            for (reason in listOf(ConversationScrollReason.Reply, ConversationScrollReason.Search)) {
+                val writer = RecordingScrollWriter()
+                val coordinator = ConversationScrollCoordinator(writer)
+                val prepared = CompletableDeferred<Unit>()
+                var revealed = true
+                val send =
+                    launch(start = CoroutineStart.UNDISPATCHED) {
+                        revealed =
+                            coordinator.revealSentAtLiveTail(
+                                prepareLatest = {
+                                    prepared.await()
+                                    true
+                                },
+                                resolveTailIndex = { 0 },
+                                awaitFrame = {},
+                            )
+                    }
+                assertTrue(coordinator.programmaticJump("target", reason) { scrollToItem(18, 12) })
+                prepared.complete(Unit)
+                send.join()
+                assertFalse(revealed)
+                assertEquals(listOf(ScrollWrite.Snap(18, 12)), writer.writes)
+            }
+        }
+
+    /** No stale-window snap is allowed when authoritative newest preparation fails. */
+    @Test
     fun unavailableNewestWindowPreservesHistoryWithoutWriting() =
         runTest {
             val writer = RecordingScrollWriter()
