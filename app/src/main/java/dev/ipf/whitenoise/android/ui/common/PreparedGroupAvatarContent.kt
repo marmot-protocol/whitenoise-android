@@ -52,8 +52,8 @@ internal fun PreparedGroupAvatarContent(
     val selected =
         assets
             .asSequence()
-            .filter { it.isRenderable() }
             .map { it.copy() }
+            .filter { asset -> asset.isRenderable() && accountRef?.let(asset::cacheKey) != null }
             .distinctBy { it.cacheKey(accountRef.orEmpty()) }
             .take(VISIBLE_GROUP_AVATAR_LIMIT)
             .toList()

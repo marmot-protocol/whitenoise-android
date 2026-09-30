@@ -443,7 +443,7 @@ internal fun GroupDetailsScreen(
                     )
                 }
             }
-            return
+            return@PreparedGroupAvatarContent
         }
         val canShowEditAction = !isDm && canEdit
         LaunchedEffect(canShowEditAction) {
@@ -665,7 +665,7 @@ internal fun GroupDetailsScreen(
                 onBack = { mediaLibraryCategory = null },
                 onJumpToMessage = onJumpToMessage,
             )
-            return
+            return@PreparedGroupAvatarContent
         }
 
         if (showBubbleColors) {
@@ -675,7 +675,7 @@ internal fun GroupDetailsScreen(
                 onBack = { showBubbleColors = false },
                 groupIdHex = controller.group.groupIdHex,
             )
-            return
+            return@PreparedGroupAvatarContent
         }
 
         if (showMuteDurationDialog) {
@@ -754,14 +754,14 @@ internal fun GroupDetailsScreen(
                     },
                 )
             }
-            return
+            return@PreparedGroupAvatarContent
         }
 
         BackHandler { onBack() }
 
         if (showEditGroup) {
             GroupEditScreen(appState = appState, controller = controller, onBack = { showEditGroup = false })
-            return
+            return@PreparedGroupAvatarContent
         }
 
         val folderAccountRef = appState.activeAccountRef
@@ -773,7 +773,7 @@ internal fun GroupDetailsScreen(
                 onClose = { showFolderCreate = false },
                 initialManualChatIds = setOf(controller.group.groupIdHex.lowercase(Locale.ROOT)),
             )
-            return
+            return@PreparedGroupAvatarContent
         }
 
         if (showAddMember && canAdministerMembers) {
@@ -856,7 +856,7 @@ internal fun GroupDetailsScreen(
                     onDismiss = { showLargeGroupInviteConfirmation = false },
                 )
             }
-            return
+            return@PreparedGroupAvatarContent
         }
 
         if (showGroupInfo) {
@@ -867,7 +867,7 @@ internal fun GroupDetailsScreen(
                 relays = controller.group.relays,
                 onBack = { showGroupInfo = false },
             )
-            return
+            return@PreparedGroupAvatarContent
         }
 
         if (showTransferAdmin) {
@@ -1285,7 +1285,7 @@ internal fun GroupDetailsScreen(
                 bottomBar = groupNotice,
                 content = memberContent,
             )
-            return
+            return@PreparedGroupAvatarContent
         }
         if (showChatRelays) {
             BackHandler { showChatRelays = false }
@@ -1295,7 +1295,7 @@ internal fun GroupDetailsScreen(
                 feedback = groupFeedback,
                 bottomBar = groupNotice,
             )
-            return
+            return@PreparedGroupAvatarContent
         }
 
         val groupAvatar = rememberConversationGroupAvatar(appState, controller)

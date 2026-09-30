@@ -17,11 +17,17 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -148,6 +154,7 @@ class GroupAvatarLocalAssetScreenshotTest {
                 val kind = if (encrypted) "encrypted" else "public"
                 composeRule.onRoot().captureRoboImage("src/test/snapshots/group_stored_avatar_${kind}_surface_$index.png")
             }
+            captureStoredPictureViewer(if (encrypted) "encrypted" else "public")
             assertEquals(0, urlFetches.get())
             assertEquals(0, fixture.reads.get())
             assertEquals(0, fixture.requests.get())
@@ -159,8 +166,8 @@ class GroupAvatarLocalAssetScreenshotTest {
     }
 
     /** Tests rendered pixels, rather than inferring the result from a helper's returned bitmap. */
-    private fun assertBlueAvatarPixels() {
-        val bitmap = composeRule.onRoot().captureToImage().asAndroidBitmap()
+    private fun assertBlueAvatarPixels(node: SemanticsNodeInteraction = composeRule.onRoot()) {
+        val bitmap = node.captureToImage().asAndroidBitmap()
         var bluePixels = 0
         for (y in 0 until bitmap.height) {
             for (x in 0 until bitmap.width) {
@@ -168,6 +175,22 @@ class GroupAvatarLocalAssetScreenshotTest {
             }
         }
         assertTrue("Selected group picture must be rendered on the production surface", bluePixels > 300)
+    }
+
+    /** Opens the real editor's picture action and records its immediately supplied image, without refetching. */
+    private fun captureStoredPictureViewer(kind: String) {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val label = context.getString(R.string.profile_view_picture)
+        composeRule
+            .onNode(
+                SemanticsMatcher("View picture action") { node ->
+                    node.config.getOrNull(SemanticsActions.OnClick)?.label == label
+                },
+            ).performClick()
+        composeRule.waitForIdle()
+        val dialog = composeRule.onNode(isDialog())
+        assertBlueAvatarPixels(dialog)
+        dialog.captureRoboImage("src/test/snapshots/group_stored_avatar_${kind}_viewer.png")
     }
 
     /** Header hydration/name lag must retain the current row asset, but an image-identity mismatch cannot. */
@@ -392,6 +415,26 @@ class GroupAvatarLocalAssetScreenshotTest {
         assertEquals(0, fixture.legacyDownloads.get())
     }
 
+    /** A renderable projection without a usable reference is still a lazy miss, never a preparation crash. */
+    @Test
+    fun missingReferenceDoesNotEnterPreparation() {
+        val fixture = AvatarLocalFixture()
+        val selected = asset().copy(reference = null)
+        var observed: ImageBitmap? = null
+        composeRule.setContent {
+            PreparedGroupAvatarContent(fixture.state, listOf(selected)) {
+                val presentation = rememberGroupAvatarPresentation(fixture.state, group(), selected)
+                SideEffect { observed = presentation.image }
+                Text("reference unavailable")
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("reference unavailable").assertExists()
+        assertNull(observed)
+        assertEquals(0, fixture.reads.get())
+        assertEquals(0, fixture.legacyDownloads.get())
+    }
+
     /** A stale asset retains its current pixels while native refresh cannot provide another payload. */
     @Test
     fun staleRefreshMissDoesNotBlankTheCurrentPicture() {
@@ -559,7 +602,6 @@ class StoredAvatarExportTest {
                 release.complete(Unit)
             }
         }
-
 }
 
 /** Counts native calls; the only successful byte path is MDK's existing account-pinned local store. */
