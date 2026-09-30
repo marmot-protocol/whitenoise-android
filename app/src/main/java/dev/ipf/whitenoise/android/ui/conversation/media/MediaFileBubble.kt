@@ -45,7 +45,6 @@ import dev.ipf.whitenoise.android.state.hasCachedAttachmentInMemory
 import dev.ipf.whitenoise.android.state.refreshAttachmentTransferState
 import dev.ipf.whitenoise.android.state.requestAttachmentInstallerHandoff
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
-import dev.ipf.whitenoise.android.ui.conversation.messages.RetentionIndicatorInput
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
@@ -71,7 +70,7 @@ internal fun fileAttachmentCardTestTag(
  * in-app reader. Other files join any automatic/durable fetch already in
  * flight and open a reusable FileProvider artifact in an external viewer.
  * When selected as the message footer owner, the card also carries the timestamp,
- * delivery state, retention indicator, and invalidation warning as one contract.
+ * delivery state and invalidation warning as one contract.
  */
 @Composable
 internal fun MediaFileBubble(
@@ -87,8 +86,6 @@ internal fun MediaFileBubble(
     timestampText: String? = null,
     showStatus: Boolean = false,
     status: MessageStatus = MessageStatus.Received,
-    retention: RetentionIndicatorInput? = null,
-    reserveRetentionSpace: Boolean = false,
     footerWarningText: String? = null,
 ) {
     val context = LocalContext.current
@@ -397,8 +394,6 @@ internal fun MediaFileBubble(
             timestampText = timestampText,
             showStatus = showStatus,
             status = status,
-            retention = retention,
-            reserveRetentionSpace = reserveRetentionSpace,
             footerWarningText = footerWarningText,
             openPending = opening,
             onCancelTransfer = { controller.cancelAttachmentTransfer(messageIdHex, attachmentIndex) },
@@ -544,8 +539,6 @@ internal fun PendingFilePill(
     timestampText: String? = null,
     showStatus: Boolean = false,
     status: MessageStatus = MessageStatus.Pending,
-    retention: RetentionIndicatorInput? = null,
-    reserveRetentionSpace: Boolean = false,
 ) {
     val presentation = remember(mediaType, fileName) { resolveAttachmentPresentation(mediaType, fileName) }
     Surface(
@@ -576,8 +569,6 @@ internal fun PendingFilePill(
             trailingMetadataText = timestampText ?: statusLabel,
             trailingMetadataIsError = failed && timestampText == null,
             trailingStatus = status.takeIf { showStatus },
-            retention = retention,
-            reserveRetentionSpace = reserveRetentionSpace,
             loadingDescription = statusLabel,
             transferDirection = FileTransferDirection.Upload,
         )

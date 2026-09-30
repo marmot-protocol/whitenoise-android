@@ -39,7 +39,6 @@ import dev.ipf.whitenoise.android.ui.conversation.media.PendingFilePill
 import dev.ipf.whitenoise.android.ui.conversation.media.fileBubbleWidth
 import dev.ipf.whitenoise.android.ui.conversation.media.resolveAttachmentPresentation
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageInlineFooter
-import dev.ipf.whitenoise.android.ui.conversation.messages.RetentionIndicatorInput
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -73,7 +72,6 @@ class ReceivedFileTimestampScreenshotTest {
                             timestampText = SINGLE_TIME,
                             showStatus = true,
                             status = MessageStatus.Pending,
-                            reserveRetentionSpace = true,
                         )
                     }
                     Surface(
@@ -89,8 +87,6 @@ class ReceivedFileTimestampScreenshotTest {
                             timestampText = SINGLE_TIME,
                             showStatus = true,
                             status = MessageStatus.Sent,
-                            retention = retentionInput("confirmed-file"),
-                            retentionClockMillis = { RETENTION_NOW_MILLIS },
                         )
                     }
                 }
@@ -128,7 +124,7 @@ class ReceivedFileTimestampScreenshotTest {
         composeRule.onAllNodesWithContentDescription("Downloading").assertCountEquals(1)
         composeRule.onAllNodesWithContentDescription("Tap to retry").assertCountEquals(1)
         composeRule.onAllNodesWithContentDescription("Sent").assertCountEquals(1)
-        composeRule.onAllNodesWithContentDescription("Disappearing message").assertCountEquals(1)
+        composeRule.onAllNodesWithContentDescription("Disappearing message").assertCountEquals(0)
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/received_file_timestamp_light.png")
     }
 
@@ -153,7 +149,6 @@ class ReceivedFileTimestampScreenshotTest {
                         timestampText = SENT_TIME,
                         showStatus = true,
                         status = MessageStatus.Sent,
-                        retention = retentionInput("sent-file"),
                     )
                     Text("File with caption", style = MaterialTheme.typography.labelMedium)
                     CaptionedFileCard()
@@ -276,7 +271,6 @@ class ReceivedFileTimestampScreenshotTest {
                             timestampText = SENT_RTL_TIME,
                             showStatus = true,
                             status = MessageStatus.Sent,
-                            retention = retentionInput("sent-file-rtl"),
                         )
                     }
                 }
@@ -285,7 +279,7 @@ class ReceivedFileTimestampScreenshotTest {
 
         composeRule.onAllNodesWithText(SENT_RTL_TIME).assertCountEquals(1)
         composeRule.onAllNodesWithContentDescription("Sent").assertCountEquals(1)
-        composeRule.onAllNodesWithContentDescription("Disappearing message").assertCountEquals(1)
+        composeRule.onAllNodesWithContentDescription("Disappearing message").assertCountEquals(0)
         composeRule
             .onNodeWithTag(SENT_RTL_TAG)
             .captureRoboImage("src/test/snapshots/sent_file_timestamp_dark_large_rtl.png")
@@ -443,7 +437,6 @@ class ReceivedFileTimestampScreenshotTest {
         timestampText: String?,
         showStatus: Boolean = false,
         status: MessageStatus = MessageStatus.Received,
-        retention: RetentionIndicatorInput? = null,
         openPending: Boolean = false,
         footerWarningText: String? = null,
         cardTag: String? = null,
@@ -463,9 +456,7 @@ class ReceivedFileTimestampScreenshotTest {
                 timestampText = timestampText,
                 showStatus = showStatus,
                 status = status,
-                retention = retention,
                 footerWarningText = footerWarningText,
-                retentionClockMillis = { RETENTION_NOW_MILLIS },
                 openPending = openPending,
             )
         }
@@ -486,17 +477,6 @@ class ReceivedFileTimestampScreenshotTest {
         dim = null,
         thumbhash = null,
     )
-
-    private fun retentionInput(messageIdHex: String) =
-        RetentionIndicatorInput(
-            controllerKey = screenshotControllerKey,
-            accountRef = "personal",
-            groupIdHex = "group",
-            messageIdHex = messageIdHex,
-            sourceEpoch = 7uL,
-            durationSeconds = 100uL,
-            expiresAtEpochSeconds = 200uL,
-        )
 
     private companion object {
         const val TAG = "received-file-timestamp-gallery"
@@ -523,7 +503,5 @@ class ReceivedFileTimestampScreenshotTest {
         const val SPREADSHEET_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         const val SENDING_CARD_TAG = "sending-file-card"
         const val RECEIVED_CARD_TAG = "received-file-card"
-        const val RETENTION_NOW_MILLIS = 150_000L
-        val screenshotControllerKey = Any()
     }
 }

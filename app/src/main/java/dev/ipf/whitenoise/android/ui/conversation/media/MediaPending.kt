@@ -46,7 +46,6 @@ import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
-import dev.ipf.whitenoise.android.ui.conversation.messages.RetentionIndicatorInput
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -69,8 +68,6 @@ internal fun MediaPendingPlaceholder(
     timestampText: String? = null,
     showStatus: Boolean = false,
     status: MessageStatus = MessageStatus.Pending,
-    retention: RetentionIndicatorInput? = null,
-    reserveRetentionSpace: Boolean = false,
 ) {
     val statusLabel = stringResource(if (failed) R.string.media_upload_failed else R.string.media_uploading)
     val statusColor = if (failed) MaterialTheme.colorScheme.error else Color.White
@@ -92,8 +89,6 @@ internal fun MediaPendingPlaceholder(
             timestampText = timestampText,
             showStatus = showStatus,
             status = status,
-            retention = retention,
-            reserveRetentionSpace = reserveRetentionSpace,
         )
         return
     }
@@ -108,8 +103,6 @@ internal fun MediaPendingPlaceholder(
                 timestampText = timestampText,
                 showStatus = showStatus,
                 status = status,
-                retention = retention,
-                reserveRetentionSpace = reserveRetentionSpace,
             )
         }
         return
@@ -128,8 +121,6 @@ private fun PendingFilePills(
     timestampText: String?,
     showStatus: Boolean,
     status: MessageStatus,
-    retention: RetentionIndicatorInput?,
-    reserveRetentionSpace: Boolean,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         attachments.forEachIndexed { index, attachment ->
@@ -144,8 +135,6 @@ private fun PendingFilePills(
                 timestampText = timestampText.takeIf { ownsFooter },
                 showStatus = ownsFooter && showStatus,
                 status = status,
-                retention = retention.takeIf { ownsFooter },
-                reserveRetentionSpace = ownsFooter && reserveRetentionSpace,
             )
         }
     }

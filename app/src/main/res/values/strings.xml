@@ -259,6 +259,8 @@
     <string name="wave_hi">Wave hi</string>
     <string name="conversation_empty_disappearing_title">No messages to show</string>
     <string name="conversation_empty_disappearing_body">Disappearing messages are on. New messages in this chat disappear after %1$s.</string>
+    <string name="conversation_history_may_have_expired">Earlier messages may have expired</string>
+    <string name="conversation_history_retention_description">%1$s. Disappearing messages: %2$s.</string>
     <string name="group_empty_only_you_title">This group is only you</string>
     <string name="group_empty_invite_members">Invite people when you are ready.</string>
     <string name="you_are_no_longer_a_member">You can\'t send messages to this group because you\'re no longer a member.</string>

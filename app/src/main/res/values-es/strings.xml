@@ -201,6 +201,8 @@
     <string name="wave_hi">Saludar</string>
     <string name="conversation_empty_disappearing_title">No hay mensajes que mostrar</string>
     <string name="conversation_empty_disappearing_body">Los mensajes temporales están activados. Los mensajes nuevos de este chat desaparecen después de %1$s.</string>
+    <string name="conversation_history_may_have_expired">Es posible que los mensajes anteriores hayan caducado</string>
+    <string name="conversation_history_retention_description">%1$s. Mensajes temporales: %2$s.</string>
     <string name="group_empty_only_you_title">Solo estás tú en este grupo</string>
     <string name="group_empty_invite_members">Invita a otras personas cuando quieras.</string>
     <string name="you_are_no_longer_a_member">No puedes enviar mensajes a este grupo porque ya no eres miembro.</string>
