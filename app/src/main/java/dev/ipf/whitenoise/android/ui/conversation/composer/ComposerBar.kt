@@ -1196,6 +1196,17 @@ internal fun ComposerBar(
                             attachmentSheetState.dismiss()
                         },
                     )
+                } else if (
+                    composerTextMatchesEditSession &&
+                    composerExpansion.mode == ComposerExpansionMode.Automatic
+                ) {
+                    EmojiShortcodeSuggestions(
+                        field = textFieldValue,
+                        onPick = { updated ->
+                            applyComposerFieldValue(updated)
+                            runCatching { composerFocus.requestFocus() }
+                        },
+                    )
                 }
                 val activeRecordingController = voiceRecordingController?.takeIf { it.isRecording }
                 val isRecordingVoice = activeRecordingController != null
