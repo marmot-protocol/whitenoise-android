@@ -60,6 +60,10 @@ class ChatListTitleTest {
             "Hermes",
             chatListItemTitle(item, { if (it == "peer-acc") "Hermes" else null }, { "Fallback" }, copy),
         )
+        assertEquals(
+            "Hermes",
+            chatListItemTitle(item.copy(selectedPresentation = null), { "Hermes" }, { "Fallback" }, copy),
+        )
         assertEquals("Jade Crane", chatListItemTitle(item, { null }, { "Fallback" }, copy))
         assertEquals("Jade Crane", chatListItemTitle(item, { " \u200b " }, { "Fallback" }, copy))
     }
