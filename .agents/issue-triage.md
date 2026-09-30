@@ -37,6 +37,6 @@ execution ledgers link GitHub work rather than becoming another backlog.
 Use maintained authenticated tools and workspace discovery/quota rules; mutations
 require uncached live readback. On the shared Hermes host, use its Project tools
 (`gh project item-list` is blocked). Elsewhere, `python3 scripts/check_github_triage.py`
-checks its configured subset only; `--repair-additions` adds missing issues without
-classifying them. Verify the full field contract, uniqueness, hierarchy and status
+checks its configured subset only; `--repair-additions` adds missing open issues/PRs
+without classifying them. Verify the full field contract, uniqueness, hierarchy and status
 separately; preserve legitimate history when reconciling obsolete/duplicate work.
