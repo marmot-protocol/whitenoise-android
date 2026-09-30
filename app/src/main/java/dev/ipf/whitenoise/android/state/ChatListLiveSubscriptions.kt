@@ -22,7 +22,7 @@ internal interface ChatListWindowHandle {
     /** Returns the complete first replacement captured when this window opened; consumed once. */
     fun snapshot(): ChatListWindowSnapshotFfi?
 
-    /** Waits for the next complete replacement, or null once the window is closed. */
+    /** Waits for a complete replacement or native stream end; the owner cancels pending waits on retirement. */
     suspend fun next(): ChatListWindowSnapshotFfi?
 
     /** Extends the retained window from the installed [sequence] in [direction]. */

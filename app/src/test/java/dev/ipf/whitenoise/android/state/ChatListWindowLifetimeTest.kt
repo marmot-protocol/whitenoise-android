@@ -138,16 +138,31 @@ class ChatListWindowLifetimeTest {
         }
 
     @Test
-    fun nativeWindowClosedIsIgnoredOnlyAfterThisSetRetires() =
+    fun nativeWindowClosedBeforeKotlinRetirementDoesNotEscapeIntoViewportCommands() =
+        runBlocking {
+            LifetimeCommand.entries.forEach { command ->
+                val fixture = lifetimeWindows()
+                val receiver = launch { fixture.windows.receive { _, _ -> error("unexpected replacement") } }
+                fixture.handles.values.forEach { handle -> withTimeout(5_000) { handle.nextStarted.await() } }
+                fixture.chats.beforeCommand = { throw MarmotKitException.ChatWindowClosed() }
+                assertNull(command.run(fixture.windows))
+                assertFalse(fixture.windows.closed)
+                assertTrue(receiver.isActive)
+                assertEquals(0L, fixture.windows.frame().revision)
+                assertEquals(listOf("old"), fixture.windows.rows.map { it.row.groupIdHex })
+                fixture.windows.close()
+                withTimeout(5_000) { receiver.join() }
+                withTimeout(5_000) { fixture.windows.awaitReleased() }
+                fixture.assertReleasedOnce()
+            }
+        }
+
+    @Test
+    fun nativeWindowClosedDuringKotlinRetirementIsIgnored() =
         runBlocking {
             supervisorScope {
                 val fixture = lifetimeWindows()
                 val ended = MarmotKitException.ChatWindowClosed()
-                fixture.chats.beforeCommand = { throw ended }
-                assertTrue(
-                    runCatching { fixture.windows.returnToTop(ChatListViewFfi.CHATS) }
-                        .exceptionOrNull() is MarmotKitException.ChatWindowClosed,
-                )
                 val entered = CompletableDeferred<Unit>()
                 val release = CompletableDeferred<Unit>()
                 fixture.chats.beforeCommand = {

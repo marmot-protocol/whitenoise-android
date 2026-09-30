@@ -55,7 +55,10 @@ internal class ChatListWindowLifetime(
         }
     }
 
-    /** Rejects new calls immediately, cancels only receive workers, and never waits for a command mutex. */
+    /**
+     * Rejects new calls immediately and cancels only receive workers, without waiting for a command mutex.
+     * Native destruction finishes asynchronously after admitted calls; use [awaitReleased] to observe it.
+     */
     fun close() {
         val (jobs, release) =
             synchronized(lock) {

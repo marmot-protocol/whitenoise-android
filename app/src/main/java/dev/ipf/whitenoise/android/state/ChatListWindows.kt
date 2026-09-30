@@ -175,7 +175,8 @@ internal class ChatListWindowSet private constructor(
 
     // A stale sequence or an anchor outside the retained rows carries no detail worth surfacing: the
     // contract is to reassess from the newest installed replacement, which the receive loop delivers.
-    // A retired account can also close its native window before an admitted command finishes.
+    // Native shutdown may precede Kotlin retirement. The receive loop owns reopening a closed
+    // window; viewport commands have no result to publish and must not escape into UI effects.
     @Suppress("SwallowedException")
     private suspend fun command(
         view: ChatListViewFfi,
@@ -195,7 +196,6 @@ internal class ChatListWindowSet private constructor(
                 } catch (outside: MarmotKitException.ChatWindowAnchorOutside) {
                     null
                 } catch (ended: MarmotKitException.ChatWindowClosed) {
-                    if (!closed) throw ended
                     null
                 }
             result?.takeIf { install(view, it) }
