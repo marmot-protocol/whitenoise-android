@@ -132,6 +132,7 @@ import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutR
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutSink
 import dev.ipf.whitenoise.android.ui.conversation.InvitationActions
 import dev.ipf.whitenoise.android.ui.conversation.InviteAcceptanceResolutionStatus
+import dev.ipf.whitenoise.android.ui.conversation.composer.BlockedDmComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
@@ -347,6 +348,8 @@ internal fun MessageBubble(
     onQuickReactionsSave: (List<String>) -> Unit,
     onReplyPreviewClick: (TimelineMessage) -> Unit,
     composerGate: ComposerGate,
+    blockedDmUnblockInFlight: Boolean = false,
+    onUnblockBlockedDm: () -> Unit = {},
     groupDisbanded: Boolean = false,
     inviteMutationInFlight: Boolean,
     onJoinInvite: () -> Unit,
@@ -2759,6 +2762,11 @@ internal fun MessageBubble(
                                         )
                                     }
                                 ComposerGate.NOTICE -> RemovedMemberComposerNotice()
+                                ComposerGate.BLOCKED ->
+                                    BlockedDmComposerNotice(
+                                        unblockInFlight = blockedDmUnblockInFlight,
+                                        onUnblock = onUnblockBlockedDm,
+                                    )
                                 ComposerGate.FROZEN -> FrozenGroupComposerNotice()
                                 ComposerGate.DISBANDED -> DisbandedGroupComposerNotice(disbanded = groupDisbanded)
                                 ComposerGate.INVITE ->
