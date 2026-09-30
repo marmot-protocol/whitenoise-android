@@ -3923,7 +3923,9 @@ internal fun ConversationScreen(
                                 }
                             },
                         )
-                    controller.group.pendingConfirmation && renderedTimeline.isEmpty() ->
+                    (controller.group.pendingConfirmation || controller.inviteAcceptanceResolutionPending) &&
+                        !controller.terminalConversationUnavailable &&
+                        renderedTimeline.isEmpty() ->
                         InvitePreviewPlaceholder(
                             inviterName = controller.inviteAccount?.let { appState.chatMemberTitle(it) },
                         )

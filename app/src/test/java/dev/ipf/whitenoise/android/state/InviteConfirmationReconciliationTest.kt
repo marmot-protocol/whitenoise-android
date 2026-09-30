@@ -196,12 +196,109 @@ class InviteConfirmationReconciliationTest {
             assertTrue(controller.inviteAcceptanceResolutionPending)
             assertFalse(controller.canSendMessages)
             assertEquals(GroupRosterLoadState.FAILED, controller.memberRosterState)
+            assertEquals(GroupRosterLoadState.FAILED, controller.inviteAcceptanceResolutionState)
             assertEquals(1, closed)
             available = true
             controller.retryInviteAcceptanceAuthority()
             assertFalse(controller.inviteAcceptanceResolutionPending)
             assertFalse(controller.group.pendingConfirmation)
             assertEquals(2, closed)
+        }
+
+    /** Both stream orders retain invitation identity without rewriting protocol confirmation. */
+    @Test
+    fun conflictingRowsRemainIdentifiableAndTerminalRowsWin() {
+        for (rowPending in listOf(false, true)) {
+            val item = chatListItemFromProjection(chatListRow(pending = rowPending), group = group(pending = !rowPending, welcome = OLD_WELCOME))
+            assertTrue(item.checkingInvitation)
+            assertEquals(rowPending, item.group.pendingConfirmation)
+            assertFalse(item.copy(group = item.group.copy(unrecoverable = true)).checkingInvitation)
+        }
+    }
+
+    /** Resume and startup retries coalesce while the canonical read owns its handle. */
+    @Test
+    fun overlappingResolutionRequestsDoNotReplaceTheAuthorityRead() =
+        runTest {
+            val release = CompletableDeferred<Unit>()
+            var reads = 0
+            var closed = 0
+            val item = chatListItemFromProjection(chatListRow(pending = false), group = pending())
+            val controller =
+                conflictController(item) {
+                    reads += 1
+                    release.await()
+                    object : ConversationGroupStateSubscriptionHandle {
+                        override fun snapshot() = pending()
+
+                        override suspend fun next(): AppGroupRecordFfi? = null
+
+                        override fun close() {
+                            closed += 1
+                        }
+                    }
+                }
+            val first = async { controller.retryInviteAcceptanceAuthority() }
+            runCurrent()
+            controller.retryMembers()
+            val duplicate = async { controller.retryInviteAcceptanceAuthority() }
+            runCurrent()
+            assertEquals(1, reads)
+            assertTrue(controller.inviteAcceptanceResolutionPending)
+            assertEquals(GroupRosterLoadState.LOADING, controller.inviteAcceptanceResolutionState)
+            release.complete(Unit)
+            first.await()
+            duplicate.await()
+            assertEquals(1, reads)
+            assertEquals(1, closed)
+            assertFalse(controller.inviteAcceptanceResolutionPending)
+            assertTrue(controller.group.pendingConfirmation)
+        }
+
+    /** Cancellation remains retryable; a later foreground check restores actions without Join. */
+    @Test
+    fun cancelledConflictReadCanResolveOnReturn() =
+        runTest {
+            val release = CompletableDeferred<Unit>()
+            var available = false
+            val item = chatListItemFromProjection(chatListRow(pending = false), group = pending())
+            val controller =
+                conflictController(item) {
+                    if (!available) release.await()
+                    ScriptedConversationGroupStateSubscription(pending())
+                }
+            val read = async { controller.retryInviteAcceptanceAuthority() }
+            runCurrent()
+            read.cancelAndJoin()
+            assertTrue(controller.inviteAcceptanceResolutionPending)
+            assertEquals(GroupRosterLoadState.FAILED, controller.inviteAcceptanceResolutionState)
+            assertFalse(controller.acceptInvite(notify = false))
+            assertFalse(controller.declineInvite())
+            available = true
+            controller.retryInviteAcceptanceAuthority()
+            assertFalse(controller.inviteAcceptanceResolutionPending)
+            assertTrue(controller.group.pendingConfirmation)
+        }
+
+    /** A newer terminal native observation cannot be undone by a held conflict read. */
+    @Test
+    fun terminalUpdateSupersedesHeldAuthorityRead() =
+        runTest {
+            val release = CompletableDeferred<Unit>()
+            val item = chatListItemFromProjection(chatListRow(pending = false), group = pending())
+            val controller =
+                conflictController(item) {
+                    release.await()
+                    ScriptedConversationGroupStateSubscription(pending())
+                }
+            val read = async { controller.retryInviteAcceptanceAuthority() }
+            runCurrent()
+            controller.applyGroupStateForTest(accepted().copy(disbanded = true))
+            release.complete(Unit)
+            read.await()
+            assertTrue(controller.group.disbanded)
+            assertFalse(controller.group.pendingConfirmation)
+            assertFalse(controller.inviteAcceptanceResolutionPending)
         }
 
     /** Unknown generation identity cannot establish a sticky acceptance proof. */
@@ -227,6 +324,7 @@ class InviteConfirmationReconciliationTest {
         assertFalse(controller.declineInvite())
         controller.retryInviteAcceptanceAuthority()
         assertFalse(controller.inviteAcceptanceResolutionPending)
+        assertEquals(GroupRosterLoadState.READY, controller.inviteAcceptanceResolutionState)
         assertEquals(canonical.pendingConfirmation, controller.group.pendingConfirmation)
     }
 

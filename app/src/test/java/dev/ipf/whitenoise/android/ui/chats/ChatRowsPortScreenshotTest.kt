@@ -9,7 +9,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -38,6 +40,39 @@ import org.robolectric.annotation.GraphicsMode
 class ChatRowsPortScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
     private val context = ApplicationProvider.getApplicationContext<Context>()
+
+    /** Conflicting stream frames keep the invitation identifiable even with a selected message. */
+    @Test fun checkingInvitationLight() = captureCheckingInvitation(dark = false)
+
+    @Test fun checkingInvitationDark() = captureCheckingInvitation(dark = true)
+
+    private fun captureCheckingInvitation(dark: Boolean) {
+        val state = ChatRowPortFixtures.state(context)
+        val base = ChatRowPortFixtures.item()
+        val item = base.copy(inviteConfirmationUnresolved = true, selectedPreview = SelectedChatPreviewFfi.Message)
+        val draftItem =
+            base.copy(
+                group = base.group.copy(groupIdHex = "b".repeat(64)),
+                inviteConfirmationUnresolved = true,
+                selectedPreview = SelectedChatPreviewFfi.Draft(ChatListDraftPreviewFfi("Saved draft", false, 0uL, null)),
+            )
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = dark) {
+                Surface(Modifier.fillMaxSize()) {
+                    Column {
+                        listOf(item, draftItem).forEach { row ->
+                            ChatRow(item = row, appState = state, onClick = {}, onOpenProfile = {})
+                        }
+                    }
+                }
+            }
+        }
+        composeRule.onAllNodesWithText(context.getString(R.string.checking_invitation)).assertCountEquals(2)
+        composeRule.onNodeWithText("Saved draft").assertDoesNotExist()
+        composeRule.onNodeWithText(ChatRowPortFixtures.PREVIEW).assertDoesNotExist()
+        val theme = if (dark) "dark" else "light"
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/chat_row_checking_invitation_$theme.png")
+    }
 
     /** Expiry hides the selected message while preserving the chat, unread badge, and native row selection. */
     @Test

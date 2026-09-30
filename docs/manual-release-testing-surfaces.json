@@ -2823,6 +2823,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
         "anchor": "fun InviteAcceptanceResolutionStatus(",
         "test_ids": [
+          "GRP-011",
           "GRP-012",
           "GRP-014"
         ]
@@ -27594,6 +27595,23 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MessageOutboundShare.kt",
         "anchor": "internal const val OUTBOUND_SHARE_MAX_BYTES",
         "test_ids": ["MED-016"]
+      },
+      {
+        "surface": "Conflicting invitation snapshots retain identifiable chat-row presentation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatListItem.kt",
+        "anchor": "val checkingInvitation: Boolean",
+        "test_ids": [
+          "GRP-011"
+        ]
+      },
+      {
+        "surface": "Foreground invitation authority retry without consent mutation replay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundRestoreEffects.kt",
+        "anchor": "scope.launch { controller.retryInviteAcceptanceAuthority() }",
+        "test_ids": [
+          "GRP-011",
+          "GRP-014"
+        ]
       }
     ],
     "notification_content_contracts": [
