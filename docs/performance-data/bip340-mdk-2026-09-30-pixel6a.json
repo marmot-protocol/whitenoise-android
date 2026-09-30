@@ -1,0 +1,94 @@
+{
+  "schema": 2,
+  "implementation": "MDK 0.11.0 stateless full-event verifier",
+  "buildFingerprint": "google/bluejay/bluejay:17/CP3A.260905.009/2026092501:user/release-keys",
+  "abi": "arm64-v8a",
+  "warmupOperations": 10,
+  "operationsPerSample": 8,
+  "sampleCount": 20,
+  "before": {
+    "batteryPercent": 80,
+    "thermalStatus": 0
+  },
+  "after": {
+    "batteryPercent": 80,
+    "thermalStatus": 0
+  },
+  "results": [
+    {
+      "name": "legacyFullEvent",
+      "timeNs": [
+        234717819,
+        236096115,
+        234602300,
+        235928370,
+        235068115,
+        234912419,
+        234450582,
+        232706995,
+        232328944,
+        235232422,
+        231818054,
+        233518717,
+        235479085,
+        234783737,
+        233602569,
+        233832860,
+        233723877,
+        233324758,
+        234427887,
+        233052663
+      ],
+      "medianNs": 234439234,
+      "operationsPerSecond": 4.265497642770834
+    },
+    {
+      "name": "replacementFullEvent",
+      "timeNs": [
+        515548,
+        456680,
+        485433,
+        469309,
+        479746,
+        485743,
+        478393,
+        506917,
+        458684,
+        464579,
+        464111,
+        487538,
+        500300,
+        467341,
+        490712,
+        498713,
+        453791,
+        504608,
+        458470,
+        471288
+      ],
+      "medianNs": 479069,
+      "operationsPerSecond": 2087.3819846410433
+    }
+  ],
+  "recordedAtUtc": "2026-09-30T22:06:24.648694+00:00",
+  "sourceRevision": "85058376027a20a8e9b2a3bc3f3efc4bebb5cb65",
+  "sourceMode": "APKs built from migration snapshot immediately before commit; every benchmark source hash verified equal to committed source revision. APK embedded VCS metadata may retain pre-commit head.",
+  "sourceHashes": {
+    "app/src/main/java/dev/ipf/whitenoise/android/core/nostr/NostrEvent.kt": "d38aaad0ca960cad7f7103bf0e73980b94cb780ab5cf964ee54caecd25a510c4",
+    "app/src/main/java/dev/ipf/whitenoise/android/core/nostr/NostrEventVerifier.kt": "635efaa9f19270a33983dac08fd328f70b601eb84651df62032a706a59f4ea64",
+    "cryptoBenchmark/src/main/java/dev/ipf/whitenoise/android/core/nostr/Bip340ComparisonBridge.kt": "7f36326aa2e9fa7121675f0aa510796b82e978edc25648c0bf7b677228fbc9c6",
+    "cryptoBenchmark/src/main/java/dev/ipf/whitenoise/android/core/nostr/LegacyBip340BenchmarkVerifier.kt": "ed5235bce89ee5949535cb63e5942a41ccff13c3201a6a0e89ce6cb7cdf2e684",
+    "cryptoBenchmark/src/androidTest/java/dev/ipf/whitenoise/android/core/nostr/Bip340PhysicalBenchmark.kt": "4fe0b83e96b37103806d2b60a9b458cc4b022f16e1e40a175d09f370b7b15958",
+    "cryptoBenchmark/build.gradle.kts": "26022c5f8cef7c0412286a74a5894045d34c20d7258ab1894b402fbd92f3ddbc",
+    "cryptoBenchmark/benchmark-rules.pro": "d943fb72bbda0d9ef96675f303656cb5392d57d427e2268ed4a1f872dbc2d560",
+    "app/src/main/marmotkit/MARMOT_VERSION": "e94cde28f96e5daed5f52ef08a3980560a4815b1e7095baa40f22511452c17d4"
+  },
+  "apkHashes": {
+    "cryptoBenchmark/build/outputs/apk/release/cryptoBenchmark-release.apk": "65c51d5c9ccf29ac1837425269343acbc37b1f1d9e5e1fc3c1127e513f93d04c",
+    "cryptoBenchmark/build/outputs/apk/androidTest/release/cryptoBenchmark-release-androidTest.apk": "38aba2b74b4730cda0ad88af11dd8e287e16da643d95d067291e64f7d2ea1dc1"
+  },
+  "marmotKitVersion": "0.11.0",
+  "marmotKitArtifactSha256": "5ab8bf5f7723ed2c07d15a07c5691d05eb8a37354882020c0b69b952d6418923",
+  "instrumentationVerdict": "OK (1 test)",
+  "instrumentationDurationSeconds": 40.172
+}

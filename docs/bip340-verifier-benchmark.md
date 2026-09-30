@@ -27,6 +27,30 @@ JVM fuzzing covers the parser and serialization roundtrip; cryptographic rejecti
 runs in this isolated Android APK using the real native library. Domain unit tests
 inject immutable verifier decisions and do not claim cryptographic validation.
 
+## Current MDK measurements
+
+The [2026-09-30 Pixel 6a samples](performance-data/bip340-mdk-2026-09-30-pixel6a.json)
+come from one guarded physical-device run of the minified release benchmark on
+GrapheneOS Android 17 / arm64-v8a. The instrumentation verdict was `OK (1 test)`.
+Battery was 80% and thermal status was 0 before and after measurement.
+
+| Full-event verifier | Median | Operations per second |
+| --- | ---: | ---: |
+| Legacy Kotlin | 234.439 ms | 4.27 |
+| MDK 0.11.0 | 0.479 ms | 2,087 |
+
+The warmed MDK path was approximately 489 times faster for this signed fixture.
+These measurements cover full-event verification, including canonical event-ID
+validation, and do not measure card rendering or end-to-end message latency.
+
+The report includes the MarmotKit artifact checksum, both APK checksums, all
+benchmark source checksums, and source revision
+`85058376027a20a8e9b2a3bc3f3efc4bebb5cb65`. The APKs were built immediately
+before that commit; every benchmark source checksum was verified against the
+committed files. Embedded APK VCS metadata may retain the preceding head. The
+benchmark now uses the app's standard optimized Android R8 defaults so JNA's
+runtime structure annotations survive minification.
+
 ## Historical ACINQ measurements
 
 The following retained samples measure the earlier ACINQ/libsecp256k1 candidate.
