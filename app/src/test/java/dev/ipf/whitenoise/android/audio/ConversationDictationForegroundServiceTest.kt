@@ -9,6 +9,8 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import android.widget.Button
 import android.widget.FrameLayout
 import androidx.compose.runtime.snapshots.Snapshot
@@ -279,9 +281,53 @@ class ConversationDictationForegroundServiceTest {
         lifecycle.destroy()
     }
 
-    /** A Cancel delivered as the first command still removes the notification it just promoted. */
+    /** Android queues foreground posts; a completion tap must not queue stale controls behind cleanup. */
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun cancelDuringFirstStartRemovesPromotedNotificationImmediately() {
+    fun completionActionsCannotRepostControlsAfterConnectionRestoration() =
+        runTest {
+            notificationActions.forEach { action ->
+                BackgroundConnectionNotification.markForegroundActive()
+                val harness = Harness(this)
+                ConversationDictationForegroundService.hostResolver = { harness }
+                ConversationDictationForegroundService.foregroundPromoter = { service, notification ->
+                    defaultForegroundPromoter(service, notification)
+                    // ServiceRecord.postNotification captures the notification, then posts it on
+                    // the system handler. STOP_FOREGROUND_REMOVE cannot cancel a shared ID
+                    // while the connection service still owns it.
+                    Handler(Looper.getMainLooper()).post {
+                        service.getSystemService(NotificationManager::class.java)
+                            .notify(BackgroundConnectionNotification.NOTIFICATION_ID, notification)
+                    }
+                }
+                val lifecycle = Robolectric.buildService(ConversationDictationForegroundService::class.java).create()
+                val service = lifecycle.get()
+                service.onStartCommand(startIntent(service, harness), 0, 1)
+                shadowOf(Looper.getMainLooper()).idle()
+
+                service.onStartCommand(actionCommand(service, harness, action), 0, 2)
+                harness.platform.listener.onResult("completed transcript")
+                runCurrent()
+                assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)
+                Snapshot.sendApplyNotifications()
+                shadowOf(Looper.getMainLooper()).idle()
+
+                val notification =
+                    service.getSystemService(NotificationManager::class.java)
+                        .activeNotifications.single().notification
+                assertEquals(
+                    "White Noise is connected",
+                    notification.extras.getCharSequence(Notification.EXTRA_TITLE).toString(),
+                )
+                assertNull(notification.contentView)
+                lifecycle.destroy()
+                shadowOf(Looper.getMainLooper()).idle()
+            }
+        }
+
+    /** A Cancel delivered as the first command never queues a foreground notification. */
+    @Test
+    fun cancelDuringFirstStartNeverPromotesNotification() {
         val harness = installHost()
         val lifecycle = Robolectric.buildService(ConversationDictationForegroundService::class.java).create()
         val service = lifecycle.get()
@@ -293,9 +339,36 @@ class ConversationDictationForegroundServiceTest {
         )
 
         assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)
-        assertTrue(shadowOf(service as Service).isForegroundStopped)
+        assertNull(shadowOf(service as Service).lastForegroundNotification)
         assertTrue(service.getSystemService(NotificationManager::class.java).activeNotifications.isEmpty())
         lifecycle.destroy()
+    }
+
+    /** Every completion queued before the initial service start ends without capturing or posting controls. */
+    @Test
+    fun completionBeforeFirstPromotionNeverStartsMicrophone() {
+        notificationActions.forEach { action ->
+            BackgroundConnectionNotification.markForegroundActive()
+            val harness = Harness(autoReady = false)
+            ConversationDictationForegroundService.hostResolver = { harness }
+            val lifecycle = Robolectric.buildService(ConversationDictationForegroundService::class.java).create()
+            val service = lifecycle.get()
+
+            service.onStartCommand(actionCommand(service, harness, action), 0, 1)
+
+            assertFalse(harness.conversationDictation.hasDurableSession)
+            assertEquals(0, harness.platform.sessionsCreated)
+            assertNull(shadowOf(service as Service).lastForegroundNotification)
+            val notification =
+                service.getSystemService(NotificationManager::class.java)
+                    .activeNotifications.single().notification
+            assertEquals(
+                "White Noise is connected",
+                notification.extras.getCharSequence(Notification.EXTRA_TITLE).toString(),
+            )
+            lifecycle.destroy()
+            shadowOf(Looper.getMainLooper()).idle()
+        }
     }
 
     private fun assertExplicitNotificationDestinations(

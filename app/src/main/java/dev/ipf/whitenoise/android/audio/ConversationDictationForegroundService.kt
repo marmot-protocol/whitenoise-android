@@ -50,7 +50,7 @@ class ConversationDictationForegroundService : Service() {
     /** Dictation is command-only and never exposes a bound service interface. */
     override fun onBind(intent: Intent?): IBinder? = null
 
-    /** Promotes capture before routing metadata-free Cancel/Paste/Send actions to the process owner. */
+    /** Routes session commands without re-posting controls that may complete synchronously. */
     @Suppress("CyclomaticComplexMethod", "ReturnCount") // Early returns reject stale ownership commands.
     override fun onStartCommand(
         intent: Intent?,
@@ -76,20 +76,23 @@ class ConversationDictationForegroundService : Service() {
                 }
                 return START_NOT_STICKY
             }
+            when (intent.action) {
+                ACTION_CANCEL -> controller.cancel()
+                ACTION_PASTE -> controller.paste()
+                ACTION_SEND -> controller.send()
+            }
+            // A completion received before the queued start must not promote stale controls
+            // or open the microphone. Android posts foreground notifications asynchronously.
+            if (!controller.hasDurableSession || controller.notificationSessionToken != sessionToken) {
+                removeForegroundNotification()
+                stopSelfResult(startId)
+                return START_NOT_STICKY
+            }
             ensureChannel(this)
-            if (promoteOrCancel(controller, sessionToken, startId)) {
+            val alreadyPromoted =
+                foregroundPromoted && promotedController === controller && promotedSessionToken == sessionToken
+            if (alreadyPromoted || promoteOrCancel(controller, sessionToken, startId)) {
                 // Promotion may synchronously cancel or replace the controller in tests or platform hooks.
-                if (!controller.hasDurableSession || controller.notificationSessionToken != sessionToken) {
-                    removeForegroundNotification()
-                    stopSelfResult(startId)
-                    return START_NOT_STICKY
-                }
-                when (intent.action) {
-                    ACTION_CANCEL -> controller.cancel()
-                    ACTION_PASTE -> controller.paste()
-                    ACTION_SEND -> controller.send()
-                }
-                // A completion action received during startup must not briefly open the microphone.
                 if (!controller.hasDurableSession || controller.notificationSessionToken != sessionToken) {
                     removeForegroundNotification()
                     stopSelfResult(startId)
