@@ -115,7 +115,9 @@ internal fun IdentityEntryForm(
                                         // Identity-specific paste: ClipboardPasteAffordance
                                         // is public-identifier-only and would reject an nsec.
                                         clipboardManager.withPrimaryClipForPaste { clip ->
-                                            IdentityEntryInput.pasteValue(clip.plainText(context))?.let(onIdentityChange)
+                                            IdentityEntryInput
+                                                .pasteValue(clip.plainText(context))
+                                                ?.let(onIdentityChange)
                                         }
                                     },
                                     enabled = !busy,
