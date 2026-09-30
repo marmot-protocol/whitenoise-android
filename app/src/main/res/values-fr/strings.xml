@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="poll_custom_time">Durée personnalisée</string>
+    <string name="poll_custom_duration">Durée</string>
+    <string name="poll_unit_seconds">Secondes</string>
+    <string name="poll_unit_minutes">min</string>
+    <string name="poll_unit_hours">Heures</string>
+    <string name="poll_unit_days">Jours</string>
+    <string name="poll_custom_duration_error">Saisissez un nombre entier entre 1 seconde et 30 jours.</string>
+    <string name="poll_custom_preview">Le sondage se termine %1$s après sa publication.</string>
+    <string name="poll_cancel_custom_time">Utiliser le délai précédent</string>
     <string name="app_name">White Noise</string>
     <string name="poll_preview">Sondage</string>
     <string name="poll_unsupported">Impossible d\'afficher ce sondage</string>
