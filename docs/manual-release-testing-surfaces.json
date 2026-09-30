@@ -45,6 +45,12 @@
         "test_ids": ["ONB-005", "FIND-005", "FIND-006"]
       },
       {
+        "surface": "Explicit clipboard read with Secure Paste fallback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Clipboard.kt",
+        "anchor": "fun android.content.ClipboardManager?.withPrimaryClipForPaste(",
+        "test_ids": ["ONB-005", "FIND-005", "FIND-006"]
+      },
+      {
         "surface": "content",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/BuiltinEmoji.kt",
         "anchor": "fun content(): Map<String, InlineTextContent>",

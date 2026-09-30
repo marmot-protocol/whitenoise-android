@@ -42,6 +42,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RecipientPasteDecision
 import dev.ipf.whitenoise.android.core.RecipientPastePolicy
 import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
+import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 
@@ -108,13 +109,15 @@ internal fun RecipientSearchField(
                         SystemPasteIconButton(
                             enabled = enabled,
                             onPaste = {
-                                dispatchRecipientPaste(
-                                    state = state,
-                                    items = clipboardManager?.primaryClip?.directRecipientPasteItems(),
-                                    platformHandlesPassThrough = false,
-                                    isValidNpub = isValidNpub,
-                                    onRejected = onPasteRejected,
-                                )
+                                clipboardManager.withPrimaryClipForPaste { clip ->
+                                    dispatchRecipientPaste(
+                                        state = state,
+                                        items = clip.directRecipientPasteItems(),
+                                        platformHandlesPassThrough = false,
+                                        isValidNpub = isValidNpub,
+                                        onRejected = onPasteRejected,
+                                    )
+                                }
                             },
                         ) {
                             Icon(Icons.Default.ContentPaste, contentDescription = stringResource(R.string.paste))

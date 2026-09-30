@@ -17,12 +17,13 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalTextToolbar
 
 /**
- * Opens the platform Paste action. Clipboard access in [onPaste] occurs only after the user
- * selects that action, so systems with Secure Paste can grant access to this clipboard item.
+ * Attempts Paste only after an explicit tap. [onPaste] returns true when the clipboard was
+ * readable, including when field validation rejected it. If access was denied, opens the
+ * platform Paste action so Secure Paste can grant access without changing the user's policy.
  */
 @Composable
 internal fun SystemPasteIconButton(
-    onPaste: () -> Unit,
+    onPaste: () -> Boolean,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     content: @Composable () -> Unit,
@@ -31,17 +32,24 @@ internal fun SystemPasteIconButton(
     val latestOnPaste by rememberUpdatedState(onPaste)
     val latestEnabled by rememberUpdatedState(enabled)
     var bounds by remember { mutableStateOf(Rect.Zero) }
+    var active by remember(toolbar) { mutableStateOf(true) }
 
     DisposableEffect(toolbar) {
-        onDispose { toolbar.hide() }
+        active = true
+        onDispose {
+            active = false
+            toolbar.hide()
+        }
     }
 
     IconButton(
         onClick = {
-            toolbar.showMenu(
-                rect = bounds,
-                onPasteRequested = { if (latestEnabled) latestOnPaste() },
-            )
+            if (!latestOnPaste()) {
+                toolbar.showMenu(
+                    rect = bounds,
+                    onPasteRequested = { if (active && latestEnabled) latestOnPaste() },
+                )
+            }
         },
         modifier = modifier.onGloballyPositioned { bounds = it.boundsInWindow() },
         enabled = enabled,

@@ -68,8 +68,7 @@ class RecipientSearchFieldTest {
         composeRule.onNodeWithContentDescription(context.getString(R.string.paste)).performClick()
 
         composeRule.runOnIdle {
-            assertEquals("", state.text.toString())
-            textToolbar.selectPaste()
+            assertEquals(TextToolbarStatus.Hidden, textToolbar.status)
             assertEquals(ALICE_NPUB, state.text.toString())
             assertEquals(TextRange(ALICE_NPUB.length), state.selection)
             assertEquals(0, rejections)
@@ -88,7 +87,7 @@ class RecipientSearchFieldTest {
         composeRule.onNodeWithContentDescription(context.getString(R.string.paste)).performClick()
 
         composeRule.runOnIdle {
-            textToolbar.selectPaste()
+            assertEquals(TextToolbarStatus.Hidden, textToolbar.status)
             assertEquals("", state.text.toString())
             assertEquals(1, rejections)
         }
@@ -138,7 +137,7 @@ class RecipientSearchFieldTest {
         composeRule.onNodeWithContentDescription(context.getString(R.string.paste)).performClick()
 
         composeRule.runOnIdle {
-            textToolbar.selectPaste()
+            assertEquals(TextToolbarStatus.Hidden, textToolbar.status)
             assertEquals("alice@example.com", state.text.toString())
             assertEquals(TextRange("alice@example.com".length), state.selection)
         }

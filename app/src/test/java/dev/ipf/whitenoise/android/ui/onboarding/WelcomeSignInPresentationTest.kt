@@ -194,7 +194,7 @@ class WelcomeSignInPresentationTest {
         composeRule.onNodeWithTag("onboarding.sign_in.action").assertIsNotEnabled()
     }
 
-    /** Pasting reads the actual local clipboard only after choosing system Paste and never starts import. */
+    /** An explicit icon tap fills the masked field once when clipboard access is allowed, without import. */
     @Test fun pasteFillsOnlyAfterTheUserRequestsIt() {
         val clipboard = context.getSystemService(ClipboardManager::class.java)
         clipboard.setPrimaryClip(ClipData.newPlainText("synthetic test key", SECRET))
@@ -237,12 +237,12 @@ class WelcomeSignInPresentationTest {
                 }
             }
         }
+        composeRule.runOnIdle { assertEquals("", key.text.toString()) }
         composeRule.onNodeWithContentDescription(context.getString(R.string.paste)).performClick()
         composeRule.runOnIdle {
-            assertEquals("", key.text.toString())
-            check(toolbar.status == TextToolbarStatus.Shown)
-            systemPaste?.invoke()
             assertEquals(SECRET, key.text.toString())
+            assertEquals(TextToolbarStatus.Hidden, toolbar.status)
+            assertEquals(null, systemPaste)
         }
         assertEquals(0, imports)
         clipboard.clearPrimaryClip()

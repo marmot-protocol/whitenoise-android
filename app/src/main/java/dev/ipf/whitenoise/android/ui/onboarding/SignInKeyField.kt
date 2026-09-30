@@ -42,7 +42,8 @@ import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButtonDefaults
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSecureTextField
-import dev.ipf.whitenoise.android.ui.common.primaryClipPlainText
+import dev.ipf.whitenoise.android.ui.common.plainText
+import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -116,9 +117,9 @@ internal fun SignInKeyField(
                     if (empty) {
                         SystemPasteIconButton(
                             onPaste = {
-                                IdentityEntryInput
-                                    .pasteValue(clipboard?.primaryClipPlainText(context))
-                                    ?.let(::replaceKey)
+                                clipboard.withPrimaryClipForPaste { clip ->
+                                    IdentityEntryInput.pasteValue(clip.plainText(context))?.let(::replaceKey)
+                                }
                             },
                             modifier = Modifier.padding(horizontal = 4.dp),
                         ) {
