@@ -2169,6 +2169,8 @@ internal fun MessageBubble(
                                                 sharedContact = sharedContact,
                                                 sharedUser = sharedUser,
                                                 remoteGiphyMedia = remoteGiphyMedia,
+                                                giphyEditedLabel = footerLabel,
+                                                onGiphyEditedClick = onEditedClick,
                                                 deleted = deleted,
                                                 mine = mine,
                                                 showStatus = showOutgoingStatus,
@@ -2215,12 +2217,12 @@ internal fun MessageBubble(
                                     bubbleContentColor = bubbleContentColor,
                                     timestampColor = timestampColor,
                                     statusContainerColor = colorFromArgb(bubblePresentation.backgroundArgb),
-                                    showStatus = showOutgoingStatus && !fileFooterInCard,
-                                    editedLabel = footerLabel,
-                                    onEditedClick = onEditedClick,
+                                    showStatus = showOutgoingStatus && !fileFooterInCard && remoteGiphyMedia == null,
+                                    editedLabel = footerLabel.takeIf { remoteGiphyMedia == null },
+                                    onEditedClick = onEditedClick.takeIf { remoteGiphyMedia == null },
                                     footerOnVisualMedia = footerOnVisualMedia,
                                     footerOnPendingVisual = footerOnPendingVisual,
-                                    showTimestamp = !fileFooterInCard,
+                                    showTimestamp = !fileFooterInCard && remoteGiphyMedia == null,
                                     invalidationWarning = outerInvalidationWarning,
                                     mine = mine,
                                     onExpand = { if (!deleted) expandedFullView = true },
@@ -2253,6 +2255,8 @@ internal fun MessageBubble(
                                                 sharedContact = sharedContact,
                                                 sharedUser = sharedUser,
                                                 remoteGiphyMedia = remoteGiphyMedia,
+                                                giphyEditedLabel = footerLabel,
+                                                onGiphyEditedClick = onEditedClick,
                                                 deleted = deleted,
                                                 mine = mine,
                                                 showStatus = showOutgoingStatus,
@@ -2302,12 +2306,12 @@ internal fun MessageBubble(
                                     bubbleContentColor = bubbleContentColor,
                                     timestampColor = timestampColor,
                                     statusContainerColor = colorFromArgb(bubblePresentation.backgroundArgb),
-                                    showStatus = showOutgoingStatus && !fileFooterInCard,
-                                    editedLabel = footerLabel,
-                                    onEditedClick = onEditedClick,
+                                    showStatus = showOutgoingStatus && !fileFooterInCard && remoteGiphyMedia == null,
+                                    editedLabel = footerLabel.takeIf { remoteGiphyMedia == null },
+                                    onEditedClick = onEditedClick.takeIf { remoteGiphyMedia == null },
                                     footerOnVisualMedia = footerOnVisualMedia,
                                     footerOnPendingVisual = footerOnPendingVisual,
-                                    showTimestamp = !fileFooterInCard,
+                                    showTimestamp = !fileFooterInCard && remoteGiphyMedia == null,
                                     invalidationWarning = outerInvalidationWarning,
                                     mine = mine,
                                     onExpand = { if (!deleted) expandedFullView = true },
@@ -2526,11 +2530,11 @@ internal fun MessageBubble(
                             MessageInlineFooter(
                                 timeText = rememberedMessageBubbleTime(record.recordedAt),
                                 color = timestampColor,
-                                showStatus = showOutgoingStatus && !fileFooterInCard,
+                                showStatus = showOutgoingStatus && !fileFooterInCard && remoteGiphyMedia == null,
                                 status = item.status,
-                                editedLabel = footerLabel,
+                                editedLabel = footerLabel.takeIf { remoteGiphyMedia == null },
                                 onEditedClick = null,
-                                showTime = !fileFooterInCard,
+                                showTime = !fileFooterInCard && remoteGiphyMedia == null,
                                 statusContainerColor = colorFromArgb(bubblePresentation.backgroundArgb),
                             )
                         }
@@ -2582,7 +2586,7 @@ internal fun MessageBubble(
                                     )
                                 }
                                 mediaPreview?.invoke()
-                                if (!footerOnVisualMedia && !footerOnPendingVisual) {
+                                if (!footerOnVisualMedia && !footerOnPendingVisual && remoteGiphyMedia == null) {
                                     previewFooter()
                                 }
                             }
