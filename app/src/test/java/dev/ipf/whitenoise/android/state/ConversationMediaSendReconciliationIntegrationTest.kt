@@ -470,6 +470,7 @@ class ConversationMediaSendReconciliationIntegrationTest {
     }
 }
 
+/** Mounts the existing chat-list bridge so accepted media preview replacement remains observable. */
 private fun attachedChatsController(appState: WhiteNoiseAppState): ChatsController =
     ChatsController(
         appState = appState,
@@ -481,6 +482,7 @@ private fun attachedChatsController(appState: WhiteNoiseAppState): ChatsControll
         chatsController.applyChatListRow(chatListRow())
     }
 
+/** Delivers a canonical native timeline upsert through the production live-change path. */
 private fun applyProjection(
     controller: ConversationController,
     message: TimelineMessageRecordFfi,
@@ -495,6 +497,7 @@ private fun applyProjection(
     )
 }
 
+/** Returns a native upload result referencing one validated synthetic attachment. */
 private fun uploadResult(reference: MediaAttachmentReferenceFfi) =
     MediaUploadResultFfi(
         attachments =
@@ -513,6 +516,7 @@ private fun uploadResult(reference: MediaAttachmentReferenceFfi) =
             ),
     )
 
+/** Represents durable acceptance without waiting for relay publication. */
 private fun acceptedPendingSummary() =
     SendSummaryFfi(
         published = 0u,
@@ -521,6 +525,7 @@ private fun acceptedPendingSummary() =
         maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
     )
 
+/** Pins one immutable encrypted-media identity independent of its optimistic message ID. */
 private fun mediaReference() =
     MediaAttachmentReferenceFfi(
         locators =
@@ -541,6 +546,7 @@ private fun mediaReference() =
         thumbhash = null,
     )
 
+/** Supplies the legacy media hint used by existing native-boundary fixtures. */
 private fun mediaImetaTag() = MessageTagFfi(listOf("imeta", "m image/jpeg"))
 
 /** Creates the authoritative media projection used to reconcile one optimistic send token. */
@@ -579,6 +585,7 @@ private fun projectedMediaMessage(
     retentionExpiresAt = null,
 )
 
+/** Builds a single account owner with process-local drafts and no real relay connection. */
 private fun appState() =
     WhiteNoiseAppState(
         context = ApplicationProvider.getApplicationContext(),
@@ -598,6 +605,7 @@ private fun appState() =
         activeAccountRef = ACCOUNT_REF,
     )
 
+/** Provides authoritative self-membership for send-admission guards. */
 private fun memberSnapshot() =
     GroupMemberSnapshot(
         listOf(
@@ -609,6 +617,7 @@ private fun memberSnapshot() =
         ),
     )
 
+/** Returns the native roster used to admit this account to media mutations. */
 private fun authoritativeRoster() =
     GroupRosterFfi(
         groupIdHex = GROUP_ID,
@@ -631,6 +640,7 @@ private fun authoritativeRoster() =
         lifecycleState = GroupLifecycleStateFfi.STABLE,
     )
 
+/** Provides a stable group generation for accepted sends and canonical replacement. */
 private fun group() =
     AppGroupRecordFfi(
         groupIdHex = GROUP_ID,
@@ -661,6 +671,7 @@ private fun group() =
         viaWelcomeMessageIdHex = null,
     )
 
+/** Matches the existing encrypted-media capability expected by the upload path. */
 private fun encryptedMediaComponent() =
     AppGroupEncryptedMediaComponentFfi(
         componentId = 0x8008u,
@@ -678,6 +689,7 @@ private fun encryptedMediaComponent() =
             ),
     )
 
+/** Supplies the pre-send authoritative row for optimistic chat-list reconciliation. */
 private fun chatListRow() =
     ChatListRowFfi(
         selfMembership = SelfMembershipFfi.MEMBER,
@@ -729,6 +741,7 @@ private fun chatListRow() =
         disbandRequest = null,
     )
 
+/** Keeps media fixtures independent of asynchronous Markdown hydration. */
 private fun emptyMarkdownDocument() =
     MarkdownDocumentFfi(
         truncated = false,

@@ -189,10 +189,12 @@ class ConversationAcceptedSendRouteScreenshotTest {
         val writes = CopyOnWriteArrayList<ConversationScrollWriteEvidence>()
         var viewport: ConversationViewportEvidence? = null
 
+        /** Retains the measured current frame for bubble/composer clearance assertions. */
         override fun onViewport(snapshot: ConversationViewportEvidence) {
             viewport = snapshot
         }
 
+        /** Records every real list write so an animated history glide cannot pass as a snap. */
         override fun onWrite(write: ConversationScrollWriteEvidence) {
             writes += write
         }
