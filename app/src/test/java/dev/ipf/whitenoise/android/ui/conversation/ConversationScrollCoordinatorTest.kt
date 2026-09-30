@@ -595,8 +595,104 @@ class ConversationScrollCoordinatorTest {
 
             assertTrue(revealed)
             assertEquals(1, awaitedFrames)
-            assertEquals(listOf(ScrollWrite.Animate(0, 0)), writer.writes)
+            assertEquals(listOf(ScrollWrite.Snap(0, 0)), writer.writes)
             assertTrue(coordinator.isFollowingTail)
+        }
+
+    /** History sends use the same bounded geometry chase and resolve a replaced live tail each frame. */
+    @Test
+    fun historySendSettlesTheChangingTailAboveTheComposerWithoutAnimating() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator =
+                ConversationScrollCoordinator(
+                    writer,
+                    initialMode = ConversationScrollMode.ReadingHistory("old-date", 40),
+                )
+            var frame = 0
+            var prepared = false
+            val resolvedIndexes = mutableListOf<Int>()
+            val revealed =
+                coordinator.revealSentAtLiveTail(
+                    prepareLatest = {
+                        prepared = true
+                        true
+                    },
+                    resolveTailIndex = {
+                        check(prepared)
+                        // A pending/canonical replacement or a concurrent arrival changes the rendered tail.
+                        if (frame < 5) 2 else 0
+                    },
+                    captureLayout = { index ->
+                        resolvedIndexes += index
+                        SentTailGeometry(
+                            tailOffset = if (frame < 11) -8 else 0,
+                            viewportEnd = if (frame < 10) 424 else 432,
+                            padding = if (frame < 10) 72 else 64,
+                            viewportSize = 496,
+                        ).asTailLayout()
+                    },
+                    awaitFrame = { frame++ },
+                )
+
+            assertTrue(revealed)
+            assertEquals(13, frame)
+            assertTrue(writer.writes.all { it is ScrollWrite.Snap })
+            assertEquals(ScrollWrite.Snap(0, 0), writer.writes.last())
+            assertTrue(resolvedIndexes.contains(2))
+            assertTrue(resolvedIndexes.contains(0))
+            assertTrue(coordinator.isFollowingTail)
+        }
+
+    /** No stale-window snap is allowed when authoritative newest preparation fails. */
+    @Test
+    fun unavailableNewestWindowPreservesHistoryWithoutWriting() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val history = ConversationScrollMode.ReadingHistory("old-date", 40)
+            val coordinator = ConversationScrollCoordinator(writer, initialMode = history)
+
+            assertFalse(
+                coordinator.revealSentAtLiveTail(
+                    prepareLatest = { false },
+                    resolveTailIndex = { error("an unavailable newest window has no valid tail") },
+                    awaitFrame = { error("no layout should be awaited") },
+                ),
+            )
+            assertTrue(writer.writes.isEmpty())
+            assertEquals(history, coordinator.mode)
+        }
+
+    /** A reader can cancel the send while the newest window is still being prepared. */
+    @Test
+    fun newerGestureCancelsHistorySendDuringNewestPreparation() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            val preparing = CompletableDeferred<Unit>()
+            val prepared = CompletableDeferred<Unit>()
+            var result = true
+            val reveal =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    result =
+                        coordinator.revealSentAtLiveTail(
+                            prepareLatest = {
+                                preparing.complete(Unit)
+                                prepared.await()
+                                true
+                            },
+                            resolveTailIndex = { 0 },
+                            awaitFrame = {},
+                        )
+                }
+            preparing.await()
+            coordinator.onUserGestureStarted(anchor(messageId = "reader", listIndex = 10, pixelOffset = 24))
+            prepared.complete(Unit)
+            reveal.join()
+
+            assertFalse(result)
+            assertTrue(writer.writes.isEmpty())
+            assertEquals(ConversationScrollMode.ReadingHistory("reader", 24), coordinator.mode)
         }
 
     @Test

@@ -165,9 +165,9 @@ class ConversationSendOptimisticPublicationTest {
             }
         }
 
-    /** Carries a reader who sent from history to the new row instead of snapping them there. */
+    /** Snaps a reader who sent from history to the same live tail as a tail-following reader. */
     @Test
-    fun durableCallbackAnimatesAHistoryReaderToTheLiveTail() =
+    fun durableCallbackSnapsAHistoryReaderToTheLiveTail() =
         runBlocking {
             val writer = RecordingSendRevealWriter()
             val scrollCoordinator =
@@ -183,17 +183,16 @@ class ConversationSendOptimisticPublicationTest {
                 assertTrue(
                     scrollCoordinator.revealSentAtLiveTail(
                         controller,
-                        captureLayout = { error("history reveal must not start the snap settle") },
                         awaitFrame = { awaitedFrames += 1 },
                     ),
                 )
                 assertEquals(1, awaitedFrames)
                 assertEquals(
-                    "a history reader must be carried to the transcript's newest row",
+                    "a history reader must snap to the transcript's newest row",
                     listOf(0),
-                    writer.animatedIndexes,
+                    writer.snappedIndexes,
                 )
-                assertTrue("a history reader must not be snapped", writer.snappedIndexes.isEmpty())
+                assertTrue("a history reader must not be animated", writer.animatedIndexes.isEmpty())
                 assertEquals(ConversationScrollMode.FollowingTail, scrollCoordinator.mode)
             } finally {
                 controller.onCleared()
