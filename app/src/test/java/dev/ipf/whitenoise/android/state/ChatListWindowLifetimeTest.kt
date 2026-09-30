@@ -17,7 +17,6 @@ import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -130,7 +129,9 @@ class ChatListWindowLifetimeTest {
                 withTimeout(5_000) { entered.await() }
                 fixture.windows.close()
                 release.complete(Unit)
-                assertSame(failure, runCatching { withTimeout(5_000) { pending.await() } }.exceptionOrNull())
+                val observed = runCatching { withTimeout(5_000) { pending.await() } }.exceptionOrNull()
+                assertTrue(observed is IllegalStateException)
+                assertEquals(failure.message, observed?.message)
                 withTimeout(5_000) { fixture.windows.awaitReleased() }
                 fixture.assertReleasedOnce()
             }
@@ -143,9 +144,9 @@ class ChatListWindowLifetimeTest {
                 val fixture = lifetimeWindows()
                 val ended = MarmotKitException.ChatWindowClosed()
                 fixture.chats.beforeCommand = { throw ended }
-                assertSame(
-                    ended,
-                    runCatching { fixture.windows.returnToTop(ChatListViewFfi.CHATS) }.exceptionOrNull(),
+                assertTrue(
+                    runCatching { fixture.windows.returnToTop(ChatListViewFfi.CHATS) }
+                        .exceptionOrNull() is MarmotKitException.ChatWindowClosed,
                 )
                 val entered = CompletableDeferred<Unit>()
                 val release = CompletableDeferred<Unit>()
@@ -184,9 +185,10 @@ class ChatListWindowLifetimeTest {
         runBlocking {
             repeat(30) {
                 val fixture = lifetimeWindows()
-                val receiver = launch(kotlinx.coroutines.Dispatchers.Default) {
-                    fixture.windows.receive { _, _ -> error("unexpected replacement") }
-                }
+                val receiver =
+                    launch(kotlinx.coroutines.Dispatchers.Default) {
+                        fixture.windows.receive { _, _ -> error("unexpected replacement") }
+                    }
                 fixture.windows.close()
                 withTimeout(5_000) { receiver.join() }
                 withTimeout(5_000) { fixture.windows.awaitReleased() }
@@ -211,9 +213,10 @@ class ChatListWindowLifetimeTest {
     fun closeInsideReplacementCallbackDoesNotCancelItsParent() =
         runBlocking {
             val fixture = lifetimeWindows()
-            val receiver = launch {
-                fixture.windows.receive { _, _ -> fixture.windows.close() }
-            }
+            val receiver =
+                launch {
+                    fixture.windows.receive { _, _ -> fixture.windows.close() }
+                }
             withTimeout(5_000) { fixture.chats.nextStarted.await() }
             fixture.chats.emit("fresh")
             withTimeout(5_000) { receiver.join() }

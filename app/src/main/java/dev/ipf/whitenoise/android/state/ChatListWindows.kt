@@ -105,15 +105,16 @@ internal class ChatListWindowSet private constructor(
             val failure = AtomicReference<Throwable?>(null)
             val jobs =
                 handles.keys.map { view ->
-                    val job = launch(start = CoroutineStart.LAZY) {
-                        try {
-                            receiveView(view, onReplacement)
-                        } catch (cancel: CancellationException) {
-                            throw cancel
-                        } catch (throwable: Throwable) {
-                            failure.compareAndSet(null, throwable)
+                    val job =
+                        launch(start = CoroutineStart.LAZY) {
+                            try {
+                                receiveView(view, onReplacement)
+                            } catch (cancel: CancellationException) {
+                                throw cancel
+                            } catch (throwable: Throwable) {
+                                failure.compareAndSet(null, throwable)
+                            }
                         }
-                    }
                     job.invokeOnCompletion {
                         lifetime.unregisterReceiver(job)
                         ended.complete(Unit)

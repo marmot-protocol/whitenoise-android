@@ -250,6 +250,49 @@ class ChatListReconnectIntegrationTest {
         }
     }
 
+    /** Cancelling a suspended replacement callback retires its read without cancelling the controller's retry. */
+    @Test
+    fun closeDuringSuspendingValidationKeepsTheBindAliveForRetry() {
+        val pinned = notificationChatListRow().copy(groupIdHex = "aa".repeat(32), pinned = true)
+        val group = notificationChatListRow().copy(groupIdHex = "bb".repeat(32))
+        val subscriptions = DroppedChatSubscriptions(pinned, group)
+        val entered = CompletableDeferred<Unit>()
+        val cancelled = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        subscriptions.suspendBeforeKeyedLookup = {
+            entered.complete(Unit)
+            try {
+                release.await()
+            } finally {
+                cancelled.complete(Unit)
+            }
+        }
+        val controller =
+            testChatsController(chatListTestAppState(testRecoveryDiagnostics(), subscriptions.liveSubscriptions))
+        val bindScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        val bind = bindScope.launch { controller.bind(ConversationTimelineTestIds.ACCOUNT_REF) }
+        try {
+            awaitChatListCondition { subscriptions.first.nextUpdateStarted.isCompleted && controller.items.size == 2 }
+            subscriptions.first.emitRows(listOf(group))
+            awaitChatListCondition { entered.isCompleted }
+            requireNotNull(controller.chatListWindows).close()
+            awaitChatListCondition { cancelled.isCompleted && subscriptions.first.closed }
+            assertTrue(bind.isActive)
+            assertEquals(setOf(pinned.groupIdHex, group.groupIdHex), controller.items.map { it.id }.toSet())
+            controller.retryLoad()
+            awaitChatListCondition { subscriptions.second.nextUpdateStarted.isCompleted }
+            assertTrue(bind.isActive)
+            assertEquals(2, subscriptions.activeOpenCount.get())
+            assertEquals(setOf(pinned.groupIdHex, group.groupIdHex), controller.items.map { it.id }.toSet())
+        } finally {
+            release.complete(Unit)
+            controller.onCleared()
+            subscriptions.closeAll()
+            bindScope.cancel()
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+    }
+
     /** A captured old-account command can finish after teardown without changing the replacement list. */
     @Test
     fun retiredAccountCommandCannotOverwriteReplacementAccountRows() {
@@ -272,9 +315,10 @@ class ChatListReconnectIntegrationTest {
             awaitChatListCondition { subscriptions.first.nextUpdateStarted.isCompleted && controller.items.size == 2 }
             val oldCommand = bindScope.launch { controller.reportVisibleChat(oldRow.groupIdHex) }
             awaitChatListCondition { entered.isCompleted }
-            val teardown = bindScope.launch {
-                controller.closeLiveSubscriptionsForAccountTeardown(ConversationTimelineTestIds.ACCOUNT_REF)
-            }
+            val teardown =
+                bindScope.launch {
+                    controller.closeLiveSubscriptionsForAccountTeardown(ConversationTimelineTestIds.ACCOUNT_REF)
+                }
             awaitChatListCondition { teardown.isCompleted }
             assertFalse(subscriptions.first.closed)
             assertTrue(oldCommand.isActive)
