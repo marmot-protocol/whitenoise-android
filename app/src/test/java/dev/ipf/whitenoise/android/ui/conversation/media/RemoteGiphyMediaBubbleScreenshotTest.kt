@@ -8,13 +8,21 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
+import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -42,41 +50,88 @@ class RemoteGiphyMediaBubbleScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/giphy_cards_dark.png")
     }
 
-    private fun render(darkTheme: Boolean) {
+    /** AMOLED still has one readable attribution and timestamp row per state. */
+    @Test
+    fun giphyCardsAmoled() {
+        render(darkTheme = true, amoled = true)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/giphy_cards_amoled.png")
+    }
+
+    /** Long creator text yields to outgoing metadata at large font scale in RTL. */
+    @Test
+    @Config(qualifiers = "en-w300dp-h950dp-mdpi")
+    fun giphyCardsLargeRtl() {
+        render(darkTheme = false, rtl = true, scale = 1.7f)
+        composeRule
+            .onAllNodesWithContentDescription("via GIPHY · Marmot Studio with a very long creator attribution")
+            .assertCountEquals(2)
+        composeRule.onAllNodesWithTag("giphy.message-footer", useUnmergedTree = true).assertCountEquals(3)
+        val attributions =
+            composeRule.onAllNodesWithTag("giphy.attribution", useUnmergedTree = true).fetchSemanticsNodes()
+        val metadata =
+            composeRule.onAllNodesWithTag("giphy.message-footer", useUnmergedTree = true).fetchSemanticsNodes()
+        attributions.zip(metadata).forEach { (credit, details) ->
+            assertTrue(credit.boundsInRoot.width > 40f)
+            assertTrue(credit.boundsInRoot.left >= details.boundsInRoot.right)
+        }
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/giphy_cards_large_rtl.png")
+    }
+
+    /** Exercises the same footer component used by real incoming and outgoing GIPHY bubbles. */
+    private fun render(
+        darkTheme: Boolean,
+        amoled: Boolean = false,
+        rtl: Boolean = false,
+        scale: Float = 1f,
+    ) {
         val media =
             RemoteGiphyMedia(
                 url = "https://media.giphy.com/media/abc/giphy.gif",
-                attribution = "Marmot Studio",
+                attribution = "Marmot Studio with a very long creator attribution",
             )
         val presentation = DecodedAttachmentPresentation.Static(sampleBitmap())
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = darkTheme) {
-                Surface {
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.padding(16.dp),
-                    ) {
-                        RemoteGiphyMediaCard(
-                            media = media,
-                            presentation = presentation,
-                            loading = false,
-                            failed = false,
-                            onLoad = {},
-                        )
-                        RemoteGiphyMediaCard(
-                            media = media.copy(attribution = null),
-                            presentation = null,
-                            loading = false,
-                            failed = false,
-                            onLoad = {},
-                        )
-                        RemoteGiphyMediaCard(
-                            media = media,
-                            presentation = null,
-                            loading = false,
-                            failed = true,
-                            onLoad = {},
-                        )
+            CompositionLocalProvider(
+                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
+                WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled, fontScale = scale) {
+                    Surface {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.padding(16.dp),
+                        ) {
+                            RemoteGiphyMediaCard(
+                                media = media,
+                                footer = GiphyMessageFooter("10:41 AM", false, MessageStatus.Sent, null, null),
+                                presentation = presentation,
+                                loading = false,
+                                failed = false,
+                                onLoad = {},
+                            )
+                            RemoteGiphyMediaCard(
+                                media = media.copy(attribution = null),
+                                footer = GiphyMessageFooter("10:42 AM", true, MessageStatus.Pending, null, null),
+                                presentation = null,
+                                loading = true,
+                                failed = false,
+                                onLoad = {},
+                            )
+                            RemoteGiphyMediaCard(
+                                media = media,
+                                footer =
+                                    GiphyMessageFooter(
+                                        "10:43 AM",
+                                        true,
+                                        MessageStatus.Failed,
+                                        "Edited a very long time ago",
+                                        {},
+                                    ),
+                                presentation = null,
+                                loading = false,
+                                failed = true,
+                                onLoad = {},
+                            )
+                        }
                     }
                 }
             }

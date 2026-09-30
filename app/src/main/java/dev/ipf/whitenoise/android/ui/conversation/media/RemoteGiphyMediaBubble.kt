@@ -1,15 +1,21 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.Refresh
@@ -27,9 +33,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
@@ -37,9 +51,11 @@ import dev.ipf.whitenoise.android.core.SafeHttpsGet
 import dev.ipf.whitenoise.android.media.ByteSizeLruCache
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
+import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
+import dev.ipf.whitenoise.android.ui.conversation.messages.MessageInlineFooter
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
@@ -61,6 +77,15 @@ private const val GIPHY_READ_TIMEOUT_MILLIS = 15_000
 private val giphyFetchSlots = Semaphore(6)
 private val giphyPlaybackSlots = Semaphore(6)
 private val giphyByteCache = RemoteGiphyByteCache(GIPHY_MEMORY_CACHE_MAX_BYTES)
+
+/** The message's existing metadata, placed once inside the GIPHY card footer. */
+internal class GiphyMessageFooter(
+    val timeText: String,
+    val showStatus: Boolean,
+    val status: MessageStatus,
+    val editedLabel: String?,
+    val onEditedClick: (() -> Unit)?,
+)
 
 /** Thread-safe, byte-bounded cache that survives conversation-row disposal within this process. */
 internal class RemoteGiphyByteCache(
@@ -106,6 +131,7 @@ internal fun shouldLoadRemoteGiphyMedia(
 @Suppress("FunctionNaming")
 internal fun RemoteGiphyMediaBubble(
     media: RemoteGiphyMedia,
+    footer: GiphyMessageFooter,
     appState: WhiteNoiseAppState,
     onLongPress: () -> Unit,
 ) {
@@ -158,6 +184,7 @@ internal fun RemoteGiphyMediaBubble(
 
     RemoteGiphyMediaCard(
         media = media,
+        footer = footer,
         presentation = presentation.takeIf { playbackGranted },
         loading = shouldLoad && (presentation == null || !playbackGranted) && !failed,
         failed = failed,
@@ -175,6 +202,7 @@ internal fun RemoteGiphyMediaBubble(
 @Suppress("FunctionNaming", "LongMethod")
 internal fun RemoteGiphyMediaCard(
     media: RemoteGiphyMedia,
+    footer: GiphyMessageFooter,
     presentation: DecodedAttachmentPresentation?,
     loading: Boolean,
     failed: Boolean,
@@ -234,18 +262,93 @@ internal fun RemoteGiphyMediaCard(
                         }
                 }
             }
+            GiphyCardFooter(attribution, footer)
+        }
+    }
+}
+
+/** Reserves the visible GIPHY credit and timestamp first, then ellipsizes optional edit metadata. */
+@Composable
+@Suppress("FunctionNaming")
+private fun GiphyCardFooter(
+    attribution: String,
+    footer: GiphyMessageFooter,
+) {
+    val textMeasurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val attributionStyle = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium)
+    val timestampStyle = MaterialTheme.typography.labelSmall
+    val attributionPixels =
+        textMeasurer
+            .measure(
+                AnnotatedString(stringResource(R.string.giphy_attribution)),
+                style = attributionStyle,
+                maxLines = 1,
+            ).size.width
+    val attributionMinimum = with(density) { attributionPixels.toDp() }
+    val timestampPixels =
+        textMeasurer.measure(AnnotatedString(footer.timeText), style = timestampStyle, maxLines = 1).size.width
+    val timestampWidth = with(density) { timestampPixels.toDp() }
+    BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
+        val mandatoryMetadataWidth = timestampWidth + if (footer.showStatus) 17.dp else 0.dp
+        val metadataLimit =
+            (maxWidth - attributionMinimum - 8.dp)
+                .coerceAtLeast(mandatoryMetadataWidth)
+                .coerceAtMost(maxWidth)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 text = attribution,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Medium,
+                style = attributionStyle,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier =
                     Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .weight(1f)
+                        .alignByBaseline()
+                        .testTag("giphy.attribution")
+                        .semantics { contentDescription = attribution },
+            )
+            GiphyMetadataRow(footer, timestampStyle, metadataLimit)
+        }
+    }
+}
+
+/** Gives the shared timestamp/status footer its measured width before the optional edited label. */
+@Composable
+@Suppress("FunctionNaming")
+private fun RowScope.GiphyMetadataRow(
+    footer: GiphyMessageFooter,
+    timestampStyle: TextStyle,
+    maxWidth: Dp,
+) {
+    Row(
+        modifier = Modifier.widthIn(max = maxWidth).alignByBaseline().testTag("giphy.message-footer"),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        footer.editedLabel?.let { label ->
+            Text(
+                text = label,
+                style = timestampStyle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier =
+                    Modifier
+                        .weight(1f, fill = false)
+                        .alignByBaseline()
+                        .then(footer.onEditedClick?.let { Modifier.clickable(onClick = it) } ?: Modifier),
             )
         }
+        MessageInlineFooter(
+            timeText = footer.timeText,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            showStatus = footer.showStatus,
+            status = footer.status,
+            editedLabel = null,
+            onEditedClick = null,
+            modifier = Modifier.alignByBaseline(),
+            statusContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+        )
     }
 }
 

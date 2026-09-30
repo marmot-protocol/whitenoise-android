@@ -66,6 +66,7 @@ import dev.ipf.whitenoise.android.ui.TtsSentenceActions
 import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
 import dev.ipf.whitenoise.android.ui.common.rememberedMessageBubbleTime
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOpenRequest
+import dev.ipf.whitenoise.android.ui.conversation.media.GiphyMessageFooter
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaFileBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaImageBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaPendingPlaceholder
@@ -161,6 +162,8 @@ internal fun ColumnScope.BubbleMediaBlocks(
     sharedContact: SharedContact?,
     sharedUser: SharedUser?,
     remoteGiphyMedia: RemoteGiphyMedia?,
+    giphyEditedLabel: String?,
+    onGiphyEditedClick: (() -> Unit)?,
     deleted: Boolean,
     mine: Boolean,
     showStatus: Boolean,
@@ -211,6 +214,14 @@ internal fun ColumnScope.BubbleMediaBlocks(
     if (remoteGiphyMedia != null) {
         RemoteGiphyMediaBubble(
             media = remoteGiphyMedia,
+            footer =
+                GiphyMessageFooter(
+                    timeText = rememberedMessageBubbleTime(record.recordedAt),
+                    showStatus = showStatus,
+                    status = item.status,
+                    editedLabel = giphyEditedLabel,
+                    onEditedClick = onGiphyEditedClick,
+                ),
             appState = appState,
             onLongPress = onMediaLongPress,
         )
