@@ -44,7 +44,7 @@ class QuickAccountSwitchingUiTest {
     @Test fun appearanceOptOutDoesNotChangeTheActiveAccount() {
         val app = state(listOf(A, B))
         composeRule.setContent {
-            WhiteNoiseTheme { AppearanceScreen(app, {}, {}, {}, {}) }
+            WhiteNoiseTheme { AppearanceScreen(app, {}, {}, {}, {}, {}) }
         }
         composeRule.onNodeWithText(context.getString(R.string.quick_account_switching)).performClick()
         composeRule.runOnIdle {

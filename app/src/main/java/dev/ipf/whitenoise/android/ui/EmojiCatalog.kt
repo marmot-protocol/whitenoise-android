@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import dev.ipf.whitenoise.android.R
+import java.util.Locale
 
 /**
  * Picker sections in prototype order. Each category collects one or more groups of the bundled
@@ -15,6 +16,7 @@ internal enum class EmojiCategory(
     @DrawableRes val iconRes: Int,
     val datasetGroups: List<Int>,
 ) {
+    Custom("custom", R.string.emoji_category_custom, R.drawable.ic_image, emptyList()),
     Recent("recent", R.string.emoji_category_recent, R.drawable.ic_emoji_recent, emptyList()),
     SmileysAndPeople("smileys", R.string.emoji_category_smileys_people, R.drawable.ic_emoji_smileys, listOf(0, 1)),
     AnimalsAndNature("animals", R.string.emoji_category_animals_nature, R.drawable.ic_emoji_animals, listOf(2)),
@@ -38,13 +40,15 @@ internal data class EmojiSection(
     val emoji: List<String>,
 )
 
-/** Browse layout: recents first when there are any, then every populated category in [EmojiCategory] order. */
+/** Browse layout: the user's emoji and recents first when there are any, then every populated category. */
 internal fun emojiBrowseSections(
     entries: List<EmojiEntry>,
     recents: List<String>,
+    custom: List<String>,
 ): List<EmojiSection> {
     val byCategory = entries.groupBy { EmojiCategory.forDatasetGroup(it.group) }
     return buildList {
+        if (custom.isNotEmpty()) add(EmojiSection(EmojiCategory.Custom, custom))
         if (recents.isNotEmpty()) add(EmojiSection(EmojiCategory.Recent, recents))
         for (category in EmojiCategory.entries) {
             val emoji = byCategory[category].orEmpty()
@@ -60,3 +64,16 @@ internal fun emojiSearchSections(results: List<EmojiEntry>): List<EmojiSection> 
         .entries
         .sortedBy { it.key.ordinal }
         .map { (category, matches) -> EmojiSection(category, matches.map { it.emoji }) }
+
+/** The user's shortcodes whose code contains [query], ignoring case, as the leading search section. */
+internal fun customEmojiSearchSection(
+    custom: List<String>,
+    query: String,
+): EmojiSection? {
+    val needle = query.trim().trim(':').lowercase(Locale.ROOT)
+    if (needle.isEmpty()) {
+        return null
+    }
+    val matches = custom.filter { it.trim(':').lowercase(Locale.ROOT).contains(needle) }
+    return matches.takeIf { it.isNotEmpty() }?.let { EmojiSection(EmojiCategory.Custom, it) }
+}

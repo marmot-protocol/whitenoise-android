@@ -29,7 +29,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
-import dev.ipf.whitenoise.android.ui.BuiltinEmoji
+import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayout
 import dev.ipf.whitenoise.android.ui.markdownLinkDestinationAt
 
@@ -189,8 +189,8 @@ internal fun ReaderSelectablePlainText(
         onDispose { onSelectableTextLayoutChanged(key, null, null) }
     }
     Text(
-        text = remember(text) { BuiltinEmoji.annotate(AnnotatedString(text)) },
-        inlineContent = BuiltinEmoji.content(),
+        text = remember(text) { EmojiShortcodes.annotate(AnnotatedString(text)) },
+        inlineContent = EmojiShortcodes.content(),
         style = MaterialTheme.typography.bodyLarge,
         modifier =
             Modifier

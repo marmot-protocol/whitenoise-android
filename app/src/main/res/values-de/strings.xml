@@ -1475,6 +1475,18 @@
     <string name="notification_channel_app_updates_global_description">Android-Benachrichtigungsverhalten für White-Noise-App-Updates</string>
 
     <string name="chat_bubble_colors">Farben der Chatblasen</string>
+    <string name="custom_emoji">Eigene Emoji</string>
+    <string name="custom_emoji_detail">Bilder, die du hier hinzufügst, werden in Nachrichten und Reaktionen zu :kurzcode:-Emoji. Sie bleiben auf diesem Gerät, und andere sehen den Kurzcode als Text.</string>
+    <string name="custom_emoji_empty">Noch keine eigenen Emoji.</string>
+    <string name="custom_emoji_name_title">Emoji benennen</string>
+    <string name="custom_emoji_name_label">Kurzcode</string>
+    <string name="custom_emoji_name_help">Buchstaben, Zahlen und Unterstriche.</string>
+    <string name="custom_emoji_replaces">Ersetzt dein bisheriges %1$s.</string>
+    <string name="custom_emoji_remove_title">%1$s entfernen?</string>
+    <string name="custom_emoji_remove_detail">Das Bild wird von diesem Gerät gelöscht. Nachrichten behalten den Kurzcode als Text.</string>
+    <string name="custom_emoji_too_large">Dieses Bild ist größer als 1 MB.</string>
+    <string name="custom_emoji_not_image">Diese Datei ist kein Bild, das White Noise anzeigen kann.</string>
+    <string name="custom_emoji_save_failed">Das Emoji konnte nicht gespeichert werden.</string>
     <string name="action_color">Aktionsfarbe</string>
     <string name="action_color_no_active_account">Wähle ein aktives Konto aus, bevor du seine App-Akzentfarbe festlegst.</string>
     <string name="bubble_color_preview">Vorschau</string>

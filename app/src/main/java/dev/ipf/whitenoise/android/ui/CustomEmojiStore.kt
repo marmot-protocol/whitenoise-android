@@ -1,0 +1,223 @@
+package dev.ipf.whitenoise.android.ui
+
+import android.content.Context
+import android.graphics.BitmapFactory
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
+import dev.ipf.whitenoise.android.WhiteNoiseApplication
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.IOException
+import java.util.Locale
+
+/** One user-defined emoji: `:code:`, the file it lives in, and its decoded artwork. */
+@Immutable
+internal class CustomEmoji(
+    val shortcode: String,
+    val file: File,
+    val image: ImageBitmap,
+) {
+    val art = EmojiArt.Decoded(image)
+}
+
+/** The user's emoji in shortcode order. */
+@Immutable
+internal class CustomEmojiSet(
+    val entries: List<CustomEmoji>,
+) {
+    private val byShortcode = entries.associateBy { it.shortcode }
+
+    operator fun get(shortcode: String): CustomEmoji? = byShortcode[shortcode]
+
+    companion object {
+        val Empty = CustomEmojiSet(emptyList())
+    }
+}
+
+internal enum class CustomEmojiSaveResult { Saved, InvalidName, TooLarge, NotAnImage, Failed }
+
+/**
+ * NIP-30's shortcode alphabet: lowercase letters, digits and `_`. `-` becomes `_` and anything
+ * else is dropped, which also keeps the code safe as a filename.
+ */
+internal fun sanitizeEmojiCode(raw: String): String =
+    buildString {
+        for (c in raw.lowercase(Locale.ROOT)) {
+            when (c) {
+                in 'a'..'z', in '0'..'9', '_' -> append(c)
+                '-' -> append('_')
+            }
+        }
+    }.take(EmojiShortcodes.MAX_CODE_LENGTH)
+
+/** The prefilled code for a picked file: its name without the extension, sanitized. */
+internal fun emojiCodeForFileName(name: String): String = sanitizeEmojiCode(name.substringBeforeLast('.'))
+
+/**
+ * User emoji as device-local files `emoji/<code>.<ext>` under the app's files directory. The
+ * filename stem is the shortcode, so the directory is the whole map. These are the user's own
+ * source images, never received protocol data.
+ */
+internal class CustomEmojiStore(
+    private val directory: File,
+) {
+    private val mutex = Mutex()
+    private var loaded = false
+
+    var emoji: CustomEmojiSet by mutableStateOf(CustomEmojiSet.Empty)
+        private set
+
+    /** Reads the directory once per process. */
+    suspend fun load() {
+        mutex.withLock {
+            if (loaded) {
+                return
+            }
+            emoji = withContext(Dispatchers.IO) { scan() }
+            loaded = true
+        }
+    }
+
+    /** Stores [bytes] as `:code:`, replacing an emoji of the same code. */
+    suspend fun save(
+        code: String,
+        bytes: ByteArray,
+    ): CustomEmojiSaveResult {
+        val rejected =
+            when {
+                code.isEmpty() || sanitizeEmojiCode(code) != code -> CustomEmojiSaveResult.InvalidName
+                bytes.size > MAX_BYTES -> CustomEmojiSaveResult.TooLarge
+                else -> null
+            }
+        return rejected ?: mutex.withLock { withContext(Dispatchers.IO) { store(code, bytes) } }
+    }
+
+    /** Deletes the file behind [shortcode]. */
+    suspend fun remove(shortcode: String) {
+        mutex.withLock {
+            withContext(Dispatchers.IO) {
+                emoji[shortcode]?.file?.delete()
+                emoji = scan()
+                loaded = true
+            }
+        }
+    }
+
+    private fun store(
+        code: String,
+        bytes: ByteArray,
+    ): CustomEmojiSaveResult {
+        val extension = imageExtension(bytes) ?: return CustomEmojiSaveResult.NotAnImage
+        val written =
+            try {
+                write(code, extension, bytes)
+                true
+            } catch (_: IOException) {
+                false
+            }
+        emoji = scan()
+        loaded = true
+        return if (written) CustomEmojiSaveResult.Saved else CustomEmojiSaveResult.Failed
+    }
+
+    private fun write(
+        code: String,
+        extension: String,
+        bytes: ByteArray,
+    ) {
+        if (!directory.isDirectory && !directory.mkdirs()) {
+            throw IOException("cannot create $directory")
+        }
+        val staged = File(directory, ".$code.tmp")
+        staged.writeBytes(bytes)
+        filesFor(code).forEach(File::delete)
+        if (!staged.renameTo(File(directory, "$code.$extension"))) {
+            staged.delete()
+            throw IOException("cannot store $code")
+        }
+    }
+
+    private fun filesFor(code: String): List<File> {
+        val files = directory.listFiles().orEmpty()
+        return files.filter { it.isFile && it.nameWithoutExtension == code }
+    }
+
+    private fun scan(): CustomEmojiSet {
+        val entries =
+            directory
+                .listFiles()
+                .orEmpty()
+                .filter { it.isFile && !it.name.startsWith('.') }
+                .mapNotNull { file ->
+                    val code = file.name.substringBeforeLast('.')
+                    if (code.isEmpty() || sanitizeEmojiCode(code) != code || file.length() > MAX_BYTES) {
+                        return@mapNotNull null
+                    }
+                    val image = decodeEmojiImage(file.readBytes()) ?: return@mapNotNull null
+                    CustomEmoji(":$code:", file, image)
+                }.distinctBy { it.shortcode }
+                .sortedBy { it.shortcode }
+        return CustomEmojiSet(entries)
+    }
+
+    companion object {
+        const val MAX_BYTES = 1024 * 1024
+        const val DIRECTORY = "emoji"
+    }
+}
+
+private const val EMOJI_DECODE_PX = 128
+
+/** Emoji artwork downsampled to at most twice the largest size it draws at; null when not an image. */
+internal fun decodeEmojiImage(bytes: ByteArray): ImageBitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+        return null
+    }
+    var sample = 1
+    val smallerEdge = minOf(bounds.outWidth, bounds.outHeight)
+    while (smallerEdge / (sample * 2) >= EMOJI_DECODE_PX) {
+        sample *= 2
+    }
+    val options = BitmapFactory.Options().apply { inSampleSize = sample }
+    return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)?.asImageBitmap()
+}
+
+/** File extension for a decodable image, from its content rather than its name. */
+private fun imageExtension(bytes: ByteArray): String? {
+    if (decodeEmojiImage(bytes) == null) {
+        return null
+    }
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+    return when (bounds.outMimeType) {
+        "image/png" -> "png"
+        "image/gif" -> "gif"
+        "image/webp" -> "webp"
+        "image/jpeg" -> "jpg"
+        else -> "img"
+    }
+}
+
+/** The process-wide store, loaded on first use. */
+@Composable
+internal fun rememberCustomEmojiStore(context: Context = LocalContext.current): CustomEmojiStore {
+    val application = context.applicationContext as WhiteNoiseApplication
+    val store = remember(application) { application.customEmojiStore }
+    LaunchedEffect(store) {
+        store.load()
+    }
+    return store
+}

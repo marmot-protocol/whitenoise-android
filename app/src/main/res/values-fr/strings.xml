@@ -1477,6 +1477,18 @@
     <string name="notification_channel_app_updates_global_description">Comportement d’alerte Android pour les mises à jour de White Noise</string>
 
     <string name="chat_bubble_colors">Couleurs des bulles</string>
+    <string name="custom_emoji">Emoji personnalisés</string>
+    <string name="custom_emoji_detail">Les images ajoutées ici deviennent des emoji :code: dans les messages et les réactions. Elles restent sur cet appareil, et les autres voient le code sous forme de texte.</string>
+    <string name="custom_emoji_empty">Aucun emoji personnalisé pour l’instant.</string>
+    <string name="custom_emoji_name_title">Nommer cet emoji</string>
+    <string name="custom_emoji_name_label">Code court</string>
+    <string name="custom_emoji_name_help">Lettres, chiffres et tirets bas.</string>
+    <string name="custom_emoji_replaces">Remplace votre %1$s actuel.</string>
+    <string name="custom_emoji_remove_title">Supprimer %1$s ?</string>
+    <string name="custom_emoji_remove_detail">L’image est supprimée de cet appareil. Les messages conservent le code sous forme de texte.</string>
+    <string name="custom_emoji_too_large">Cette image dépasse 1 Mo.</string>
+    <string name="custom_emoji_not_image">Ce fichier n’est pas une image que White Noise peut afficher.</string>
+    <string name="custom_emoji_save_failed">Impossible d’enregistrer cet emoji.</string>
     <string name="action_color">Couleur d\'action</string>
     <string name="action_color_no_active_account">Sélectionnez un compte actif avant de définir sa couleur d’accentuation.</string>
     <string name="bubble_color_preview">Aperçu</string>

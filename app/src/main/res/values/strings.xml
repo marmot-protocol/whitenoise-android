@@ -476,6 +476,7 @@
     <string name="emoji_search_hint">Search emoji</string>
     <string name="emoji_search_clear">Clear emoji search</string>
     <string name="emoji_search_no_results">No emoji found</string>
+    <string name="emoji_category_custom" translatable="false">Custom</string>
     <string name="emoji_category_recent" translatable="false">Recently Used</string>
     <string name="emoji_category_smileys_people" translatable="false">Smileys &amp; People</string>
     <string name="emoji_category_animals_nature" translatable="false">Animals &amp; Nature</string>
@@ -1735,6 +1736,18 @@
     <string name="notification_channel_app_updates_global_description">Android alert behavior for White Noise app updates</string>
 
     <string name="chat_bubble_colors">Chat bubble colors</string>
+    <string name="custom_emoji">Custom emoji</string>
+    <string name="custom_emoji_detail">Images you add here become :shortcode: emoji in messages and reactions. They stay on this device, and other people see the shortcode as text.</string>
+    <string name="custom_emoji_empty">No custom emoji yet.</string>
+    <string name="custom_emoji_name_title">Name this emoji</string>
+    <string name="custom_emoji_name_label">Shortcode</string>
+    <string name="custom_emoji_name_help">Letters, numbers and underscores.</string>
+    <string name="custom_emoji_replaces">Replaces your current %1$s.</string>
+    <string name="custom_emoji_remove_title">Remove %1$s?</string>
+    <string name="custom_emoji_remove_detail">The image is deleted from this device. Messages keep the shortcode as text.</string>
+    <string name="custom_emoji_too_large">That image is larger than 1 MB.</string>
+    <string name="custom_emoji_not_image">That file isn’t an image White Noise can show.</string>
+    <string name="custom_emoji_save_failed">Couldn’t save that emoji.</string>
     <string name="action_color">Action color</string>
     <string name="action_color_no_active_account">Choose an active account before setting its app accent color.</string>
     <string name="bubble_color_preview">Preview</string>

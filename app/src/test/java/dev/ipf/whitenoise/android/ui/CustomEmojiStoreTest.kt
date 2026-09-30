@@ -1,0 +1,83 @@
+package dev.ipf.whitenoise.android.ui
+
+import android.graphics.Bitmap
+import android.graphics.Color
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Rule
+import org.junit.Test
+import org.junit.rules.TemporaryFolder
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import java.io.ByteArrayOutputStream
+
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [36])
+class CustomEmojiStoreTest {
+    @get:Rule val folder = TemporaryFolder()
+
+    private fun image(format: Bitmap.CompressFormat): ByteArray {
+        val bitmap = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
+        return ByteArrayOutputStream().also { bitmap.compress(format, 100, it) }.toByteArray()
+    }
+
+    @Test
+    fun codesKeepTheShortcodeAlphabet() {
+        // Like the Linux client: `-` becomes `_`, anything else outside the alphabet is dropped.
+        assertEquals("party_parrot2", sanitizeEmojiCode("Party-Parrot 2!"))
+        assertEquals("a".repeat(64), sanitizeEmojiCode("A".repeat(70)))
+        assertEquals("", sanitizeEmojiCode("🎉.:/"))
+        assertEquals("party_parrotv2", emojiCodeForFileName("Party-Parrot.v2.PNG"))
+        assertEquals("", emojiCodeForFileName(".gif"))
+    }
+
+    @Test
+    fun saveOverwritesTheSameCodeAndSurvivesReload() =
+        runBlocking {
+            val directory = folder.newFolder("emoji")
+            val store = CustomEmojiStore(directory)
+            assertEquals(CustomEmojiSaveResult.Saved, store.save("party", image(Bitmap.CompressFormat.PNG)))
+            assertEquals(CustomEmojiSaveResult.Saved, store.save("party", image(Bitmap.CompressFormat.JPEG)))
+            assertEquals(CustomEmojiSaveResult.Saved, store.save("cat", image(Bitmap.CompressFormat.WEBP_LOSSLESS)))
+            assertEquals(listOf("cat.webp", "party.jpg"), directory.list()!!.sorted())
+            val reloaded = CustomEmojiStore(directory).apply { load() }
+            assertEquals(listOf(":cat:", ":party:"), reloaded.emoji.entries.map { it.shortcode })
+
+            reloaded.remove(":party:")
+            assertEquals(listOf(":cat:"), reloaded.emoji.entries.map { it.shortcode })
+            assertEquals(listOf("cat.webp"), directory.list()!!.toList())
+        }
+
+    @Test
+    fun rejectsNamesOutsideTheAlphabetOversizedFilesAndNonImages() =
+        runBlocking {
+            val directory = folder.newFolder("emoji")
+            val store = CustomEmojiStore(directory)
+            val png = image(Bitmap.CompressFormat.PNG)
+            assertEquals(CustomEmojiSaveResult.InvalidName, store.save("", png))
+            assertEquals(CustomEmojiSaveResult.InvalidName, store.save("Party", png))
+            assertEquals(CustomEmojiSaveResult.InvalidName, store.save("../x", png))
+            assertEquals(
+                CustomEmojiSaveResult.TooLarge,
+                store.save("big", png + ByteArray(CustomEmojiStore.MAX_BYTES + 1 - png.size)),
+            )
+            assertEquals(CustomEmojiSaveResult.NotAnImage, store.save("text", "hello".toByteArray()))
+            assertEquals(emptyList<String>(), directory.list()!!.toList())
+        }
+
+    @Test
+    fun undecodableAndMisnamedFilesAreSkippedOnLoad() =
+        runBlocking {
+            val directory = folder.newFolder("emoji")
+            directory.resolve("broken.png").writeBytes("nope".toByteArray())
+            directory.resolve("Upper.png").writeBytes(image(Bitmap.CompressFormat.PNG))
+            directory.resolve("ok.png").writeBytes(image(Bitmap.CompressFormat.PNG))
+            val store = CustomEmojiStore(directory).apply { load() }
+            assertEquals(listOf(":ok:"), store.emoji.entries.map { it.shortcode })
+            assertNull(store.emoji[":broken:"])
+        }
+}
