@@ -45,7 +45,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -57,7 +56,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -88,21 +86,14 @@ import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
-import dev.ipf.whitenoise.android.ui.common.plainText
-import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
-import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
 import dev.ipf.whitenoise.android.ui.conversation.CompactViableComposerHeight
 import dev.ipf.whitenoise.android.ui.conversation.composerMultilineControlsSuppressed
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.conversation.resolveAutomaticComposerCeiling
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 private val ComposerManualMinimumHeight = 144.dp
@@ -223,23 +214,6 @@ internal fun insertEmojiAtSelection(
         }
     val caret = start + emoji.length
     return value.copy(text = updatedText, selection = TextRange(caret), composition = null)
-}
-
-/** Inserts plain clipboard text into the controlled draft without discarding its selection or composition. */
-internal fun insertComposerClipboardText(
-    value: TextFieldValue,
-    paste: String,
-): TextFieldValue? {
-    if (paste.isBlank()) return null
-    val start = minOf(value.selection.start, value.selection.end).coerceIn(0, value.text.length)
-    val end = maxOf(value.selection.start, value.selection.end).coerceIn(start, value.text.length)
-    val updated =
-        buildString {
-            append(value.text, 0, start)
-            append(paste)
-            append(value.text, end, value.text.length)
-        }
-    return value.copy(text = updated, selection = TextRange(start + paste.length), composition = null)
 }
 
 /** Deletes the selected range, or the code point before a clamped caret. */
@@ -477,9 +451,6 @@ internal fun ComposerBar(
     topInteractionClearance: Dp = 0.dp,
 ) {
     val actionColors = accountActionColors(appState)
-    val context = LocalContext.current
-    val clipboardManager = remember(context) { context.getSystemService(android.content.ClipboardManager::class.java) }
-    val clipboardCanOfferPaste = rememberClipboardCanOfferPaste(clipboardManager)
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val editorLineHeight = rememberComposerEditorLineHeight()
@@ -546,14 +517,6 @@ internal fun ComposerBar(
         ) {
             mutableStateOf(false)
         }
-    var composerFocused by remember(draftKey, draftAccountRef, draftGroupIdHex) { mutableStateOf(false) }
-    var pasteOwnerActive by remember(draftKey, draftAccountRef, draftGroupIdHex) { mutableStateOf(true) }
-    var pasteReadInFlight by remember(draftKey, draftAccountRef, draftGroupIdHex) { mutableStateOf(false) }
-    val pasteScope = rememberCoroutineScope()
-    DisposableEffect(draftKey, draftAccountRef, draftGroupIdHex) {
-        pasteOwnerActive = true
-        onDispose { pasteOwnerActive = false }
-    }
     var automaticComposerHeightPx by
         remember(
             draftKey,
@@ -938,56 +901,6 @@ internal fun ComposerBar(
         if (editingMessageId == null) onDraftChange(value)
     }
 
-    val livePasteEligible by rememberUpdatedState(
-        !composerFocused &&
-            textFieldValue.text.isEmpty() &&
-            editingMessageId == null &&
-            !hasPendingAttachments &&
-            voiceRecordingController?.isRecording == false &&
-            voiceReview?.clip == null &&
-            composerExpansion.mode == ComposerExpansionMode.Automatic &&
-            !composerUsesMultilineControls &&
-            (!dictationOwnedByComposer || dictationState is ConversationDictationState.Idle),
-    )
-
-    /** Reads provider-backed clipboard content off main, then publishes only to the still-current draft. */
-    fun pasteClipboardText(): Boolean {
-        /** A retained click cannot paste into a composer that changed owners or mode. */
-        fun canPaste(): Boolean =
-            pasteOwnerActive &&
-                livePasteEligible &&
-                textFieldValue.text.isEmpty() &&
-                (appState == null || appState.activeAccountRef == draftAccountRef)
-
-        if (!canPaste() || pasteReadInFlight) return true
-        return try {
-            clipboardManager.withPrimaryClipForPaste { clip ->
-                if (canPaste()) {
-                    pasteReadInFlight = true
-                    pasteScope.launch {
-                        try {
-                            val value =
-                                try {
-                                    withContext(Dispatchers.IO) { clip.plainText(context) }
-                                } catch (cancelled: CancellationException) {
-                                    throw cancelled
-                                } catch (_: RuntimeException) {
-                                    null
-                                }
-                            if (canPaste() && value != null) {
-                                insertComposerClipboardText(textFieldValue, value)?.let(::applyComposerFieldValue)
-                            }
-                        } finally {
-                            pasteReadInFlight = false
-                        }
-                    }
-                }
-            }
-        } catch (_: SecurityException) {
-            false
-        }
-    }
-
     /** Deletes the current selection or previous code point and repairs mention tokens before publishing. */
     fun deleteFromComposer() {
         val proposedValue = deleteComposerSelectionOrPreviousCodePoint(textFieldValue) ?: return
@@ -1334,16 +1247,6 @@ internal fun ComposerBar(
                         editingMessageId == null &&
                         voiceRecordingController != null &&
                         !dictationActiveInComposer
-                val showPasteButton =
-                    showMicButton &&
-                        !isRecordingVoice &&
-                        text.isEmpty() &&
-                        !composerFocused &&
-                        !hasPendingAttachments &&
-                        voiceReviewClip == null &&
-                        composerExpansion.mode == ComposerExpansionMode.Automatic &&
-                        !composerUsesMultilineControls &&
-                        clipboardCanOfferPaste
                 val showPrimaryTrailingAction =
                     voiceReviewClip == null &&
                         !dictationActiveInComposer &&
@@ -1393,7 +1296,6 @@ internal fun ComposerBar(
                             // asks for the keyboard; the pending guard drops the
                             // echo of that focus request.
                             if (focused && composerEmojiPickerOpen) restoreKeyboardFromEmojiPane()
-                            composerFocused = focused
                             onComposerFocusChanged(focused)
                         },
                         onValueChange = { value ->
@@ -1559,15 +1461,7 @@ internal fun ComposerBar(
                     ) {
                         // This call site stays shared by idle and recording states;
                         // moving it would break the active hold gesture's identity.
-                        if (showPrimaryTrailingAction && showPasteButton) {
-                            ComposerPasteActionDisc(
-                                onPaste = ::pasteClipboardText,
-                                containerColor = actionColors.container,
-                                contentColor = actionColors.content,
-                                description = stringResource(R.string.paste),
-                                icon = R.drawable.ic_content_paste,
-                            )
-                        } else if (showPrimaryTrailingAction && showMicButton && voiceRecordingController.locked) {
+                        if (showPrimaryTrailingAction && showMicButton && voiceRecordingController.locked) {
                             IconButton(
                                 onClick = { voiceRecordingController.cancel() },
                                 modifier = Modifier.size(40.dp),

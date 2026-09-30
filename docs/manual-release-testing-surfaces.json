@@ -75,12 +75,6 @@
         "test_ids": ["ONB-005", "FIND-005", "FIND-006"]
       },
       {
-        "surface": "Composer Paste action",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
-        "anchor": "R.string.paste",
-        "test_ids": ["CON-013", "CON-021"]
-      },
-      {
         "surface": "Received contact Add action",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
         "anchor": "R.string.contact_add",
@@ -3124,23 +3118,6 @@
         "anchor": "fun ComposerActionDisc(",
         "test_ids": [
           "CON-001",
-          "CON-020"
-        ]
-      },
-      {
-        "surface": "ComposerPasteActionDisc",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerActionDisc.kt",
-        "anchor": "fun ComposerPasteActionDisc(",
-        "test_ids": [
-          "CON-013"
-        ]
-      },
-      {
-        "surface": "ComposerDiscFace",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerActionDisc.kt",
-        "anchor": "fun ComposerDiscFace(",
-        "test_ids": [
-          "CON-013",
           "CON-020"
         ]
       },
