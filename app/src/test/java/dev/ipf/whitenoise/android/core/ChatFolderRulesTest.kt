@@ -266,9 +266,10 @@ class ChatFolderRulesTest {
         )
     }
 
-    private fun ChatListItem.withRow(
-        update: ChatListRowFfi.() -> ChatListRowFfi,
-    ): ChatListItem = copy(projection = requireNotNull(projection).update())
+    private fun ChatListItem.withRow(update: ChatListRowFfi.() -> ChatListRowFfi): ChatListItem {
+        val updated = requireNotNull(projection).update()
+        return copy(projection = updated)
+    }
 
     private fun folderIds(
         items: List<ChatListItem>,
