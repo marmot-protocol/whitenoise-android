@@ -3052,6 +3052,15 @@
         ]
       },
       {
+        "surface": "Composer IME Send after a text commit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "val submitMessage: () -> Unit = {",
+        "test_ids": [
+          "CON-001",
+          "DIC-002"
+        ]
+      },
+      {
         "surface": "Automatic composer height ceiling",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationCompactHeight.kt",
         "anchor": "fun resolveAutomaticComposerCeiling(",

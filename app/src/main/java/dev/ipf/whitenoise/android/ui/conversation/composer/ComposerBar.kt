@@ -875,7 +875,9 @@ internal fun ComposerBar(
                     if (!dispatched) attachmentSendInFlight = false
                 }
             }
-        } else if (text.isNotBlank()) {
+        } else if (textState.valueState.value.text.isNotBlank()) {
+            // An IME can commit text and request Send before the next composition.
+            // Read the live editor state, just as the acceptance token does below.
             val sendingEdit = editingMessageId != null
             val acceptanceToken = textState.acceptanceToken()
             onSend(acceptanceToken.text) {
