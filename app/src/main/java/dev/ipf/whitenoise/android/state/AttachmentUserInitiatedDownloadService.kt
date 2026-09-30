@@ -19,15 +19,12 @@ import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.concurrent.ConcurrentHashMap
 
 private const val TAG = "DMAttachmentJob"
 private const val JOB_NAMESPACE = "attachment_download_v1"
@@ -154,7 +151,7 @@ internal fun attachmentDownloadNotification(context: Context): Notification {
 @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 class AttachmentUserInitiatedDownloadService : JobService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val running = ConcurrentHashMap<Int, Job>()
+    private val runs = AttachmentDownloadJobRuns(scope)
 
     override fun onStartJob(params: JobParameters): Boolean {
         val request = decodeAttachmentJobExtras(params.extras)
@@ -168,16 +165,20 @@ class AttachmentUserInitiatedDownloadService : JobService() {
             attachmentDownloadNotification(this),
             JOB_END_NOTIFICATION_POLICY_REMOVE,
         )
-        running[params.jobId] =
-            scope.launch {
-                runDownload(params, request)
-            }
+        runs.start(
+            jobId = params.jobId,
+            download = { runDownload(request) },
+            onFinished = {
+                attachmentIntentStore(applicationContext).setInteractive(request, interactive = false)
+                AttachmentDownloadJobEvents.changed()
+                jobFinished(params, false)
+            },
+        )
         return true
     }
 
     @Suppress("TooGenericExceptionCaught") // This JobService boundary must finish jobs for all native failures.
     private suspend fun runDownload(
-        params: JobParameters,
         request: AttachmentTransferRequest,
     ) {
         val store = attachmentIntentStore(applicationContext)
@@ -196,20 +197,15 @@ class AttachmentUserInitiatedDownloadService : JobService() {
             }
         } catch (cancel: CancellationException) {
             Log.w(TAG, "attachment_user_job_cancelled type=${cancel.javaClass.simpleName}")
-            return
+            throw cancel
         } catch (failure: Throwable) {
             Log.w(TAG, "attachment_user_job_failed type=${failure.javaClass.simpleName}")
-        } finally {
-            running.remove(params.jobId)
         }
-        store.setInteractive(request, interactive = false)
-        AttachmentDownloadJobEvents.changed()
-        jobFinished(params, false)
     }
 
     override fun onStopJob(params: JobParameters): Boolean {
         Log.w(TAG, "attachment_user_job_stopped reason=${params.stopReason}")
-        running.remove(params.jobId)?.cancel()
+        runs.stop(params.jobId)
         AttachmentDownloadJobEvents.changed()
         return decodeAttachmentJobExtras(params.extras)?.let { request ->
             attachmentIntentStore(applicationContext).isInteractive(request)
