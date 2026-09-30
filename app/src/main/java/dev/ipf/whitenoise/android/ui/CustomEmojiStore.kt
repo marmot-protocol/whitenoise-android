@@ -141,11 +141,15 @@ internal class CustomEmojiStore(
         }
         val staged = File(directory, ".$code.tmp")
         staged.writeBytes(bytes)
-        filesFor(code).forEach(File::delete)
-        if (!staged.renameTo(File(directory, "$code.$extension"))) {
+
+        // Install first so a failed rename keeps the previous emoji.
+        val target = File(directory, "$code.$extension")
+        val previous = filesFor(code).filter { it != target }
+        if (!staged.renameTo(target)) {
             staged.delete()
             throw IOException("cannot store $code")
         }
+        previous.forEach(File::delete)
     }
 
     private fun filesFor(code: String): List<File> {
@@ -179,7 +183,10 @@ internal class CustomEmojiStore(
 
 private const val EMOJI_DECODE_PX = 128
 
-/** Emoji artwork downsampled to at most twice the largest size it draws at; null when not an image. */
+/**
+ * Emoji artwork downsampled so its longer edge is under twice [EMOJI_DECODE_PX]; null when not an image.
+ * Sampling by the longer edge bounds memory for extreme aspect ratios (e.g. 100000x255).
+ */
 internal fun decodeEmojiImage(bytes: ByteArray): ImageBitmap? {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
@@ -187,8 +194,8 @@ internal fun decodeEmojiImage(bytes: ByteArray): ImageBitmap? {
         return null
     }
     var sample = 1
-    val smallerEdge = minOf(bounds.outWidth, bounds.outHeight)
-    while (smallerEdge / (sample * 2) >= EMOJI_DECODE_PX) {
+    val longerEdge = maxOf(bounds.outWidth, bounds.outHeight)
+    while (longerEdge / (sample * 2) >= EMOJI_DECODE_PX) {
         sample *= 2
     }
     val options = BitmapFactory.Options().apply { inSampleSize = sample }

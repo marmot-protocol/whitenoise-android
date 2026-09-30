@@ -5,6 +5,7 @@ import android.graphics.Color
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -20,9 +21,22 @@ import java.io.ByteArrayOutputStream
 class CustomEmojiStoreTest {
     @get:Rule val folder = TemporaryFolder()
 
-    private fun image(format: Bitmap.CompressFormat): ByteArray {
-        val bitmap = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
+    private fun image(
+        format: Bitmap.CompressFormat,
+        width: Int = 4,
+        height: Int = 4,
+    ): ByteArray {
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
         return ByteArrayOutputStream().also { bitmap.compress(format, 100, it) }.toByteArray()
+    }
+
+    @Test
+    fun wideArtworkIsSampledByItsLongerEdge() {
+        // A short edge under the bound must not stop sampling of the long edge.
+        val decoded = decodeEmojiImage(image(Bitmap.CompressFormat.PNG, width = 4096, height = 100))!!
+
+        assertTrue("width ${decoded.width}", decoded.width < 256)
+        assertTrue("height ${decoded.height}", decoded.height in 1..100)
     }
 
     @Test
