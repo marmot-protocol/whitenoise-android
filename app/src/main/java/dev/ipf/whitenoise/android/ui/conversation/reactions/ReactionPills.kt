@@ -38,7 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ReactionTally
-import dev.ipf.whitenoise.android.ui.BuiltinEmoji
+import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 
 // Distinct emojis shown as pills; the "+N" pill carries every reaction beyond them.
 internal const val MAX_VISIBLE_REACTIONS = 4
@@ -186,8 +186,8 @@ private fun ReactionPillSurface(
     ) {
         if (emoji != null) {
             Text(
-                text = BuiltinEmoji.annotate(AnnotatedString(emoji)),
-                inlineContent = BuiltinEmoji.content(),
+                text = EmojiShortcodes.annotate(AnnotatedString(emoji)),
+                inlineContent = EmojiShortcodes.content(),
                 fontSize = with(LocalDensity.current) { ReactionEmojiSize.toSp() },
                 lineHeight = with(LocalDensity.current) { ReactionPillHeight.toSp() },
                 maxLines = 1,

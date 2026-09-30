@@ -21,6 +21,7 @@ class SettingsDetailNavigationTest {
     fun appearanceSubscreensReturnToAppearance() {
         assertEquals(SettingsDetail.Appearance, settingsDetailParent(SettingsDetail.ActionColor))
         assertEquals(SettingsDetail.Appearance, settingsDetailParent(SettingsDetail.ChatBubbleColors))
+        assertEquals(SettingsDetail.Appearance, settingsDetailParent(SettingsDetail.CustomEmoji))
     }
 
     /** Diagnostics & Improvements returns to Privacy & Security, which returns home. */

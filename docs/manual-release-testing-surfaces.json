@@ -52,9 +52,9 @@
       },
       {
         "surface": "content",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/BuiltinEmoji.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiShortcodes.kt",
         "anchor": "fun content(): Map<String, InlineTextContent>",
-        "test_ids": ["MSG-022"]
+        "test_ids": ["MSG-022", "MSG-023", "MSG-024"]
       },
       {
         "surface": "Empty document send feedback",
@@ -3287,12 +3287,55 @@
         ]
       },
       {
+        "surface": "EmojiArtImage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiShortcodes.kt",
+        "anchor": "fun EmojiArtImage(",
+        "test_ids": [
+          "MSG-023",
+          "MSG-024",
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "EmojiShortcodeSuggestions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiShortcodeSuggestions.kt",
+        "anchor": "fun EmojiShortcodeSuggestions(",
+        "test_ids": [
+          "MSG-023"
+        ]
+      },
+      {
+        "surface": "CustomEmojiScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "fun CustomEmojiScreen(",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "CustomEmojiContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "fun CustomEmojiContent(",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "CustomEmojiNameDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "fun CustomEmojiNameDialog(",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
         "surface": "EmojiGlyph",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt",
         "anchor": "fun EmojiGlyph(",
         "test_ids": [
           "CON-010",
-          "MSG-005"
+          "MSG-005",
+          "MSG-023"
         ]
       },
       {
@@ -3301,7 +3344,8 @@
         "anchor": "fun EmojiPickerContent(",
         "test_ids": [
           "CON-010",
-          "MSG-005"
+          "MSG-005",
+          "MSG-023"
         ]
       },
       {
@@ -9958,6 +10002,159 @@
         "anchor": "R.string.emoji_category_objects",
         "test_ids": [
           "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:emoji_category_custom",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiCatalog.kt",
+        "anchor": "R.string.emoji_category_custom",
+        "test_ids": [
+          "MSG-023"
+        ]
+      },
+      {
+        "surface": "setting:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:choose_files",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.choose_files",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:choose_photos",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.choose_photos",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:custom_emoji",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.custom_emoji",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:custom_emoji_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.custom_emoji_detail",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:custom_emoji_empty",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.custom_emoji_empty",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:custom_emoji_name_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.custom_emoji_name_help",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:custom_emoji_name_label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.custom_emoji_name_label",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:custom_emoji_name_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.custom_emoji_name_title",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:custom_emoji_not_image",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.custom_emoji_not_image",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:custom_emoji_remove_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.custom_emoji_remove_detail",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:custom_emoji_remove_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.custom_emoji_remove_title",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:custom_emoji_replaces",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.custom_emoji_replaces",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:custom_emoji_save_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.custom_emoji_save_failed",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:custom_emoji_too_large",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.custom_emoji_too_large",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:remove",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.remove",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:save",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.save",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:custom_emoji",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.custom_emoji",
+        "test_ids": [
+          "SET-001",
+          "SET-030"
         ]
       },
       {

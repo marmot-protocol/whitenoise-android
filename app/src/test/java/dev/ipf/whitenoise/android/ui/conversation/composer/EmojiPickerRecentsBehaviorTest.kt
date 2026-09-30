@@ -1,14 +1,20 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Color
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -19,6 +25,10 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.CustomEmoji
+import dev.ipf.whitenoise.android.ui.CustomEmojiSet
+import dev.ipf.whitenoise.android.ui.EmojiCategory
+import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
 import dev.ipf.whitenoise.android.ui.RecentEmojiRecentsOwner
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CoroutineScope
@@ -26,12 +36,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -197,24 +209,65 @@ class EmojiPickerRecentsBehaviorTest {
     @Test
     fun groupImagePickerExcludesArtworkFromRecentsAndSearch() {
         composeRule.setContent {
-            WhiteNoiseTheme {
-                EmojiPickerContent(
-                    onEmojiPicked = {},
-                    purpose = EmojiPickerPurpose.GROUP_IMAGE,
-                    recentEmojis = listOf(":marmot:", ":wn:", "👍"),
-                    modifier = Modifier.width(360.dp).height(400.dp),
-                )
+            CompositionLocalProvider(LocalCustomEmoji provides customParty()) {
+                WhiteNoiseTheme {
+                    EmojiPickerContent(
+                        onEmojiPicked = {},
+                        purpose = EmojiPickerPurpose.GROUP_IMAGE,
+                        recentEmojis = listOf(":marmot:", ":wn:", ":party:", "👍"),
+                        modifier = Modifier.width(360.dp).height(400.dp),
+                    )
+                }
             }
         }
         waitForBrowseGrid()
         composeRule.onNodeWithText("👍").assertIsDisplayed()
         composeRule.onAllNodesWithContentDescription(":marmot:").assertCountEquals(0)
         composeRule.onAllNodesWithContentDescription(":wn:").assertCountEquals(0)
+        composeRule.onAllNodesWithContentDescription(":party:").assertCountEquals(0)
+        composeRule.onNodeWithTag(emojiPickerHeaderTestTag(EmojiCategory.Custom)).assertDoesNotExist()
         composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).performTextInput(":marmot:")
         composeRule.waitUntil(5_000) {
             composeRule.onAllNodesWithText(string(R.string.emoji_search_no_results)).fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.onNodeWithText(string(R.string.emoji_search_no_results)).assertIsDisplayed()
+    }
+
+    @Test
+    fun customEmojiLeadBrowseAndSearchAndDeliverLiteralShortcodes() {
+        val picked = mutableListOf<String>()
+        composeRule.setContent {
+            CompositionLocalProvider(LocalCustomEmoji provides customParty()) {
+                WhiteNoiseTheme {
+                    EmojiPickerContent(
+                        onEmojiPicked = picked::add,
+                        recentEmojis = listOf("👍"),
+                        modifier = Modifier.width(360.dp).height(400.dp),
+                    )
+                }
+            }
+        }
+        waitForBrowseGrid()
+        composeRule.onNodeWithTag(emojiPickerItemTestTag(EmojiCategory.Custom, 0)).performClick()
+        assertEquals(listOf(":party:"), picked)
+        val customTop = composeRule.onNodeWithTag(emojiPickerHeaderTestTag(EmojiCategory.Custom)).getBoundsInRoot().top
+        val recentTop = composeRule.onNodeWithTag(emojiPickerHeaderTestTag(EmojiCategory.Recent)).getBoundsInRoot().top
+        assertTrue(customTop < recentTop)
+
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).performTextInput("ART")
+        composeRule.waitUntil(5_000) {
+            composeRule
+                .onAllNodesWithTag(emojiPickerItemTestTag(EmojiCategory.Custom, 0))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeRule.onNodeWithTag(emojiPickerItemTestTag(EmojiCategory.Custom, 0)).performClick()
+        assertEquals(listOf(":party:", ":party:"), picked)
+    }
+
+    private fun customParty(): CustomEmojiSet {
+        val bitmap = Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.MAGENTA) }
+        return CustomEmojiSet(listOf(CustomEmoji(":party:", File("party.png"), bitmap.asImageBitmap())))
     }
 
     /** Waits until the browse grid is composed. */
