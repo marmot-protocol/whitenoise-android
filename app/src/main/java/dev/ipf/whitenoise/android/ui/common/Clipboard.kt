@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.common
 
 import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.os.Build
 import androidx.compose.runtime.Composable
@@ -45,8 +46,7 @@ internal fun rememberClipboardCanOfferPaste(clipboardManager: android.content.Cl
 private fun android.content.ClipboardManager?.canOfferTextPaste(): Boolean =
     this?.primaryClipDescription?.hasMimeType(ClipboardPasteAffordance.TEXT_MIME_TYPE_PATTERN) ?: false
 
-internal fun android.content.ClipboardManager.primaryClipPlainText(context: android.content.Context): String? =
-    primaryClip?.plainText(context)
+internal fun ClipboardManager.primaryClipPlainText(context: Context): String? = primaryClip?.plainText(context)
 
 internal fun ClipData.plainText(context: Context): String? =
     takeIf { it.itemCount > 0 }
