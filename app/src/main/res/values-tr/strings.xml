@@ -2110,4 +2110,6 @@
     <string name="dictation_pause_other_audio_title">Diğer sesleri duraklat</string>
     <string name="dictation_pause_other_audio_subtitle">Dikte sırasında müzik ve podcast yayınlarını duraklatır; kayıt bittiğinde devam edebilirler. White Noise sesli okuma ve sesli mesajları güvenlik için her zaman duraklatılır.</string>
     <string name="dictation_audio_focus_unavailable">Diğer sesler duraklatılamadı. Tekrar deneyin veya Dikte ayarlarında bu seçeneği kapatın.</string>
+    <string name="checking_invitation">Davet kontrol ediliyor…</string>
+    <string name="couldnt_check_invitation">Davet kontrol edilemedi</string>
 </resources>

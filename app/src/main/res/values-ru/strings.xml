@@ -2176,4 +2176,6 @@
     <string name="dictation_pause_other_audio_title">Приостанавливать другое аудио</string>
     <string name="dictation_pause_other_audio_subtitle">Музыка и подкасты приостанавливаются во время диктовки и могут возобновиться после окончания записи. Озвучивание и голосовые сообщения в White Noise всегда приостанавливаются для безопасности.</string>
     <string name="dictation_audio_focus_unavailable">Не удалось приостановить другое аудио. Повторите попытку или отключите этот параметр в настройках диктовки.</string>
+    <string name="checking_invitation">Проверка приглашения…</string>
+    <string name="couldnt_check_invitation">Не удалось проверить приглашение</string>
 </resources>

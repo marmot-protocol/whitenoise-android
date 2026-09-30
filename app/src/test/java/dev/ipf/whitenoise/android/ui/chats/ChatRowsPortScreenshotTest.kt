@@ -22,6 +22,7 @@ import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListAttachmentKindFfi
 import dev.ipf.marmotkit.ChatListDraftPreviewFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
+import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.SelectedChatPreviewFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
@@ -45,6 +46,29 @@ class ChatRowsPortScreenshotTest {
     @Test fun checkingInvitationLight() = captureCheckingInvitation(dark = false)
 
     @Test fun checkingInvitationDark() = captureCheckingInvitation(dark = true)
+
+    /** A native disband observation remains visible when the group confirmation stream is stale. */
+    @Test
+    fun terminalRowBeforeGroupConfirmation() {
+        val state = ChatRowPortFixtures.state(context)
+        val base = ChatRowPortFixtures.item()
+        val item =
+            base.copy(
+                inviteConfirmationUnresolved = true,
+                selectedPreview = SelectedChatPreviewFfi.Message,
+                projection = checkNotNull(base.projection).copy(lifecycleState = GroupLifecycleStateFfi.DISBANDED),
+            )
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                Surface(Modifier.fillMaxSize()) {
+                    ChatRow(item = item, appState = state, onClick = {}, onOpenProfile = {})
+                }
+            }
+        }
+        composeRule.onNodeWithText(context.getString(R.string.checking_invitation)).assertDoesNotExist()
+        composeRule.onNodeWithText(ChatRowPortFixtures.PREVIEW).assertExists()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/chat_row_terminal_before_invite_confirmation_dark.png")
+    }
 
     private fun captureCheckingInvitation(dark: Boolean) {
         val state = ChatRowPortFixtures.state(context)

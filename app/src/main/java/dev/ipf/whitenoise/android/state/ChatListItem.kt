@@ -190,7 +190,11 @@ data class ChatListItem(
 
     /** Presentation only: conflicting snapshots cannot establish invitation consent. */
     val checkingInvitation: Boolean
-        get() = inviteConfirmationUnresolved && group.acceptsInviteResults()
+        get() =
+            inviteConfirmationUnresolved &&
+                group.acceptsInviteResults() &&
+                projection?.disbanding != true &&
+                projection?.lifecycleState != GroupLifecycleStateFfi.DISBANDED
 
     /**
      * Case-folded group id, for the folder membership sets that key chats by

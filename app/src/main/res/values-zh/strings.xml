@@ -2082,4 +2082,6 @@
     <string name="dictation_pause_other_audio_title">暂停其他音频</string>
     <string name="dictation_pause_other_audio_subtitle">听写期间暂停音乐和播客；录音结束后可继续播放。为安全起见，White Noise 的朗读和语音消息始终会暂停。</string>
     <string name="dictation_audio_focus_unavailable">无法暂停其他音频。请重试，或在听写设置中关闭“暂停其他音频”。</string>
+    <string name="checking_invitation">正在检查邀请…</string>
+    <string name="couldnt_check_invitation">无法检查邀请</string>
 </resources>

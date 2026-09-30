@@ -48,25 +48,7 @@ class ConversationInviteResolutionLifecycleTest {
         val closed = AtomicInteger(0)
         val joins = AtomicInteger(0)
         val app = appState()
-        app.liveSubscriptionOverrides.conversation =
-            ConversationLiveSubscriptions(
-                openTimeline = { _, _, _ -> error("unexpected timeline") },
-                openGroupState = { _, _ ->
-                    object : ConversationGroupStateSubscriptionHandle {
-                        override fun snapshot(): AppGroupRecordFfi {
-                            reads.incrementAndGet()
-                            check(nativeAvailable.get()) { "authority unavailable" }
-                            return pending
-                        }
-
-                        override suspend fun next(): AppGroupRecordFfi? = null
-
-                        override fun close() {
-                            closed.incrementAndGet()
-                        }
-                    }
-                },
-            )
+        app.liveSubscriptionOverrides.conversation = nativeSubscriptions(pending, nativeAvailable, reads, closed)
         val controller =
             ConversationController(
                 appState = app,
@@ -113,6 +95,32 @@ class ConversationInviteResolutionLifecycleTest {
             controller.onCleared()
         }
     }
+
+    /** Injects only the native authority boundary needed by the real screen lifecycle. */
+    private fun nativeSubscriptions(
+        pending: AppGroupRecordFfi,
+        nativeAvailable: AtomicBoolean,
+        reads: AtomicInteger,
+        closed: AtomicInteger,
+    ): ConversationLiveSubscriptions =
+        ConversationLiveSubscriptions(
+            openTimeline = { _, _, _ -> error("unexpected timeline") },
+            openGroupState = { _, _ ->
+                object : ConversationGroupStateSubscriptionHandle {
+                    override fun snapshot(): AppGroupRecordFfi {
+                        reads.incrementAndGet()
+                        check(nativeAvailable.get()) { "authority unavailable" }
+                        return pending
+                    }
+
+                    override suspend fun next(): AppGroupRecordFfi? = null
+
+                    override fun close() {
+                        closed.incrementAndGet()
+                    }
+                }
+            },
+        )
 
     /** Keeps Android resources/activity intact while independently driving the screen's lifecycle observer. */
     private class ResolutionLifecycleContext(

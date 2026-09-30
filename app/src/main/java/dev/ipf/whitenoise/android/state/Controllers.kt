@@ -31,7 +31,6 @@ import dev.ipf.marmotkit.ChatPinStateFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.GroupDetailsFfi
-import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.GroupManagementStateFfi
 import dev.ipf.marmotkit.GroupMutationResultFfi
 import dev.ipf.marmotkit.GroupPushDebugInfoFfi
@@ -1675,138 +1674,6 @@ data class ConversationControllerCopy(
     fun streamFailed(): String = String.format(streamFailedFormat, tryAgain)
 
     fun couldntAddMemberDuplicate(name: String): String = String.format(couldntAddMemberDuplicateFormat, name)
-}
-
-internal data class AppliedGroupDetails(
-    val group: AppGroupRecordFfi,
-    val members: List<AppGroupMemberRecordFfi>,
-)
-
-internal enum class GroupRosterInvariant {
-    GROUP_ID_MISMATCH,
-    EMPTY_JOINED_ROSTER,
-    LOCAL_MEMBER_MISSING,
-    MEMBER_COUNT_MISMATCH,
-}
-
-internal data class GroupRosterResolution(
-    val applied: AppliedGroupDetails,
-    val invariant: GroupRosterInvariant?,
-    val uniqueMemberCount: Int,
-    val mlsMemberCount: UInt,
-    val containsLocalMember: Boolean,
-)
-
-internal fun applyAuthoritativeGroupDetails(details: GroupDetailsFfi): AppliedGroupDetails =
-    AppliedGroupDetails(
-        group = details.group,
-        members =
-            GroupProjector.identityDistinctMembers(
-                details.members.map { member ->
-                    AppGroupMemberRecordFfi(
-                        memberIdHex = member.memberIdHex,
-                        account = member.account,
-                        local = member.local,
-                    )
-                },
-            ),
-    )
-
-internal fun resolveAuthoritativeGroupRoster(
-    details: GroupDetailsFfi,
-    activeAccountIdHex: String?,
-): GroupRosterResolution {
-    val applied = applyAuthoritativeGroupDetails(details)
-    val uniqueMemberCount = GroupProjector.uniqueMemberCount(applied.members)
-    val containsLocalMember =
-        details.members.any { member ->
-            member.isSelf ||
-                activeAccountIdHex?.let { accountId ->
-                    member.memberIdHex.equals(accountId, ignoreCase = true)
-                } == true
-        }
-    val activeJoinedGroup =
-        details.group.selfMembership == SelfMembershipFfi.MEMBER &&
-            !details.group.pendingConfirmation
-    val invariant =
-        when {
-            !activeJoinedGroup -> null
-            uniqueMemberCount == 0 -> GroupRosterInvariant.EMPTY_JOINED_ROSTER
-            !containsLocalMember -> GroupRosterInvariant.LOCAL_MEMBER_MISSING
-            details.members.size.toLong() !=
-                details.mlsState.memberCount.toLong() -> GroupRosterInvariant.MEMBER_COUNT_MISMATCH
-            else -> null
-        }
-    return GroupRosterResolution(
-        applied = applied,
-        invariant = invariant,
-        uniqueMemberCount = uniqueMemberCount,
-        mlsMemberCount = details.mlsState.memberCount,
-        containsLocalMember = containsLocalMember,
-    )
-}
-
-/** Convert the lightweight MDK roster projection without a second details read. */
-internal fun applyAuthoritativeGroupRoster(
-    currentGroup: AppGroupRecordFfi,
-    roster: GroupRosterFfi,
-): AppliedGroupDetails =
-    AppliedGroupDetails(
-        group =
-            currentGroup.copy(
-                admins = roster.members.filter { it.isAdmin }.map { it.memberIdHex },
-                selfMembership = roster.selfMembership,
-                unrecoverable = roster.lifecycleState == GroupLifecycleStateFfi.UNRECOVERABLE,
-                disbanded = roster.lifecycleState == GroupLifecycleStateFfi.DISBANDED,
-            ),
-        members =
-            GroupProjector.identityDistinctMembers(
-                roster.members.map { member ->
-                    AppGroupMemberRecordFfi(
-                        memberIdHex = member.memberIdHex,
-                        account = member.account,
-                        local = member.local,
-                    )
-                },
-            ),
-    )
-
-internal fun resolveAuthoritativeGroupRoster(
-    currentGroup: AppGroupRecordFfi,
-    roster: GroupRosterFfi,
-    activeAccountIdHex: String?,
-): GroupRosterResolution {
-    val applied = applyAuthoritativeGroupRoster(currentGroup, roster)
-    val uniqueMemberCount = GroupProjector.uniqueMemberCount(applied.members)
-    val matchesCurrentGroup =
-        currentGroup.groupIdHex.trim().equals(roster.groupIdHex.trim(), ignoreCase = true)
-    val containsLocalMember =
-        roster.members.any { member ->
-            member.isSelf ||
-                activeAccountIdHex?.let { accountId ->
-                    member.memberIdHex.equals(accountId, ignoreCase = true)
-                } == true
-        }
-    val activeJoinedGroup =
-        applied.group.selfMembership == SelfMembershipFfi.MEMBER &&
-            !applied.group.pendingConfirmation
-    val invariant =
-        when {
-            !matchesCurrentGroup -> GroupRosterInvariant.GROUP_ID_MISMATCH
-            !activeJoinedGroup -> null
-            uniqueMemberCount == 0 -> GroupRosterInvariant.EMPTY_JOINED_ROSTER
-            !containsLocalMember -> GroupRosterInvariant.LOCAL_MEMBER_MISSING
-            uniqueMemberCount.toLong() != roster.memberCount.toLong() ->
-                GroupRosterInvariant.MEMBER_COUNT_MISMATCH
-            else -> null
-        }
-    return GroupRosterResolution(
-        applied = applied,
-        invariant = invariant,
-        uniqueMemberCount = uniqueMemberCount,
-        mlsMemberCount = roster.memberCount,
-        containsLocalMember = containsLocalMember,
-    )
 }
 
 /**
@@ -12858,87 +12725,93 @@ class ConversationController(
                 currentRead &&
                 appState.runtimeGeneration == runtimeGeneration
         if (ownsRead) applyGroupState(canonical)
-        return ownsRead
+        // A newer canonical nonterminal update already resolved consent. Discard this
+        // older snapshot, but let the same owner load a fresh roster for that group.
+        val resolvedByUpdate = !inviteConfirmationUnresolved && group.acceptsInviteResults()
+        return ownsCurrentMemberRead(refreshGeneration, runtimeGeneration) && (ownsRead || resolvedByUpdate)
     }
+
+    private fun ownsCurrentMemberRead(
+        generation: Long,
+        runtimeGeneration: Int,
+    ): Boolean =
+        ownsInviteAcceptanceResult &&
+            memberRosterRefreshGeneration.isCurrent(generation) &&
+            appState.runtimeGeneration == runtimeGeneration
 
     /** Publishes the latest authoritative roster while rejecting older refresh completions. */
     private suspend fun refreshMembers(
-        retryOnHydrationPending: Boolean = true,
+        retryOnPendingRead: Boolean = true,
         prefetchedRoster: Deferred<Result<GroupRosterFfi>>? = null,
     ) {
-        val account = conversationAccountRef ?: return
-        if (inviteAcceptanceResolutionPending && inviteAuthorityReadInFlight) return
-        val refreshGeneration = beginMemberRosterRefresh() ?: return
+        val account = conversationAccountRef?.takeUnless { inviteAcceptanceResolutionPending && inviteAuthorityReadInFlight } ?: return
+        val generation = beginMemberRosterRefresh() ?: return
         val runtimeGeneration = appState.runtimeGeneration
         if (inviteAcceptanceResolutionPending) inviteAcceptanceResolutionState = GroupRosterLoadState.LOADING
         memberRosterLoadTracker.transition(GroupRosterRefreshEvent.STARTED)
-        var resolutionAuthorityEpoch = groupAuthorityEpoch
         try {
             runCatchingCancellable {
-                val resolvingConflict = inviteConfirmationUnresolved
-                if (!resolveInitialInviteConfirmation(account, refreshGeneration)) return@runCatchingCancellable
-                val authorityEpoch = groupAuthorityEpoch
-                resolutionAuthorityEpoch = authorityEpoch
-                // One projection replaces the serialized groupMlsState() eviction and groupDetails() roster reads.
-                // It carries membership, admins, epoch/revision, lifecycle, and self-membership together.
-                // The hydration retry below reads again; the prefetched answer is the one that failed.
-                val roster =
-                    if (resolvingConflict) {
-                        groupRosterReader(account, group.groupIdHex)
-                    } else {
-                        prefetchedRoster?.await()?.getOrThrow() ?: groupRosterReader(account, group.groupIdHex)
-                    }
-                memberRosterRefreshGeneration.runIfCurrent(refreshGeneration) {
-                    if (!ownsInviteAcceptanceResult ||
-                        runtimeGeneration != appState.runtimeGeneration ||
-                        authorityEpoch != groupAuthorityEpoch
-                    ) {
-                        return@runIfCurrent
-                    }
-                    val applied = applyGroupRoster(account, roster) ?: return@runIfCurrent
-                    appState.applyLocalGroupDetails(account, applied.group, applied.members)
-                }
-            }.onFailure { throwable ->
-                if (!ownsInviteAcceptanceResult ||
-                    runtimeGeneration != appState.runtimeGeneration ||
-                    !memberRosterRefreshGeneration.isCurrent(refreshGeneration)
-                ) {
-                    return@onFailure
-                }
-                if (retryOnHydrationPending && throwable is MarmotKitException.GroupHydrationPending) {
-                    // Deferred hydration answers early reads with a retryable pending state; the runtime
-                    // promotes the group shortly after account readiness, so wait once instead of showing
-                    // a failed roster.
-                    delay(GROUP_HYDRATION_RETRY_DELAY_MS)
-                    if (memberRosterRefreshGeneration.isCurrent(refreshGeneration)) {
-                        refreshMembers(retryOnHydrationPending = false)
-                    }
-                    return@onFailure
-                }
-                memberRosterRefreshGeneration.runIfCurrent(refreshGeneration) {
-                    if (throwable.isUseAfterEviction()) {
-                        markActiveAccountRemovedFromMembers(account)
-                    } else {
-                        memberRosterLoadTracker.transition(GroupRosterRefreshEvent.FAILED)
-                        if (inviteAcceptanceResolutionPending && resolutionAuthorityEpoch == groupAuthorityEpoch) {
-                            inviteAcceptanceResolutionState = GroupRosterLoadState.FAILED
-                        }
-                        if (BuildConfig.DEBUG) Log.w("DMConversation", "refresh members failed", throwable)
-                    }
+                readAndApplyMembers(account, generation, runtimeGeneration, prefetchedRoster)
+            }.onFailure { failure ->
+                if (ownsCurrentMemberRead(generation, runtimeGeneration)) {
+                    handleMemberReadFailure(account, generation, runtimeGeneration, failure, retryOnPendingRead)
                 }
             }
         } catch (cancel: CancellationException) {
-            memberRosterRefreshGeneration.runIfCurrent(refreshGeneration) {
+            if (ownsCurrentMemberRead(generation, runtimeGeneration)) {
                 memberRosterLoadTracker.restoreAfterCancellation()
-                if (ownsInviteAcceptanceResult &&
-                    runtimeGeneration == appState.runtimeGeneration &&
-                    inviteAcceptanceResolutionPending &&
-                    resolutionAuthorityEpoch == groupAuthorityEpoch
-                ) {
-                    inviteAcceptanceResolutionState = GroupRosterLoadState.FAILED
-                }
+                if (inviteAcceptanceResolutionPending) inviteAcceptanceResolutionState = GroupRosterLoadState.FAILED
             }
             throw cancel
+        }
+    }
+
+    /** Reads consent before members and never publishes a roster across a canonical group edge. */
+    private suspend fun readAndApplyMembers(
+        account: String,
+        generation: Long,
+        runtimeGeneration: Int,
+        prefetchedRoster: Deferred<Result<GroupRosterFfi>>?,
+    ) {
+        val resolvingConflict = inviteConfirmationUnresolved
+        if (!resolveInitialInviteConfirmation(account, generation)) return
+        val authorityEpoch = groupAuthorityEpoch
+        // A prefetched roster can predate the consent check and must not settle that check.
+        val roster =
+            if (resolvingConflict) {
+                groupRosterReader(account, group.groupIdHex)
+            } else {
+                prefetchedRoster?.await()?.getOrThrow() ?: groupRosterReader(account, group.groupIdHex)
+            }
+        memberRosterRefreshGeneration.runIfCurrent(generation) {
+            if (ownsCurrentMemberRead(generation, runtimeGeneration)) {
+                if (authorityEpoch != groupAuthorityEpoch) throw SupersededGroupRosterRead()
+                val applied = applyGroupRoster(account, roster)
+                if (applied != null) appState.applyLocalGroupDetails(account, applied.group, applied.members)
+            }
+        }
+    }
+
+    /** Retry one fresh read after hydration or supersession, then expose the existing Retry state. */
+    private suspend fun handleMemberReadFailure(
+        account: String,
+        generation: Long,
+        runtimeGeneration: Int,
+        failure: Throwable,
+        retryOnPendingRead: Boolean,
+    ) {
+        val hydrationPending = failure is MarmotKitException.GroupHydrationPending
+        val superseded = failure is SupersededGroupRosterRead
+        if (superseded && !group.acceptsInviteResults()) return
+        if (retryOnPendingRead && (hydrationPending || superseded)) {
+            if (hydrationPending) delay(GROUP_HYDRATION_RETRY_DELAY_MS)
+            if (ownsCurrentMemberRead(generation, runtimeGeneration)) refreshMembers(retryOnPendingRead = false)
+        } else if (failure.isUseAfterEviction()) {
+            markActiveAccountRemovedFromMembers(account)
+        } else {
+            memberRosterLoadTracker.transition(GroupRosterRefreshEvent.FAILED)
+            if (inviteAcceptanceResolutionPending) inviteAcceptanceResolutionState = GroupRosterLoadState.FAILED
+            if (BuildConfig.DEBUG) Log.w("DMConversation", "refresh members failed", failure)
         }
     }
 
