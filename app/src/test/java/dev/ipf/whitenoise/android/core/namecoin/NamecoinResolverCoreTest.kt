@@ -42,11 +42,13 @@ class NamecoinResolverCoreTest {
             requests += requestJson
             val req = JSONObject(requestJson)
             val params =
-                req.optJSONArray("params")?.let { arr ->
-                    buildList {
-                        for (i in 0 until arr.length()) add(arr.opt(i)?.toString() ?: "")
-                    }
-                }.orEmpty()
+                req
+                    .optJSONArray("params")
+                    ?.let { arr ->
+                        buildList {
+                            for (i in 0 until arr.length()) add(arr.opt(i)?.toString() ?: "")
+                        }
+                    }.orEmpty()
             return handler(server.host, req.getInt("id"), req.getString("method"), params)
         }
     }
@@ -71,8 +73,7 @@ class NamecoinResolverCoreTest {
         }
 
     /** The scripthash an ElectrumX server would be queried with for [name]. */
-    private fun scripthashOf(name: String): String =
-        NamecoinScript.electrumScriptHash(NamecoinScript.buildNameIndexScript(name.toByteArray()))
+    private fun scripthashOf(name: String): String = NamecoinScript.electrumScriptHash(NamecoinScript.buildNameIndexScript(name.toByteArray()))
 
     /**
      * The canonical happy-path handler: version handshake, one history entry,
@@ -365,8 +366,14 @@ class NamecoinResolverCoreTest {
             // cache keys upstream as well, so they are not collapsed here.
             val results =
                 listOf(
-                    "example.bit", "Example.BIT", " example.bit ", "EXAMPLE.bit",
-                    "example.bit", " Example.bit", "example.BIT", "EXAMPLE.BIT",
+                    "example.bit",
+                    "Example.BIT",
+                    " example.bit ",
+                    "EXAMPLE.bit",
+                    "example.bit",
+                    " Example.bit",
+                    "example.BIT",
+                    "EXAMPLE.BIT",
                 ).map { async { core.resolve(it) } }
                     .awaitAll()
             assertTrue(results.all { it is NamecoinResolver.NamecoinResult.Resolved })

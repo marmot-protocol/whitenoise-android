@@ -116,8 +116,7 @@ internal fun rememberRecipientResolution(
  * unreachable message when a `.bit` input settles without a key. Null for
  * non-Namecoin inputs so the caller falls back to its generic copy.
  */
-internal fun namecoinResolvingLabel(query: String): Int? =
-    if (NamecoinResolver.isBit(query)) R.string.namecoin_lookup_resolving else null
+internal fun namecoinResolvingLabel(query: String): Int? = if (NamecoinResolver.isBit(query)) R.string.namecoin_lookup_resolving else null
 
 /**
  * Map a settled (non-resolving, no-key) Namecoin outcome to the inline

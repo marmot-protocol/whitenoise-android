@@ -2,9 +2,9 @@ package dev.ipf.whitenoise.android.core.namecoin
 
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
+import okhttp3.WebSocketListener
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
-import okhttp3.WebSocketListener
 import okio.ByteString
 import org.junit.After
 import org.junit.Assert.assertEquals

@@ -374,10 +374,11 @@ internal class NamecoinResolverCore(
             """{"jsonrpc":"2.0","id":2,"method":"blockchain.scripthash.get_history","params":["$scripthash"]}"""
         val historyBody =
             transport.call(server, url, historyReq, 2, requestTimeoutMillis) ?: return NameValueOutcome.Unavailable
-        val lastEntry = lastHistoryEntry(historyBody)
-            // Empty history is a definitive Namecoin miss (name never
-            // registered / has no ops).
-            ?: return NameValueOutcome.NotFound
+        val lastEntry =
+            lastHistoryEntry(historyBody)
+                // Empty history is a definitive Namecoin miss (name never
+                // registered / has no ops).
+                ?: return NameValueOutcome.NotFound
 
         val txReq =
             """{"jsonrpc":"2.0","id":3,"method":"blockchain.transaction.get","params":["${lastEntry.txHash}",true]}"""
@@ -395,11 +396,12 @@ internal class NamecoinResolverCore(
             return NameValueOutcome.NotFound
         }
 
-        val value = extractValueFromTx(txBody, name)
-            // The tx we got back does not carry this name's value. Treat as
-            // definitive miss — the history entry pointed at something that is
-            // not our name payload.
-            ?: return NameValueOutcome.NotFound
+        val value =
+            extractValueFromTx(txBody, name)
+                // The tx we got back does not carry this name's value. Treat as
+                // definitive miss — the history entry pointed at something that is
+                // not our name payload.
+                ?: return NameValueOutcome.NotFound
         return NameValueOutcome.Value(value)
     }
 

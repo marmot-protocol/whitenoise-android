@@ -162,7 +162,7 @@ class NamecoinRecordTest {
         runBlocking {
             val raw =
                 """{"import":[],"nostr":{"names":{"alice":"${"c".repeat(64)}"},""" +
-                """"relays":{"${"c".repeat(64)}":["wss://one","wss://two"]}}}"""
+                    """"relays":{"${"c".repeat(64)}":["wss://one","wss://two"]}}}"""
             val merged = NamecoinRecord.resolveValueWithImports(JSONObject(raw), fetch = { null })
             val names = merged.getJSONObject("nostr").getJSONObject("names")
             assertEquals("c".repeat(64), names.getString("alice"))

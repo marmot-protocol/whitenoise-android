@@ -87,7 +87,10 @@ internal open class NamecoinTransport(
             if (chain.isEmpty()) throw CertificateException("empty certificate chain")
             val leafSpki = chain[0].publicKey.encoded
             val digest = MessageDigest.getInstance("SHA-256").digest(leafSpki)
-            val presented = java.util.Base64.getEncoder().encodeToString(digest)
+            val presented =
+                java.util.Base64
+                    .getEncoder()
+                    .encodeToString(digest)
             if (presented !in pinsBase64) {
                 throw CertificateException("leaf public key does not match the pinned SHA-256")
             }

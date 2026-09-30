@@ -288,13 +288,15 @@ internal object NamecoinRecord {
         val pubkey = nostr.optString("pubkey", "")
         if (!HEX_PUBKEY.matches(pubkey)) return Extraction.NotFound
         val relays =
-            nostr.optJSONArray("relays")?.let { arr ->
-                buildList {
-                    for (i in 0 until arr.length()) {
-                        (arr.opt(i) as? String)?.let(::add)
+            nostr
+                .optJSONArray("relays")
+                ?.let { arr ->
+                    buildList {
+                        for (i in 0 until arr.length()) {
+                            (arr.opt(i) as? String)?.let(::add)
+                        }
                     }
-                }
-            }.orEmpty()
+                }.orEmpty()
         return Extraction.Resolved(
             pubkeyHex = pubkey.lowercase(Locale.ROOT),
             relays = relays,
