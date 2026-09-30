@@ -98,19 +98,26 @@ private fun chatFolderRuleMatches(
 }
 
 /** An empty rule remains manual-only; any category can select chats on its own. */
-private fun ChatFolderRule.hasCategoryConstraint(): Boolean = unreadOnly || groupsOnly || archivedOnly || unreadMentionsOnly || directChatsOnly || pinnedOnly
+private fun ChatFolderRule.hasCategoryConstraint(): Boolean {
+    return unreadOnly || groupsOnly || archivedOnly ||
+        unreadMentionsOnly || directChatsOnly || pinnedOnly
+}
 
 /** Read and pin constraints use the same native state the chat row renders. */
 private fun ChatFolderRule.matchesAttention(
     item: ChatListItem,
     activeAccountIdHex: String?,
-): Boolean =
-    (!unreadOnly || item.effectiveHasUnread(activeAccountIdHex)) &&
-        (!unreadMentionsOnly || (item.unreadMention && item.projection?.hasUnread == true && item.effectiveHasUnread(activeAccountIdHex))) &&
+): Boolean {
+    val nativeUnreadMention = item.unreadMention && item.projection?.hasUnread == true
+    return (!unreadOnly || item.effectiveHasUnread(activeAccountIdHex)) &&
+        (!unreadMentionsOnly || (nativeUnreadMention && item.effectiveHasUnread(activeAccountIdHex))) &&
         (!pinnedOnly || item.pinned())
+}
 
 /** Contradictory legacy/custom flags match no chats; the editor makes these choices exclusive. */
-private fun ChatFolderRule.matchesConversationKind(item: ChatListItem): Boolean = (!groupsOnly || !item.isDm()) && (!directChatsOnly || item.isDm())
+private fun ChatFolderRule.matchesConversationKind(item: ChatListItem): Boolean {
+    return (!groupsOnly || !item.isDm()) && (!directChatsOnly || item.isDm())
+}
 
 // Matches against the roster snapshot the chat-list row already carries. A
 // DM's roster often holds only the active account (the counterpart is not an

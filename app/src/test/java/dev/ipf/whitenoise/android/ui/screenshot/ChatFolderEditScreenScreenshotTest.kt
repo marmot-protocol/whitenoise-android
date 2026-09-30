@@ -91,7 +91,15 @@ class ChatFolderEditScreenScreenshotTest {
     /** 200% RTL text keeps the mention and pin switches on their own accessible rows. */
     @Test
     @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h1100dp-mdpi")
-    fun attentionFiltersRtlLarge() = capture("chat_folder_attention_rtl_large", dark = true, amoled = false, largeRtl = true, attention = true)
+    fun attentionFiltersRtlLarge() {
+        capture(
+            "chat_folder_attention_rtl_large",
+            dark = true,
+            amoled = false,
+            largeRtl = true,
+            attention = true,
+        )
+    }
 
     @Test
     fun folderDeleteActionLight() {

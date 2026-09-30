@@ -1223,6 +1223,9 @@
     <string name="chat_folder_description_label">Description</string>
     <string name="chat_folder_keyword_label">Mot-clé</string>
     <string name="chat_folder_unread_only">Non lues uniquement</string>
+    <string name="chat_folder_unread_mentions_only">Mentions non lues uniquement</string>
+    <string name="chat_folder_direct_chats_only">Discussions directes uniquement</string>
+    <string name="chat_folder_pinned_only">Discussions épinglées uniquement</string>
     <string name="chat_folder_include_muted">Inclure les discussions en sourdine</string>
     <string name="chat_folder_groups_only">Groupes uniquement</string>
     <string name="chat_folder_archived_only">Archivées uniquement</string>
@@ -1240,7 +1243,7 @@
     <string name="folder_manual_hint">Les discussions ajoutées ici restent incluses, même si elles ne correspondent pas aux règles automatiques.</string>
     <string name="folder_rules">Règles automatiques</string>
     <string name="folder_keyword_hint">Correspond au titre d’une discussion ou à la description d’un groupe. Les discussions avec une personne sélectionnée correspondent aussi.</string>
-    <string name="folder_rule_hint">Les discussions correspondent si elles respectent au moins une règle de personne ou de mot-clé sélectionnée. Les options de catégorie affinent ces résultats. Une discussion retirée réapparaît si elle correspond toujours.</string>
+    <string name="folder_rule_hint">Les discussions doivent respecter au moins une règle de personne ou de mot-clé et toutes les catégories sélectionnées. Sans personne ni mot-clé, les catégories fonctionnent seules. Une discussion retirée réapparaît si elle correspond toujours.</string>
     <string name="folder_preview">Aperçu</string>
     <string name="folder_discard_title">Abandonner les modifications ?</string>
     <string name="folder_discard_detail">Vos modifications du dossier n’ont pas été enregistrées.</string>

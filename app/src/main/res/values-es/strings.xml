@@ -1223,6 +1223,9 @@
     <string name="chat_folder_description_label">Descripción</string>
     <string name="chat_folder_keyword_label">Palabra clave</string>
     <string name="chat_folder_unread_only">Solo no leídos</string>
+    <string name="chat_folder_unread_mentions_only">Solo menciones sin leer</string>
+    <string name="chat_folder_direct_chats_only">Solo chats directos</string>
+    <string name="chat_folder_pinned_only">Solo chats fijados</string>
     <string name="chat_folder_include_muted">Incluir chats silenciados</string>
     <string name="chat_folder_groups_only">Solo grupos</string>
     <string name="chat_folder_archived_only">Solo archivados</string>
@@ -1240,7 +1243,7 @@
     <string name="folder_manual_hint">Los chats que añadas aquí seguirán incluidos aunque no cumplan las reglas automáticas.</string>
     <string name="folder_rules">Reglas automáticas</string>
     <string name="folder_keyword_hint">Coincide con el título del chat o la descripción del grupo. Los chats con cualquier persona seleccionada también coinciden.</string>
-    <string name="folder_rule_hint">Los chats coinciden si cumplen alguna regla seleccionada de persona o palabra clave. Las opciones de categoría acotan esas coincidencias. Un chat que quites volverá si aún coincide.</string>
+    <string name="folder_rule_hint">Los chats deben cumplir alguna regla seleccionada de persona o palabra clave y todas las categorías seleccionadas. Sin persona ni palabra clave, las categorías funcionan por sí solas. Un chat que quites volverá si aún coincide.</string>
     <string name="folder_preview">Vista previa</string>
     <string name="folder_discard_title">¿Descartar los cambios?</string>
     <string name="folder_discard_detail">Los cambios de la carpeta no se han guardado.</string>

@@ -1223,6 +1223,9 @@
     <string name="chat_folder_description_label">Descrizione</string>
     <string name="chat_folder_keyword_label">Parola chiave</string>
     <string name="chat_folder_unread_only">Solo non lette</string>
+    <string name="chat_folder_unread_mentions_only">Solo menzioni non lette</string>
+    <string name="chat_folder_direct_chats_only">Solo chat dirette</string>
+    <string name="chat_folder_pinned_only">Solo chat fissate</string>
     <string name="chat_folder_include_muted">Includi le chat silenziate</string>
     <string name="chat_folder_groups_only">Solo gruppi</string>
     <string name="chat_folder_archived_only">Solo archiviate</string>
@@ -1240,7 +1243,7 @@
     <string name="folder_manual_hint">Le chat che aggiungi qui restano incluse anche se non corrispondono alle regole automatiche.</string>
     <string name="folder_rules">Regole automatiche</string>
     <string name="folder_keyword_hint">Corrisponde al titolo di una chat o alla descrizione di un gruppo. Anche le chat con una persona selezionata corrispondono.</string>
-    <string name="folder_rule_hint">Le chat corrispondono se soddisfano una regola selezionata per persona o parola chiave. Le opzioni di categoria restringono le corrispondenze. Una chat rimossa ricompare se corrisponde ancora.</string>
+    <string name="folder_rule_hint">Le chat devono soddisfare una regola selezionata per persona o parola chiave e tutte le categorie selezionate. Senza persona o parola chiave, le categorie funzionano da sole. Una chat rimossa ricompare se corrisponde ancora.</string>
     <string name="folder_preview">Anteprima</string>
     <string name="folder_discard_title">Annullare le modifiche?</string>
     <string name="folder_discard_detail">Le modifiche alla cartella non sono state salvate.</string>

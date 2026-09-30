@@ -12,8 +12,10 @@ import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.whitenoise.android.state.ChatFolderRule
 import dev.ipf.whitenoise.android.state.ChatsController
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.messages.FORWARD_CHAT_PICKER_ACCOUNT_ROW_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessagePickerContent
+import dev.ipf.whitenoise.android.ui.conversation.messages.PickerStateListener
 import dev.ipf.whitenoise.android.ui.conversation.messages.forwardFolderChipTestTag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -38,42 +40,17 @@ class ForwardAttentionFolderReactivityTest {
     fun unreadMentionFolderTracksReadPinAndDirectStateWithoutRemounting() {
         val appState = emptyAppState()
         val controller = ChatsController(appState, ACCOUNT_REF) { _, _ -> emptyList() }
-        controller.applyLocalDirectChat(GROUP_A, ACCOUNT_HEX, PEER_A)
-        controller.applyLocalDirectChat(GROUP_B, ACCOUNT_HEX, PEER_B)
+        seedAttentionChats(controller, ACCOUNT_REF, ACCOUNT_HEX)
         appState.attachChatsController(controller)
-        val store = appState.chatFolderPreferences
-        store.clearAllForAccount(ACCOUNT_REF)
-        store.foldersFor(ACCOUNT_REF)
         val folder =
-            requireNotNull(
-                store.commitFolderDraft(
-                    accountRef = ACCOUNT_REF,
-                    folderId = null,
-                    name = "Unread mentions",
-                    description = "",
-                    manualChatIds = emptySet(),
-                    rule = ChatFolderRule(unreadMentionsOnly = true, directChatsOnly = true, pinnedOnly = true),
-                ),
+            createAttentionFolder(
+                appState,
+                ACCOUNT_REF,
+                ChatFolderRule(unreadMentionsOnly = true, directChatsOnly = true, pinnedOnly = true),
             )
         val mentioned = attentionRow(GROUP_B)
-        controller.publishRow(attentionRow(GROUP_A))
-        controller.publishRow(mentioned)
         try {
-            composeRule.setContent {
-                WhiteNoiseTheme {
-                    Surface {
-                        ForwardMessagePickerContent(
-                            appState = appState,
-                            messageCount = 1,
-                            attachmentCount = 0,
-                            originGroupIdHex = "ff".repeat(32),
-                            sourceAccountRef = ACCOUNT_REF,
-                            onDismiss = {},
-                            onForward = { _, _ -> true },
-                        )
-                    }
-                }
-            }
+            renderPicker(appState)
             val chip = composeRule.onNodeWithTag(forwardFolderChipTestTag(folder.id))
             chip.assertExists()
 
@@ -81,7 +58,12 @@ class ForwardAttentionFolderReactivityTest {
             val excludedRows =
                 listOf(
                     mentioned.copy(unreadMention = false, unreadMentionCount = 0uL), // ordinary unread
-                    mentioned.copy(hasUnread = false, unreadCount = 0uL, unreadMention = false, unreadMentionCount = 0uL),
+                    mentioned.copy(
+                        hasUnread = false,
+                        unreadCount = 0uL,
+                        unreadMention = false,
+                        unreadMentionCount = 0uL,
+                    ),
                     mentioned.copy(
                         hasUnread = false,
                         unreadCount = 0uL,
@@ -99,11 +81,7 @@ class ForwardAttentionFolderReactivityTest {
                 chip.assertExists()
             }
         } finally {
-            composeRule.runOnIdle {
-                store.clearAllForAccount(ACCOUNT_REF)
-                appState.attachChatsController(null)
-                controller.onCleared()
-            }
+            cleanUp(appState, listOf(controller))
         }
     }
 
@@ -116,67 +94,35 @@ class ForwardAttentionFolderReactivityTest {
                 accounts = listOf(testAccount(ACCOUNT_REF, ACCOUNT_HEX), testAccount(otherAccountRef, otherAccountHex)),
             )
         val activeController = ChatsController(appState, ACCOUNT_REF) { _, _ -> emptyList() }
-        listOf(GROUP_A to PEER_A, GROUP_B to PEER_B).forEach { (groupId, peerId) ->
-            activeController.applyLocalDirectChat(groupId, ACCOUNT_HEX, peerId)
-            activeController.publishRow(attentionRow(groupId))
-        }
+        seedAttentionChats(activeController, ACCOUNT_REF, ACCOUNT_HEX)
         appState.attachChatsController(activeController)
-        val store = appState.chatFolderPreferences
-        listOf(ACCOUNT_REF, otherAccountRef).forEach {
-            store.clearAllForAccount(it)
-            store.foldersFor(it)
-        }
         val folders =
             listOf(ACCOUNT_REF, otherAccountRef).associateWith { owner ->
-                requireNotNull(
-                    store.commitFolderDraft(
-                        accountRef = owner,
-                        folderId = null,
-                        name = "$owner mentions",
-                        description = "",
-                        manualChatIds = emptySet(),
-                        rule = ChatFolderRule(unreadMentionsOnly = true),
-                    ),
-                )
+                createAttentionFolder(appState, owner, ChatFolderRule(unreadMentionsOnly = true))
             }
         var destinationController: ChatsController? = null
         var selectedOwner: String? = null
         try {
-            composeRule.setContent {
-                WhiteNoiseTheme {
-                    Surface {
-                        ForwardMessagePickerContent(
-                            appState = appState,
-                            messageCount = 1,
-                            attachmentCount = 0,
-                            originGroupIdHex = "ff".repeat(32),
-                            sourceAccountRef = ACCOUNT_REF,
-                            onDismiss = {},
-                            onForward = { _, _ -> true },
-                            onPickerStateChanged = { owner, _, _ -> selectedOwner = owner },
-                            controllerFactory = { state ->
-                                ChatsController(state, otherAccountRef) { _, _ -> emptyList() }
-                                    .also { destinationController = it }
-                            },
-                            controllerBinder = { controller, owner ->
-                                listOf(GROUP_A to PEER_A, GROUP_B to PEER_B).forEach { (groupId, peerId) ->
-                                    controller.applyLocalDirectChat(groupId, otherAccountHex, peerId)
-                                    controller.publishRow(
-                                        attentionRow(groupId).copy(unreadMention = false, unreadMentionCount = 0uL),
-                                        owner,
-                                    )
-                                }
-                            },
-                        )
-                    }
-                }
-            }
+            renderPicker(
+                appState,
+                onPickerStateChanged = { owner, _, _ -> selectedOwner = owner },
+                controllerFactory = { state ->
+                    ChatsController(state, otherAccountRef) { _, _ -> emptyList() }
+                        .also { destinationController = it }
+                },
+                controllerBinder = { controller, owner ->
+                    seedAttentionChats(controller, owner, otherAccountHex, hasMention = false)
+                },
+            )
             val activeChip = composeRule.onNodeWithTag(forwardFolderChipTestTag(folders.getValue(ACCOUNT_REF).id))
-            val destinationChip = composeRule.onNodeWithTag(forwardFolderChipTestTag(folders.getValue(otherAccountRef).id))
+            val destinationChip =
+                composeRule.onNodeWithTag(forwardFolderChipTestTag(folders.getValue(otherAccountRef).id))
             activeChip.assertExists()
             composeRule.onNodeWithTag(FORWARD_CHAT_PICKER_ACCOUNT_ROW_TEST_TAG).performClick()
             composeRule.onNodeWithText(otherAccountRef).performClick()
-            composeRule.waitUntil(timeoutMillis = 5_000) { selectedOwner == otherAccountRef && destinationController != null }
+            composeRule.waitUntil(timeoutMillis = 5_000) {
+                selectedOwner == otherAccountRef && destinationController != null
+            }
             activeChip.assertDoesNotExist()
             destinationChip.assertDoesNotExist()
 
@@ -193,12 +139,82 @@ class ForwardAttentionFolderReactivityTest {
             activeChip.assertExists()
             destinationChip.assertDoesNotExist()
         } finally {
-            composeRule.runOnIdle {
-                listOf(ACCOUNT_REF, otherAccountRef).forEach(store::clearAllForAccount)
-                appState.attachChatsController(null)
-                activeController.onCleared()
-                destinationController?.onCleared()
+            cleanUp(appState, listOfNotNull(activeController, destinationController))
+        }
+    }
+
+    private fun seedAttentionChats(
+        controller: ChatsController,
+        ownerRef: String,
+        ownerHex: String,
+        hasMention: Boolean = true,
+    ) {
+        listOf(GROUP_A to PEER_A, GROUP_B to PEER_B).forEach { (groupId, peerId) ->
+            controller.applyLocalDirectChat(groupId, ownerHex, peerId)
+            controller.publishRow(
+                attentionRow(groupId).copy(
+                    unreadMention = hasMention,
+                    unreadMentionCount = if (hasMention) 1uL else 0uL,
+                ),
+                ownerRef,
+            )
+        }
+    }
+
+    private fun createAttentionFolder(
+        appState: WhiteNoiseAppState,
+        ownerRef: String,
+        rule: ChatFolderRule,
+    ) =
+        appState.chatFolderPreferences.let { store ->
+            store.clearAllForAccount(ownerRef)
+            store.foldersFor(ownerRef)
+            requireNotNull(
+                store.commitFolderDraft(
+                    accountRef = ownerRef,
+                    folderId = null,
+                    name = "$ownerRef mentions",
+                    description = "",
+                    manualChatIds = emptySet(),
+                    rule = rule,
+                ),
+            )
+        }
+
+    private fun renderPicker(
+        appState: WhiteNoiseAppState,
+        onPickerStateChanged: PickerStateListener = { _, _, _ -> },
+        controllerFactory: (WhiteNoiseAppState) -> ChatsController = { ChatsController(it) },
+        controllerBinder: suspend (ChatsController, String) -> Unit = { _, _ -> },
+    ) {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface {
+                    ForwardMessagePickerContent(
+                        appState = appState,
+                        messageCount = 1,
+                        attachmentCount = 0,
+                        originGroupIdHex = "ff".repeat(32),
+                        sourceAccountRef = ACCOUNT_REF,
+                        onDismiss = {},
+                        onForward = { _, _ -> true },
+                        onPickerStateChanged = onPickerStateChanged,
+                        controllerFactory = controllerFactory,
+                        controllerBinder = controllerBinder,
+                    )
+                }
             }
+        }
+    }
+
+    private fun cleanUp(
+        appState: WhiteNoiseAppState,
+        controllers: List<ChatsController>,
+    ) {
+        composeRule.runOnIdle {
+            appState.accounts.forEach { appState.chatFolderPreferences.clearAllForAccount(it.label) }
+            appState.attachChatsController(null)
+            controllers.forEach(ChatsController::onCleared)
         }
     }
 

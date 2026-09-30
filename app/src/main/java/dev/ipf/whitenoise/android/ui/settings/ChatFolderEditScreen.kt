@@ -53,8 +53,8 @@ internal const val CHAT_FOLDER_EDIT_CONTENT_TAG = "chat-folder-edit-content"
 
 /**
  * Create/edit form for one chat folder: name and description, Included Chats, the automatic rules (People,
- * Keyword, category switches) and a live Preview. Nothing persists until Save; Back asks before discarding a dirty draft,
- * and a failed save keeps every field (M027, M028).
+ * Keyword, category switches) and a live Preview. Nothing persists until Save; Back asks before discarding
+ * a dirty draft, and a failed save keeps every field (M027, M028).
  */
 @Composable
 @Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")

@@ -181,7 +181,10 @@ class ChatFolderRulesTest {
         val manualUnread = item("manual").withRow { copy(manuallyMarkedUnread = true) }
         val staleManualMention = readMention.withRow { copy(manuallyMarkedUnread = true) }
 
-        assertEquals(setOf("mention"), folderIds(listOf(mentioned, ordinary, readMention, manualUnread, staleManualMention), rule = rule))
+        assertEquals(
+            setOf("mention"),
+            folderIds(listOf(mentioned, ordinary, readMention, manualUnread, staleManualMention), rule = rule),
+        )
         val read =
             mentioned.withRow {
                 copy(hasUnread = false, unreadCount = 0uL, unreadMention = false, unreadMentionCount = 0uL)
@@ -204,9 +207,14 @@ class ChatFolderRulesTest {
             )
         val rule = ChatFolderRule(unreadMentionsOnly = true)
         assertEquals(setOf("g1"), folderIds(listOf(mentioned), rule = rule, activeAccount = "self"))
-        excluded.forEach { assertEquals(emptySet<String>(), folderIds(listOf(it), rule = rule, activeAccount = "self")) }
+        excluded.forEach {
+            assertEquals(emptySet<String>(), folderIds(listOf(it), rule = rule, activeAccount = "self"))
+        }
         // The next account's row, with the same chat id but no mention, cannot inherit the prior match.
-        assertEquals(emptySet<String>(), folderIds(listOf(item("g1", unread = true)), rule = rule, activeAccount = "other"))
+        assertEquals(
+            emptySet<String>(),
+            folderIds(listOf(item("g1", unread = true)), rule = rule, activeAccount = "other"),
+        )
     }
 
     @Test
@@ -230,7 +238,10 @@ class ChatFolderRulesTest {
         assertEquals(setOf("member", "keyword"), folderIds(items, rule = rule))
         assertEquals(setOf("archive"), folderIds(items, rule = rule.copy(archivedOnly = true)))
         assertEquals(setOf("member"), folderIds(items, rule = rule, isMuted = { it == "keyword" }))
-        assertEquals(setOf("member", "keyword"), folderIds(items, rule = rule.copy(includeMuted = true), isMuted = { true }))
+        assertEquals(
+            setOf("member", "keyword"),
+            folderIds(items, rule = rule.copy(includeMuted = true), isMuted = { true }),
+        )
         assertEquals(setOf("member", "keyword", "plain"), folderIds(items, manual = setOf("plain"), rule = rule))
     }
 
@@ -240,7 +251,10 @@ class ChatFolderRulesTest {
         assertEquals(setOf("dm", "other"), folderIds(items, rule = ChatFolderRule(directChatsOnly = true)))
         assertEquals(setOf("dm", "group"), folderIds(items, rule = ChatFolderRule(pinnedOnly = true)))
         assertEquals(setOf("dm"), folderIds(items, rule = ChatFolderRule(directChatsOnly = true, pinnedOnly = true)))
-        assertEquals(emptySet<String>(), folderIds(items, rule = ChatFolderRule(directChatsOnly = true, groupsOnly = true)))
+        assertEquals(
+            emptySet<String>(),
+            folderIds(items, rule = ChatFolderRule(directChatsOnly = true, groupsOnly = true)),
+        )
         val pinnedDm = items.first()
         assertEquals(
             emptySet<String>(),
@@ -252,7 +266,9 @@ class ChatFolderRulesTest {
         )
     }
 
-    private fun ChatListItem.withRow(update: ChatListRowFfi.() -> ChatListRowFfi): ChatListItem = copy(projection = requireNotNull(projection).update())
+    private fun ChatListItem.withRow(update: ChatListRowFfi.() -> ChatListRowFfi): ChatListItem {
+        return copy(projection = requireNotNull(projection).update())
+    }
 
     private fun folderIds(
         items: List<ChatListItem>,

@@ -163,7 +163,13 @@ class ChatFolderEditScreenTest {
         composeRule.onNodeWithText(app.getString(R.string.save)).performClick()
         val reloaded = ChatFolderPreferences(app)
         assertEquals(
-            ChatFolderRule(unreadOnly = true, includeMuted = true, unreadMentionsOnly = true, pinnedOnly = true, groupsOnly = true),
+            ChatFolderRule(
+                unreadOnly = true,
+                includeMuted = true,
+                unreadMentionsOnly = true,
+                pinnedOnly = true,
+                groupsOnly = true,
+            ),
             reloaded.folderRule(ACCOUNT_REF, ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID),
         )
     }
@@ -177,14 +183,19 @@ class ChatFolderEditScreenTest {
         val label = app.getString(R.string.chat_folder_unread_mentions_only)
         composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasText(label))
         composeRule.onNodeWithText(label).performClick()
-        assertEquals(false, appState.chatFolderPreferences.folderRule(ACCOUNT_REF, ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID)?.unreadMentionsOnly)
+        val original = appState.chatFolderPreferences.folderRule(
+            ACCOUNT_REF,
+            ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID,
+        )
+        assertEquals(false, original?.unreadMentionsOnly)
         composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
         composeRule.onNodeWithText(app.getString(R.string.folder_keep_editing)).performClick()
         composeRule.onNodeWithText(label).assertIsOn()
         composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
         composeRule.onNodeWithText(app.getString(R.string.folder_discard)).performClick()
         assertTrue(closed)
-        assertEquals(false, ChatFolderPreferences(app).folderRule(ACCOUNT_REF, ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID)?.unreadMentionsOnly)
+        val reloaded = ChatFolderPreferences(app).folderRule(ACCOUNT_REF, ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID)
+        assertEquals(false, reloaded?.unreadMentionsOnly)
     }
 
     private fun renderEditor(
