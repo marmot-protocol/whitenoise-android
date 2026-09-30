@@ -6,33 +6,28 @@ import java.util.concurrent.atomic.AtomicBoolean
 /** A process-local lease for a preparing post and its detached enrichment. */
 internal class NotificationCardGeneration(
     val id: String,
-    val sequence: Long,
-    val tag: String,
-    val notificationId: Int,
 ) {
     val dismissed = AtomicBoolean()
     var references = 1
 }
 
-/** The preparing posts represented when a group summary was published, scoped to this process. */
-internal data class NotificationGroupDismissalFence(
-    val session: String,
-    val sequence: Long,
-)
-
 /**
- * Contains only active Android writes, never unread/protocol state. Dismissal of a summary invalidates
- * its preparing posts without affecting later arrivals; an old process's callback cannot invalidate a new one.
+ * Contains only active Android writes, never unread/protocol state. A delete callback invalidates
+ * only the displayed generation; new, not-yet-displayed messages always have a different generation.
  */
 internal object NotificationCardGenerations {
     private val lock = Any()
-    private val session = UUID.randomUUID().toString()
-    private var sequence = 0L
     private val active = mutableMapOf<String, NotificationCardGeneration>()
 
-    fun register(tag: String, notificationId: Int): NotificationCardGeneration =
+    fun register(generationId: String = UUID.randomUUID().toString()): NotificationCardGeneration =
         synchronized(lock) {
-            NotificationCardGeneration(UUID.randomUUID().toString(), ++sequence, tag, notificationId).also { active[it.id] = it }
+            val existing = active[generationId]
+            if (existing != null) {
+                existing.references++
+                existing
+            } else {
+                NotificationCardGeneration(generationId).also { active[it.id] = it }
+            }
         }
 
     fun retain(generation: NotificationCardGeneration): Boolean =
@@ -50,20 +45,10 @@ internal object NotificationCardGenerations {
         }
     }
 
-    fun captureFence(): NotificationGroupDismissalFence = synchronized(lock) { NotificationGroupDismissalFence(session, sequence) }
-
     fun dismiss(generationId: String) {
         synchronized(lock) { active[generationId]?.dismissed?.set(true) }
     }
 
-    fun isDismissed(generationId: String?): Boolean = synchronized(lock) { active[generationId]?.dismissed?.get() == true }
-
-    fun dismissThrough(fence: NotificationGroupDismissalFence, children: List<NotificationGroupChild>) {
-        synchronized(lock) {
-            if (fence.session != session) return
-            active.values.filter { generation ->
-                generation.sequence <= fence.sequence && children.any { it.tag == generation.tag && it.id == generation.notificationId }
-            }.forEach { it.dismissed.set(true) }
-        }
-    }
+    fun isDismissed(generationId: String?): Boolean =
+        synchronized(lock) { active[generationId]?.dismissed?.get() == true }
 }

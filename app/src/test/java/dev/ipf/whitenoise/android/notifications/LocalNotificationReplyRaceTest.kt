@@ -28,7 +28,6 @@ import org.robolectric.annotation.Config
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
@@ -587,25 +586,29 @@ class LocalNotificationReplyRaceTest {
                 },
                 dismissalRetryDelay = {},
                 activeNotificationsProvider = {
-                    if (refreshReadyToWrite.count == 0L && allowRefreshWrite.count == 1L && dismissalInspectionClaimed.compareAndSet(false, true)) {
-                            dismissalReadStartedAtMs.set(System.currentTimeMillis())
-                            dismissalReadStarted.countDown()
-                            check(allowDismissalRead.await(5, TimeUnit.SECONDS))
-                            manager.activeNotifications
-                                .map { live ->
-                                    StatusBarNotification(
-                                        context.packageName,
-                                        context.packageName,
-                                        live.id,
-                                        live.tag,
-                                        1_000,
-                                        0,
-                                        0,
-                                        live.notification,
-                                        Process.myUserHandle(),
-                                        Long.MAX_VALUE,
-                                    )
-                                }.toTypedArray()
+                    if (
+                        refreshReadyToWrite.count == 0L &&
+                        allowRefreshWrite.count == 1L &&
+                        dismissalInspectionClaimed.compareAndSet(false, true)
+                    ) {
+                        dismissalReadStartedAtMs.set(System.currentTimeMillis())
+                        dismissalReadStarted.countDown()
+                        check(allowDismissalRead.await(5, TimeUnit.SECONDS))
+                        manager.activeNotifications
+                            .map { live ->
+                                StatusBarNotification(
+                                    context.packageName,
+                                    context.packageName,
+                                    live.id,
+                                    live.tag,
+                                    1_000,
+                                    0,
+                                    0,
+                                    live.notification,
+                                    Process.myUserHandle(),
+                                    Long.MAX_VALUE,
+                                )
+                            }.toTypedArray()
                     } else {
                         manager.activeNotifications
                     }

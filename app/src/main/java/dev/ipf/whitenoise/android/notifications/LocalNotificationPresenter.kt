@@ -30,6 +30,8 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
+import dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup.EXTRA_GENERATION
+import dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup.dismissalTime
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
@@ -233,7 +235,7 @@ class LocalNotificationPresenter(
                                 live.tag.orEmpty(),
                                 live.id,
                                 renamed,
-                                recordedAtMs = UserEventNotificationGroup.dismissalTime(live),
+                                recordedAtMs = dismissalTime(live),
                                 mustBeLive = true,
                             ) == NotificationCardWriteResult.WRITTEN
                         ) {
@@ -323,7 +325,7 @@ class LocalNotificationPresenter(
         }
         initial
             ?.asSequence()
-            ?.filter { UserEventNotificationGroup.dismissalTime(it) <= cutoffMs && it.matchesInvite(accountRef, groupIdHex) }
+            ?.filter { dismissalTime(it) <= cutoffMs && it.matchesInvite(accountRef, groupIdHex) }
             ?.forEach { invite ->
                 val key = NotificationDismissalKey(invite.tag.orEmpty(), invite.id)
                 outcomes[key] = dismissInviteCard(platform, compat, invite, accountRef, groupIdHex, cutoffMs)
@@ -335,7 +337,7 @@ class LocalNotificationPresenter(
         } else {
             remaining
                 .asSequence()
-                .filter { UserEventNotificationGroup.dismissalTime(it) <= cutoffMs && it.matchesConversationCard(accountRef, groupIdHex) }
+                .filter { dismissalTime(it) <= cutoffMs && it.matchesConversationCard(accountRef, groupIdHex) }
                 .forEach {
                     val key = NotificationDismissalKey(it.tag.orEmpty(), it.id)
                     if (outcomes[key] != ConversationCardDismissalOutcome.FAILED) {
@@ -356,7 +358,7 @@ class LocalNotificationPresenter(
         ConversationCardPostSynchronizer.withLock(key.tag, key.id, ConversationCardOp.DISMISS_CANCEL) {
             val writtenByApp =
                 ConversationCardPostedRegistry.clearPosted(key.tag, key.id, cutoffMs)
-            val listed = active?.any { it.tag == key.tag && it.id == key.id && UserEventNotificationGroup.dismissalTime(it) <= cutoffMs } == true
+            val listed = active?.any { it.tag == key.tag && it.id == key.id && dismissalTime(it) <= cutoffMs } == true
             if (active != null && !writtenByApp && !listed) return@withLock ConversationCardDismissalOutcome.ABSENT
             try {
                 cancelNotification(manager, key.tag, key.id)
@@ -383,7 +385,7 @@ class LocalNotificationPresenter(
             val live =
                 activeNotification(platform, invite.tag, invite.id)
                     ?: return@withLock ConversationCardDismissalOutcome.ABSENT
-            if (UserEventNotificationGroup.dismissalTime(live) > cutoffMs || !live.matchesInvite(accountRef, groupIdHex)) {
+            if (dismissalTime(live) > cutoffMs || !live.matchesInvite(accountRef, groupIdHex)) {
                 return@withLock ConversationCardDismissalOutcome.ABSENT
             }
             try {
@@ -501,7 +503,7 @@ class LocalNotificationPresenter(
                     accountRef = accountRef,
                     groupIdHex = groupIdHex,
                 )
-            if (isInvite && UserEventNotificationGroup.dismissalTime(sbn) <= sinceMs) {
+            if (isInvite && dismissalTime(sbn) <= sinceMs) {
                 ConversationCardPostSynchronizer.withLock(
                     sbn.tag.orEmpty(),
                     sbn.id,
@@ -510,7 +512,7 @@ class LocalNotificationPresenter(
                     val live = activeNotification(manager, sbn.tag, sbn.id) ?: return@withLock
                     val liveExtras = live.notification.extras ?: return@withLock
                     if (
-                        UserEventNotificationGroup.dismissalTime(live) <= sinceMs &&
+                        dismissalTime(live) <= sinceMs &&
                         shouldDismissInvite(
                             extraAccountRef =
                                 liveExtras.getString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF),
@@ -628,6 +630,7 @@ class LocalNotificationPresenter(
                 rawNotificationContent
             }
         var written = false
+        var rewriteLease: NotificationCardGeneration? = null
         try {
             written =
                 ConversationCardPostSynchronizer.withRegisteredShow(
@@ -635,7 +638,6 @@ class LocalNotificationPresenter(
                     notificationContent.notificationId,
                     ConversationCardScope(update.accountRef, update.groupIdHex),
                 ) { showToken ->
-                    reconcileNotificationGroup()
                     val showGenerationAllowsPost = {
                         if (replaceCurrentMessage) {
                             ConversationCardPostSynchronizer.isShowCurrent(showToken)
@@ -650,6 +652,31 @@ class LocalNotificationPresenter(
                         notificationContent.notificationId,
                     )
                     if (!isPostStillAllowed() || !showGenerationAllowsPost()) return@withRegisteredShow false
+                    val rewriteGeneration =
+                        if (silentUpdate || replaceCurrentMessage) {
+                            withContext(Dispatchers.Default) {
+                                synchronized(UserEventNotificationGroup.mutationLock) {
+                                    val platform = context.getSystemService(NotificationManager::class.java)
+                                    val active = platform?.let {
+                                        activeNotification(
+                                            it,
+                                            notificationContent.notificationTag,
+                                            notificationContent.notificationId,
+                                        )
+                                    }
+                                    val messageId = active?.notification?.extras?.getString(
+                                        LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX,
+                                    )
+                                    active?.takeIf { messageId == update.messageIdHex }
+                                        ?.notification?.extras?.getString(EXTRA_GENERATION)
+                                        ?.takeIf(String::isNotBlank)
+                                        ?.also { rewriteLease = NotificationCardGenerations.register(it) }
+                                }
+                            }
+                        } else {
+                            null
+                        }
+                    if (replaceCurrentMessage && rewriteGeneration == null) return@withRegisteredShow false
                     // Ordinary messages keep their required People/conversation child.
                     // Other event types inherit the stable global channel until this
                     // chat has an explicit or legacy custom override.
@@ -682,8 +709,13 @@ class LocalNotificationPresenter(
                         }
                     val quietChannel =
                         runCatching {
-                            context.getSystemService(NotificationManager::class.java)?.getNotificationChannel(channelId)?.importance
-                        }.getOrNull()?.let { it in NotificationManager.IMPORTANCE_NONE..NotificationManager.IMPORTANCE_LOW } == true
+                            context
+                                .getSystemService(NotificationManager::class.java)
+                                ?.getNotificationChannel(channelId)
+                                ?.importance
+                        }.getOrNull()?.let { importance ->
+                            importance in NotificationManager.IMPORTANCE_NONE..NotificationManager.IMPORTANCE_LOW
+                        } == true
                     val builder =
                         NotificationCompat
                             .Builder(context, channelId)
@@ -694,12 +726,11 @@ class LocalNotificationPresenter(
                                     NotificationGroupChild(
                                         notificationContent.notificationTag,
                                         notificationContent.notificationId,
-                                        showToken.notificationGeneration.id,
+                                        rewriteGeneration ?: showToken.notificationGeneration.id,
                                     ),
                                     silent = silentPost || quietChannel || decision.importance == ChannelImportance.LOW,
                                 )
-                            }
-                            .setSmallIcon(R.drawable.ic_stat_whitenoise)
+                            }.setSmallIcon(R.drawable.ic_stat_whitenoise)
                             .setContentIntent(conversationPendingIntent(update, notificationContent.notificationTag))
                             .setCategory(decision.category)
                             .setPriority(decision.importance.toCompatPriority())
@@ -923,7 +954,11 @@ class LocalNotificationPresenter(
                                         )
                                     }
                                     val notification =
-                                        builder.silencedIfSuperseded(heldAlert, replaceCurrentMessage, notificationContent.notificationId).build()
+                                        builder.silencedIfSuperseded(
+                                            heldAlert,
+                                            replaceCurrentMessage,
+                                            notificationContent.notificationId,
+                                        ).build()
                                     ConversationCardPostSynchronizer.awaitTestBarrier(
                                         ConversationCardOp.SHOW_NOTIFY,
                                         ConversationCardBarrier.BEFORE_WRITE,
@@ -943,6 +978,11 @@ class LocalNotificationPresenter(
                                             notificationContent.notificationId,
                                             notification,
                                             writeObserver,
+                                            mustBeLive = rewriteGeneration != null,
+                                            finalPostAllowed = {
+                                                isPostStillAllowed() && showGenerationAllowsPost() &&
+                                                    rewriteLease?.dismissed?.get() != true
+                                            },
                                         )
                                     if (firstPostResult == NotificationCardWriteResult.WRITTEN) {
                                         ConversationCardPostSynchronizer.awaitTestBarrier(
@@ -958,7 +998,11 @@ class LocalNotificationPresenter(
                                             notificationContent.notificationId,
                                         )
                                     } else if (firstPostResult == NotificationCardWriteResult.FAILED) {
-                                        cancelNotification(notificationManager, notificationContent.notificationTag, notificationContent.notificationId)
+                                        cancelNotification(
+                                            notificationManager,
+                                            notificationContent.notificationTag,
+                                            notificationContent.notificationId,
+                                        )
                                         if (carried.isNullOrEmpty()) {
                                             false
                                         } else {
@@ -976,7 +1020,11 @@ class LocalNotificationPresenter(
                                                 ),
                                             )
                                             val cleanNotification =
-                                                builder.silencedIfSuperseded(heldAlert, replaceCurrentMessage, notificationContent.notificationId).build()
+                                                builder.silencedIfSuperseded(
+                                                    heldAlert,
+                                                    replaceCurrentMessage,
+                                                    notificationContent.notificationId,
+                                                ).build()
                                             val retryResult =
                                                 postNotificationSafely(
                                                     notificationManager,
@@ -984,6 +1032,11 @@ class LocalNotificationPresenter(
                                                     notificationContent.notificationId,
                                                     cleanNotification,
                                                     writeObserver,
+                                                    mustBeLive = rewriteGeneration != null,
+                                                    finalPostAllowed = {
+                                                        isPostStillAllowed() && showGenerationAllowsPost() &&
+                                                            rewriteLease?.dismissed?.get() != true
+                                                    },
                                                 )
                                             if (retryResult == NotificationCardWriteResult.WRITTEN) {
                                                 ConversationCardPostSynchronizer.awaitTestBarrier(
@@ -999,7 +1052,15 @@ class LocalNotificationPresenter(
                                                     notificationContent.notificationId,
                                                 )
                                             } else {
-                                                if (retryResult == NotificationCardWriteResult.FAILED) cancelNotification(notificationManager, notificationContent.notificationTag, notificationContent.notificationId)
+                                                if (retryResult ==
+                                                    NotificationCardWriteResult.FAILED
+                                                ) {
+                                                    cancelNotification(
+                                                        notificationManager,
+                                                        notificationContent.notificationTag,
+                                                        notificationContent.notificationId,
+                                                    )
+                                                }
                                                 false
                                             }
                                         }
@@ -1022,7 +1083,11 @@ class LocalNotificationPresenter(
                                     val presentationTimestampMs = nowMillis()
                                     stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
                                     val notification =
-                                        builder.silencedIfSuperseded(heldAlert, replaceCurrentMessage, notificationContent.notificationId).build()
+                                        builder.silencedIfSuperseded(
+                                            heldAlert,
+                                            replaceCurrentMessage,
+                                            notificationContent.notificationId,
+                                        ).build()
                                     ConversationCardPostSynchronizer.awaitTestBarrier(
                                         ConversationCardOp.SHOW_NOTIFY,
                                         ConversationCardBarrier.BEFORE_WRITE,
@@ -1042,6 +1107,11 @@ class LocalNotificationPresenter(
                                             notificationContent.notificationId,
                                             notification,
                                             writeObserver,
+                                            mustBeLive = rewriteGeneration != null,
+                                            finalPostAllowed = {
+                                                isPostStillAllowed() && showGenerationAllowsPost() &&
+                                                    rewriteLease?.dismissed?.get() != true
+                                            },
                                         )
                                     if (postResult == NotificationCardWriteResult.WRITTEN) {
                                         ConversationCardPostSynchronizer.awaitTestBarrier(
@@ -1057,7 +1127,15 @@ class LocalNotificationPresenter(
                                             notificationContent.notificationId,
                                         )
                                     } else {
-                                        if (postResult == NotificationCardWriteResult.FAILED) cancelNotification(notificationManager, notificationContent.notificationTag, notificationContent.notificationId)
+                                        if (postResult ==
+                                            NotificationCardWriteResult.FAILED
+                                        ) {
+                                            cancelNotification(
+                                                notificationManager,
+                                                notificationContent.notificationTag,
+                                                notificationContent.notificationId,
+                                            )
+                                        }
                                         false
                                     }
                                 }
@@ -1069,7 +1147,7 @@ class LocalNotificationPresenter(
                             update = update,
                             content = notificationContent,
                             messaging = messaging,
-                            showToken = showToken,
+                            showToken = rewriteLease?.let { showToken.copy(notificationGeneration = it) } ?: showToken,
                             directShareEligible = directShareEligible,
                             isPostStillAllowed = isPostStillAllowed,
                         )
@@ -1081,6 +1159,7 @@ class LocalNotificationPresenter(
                     true
                 }
         } finally {
+            rewriteLease?.let(NotificationCardGenerations::release)
             if (!written) heldAlert?.release()
         }
         return written
@@ -1387,27 +1466,37 @@ class LocalNotificationPresenter(
         onNotificationWritten: (() -> Unit)? = null,
         recordedAtMs: Long? = null,
         mustBeLive: Boolean = false,
+        finalPostAllowed: (() -> Boolean)? = null,
     ): NotificationCardWriteResult =
         try {
-            if (!mustBeLive) {
-                ConversationCardPostSynchronizer.awaitTestBarrier(ConversationCardOp.SHOW_NOTIFY, ConversationCardBarrier.BEFORE_PLATFORM_WRITE, tag, id)
+            if (finalPostAllowed != null) {
+                ConversationCardPostSynchronizer.awaitTestBarrier(
+                    ConversationCardOp.SHOW_NOTIFY,
+                    ConversationCardBarrier.BEFORE_PLATFORM_WRITE,
+                    tag,
+                    id,
+                )
             }
             val written =
                 NotificationGroupReconciler.postChild(
                     context,
                     notification,
                     request = groupReconciliation,
-                    isLive =
-                        if (mustBeLive) {
-                            {
-                                val current =
-                                    context.getSystemService(NotificationManager::class.java)?.let { activeNotification(it, tag, id) }
-                                current != null && current.notification.extras.getString(UserEventNotificationGroup.EXTRA_GENERATION) ==
-                                    notification.extras.getString(UserEventNotificationGroup.EXTRA_GENERATION)
-                            }
+                    isLive = {
+                        if (finalPostAllowed?.invoke() == false) {
+                            false
+                        } else if (!mustBeLive) {
+                            true
                         } else {
-                            null
-                        },
+                            val current =
+                                context.getSystemService(NotificationManager::class.java)?.let {
+                                    activeNotification(it, tag, id)
+                                }
+                            current != null &&
+                                current.notification.extras.getString(EXTRA_GENERATION) ==
+                                notification.extras.getString(EXTRA_GENERATION)
+                        }
+                    },
                 ) { notificationPoster(manager, tag, id, notification) }
             if (written) {
                 ConversationCardPostedRegistry.markPosted(tag, id, recordedAtMs ?: System.currentTimeMillis())
@@ -1423,7 +1512,11 @@ class LocalNotificationPresenter(
             NotificationCardWriteResult.FAILED
         }
 
-    private fun cancelNotification(manager: NotificationManagerCompat, tag: String, id: Int) {
+    private fun cancelNotification(
+        manager: NotificationManagerCompat,
+        tag: String,
+        id: Int,
+    ) {
         NotificationGroupReconciler.mutate(context, groupReconciliation) { notificationCanceller(manager, tag, id) }
     }
 
@@ -1483,7 +1576,7 @@ class LocalNotificationPresenter(
     ) {
         ConversationCardPostSynchronizer.withLock(tag, id, ConversationCardOp.DISMISS_CANCEL) {
             val live = activeNotification(manager, tag, id) ?: return@withLock
-            if (UserEventNotificationGroup.dismissalTime(live) <= sinceMs) {
+            if (dismissalTime(live) <= sinceMs) {
                 ConversationCardPostedRegistry.clearPosted(tag, id)
                 cancelNotification(compat, tag, id)
             }
@@ -1708,7 +1801,17 @@ class LocalNotificationPresenter(
                         .setSilent(true)
                         .setOnlyAlertOnce(true)
                         .build()
-                if (postNotificationSafely(NotificationManagerCompat.from(context), notificationTag, notificationId, resolved, mustBeLive = true) != NotificationCardWriteResult.WRITTEN) return@runCatching false
+                if (postNotificationSafely(
+                    NotificationManagerCompat.from(context),
+                    notificationTag,
+                    notificationId,
+                    resolved,
+                    mustBeLive = true,
+                ) !=
+                    NotificationCardWriteResult.WRITTEN
+                ) {
+                    return@runCatching false
+                }
                 notificationDebug { "remote-input-handled re-post tag=${notificationTag.take(16)} id=$notificationId" }
                 true
             }.getOrDefault(false)
@@ -1755,7 +1858,17 @@ class LocalNotificationPresenter(
                         .setSilent(true)
                         .setOnlyAlertOnce(true)
                         .build()
-                if (postNotificationSafely(NotificationManagerCompat.from(context), notificationTag, notificationId, resolved, mustBeLive = true) != NotificationCardWriteResult.WRITTEN) return@runCatching false
+                if (postNotificationSafely(
+                    NotificationManagerCompat.from(context),
+                    notificationTag,
+                    notificationId,
+                    resolved,
+                    mustBeLive = true,
+                ) !=
+                    NotificationCardWriteResult.WRITTEN
+                ) {
+                    return@runCatching false
+                }
                 notificationDebug { "reply-failed re-post tag=${notificationTag.take(16)} id=$notificationId" }
                 true
             }.getOrDefault(false)

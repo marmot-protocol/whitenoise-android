@@ -7,18 +7,15 @@ import androidx.core.app.NotificationManagerCompat
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 
-/** Fences preparing/enriching writes, then removes only matching live OS generations. */
-@Suppress("LongParameterList") // Separate platform read/schedule seams keep async dismissal tests deterministic.
+/** Invalidates displayed/enriching generations, then removes only their matching live OS cards. */
 internal suspend fun dismissNotificationGroupGenerations(
     context: Context,
     children: List<NotificationGroupChild>,
-    fence: NotificationGroupDismissalFence? = null,
     pacer: NotificationPostPacer = NotificationPostPacer.shared,
     read: (NotificationManager) -> Array<StatusBarNotification> = { it.activeNotifications },
     request: () -> Unit = { NotificationGroupReconciler.shared(context).request() },
 ) {
     synchronized(UserEventNotificationGroup.mutationLock) {
-        fence?.let { NotificationCardGenerations.dismissThrough(it, children) }
         children.forEach { NotificationCardGenerations.dismiss(it.generation) }
     }
     val manager = context.getSystemService(NotificationManager::class.java) ?: return
@@ -43,7 +40,10 @@ private class NotificationGroupDismissalPlatform(
 ) {
     private val compat = NotificationManagerCompat.from(context)
 
-    suspend fun attempt(target: NotificationGroupChild, pacer: NotificationPostPacer): Boolean =
+    suspend fun attempt(
+        target: NotificationGroupChild,
+        pacer: NotificationPostPacer,
+    ): Boolean =
         try {
             // Normally Android has already removed the group; absent/replaced cards need no slot.
             if (read(manager).none { UserEventNotificationGroup.child(it) == target }) {

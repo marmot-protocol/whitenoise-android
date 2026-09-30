@@ -443,10 +443,12 @@ class NotificationAccountIsolationNavigationTest {
 
     /** The app summary has no account ownership; every actual child key still participates. */
     private fun activeUserCardKeys(): Set<Pair<String?, Int>> =
-        manager.activeNotifications.filterNot {
-            it.tag == dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup.SUMMARY_TAG &&
-                it.id == dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup.SUMMARY_ID
-        }.map { it.tag to it.id }.toSet()
+        manager.activeNotifications
+            .filterNot {
+                it.tag == dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup.SUMMARY_TAG &&
+                    it.id == dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup.SUMMARY_ID
+            }.map { it.tag to it.id }
+            .toSet()
 
     private fun verifyRouteCompletion(
         appState: WhiteNoiseAppState,

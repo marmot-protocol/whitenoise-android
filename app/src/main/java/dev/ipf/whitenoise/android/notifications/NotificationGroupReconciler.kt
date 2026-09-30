@@ -7,6 +7,10 @@ import android.content.Context
 import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup.EXTRA_GENERATION
+import dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup.EXTRA_LEGACY_POST_TIME
+import dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup.SUMMARY_ID
+import dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup.SUMMARY_TAG
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -21,14 +25,19 @@ import java.util.concurrent.atomic.AtomicLong
  * Coalesces platform-only reconciliation. The OS tray is the sole child inventory; a failed read is
  * unknown, never empty. Retries cannot reconstruct a dismissed card from persisted messages.
  */
-@SuppressLint("MissingPermission") // Only platform summary/adoption writes; child permission/eligibility policy is unchanged.
+// Only platform summary/adoption writes; child permission/eligibility policy is unchanged.
+@SuppressLint("MissingPermission")
 internal class NotificationGroupReconciler(
     private val context: Context,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
     private val pacer: NotificationPostPacer = NotificationPostPacer.shared,
     private val read: (NotificationManager) -> Array<StatusBarNotification> = { it.activeNotifications },
-    private val post: (NotificationManagerCompat, String, Int, Notification) -> Unit = { manager, tag, id, card -> manager.notify(tag, id, card) },
-    private val cancel: (NotificationManagerCompat, String, Int) -> Unit = { manager, tag, id -> manager.cancel(tag, id) },
+    private val post: (NotificationManagerCompat, String, Int, Notification) -> Unit = { manager, tag, id, card ->
+        manager.notify(tag, id, card)
+    },
+    private val cancel: (NotificationManagerCompat, String, Int) -> Unit = { manager, tag, id ->
+        manager.cancel(tag, id)
+    },
 ) {
     private val requests = Channel<Unit>(Channel.CONFLATED)
     private val revision = AtomicLong()
@@ -55,7 +64,12 @@ internal class NotificationGroupReconciler(
         repeat(MAX_ATTEMPTS) { attempt ->
             val expected = revision.get()
             try {
-                if (reconcileSnapshot(expected, allowEmpty = attempt >= EMPTY_RECHECKS) && expected == revision.get()) return
+                if (
+                    reconcileSnapshot(expected, allowEmpty = attempt >= EMPTY_RECHECKS) &&
+                    expected == revision.get()
+                ) {
+                    return
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: RuntimeException) {
@@ -73,12 +87,15 @@ internal class NotificationGroupReconciler(
         if (adoptLegacyCards(manager, compat, first)) return false
         if (revision.get() != expected) return false
         val children = first.mapNotNull(UserEventNotificationGroup::child)
-        val old = first.firstOrNull { it.tag == UserEventNotificationGroup.SUMMARY_TAG && it.id == UserEventNotificationGroup.SUMMARY_ID }
+        val old = first.firstOrNull { it.tag == SUMMARY_TAG && it.id == SUMMARY_ID }
         if (children.isEmpty() && !allowEmpty) return false
         if (children.isNotEmpty() && matches(old, UserEventNotificationGroup.summaryState(children))) return true
         if (children.isEmpty() && old == null) return true
-        if (manager.getNotificationChannel(NotificationChannelSpec.USER_EVENT_SUMMARY.id) == null) NotificationChannels.ensureChannels(context)
+        if (manager.getNotificationChannel(NotificationChannelSpec.USER_EVENT_SUMMARY.id) == null) {
+            NotificationChannels.ensureChannels(context)
+        }
         // Pacing and coroutine suspension happen before the commit gate. Re-read after waiting.
+        if (revision.get() != expected) return false
         pacer.awaitSlot()
         return synchronized(UserEventNotificationGroup.mutationLock) {
             if (revision.get() != expected) return@synchronized false
@@ -87,28 +104,44 @@ internal class NotificationGroupReconciler(
     }
 
     /** Called only under the group mutation gate, after pacing and revision validation. */
-    private fun commitSummary(manager: NotificationManager, compat: NotificationManagerCompat, allowEmpty: Boolean): Boolean {
+    private fun commitSummary(
+        manager: NotificationManager,
+        compat: NotificationManagerCompat,
+        allowEmpty: Boolean,
+    ): Boolean {
         val latest = read(manager)
         val liveChildren = latest.mapNotNull(UserEventNotificationGroup::child)
-        val liveSummary = latest.firstOrNull { it.tag == UserEventNotificationGroup.SUMMARY_TAG && it.id == UserEventNotificationGroup.SUMMARY_ID }
+        val liveSummary = latest.firstOrNull { it.tag == SUMMARY_TAG && it.id == SUMMARY_ID }
         if (liveChildren.isEmpty()) {
             if (!allowEmpty) return false
-            if (liveSummary != null) cancel(compat, UserEventNotificationGroup.SUMMARY_TAG, UserEventNotificationGroup.SUMMARY_ID)
+            if (liveSummary != null) cancel(compat, SUMMARY_TAG, SUMMARY_ID)
         } else {
-            val liveFence = NotificationCardGenerations.captureFence()
             if (!matches(liveSummary, UserEventNotificationGroup.summaryState(liveChildren))) {
-                post(compat, UserEventNotificationGroup.SUMMARY_TAG, UserEventNotificationGroup.SUMMARY_ID, UserEventNotificationGroup.summary(context, liveChildren, liveFence))
+                post(
+                    compat,
+                    SUMMARY_TAG,
+                    SUMMARY_ID,
+                    UserEventNotificationGroup.summary(context, liveChildren),
+                )
             }
         }
         // A subsequent bounded read confirms asynchronous platform visibility, including cancels.
         val after = read(manager)
         val afterChildren = after.mapNotNull(UserEventNotificationGroup::child)
-        val afterSummary = after.firstOrNull { it.tag == UserEventNotificationGroup.SUMMARY_TAG && it.id == UserEventNotificationGroup.SUMMARY_ID }
-        return if (afterChildren.isEmpty()) afterSummary == null else matches(afterSummary, UserEventNotificationGroup.summaryState(afterChildren))
+        val afterSummary = after.firstOrNull { it.tag == SUMMARY_TAG && it.id == SUMMARY_ID }
+        return if (afterChildren.isEmpty()) {
+            afterSummary == null
+        } else {
+            matches(afterSummary, UserEventNotificationGroup.summaryState(afterChildren))
+        }
     }
 
-    private fun matches(summary: StatusBarNotification?, state: String): Boolean =
-        summary != null && UserEventNotificationGroup.isSummary(summary.notification) &&
+    private fun matches(
+        summary: StatusBarNotification?,
+        state: String,
+    ): Boolean =
+        summary != null &&
+            UserEventNotificationGroup.isSummary(summary.notification) &&
             summary.notification.group == UserEventNotificationGroup.KEY &&
             summary.notification.extras.getString(UserEventNotificationGroup.EXTRA_SUMMARY_STATE) == state
 
@@ -119,19 +152,54 @@ internal class NotificationGroupReconciler(
         snapshot: Array<StatusBarNotification>,
     ): Boolean {
         var changed = false
-        snapshot.filter { UserEventNotificationGroup.isChildCandidate(it) && UserEventNotificationGroup.child(it) == null }.forEach { candidate ->
+        snapshot.filter {
+            UserEventNotificationGroup.isChildCandidate(it) && UserEventNotificationGroup.child(it) == null
+        }.forEach { candidate ->
             pacer.awaitSlot()
-            ConversationCardPostSynchronizer.withLock(candidate.tag.orEmpty(), candidate.id, ConversationCardOp.REFRESH_CONTACT_NAME) {
+            ConversationCardPostSynchronizer.withLock(
+                candidate.tag.orEmpty(),
+                candidate.id,
+                ConversationCardOp.REFRESH_CONTACT_NAME,
+            ) {
                 synchronized(UserEventNotificationGroup.mutationLock) {
-                    val live = read(manager).firstOrNull { it.tag == candidate.tag && it.id == candidate.id } ?: return@synchronized
-                    if (!UserEventNotificationGroup.isChildCandidate(live) || UserEventNotificationGroup.child(live) != null) return@synchronized
-                    val generation = live.notification.extras.getString(UserEventNotificationGroup.EXTRA_GENERATION) ?: UUID.randomUUID().toString()
-                    val builder = NotificationCompat.Builder(context, live.notification)
-                        .addExtras(android.os.Bundle().apply { putLong(UserEventNotificationGroup.EXTRA_LEGACY_POST_TIME, UserEventNotificationGroup.dismissalTime(live)) })
-                    val adopted = UserEventNotificationGroup.decorateChild(context, builder, NotificationGroupChild(requireNotNull(live.tag), live.id, generation), silent = true)
-                        .setOnlyAlertOnce(true).setSilent(true).build()
+                    val live =
+                        read(manager).firstOrNull { it.tag == candidate.tag && it.id == candidate.id }
+                            ?: return@synchronized
+                    if (
+                        !UserEventNotificationGroup.isChildCandidate(live) ||
+                        UserEventNotificationGroup.child(live) != null
+                    ) {
+                        return@synchronized
+                    }
+                    val generation =
+                        live.notification.extras.getString(EXTRA_GENERATION) ?: UUID.randomUUID().toString()
+                    val builder =
+                        NotificationCompat
+                            .Builder(context, live.notification)
+                            .addExtras(
+                                android.os.Bundle().apply {
+                                    putLong(
+                                        EXTRA_LEGACY_POST_TIME,
+                                        UserEventNotificationGroup.dismissalTime(live),
+                                    )
+                                },
+                            )
+                    val adopted =
+                        UserEventNotificationGroup
+                            .decorateChild(
+                                context,
+                                builder,
+                                NotificationGroupChild(requireNotNull(live.tag), live.id, generation),
+                                silent = true,
+                            ).setOnlyAlertOnce(true)
+                            .setSilent(true)
+                            .build()
                     post(compat, requireNotNull(live.tag), live.id, adopted)
-                    ConversationCardPostedRegistry.markPosted(requireNotNull(live.tag), live.id, UserEventNotificationGroup.dismissalTime(live))
+                    ConversationCardPostedRegistry.markPosted(
+                        requireNotNull(live.tag),
+                        live.id,
+                        UserEventNotificationGroup.dismissalTime(live),
+                    )
                     changed = true
                 }
             }
@@ -160,7 +228,11 @@ internal class NotificationGroupReconciler(
             }
 
         /** Every child mutation schedules reconciliation even when the platform call fails. */
-        fun <T> mutate(context: Context, request: () -> Unit = { shared(context).request() }, block: () -> T): T =
+        fun <T> mutate(
+            context: Context,
+            request: () -> Unit = { shared(context).request() },
+            block: () -> T,
+        ): T =
             try {
                 synchronized(UserEventNotificationGroup.mutationLock, block)
             } finally {
@@ -176,7 +248,9 @@ internal class NotificationGroupReconciler(
             post: () -> Unit,
         ): Boolean =
             mutate(context, request) {
-                if (NotificationCardGenerations.isDismissed(notification.extras.getString(UserEventNotificationGroup.EXTRA_GENERATION))) return@mutate false
+                if (NotificationCardGenerations.isDismissed(notification.extras.getString(EXTRA_GENERATION))) {
+                    return@mutate false
+                }
                 if (isLive != null && !isLive()) return@mutate false
                 post()
                 true

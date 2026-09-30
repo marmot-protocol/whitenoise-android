@@ -10,6 +10,8 @@ import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationCompat
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter.GROUP_MEMBERSHIP_NOTIFICATION_ID
+import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID
 import java.security.MessageDigest
 import java.util.UUID
 
@@ -33,8 +35,6 @@ internal object UserEventNotificationGroup {
     const val EXTRA_TAGS = "tags"
     const val EXTRA_IDS = "ids"
     const val EXTRA_GENERATIONS = "generations"
-    const val EXTRA_FENCE_SESSION = "session"
-    const val EXTRA_FENCE_SEQUENCE = "sequence"
     private const val SUMMARY_OPEN_REQUEST = 9201
     private const val MAX_CHILDREN = 128
 
@@ -59,7 +59,10 @@ internal object UserEventNotificationGroup {
                 },
             ).setDeleteIntent(deleteIntent(context, listOf(child), child.generation))
 
-    fun attentionSortKey(id: Int, silent: Boolean): String =
+    fun attentionSortKey(
+        id: Int,
+        silent: Boolean,
+    ): String =
         when {
             id == LocalNotificationFormatter.MENTION_NOTIFICATION_ID -> "0"
             silent || id == LocalNotificationFormatter.AGENT_ACTIVITY_NOTIFICATION_ID -> "2"
@@ -77,9 +80,10 @@ internal object UserEventNotificationGroup {
     /** Only known presenter cards can be adopted; services, updates and unrelated notifications are excluded. */
     fun isChildCandidate(notification: StatusBarNotification): Boolean {
         val tag = notification.tag?.takeIf(String::isNotBlank) ?: return false
-        val validId = notification.id in LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID..LocalNotificationFormatter.GROUP_MEMBERSHIP_NOTIFICATION_ID
+        val validId = notification.id in MESSAGE_NOTIFICATION_ID..GROUP_MEMBERSHIP_NOTIFICATION_ID
         val extras = notification.notification.extras
-        val identifiable = extras.getBoolean(EXTRA_CHILD) || isLegacyInvitation(notification) || matchesLegacyTag(tag, notification.id)
+        val identifiable =
+            extras.getBoolean(EXTRA_CHILD) || isLegacyInvitation(notification) || matchesLegacyTag(tag, notification.id)
         return validId && identifiable
     }
 
@@ -94,22 +98,27 @@ internal object UserEventNotificationGroup {
 
     fun summaryState(children: List<NotificationGroupChild>): String {
         val bytes =
-            children.sortedWith(compareBy({ it.tag }, { it.id })).joinToString("\n") { "${it.tag}\u0000${it.id}\u0000${it.generation}" }.toByteArray()
+            children
+                .sortedWith(compareBy({ it.tag }, { it.id }))
+                .joinToString("\n") { "${it.tag}\u0000${it.id}\u0000${it.generation}" }
+                .toByteArray()
         return MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
     }
 
     fun summary(
         context: Context,
         children: List<NotificationGroupChild>,
-        fence: NotificationGroupDismissalFence,
     ): Notification {
         require(children.isNotEmpty() && children.size <= MAX_CHILDREN)
         val state = summaryState(children)
         val publicVersion = redactedGroupSummary(context)
-        return NotificationCompat.Builder(context, NotificationChannelSpec.USER_EVENT_SUMMARY.id)
+        return NotificationCompat
+            .Builder(context, NotificationChannelSpec.USER_EVENT_SUMMARY.id)
             .setSmallIcon(R.drawable.ic_stat_whitenoise)
             .setContentTitle(context.getString(R.string.app_name))
-            .setContentText(context.resources.getQuantityString(R.plurals.notification_group_count, children.size, children.size))
+            .setContentText(
+                context.resources.getQuantityString(R.plurals.notification_group_count, children.size, children.size),
+            )
             .setGroup(KEY)
             .setGroupSummary(true)
             .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
@@ -124,10 +133,11 @@ internal object UserEventNotificationGroup {
                 PendingIntent.getActivity(
                     context,
                     SUMMARY_OPEN_REQUEST,
-                    Intent(context, MainActivity::class.java).setAction("${context.packageName}.OPEN_NOTIFICATION_GROUP"),
+                    Intent(context, MainActivity::class.java)
+                        .setAction("${context.packageName}.OPEN_NOTIFICATION_GROUP"),
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                 ),
-            ).setDeleteIntent(deleteIntent(context, children, state, fence))
+            ).setDeleteIntent(deleteIntent(context, children, state))
             .addExtras(Bundle().apply { putString(EXTRA_SUMMARY_STATE, state) })
             .build()
     }
@@ -136,17 +146,26 @@ internal object UserEventNotificationGroup {
         context: Context,
         children: List<NotificationGroupChild>,
         identity: String = UUID.randomUUID().toString(),
-        fence: NotificationGroupDismissalFence? = null,
     ): PendingIntent {
         val intent =
             Intent(context, NotificationGroupDismissReceiver::class.java)
                 .setAction(ACTION_DISMISS)
-                .setData(Uri.Builder().scheme("whitenoise-notification").authority("dismiss").appendPath(identity).build())
-                .putStringArrayListExtra(EXTRA_TAGS, ArrayList(children.map { it.tag }))
+                .setData(
+                    Uri
+                        .Builder()
+                        .scheme("whitenoise-notification")
+                        .authority("dismiss")
+                        .appendPath(identity)
+                        .build(),
+                ).putStringArrayListExtra(EXTRA_TAGS, ArrayList(children.map { it.tag }))
                 .putExtra(EXTRA_IDS, children.map { it.id }.toIntArray())
                 .putStringArrayListExtra(EXTRA_GENERATIONS, ArrayList(children.map { it.generation }))
-        fence?.let { intent.putExtra(EXTRA_FENCE_SESSION, it.session).putExtra(EXTRA_FENCE_SEQUENCE, it.sequence) }
-        return PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        return PendingIntent.getBroadcast(
+            context,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
     }
 
     @Suppress("ReturnCount") // Reject malformed immutable callback payloads before scheduling any work.
@@ -158,35 +177,41 @@ internal object UserEventNotificationGroup {
         if (tags.isEmpty() || tags.size > MAX_CHILDREN) return null
         if (tags.size != ids.size || tags.size != generations.size) return null
         if (tags.any(String::isBlank) || generations.any(String::isBlank)) return null
-        if (ids.any { it !in LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID..LocalNotificationFormatter.GROUP_MEMBERSHIP_NOTIFICATION_ID }) return null
+        if (ids.any { it !in MESSAGE_NOTIFICATION_ID..GROUP_MEMBERSHIP_NOTIFICATION_ID }) return null
         return tags.indices.map { NotificationGroupChild(tags[it], ids[it], generations[it]) }
     }
 }
 
 private fun isLegacyInvitation(notification: StatusBarNotification): Boolean {
     val extras = notification.notification.extras
-    return notification.id == LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID &&
+    return notification.id == MESSAGE_NOTIFICATION_ID &&
         !extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF).isNullOrBlank() &&
         !extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID).isNullOrBlank()
 }
 
-private fun matchesLegacyTag(tag: String, id: Int): Boolean {
-    val prefix = when (id) {
-        LocalNotificationFormatter.REACTION_NOTIFICATION_ID -> "reaction|"
-        LocalNotificationFormatter.MENTION_NOTIFICATION_ID -> "mention|"
-        LocalNotificationFormatter.AGENT_ACTIVITY_NOTIFICATION_ID -> "agent-activity|"
-        LocalNotificationFormatter.GROUP_MEMBERSHIP_NOTIFICATION_ID -> "group-membership|"
-        else -> ""
-    }
+private fun matchesLegacyTag(
+    tag: String,
+    id: Int,
+): Boolean {
+    val prefix =
+        when (id) {
+            LocalNotificationFormatter.REACTION_NOTIFICATION_ID -> "reaction|"
+            LocalNotificationFormatter.MENTION_NOTIFICATION_ID -> "mention|"
+            LocalNotificationFormatter.AGENT_ACTIVITY_NOTIFICATION_ID -> "agent-activity|"
+            GROUP_MEMBERSHIP_NOTIFICATION_ID -> "group-membership|"
+            else -> ""
+        }
     if (!tag.startsWith(prefix)) return false
     val unscopedTag = tag.removePrefix(prefix)
     val recipient = unscopedTag.substringBefore('|')
-    return unscopedTag.contains('|') && unscopedTag.substringAfter('|').isNotBlank() &&
+    return unscopedTag.contains('|') &&
+        unscopedTag.substringAfter('|').isNotBlank() &&
         LocalNotificationFormatter.deterministicTagBelongsToAccount(tag, recipient)
 }
 
 private fun redactedGroupSummary(context: Context): Notification =
-    NotificationCompat.Builder(context, NotificationChannelSpec.USER_EVENT_SUMMARY.id)
+    NotificationCompat
+        .Builder(context, NotificationChannelSpec.USER_EVENT_SUMMARY.id)
         .setSmallIcon(R.drawable.ic_stat_whitenoise)
         .setContentTitle(context.getString(R.string.app_name))
         .setContentText(context.getString(R.string.notification_hidden_content))

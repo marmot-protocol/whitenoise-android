@@ -3,11 +3,12 @@ package dev.ipf.whitenoise.android.notifications
 import android.app.Notification
 import android.content.Context
 import androidx.core.app.NotificationCompat
+import dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup.EXTRA_GENERATION
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -21,55 +22,77 @@ class NotificationGroupGenerationTest {
     private val context: Context get() = RuntimeEnvironment.getApplication()
 
     @Test
-    fun summaryFenceRejectsRepresentedPendingPostsButPreservesLaterArrivals() =
+    fun displayedGenerationDismissalPreservesPendingMessagesOnSameAndOtherKeys() =
         runBlocking {
-            val before = CompletableDeferred<ConversationCardShowToken>()
+            val shown = CompletableDeferred<ConversationCardShowToken>()
+            val sameKey = CompletableDeferred<ConversationCardShowToken>()
             val unseen = CompletableDeferred<ConversationCardShowToken>()
-            val after = CompletableDeferred<ConversationCardShowToken>()
             val release = CompletableDeferred<Unit>()
-            val old = async {
-                ConversationCardPostSynchronizer.withRegisteredShow("account|old", 0, ConversationCardScope("account", "old")) {
-                    before.complete(it)
-                    release.await()
+            val old =
+                async {
+                    ConversationCardPostSynchronizer.withRegisteredShow(
+                        "account|group",
+                        0,
+                        ConversationCardScope("account", "group"),
+                    ) {
+                        shown.complete(it)
+                        release.await()
+                    }
                 }
-            }
-            val oldToken = withTimeout(5_000) { before.await() }
-            val unseenPost = async {
-                ConversationCardPostSynchronizer.withRegisteredShow("other-account|unseen", 0, ConversationCardScope("other-account", "unseen")) {
-                    unseen.complete(it)
-                    release.await()
+            val oldToken = withTimeout(5_000) { shown.await() }
+            val sameKeyPost =
+                async {
+                    ConversationCardPostSynchronizer.withRegisteredShow(
+                        "account|group",
+                        0,
+                        ConversationCardScope("account", "group"),
+                    ) {
+                        sameKey.complete(it)
+                        release.await()
+                    }
                 }
-            }
-            val unseenToken = withTimeout(5_000) { unseen.await() }
-            val fence = NotificationCardGenerations.captureFence()
-            val later = async {
-                ConversationCardPostSynchronizer.withRegisteredShow("account|new", 0, ConversationCardScope("account", "new")) {
-                    after.complete(it)
-                    release.await()
+            val unseenPost =
+                async {
+                    ConversationCardPostSynchronizer.withRegisteredShow(
+                        "other-account|unseen",
+                        0,
+                        ConversationCardScope("other-account", "unseen"),
+                    ) {
+                        unseen.complete(it)
+                        release.await()
+                    }
                 }
-            }
             try {
-                val laterToken = withTimeout(5_000) { after.await() }
-                NotificationCardGenerations.dismissThrough(fence, listOf(NotificationGroupChild("account|old", 0, "visible-generation")))
+                val sameKeyToken = withTimeout(5_000) { sameKey.await() }
+                val unseenToken = withTimeout(5_000) { unseen.await() }
+                NotificationCardGenerations.dismiss(oldToken.notificationGeneration.id)
                 assertFalse(ConversationCardPostSynchronizer.isShowNotDismissed(oldToken))
-                assertTrue(ConversationCardPostSynchronizer.isShowNotDismissed(unseenToken))
-                assertTrue(NotificationGroupReconciler.postChild(context, notification(unseenToken), request = {}) {})
-                assertFalse(NotificationGroupReconciler.postChild(context, notification(oldToken), request = {}) { error("dismissed write reached the platform") })
-                assertTrue(ConversationCardPostSynchronizer.isShowNotDismissed(laterToken))
-                var posted = false
-                assertTrue(NotificationGroupReconciler.postChild(context, notification(laterToken), request = {}) { posted = true })
-                assertTrue(posted)
+                assertFalse(
+                    NotificationGroupReconciler.postChild(
+                        context,
+                        notification(oldToken),
+                        request = {},
+                    ) { error("dismissed rewrite reached the platform") },
+                )
+                listOf(sameKeyToken, unseenToken).forEach { pending ->
+                    assertTrue(ConversationCardPostSynchronizer.isShowNotDismissed(pending))
+                    assertTrue(NotificationGroupReconciler.postChild(context, notification(pending), request = {}) {})
+                }
             } finally {
                 release.complete(Unit)
-                withTimeout(5_000) { old.await(); unseenPost.await(); later.await() }
+                withTimeout(5_000) {
+                    old.await()
+                    sameKeyPost.await()
+                    unseenPost.await()
+                }
             }
         }
 
     @Test
-    fun aPreviousProcessFenceCannotInvalidateTheCurrentProcessesWrites() {
-        val generation = NotificationCardGenerations.register("account|group", 0)
+    fun aPreviousProcessesDeleteGenerationCannotInvalidateCurrentWrites() {
+        val generation = NotificationCardGenerations.register()
         try {
-            NotificationCardGenerations.dismissThrough(NotificationGroupDismissalFence("another-process", Long.MAX_VALUE), listOf(NotificationGroupChild("account|group", 0, generation.id)))
+            NotificationCardGenerations.dismiss("previous-process-generation")
             assertFalse(generation.dismissed.get())
         } finally {
             NotificationCardGenerations.release(generation)
@@ -87,7 +110,8 @@ class NotificationGroupGenerationTest {
         }
 
     private fun notification(token: ConversationCardShowToken): Notification =
-        NotificationCompat.Builder(context, NotificationChannelSpec.GROUP_MESSAGES.id)
-            .addExtras(android.os.Bundle().apply { putString(UserEventNotificationGroup.EXTRA_GENERATION, token.notificationGeneration.id) })
+        NotificationCompat
+            .Builder(context, NotificationChannelSpec.GROUP_MESSAGES.id)
+            .addExtras(android.os.Bundle().apply { putString(EXTRA_GENERATION, token.notificationGeneration.id) })
             .build()
 }

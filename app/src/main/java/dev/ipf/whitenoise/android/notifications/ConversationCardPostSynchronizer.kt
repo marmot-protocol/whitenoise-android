@@ -100,7 +100,7 @@ internal object ConversationCardPostSynchronizer {
                     conversationScope = conversationScope,
                     dismissalGeneration = state.dismissals.capture(),
                     showGeneration = state.shows.advance(),
-                    notificationGeneration = NotificationCardGenerations.register(notificationTag, notificationId),
+                    notificationGeneration = NotificationCardGenerations.register(),
                 )
             }
         return try {

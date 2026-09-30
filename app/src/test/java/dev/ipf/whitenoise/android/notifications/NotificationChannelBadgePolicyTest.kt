@@ -49,7 +49,11 @@ class NotificationChannelBadgePolicyTest {
         assertFalse(summary.shouldVibrate())
         assertFalse(summary.canShowBadge())
         listOf(false, true).forEach { isDm ->
-            assertFalse(ConversationNotificationChannels.relevantParents(isDm).contains(NotificationChannelSpec.USER_EVENT_SUMMARY))
+            assertFalse(
+                ConversationNotificationChannels
+                    .relevantParents(isDm)
+                    .contains(NotificationChannelSpec.USER_EVENT_SUMMARY),
+            )
         }
     }
 
