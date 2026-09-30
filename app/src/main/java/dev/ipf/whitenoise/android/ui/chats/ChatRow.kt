@@ -59,6 +59,7 @@ import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.messagePreviewForRetention
+import dev.ipf.whitenoise.android.ui.BuiltinEmoji
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
@@ -416,10 +417,11 @@ internal fun ChatRow(
                     )
                 val snippetText =
                     remember(bodyMatch.snippet, highlightStyle) {
-                        highlightedSnippet(bodyMatch.snippet, highlightStyle)
+                        BuiltinEmoji.annotate(highlightedSnippet(bodyMatch.snippet, highlightStyle))
                     }
                 Text(
                     text = snippetText,
+                    inlineContent = BuiltinEmoji.content(),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -523,8 +525,8 @@ internal fun ChatRowPreviewLine(
                 }.orEmpty()
         }
     Text(
-        text = text,
-        inlineContent = inlineContent,
+        text = remember(text) { BuiltinEmoji.annotate(text) },
+        inlineContent = inlineContent + BuiltinEmoji.content(),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         fontStyle = fontStyle,

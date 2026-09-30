@@ -45,6 +45,12 @@
         "test_ids": ["ONB-005", "FIND-005", "FIND-006"]
       },
       {
+        "surface": "content",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/BuiltinEmoji.kt",
+        "anchor": "fun content(): Map<String, InlineTextContent>",
+        "test_ids": ["MSG-022"]
+      },
+      {
         "surface": "Empty document send feedback",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
         "anchor": "R.string.media_file_empty",
@@ -1037,6 +1043,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
         "anchor": "fun ChatRow(",
         "test_ids": [
+          "MSG-022",
           "CHL-001",
           "CHL-002",
           "CHL-011",
