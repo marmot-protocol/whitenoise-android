@@ -1431,6 +1431,7 @@
     <string name="onboarding_continue_as">Continua come %1$s</string>
     <string name="onboarding_offline_setup_message">Nessuna connessione Internet. Connettiti tramite Wi-Fi, dati mobili o un’altra rete, quindi riprova.</string>
     <string name="toast_couldnt_login_amber">Impossibile accedere con Amber</string>
+    <string name="amber_identity_already_added">Questo account è già stato aggiunto a White Noise. Selezionalo nel selettore degli account.</string>
     <string name="toast_amber_sign_in_cancelled">Accesso con Amber annullato</string>
     <string name="onboarding_sign_up">Registrati</string>
     <string name="sign_in_error_public_key">Questa è una chiave pubblica. Inserisci la tua chiave segreta (nsec) per accedere.</string>

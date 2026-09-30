@@ -1405,6 +1405,7 @@
     <string name="onboarding_continue_as">以 %1$s 身份继续</string>
     <string name="onboarding_offline_setup_message">无互联网连接。请使用 Wi-Fi、移动数据或其他网络连接，然后重试。</string>
     <string name="toast_couldnt_login_amber">无法使用 Amber 登录</string>
+    <string name="amber_identity_already_added">此账号已添加到 White Noise。请在账号切换器中选择。</string>
     <string name="toast_amber_sign_in_cancelled">已取消 Amber 登录</string>
     <string name="onboarding_sign_up">注册</string>
     <string name="sign_in_error_public_key">这是公钥。请输入你的私钥（nsec）登录。</string>

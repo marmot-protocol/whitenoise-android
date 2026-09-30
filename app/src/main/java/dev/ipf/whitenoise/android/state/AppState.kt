@@ -5020,9 +5020,9 @@ class WhiteNoiseAppState private constructor(
      * signing decisions. Existing accounts that cannot enter staged setup use
      * the legacy login and signer-reconciliation path.
      *
-     * Typed engine/protocol errors are surfaced distinctly: a user cancel/reject
-     * is a gentle "cancelled" toast; every other
-     * failure (unavailable / mismatch / runtime) is a copyable failure toast.
+     * A signer rejection remains a cancellation notice. A duplicate identity
+     * keeps the existing account untouched and explains where to find it;
+     * other failures retain the generic copyable report.
      */
     suspend fun loginWithAmber() {
         try {
@@ -5082,7 +5082,12 @@ class WhiteNoiseAppState private constructor(
                 presentTransient(R.string.toast_amber_sign_in_cancelled)
             } else {
                 appStateDebug(error) { "amber login failed: ${error.readableMessage()}" }
-                presentFailure(R.string.toast_couldnt_login_amber, "AMBER_SIGN_IN", error)
+                presentFailure(
+                    R.string.toast_couldnt_login_amber,
+                    "AMBER_SIGN_IN",
+                    error,
+                    detail = amberSignInFailureDetail(error),
+                )
             }
         } finally {
             amberSignInStage = null
