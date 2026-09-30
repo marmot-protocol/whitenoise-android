@@ -100,3 +100,6 @@ jobs:
           releaseName: White Noise ${{ steps.candidate.outputs.version }}
           whatsNewDirectory: build/play-whats-new
           mappingFile: build/production-release/mapping-${{ steps.candidate.outputs.version }}-play.txt
+          # Play refuses to auto-submit while other changes await review. Commit the
+          # edit and leave sending it for review to the Console operator.
+          changesNotSentForReview: true
