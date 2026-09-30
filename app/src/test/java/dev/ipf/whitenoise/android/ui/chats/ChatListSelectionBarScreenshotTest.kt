@@ -6,10 +6,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -18,7 +22,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** Direct selection actions remain visible at compact widths and across the supported themes. */
+/** The labeled Select all action remains visible at compact widths and across the supported themes. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
@@ -91,6 +95,9 @@ class ChatListSelectionBarScreenshotTest {
                 }
             }
         }
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val selectAllLabel = context.getString(R.string.chat_list_select_all)
+        composeRule.onNodeWithText(selectAllLabel, useUnmergedTree = true).assertIsDisplayed()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
 }

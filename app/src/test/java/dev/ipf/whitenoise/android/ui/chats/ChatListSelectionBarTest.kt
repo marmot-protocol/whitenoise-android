@@ -124,6 +124,7 @@ class ChatListSelectionBarTest {
             }
         }
 
+        composeRule.onNodeWithText(string(R.string.chat_list_select_all), useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.chat_list_select_all)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.chat_list_deselect_all)).assertDoesNotExist()
         composeRule.onNodeWithContentDescription(string(R.string.chat_list_select_all)).performClick()
@@ -166,6 +167,7 @@ class ChatListSelectionBarTest {
             }
         }
 
+        composeRule.onNodeWithText(string(R.string.chat_list_deselect_all), useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.chat_list_deselect_all)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.chat_list_select_all)).assertDoesNotExist()
         composeRule.onNodeWithContentDescription(string(R.string.chat_list_deselect_all)).performClick()
@@ -245,6 +247,7 @@ class ChatListSelectionBarTest {
             }
         }
 
+        composeRule.onNodeWithText(string(R.string.chat_list_select_all), useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_mark_read)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_mute)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_unmute)).assertDoesNotExist()

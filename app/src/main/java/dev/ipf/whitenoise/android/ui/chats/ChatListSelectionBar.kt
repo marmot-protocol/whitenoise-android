@@ -4,6 +4,7 @@ import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -13,6 +14,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TooltipAnchorPosition
@@ -100,7 +102,7 @@ internal fun ChatListSelectionControls(
         stringResource(
             if (archiveAction == ChatListBulkArchiveAction.Archive) R.string.archive else R.string.unarchive,
         )
-    // Fixed touch targets wrap as whole actions at narrow widths; labels remain available as tooltips.
+    // Whole actions wrap at narrow widths; the selection toggle keeps its label visible.
     FlowRow(
         Modifier
             .fillMaxWidth()
@@ -123,12 +125,17 @@ internal fun ChatListSelectionControls(
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        DirectSelectionAction(
-            label = selectAllLabel,
-            icon = if (allVisibleSelected) R.drawable.ic_close else R.drawable.ic_check,
-            enabled = actionsEnabled,
+        OutlinedButton(
             onClick = { perform(if (allVisibleSelected) onDeselectAll else onSelectAll) },
-        )
+            enabled = actionsEnabled,
+            modifier =
+                Modifier
+                    .heightIn(min = 48.dp)
+                    .testTag("chats.selectAllAction")
+                    .semantics { contentDescription = selectAllLabel },
+        ) {
+            Text(selectAllLabel)
+        }
         DirectSelectionAction(
             label = archiveLabel,
             icon =
