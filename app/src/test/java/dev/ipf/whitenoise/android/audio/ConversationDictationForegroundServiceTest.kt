@@ -436,12 +436,17 @@ class ConversationDictationForegroundServiceTest {
         val context = RuntimeEnvironment.getApplication()
         val connectionLifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
         val connectionService = connectionLifecycle.get()
-        assertTrue(NotificationStreamForegroundService.start(context))
-        connectionService.onStartCommand(shadowOf(context).nextStartedService, 0, 1)
         val harness = installHost()
         val dictationLifecycle = Robolectric.buildService(ConversationDictationForegroundService::class.java).create()
         val dictationService = dictationLifecycle.get()
         dictationService.onStartCommand(startIntent(dictationService, harness), 0, 1)
+        assertTrue(NotificationStreamForegroundService.start(context))
+        connectionService.onStartCommand(shadowOf(context).nextStartedService, 0, 1)
+        val original = shadowOf(connectionService as Service).lastForegroundNotification
+        assertEquals(
+            "Dictation active",
+            original.extras.getCharSequence(Notification.EXTRA_TITLE).toString(),
+        )
 
         harness.conversationDictation.cancel()
 
