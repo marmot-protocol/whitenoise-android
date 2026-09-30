@@ -99,8 +99,9 @@ private fun chatFolderRuleMatches(
 
 /** An empty rule remains manual-only; any category can select chats on its own. */
 private fun ChatFolderRule.hasCategoryConstraint(): Boolean {
-    return unreadOnly || groupsOnly || archivedOnly ||
-        unreadMentionsOnly || directChatsOnly || pinnedOnly
+    val attention = unreadOnly || unreadMentionsOnly || pinnedOnly
+    val conversationKind = groupsOnly || directChatsOnly
+    return attention || conversationKind || archivedOnly
 }
 
 /** Read and pin constraints use the same native state the chat row renders. */
@@ -116,7 +117,8 @@ private fun ChatFolderRule.matchesAttention(
 
 /** Contradictory legacy/custom flags match no chats; the editor makes these choices exclusive. */
 private fun ChatFolderRule.matchesConversationKind(item: ChatListItem): Boolean {
-    return (!groupsOnly || !item.isDm()) && (!directChatsOnly || item.isDm())
+    val direct = item.isDm()
+    return (!groupsOnly || !direct) && (!directChatsOnly || direct)
 }
 
 // Matches against the roster snapshot the chat-list row already carries. A
