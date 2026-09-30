@@ -1572,8 +1572,8 @@ internal class ConversationDictationController internal constructor(
             return
         }
         clearRecognitionGeneration(cancel = false)
-        if (deferRecognitionUntilTeardownSettles(sessionId, target)) return
         if (!ensureDurableSession(sessionId, target)) return
+        if (deferRecognitionUntilTeardownSettles(sessionId, target)) return
         if (microphoneHeld && activeCaptureSessionId != sessionId) {
             // A replaced session's asynchronous recorder close has not returned yet.
             // Never reuse its microphone or focus lease for a different target.

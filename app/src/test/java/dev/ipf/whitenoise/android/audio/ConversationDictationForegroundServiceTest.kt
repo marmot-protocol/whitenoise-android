@@ -555,6 +555,8 @@ class ConversationDictationForegroundServiceTest {
         oldLifecycle.destroy()
         shadowOf(android.os.Looper.getMainLooper()).idle()
         assertTrue(harness.conversationDictation.hasDurableSession)
+        assertFalse(harness.conversationDictation.ownsMicrophone)
+        shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(500L))
         assertTrue(harness.conversationDictation.ownsMicrophone)
         val replacementNotification =
             newService
