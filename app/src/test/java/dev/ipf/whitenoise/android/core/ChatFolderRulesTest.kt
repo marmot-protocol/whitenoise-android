@@ -179,8 +179,9 @@ class ChatFolderRulesTest {
         val ordinary = item("ordinary", unread = true)
         val readMention = item("read", mention = true)
         val manualUnread = item("manual").withRow { copy(manuallyMarkedUnread = true) }
+        val staleManualMention = readMention.withRow { copy(manuallyMarkedUnread = true) }
 
-        assertEquals(setOf("mention"), folderIds(listOf(mentioned, ordinary, readMention, manualUnread), rule = rule))
+        assertEquals(setOf("mention"), folderIds(listOf(mentioned, ordinary, readMention, manualUnread, staleManualMention), rule = rule))
         val read =
             mentioned.withRow {
                 copy(hasUnread = false, unreadCount = 0uL, unreadMention = false, unreadMentionCount = 0uL)

@@ -106,7 +106,7 @@ private fun ChatFolderRule.matchesAttention(
     activeAccountIdHex: String?,
 ): Boolean =
     (!unreadOnly || item.effectiveHasUnread(activeAccountIdHex)) &&
-        (!unreadMentionsOnly || (item.unreadMention && item.effectiveHasUnread(activeAccountIdHex))) &&
+        (!unreadMentionsOnly || (item.unreadMention && item.projection?.hasUnread == true && item.effectiveHasUnread(activeAccountIdHex))) &&
         (!pinnedOnly || item.pinned())
 
 /** Contradictory legacy/custom flags match no chats; the editor makes these choices exclusive. */

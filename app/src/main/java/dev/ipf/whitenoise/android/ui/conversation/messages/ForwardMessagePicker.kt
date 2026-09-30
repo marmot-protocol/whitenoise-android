@@ -266,7 +266,7 @@ internal fun ForwardMessagePickerContent(
     val targetError = dataSource.error
     val memberRevision = dataSource.memberSnapshotsRevision
     val targets =
-        remember(dataSource.targets, originGroupIdHex) {
+        remember(dataSource.targets, dataSource.targetsRevision, originGroupIdHex) {
             dataSource.targets
                 .filterNot { it.group.groupIdHex.equals(originGroupIdHex, ignoreCase = true) }
         }

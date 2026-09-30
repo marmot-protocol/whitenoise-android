@@ -18890,8 +18890,7 @@
         "anchor": "R.string.folder_delete_action",
         "test_ids": [
           "SET-009",
-          "ACC-017",
-          "FLD-003"
+          "ACC-017"
         ]
       },
       {
@@ -18910,8 +18909,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
         "anchor": "R.string.folder_delete_failed",
         "test_ids": [
-          "SET-009",
-          "FLD-003"
+          "SET-009"
         ]
       },
       {
