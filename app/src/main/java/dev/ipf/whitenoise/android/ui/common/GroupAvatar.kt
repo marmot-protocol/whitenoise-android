@@ -18,6 +18,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.adoptableSelectedAvatarAsset
 import dev.ipf.whitenoise.android.state.cacheKey
+import dev.ipf.whitenoise.android.state.currentGroupAvatarItem
 import dev.ipf.whitenoise.android.state.isRenderable
 
 /** All group surfaces consume the selected MDK asset; legacy acquisition is only a compatibility path. */
@@ -75,9 +76,9 @@ private fun ChatListAvatarSeed.matchesAvatarPresentationOwner(accountRef: String
 }
 
 /** A selected native identity may only reuse the exact durable presentation seed. */
-private fun ChatListAvatarSeed.durableImageFor(assetKey: String?): ImageBitmap? = image.takeIf {
-    source == ChatListAvatarSource.DURABLE && key == assetKey
-}
+private fun ChatListAvatarSeed.durableImageFor(
+    assetKey: String?,
+): ImageBitmap? = image.takeIf { source == ChatListAvatarSource.DURABLE && key == assetKey }
 
 /** The row's selected asset already includes MDK's group/peer selection and membership checks. */
 @Composable

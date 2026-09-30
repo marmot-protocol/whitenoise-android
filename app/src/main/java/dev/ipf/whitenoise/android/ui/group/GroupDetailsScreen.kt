@@ -108,6 +108,7 @@ import dev.ipf.whitenoise.android.state.GroupRosterLoadState
 import dev.ipf.whitenoise.android.state.ProfileGroupPickerState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
+import dev.ipf.whitenoise.android.state.requestProfileGroupMembers
 import dev.ipf.whitenoise.android.state.retainedAvatarBytesReader
 import dev.ipf.whitenoise.android.ui.chats.ChatFolderPickerSheet
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen

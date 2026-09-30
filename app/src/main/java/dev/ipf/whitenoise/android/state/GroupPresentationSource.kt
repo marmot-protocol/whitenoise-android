@@ -1,15 +1,24 @@
 package dev.ipf.whitenoise.android.state
 
 /** Reads the live source projection without ever crossing an account owner. */
-internal fun ChatsController?.currentGroupAvatarItem(accountRef: String?, groupIdHex: String): ChatListItem? = this
-    ?.takeIf { accountRef != null && it.boundAccountRef == accountRef }
-    ?.currentGroupAvatarItem(groupIdHex)
+internal fun WhiteNoiseAppState.currentGroupAvatarItem(
+    accountRef: String?,
+    groupIdHex: String,
+): ChatListItem? {
+    forwardTargetsRevision // Compose observes updates folded while the list is hidden.
+    return groupPresentationChatsController
+        ?.takeIf { accountRef != null && it.boundAccountRef == accountRef }
+        ?.currentGroupAvatarItem(groupIdHex)
+}
 
 /** Keeps retry admission at the existing controller boundary. */
-internal fun ChatsController.requestProfileGroupMembers(groupIds: Iterable<String>, retry: Boolean) {
+internal fun WhiteNoiseAppState.requestProfileGroupMembers(
+    groupIds: Iterable<String>,
+    retry: Boolean = false,
+) {
     if (retry) {
-        retryMemberSnapshots(groupIds)
+        groupPresentationChatsController?.retryMemberSnapshots(groupIds)
     } else {
-        requestMemberSnapshots(groupIds)
+        groupPresentationChatsController?.requestMemberSnapshots(groupIds)
     }
 }

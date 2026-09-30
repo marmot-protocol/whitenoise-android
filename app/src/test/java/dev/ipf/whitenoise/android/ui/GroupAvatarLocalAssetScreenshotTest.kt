@@ -61,6 +61,7 @@ import dev.ipf.whitenoise.android.state.ProfileGroupPickerLoadState
 import dev.ipf.whitenoise.android.state.ProfileGroupPickerState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.cacheKey
+import dev.ipf.whitenoise.android.state.currentGroupAvatarItem
 import dev.ipf.whitenoise.android.state.notificationChatListRow
 import dev.ipf.whitenoise.android.state.retainedAvatarBytesReader
 import dev.ipf.whitenoise.android.ui.chats.ChatRow

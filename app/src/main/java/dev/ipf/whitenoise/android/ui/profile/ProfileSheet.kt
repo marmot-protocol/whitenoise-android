@@ -103,6 +103,7 @@ import dev.ipf.whitenoise.android.state.createProfileChatGroup
 import dev.ipf.whitenoise.android.state.isUserBlocked
 import dev.ipf.whitenoise.android.state.memberMutePreferences
 import dev.ipf.whitenoise.android.state.presentationNpubFromReference
+import dev.ipf.whitenoise.android.state.requestProfileGroupMembers
 import dev.ipf.whitenoise.android.state.rethrowIfCancellation
 import dev.ipf.whitenoise.android.state.setMemberMutedInGroup
 import dev.ipf.whitenoise.android.state.setUserBlocked

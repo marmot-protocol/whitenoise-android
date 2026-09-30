@@ -3723,10 +3723,8 @@ class WhiteNoiseAppState private constructor(
     internal val profileGroupPickerRevision: Long
         get() = chatsController?.memberSnapshotsRevision ?: 0L
 
-    internal fun currentGroupAvatarItem(accountRef: String?, groupIdHex: String): ChatListItem? {
-        forwardTargetsRevision // Compose observes updates folded while the list is hidden.
-        return chatsController.currentGroupAvatarItem(accountRef, groupIdHex)
-    }
+    internal val groupPresentationChatsController: ChatsController?
+        get() = chatsController
 
     internal fun profileAddableGroupsState(accountIdHex: String): ProfileGroupPickerState =
         chatsController?.profileAddableGroupsState(accountIdHex, activeAccount?.accountIdHex)
@@ -3735,10 +3733,6 @@ class WhiteNoiseAppState private constructor(
     internal fun profilePromotableGroupsState(accountIdHex: String): ProfileGroupPickerState =
         chatsController?.profilePromotableGroupsState(accountIdHex, activeAccount?.accountIdHex)
             ?: ProfileGroupPickerState.empty()
-
-    internal fun requestProfileGroupMembers(groupIds: Iterable<String>, retry: Boolean = false) {
-        chatsController?.requestProfileGroupMembers(groupIds, retry)
-    }
 
     suspend fun promoteProfileInGroup(
         targetRef: String,
