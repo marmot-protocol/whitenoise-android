@@ -99,9 +99,9 @@ class DictationDiagnosticStoreTest {
     }
 
     @Test
-    fun corruptStoreProducesUnavailableManifestAndCanBeCleared() {
+    fun oversizedStoreProducesUnavailableManifestAndCanBeCleared() {
         val directory = folder.newFolder()
-        File(directory, "dictation-current.jsonl").writeText("PRIVATE_CORRUPTION")
+        File(directory, "dictation-current.jsonl").writeText("PRIVATE".repeat(40_000))
         DictationDiagnosticRecorder(DictationDiagnosticStore(directory, "abcdef012")).use { recorder ->
             val snapshot = recorder.snapshot()
             assertEquals(setOf("dictation-manifest.json"), snapshot.keys)
@@ -119,6 +119,25 @@ class DictationDiagnosticStoreTest {
                 )
             assertEquals("bounded_local_history", cleared.getString("coverage"))
         }
+    }
+
+    @Test
+    fun partialFirstRecordIsRemovedAndFutureCollectionRecovers() {
+        val directory = folder.newFolder()
+        val store = DictationDiagnosticStore(directory, "abcdef012")
+        listOf("", "{\"time_ms\":").forEach { damaged ->
+            File(directory, "dictation-current.jsonl").writeText(damaged)
+            store.append(event("event=session_started session=1"))
+            val snapshot = store.snapshot(true, 0)
+            val record = JSONObject(snapshot.getValue("dictation-current.jsonl").decodeToString())
+            assertEquals("session_started", record.getString("event"))
+        }
+        val manifest = JSONObject(store.snapshot(true, 0).getValue("dictation-manifest.json").decodeToString())
+        assertEquals(2L, manifest.getLong("invalid_files_in_process"))
+        assertTrue(store.clear())
+        val clearedSnapshot = store.snapshot(true, 0)
+        val cleared = JSONObject(clearedSnapshot.getValue("dictation-manifest.json").decodeToString())
+        assertEquals(0L, cleared.getLong("invalid_files_in_process"))
     }
 
     @Test

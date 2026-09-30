@@ -6,6 +6,7 @@ import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.FileProviderStrategyCacheRule
 import dev.ipf.whitenoise.android.audio.DictationDiagnostics
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -39,6 +40,27 @@ class AuditLogShareTest {
             DictationDiagnostics.record("event=session_started session=4")
             val archive = requireNotNull(prepareAuditAndDictationLogArchive(context, emptyList()))
             ZipFile(archive).use { zip -> assertTrue(zip.getEntry("dictation-current.jsonl") != null) }
+            assertTrue(clearAuditAndDictationLogShares(context.cacheDir))
+            assertNull(prepareAuditAndDictationLogArchive(context, emptyList()))
+        } finally {
+            DictationDiagnostics.setEnabled(false)
+            clearAuditAndDictationLogShares(context.cacheDir)
+        }
+    }
+
+    @Test
+    fun invalidRetainedFileStillExportsItsRecoveryManifest() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        DictationDiagnostics.attach(context)
+        try {
+            DictationDiagnostics.clear()
+            val directory = File(context.noBackupFilesDir, "dictation-diagnostics")
+            File(directory, "dictation-current.jsonl").writeText("PRIVATE_PARTIAL")
+            val archive = requireNotNull(prepareAuditAndDictationLogArchive(context, emptyList()))
+            val entries = archive.entries()
+            assertEquals(setOf("dictation-manifest.json"), entries.keys)
+            assertFalse(entries.values.any { it.contains("PRIVATE") })
+            assertEquals(1L, JSONObject(entries.values.single()).getLong("invalid_files_in_process"))
             assertTrue(clearAuditAndDictationLogShares(context.cacheDir))
             assertNull(prepareAuditAndDictationLogArchive(context, emptyList()))
         } finally {

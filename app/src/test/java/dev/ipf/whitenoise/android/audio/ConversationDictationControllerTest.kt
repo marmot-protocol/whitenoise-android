@@ -25,6 +25,51 @@ import org.robolectric.shadows.ShadowLog
 @Suppress("LargeClass")
 class ConversationDictationControllerTest {
     @Test
+    fun refusedReplyStartDoesNotPublishAnActiveSession() {
+        ShadowLog.clear()
+        DictationDiagnostics.activeSession = 0
+        val active = fixture(draft = TextFieldValue(""), targetReplyAvailable = { false })
+        assertFalse(
+            active.controller.requestStart(
+                ACCOUNT,
+                GROUP,
+                active.drafts.getValue(key()),
+                replyToMessageIdHex = REPLY_MESSAGE_ID,
+            ),
+        )
+        assertEquals(0L, DictationDiagnostics.activeSession)
+        assertTrue(ShadowLog.getLogsForTag("WNDictation").none { it.msg.contains("event=session_started") })
+    }
+
+    @Test
+    fun visibilityTraceEmitsOnlyOriginTransitions() {
+        val active = fixture(draft = TextFieldValue(""))
+        active.controller.requestStart(ACCOUNT, GROUP, active.drafts.getValue(key()))
+        ShadowLog.clear()
+        val lifecycle = DictationDiagnosticLifecycle()
+        lifecycle.originVisibility({ active.controller }) { true }
+        lifecycle.originVisibility({ active.controller }) { true }
+        lifecycle.originVisibility({ active.controller }) { false }
+        val entries = ShadowLog.getLogsForTag("WNDictation").mapNotNull { DictationDiagnosticSchema.fields(it.msg) }
+        val changes = entries.filter { it["event"] == "origin_visibility" }
+        assertEquals(listOf(true, false), changes.map { it["visible"] })
+        assertTrue(changes.all { it["session"] == 1L })
+    }
+
+    @Test
+    fun lateInternalCaptureClosureIsNotARejectedProviderCallback() {
+        val active = fixture(draft = TextFieldValue(""), platform = FakePlatform(deferCaptureCompletion = true))
+        active.controller.requestStart(ACCOUNT, GROUP, active.drafts.getValue(key()))
+        active.platform.listener.onReady()
+        val session = active.platform.session
+        active.controller.stop()
+        active.platform.listener.onResult("captured")
+        ShadowLog.clear()
+        session.completeCapture()
+        assertTrue(ShadowLog.getLogsForTag("WNDictation").none { it.msg.contains("event=callback_rejected") })
+    }
+
+    @Test
     fun idleVisibilityHooksDoNotInitializeTheController() {
         DictationDiagnostics.activeSession = 0
         val lifecycle = DictationDiagnosticLifecycle()

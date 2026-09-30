@@ -738,8 +738,6 @@ internal class ConversationDictationController internal constructor(
         resetTranscriptSession()
         if (state.sessionId != null) conversationDictationDiagnostic("event=session_finished outcome=replaced")
         val sessionId = ++nextSessionId
-        DictationDiagnostics.activeSession = sessionId
-        DictationDiagnostics.record("event=session_started session=$sessionId mode=${mode.name}")
         val capturedRevision = readDraft(accountRef, groupIdHex).revision
         val target =
             ConversationDictationTarget(
@@ -757,6 +755,8 @@ internal class ConversationDictationController internal constructor(
             conversationDictationDiagnostic("event=request_start accepted=false reason=reply_unavailable")
             return false
         }
+        DictationDiagnostics.activeSession = sessionId
+        DictationDiagnostics.record("event=session_started session=$sessionId mode=${mode.name}")
         if (!runCatching(platform::prepareProviderSelection).getOrDefault(false)) {
             state = ConversationDictationState.ProviderSelectionRequired(sessionId, target)
             return true
@@ -1673,7 +1673,10 @@ internal class ConversationDictationController internal constructor(
                         "event=callback_ready generation=$generationId " +
                             "elapsed_ms=${elapsedRealtime() - generationStartedAtElapsedMillis}",
                     )
-                    if (!owns(sessionId, generationId) || state !is ConversationDictationState.Starting) return
+                    if (
+                        !owns(sessionId, generationId, callback = true) ||
+                        state !is ConversationDictationState.Starting
+                    ) return
                     unresolvedRecognitionFailure = null
                     generationTimeoutHandle?.cancel()
                     generationTimeoutHandle = null
@@ -1689,7 +1692,7 @@ internal class ConversationDictationController internal constructor(
                 /** Records speech only for the generation that still owns the session. */
                 override fun onBeginningOfSpeech() {
                     conversationDictationDiagnostic("event=callback_beginning_of_speech generation=$generationId")
-                    if (!owns(sessionId, generationId)) return
+                    if (!owns(sessionId, generationId, callback = true)) return
                     generationHasSpeech = true
                     unresolvedRecognitionFailure = null
                     if (callerAudioEndpointingActive) {
@@ -1706,7 +1709,7 @@ internal class ConversationDictationController internal constructor(
                 /** Moves the owned generation into bounded final-result processing. */
                 override fun onEndOfSpeech() {
                     conversationDictationDiagnostic("event=callback_end_of_speech generation=$generationId")
-                    if (!owns(sessionId, generationId)) return
+                    if (!owns(sessionId, generationId, callback = true)) return
                     finishProviderOwnedCapture(sessionId)
                     when {
                         state is ConversationDictationState.Starting ||
@@ -1725,7 +1728,7 @@ internal class ConversationDictationController internal constructor(
                         "event=callback_result generation=$generationId has_text=${!transcript.isNullOrBlank()} " +
                             "elapsed_ms=${elapsedRealtime() - generationStartedAtElapsedMillis}",
                     )
-                    if (!owns(sessionId, generationId)) return
+                    if (!owns(sessionId, generationId, callback = true)) return
                     // Some providers skip onEndOfSpeech. A terminal result still ends their
                     // microphone capture before the next generation or transcript delivery.
                     finishProviderOwnedCapture(sessionId)
@@ -1795,7 +1798,7 @@ internal class ConversationDictationController internal constructor(
                         "event=callback_error generation=$generationId failure=${error.name} " +
                             "elapsed_ms=${elapsedRealtime() - generationStartedAtElapsedMillis}",
                     )
-                    if (!owns(sessionId, generationId)) return
+                    if (!owns(sessionId, generationId, callback = true)) return
                     finishProviderOwnedCapture(sessionId)
                     val readyAt = generationReadyAtElapsedMillis
                     val failure =
@@ -2468,10 +2471,11 @@ internal class ConversationDictationController internal constructor(
     private fun owns(
         sessionId: Long,
         generationId: Long,
+        callback: Boolean = false,
     ): Boolean {
         val accepted =
             state.sessionId == sessionId && activeRecognitionGenerationId == generationId && recognitionSession != null
-        if (!accepted) {
+        if (!accepted && callback) {
             conversationDictationDiagnostic(
                 "event=callback_rejected callback_session=$sessionId generation=$generationId reason=stale_request",
             )

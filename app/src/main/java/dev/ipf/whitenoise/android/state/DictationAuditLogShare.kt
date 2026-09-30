@@ -17,7 +17,11 @@ internal fun prepareAuditAndDictationLogArchive(
     val dropped =
         entries["dictation-manifest.json"]?.let {
             val manifest = JSONObject(it.decodeToString())
-            if (manifest.optString("coverage") == "snapshot_unavailable") 1L else manifest.optLong("dropped_in_process")
+            if (manifest.optString("coverage") == "snapshot_unavailable") {
+                1L
+            } else {
+                manifest.optLong("dropped_in_process") + manifest.optLong("invalid_files_in_process")
+            }
         } ?: 0L
     if (sourcePaths.isEmpty() && entries.keys.none { it.endsWith(".jsonl") } && dropped == 0L) return null
     return prepareAuditLogArchive(context.cacheDir, File(context.filesDir, "Marmot"), sourcePaths, entries)

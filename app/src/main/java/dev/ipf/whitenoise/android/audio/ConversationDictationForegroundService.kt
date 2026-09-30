@@ -126,7 +126,8 @@ class ConversationDictationForegroundService : Service() {
         try {
             foregroundPromoter(this, buildNotification(controller))
             foregroundPromoted = true
-            conversationDictationDiagnostic("event=foreground_service_promoted")
+            val callbackSession = sessionToken.substringAfterLast(':').toLongOrNull() ?: 0L
+            conversationDictationDiagnostic("event=foreground_service_promoted callback_session=$callbackSession")
             true
         } catch (_: SecurityException) {
             conversationDictationDiagnostic("event=foreground_service_promotion_rejected type=SecurityException")

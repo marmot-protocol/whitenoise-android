@@ -24,6 +24,7 @@ internal class DictationDiagnosticStore(
     private var sequence = 0L
     private var rotations = 0L
     private var expiredFiles = 0L
+    private var invalidFiles = 0L
 
     @Synchronized
     fun append(fields: Map<String, Any>) {
@@ -72,6 +73,7 @@ internal class DictationDiagnosticStore(
                 .put("coverage", "bounded_local_history")
                 .put("rotations_in_process", rotations)
                 .put("expired_files_in_process", expiredFiles)
+                .put("invalid_files_in_process", invalidFiles)
                 .put("process", process)
                 .put("app_revision", buildRevision.takeIf { it.matches(Regex("[a-f0-9]{7,40}")) } ?: "unknown")
         return buildMap {
@@ -112,6 +114,9 @@ internal class DictationDiagnosticStore(
             check(it.delete())
             removed = true
         }
+        rotations = 0
+        expiredFiles = 0
+        invalidFiles = 0
         return removed
     }
 
@@ -138,11 +143,19 @@ internal class DictationDiagnosticStore(
         if (file.exists()) {
             if (file.length() > maxBytes) throw IOException("Diagnostic file exceeds limit")
             // Record time is authoritative; appends or unsupported timestamp writes cannot extend retention.
-            val oldest = file.bufferedReader().use { reader -> JSONObject(reader.readLine()).getLong("time_ms") }
-            val age = nowMillis() - oldest
-            if (age < 0 || age > retentionMillis) {
+            val oldest =
+                file.bufferedReader().use { reader ->
+                    reader.readLine()?.let { runCatching { JSONObject(it).getLong("time_ms") }.getOrNull() }
+                }
+            if (oldest == null) {
                 check(file.delete())
-                expiredFiles += 1
+                invalidFiles += 1
+            } else {
+                val age = nowMillis() - oldest
+                if (age < 0 || age > retentionMillis) {
+                    check(file.delete())
+                    expiredFiles += 1
+                }
             }
         }
     }
