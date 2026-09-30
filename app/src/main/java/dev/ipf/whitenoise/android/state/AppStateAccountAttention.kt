@@ -1,5 +1,8 @@
 package dev.ipf.whitenoise.android.state
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.AccountAttentionSnapshotFfi
 import dev.ipf.marmotkit.AccountAttentionStateFfi
 import dev.ipf.marmotkit.AccountAttentionTotalFfi
@@ -34,7 +37,7 @@ internal class AccountAttentionMirror {
     val currentJob: Job? get() = job
 
     /** Newest replacement received from the runtime, or null before the first one. */
-    var latest: AccountAttentionSnapshotFfi? = null
+    var latest: AccountAttentionSnapshotFfi? by mutableStateOf(null)
         private set
 
     /** Replaces any running mirror with one bound to [marmot]; the previous loop is cancelled first. */
@@ -51,6 +54,7 @@ internal class AccountAttentionMirror {
     fun stop() {
         job?.cancel()
         job = null
+        latest = null
     }
 
     internal fun install(snapshot: AccountAttentionSnapshotFfi) {
@@ -73,6 +77,16 @@ internal fun AccountAttentionSnapshotFfi.readyBadgeCounts(): Map<String, ULong> 
             val ready = entry.state as? AccountAttentionStateFfi.Ready ?: return@mapNotNull null
             entry.accountIdHex to ready.total.badgeCount()
         }.toMap()
+
+/** Full unread-message total for one Ready account, excluding attention-only reminders and invitations. */
+internal fun AccountAttentionSnapshotFfi.readyMessageCount(accountIdHex: String): ULong? =
+    (accounts.firstOrNull { it.accountIdHex == accountIdHex }?.state as? AccountAttentionStateFfi.Ready)
+        ?.total
+        ?.unreadCount
+
+/** Current native replacement value; null while its runtime or account has no Ready snapshot. */
+internal fun WhiteNoiseAppState.activeAccountMessageCount(): ULong? =
+    activeAccount?.accountIdHex?.let { runtimeMirrors.attention.latest?.readyMessageCount(it) }
 
 /** Applies one live summary to the unread store using the signed-in account list to map ids to refs. */
 internal fun WhiteNoiseAppState.applyAccountAttention(snapshot: AccountAttentionSnapshotFfi) {

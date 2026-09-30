@@ -1032,6 +1032,12 @@
     <string name="share_user_view">Vedi profilo</string>
     <string name="attach_options">Aggiungi allegato</string>
     <string name="media_preview_position_badge">Posizione di invio %1$d</string>
+    <string name="contact_view">Visualizza contatto</string>
+    <string name="contact_add">Aggiungi ai contatti</string>
+    <string name="contact_save_vcf">Salva VCF</string>
+    <string name="contact_invalid_vcard">Questo file di contatto non è valido o è troppo grande</string>
+    <string name="contact_action_failed">Impossibile completare l’azione</string>
+    <string name="contact_vcf_saved">VCF salvato</string>
     <string name="share_contact_title">Condividi contatto</string>
     <string name="share_location_title">Condividi posizione</string>
     <string name="location_use_current">Usa posizione attuale</string>
@@ -1264,6 +1270,10 @@
     <string name="clear_search">Cancella ricerca</string>
     <string name="chat_list_action_add_to_folder">Aggiungi a una cartella</string>
     <string name="chat_folder_included_by_rule">Incluso dalle regole di questa cartella</string>
+    <plurals name="chat_pill_unread_messages_count">
+        <item quantity="one">%1$s messaggio non letto</item>
+        <item quantity="other">%1$s messaggi non letti</item>
+    </plurals>
     <plurals name="chat_folder_chat_count">
         <item quantity="one">%1$d chat</item>
         <item quantity="other">%1$d chat</item>

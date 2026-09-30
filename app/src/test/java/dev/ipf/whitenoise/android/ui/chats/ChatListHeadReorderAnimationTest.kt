@@ -235,6 +235,40 @@ class ChatListHeadReorderAnimationTest {
         )
     }
 
+    /** Unequal real-row heights expose placement and viewport correction fighting during a middle promotion. */
+    @Test
+    fun variableHeightMiddlePromotionStillMovesEachRowMonotonically() {
+        val original = listOf("A", "B", "C", "D", "E", "F")
+        val heights = mapOf("A" to 48.dp, "B" to 64.dp, "C" to 52.dp, "D" to 76.dp, "E" to 60.dp, "F" to 48.dp)
+        var ids by mutableStateOf(original)
+        composeRule.setContent {
+            ChatListHeadReorderMotionHarness(
+                itemIds = ids,
+                listState = rememberLazyListState(),
+                rowHeight = rowHeight,
+                rowHeights = heights,
+            )
+        }
+        composeRule.waitForIdle()
+        val previousTops = original.associateWith(::rowTop).toMutableMap()
+        composeRule.mainClock.autoAdvance = false
+        composeRule.runOnUiThread { ids = listOf("E", "A", "B", "C", "D", "F") }
+        composeRule.runOnIdle { }
+        repeat(60) { frame ->
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.runOnIdle { }
+            val promotedTop = rowTop("E")
+            assertTrue("E reversed at frame $frame", promotedTop <= previousTops.getValue("E") + 0.5f)
+            previousTops["E"] = promotedTop
+            listOf("A", "B", "C", "D").forEach { id ->
+                val top = rowTop(id)
+                assertTrue("$id reversed at frame $frame", top + 0.5f >= previousTops.getValue(id))
+                previousTops[id] = top
+            }
+        }
+        assertEquals(0f, rowTop("E"), 0.5f)
+    }
+
     @Test
     fun folderDatasetTransitionDoesNotTriggerHeadScrollCorrection() {
         var itemIds by mutableStateOf(listOf("A", "B", "C"))
@@ -675,6 +709,7 @@ internal fun ChatListHeadReorderMotionHarness(
     itemIds: List<String>,
     listState: LazyListState,
     rowHeight: Dp,
+    rowHeights: Map<String, Dp> = emptyMap(),
     datasetKey: ChatListDatasetKey = ChatListDatasetKey(false, null, ""),
     contentRevision: Int = 0,
     pinnedCount: Int? = null,
@@ -760,7 +795,7 @@ internal fun ChatListHeadReorderMotionHarness(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .height(rowHeight)
+                                .height(rowHeights[id] ?: rowHeight)
                                 .clickable(enabled = interactionsEnabled) { onOpen(id) }
                                 .testTag(chatListHeadReorderRowTag(id)),
                     ) {

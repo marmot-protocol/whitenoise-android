@@ -1032,6 +1032,12 @@
     <string name="share_user_view">Voir le profil</string>
     <string name="attach_options">Ajouter une pièce jointe</string>
     <string name="media_preview_position_badge">Position d\'envoi %1$d</string>
+    <string name="contact_view">Voir le contact</string>
+    <string name="contact_add">Ajouter aux contacts</string>
+    <string name="contact_save_vcf">Enregistrer le VCF</string>
+    <string name="contact_invalid_vcard">Ce fichier de contact est invalide ou trop volumineux</string>
+    <string name="contact_action_failed">Impossible de terminer cette action</string>
+    <string name="contact_vcf_saved">VCF enregistré</string>
     <string name="share_contact_title">Partager le contact</string>
     <string name="share_location_title">Partager la position</string>
     <string name="location_use_current">Utiliser la position actuelle</string>
@@ -1264,6 +1270,10 @@
     <string name="clear_search">Effacer la recherche</string>
     <string name="chat_list_action_add_to_folder">Ajouter à un dossier</string>
     <string name="chat_folder_included_by_rule">Inclus par les règles de ce dossier</string>
+    <plurals name="chat_pill_unread_messages_count">
+        <item quantity="one">%1$s message non lu</item>
+        <item quantity="other">%1$s messages non lus</item>
+    </plurals>
     <plurals name="chat_folder_chat_count">
         <item quantity="one">%1$d discussion</item>
         <item quantity="other">%1$d discussions</item>

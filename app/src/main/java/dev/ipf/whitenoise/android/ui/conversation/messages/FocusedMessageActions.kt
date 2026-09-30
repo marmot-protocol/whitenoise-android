@@ -249,6 +249,7 @@ internal const val FOCUSED_ACTION_MENU_SCROLL_TEST_TAG = "focused-action-menu-sc
 @Composable
 @Suppress("LongMethod", "LongParameterList")
 internal fun FocusedMessageActions(
+    initiatingHoldActive: Boolean = false,
     sourceBounds: IntRect?,
     touchY: Float?,
     mine: Boolean,
@@ -359,7 +360,7 @@ internal fun FocusedMessageActions(
                                 .onPlaced {
                                     previewCenterInStackPx =
                                         it.positionInParent().y.roundToInt() + it.size.height / 2
-                                }.focusedStackDrag(travel)
+                                }.then(if (initiatingHoldActive) Modifier else Modifier.focusedStackDrag(travel))
                                 .clearAndSetSemantics {
                                     contentDescription = previewDescription
                                     // The same dismissal the tap performs, reachable without one: a

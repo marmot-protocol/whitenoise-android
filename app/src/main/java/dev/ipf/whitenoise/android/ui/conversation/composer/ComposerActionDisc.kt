@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
 /**
@@ -35,22 +36,49 @@ internal fun ComposerActionDisc(
     enabled: Boolean = true,
     width: Dp = 40.dp,
 ) {
-    val outline = amoledOutlineBorder()
     IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.width(width).height(48.dp)) {
-        Surface(
-            modifier = Modifier.size(32.dp),
-            shape = CircleShape,
-            color = if (outline == null) containerColor else MaterialTheme.colorScheme.surface,
-            contentColor = if (outline == null) contentColor else MaterialTheme.colorScheme.onSurface,
-            border = outline,
-        ) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Icon(
-                    painter = painterResource(icon),
-                    contentDescription = description,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
+        ComposerDiscFace(containerColor, contentColor, description, icon)
+    }
+}
+
+/** Uses the shared explicit-read and Secure Paste fallback without changing the composer's disc. */
+@Composable
+@Suppress("FunctionNaming")
+internal fun ComposerPasteActionDisc(
+    onPaste: () -> Boolean,
+    containerColor: Color,
+    contentColor: Color,
+    description: String,
+    @DrawableRes icon: Int,
+) {
+    SystemPasteIconButton(onPaste = onPaste, modifier = Modifier.width(40.dp).height(48.dp)) {
+        ComposerDiscFace(containerColor, contentColor, description, icon)
+    }
+}
+
+/** Shared visual surface for Send and the system-aware Paste action. */
+@Composable
+@Suppress("FunctionNaming")
+private fun ComposerDiscFace(
+    containerColor: Color,
+    contentColor: Color,
+    description: String,
+    @DrawableRes icon: Int,
+) {
+    val outline = amoledOutlineBorder()
+    Surface(
+        modifier = Modifier.size(32.dp),
+        shape = CircleShape,
+        color = if (outline == null) containerColor else MaterialTheme.colorScheme.surface,
+        contentColor = if (outline == null) contentColor else MaterialTheme.colorScheme.onSurface,
+        border = outline,
+    ) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Icon(
+                painter = painterResource(icon),
+                contentDescription = description,
+                modifier = Modifier.size(20.dp),
+            )
         }
     }
 }

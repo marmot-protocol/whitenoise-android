@@ -1078,6 +1078,12 @@
     <string name="share_user_view">Открыть профиль</string>
     <string name="attach_options">Добавить вложение</string>
     <string name="media_preview_position_badge">Позиция отправки %1$d</string>
+    <string name="contact_view">Просмотреть контакт</string>
+    <string name="contact_add">Добавить в контакты</string>
+    <string name="contact_save_vcf">Сохранить VCF</string>
+    <string name="contact_invalid_vcard">Файл контакта недействителен или слишком большой</string>
+    <string name="contact_action_failed">Не удалось выполнить действие</string>
+    <string name="contact_vcf_saved">VCF сохранён</string>
     <string name="share_contact_title">Поделиться контактом</string>
     <string name="share_location_title">Поделиться геопозицией</string>
     <string name="location_use_current">Использовать текущее местоположение</string>
@@ -1312,6 +1318,12 @@
     <string name="clear_search">Очистить поиск</string>
     <string name="chat_list_action_add_to_folder">Добавить в папку</string>
     <string name="chat_folder_included_by_rule">Добавлен правилами этой папки</string>
+    <plurals name="chat_pill_unread_messages_count">
+        <item quantity="one">%1$s непрочитанное сообщение</item>
+        <item quantity="few">%1$s непрочитанных сообщения</item>
+        <item quantity="many">%1$s непрочитанных сообщений</item>
+        <item quantity="other">%1$s непрочитанных сообщений</item>
+    </plurals>
     <plurals name="chat_folder_chat_count">
         <item quantity="one">%1$d чат</item>
         <item quantity="few">%1$d чата</item>

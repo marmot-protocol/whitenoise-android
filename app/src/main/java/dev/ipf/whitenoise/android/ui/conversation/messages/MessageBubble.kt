@@ -479,6 +479,7 @@ internal fun MessageBubble(
     var selectionSeedVisibleOffset by remember(record.messageIdHex) { mutableStateOf<Int?>(null) }
     var longPressWindowY by remember { mutableStateOf<Float?>(null) }
     var actionMenuAnchorBounds by remember(record.messageIdHex) { mutableStateOf<IntRect?>(null) }
+    var initiatingMenuHoldActive by remember(record.messageIdHex) { mutableStateOf(false) }
     var reportSheetOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var reportInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
     val hasReports = item.projected?.hasReports == true
@@ -1574,6 +1575,7 @@ internal fun MessageBubble(
                                             }
                                         longPressWindowY = windowPosition.y
                                         actionMenuAnchorBounds = messageBoundsInWindow[0]
+                                        initiatingMenuHoldActive = true
                                         // Freeze the rendered hit now. The bubble
                                         // can move while its popup is open; an old
                                         // window coordinate must never be re-hit-
@@ -1582,11 +1584,13 @@ internal fun MessageBubble(
                                     }
                                 },
                                 onLongPressRelease = {
+                                    initiatingMenuHoldActive = false
                                     val linkDestination = pendingLongPressLinkDestination[0]
                                     pendingLongPressLinkDestination[0] = null
                                     if (linkDestination != null) copyMarkdownLink(linkDestination)
                                 },
                                 onDragStart = { position ->
+                                    initiatingMenuHoldActive = false
                                     if (deleted) return@longPressOrVerticalDrag
                                     // A range gesture begins after the threshold
                                     // action was shown. Hand ownership over without
@@ -1608,6 +1612,7 @@ internal fun MessageBubble(
                                     if (!deleted) onDragSelectionEnd()
                                 },
                                 onGestureCancel = {
+                                    initiatingMenuHoldActive = false
                                     pendingLongPressLinkDestination[0] = null
                                     onActionMenuOpenChange(false)
                                     if (!deleted) onDragSelectionCancel()
@@ -2398,6 +2403,7 @@ internal fun MessageBubble(
                     // A tombstone gets a focused delete-only menu. Batch or partial
                     // text selection still owns the row interaction completely.
                     expanded = isActionMenuOpen && !selectionMode && !textSelectionMode,
+                    initiatingHoldActive = initiatingMenuHoldActive,
                     anchorBoundsInWindow = actionMenuAnchorBounds,
                     anchorWindowYPx = longPressWindowY,
                     canReply = !deleted && !readOnly,

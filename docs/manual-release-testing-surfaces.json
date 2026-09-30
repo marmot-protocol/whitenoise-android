@@ -1002,7 +1002,18 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
         "anchor": "fun ChatListSelectionControls(",
         "test_ids": [
-          "CHL-001"
+          "CHL-001",
+          "CHL-011",
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "DirectSelectionAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
+        "anchor": "fun DirectSelectionAction(",
+        "test_ids": [
+          "CHL-011",
+          "CHL-012"
         ]
       },
       {
@@ -3059,6 +3070,23 @@
         "anchor": "fun ComposerActionDisc(",
         "test_ids": [
           "CON-001",
+          "CON-020"
+        ]
+      },
+      {
+        "surface": "ComposerPasteActionDisc",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerActionDisc.kt",
+        "anchor": "fun ComposerPasteActionDisc(",
+        "test_ids": [
+          "CON-013"
+        ]
+      },
+      {
+        "surface": "ComposerDiscFace",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerActionDisc.kt",
+        "anchor": "fun ComposerDiscFace(",
+        "test_ids": [
+          "CON-013",
           "CON-020"
         ]
       },
@@ -5421,7 +5449,24 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
         "anchor": "fun ContactMessageBubble(",
         "test_ids": [
-          "CON-001"
+          "CON-001",
+          "MED-014"
+        ]
+      },
+      {
+        "surface": "ContactCardActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
+        "anchor": "fun ContactCardActions(",
+        "test_ids": [
+          "MED-014"
+        ]
+      },
+      {
+        "surface": "ReceivedContactActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ReceivedContactActions.kt",
+        "anchor": "fun ReceivedContactActions(",
+        "test_ids": [
+          "MED-014"
         ]
       },
       {
@@ -25743,15 +25788,6 @@
         "anchor": "R.string.save",
         "test_ids": [
           "FLD-002"
-        ]
-      },
-      {
-        "surface": "R.string.actions",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
-        "anchor": "R.string.actions",
-        "test_ids": [
-          "CHL-011",
-          "CHL-012"
         ]
       },
       {

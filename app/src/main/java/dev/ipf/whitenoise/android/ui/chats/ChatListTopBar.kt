@@ -446,6 +446,14 @@ internal fun ChatListFilterChips(
     onSelect: (String?) -> Unit,
     onEditFolder: (String) -> Unit = {},
     onManageFolders: (() -> Unit)? = null,
+    chatsUnreadCount: ULong? = null,
 ) {
-    ChatFolderPills(chips, selectedFolderId, onSelect, onEditFolder, onManageFolders)
+    ChatFolderPills(
+        chips,
+        selectedFolderId,
+        onSelect,
+        onEditFolder,
+        onManageFolders,
+        chatsUnreadCount = chatsUnreadCount,
+    )
 }

@@ -152,6 +152,10 @@
     <string name="clear_search">Clear search</string>
     <string name="chat_list_action_add_to_folder">Add to folder</string>
     <string name="chat_folder_included_by_rule">Included by this folder\'s rules</string>
+    <plurals name="chat_pill_unread_messages_count">
+        <item quantity="one">%1$s unread message</item>
+        <item quantity="other">%1$s unread messages</item>
+    </plurals>
     <plurals name="chat_folder_chat_count">
         <item quantity="one">%1$d chat</item>
         <item quantity="other">%1$d chats</item>
@@ -1397,6 +1401,12 @@
     <string name="share_user_view">View profile</string>
     <string name="attach_options">Add attachment</string>
     <string name="media_preview_position_badge">Send position %1$d</string>
+    <string name="contact_view">View contact</string>
+    <string name="contact_add">Add to contacts</string>
+    <string name="contact_save_vcf">Save VCF</string>
+    <string name="contact_invalid_vcard">This contact file is invalid or too large</string>
+    <string name="contact_action_failed">Couldn\'t finish contact action</string>
+    <string name="contact_vcf_saved">VCF saved</string>
     <string name="share_contact_title">Share contact</string>
     <string name="share_location_title">Share location</string>
     <string name="location_use_current">Use current location</string>
