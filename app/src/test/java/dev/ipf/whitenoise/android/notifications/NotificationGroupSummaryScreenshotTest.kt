@@ -59,6 +59,7 @@ class NotificationGroupSummaryScreenshotTest {
         Robolectric.buildActivity(Activity::class.java).setup().use { controller ->
             val activity = controller.get()
             val parent = FrameLayout(activity)
+            parent.layoutDirection = activity.resources.configuration.layoutDirection
             activity.setContentView(parent, ViewGroup.LayoutParams(360, ViewGroup.LayoutParams.WRAP_CONTENT))
             val remoteViews = Notification.Builder.recoverBuilder(activity, notification).createContentView()
             parent.addView(remoteViews.apply(activity, parent))

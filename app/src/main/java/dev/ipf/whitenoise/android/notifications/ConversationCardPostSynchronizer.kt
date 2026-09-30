@@ -117,9 +117,10 @@ internal object ConversationCardPostSynchronizer {
             if (
                 state == null ||
                 !state.dismissals.isCurrent(token.dismissalGeneration) ||
-                !state.shows.isCurrent(token.showGeneration) ||
-                !NotificationCardGenerations.retain(token.notificationGeneration)
+                !state.shows.isCurrent(token.showGeneration)
             ) {
+                false
+            } else if (!NotificationCardGenerations.retain(token.notificationGeneration)) {
                 false
             } else {
                 state.activeShows += 1

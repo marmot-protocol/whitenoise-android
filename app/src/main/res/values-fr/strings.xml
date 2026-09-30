@@ -3,8 +3,8 @@
     <string name="notification_channel_summary">Résumé des notifications</string>
     <string name="notification_channel_summary_description">Résumé silencieux des messages et autres événements</string>
     <plurals name="notification_group_count">
-        <item quantity="one">%1$d notification</item>
-        <item quantity="other">%1$d notifications</item>
+        <item quantity="one">%1$d notification reçue</item>
+        <item quantity="other">%1$d notifications reçues</item>
     </plurals>
     <string name="poll_custom_time">Durée personnalisée</string>
     <string name="poll_custom_duration">Durée</string>

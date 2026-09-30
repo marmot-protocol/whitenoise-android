@@ -233,7 +233,7 @@ class LocalNotificationPresenter(
                                 live.tag.orEmpty(),
                                 live.id,
                                 renamed,
-                                recordedAtMs = live.postTime,
+                                recordedAtMs = UserEventNotificationGroup.dismissalTime(live),
                                 mustBeLive = true,
                             ) == NotificationCardWriteResult.WRITTEN
                         ) {
@@ -323,7 +323,7 @@ class LocalNotificationPresenter(
         }
         initial
             ?.asSequence()
-            ?.filter { it.postTime <= cutoffMs && it.matchesInvite(accountRef, groupIdHex) }
+            ?.filter { UserEventNotificationGroup.dismissalTime(it) <= cutoffMs && it.matchesInvite(accountRef, groupIdHex) }
             ?.forEach { invite ->
                 val key = NotificationDismissalKey(invite.tag.orEmpty(), invite.id)
                 outcomes[key] = dismissInviteCard(platform, compat, invite, accountRef, groupIdHex, cutoffMs)
@@ -335,7 +335,7 @@ class LocalNotificationPresenter(
         } else {
             remaining
                 .asSequence()
-                .filter { it.postTime <= cutoffMs && it.matchesConversationCard(accountRef, groupIdHex) }
+                .filter { UserEventNotificationGroup.dismissalTime(it) <= cutoffMs && it.matchesConversationCard(accountRef, groupIdHex) }
                 .forEach {
                     val key = NotificationDismissalKey(it.tag.orEmpty(), it.id)
                     if (outcomes[key] != ConversationCardDismissalOutcome.FAILED) {
@@ -356,7 +356,7 @@ class LocalNotificationPresenter(
         ConversationCardPostSynchronizer.withLock(key.tag, key.id, ConversationCardOp.DISMISS_CANCEL) {
             val writtenByApp =
                 ConversationCardPostedRegistry.clearPosted(key.tag, key.id, cutoffMs)
-            val listed = active?.any { it.tag == key.tag && it.id == key.id && it.postTime <= cutoffMs } == true
+            val listed = active?.any { it.tag == key.tag && it.id == key.id && UserEventNotificationGroup.dismissalTime(it) <= cutoffMs } == true
             if (active != null && !writtenByApp && !listed) return@withLock ConversationCardDismissalOutcome.ABSENT
             try {
                 cancelNotification(manager, key.tag, key.id)
@@ -383,7 +383,7 @@ class LocalNotificationPresenter(
             val live =
                 activeNotification(platform, invite.tag, invite.id)
                     ?: return@withLock ConversationCardDismissalOutcome.ABSENT
-            if (live.postTime > cutoffMs || !live.matchesInvite(accountRef, groupIdHex)) {
+            if (UserEventNotificationGroup.dismissalTime(live) > cutoffMs || !live.matchesInvite(accountRef, groupIdHex)) {
                 return@withLock ConversationCardDismissalOutcome.ABSENT
             }
             try {
@@ -501,7 +501,7 @@ class LocalNotificationPresenter(
                     accountRef = accountRef,
                     groupIdHex = groupIdHex,
                 )
-            if (isInvite && sbn.postTime <= sinceMs) {
+            if (isInvite && UserEventNotificationGroup.dismissalTime(sbn) <= sinceMs) {
                 ConversationCardPostSynchronizer.withLock(
                     sbn.tag.orEmpty(),
                     sbn.id,
@@ -510,7 +510,7 @@ class LocalNotificationPresenter(
                     val live = activeNotification(manager, sbn.tag, sbn.id) ?: return@withLock
                     val liveExtras = live.notification.extras ?: return@withLock
                     if (
-                        live.postTime <= sinceMs &&
+                        UserEventNotificationGroup.dismissalTime(live) <= sinceMs &&
                         shouldDismissInvite(
                             extraAccountRef =
                                 liveExtras.getString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF),
@@ -1275,6 +1275,7 @@ class LocalNotificationPresenter(
     ): Notification =
         NotificationCompat
             .Builder(context, active)
+            .setGroupAlertBehavior(active.groupAlertBehavior)
             .setOnlyAlertOnce(true)
             .setStyle(enrichedStyle)
             .build()
@@ -1413,6 +1414,8 @@ class LocalNotificationPresenter(
                 runCatching { onNotificationWritten?.invoke() }
             }
             if (written) NotificationCardWriteResult.WRITTEN else NotificationCardWriteResult.REFUSED
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (exception: RuntimeException) {
             notificationDebug {
                 "post failed tag=${tag.take(16)} type=${exception.javaClass.simpleName}"
@@ -1480,7 +1483,7 @@ class LocalNotificationPresenter(
     ) {
         ConversationCardPostSynchronizer.withLock(tag, id, ConversationCardOp.DISMISS_CANCEL) {
             val live = activeNotification(manager, tag, id) ?: return@withLock
-            if (live.postTime <= sinceMs) {
+            if (UserEventNotificationGroup.dismissalTime(live) <= sinceMs) {
                 ConversationCardPostedRegistry.clearPosted(tag, id)
                 cancelNotification(compat, tag, id)
             }

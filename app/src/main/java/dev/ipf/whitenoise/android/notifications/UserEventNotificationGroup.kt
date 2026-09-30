@@ -27,6 +27,7 @@ internal object UserEventNotificationGroup {
     const val SUMMARY_ID = 9200
     const val EXTRA_GENERATION = "dev.ipf.whitenoise.notify.card_generation"
     const val EXTRA_CHILD = "dev.ipf.whitenoise.notify.user_event_child"
+    const val EXTRA_LEGACY_POST_TIME = "dev.ipf.whitenoise.notify.legacy_post_time"
     const val EXTRA_SUMMARY_STATE = "dev.ipf.whitenoise.notify.group_summary_state"
     const val ACTION_DISMISS = "dev.ipf.whitenoise.notify.DISMISS_GROUP_GENERATIONS"
     const val EXTRA_TAGS = "tags"
@@ -68,37 +69,28 @@ internal object UserEventNotificationGroup {
     fun child(notification: StatusBarNotification): NotificationGroupChild? {
         val card = notification.notification
         if (!isChildCandidate(notification) || card.group != KEY || isSummary(card)) return null
-        val generation = card.extras.getString(EXTRA_GENERATION)?.takeIf(String::isNotBlank) ?: return null
-        return NotificationGroupChild(requireNotNull(notification.tag), notification.id, generation)
+        return card.extras.getString(EXTRA_GENERATION)?.takeIf(String::isNotBlank)?.let { generation ->
+            NotificationGroupChild(requireNotNull(notification.tag), notification.id, generation)
+        }
     }
 
     /** Only known presenter cards can be adopted; services, updates and unrelated notifications are excluded. */
     fun isChildCandidate(notification: StatusBarNotification): Boolean {
         val tag = notification.tag?.takeIf(String::isNotBlank) ?: return false
-        if (notification.id !in LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID..LocalNotificationFormatter.GROUP_MEMBERSHIP_NOTIFICATION_ID) {
-            return false
-        }
+        val validId = notification.id in LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID..LocalNotificationFormatter.GROUP_MEMBERSHIP_NOTIFICATION_ID
         val extras = notification.notification.extras
-        if (extras.getBoolean(EXTRA_CHILD)) return true
-        val account = extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF)
-        val group = extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID)
-        if (notification.id == LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID && !account.isNullOrBlank() && !group.isNullOrBlank()) return true
-        val prefix =
-            when (notification.id) {
-                LocalNotificationFormatter.REACTION_NOTIFICATION_ID -> "reaction|"
-                LocalNotificationFormatter.MENTION_NOTIFICATION_ID -> "mention|"
-                LocalNotificationFormatter.AGENT_ACTIVITY_NOTIFICATION_ID -> "agent-activity|"
-                LocalNotificationFormatter.GROUP_MEMBERSHIP_NOTIFICATION_ID -> "group-membership|"
-                else -> ""
-            }
-        if (!tag.startsWith(prefix)) return false
-        val unscopedTag = tag.removePrefix(prefix)
-        val recipient = unscopedTag.substringBefore('|')
-        return unscopedTag.contains('|') && unscopedTag.substringAfter('|').isNotBlank() &&
-            LocalNotificationFormatter.deterministicTagBelongsToAccount(tag, recipient)
+        val identifiable = extras.getBoolean(EXTRA_CHILD) || isLegacyInvitation(notification) || matchesLegacyTag(tag, notification.id)
+        return validId && identifiable
     }
 
     fun isSummary(notification: Notification): Boolean = notification.flags and Notification.FLAG_GROUP_SUMMARY != 0
+
+    /** Adoption/cosmetic writes must not turn an old OS card into a later message for UI cleanup. */
+    fun dismissalTime(notification: StatusBarNotification): Long {
+        if (!isChildCandidate(notification)) return notification.postTime
+        val original = notification.notification.extras.getLong(EXTRA_LEGACY_POST_TIME, notification.postTime)
+        return original.takeIf { it > 0L && it <= notification.postTime } ?: notification.postTime
+    }
 
     fun summaryState(children: List<NotificationGroupChild>): String {
         val bytes =
@@ -113,14 +105,7 @@ internal object UserEventNotificationGroup {
     ): Notification {
         require(children.isNotEmpty() && children.size <= MAX_CHILDREN)
         val state = summaryState(children)
-        val publicVersion =
-            NotificationCompat.Builder(context, NotificationChannelSpec.USER_EVENT_SUMMARY.id)
-                .setSmallIcon(R.drawable.ic_stat_whitenoise)
-                .setContentTitle(context.getString(R.string.app_name))
-                .setContentText(context.getString(R.string.notification_hidden_content))
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setSilent(true)
-                .build()
+        val publicVersion = redactedGroupSummary(context)
         return NotificationCompat.Builder(context, NotificationChannelSpec.USER_EVENT_SUMMARY.id)
             .setSmallIcon(R.drawable.ic_stat_whitenoise)
             .setContentTitle(context.getString(R.string.app_name))
@@ -164,14 +149,48 @@ internal object UserEventNotificationGroup {
         return PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     }
 
+    @Suppress("ReturnCount") // Reject malformed immutable callback payloads before scheduling any work.
     fun dismissalChildren(intent: Intent): List<NotificationGroupChild>? {
         if (intent.action != ACTION_DISMISS) return null
         val tags = intent.getStringArrayListExtra(EXTRA_TAGS) ?: return null
         val ids = intent.getIntArrayExtra(EXTRA_IDS) ?: return null
         val generations = intent.getStringArrayListExtra(EXTRA_GENERATIONS) ?: return null
-        if (tags.isEmpty() || tags.size > MAX_CHILDREN || tags.size != ids.size || tags.size != generations.size) return null
+        if (tags.isEmpty() || tags.size > MAX_CHILDREN) return null
+        if (tags.size != ids.size || tags.size != generations.size) return null
         if (tags.any(String::isBlank) || generations.any(String::isBlank)) return null
         if (ids.any { it !in LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID..LocalNotificationFormatter.GROUP_MEMBERSHIP_NOTIFICATION_ID }) return null
         return tags.indices.map { NotificationGroupChild(tags[it], ids[it], generations[it]) }
     }
 }
+
+private fun isLegacyInvitation(notification: StatusBarNotification): Boolean {
+    val extras = notification.notification.extras
+    return notification.id == LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID &&
+        !extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF).isNullOrBlank() &&
+        !extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID).isNullOrBlank()
+}
+
+private fun matchesLegacyTag(tag: String, id: Int): Boolean {
+    val prefix = when (id) {
+        LocalNotificationFormatter.REACTION_NOTIFICATION_ID -> "reaction|"
+        LocalNotificationFormatter.MENTION_NOTIFICATION_ID -> "mention|"
+        LocalNotificationFormatter.AGENT_ACTIVITY_NOTIFICATION_ID -> "agent-activity|"
+        LocalNotificationFormatter.GROUP_MEMBERSHIP_NOTIFICATION_ID -> "group-membership|"
+        else -> ""
+    }
+    if (!tag.startsWith(prefix)) return false
+    val unscopedTag = tag.removePrefix(prefix)
+    val recipient = unscopedTag.substringBefore('|')
+    return unscopedTag.contains('|') && unscopedTag.substringAfter('|').isNotBlank() &&
+        LocalNotificationFormatter.deterministicTagBelongsToAccount(tag, recipient)
+}
+
+private fun redactedGroupSummary(context: Context): Notification =
+    NotificationCompat.Builder(context, NotificationChannelSpec.USER_EVENT_SUMMARY.id)
+        .setSmallIcon(R.drawable.ic_stat_whitenoise)
+        .setContentTitle(context.getString(R.string.app_name))
+        .setContentText(context.getString(R.string.notification_hidden_content))
+        .setShowWhen(false)
+        .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+        .setSilent(true)
+        .build()

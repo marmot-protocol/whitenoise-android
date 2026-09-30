@@ -126,6 +126,31 @@ class LocalNotificationGroupSummaryTest {
         }
 
     @Test
+    fun legacyAdoptionCannotAgeAMentionPastItsOpeningCleanupBoundary() =
+        runTest {
+            val fixture = GroupFixture(context, backgroundScope)
+            val original = fixture.send("account-a", "group-a", "legacy-mention", mention = true)
+            fixture.coordinator.close()
+            val key = LocalNotificationFormatter.mentionDismissalKey("account-a", "group-a")
+            val legacyExtras = android.os.Bundle(original.extras).apply {
+                remove(UserEventNotificationGroup.EXTRA_GENERATION)
+                remove(UserEventNotificationGroup.EXTRA_CHILD)
+            }
+            manager.notify(key.tag, key.id, NotificationCompat.Builder(context, original).setGroup(null).setExtras(legacyExtras).build())
+            val cutoff = manager.activeNotifications.single { it.tag == key.tag }.postTime
+            org.robolectric.shadows.ShadowSystemClock.advanceBy(1, java.util.concurrent.TimeUnit.SECONDS)
+            val restored = NotificationGroupReconciler(context, backgroundScope, fixture.pacer)
+            restored.request()
+            settle()
+            val adopted = manager.activeNotifications.single { it.tag == key.tag }
+            assertTrue(adopted.postTime > cutoff)
+            assertEquals(cutoff, UserEventNotificationGroup.dismissalTime(adopted))
+            assertTrue(fixture.presenter.dismissConversationSiblingCardsNotNewerThan("account-a", "group-a", cutoff))
+            assertTrue(manager.activeNotifications.none { it.tag == key.tag })
+            restored.close()
+        }
+
+    @Test
     fun aFailedTrayReadKeepsTheExistingSummaryAndLaterReconciliationRecovers() =
         runTest {
             val fixture = GroupFixture(context, backgroundScope)
@@ -146,14 +171,21 @@ class LocalNotificationGroupSummaryTest {
     fun delayedPlatformVisibilityGetsSettlingReadsWithoutCreatingPhantomChildren() =
         runTest {
             val fixture = GroupFixture(context, backgroundScope)
-            fixture.hiddenReads = 2
             fixture.send("account-a", "group-a", "one")
+            fixture.coordinator.close()
+            manager.cancel(UserEventNotificationGroup.SUMMARY_TAG, UserEventNotificationGroup.SUMMARY_ID)
+            var hiddenReads = 2
+            val settling = NotificationGroupReconciler(context, backgroundScope, fixture.pacer, read = {
+                if (hiddenReads-- > 0) emptyArray() else it.activeNotifications
+            })
+            settling.request()
             advanceTimeBy(300)
             runCurrent()
             assertNull(fixture.summary())
             settle()
             assertNotNull(fixture.summary())
             assertEquals(1, fixture.childWrites)
+            settling.close()
         }
 
     @Test
@@ -306,7 +338,6 @@ private class GroupFixture(private val context: Context, scope: CoroutineScope) 
     var summaryAttempts = 0
     var summaryCancelAttempts = 0
     var failRead = false
-    var hiddenReads = 0
     var failChild = false
     var failSummary = false
     var dropSummaryCancels = 0
@@ -315,7 +346,7 @@ private class GroupFixture(private val context: Context, scope: CoroutineScope) 
             context, scope, pacer,
             read = {
                 if (failRead) throw IllegalStateException("tray unavailable")
-                if (hiddenReads > 0) { hiddenReads--; emptyArray() } else it.activeNotifications
+                it.activeNotifications
             },
             post = { compat, tag, id, notification ->
                 summaryAttempts++

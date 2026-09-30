@@ -573,7 +573,7 @@ class LocalNotificationReplyRaceTest {
         val dismissalReadStarted = CountDownLatch(1)
         val allowDismissalRead = CountDownLatch(1)
         val dismissFinished = CountDownLatch(1)
-        val providerCalls = AtomicInteger()
+        val dismissalInspectionClaimed = AtomicBoolean()
         val dismissalReadStartedAtMs = AtomicLong()
         val refreshFailure = AtomicReference<Throwable>()
         val dismissFailure = AtomicReference<Throwable>()
@@ -587,8 +587,7 @@ class LocalNotificationReplyRaceTest {
                 },
                 dismissalRetryDelay = {},
                 activeNotificationsProvider = {
-                    when (providerCalls.incrementAndGet()) {
-                        3 -> {
+                    if (refreshReadyToWrite.count == 0L && allowRefreshWrite.count == 1L && dismissalInspectionClaimed.compareAndSet(false, true)) {
                             dismissalReadStartedAtMs.set(System.currentTimeMillis())
                             dismissalReadStarted.countDown()
                             check(allowDismissalRead.await(5, TimeUnit.SECONDS))
@@ -607,9 +606,8 @@ class LocalNotificationReplyRaceTest {
                                         Long.MAX_VALUE,
                                     )
                                 }.toTypedArray()
-                        }
-
-                        else -> manager.activeNotifications
+                    } else {
+                        manager.activeNotifications
                     }
                 },
             )

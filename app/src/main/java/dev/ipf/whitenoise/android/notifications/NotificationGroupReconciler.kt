@@ -65,6 +65,7 @@ internal class NotificationGroupReconciler(
         }
     }
 
+    @Suppress("ReturnCount") // Refuse superseded/unknown snapshots before pacing or platform mutation.
     private suspend fun reconcileSnapshot(expected: Long, allowEmpty: Boolean): Boolean {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return false
         val compat = NotificationManagerCompat.from(context)
@@ -126,10 +127,11 @@ internal class NotificationGroupReconciler(
                     if (!UserEventNotificationGroup.isChildCandidate(live) || UserEventNotificationGroup.child(live) != null) return@synchronized
                     val generation = live.notification.extras.getString(UserEventNotificationGroup.EXTRA_GENERATION) ?: UUID.randomUUID().toString()
                     val builder = NotificationCompat.Builder(context, live.notification)
+                        .addExtras(android.os.Bundle().apply { putLong(UserEventNotificationGroup.EXTRA_LEGACY_POST_TIME, UserEventNotificationGroup.dismissalTime(live)) })
                     val adopted = UserEventNotificationGroup.decorateChild(context, builder, NotificationGroupChild(requireNotNull(live.tag), live.id, generation), silent = true)
                         .setOnlyAlertOnce(true).setSilent(true).build()
                     post(compat, requireNotNull(live.tag), live.id, adopted)
-                    ConversationCardPostedRegistry.markPosted(requireNotNull(live.tag), live.id, live.postTime)
+                    ConversationCardPostedRegistry.markPosted(requireNotNull(live.tag), live.id, UserEventNotificationGroup.dismissalTime(live))
                     changed = true
                 }
             }

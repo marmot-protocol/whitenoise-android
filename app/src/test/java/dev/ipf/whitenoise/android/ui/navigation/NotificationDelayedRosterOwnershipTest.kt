@@ -613,7 +613,10 @@ abstract class NotificationDelayedRosterFixture {
 
     /** Returns current platform notification keys without depending on list order. */
     private fun activeNotificationKeys(): Set<Pair<String?, Int>> {
-        val notifications = manager.activeNotifications
+        val notifications = manager.activeNotifications.filterNot {
+            it.tag == dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup.SUMMARY_TAG &&
+                it.id == dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup.SUMMARY_ID
+        }
         return notifications.mapTo(linkedSetOf()) { it.tag to it.id }
     }
 

@@ -189,7 +189,7 @@ class NotificationAccountIsolationNavigationTest {
 
         awaitCondition { handled.get() }
         awaitCondition {
-            manager.activeNotifications.map { it.tag to it.id }.toSet() == sourceKeys.toSet()
+            activeUserCardKeys() == sourceKeys.toSet()
         }
         gate.releaseActivation.countDown()
     }
@@ -319,12 +319,12 @@ class NotificationAccountIsolationNavigationTest {
         awaitCondition { handled.get() }
         awaitCondition(
             failureMessage = {
-                val activeKeys = manager.activeNotifications.map { it.tag to it.id }.toSet()
+                val activeKeys = activeUserCardKeys()
                 "source cards were not dismissed while destination cards remained: " +
                     "active=$activeKeys source=${sourceKeys.toSet()} target=${targetKeys.toSet()}"
             },
         ) {
-            val activeKeys = manager.activeNotifications.map { it.tag to it.id }.toSet()
+            val activeKeys = activeUserCardKeys()
             sourceKeys.none { it in activeKeys } && targetKeys.all { it in activeKeys }
         }
         assertEquals(SOURCE_ACCOUNT, appState.activeAccountRef)
@@ -332,7 +332,7 @@ class NotificationAccountIsolationNavigationTest {
         composeRule.runOnIdle { setActiveAccountRefForTest(appState, TARGET_ACCOUNT) }
         awaitCondition { appState.activeAccountRef == TARGET_ACCOUNT }
         awaitCondition {
-            val activeKeys = manager.activeNotifications.map { it.tag to it.id }.toSet()
+            val activeKeys = activeUserCardKeys()
             targetKeys.all { it in activeKeys }
         }
     }
@@ -363,7 +363,7 @@ class NotificationAccountIsolationNavigationTest {
             appState.setActiveConversationFromUi(SOURCE_ACCOUNT, SHARED_GROUP)
 
             awaitCondition {
-                val activeKeys = manager.activeNotifications.map { it.tag to it.id }.toSet()
+                val activeKeys = activeUserCardKeys()
                 sourceKeys.none { it in activeKeys }
             }
         } finally {
@@ -405,11 +405,11 @@ class NotificationAccountIsolationNavigationTest {
             awaitCondition(
                 failureMessage = {
                     "destination cards were not dismissed before activation: " +
-                        "active=${manager.activeNotifications.map { it.tag to it.id }.toSet()} " +
+                        "active=${activeUserCardKeys()} " +
                         "expected=${(sourceKeys + lateSource).toSet()}"
                 },
             ) {
-                manager.activeNotifications.map { it.tag to it.id }.toSet() ==
+                activeUserCardKeys() ==
                     (sourceKeys + lateSource).toSet()
             }
             // setActiveAccount publishes the target ref before the gated broad
@@ -433,13 +433,20 @@ class NotificationAccountIsolationNavigationTest {
             assertEquals(1L, gate.broadBindStarted.count)
             assertEquals(
                 (sourceKeys + targetKeys + lateSource).toSet(),
-                manager.activeNotifications.map { it.tag to it.id }.toSet(),
+                activeUserCardKeys(),
             )
             gate.releasePreload.countDown()
         }
 
         verifyRouteCompletion(appState, gate, handled, (sourceKeys + lateSource).toSet())
     }
+
+    /** The app summary has no account ownership; every actual child key still participates. */
+    private fun activeUserCardKeys(): Set<Pair<String?, Int>> =
+        manager.activeNotifications.filterNot {
+            it.tag == dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup.SUMMARY_TAG &&
+                it.id == dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup.SUMMARY_ID
+        }.map { it.tag to it.id }.toSet()
 
     private fun verifyRouteCompletion(
         appState: WhiteNoiseAppState,
@@ -455,12 +462,12 @@ class NotificationAccountIsolationNavigationTest {
         awaitCondition(
             failureMessage = {
                 "destination cards were not dismissed after the routed open: " +
-                    "active=${manager.activeNotifications.map { it.tag to it.id }.toSet()} " +
+                    "active=${activeUserCardKeys()} " +
                     "expected=$expectedNotificationKeys runtimeGeneration=${appState.runtimeGeneration} " +
                     "projectionReads=${gate.projectionReadCount.get()} handled=${handled.get()}"
             },
         ) {
-            manager.activeNotifications.map { it.tag to it.id }.toSet() == expectedNotificationKeys
+            activeUserCardKeys() == expectedNotificationKeys
         }
         assertEquals(TARGET_ACCOUNT, appState.activeAccountRef)
     }
