@@ -54,6 +54,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
     val composeRule = createComposeRule()
 
     private var controller: ConversationController? = null
+    private var publishCount = 0
     private val originalTimeZone = TimeZone.getDefault()
 
     /** Releases every conversation-owned job and restores process-wide timestamp formatting. */
@@ -66,72 +67,10 @@ class ConversationAcceptedSendRouteScreenshotTest {
     /** Exercises the production Send button and measures the pending bubble above the composer. */
     @Test
     fun acceptedSendFromFarHistorySnapsToThePendingTail() {
-        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
-        val records =
-            List(60) { index ->
-                timelineRecord((index + 1).toString(16).padStart(64, '0'), (index + 1).toULong(), "History $index")
-            }
-        val subscriptions =
-            ScriptedConversationLiveSubscriptions(
-                listOf(ScriptedConversationTimelineSubscription(timelinePage(*records.toTypedArray()))),
-                conversationTimelineTestGroup(),
-            )
-        val appState = conversationTimelineTestAppState(subscriptions.subscriptions)
-        appState.draftStore.set(
-            ConversationTimelineTestIds.ACCOUNT_REF,
-            ConversationTimelineTestIds.GROUP_ID,
-            TextFieldValue(SENT_TEXT),
-        )
-        var publishCount = 0
-        val conversation =
-            ConversationController(
-                appState = appState,
-                initialGroup = conversationTimelineTestGroup(),
-                initialMemberSnapshot = conversationTimelineMemberSnapshot(),
-                groupRosterReader = { _, _ -> conversationTimelineGroupRoster() },
-                startOnConstruction = true,
-                markdownParser = { EMPTY_MARKDOWN_DOCUMENT },
-                clockMillis = { 1_672_531_260_000L },
-                textPublisher = { _, _, _, _ ->
-                    publishCount++
-                    SendSummaryFfi(
-                        published = 0u,
-                        messageIds = listOf("c3".repeat(32)),
-                        acceptDisposition = SendAcceptDispositionFfi.ACCEPTED_PENDING,
-                        maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
-                    )
-                },
-            )
-        controller = conversation
-        awaitConversationCondition { conversation.timeline.size == records.size }
+        val conversation = createConversation()
+        val appState = conversation.appState
         val evidence = SendRouteEvidence()
-        val historyId = records[10].messageIdHex
-        composeRule.setContent {
-            CompositionLocalProvider(LocalConversationScrollEvidenceSink provides evidence) {
-                WhiteNoiseTheme {
-                    ConversationScreen(
-                        appState = appState,
-                        chat =
-                            ChatListItem(
-                                group = conversationTimelineTestGroup(),
-                                latest = null,
-                                otherMemberAccount = null,
-                                memberCount = 1,
-                                memberSnapshot = conversationTimelineMemberSnapshot(),
-                            ),
-                        controller = conversation,
-                        onBack = {},
-                        restoredScrollSnapshot =
-                            ConversationScrollSnapshot(
-                                firstVisibleItemIndex = 49,
-                                firstVisibleItemScrollOffset = 0,
-                                anchorItemId = "msg:$historyId",
-                                anchorMessageIdHex = historyId,
-                            ),
-                    )
-                }
-            }
-        }
+        mountHistoryConversation(conversation, evidence)
         composeRule.waitForIdle()
         composeRule.waitUntil(5_000) { evidence.viewport?.mode is ConversationScrollMode.ReadingHistory }
         assertTrue(checkNotNull(evidence.viewport).canScrollBackward)
@@ -167,6 +106,82 @@ class ConversationAcceptedSendRouteScreenshotTest {
             appState.draftStore.get(ConversationTimelineTestIds.ACCOUNT_REF, ConversationTimelineTestIds.GROUP_ID),
         )
         composeRule.onRoot().captureRoboImage("src/test/snapshots/conversation_accepted_send_history_tail.png")
+    }
+
+    /** Builds one synthetic authoritative window with typed durable acceptance and no relay publication. */
+    private fun createConversation(): ConversationController {
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+        val records =
+            List(60) { index ->
+                timelineRecord((index + 1).toString(16).padStart(64, '0'), (index + 1).toULong(), "History $index")
+            }
+        val subscriptions =
+            ScriptedConversationLiveSubscriptions(
+                listOf(ScriptedConversationTimelineSubscription(timelinePage(*records.toTypedArray()))),
+                conversationTimelineTestGroup(),
+            )
+        val appState = conversationTimelineTestAppState(subscriptions.subscriptions)
+        appState.draftStore.set(
+            ConversationTimelineTestIds.ACCOUNT_REF,
+            ConversationTimelineTestIds.GROUP_ID,
+            TextFieldValue(SENT_TEXT),
+        )
+        val conversation =
+            ConversationController(
+                appState = appState,
+                initialGroup = conversationTimelineTestGroup(),
+                initialMemberSnapshot = conversationTimelineMemberSnapshot(),
+                groupRosterReader = { _, _ -> conversationTimelineGroupRoster() },
+                startOnConstruction = true,
+                markdownParser = { EMPTY_MARKDOWN_DOCUMENT },
+                clockMillis = { 1_672_531_260_000L },
+                textPublisher = { _, _, _, _ ->
+                    publishCount++
+                    SendSummaryFfi(
+                        published = 0u,
+                        messageIds = listOf("c3".repeat(32)),
+                        acceptDisposition = SendAcceptDispositionFfi.ACCEPTED_PENDING,
+                        maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+                    )
+                },
+            )
+        controller = conversation
+        awaitConversationCondition { conversation.timeline.size == records.size }
+        return conversation
+    }
+
+    /** Mounts the real route with a logical far-history bookmark and the actual production scroll writer. */
+    private fun mountHistoryConversation(
+        conversation: ConversationController,
+        evidence: SendRouteEvidence,
+    ) {
+        val historyId = 11.toString(16).padStart(64, '0')
+        composeRule.setContent {
+            CompositionLocalProvider(LocalConversationScrollEvidenceSink provides evidence) {
+                WhiteNoiseTheme {
+                    ConversationScreen(
+                        appState = conversation.appState,
+                        chat =
+                            ChatListItem(
+                                group = conversationTimelineTestGroup(),
+                                latest = null,
+                                otherMemberAccount = null,
+                                memberCount = 1,
+                                memberSnapshot = conversationTimelineMemberSnapshot(),
+                            ),
+                        controller = conversation,
+                        onBack = {},
+                        restoredScrollSnapshot =
+                            ConversationScrollSnapshot(
+                                firstVisibleItemIndex = 49,
+                                firstVisibleItemScrollOffset = 0,
+                                anchorItemId = "msg:$historyId",
+                                anchorMessageIdHex = historyId,
+                            ),
+                    )
+                }
+            }
+        }
     }
 
     /** Keeps identifiers private in test memory while observing the real writer and measured viewport. */
