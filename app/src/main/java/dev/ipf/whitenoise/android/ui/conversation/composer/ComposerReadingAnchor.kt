@@ -14,25 +14,48 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
 
 /**
- * Let a short finger tap enter the unfocused editor, but keep its press and hold away from
- * BasicTextField's focus and selection handlers. Once focused, the modifier is removed and
- * the platform owns caret placement, selection and paste again. Mouse and stylus input pass
- * through unchanged. The outer reading-scroll owner still sees early vertical drags first.
+ * Let a short finger tap enter the unfocused editor and a stationary hold open Paste, while
+ * keeping both gestures away from BasicTextField's focus and selection handlers. Once focused,
+ * the modifier is removed and the platform owns caret placement, selection and paste again.
+ * Mouse and stylus input pass through unchanged. The outer reading-scroll owner still sees
+ * early vertical drags first.
  */
-@Suppress("CyclomaticComplexMethod")
-internal suspend fun PointerInputScope.composerUnfocusedTouchFocusGestures(onTap: (Offset) -> Unit) {
+@Suppress("CyclomaticComplexMethod", "LongMethod")
+internal suspend fun PointerInputScope.composerUnfocusedTouchFocusGestures(
+    onTap: (Offset) -> Unit,
+    onLongPress: () -> Unit,
+) {
     val touchSlop = viewConfiguration.touchSlop
     val longPressTimeoutMillis = viewConfiguration.longPressTimeoutMillis
     awaitPointerEventScope {
         var trackedPointer: PointerId? = null
         var downAtMillis = 0L
+        var lastEventAtMillis = 0L
         var downPosition = Offset.Zero
         var cancelled = false
+        var longPressDispatched = false
         while (true) {
-            val event = awaitPointerEvent(PointerEventPass.Initial)
+            val remaining = longPressTimeoutMillis - (lastEventAtMillis - downAtMillis)
+            val awaitingLongPress = trackedPointer != null && !cancelled && !longPressDispatched
+            val event =
+                if (awaitingLongPress && remaining > 0) {
+                    withTimeoutOrNull(remaining) { awaitPointerEvent(PointerEventPass.Initial) }
+                } else {
+                    awaitPointerEvent(PointerEventPass.Initial)
+                }
+            if (event == null) {
+                // A still, held finger produces no Move event. The timeout must open Paste
+                // without waiting for the finger to lift.
+                if (trackedPointer != null && !cancelled) {
+                    longPressDispatched = true
+                    onLongPress()
+                }
+                continue
+            }
             when (event.type) {
                 PointerEventType.Press -> {
                     val change = event.changes.firstOrNull { it.pressed && it.type == PointerType.Touch }
@@ -40,8 +63,10 @@ internal suspend fun PointerInputScope.composerUnfocusedTouchFocusGestures(onTap
                         if (trackedPointer == null) {
                             trackedPointer = change.id
                             downAtMillis = change.uptimeMillis
+                            lastEventAtMillis = downAtMillis
                             downPosition = change.position
                             cancelled = false
+                            longPressDispatched = false
                         } else {
                             cancelled = true
                         }
@@ -51,14 +76,20 @@ internal suspend fun PointerInputScope.composerUnfocusedTouchFocusGestures(onTap
                 PointerEventType.Move, PointerEventType.Release -> {
                     val change = event.changes.firstOrNull { it.id == trackedPointer }
                     if (change != null) {
+                        lastEventAtMillis = change.uptimeMillis
                         val movedBeyondSlop = (change.position - downPosition).getDistance() > touchSlop
                         cancelled = cancelled || change.isConsumed || movedBeyondSlop
                         val elapsed = change.uptimeMillis - downAtMillis
-                        val tapped = !change.pressed && !cancelled && elapsed < longPressTimeoutMillis
+                        val released = !change.pressed && !cancelled
                         change.consume()
                         if (!change.pressed) {
                             trackedPointer = null
-                            if (tapped) onTap(change.position)
+                            if (released && !longPressDispatched) {
+                                if (elapsed >= longPressTimeoutMillis) onLongPress() else onTap(change.position)
+                            }
+                        } else if (!cancelled && !longPressDispatched && elapsed >= longPressTimeoutMillis) {
+                            longPressDispatched = true
+                            onLongPress()
                         }
                     }
                 }
