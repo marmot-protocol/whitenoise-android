@@ -3044,9 +3044,18 @@
           "CON-005",
           "CON-017",
           "CON-020",
+          "CON-024",
           "DIC-001",
           "DIC-002",
           "DIC-003"
+        ]
+      },
+      {
+        "surface": "Automatic composer height ceiling",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationCompactHeight.kt",
+        "anchor": "fun resolveAutomaticComposerCeiling(",
+        "test_ids": [
+          "CON-024"
         ]
       },
       {
@@ -3091,7 +3100,8 @@
           "CON-007",
           "CON-013",
           "CON-020",
-          "CON-021"
+          "CON-021",
+          "CON-024"
         ]
       },
       {

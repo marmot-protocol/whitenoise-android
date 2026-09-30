@@ -91,6 +91,7 @@ class ComposerBarScreenshotTest {
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_bar_idle_amoled.png")
     }
 
+    /** Records the unchanged short draft height and action row in the default theme. */
     @Test
     fun composerBarDraftLight() {
         render(darkTheme = false, amoled = false, draft = "Draft message text")
@@ -177,6 +178,7 @@ class ComposerBarScreenshotTest {
         }
     }
 
+    /** Records the end caret after automatic growth and internal scrolling. */
     @Test
     fun composerBarLongDraftEndSelectionLight() {
         renderLongComposer(darkTheme = false, selectionAtEnd = true)
@@ -195,6 +197,24 @@ class ComposerBarScreenshotTest {
     fun composerBarLongDraftAmoled() {
         renderLongComposer(darkTheme = true, amoled = true)
         composeRule.onNodeWithTag(LONG_TAG).captureRoboImage("src/test/snapshots/composer_bar_long_draft_amoled.png")
+    }
+
+    /** The automatic height shows more of a long draft while preserving the reading viewport. */
+    @Test
+    fun composerBarAutomaticLongDraftAmoled() {
+        renderLongComposer(darkTheme = true, amoled = true, selectionAtEnd = true)
+        composeRule
+            .onNodeWithTag(LONG_TAG)
+            .captureRoboImage("src/test/snapshots/composer_bar_auto_long_draft_amoled.png")
+    }
+
+    /** Larger RTL text still leaves the editor and send controls inside the safe viewport. */
+    @Test
+    fun composerBarAutomaticLongDraftLargeRtl() {
+        renderLongComposer(darkTheme = true, largeRtl = true, selectionAtEnd = true)
+        composeRule
+            .onNodeWithTag(LONG_TAG)
+            .captureRoboImage("src/test/snapshots/composer_bar_auto_long_draft_large_rtl.png")
     }
 
     /** Captures the first, next, and settled frames after one long bulk replacement. */
@@ -530,6 +550,10 @@ class ComposerBarScreenshotTest {
         }
     }
 
+    /**
+     * Shares the long draft across theme, RTL, font-scale, and selection baselines
+     * so changes in their rendered height can be compared directly.
+     */
     private fun renderLongComposer(
         darkTheme: Boolean,
         amoled: Boolean = false,

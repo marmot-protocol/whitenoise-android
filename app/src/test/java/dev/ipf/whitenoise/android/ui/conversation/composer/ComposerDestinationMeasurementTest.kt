@@ -22,6 +22,7 @@ class ComposerDestinationMeasurementTest {
         assertTrue(
             measuresAtEditingWidth(compactLineCount = COMPOSER_MULTILINE_CONTROL_LINES + 4),
         )
+        assertTrue(measuresAtEditingWidth(compactLineCount = 48))
     }
 
     /** A draft still short of the crossover keeps the compact width it is rendered at. */
@@ -76,6 +77,7 @@ class ComposerDestinationMeasurementTest {
         assertFalse(editingRequested(hasText = false))
     }
 
+    /** Applies the automatic-mode row selection used by every width fixture above. */
     private fun editingRequested(
         hasText: Boolean,
         focused: Boolean = false,
@@ -88,6 +90,7 @@ class ComposerDestinationMeasurementTest {
         dismissInProgress = dismissInProgress,
     )
 
+    /** Supplies compact line counts to the same destination-width decision as the editor. */
     private fun measuresAtEditingWidth(
         compactLineCount: Int,
         startsEditing: Boolean = false,
