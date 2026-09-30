@@ -109,7 +109,14 @@ class DictationDiagnosticStoreTest {
             assertFalse(manifest.contains("PRIVATE"))
             assertEquals("store_failed", JSONObject(manifest).getString("snapshot_failure"))
             assertTrue(recorder.clear())
-            val cleared = JSONObject(recorder.snapshot().values.single().decodeToString())
+            val cleared =
+                JSONObject(
+                    recorder
+                        .snapshot()
+                        .values
+                        .single()
+                        .decodeToString(),
+                )
             assertEquals("bounded_local_history", cleared.getString("coverage"))
         }
     }
@@ -242,14 +249,20 @@ class DictationDiagnosticStoreTest {
         unavailableSnapshot(queueCapacity = 2, timeoutSeconds = 0, saturate = false, reason = "barrier_timeout")
     }
 
-    private fun unavailableSnapshot(queueCapacity: Int, timeoutSeconds: Long, saturate: Boolean, reason: String) {
+    private fun unavailableSnapshot(
+        queueCapacity: Int,
+        timeoutSeconds: Long,
+        saturate: Boolean,
+        reason: String,
+    ) {
         val entered = CountDownLatch(1)
         val release = CountDownLatch(1)
-        val store = DictationDiagnosticStore(folder.newFolder(), "abcdef012", nowMillis = {
-            entered.countDown()
-            check(release.await(5, TimeUnit.SECONDS))
-            System.currentTimeMillis()
-        })
+        val store =
+            DictationDiagnosticStore(folder.newFolder(), "abcdef012", nowMillis = {
+                entered.countDown()
+                check(release.await(5, TimeUnit.SECONDS))
+                System.currentTimeMillis()
+            })
         DictationDiagnosticRecorder(store, queueCapacity, timeoutSeconds).use { recorder ->
             try {
                 recorder.setEnabled(true)
