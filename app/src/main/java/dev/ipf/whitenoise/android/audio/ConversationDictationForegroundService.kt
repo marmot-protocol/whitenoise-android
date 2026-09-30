@@ -47,6 +47,11 @@ class ConversationDictationForegroundService : Service() {
     private var promotedSessionToken: String? = null
     private var foregroundPromoted = false
 
+    private fun conversationDictationDiagnostic(event: String) {
+        val session = promotedSessionToken?.substringAfterLast(':')?.toLongOrNull() ?: 0L
+        DictationDiagnostics.record("$event session=$session")
+    }
+
     /** Dictation is command-only and never exposes a bound service interface. */
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -58,9 +63,10 @@ class ConversationDictationForegroundService : Service() {
         startId: Int,
     ): Int {
         val controller = hostResolver(this)?.conversationDictation
+        val callbackSession = intent?.getStringExtra(EXTRA_SESSION_TOKEN)?.substringAfterLast(':')?.toLongOrNull() ?: 0L
         conversationDictationDiagnostic(
             "event=foreground_service_on_start has_controller=${controller != null} " +
-                "durable=${controller?.hasDurableSession == true}",
+                "durable=${controller?.hasDurableSession == true} callback_session=$callbackSession",
         )
         if (controller == null || !controller.hasDurableSession) {
             removeForegroundNotification()

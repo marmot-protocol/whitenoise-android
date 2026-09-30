@@ -18,11 +18,71 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowLog
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 @Suppress("LargeClass")
 class ConversationDictationControllerTest {
+    @Test
+    fun processingBackgroundAndServiceLossHaveCorrelatedCausalDiagnostics() {
+        ShadowLog.clear()
+        val active = fixture(draft = TextFieldValue("PRIVATE_DRAFT"))
+        active.controller.requestStart(ACCOUNT, GROUP, active.drafts.getValue(key()))
+        active.platform.listener.onReady()
+        active.controller.stop()
+        active.controller.onAppBackgrounded()
+        assertTrue(active.controller.state is ConversationDictationState.Processing)
+        active.controller.onDurableServiceDestroyed(requireNotNull(active.controller.notificationSessionToken))
+        val logs = ShadowLog.getLogsForTag("WNDictation").joinToString("\n") { it.msg }
+        assertTrue(
+            logs.contains(
+                "event=app_visibility foreground=false durable=true phase=Processing outcome=continued session=1",
+            ),
+        )
+        assertTrue(logs.contains("event=session_abort reason=service_destroyed accepted=true"))
+        assertTrue(logs.contains("event=state_changed session=1 from=Processing to=Idle"))
+        assertFalse(logs.contains("PRIVATE_DRAFT"))
+        assertFalse(logs.contains(ACCOUNT))
+        assertFalse(logs.contains(GROUP))
+    }
+
+    @Test
+    fun processingTimeoutTraceNamesItsDeadlineAndRecoveryCause() {
+        ShadowLog.clear()
+        val active = fixture(draft = TextFieldValue(""))
+        active.controller.requestStart(ACCOUNT, GROUP, active.drafts.getValue(key()))
+        active.platform.listener.onReady()
+        active.controller.stop()
+        active.scheduler.runDelay(20_000L)
+        val logs = ShadowLog.getLogsForTag("WNDictation").joinToString("\n") { it.msg }
+        assertTrue(logs.contains("event=watchdog_fired session=1 phase=processing accepted=true"))
+        assertTrue(logs.contains("event=failure_recovery failure=TimedOut"))
+        assertTrue(active.controller.state is ConversationDictationState.Failed)
+    }
+
+    @Test
+    fun callerAudioDrainAndStaleCallbackHaveDistinctDiagnosticOutcomes() {
+        ShadowLog.clear()
+        val active = fixture(draft = TextFieldValue(""))
+        active.platform.pendingCallerAudio = true
+        active.controller.requestStart(ACCOUNT, GROUP, active.drafts.getValue(key()))
+        val stale = active.platform.listener
+        active.platform.listener.onResult("PRIVATE_SPEECH")
+        active.scheduler.runDelay(500L)
+        active.controller.paste()
+        active.scheduler.advanceBy(20_000L)
+        active.controller.retry()
+        active.scheduler.runDelay(500L)
+        active.platform.listener.onReady()
+        active.scheduler.runDelay(90_000L)
+        stale.onResult("PRIVATE_STALE")
+        val logs = ShadowLog.getLogsForTag("WNDictation").joinToString("\n") { it.msg }
+        assertTrue(logs.contains("event=watchdog_fired session=1 phase=caller_audio_drain"))
+        assertTrue(logs.contains("event=callback_rejected callback_session=1"))
+        assertFalse(logs.contains("PRIVATE_"))
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun unacceptedSendOnFinishRestoresTheDraftAndCarriesTheCapturedReplyIdentity() =

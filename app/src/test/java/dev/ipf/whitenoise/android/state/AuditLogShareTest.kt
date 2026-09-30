@@ -27,6 +27,29 @@ class AuditLogShareTest {
     @get:Rule
     val fileProviderStrategyCacheRule = FileProviderStrategyCacheRule()
 
+    @Test
+    fun exportContainsRetainedDictationEvenWithoutNativeAuditFiles() {
+        val archive =
+            prepareAuditLogArchive(
+                temporaryFolder.newFolder("dictation-cache"),
+                File(temporaryFolder.root, "absent-engine"),
+                emptyList(),
+                mapOf("dictation-current.jsonl" to "{\"event\":\"session_started\"}\n".toByteArray()),
+            )
+        assertEquals(setOf("dictation-current.jsonl"), archive.entries().keys)
+        assertTrue(archive.entries().getValue("dictation-current.jsonl").contains("session_started"))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun supplementalExportRejectsUnknownEntryNames() {
+        prepareAuditLogArchive(
+            temporaryFolder.newFolder("bad-supplement-cache"),
+            temporaryFolder.root,
+            emptyList(),
+            mapOf("../private.txt" to "PRIVATE".toByteArray()),
+        )
+    }
+
     /** One export yields one archive in private cache holding every confined log, byte for byte. */
     @Test
     fun prepareAuditLogArchiveWritesEveryConfinedLogIntoOneArchive() {

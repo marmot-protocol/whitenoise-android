@@ -23603,6 +23603,27 @@
       }
     ],
     "source_coverage": [
+      {
+        "surface": "Retained dictation diagnostic metadata",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/DictationDiagnosticStore.kt",
+        "anchor": "internal class DictationDiagnosticStore(",
+        "test_ids": [
+          "DIC-002",
+          "SEC-009",
+          "SEC-010"
+        ]
+      },
+      {
+        "surface": "Dictation export consent and queue",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/DictationDiagnostics.kt",
+        "anchor": "internal object DictationDiagnostics {",
+        "test_ids": [
+          "DIC-002",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010"
+        ]
+      },
       {"surface": "Developer review demo cancel", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt", "anchor": "R.string.cancel", "test_ids": ["SET-020", "SET-029"]},
       {"surface": "Developer review demo review demo accepting invitation", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt", "anchor": "R.string.review_demo_accepting_invitation", "test_ids": ["SET-029"]},
       {"surface": "Developer review demo review demo account missing", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt", "anchor": "R.string.review_demo_account_missing", "test_ids": ["SET-029"]},
