@@ -88,17 +88,19 @@ internal class DictationDiagnosticStore(
         filtered: Long = 0,
     ): Map<String, ByteArray> =
         mapOf(
-            "dictation-manifest.json" to JSONObject()
-                .put("schema", 1)
-                .put("collection_enabled", enabled)
-                .put("dropped_in_process", dropped)
-                .put("filtered_fields_in_process", filtered)
-                .put("coverage", "snapshot_unavailable")
-                .put("snapshot_failure", reason)
-                .put("files", 0)
-                .put("process", process)
-                .put("app_revision", buildRevision.takeIf { it.matches(Regex("[a-f0-9]{7,40}")) } ?: "unknown")
-                .toString().toByteArray(Charsets.UTF_8),
+            "dictation-manifest.json" to
+                JSONObject()
+                    .put("schema", 1)
+                    .put("collection_enabled", enabled)
+                    .put("dropped_in_process", dropped)
+                    .put("filtered_fields_in_process", filtered)
+                    .put("coverage", "snapshot_unavailable")
+                    .put("snapshot_failure", reason)
+                    .put("files", 0)
+                    .put("process", process)
+                    .put("app_revision", buildRevision.takeIf { it.matches(Regex("[a-f0-9]{7,40}")) } ?: "unknown")
+                    .toString()
+                    .toByteArray(Charsets.UTF_8),
         )
 
     @Synchronized

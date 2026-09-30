@@ -312,13 +312,14 @@ internal object DictationDiagnosticSchema {
                 }.toMap()
         val name = tokens["event"]?.takeIf { it in events } ?: return null
         var filtered = 0L
-        val fields = buildMap<String, Any> {
-            put("event", name)
-            tokens.filterKeys { it != "event" }.forEach { (key, value) ->
-                retainField(key, value)
-                if (!containsKey(key)) filtered += 1
+        val fields =
+            buildMap<String, Any> {
+                put("event", name)
+                tokens.filterKeys { it != "event" }.forEach { (key, value) ->
+                    retainField(key, value)
+                    if (!containsKey(key)) filtered += 1
+                }
             }
-        }
         return DictationDiagnosticEvent(fields, filtered)
     }
 
@@ -336,7 +337,10 @@ internal object DictationDiagnosticSchema {
         }
     }
 
-    private fun retainedValue(key: String, value: String): Any? =
+    private fun retainedValue(
+        key: String,
+        value: String,
+    ): Any? =
         when {
             key in numbers -> value.toLongOrNull()
             key == "state" -> value.toLongOrNull() ?: value.takeIf { it == "none" }
@@ -347,8 +351,7 @@ internal object DictationDiagnosticSchema {
             else -> null
         }
 
-    private fun validPeak(value: String): Double? =
-        value.toDoubleOrNull()?.takeIf { it.isFinite() && it in 0.0..1.0 }
+    private fun validPeak(value: String): Double? = value.toDoubleOrNull()?.takeIf { it.isFinite() && it in 0.0..1.0 }
 }
 
 internal data class DictationDiagnosticEvent(
