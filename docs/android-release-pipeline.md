@@ -289,7 +289,11 @@ candidate bytes are never replaced. Publishing the draft publicly remains a
 separate deliberate action after qualification.
 
 Play uploads the reviewed AAB and mapping, with release notes, to internal
-testing as a completed internal release. Testers may receive it immediately.
+testing as a completed internal release. The workflow commits the edit with
+`changesNotSentForReview`, because Play rejects automatic submission while other
+changes await review. If Console shows the internal release under
+**Changes not yet sent for review**, send it from **Publishing overview**; testers
+receive it once it is live.
 Verify the actual Play track/version and delivered signing lineage in Console.
 If upload fails or a version code was already used, inspect Play before retrying;
 this workflow does not automatically allocate a new code or promote any track.

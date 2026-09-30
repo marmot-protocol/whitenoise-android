@@ -468,6 +468,9 @@ class WorkflowBoundaryTests(unittest.TestCase):
             self.assertNotIn('SIGN_WITH', text)
             self.assertNotIn('publish-zapstore.sh', text)
         self.assertEqual(re.findall(r'^          tracks: (.+)$', distribute, re.MULTILINE), ['internal'])
+        self.assertEqual(
+            re.findall(r'^          changesNotSentForReview: (.+)$', distribute, re.MULTILINE), ['true']
+        )
         self.assertNotIn('upload-google-play', build)
         self.assertNotIn('gh release', build)
         public = (ROOT / '.github/workflows/android-zapstore-publish.yml').read_text()
