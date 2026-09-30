@@ -62,9 +62,9 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationProvider
 import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
+import dev.ipf.whitenoise.android.audio.DictationDiagnosticLifecycle
 import dev.ipf.whitenoise.android.audio.DictationDiagnostics
 import dev.ipf.whitenoise.android.audio.MicrophoneCaptureCoordinator
-import dev.ipf.whitenoise.android.audio.conversationDictationDiagnostic
 import dev.ipf.whitenoise.android.audio.discoverConversationDictationProviders
 import dev.ipf.whitenoise.android.audio.tts.AndroidTtsSpeechEngine
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineHandle
@@ -2533,20 +2533,13 @@ class WhiteNoiseAppState private constructor(
     @Volatile
     private var suppression = NotificationSuppression()
 
-    private var dictationDiagnosticOriginVisible: Boolean? = null
+    private val dictationDiagnosticLifecycle = DictationDiagnosticLifecycle()
 
     private fun updateNotificationSuppression(next: NotificationSuppression) {
         if (next != suppression) notificationPostEpoch.advance()
         suppression = next
-        val target = if (DictationDiagnostics.activeSession != 0L) conversationDictation.state.target else null
-        if (target != null) {
-            val visible = isConversationDictationOriginVisible(target.accountRef, target.groupIdHex)
-            if (visible != dictationDiagnosticOriginVisible) {
-                dictationDiagnosticOriginVisible = visible
-                conversationDictationDiagnostic(
-                    "event=origin_visibility visible=$visible session=${conversationDictation.state.sessionId}",
-                )
-            }
+        dictationDiagnosticLifecycle.originVisibility(conversationDictation) {
+            isConversationDictationOriginVisible(it.accountRef, it.groupIdHex)
         }
     }
 
@@ -6760,25 +6753,8 @@ class WhiteNoiseAppState private constructor(
                 }
         return runCatchingCancellable {
             withContext(Dispatchers.IO) {
-                val dictationEntries = DictationDiagnostics.snapshot()
-                val droppedDictationRecords =
-                    dictationEntries["dictation-manifest.json"]?.let {
-                        org.json.JSONObject(it.decodeToString()).optLong("dropped_in_process")
-                    } ?: 0L
-                if (sourcePaths.isEmpty() &&
-                    dictationEntries.keys.none { it.endsWith(".jsonl") } &&
-                    droppedDictationRecords == 0L
-                ) {
-                    presentTransient(R.string.toast_no_audit_logs_to_export)
-                    return@withContext null
-                }
-                prepareAuditLogArchive(
-                    cacheDir = appContext.cacheDir,
-                    allowedSourceRoot = java.io.File(appContext.filesDir, "Marmot"),
-                    sourcePaths = sourcePaths,
-                    supplementalEntries = dictationEntries,
-                )
-            }
+                prepareAuditAndDictationLogArchive(appContext, sourcePaths)
+            }.also { if (it == null) presentTransient(R.string.toast_no_audit_logs_to_export) }
         }.getOrElse {
             present(R.string.toast_couldnt_export_audit_logs)
             return null
@@ -6794,13 +6770,9 @@ class WhiteNoiseAppState private constructor(
     suspend fun deleteAuditLogs(): Boolean {
         var engineFailure: Throwable? = null
         var cacheFailure: Throwable? = null
-        val dictationDeleted =
-            runCatchingCancellable {
-                withContext(Dispatchers.IO) { DictationDiagnostics.clear() }
-            }.onFailure { cacheFailure = it }.getOrDefault(false)
         val preparedDeleted =
             runCatchingCancellable {
-                withContext(Dispatchers.IO) { clearPreparedAuditLogShares(appContext.cacheDir) }
+                withContext(Dispatchers.IO) { clearAuditAndDictationLogShares(appContext.cacheDir) }
             }.onFailure { cacheFailure = it }.getOrDefault(false)
         val files =
             runCatching { marmotIo { auditLogFiles() } }
@@ -6814,14 +6786,14 @@ class WhiteNoiseAppState private constructor(
                 presentFailure(R.string.toast_couldnt_delete_audit_logs, "AUDIT_LOG_DELETE", it)
                 return false
             }
-            if (preparedDeleted || dictationDeleted) {
+            if (preparedDeleted) {
                 presentTransient(R.string.toast_audit_logs_deleted)
                 return true
             }
             presentTransient(R.string.toast_no_audit_logs_to_delete)
             return false
         }
-        var anyDeleted = dictationDeleted
+        var anyDeleted = false
         for (file in files) {
             val outcome =
                 runCatchingCancellable { marmotIo { deleteAuditLogFile(file.path) } }
@@ -7906,11 +7878,7 @@ class WhiteNoiseAppState private constructor(
             }
         }
         if (foreground) {
-            if (DictationDiagnostics.activeSession != 0L) {
-                conversationDictationDiagnostic(
-                    "event=app_visibility foreground=true durable=${conversationDictation.hasDurableSession}",
-                )
-            }
+            dictationDiagnosticLifecycle.foreground(conversationDictation)
             appLockTtsBoundaryJob?.cancel()
             appLockTtsBoundaryJob = null
             maybeShowAppLockForForeground()
@@ -10478,16 +10446,8 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /** Installs independent telemetry, audit and product destinations before native startup. */
-    private suspend fun MarmotInterface.configurePrivacyRuntime() {
-        configureTelemetryRuntime()
-        auditLogSettingsMutex.withLock {
-            DictationDiagnostics.setEnabled(false)
-            auditUploadConsent.prepare(this)
-            DictationDiagnostics.setEnabled(auditLogSettings().enabled && auditUploadConsent.granted)
-        }
-        setProductAnalyticsRuntimeConfig(androidProductAnalyticsRuntimeConfig())
-    }
+    private suspend fun MarmotInterface.configurePrivacyRuntime() =
+        configureAndroidPrivacyRuntime(this, auditUploadConsent, auditLogSettingsMutex) { configureTelemetryRuntime() }
 
     private fun warmProfile(accountIdHex: String) {
         userProfile(accountIdHex)

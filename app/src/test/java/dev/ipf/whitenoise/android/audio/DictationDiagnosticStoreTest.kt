@@ -14,6 +14,8 @@ import org.robolectric.RobolectricTestRunner
 import java.io.File
 import java.io.IOException
 import java.nio.file.Files
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 @RunWith(RobolectricTestRunner::class)
 class DictationDiagnosticStoreTest {
@@ -154,6 +156,42 @@ class DictationDiagnosticStoreTest {
             assertEquals(1, JSONObject(manifest).getInt("dropped_in_process"))
             assertTrue(snapshot.keys.none { it.endsWith(".jsonl") })
             assertFalse(manifest.contains("PRIVATE"))
+        }
+    }
+
+    @Test
+    fun saturatedExportReturnsExplicitUnavailableManifest() {
+        unavailableSnapshot(queueCapacity = 1, timeoutSeconds = 5, saturate = true, reason = "queue_full")
+    }
+
+    @Test
+    fun blockedExportReturnsExplicitTimeoutManifest() {
+        unavailableSnapshot(queueCapacity = 2, timeoutSeconds = 0, saturate = false, reason = "barrier_timeout")
+    }
+
+    private fun unavailableSnapshot(queueCapacity: Int, timeoutSeconds: Long, saturate: Boolean, reason: String) {
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val store = DictationDiagnosticStore(folder.newFolder(), "abcdef012", nowMillis = {
+            entered.countDown()
+            check(release.await(5, TimeUnit.SECONDS))
+            System.currentTimeMillis()
+        })
+        DictationDiagnosticRecorder(store, queueCapacity, timeoutSeconds).use { recorder ->
+            try {
+                recorder.setEnabled(true)
+                recorder.record("event=session_started session=1")
+                assertTrue(entered.await(5, TimeUnit.SECONDS))
+                if (saturate) recorder.record("event=session_started session=2")
+                val snapshot = recorder.snapshot()
+                val manifest = JSONObject(snapshot.getValue("dictation-manifest.json").decodeToString())
+                assertEquals(setOf("dictation-manifest.json"), snapshot.keys)
+                assertEquals("snapshot_unavailable", manifest.getString("coverage"))
+                assertEquals(reason, manifest.getString("snapshot_failure"))
+                assertEquals(0, manifest.getInt("files"))
+            } finally {
+                release.countDown()
+            }
         }
     }
 

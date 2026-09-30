@@ -168,7 +168,7 @@ internal object DictationDiagnosticSchema {
             "path",
             "source",
         )
-    private val values =
+    private val allowedCategoryValues =
         setOf(
             "Idle",
             "ProviderSelectionRequired",
@@ -288,14 +288,14 @@ internal object DictationDiagnosticSchema {
                             put("read_code", it)
                         }
                     key in numbers -> value.toLongOrNull()?.let { put(key, it) }
-                    key == "type" -> put(key, value.takeIf { it in values } ?: "other")
+                    key == "type" -> put(key, value.takeIf { it in allowedCategoryValues } ?: "other")
                     key == "peak" ->
                         value
                             .toDoubleOrNull()
                             ?.takeIf { it.isFinite() && it in 0.0..1.0 }
                             ?.let { put(key, it) }
                     key in booleans && value in setOf("true", "false") -> put(key, value == "true")
-                    key in categories && value in values -> put(key, value)
+                    key in categories && value in allowedCategoryValues -> put(key, value)
                 }
             }
         }

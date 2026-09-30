@@ -6,8 +6,10 @@ import android.util.Log
 import dev.ipf.whitenoise.android.BuildConfig
 import java.io.File
 import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicLong
 
 private const val DIAGNOSTIC_BARRIER_TIMEOUT_SECONDS = 5L
@@ -48,6 +50,8 @@ internal object DictationDiagnostics {
 
 internal class DictationDiagnosticRecorder(
     private val store: DictationDiagnosticStore,
+    queueCapacity: Int = 256,
+    private val barrierTimeoutSeconds: Long = DIAGNOSTIC_BARRIER_TIMEOUT_SECONDS,
 ) : AutoCloseable {
     private val executor =
         ThreadPoolExecutor(
@@ -55,7 +59,7 @@ internal class DictationDiagnosticRecorder(
             1,
             0,
             TimeUnit.MILLISECONDS,
-            ArrayBlockingQueue(256),
+            ArrayBlockingQueue(queueCapacity),
             { runnable -> Thread(runnable, "dictation-diagnostics").apply { isDaemon = true } },
         )
     private val dropped = AtomicLong()
@@ -91,9 +95,15 @@ internal class DictationDiagnosticRecorder(
     }
 
     fun snapshot(): Map<String, ByteArray> =
-        executor
-            .submit<Map<String, ByteArray>> { store.snapshot(enabled, dropped.get()) }
-            .get(DIAGNOSTIC_BARRIER_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        try {
+            executor
+                .submit<Map<String, ByteArray>> { store.snapshot(enabled, dropped.get()) }
+                .get(barrierTimeoutSeconds, TimeUnit.SECONDS)
+        } catch (_: RejectedExecutionException) {
+            store.unavailableSnapshot(enabled, dropped.get(), "queue_full")
+        } catch (_: TimeoutException) {
+            store.unavailableSnapshot(enabled, dropped.get(), "barrier_timeout")
+        }
 
     fun clear(): Boolean {
         val clearing =

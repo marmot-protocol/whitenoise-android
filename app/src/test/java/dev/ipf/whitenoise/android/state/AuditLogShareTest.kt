@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.FileProviderStrategyCacheRule
+import dev.ipf.whitenoise.android.audio.DictationDiagnostics
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -26,6 +27,25 @@ class AuditLogShareTest {
 
     @get:Rule
     val fileProviderStrategyCacheRule = FileProviderStrategyCacheRule()
+
+    @Test
+    fun retainedDiagnosticExportAndClearWorkWithoutNativeLogs() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        DictationDiagnostics.attach(context)
+        try {
+            DictationDiagnostics.clear()
+            assertNull(prepareAuditAndDictationLogArchive(context, emptyList()))
+            DictationDiagnostics.setEnabled(true)
+            DictationDiagnostics.record("event=session_started session=4")
+            val archive = requireNotNull(prepareAuditAndDictationLogArchive(context, emptyList()))
+            ZipFile(archive).use { zip -> assertTrue(zip.getEntry("dictation-current.jsonl") != null) }
+            assertTrue(clearAuditAndDictationLogShares(context.cacheDir))
+            assertNull(prepareAuditAndDictationLogArchive(context, emptyList()))
+        } finally {
+            DictationDiagnostics.setEnabled(false)
+            clearAuditAndDictationLogShares(context.cacheDir)
+        }
+    }
 
     @Test
     fun exportContainsRetainedDictationEvenWithoutNativeAuditFiles() {

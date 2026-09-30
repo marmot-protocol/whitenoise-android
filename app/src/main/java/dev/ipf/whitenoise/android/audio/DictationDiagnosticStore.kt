@@ -5,6 +5,7 @@ import java.io.File
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.LinkOption
+import java.nio.file.StandardCopyOption
 import java.util.UUID
 
 /** Local technical metadata only, outside the engine's automatic-upload directory. */
@@ -37,8 +38,12 @@ internal class DictationDiagnosticStore(
         val current = File(directory, names[0])
         if (current.length() + bytes.size > maxBytes) {
             val previous = File(directory, names[1])
-            if (previous.exists()) check(previous.delete())
-            check(current.renameTo(previous))
+            Files.move(
+                current.toPath(),
+                previous.toPath(),
+                StandardCopyOption.REPLACE_EXISTING,
+                StandardCopyOption.ATOMIC_MOVE,
+            )
             rotations += 1
         }
         // Appending must not extend the oldest record's retention window.
@@ -72,6 +77,21 @@ internal class DictationDiagnosticStore(
             put("dictation-manifest.json", metadata.put("files", files.size).toString().toByteArray(Charsets.UTF_8))
         }
     }
+
+    /** No IO or store lock: native logs can still be exported when the writer barrier is unavailable. */
+    fun unavailableSnapshot(enabled: Boolean, dropped: Long, reason: String): Map<String, ByteArray> =
+        mapOf(
+            "dictation-manifest.json" to JSONObject()
+                .put("schema", 1)
+                .put("collection_enabled", enabled)
+                .put("dropped_in_process", dropped)
+                .put("coverage", "snapshot_unavailable")
+                .put("snapshot_failure", reason)
+                .put("files", 0)
+                .put("process", process)
+                .put("app_revision", buildRevision.takeIf { it.matches(Regex("[a-f0-9]{7,40}")) } ?: "unknown")
+                .toString().toByteArray(Charsets.UTF_8),
+        )
 
     @Synchronized
     fun clear(): Boolean {
