@@ -346,9 +346,10 @@ internal fun ChatRow(
                 chatRowDraftPreview(
                     item = item,
                     legacyDraft = appState.chatRowDraftFor(accountRef, item.group.groupIdHex),
-                )
+                ).takeUnless { item.checkingInvitation }
             val invitation =
-                item.selectedPreview == SelectedChatPreviewFfi.Invitation ||
+                item.checkingInvitation ||
+                    item.selectedPreview == SelectedChatPreviewFfi.Invitation ||
                     (item.selectedPreview == null && item.group.pendingConfirmation)
             val expired by rememberChatPreviewExpired(item.messagePreviewForRetention())
             val empty =
@@ -380,6 +381,7 @@ internal fun ChatRow(
                 } else {
                     AnnotatedString(
                         when {
+                            item.checkingInvitation -> stringResource(R.string.checking_invitation)
                             invitation ->
                                 stringResource(
                                     R.string.invited_to_chat_by,
@@ -409,7 +411,7 @@ internal fun ChatRow(
             // timestamp already rides `timestampAt` above), so the line the user
             // reads is the one that actually matched. Title/preview-only hits
             // (bodyMatch null) keep the normal last-message preview.
-            if (bodyMatch != null) {
+            if (bodyMatch != null && !item.checkingInvitation) {
                 val highlightStyle =
                     SpanStyle(
                         color = MaterialTheme.colorScheme.primary,

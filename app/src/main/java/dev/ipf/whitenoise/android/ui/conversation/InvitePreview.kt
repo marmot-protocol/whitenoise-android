@@ -13,10 +13,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -32,7 +35,6 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.GroupRosterLoadState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
-import dev.ipf.whitenoise.android.ui.group.GroupRosterLoadStatus
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -140,10 +142,28 @@ internal fun InviteAcceptanceResolutionStatus(
                 .imePadding()
                 .padding(vertical = 12.dp),
     ) {
-        GroupRosterLoadStatus(
-            state = state,
-            onRetry = onRetry,
-            retryContentColor = MaterialTheme.colorScheme.onSurface,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+            horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val checking = state == GroupRosterLoadState.LOADING
+            val label = if (checking) R.string.checking_invitation else R.string.couldnt_check_invitation
+            if (checking) {
+                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+            }
+            Text(
+                stringResource(label),
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (state != GroupRosterLoadState.LOADING) {
+                TextButton(
+                    onClick = onRetry,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                ) { Text(stringResource(R.string.retry)) }
+            }
+        }
     }
 }

@@ -2151,4 +2151,6 @@
     <string name="dictation_pause_other_audio_title">Andere Audioinhalte pausieren</string>
     <string name="dictation_pause_other_audio_subtitle">Musik und Podcasts während des Diktierens pausieren; nach der Aufnahme können sie weiterlaufen. Sprachausgabe und Sprachnachrichten in White Noise werden aus Sicherheitsgründen immer pausiert.</string>
     <string name="dictation_audio_focus_unavailable">Andere Audioinhalte konnten nicht pausiert werden. Versuche es erneut oder deaktiviere diese Option in den Diktiereinstellungen.</string>
+    <string name="checking_invitation">Einladung wird geprüft…</string>
+    <string name="couldnt_check_invitation">Einladung konnte nicht geprüft werden</string>
 </resources>

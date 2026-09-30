@@ -2134,4 +2134,6 @@
     <string name="dictation_pause_other_audio_title">Pausar otro audio</string>
     <string name="dictation_pause_other_audio_subtitle">Pausa la música y los pódcasts mientras dictas; pueden reanudarse al terminar la grabación. La voz y los mensajes de voz de White Noise siempre se pausan por seguridad.</string>
     <string name="dictation_audio_focus_unavailable">No se pudo pausar otro audio. Inténtalo de nuevo o desactiva esta opción en los ajustes de dictado.</string>
+    <string name="checking_invitation">Comprobando invitación…</string>
+    <string name="couldnt_check_invitation">No se pudo comprobar la invitación</string>
 </resources>
