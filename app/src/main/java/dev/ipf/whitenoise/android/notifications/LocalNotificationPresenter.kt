@@ -137,6 +137,7 @@ class LocalNotificationPresenter(
     private val postPacer: NotificationPostPacer = NotificationPostPacer.shared,
     private val alertBudget: NotificationAlertBudget = NotificationAlertBudget(),
     private val dismissalRetryDelay: suspend () -> Unit = { delay(CONVERSATION_DISMISSAL_RETRY_DELAY_MS) },
+    private val groupReconciliation: () -> Unit = { NotificationGroupReconciler.shared(context).request() },
     // Kept last so callers may still pass it as a trailing lambda.
     private val activeNotificationsProvider: (NotificationManager) -> Array<StatusBarNotification> = { manager ->
         manager.activeNotifications
@@ -159,7 +160,11 @@ class LocalNotificationPresenter(
 
     fun ensureChannels() {
         NotificationChannels.ensureChannels(context)
+        reconcileNotificationGroup()
     }
+
+    /** Rechecks OS cards on process start/resume and after auto-cancel notification taps. */
+    fun reconcileNotificationGroup() = groupReconciliation()
 
     fun hideConversationShortcutsFromDirectShare() {
         hideConversationShortcutsFromDirectShare(context)
@@ -229,6 +234,7 @@ class LocalNotificationPresenter(
                                 live.id,
                                 renamed,
                                 recordedAtMs = live.postTime,
+                                mustBeLive = true,
                             )
                         ) {
                             refreshed += 1
@@ -353,7 +359,7 @@ class LocalNotificationPresenter(
             val listed = active?.any { it.tag == key.tag && it.id == key.id && it.postTime <= cutoffMs } == true
             if (active != null && !writtenByApp && !listed) return@withLock ConversationCardDismissalOutcome.ABSENT
             try {
-                notificationCanceller(manager, key.tag, key.id)
+                cancelNotification(manager, key.tag, key.id)
                 ConversationCardDismissalOutcome.CANCELLED
             } catch (exception: RuntimeException) {
                 notificationDebug {
@@ -381,7 +387,7 @@ class LocalNotificationPresenter(
                 return@withLock ConversationCardDismissalOutcome.ABSENT
             }
             try {
-                notificationCanceller(compat, tag, live.id)
+                cancelNotification(compat, tag, live.id)
                 ConversationCardPostedRegistry.clearPosted(tag, live.id)
                 live.tag?.takeIf(String::isNotBlank)?.let(tapTokens::remove)
                 ConversationCardDismissalOutcome.CANCELLED
@@ -514,7 +520,7 @@ class LocalNotificationPresenter(
                             groupIdHex = groupIdHex,
                         )
                     ) {
-                        compat.cancel(live.tag, live.id)
+                        cancelNotification(compat, live.tag.orEmpty(), live.id)
                         live.tag?.takeIf(String::isNotBlank)?.let(tapTokens::remove)
                     }
                 }
@@ -629,6 +635,7 @@ class LocalNotificationPresenter(
                     notificationContent.notificationId,
                     ConversationCardScope(update.accountRef, update.groupIdHex),
                 ) { showToken ->
+                    reconcileNotificationGroup()
                     val showGenerationAllowsPost = {
                         if (replaceCurrentMessage) {
                             ConversationCardPostSynchronizer.isShowCurrent(showToken)
@@ -673,9 +680,25 @@ class LocalNotificationPresenter(
                                     primaryVibrationPattern = vibrationPattern,
                                 ).channelId
                         }
+                    val quietChannel =
+                        runCatching {
+                            context.getSystemService(NotificationManager::class.java)?.getNotificationChannel(channelId)?.importance
+                        }.getOrNull()?.let { it in NotificationManager.IMPORTANCE_NONE..NotificationManager.IMPORTANCE_LOW } == true
                     val builder =
                         NotificationCompat
                             .Builder(context, channelId)
+                            .apply {
+                                UserEventNotificationGroup.decorateChild(
+                                    context,
+                                    this,
+                                    NotificationGroupChild(
+                                        notificationContent.notificationTag,
+                                        notificationContent.notificationId,
+                                        showToken.notificationGeneration.id,
+                                    ),
+                                    silent = silentPost || quietChannel || decision.importance == ChannelImportance.LOW,
+                                )
+                            }
                             .setSmallIcon(R.drawable.ic_stat_whitenoise)
                             .setContentIntent(conversationPendingIntent(update, notificationContent.notificationTag))
                             .setCategory(decision.category)
@@ -684,9 +707,8 @@ class LocalNotificationPresenter(
                             .setAutoCancel(true)
                             .setOnlyAlertOnce(silentPost)
                             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
-                            // Matching corrections keep their original grouping. setSilent(true)
-                            // moves an ungrouped card into the platform's silent group and can
-                            // remove its heads-up banner; onlyAlertOnce suppresses repeat alerts.
+                            // The explicit group is installed before setSilent, which still suppresses
+                            // only this child. A later alerting child keeps GROUP_ALERT_CHILDREN.
                             .setSilent(silentPost && !replaceCurrentMessage)
                     // Name the recipient identity in the header when multi-account (#836).
                     if (!redactContent && !recipientAccountSubtext.isNullOrBlank()) {
@@ -901,7 +923,7 @@ class LocalNotificationPresenter(
                                         )
                                     }
                                     val notification =
-                                        builder.silencedIfSuperseded(heldAlert, replaceCurrentMessage).build()
+                                        builder.silencedIfSuperseded(heldAlert, replaceCurrentMessage, notificationContent.notificationId).build()
                                     ConversationCardPostSynchronizer.awaitTestBarrier(
                                         ConversationCardOp.SHOW_NOTIFY,
                                         ConversationCardBarrier.BEFORE_WRITE,
@@ -936,7 +958,7 @@ class LocalNotificationPresenter(
                                             notificationContent.notificationId,
                                         )
                                     } else {
-                                        notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
+                                        cancelNotification(notificationManager, notificationContent.notificationTag, notificationContent.notificationId)
                                         if (carried.isNullOrEmpty()) {
                                             false
                                         } else {
@@ -954,7 +976,7 @@ class LocalNotificationPresenter(
                                                 ),
                                             )
                                             val cleanNotification =
-                                                builder.silencedIfSuperseded(heldAlert, replaceCurrentMessage).build()
+                                                builder.silencedIfSuperseded(heldAlert, replaceCurrentMessage, notificationContent.notificationId).build()
                                             val retrySucceeded =
                                                 postNotificationSafely(
                                                     notificationManager,
@@ -977,7 +999,7 @@ class LocalNotificationPresenter(
                                                     notificationContent.notificationId,
                                                 )
                                             } else {
-                                                notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
+                                                cancelNotification(notificationManager, notificationContent.notificationTag, notificationContent.notificationId)
                                                 false
                                             }
                                         }
@@ -998,7 +1020,7 @@ class LocalNotificationPresenter(
                                     val presentationTimestampMs = nowMillis()
                                     stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
                                     val notification =
-                                        builder.silencedIfSuperseded(heldAlert, replaceCurrentMessage).build()
+                                        builder.silencedIfSuperseded(heldAlert, replaceCurrentMessage, notificationContent.notificationId).build()
                                     ConversationCardPostSynchronizer.awaitTestBarrier(
                                         ConversationCardOp.SHOW_NOTIFY,
                                         ConversationCardBarrier.BEFORE_WRITE,
@@ -1033,7 +1055,7 @@ class LocalNotificationPresenter(
                                             notificationContent.notificationId,
                                         )
                                     } else {
-                                        notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
+                                        cancelNotification(notificationManager, notificationContent.notificationTag, notificationContent.notificationId)
                                         false
                                     }
                                 }
@@ -1231,6 +1253,7 @@ class LocalNotificationPresenter(
                     content.notificationTag,
                     content.notificationId,
                     enriched,
+                    mustBeLive = true,
                 )
             ) {
                 retainPostedCardUnlessDismissed(
@@ -1342,11 +1365,14 @@ class LocalNotificationPresenter(
     private fun NotificationCompat.Builder.silencedIfSuperseded(
         heldAlert: NotificationAlertReservation?,
         replaceCurrentMessage: Boolean,
+        notificationId: Int,
     ): NotificationCompat.Builder {
         if (heldAlert == null || heldAlert.stillHoldsTheRing()) return this
         notificationDebug { "silent first post reason=Superseded" }
         heldAlert.release()
-        return setOnlyAlertOnce(true).setSilent(!replaceCurrentMessage)
+        return setOnlyAlertOnce(true)
+            .setSortKey(UserEventNotificationGroup.attentionSortKey(notificationId, silent = true))
+            .setSilent(!replaceCurrentMessage)
     }
 
     /** Writes one card and reports success without allowing observer failures to alter delivery. */
@@ -1357,18 +1383,41 @@ class LocalNotificationPresenter(
         notification: Notification,
         onNotificationWritten: (() -> Unit)? = null,
         recordedAtMs: Long? = null,
+        mustBeLive: Boolean = false,
     ): Boolean =
         try {
-            notificationPoster(manager, tag, id, notification)
-            ConversationCardPostedRegistry.markPosted(tag, id, recordedAtMs ?: System.currentTimeMillis())
-            runCatching { onNotificationWritten?.invoke() }
-            true
+            val written =
+                NotificationGroupReconciler.postChild(
+                    context,
+                    notification,
+                    request = groupReconciliation,
+                    isLive =
+                        if (mustBeLive) {
+                            {
+                                val current =
+                                    context.getSystemService(NotificationManager::class.java)?.let { activeNotification(it, tag, id) }
+                                current != null && current.notification.extras.getString(UserEventNotificationGroup.EXTRA_GENERATION) ==
+                                    notification.extras.getString(UserEventNotificationGroup.EXTRA_GENERATION)
+                            }
+                        } else {
+                            null
+                        },
+                ) { notificationPoster(manager, tag, id, notification) }
+            if (written) {
+                ConversationCardPostedRegistry.markPosted(tag, id, recordedAtMs ?: System.currentTimeMillis())
+                runCatching { onNotificationWritten?.invoke() }
+            }
+            written
         } catch (exception: RuntimeException) {
             notificationDebug {
                 "post failed tag=${tag.take(16)} type=${exception.javaClass.simpleName}"
             }
             false
         }
+
+    private fun cancelNotification(manager: NotificationManagerCompat, tag: String, id: Int) {
+        NotificationGroupReconciler.mutate(context, groupReconciliation) { notificationCanceller(manager, tag, id) }
+    }
 
     /** Cancels a completed write when its conversation was dismissed during the platform call. */
     private fun retainPostedCardUnlessDismissed(
@@ -1379,7 +1428,7 @@ class LocalNotificationPresenter(
     ): Boolean {
         if (ConversationCardPostSynchronizer.isShowNotDismissed(showToken)) return true
         ConversationCardPostedRegistry.clearPosted(tag, id)
-        notificationCanceller(manager, tag, id)
+        cancelNotification(manager, tag, id)
         return false
     }
 
@@ -1398,7 +1447,7 @@ class LocalNotificationPresenter(
         ConversationCardPostSynchronizer.withLock(tag, id, ConversationCardOp.DISMISS_CANCEL) {
             ConversationCardPostSynchronizer.markDismissed(tag, id)
             val writtenByApp = ConversationCardPostedRegistry.clearPosted(tag, id)
-            if (!onlyIfLive || writtenByApp || cardIsLive(tag, id)) notificationCanceller(manager, tag, id)
+            if (!onlyIfLive || writtenByApp || cardIsLive(tag, id)) cancelNotification(manager, tag, id)
         }
     }
 
@@ -1428,7 +1477,7 @@ class LocalNotificationPresenter(
             val live = activeNotification(manager, tag, id) ?: return@withLock
             if (live.postTime <= sinceMs) {
                 ConversationCardPostedRegistry.clearPosted(tag, id)
-                compat.cancel(tag, id)
+                cancelNotification(compat, tag, id)
             }
         }
     }
@@ -1567,7 +1616,7 @@ class LocalNotificationPresenter(
             )
             if (shouldCancelRepliedConversationCard(actedMessageIdHex, liveCardMessageIdHex)) {
                 ConversationCardPostedRegistry.clearPosted(notificationTag, notificationId)
-                NotificationManagerCompat.from(context).cancel(notificationTag, notificationId)
+                cancelNotification(NotificationManagerCompat.from(context), notificationTag, notificationId)
                 notificationDebug { "cancelled tag=${notificationTag.take(16)} id=$notificationId" }
             }
         }
@@ -1651,7 +1700,7 @@ class LocalNotificationPresenter(
                         .setSilent(true)
                         .setOnlyAlertOnce(true)
                         .build()
-                NotificationManagerCompat.from(context).notify(notificationTag, notificationId, resolved)
+                if (!postNotificationSafely(NotificationManagerCompat.from(context), notificationTag, notificationId, resolved, mustBeLive = true)) return@runCatching false
                 notificationDebug { "remote-input-handled re-post tag=${notificationTag.take(16)} id=$notificationId" }
                 true
             }.getOrDefault(false)
@@ -1698,7 +1747,7 @@ class LocalNotificationPresenter(
                         .setSilent(true)
                         .setOnlyAlertOnce(true)
                         .build()
-                NotificationManagerCompat.from(context).notify(notificationTag, notificationId, resolved)
+                if (!postNotificationSafely(NotificationManagerCompat.from(context), notificationTag, notificationId, resolved, mustBeLive = true)) return@runCatching false
                 notificationDebug { "reply-failed re-post tag=${notificationTag.take(16)} id=$notificationId" }
                 true
             }.getOrDefault(false)

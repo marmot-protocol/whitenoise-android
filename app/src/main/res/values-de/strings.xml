@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="notification_channel_summary">Benachrichtigungsübersicht</string>
+    <string name="notification_channel_summary_description">Stille Übersicht der Nachrichten und anderer Ereignisse</string>
+    <plurals name="notification_group_count">
+        <item quantity="one">%1$d Benachrichtigung</item>
+        <item quantity="other">%1$d Benachrichtigungen</item>
+    </plurals>
     <string name="poll_custom_time">Eigene Dauer</string>
     <string name="poll_custom_duration">Dauer</string>
     <string name="poll_unit_seconds">Sekunden</string>

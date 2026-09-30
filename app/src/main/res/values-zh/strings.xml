@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="notification_channel_summary">通知摘要</string>
+    <string name="notification_channel_summary_description">消息和其他事件的静音摘要</string>
+    <plurals name="notification_group_count">
+        <item quantity="other">%1$d 条通知</item>
+    </plurals>
     <string name="poll_custom_time">自定义时间</string>
     <string name="poll_custom_duration">时长</string>
     <string name="poll_unit_seconds">秒</string>

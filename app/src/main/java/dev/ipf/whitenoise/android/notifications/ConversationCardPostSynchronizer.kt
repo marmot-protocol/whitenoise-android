@@ -26,6 +26,7 @@ internal data class ConversationCardShowToken(
     val conversationScope: ConversationCardScope,
     val dismissalGeneration: Long,
     val showGeneration: Long,
+    val notificationGeneration: NotificationCardGeneration,
 )
 
 /** Account and conversation identity used to invalidate opaque in-flight cards. */
@@ -98,6 +99,7 @@ internal object ConversationCardPostSynchronizer {
                     conversationScope = conversationScope,
                     dismissalGeneration = state.dismissals.capture(),
                     showGeneration = state.shows.advance(),
+                    notificationGeneration = NotificationCardGenerations.register(),
                 )
             }
         return try {
@@ -114,7 +116,8 @@ internal object ConversationCardPostSynchronizer {
             if (
                 state == null ||
                 !state.dismissals.isCurrent(token.dismissalGeneration) ||
-                !state.shows.isCurrent(token.showGeneration)
+                !state.shows.isCurrent(token.showGeneration) ||
+                !NotificationCardGenerations.retain(token.notificationGeneration)
             ) {
                 false
             } else {
@@ -127,6 +130,7 @@ internal object ConversationCardPostSynchronizer {
 
     /** Releases one registered post and retires its key after all detached work completes. */
     fun releaseShow(token: ConversationCardShowToken) {
+        NotificationCardGenerations.release(token.notificationGeneration)
         val key = ConversationCardKey(token.notificationTag, token.notificationId)
         synchronized(inFlightShowsLock) {
             val state = inFlightShows[key] ?: return
@@ -147,7 +151,8 @@ internal object ConversationCardPostSynchronizer {
             inFlightShows[ConversationCardKey(token.notificationTag, token.notificationId)]
                 ?.let { state ->
                     state.dismissals.isCurrent(token.dismissalGeneration) &&
-                        state.shows.isCurrent(token.showGeneration)
+                        state.shows.isCurrent(token.showGeneration) &&
+                        !token.notificationGeneration.dismissed.get()
                 } == true
         }
 
@@ -156,7 +161,8 @@ internal object ConversationCardPostSynchronizer {
         synchronized(inFlightShowsLock) {
             inFlightShows[ConversationCardKey(token.notificationTag, token.notificationId)]
                 ?.dismissals
-                ?.isCurrent(token.dismissalGeneration) == true
+                ?.isCurrent(token.dismissalGeneration) == true &&
+                !token.notificationGeneration.dismissed.get()
         }
 
     /** Invalidates every registered post that predates a conversation-card dismissal. */

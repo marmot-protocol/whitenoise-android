@@ -97,6 +97,14 @@ enum class NotificationChannelSpec(
         ConversationChannelPolicy.GLOBAL_ONLY,
         launcherBadgeByDefault = false,
     ),
+
+    /** Presentation-only summary. Child channels and their existing settings own every alert. */
+    USER_EVENT_SUMMARY(
+        "user_event_summary_v1",
+        ChannelImportance.LOW,
+        ConversationChannelPolicy.GLOBAL_ONLY,
+        launcherBadgeByDefault = false,
+    ),
     ;
 
     companion object {

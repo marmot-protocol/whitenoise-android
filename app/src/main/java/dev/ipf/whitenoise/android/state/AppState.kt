@@ -7887,6 +7887,7 @@ class WhiteNoiseAppState private constructor(
         }
         if (foreground) {
             refreshLocalNotificationPermission()
+            localNotificationPresenter.reconcileNotificationGroup()
             refreshNotificationBatteryPolicy()
             notificationScope.launch { catchUpAfterForegroundActivation() }
         }
