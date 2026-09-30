@@ -1,72 +1,42 @@
 # White Noise Android issue triage
 
-[Project 7](https://github.com/orgs/marmot-protocol/projects/7) is the product
-planning authority. Read its live README and field options before metadata
-changes; product ordering and release steering must not be frozen in agent docs.
-Execution ledgers may track delivery but must link existing GitHub work.
+[Project 7](https://github.com/orgs/marmot-protocol/projects/7) is the planning
+authority. Read its live README and field options before metadata changes;
+execution ledgers link GitHub work rather than becoming another backlog.
 
 ## Ownership and publication
 
-- Apply the [root MDK/Android boundary](../AGENTS.md#architecture-minimal-android-display-layer).
-  File shared runtime defects in MDK; use Android issues for presentation and
-  platform integration. Represent a missing upstream capability as a real
-  dependency, not a Kotlin workaround.
-- Before implementation, check live assignees, related PRs, and current source.
-  Establish sole authorized ownership; preserve another contributor's active work.
-- Before creating or materially editing an issue, search open/closed issues and
-  open/closed/merged PRs by symptom, subsystem and root cause. Inspect plausible
-  matches; update the canonical scope instead of creating duplicates.
-- Draft the exact title, body, native type, labels, all Project fields, parent,
-  dependencies and duplicate disposition. Begin the body with `## Summary` and
-  name the owning source paths, acceptance criteria and regression-test target.
-- Pass the workspace's source-grounded independent issue review on that exact
-  artifact. Substantive edits invalidate the review. Publish from the reviewed
-  body and read back both issue and Project metadata before reporting success.
+- Apply the [MDK/Android boundary](../AGENTS.md#architecture-minimal-android-display-layer).
+  File shared runtime defects in MDK; link missing upstream capabilities as dependencies.
+- Check live assignees, related PRs and current source before implementation;
+  establish sole authorized ownership and preserve active contributors.
+- Search open/closed issues and PRs (including merged PRs) by symptom, subsystem
+  and cause before publication. Update the canonical scope instead of duplicating it.
+- Draft exact title/body, native type, labels, Project fields and relationships.
+  Begin with `## Summary`; include source paths, acceptance criteria and regression tests.
+- Obtain source-grounded independent review of the exact artifact under workspace
+  policy. Publish from the reviewed body; read back issue and Project metadata.
 
 ## Project contract
 
-- Every open issue and PR appears exactly once. Open PRs use `In Progress`.
-- Issues use native `Bug`, `Feature`, `Task` or `Tracking` types. Trackers use
-  native parent/sub-issue relationships and a bounded completion rule; do not
-  force unrelated standalone work under one tracker.
+- Every open issue/PR appears exactly once; open PRs use `In Progress`.
+- Use native `Bug`, `Feature`, `Task` or `Tracking` types and real parent/dependency
+  relationships. Trackers need bounded completion criteria; preserve user relationships.
 - Set `Status`, `Release gate`, `Priority`, `Area`, `Triage health`, `Impact` and
-  `Confidence` from live options/evidence. For PRs, inherit classification from
-  the canonical issue where appropriate. Review every optional planning field;
-  leave unsupported dates, ranks, iterations and commitments unset.
-- `Priority` controls execution order. Follow the live README for `Release gate`,
-  including any compatibility-only disposition; never infer priority from it.
-  Use P0 for the immediate emergency/critical-path lane, P1
-  for high-impact committed work, P2 for normal next/active work, and P3 for
-  intentionally deferred work. Live steering takes precedence.
-- `Triage health` distinguishes executable `Ready` work from `Needs design`,
-  `Needs upstream`, concrete `Blocked` work and temporary `Needs triage` intake.
-- Use `Product rank` only for an established product order. Use native
-  dependencies only for actual blockers. Preserve user-authored relationships.
-- Retired labels `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`, and `tracking` must not be
-  recreated. Native Bug uses the existing `bug` label; Feature uses `enhancement`.
-  Do not invent labels duplicating type or Project fields.
-- `agent-ok` is a separate autonomy decision. Apply it only when current policy
-  permits implementation and the independently reviewed scope has no unresolved
-  product/upstream gate; never add it to broad trackers.
+  `Confidence` from live steering/evidence; PRs inherit issue classification where
+  appropriate. Inspect optional fields; leave unsupported commitments unset.
+- Follow live priority/health definitions; release gate does not imply priority.
+  Use `Product rank` only for an established product order.
+- Do not recreate retired `CRITICAL`, `HIGH`, `MEDIUM`, `LOW` or `tracking` labels.
+  Bug uses `bug`; Feature uses `enhancement`. Avoid labels duplicating Project fields.
+- Apply `agent-ok` only under current autonomy policy to independently reviewed,
+  executable scopes without unresolved product/upstream gates; never broad trackers.
 
-## Access and reconciliation
+## Verification
 
-Use the existing authenticated GitHub CLI and preserve its credential boundary.
-A missing MCP/plugin is not evidence that GitHub is unavailable. Require only
-permissions needed for the operation; do not create another login or print tokens.
-Use local mirrored discovery where the workspace provides it; exact mutation
-and readiness gates require uncached live readback through the maintained tools.
-
-Prefer supported Projects v2 REST reads for current project fields/items. Follow
-workspace quota/admission rules rather than switching clients or credentials.
-On the shared Hermes host, use its maintained Project audit/publisher tools;
-`gh project item-list` is blocked there, so the repository checker below is not
-an API-error fallback.
-
-For environments supporting the repository checker's CLI reads, run
-`python3 scripts/check_github_triage.py` after Project changes. Its
-`--repair-additions` option only adds missing open issues; it does not classify
-items. Also verify the full live field contract above: the checker covers only
-its configured subset. Reconcile missing/duplicate items, retired labels, native
-hierarchy and stale status; close/archive shipped, obsolete or duplicate work
-without deleting legitimate history.
+Use maintained authenticated tools and workspace discovery/quota rules; mutations
+require uncached live readback. On the shared Hermes host, use its Project tools
+(`gh project item-list` is blocked). Elsewhere, `python3 scripts/check_github_triage.py`
+checks its configured subset only; `--repair-additions` adds missing issues without
+classifying them. Verify the full field contract, uniqueness, hierarchy and status
+separately; preserve legitimate history when reconciling obsolete/duplicate work.

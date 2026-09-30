@@ -5,15 +5,9 @@ Android client for White Noise, backed by the Marmot bindings.
 ## Project Shape
 
 The Kotlin/Jetpack Compose app is a minimal display and Android platform layer.
-MDK owns the shared product logic, protocol, persistence, queries/projections,
-relay/media operations, validation and recovery. Android renders its typed
-state and supplies platform inputs; it does not recreate those rules in Kotlin.
-
-See [the agent guide](AGENTS.md#architecture-minimal-android-display-layer) and
-[MDK's host boundary](https://github.com/marmot-protocol/mdk/blob/master/docs/marmot-architecture/overview/app-core-boundary.md#host-app-boundary).
-Improve slow native queries or bindings rather than introducing a second Android
-store for protocol data. Missing shared capabilities are implemented in MDK and
-adopted through a reviewed, published MarmotKit artifact.
+MDK owns shared product logic and authoritative state. Follow [the agent guide](AGENTS.md#architecture-minimal-android-display-layer)
+and [MDK's host boundary](https://github.com/marmot-protocol/mdk/blob/master/docs/marmot-architecture/overview/app-core-boundary.md#host-app-boundary)
+when choosing where to implement a change.
 
 ## Common Commands
 
