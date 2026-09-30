@@ -1,5 +1,49 @@
 # White Noise Android manual release testing
 
+## Quick checklist for human testers
+
+Start here for a short everyday-use pass. The [detailed checklist](#full-release-checklist) below covers edge cases and remains required for release approval.
+
+Use disposable profiles you control and harmless content. Test with a second installation on another profile; have a third profile for group changes. Include iOS if available. Record the build, app version, phone, Android version, tester and date. Tick after checking results; explain skipped checks.
+
+### Start and sign in
+
+- [ ] Install fresh, create a profile and set its name/photo. Reopen: profile and settings remain.
+- [ ] Upgrade a populated test install: chats, profiles and drafts survive, and sending still works. Keep a device-level copy of app data first; an exported key does not back up chat history. Avoid downgrades.
+- [ ] Sign in with a test key; try Amber if available. Cancel and retry: sign-in recovers.
+- [ ] Switch between two profiles, then restart. Each shows its own chats and settings.
+
+### Chat and send
+
+- [ ] Send both ways in a direct chat and a group. Text, emoji, links and formatted messages appear once on both installations.
+- [ ] Reply, react, edit and delete your own test messages. The other installation sees the correct changes; replies open the right message.
+- [ ] Turn networking off, try sending, then reconnect and retry as needed. Messages reach the other installation once; failures offer a usable retry.
+- [ ] Leave a draft and reopen the chat: it remains. Scroll older history, jump to newest and search for a known message: the right content appears.
+
+### Groups and media
+
+- [ ] Create/join a group, add/remove the third profile and change its name/photo. Members see changes; removed members lose access to new messages. Leave using a non-admin test profile.
+- [ ] Send a poll; vote and change your vote on the peer. Results agree; voting stops at the chosen closing time.
+- [ ] Enable disappearing messages in a test chat and set a default for new chats. Check expiry on both installations; existing chat timers stay unchanged by the default.
+- [ ] Send a photo, video, voice message and document. The peer can open/play them. Save or share a received file, then start a download and leave the chat: it completes.
+- [ ] Crop a profile/group photo, view a received photo full-screen and try a GIF sent from iOS if available. Images and playback look correct.
+- [ ] Try dictation's Paste and Send, plus read-aloud if available. Transcription goes into the draft or sends as chosen; Stop ends recording/playback.
+
+### Background, privacy and daily use
+
+- [ ] Background the app and lock the phone; send from the peer. Check the notification, then tap it: the correct profile/chat opens and the message appears once. Repeat after restarting the phone.
+- [ ] Mute a chat, set a group to mentions-only notifications and enable app lock. Alerts, private previews and Recents follow privacy settings.
+- [ ] Block/unblock a test peer. Sending controls and notifications follow the blocked state.
+- [ ] Pin/archive a chat and create/delete a folder. Change theme, language and font size. Reopen the app: saved choices remain and Back returns to the expected screen.
+- [ ] Try large text, landscape and TalkBack. Main actions remain readable and reachable; the keyboard leaves Send accessible.
+- [ ] Open Help, copy the version and submit a test bug report: links and feedback work. Recheck this release's changed features.
+
+### Report and finish
+
+Report failures with build, phone, steps, expected/actual result and time. Hide keys/private content in screenshots; include a detailed test ID if available. Flag crashes, lost data/messages, wrong-profile content and privacy failures immediately. Clear test downloads/clipboard and remove test data. Report a **quick pass**, not full release approval.
+
+## Detailed testing
+
 This is the release-candidate checklist for every user-visible White Noise Android surface. It is written so a tester who has never used White Noise can follow it without reading the source. Run every applicable point against the exact APK proposed for release. Do not infer a pass from an automated test.
 
 ## How to use this guide
