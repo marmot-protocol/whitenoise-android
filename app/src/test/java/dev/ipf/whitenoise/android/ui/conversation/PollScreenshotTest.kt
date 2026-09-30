@@ -89,7 +89,12 @@ class PollScreenshotTest {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true, amoled = true) {
                 Surface(Modifier.width(360.dp).testTag("poll-card")) {
-                    PollCard(poll().copy(localSelection = emptyList()), canVote = true, onVote = {}, status = PollVoteStatus.FAILED)
+                    PollCard(
+                        poll().copy(localSelection = emptyList()),
+                        canVote = true,
+                        onVote = {},
+                        status = PollVoteStatus.FAILED,
+                    )
                 }
             }
         }

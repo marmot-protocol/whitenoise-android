@@ -9063,6 +9063,12 @@
         "test_ids": ["SET-020"]
       },
       {
+        "surface": "PollVoteStatusLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
+        "anchor": "private fun PollVoteStatusLabel(",
+        "test_ids": ["MSG-021"]
+      },
+      {
         "surface": "PollVotingCard",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
         "anchor": "internal fun PollVotingCard(",

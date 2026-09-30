@@ -120,14 +120,22 @@ class PollConversationActionsTest {
                 )
             val controller = controller(state)
             assertNull(controller.castPollVote(MESSAGE_ID, listOf("native-option")))
-            assertEquals(SendAcceptDispositionFfi.PUBLISHED, controller.castPollVote(MESSAGE_ID, listOf("native-option")))
+            assertEquals(
+                SendAcceptDispositionFfi.PUBLISHED,
+                controller.castPollVote(MESSAGE_ID, listOf("native-option")),
+            )
             assertEquals(2, attempt)
         }
 
     @Test
     fun preservesPendingAndUnknownNativeOutcomes() =
         runTest {
-            for (disposition in listOf(SendAcceptDispositionFfi.ACCEPTED_PENDING, SendAcceptDispositionFfi.COMPLETION_UNKNOWN)) {
+            val dispositions =
+                listOf(
+                    SendAcceptDispositionFfi.ACCEPTED_PENDING,
+                    SendAcceptDispositionFfi.COMPLETION_UNKNOWN,
+                )
+            for (disposition in dispositions) {
                 val controller = controller(appState(native { _, _ -> summary(disposition) }))
                 assertEquals(disposition, controller.castPollVote(MESSAGE_ID, listOf("native-option")))
             }
@@ -156,7 +164,10 @@ class PollConversationActionsTest {
         }
 
     private fun native(call: (String, Array<out Any?>) -> Any?): MarmotInterface =
-        Proxy.newProxyInstance(MarmotInterface::class.java.classLoader, arrayOf(MarmotInterface::class.java)) { proxy, method, args ->
+        Proxy.newProxyInstance(
+            MarmotInterface::class.java.classLoader,
+            arrayOf(MarmotInterface::class.java),
+        ) { proxy, method, args ->
             when (val name = method.name.substringBefore('-')) {
                 "toString" -> "poll-test-native"
                 "hashCode" -> System.identityHashCode(proxy)

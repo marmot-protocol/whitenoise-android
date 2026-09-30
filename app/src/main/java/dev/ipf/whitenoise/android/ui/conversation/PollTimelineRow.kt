@@ -203,22 +203,22 @@ internal fun PollVotingCard(
         }
     }
     val displayedPoll = pendingSelection?.let { optimisticPollProjection(poll, it) } ?: poll
+    val effectiveCanVote = canVote && open
     PollCard(
         poll = displayedPoll,
-        canVote = canVote && open && !voting,
+        canVote = effectiveCanVote && !voting,
         open = open,
         status = if (voting) PollVoteStatus.SUBMITTING else status,
-        onVote = { optionId ->
-            val replacement = replacementPollSelection(displayedPoll, optionId)
-            if (!voting && canVote && open && replacement != null && pollVoteAllowed(poll, System.currentTimeMillis())) {
-                voting = true
-                status = PollVoteStatus.SUBMITTING
-                pendingSelection = replacement
-                submitVote(replacement) { outcome ->
-                    status = if (pendingSelection == null) PollVoteStatus.IDLE else outcome.voteStatus()
-                    if (outcome == null) pendingSelection = null
-                    voting = false
-                }
+        onVote = vote@{ optionId ->
+            if (voting || !effectiveCanVote || !pollVoteAllowed(poll, System.currentTimeMillis())) return@vote
+            val replacement = replacementPollSelection(displayedPoll, optionId) ?: return@vote
+            voting = true
+            status = PollVoteStatus.SUBMITTING
+            pendingSelection = replacement
+            submitVote(replacement) { outcome ->
+                status = if (pendingSelection == null) PollVoteStatus.IDLE else outcome.voteStatus()
+                if (outcome == null) pendingSelection = null
+                voting = false
             }
         },
     )
@@ -311,18 +311,33 @@ internal fun PollCard(
                         .format(Date(endsAt.toLong() * 1_000L))
                 Text(stringResource(R.string.poll_ends_at, deadline), style = MaterialTheme.typography.labelSmall)
             }
-            if (status == PollVoteStatus.SUBMITTING) Text(stringResource(R.string.sending), style = MaterialTheme.typography.labelMedium)
-            if (status == PollVoteStatus.UNCONFIRMED) Text(stringResource(R.string.delivery_not_confirmed), style = MaterialTheme.typography.labelMedium)
-            if (status == PollVoteStatus.FAILED) {
-                Text(
-                    stringResource(R.string.poll_vote_failed),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
+            PollVoteStatusLabel(status)
             if (!open) Text(stringResource(R.string.poll_closed), style = MaterialTheme.typography.labelMedium)
         }
     }
+}
+
+/** Shows only presentation feedback; MDK remains authoritative for the selection and tally. */
+@Composable
+@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
+private fun PollVoteStatusLabel(status: PollVoteStatus) {
+    val label =
+        when (status) {
+            PollVoteStatus.IDLE -> return
+            PollVoteStatus.SUBMITTING -> R.string.sending
+            PollVoteStatus.UNCONFIRMED -> R.string.delivery_not_confirmed
+            PollVoteStatus.FAILED -> R.string.poll_vote_failed
+        }
+    Text(
+        stringResource(label),
+        style = MaterialTheme.typography.labelMedium,
+        color =
+            if (status == PollVoteStatus.FAILED) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+    )
 }
 
 /** Keeps vote counts readable in both live and closed polls while retaining a clear tap target. */

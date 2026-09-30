@@ -32,10 +32,15 @@ class PollVotingInteractionTest {
         var complete: ((SendAcceptDispositionFfi?) -> Unit)? = null
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true, amoled = true) {
-                PollVotingCard(projection.value, "account" to "received-poll", canVote = true, submitVote = { ids, done ->
-                    submissions += ids
-                    complete = done
-                })
+                PollVotingCard(
+                    projection.value,
+                    "account" to "received-poll",
+                    canVote = true,
+                    submitVote = { ids, done ->
+                        submissions += ids
+                        complete = done
+                    },
+                )
             }
         }
 
@@ -51,7 +56,11 @@ class PollVotingInteractionTest {
                 poll().copy(
                     localSelection = listOf("native-b"),
                     participants = 1uL,
-                    options = listOf(PollOptionResultFfi("native-a", "Soup", 0uL), PollOptionResultFfi("native-b", "Salad", 1uL)),
+                    options =
+                        listOf(
+                            PollOptionResultFfi("native-a", "Soup", 0uL),
+                            PollOptionResultFfi("native-b", "Salad", 1uL),
+                        ),
                 )
         }
         composeRule.onNodeWithText("Sending").assertExists()
@@ -134,9 +143,14 @@ class PollVotingInteractionTest {
         val submissions = mutableListOf<List<String>>()
         composeRule.setContent {
             WhiteNoiseTheme {
-                PollVotingCard(projection.value, "account" to "received-poll", canVote = available.value, submitVote = { ids, _ ->
-                    submissions += ids
-                })
+                PollVotingCard(
+                    projection.value,
+                    "account" to "received-poll",
+                    canVote = available.value,
+                    submitVote = { ids, _ ->
+                        submissions += ids
+                    },
+                )
             }
         }
         composeRule.onNodeWithText("Salad").assertIsNotEnabled().performClick()
@@ -152,7 +166,11 @@ class PollVotingInteractionTest {
     private fun poll() =
         PollProjectionFfi(
             question = "Lunch?",
-            options = listOf(PollOptionResultFfi("native-a", "Soup", 0uL), PollOptionResultFfi("native-b", "Salad", 0uL)),
+            options =
+                listOf(
+                    PollOptionResultFfi("native-a", "Soup", 0uL),
+                    PollOptionResultFfi("native-b", "Salad", 0uL),
+                ),
             pollType = PollTypeFfi.SINGLE_CHOICE,
             participants = 0uL,
             localSelection = emptyList(),
