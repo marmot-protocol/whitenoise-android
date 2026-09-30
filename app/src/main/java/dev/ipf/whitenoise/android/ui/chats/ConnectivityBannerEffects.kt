@@ -26,6 +26,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withTimeoutOrNull
 
+/**
+ * Counter that increments once per host `ON_START`, so a `LaunchedEffect` keyed on it can detect a
+ * foreground resume distinctly from any other recomposition.
+ */
 @Composable
 internal fun rememberConnectivityForegroundEpoch(): Int {
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -127,6 +131,10 @@ internal fun RelayConnectivityPollingEffect(
     }
 }
 
+/**
+ * Re-evaluates chat-list readiness whenever validated internet appears, recovers, or drops, keyed so
+ * the first signal after a bind only invalidates rather than assuming a prior attempt failed.
+ */
 @Composable
 @Suppress("FunctionNaming")
 internal fun ValidatedInternetRefreshEffect(
@@ -153,6 +161,11 @@ internal fun ValidatedInternetRefreshEffect(
     }
 }
 
+/**
+ * Revalidates chat-list readiness on the two edges the periodic poll would otherwise be alone in
+ * catching: a foreground resume with usable internet, and relays reading disconnected while internet
+ * is validated.
+ */
 @Composable
 @Suppress("FunctionNaming")
 internal fun ConnectivityEdgeRefreshEffects(

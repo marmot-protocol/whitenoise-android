@@ -37,6 +37,7 @@ class ChatListConnectivityLifecycleTest {
 
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
 
+    /** A STOP/START cycle with no relay sample still revalidates once on resume, with no visible banner. */
     @Test
     fun healthyStopStartWithZeroRelaySampleRevalidatesWithoutRenderingAConnectivityTransition() {
         val lifecycleOwner = StartedLifecycleOwner()
@@ -269,6 +270,7 @@ class ChatListConnectivityLifecycleTest {
         assertEquals("the new owner takes its own fresh sample on resume", countAtStop + 1, refreshCount)
     }
 
+    /** A [LifecycleOwner] test double that starts already resumed, so tests drive STOP/START directly. */
     private class StartedLifecycleOwner : LifecycleOwner {
         private val registry = LifecycleRegistry(this)
 
@@ -280,6 +282,7 @@ class ChatListConnectivityLifecycleTest {
             registry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
         }
 
+        /** Dispatches one lifecycle event to every observer registered on this owner. */
         fun handle(event: Lifecycle.Event) {
             registry.handleLifecycleEvent(event)
         }
