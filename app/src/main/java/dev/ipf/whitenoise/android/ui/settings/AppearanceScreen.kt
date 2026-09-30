@@ -69,6 +69,7 @@ internal fun AppearanceScreen(
     onOpenActionColor: () -> Unit,
     onOpenChatBubbleColors: () -> Unit,
     onOpenLanguage: () -> Unit,
+    onOpenCustomEmoji: () -> Unit,
 ) {
     var fontFamilyOpen by rememberSaveable { mutableStateOf(false) }
     var fontSizeOpen by rememberSaveable { mutableStateOf(false) }
@@ -202,6 +203,17 @@ internal fun AppearanceScreen(
                             title = stringResource(R.string.enter_key_behavior_title),
                             value = enterLabels.getValue(appState.enterKeyBehavior),
                             onClick = { enterOpen = true },
+                        )
+                    }
+                }
+            }
+            item {
+                SettingsGroup(modifier = Modifier.testTag("appearance.custom_emoji.group")) {
+                    row("custom_emoji") { context ->
+                        SettingsLink(
+                            context = context,
+                            title = stringResource(R.string.custom_emoji),
+                            onClick = onOpenCustomEmoji,
                         )
                     }
                 }

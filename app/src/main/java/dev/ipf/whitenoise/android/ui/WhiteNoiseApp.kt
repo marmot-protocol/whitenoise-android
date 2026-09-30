@@ -462,6 +462,7 @@ internal fun WhiteNoiseApp(
         }
     }
 
+    val customEmojiStore = rememberCustomEmojiStore(context)
     // Privacy hardening (#405): when "Force incognito keyboard" is on, wrap the
     // whole app UI so every descendant text field requests incognito mode from
     // the IME (no learning / suggestion history / cloud sync of typed content).
@@ -469,6 +470,7 @@ internal fun WhiteNoiseApp(
         CompositionLocalProvider(
             LocalSnackbarBottomInset provides snackbarBottomInset,
             LocalSnackbarContentInset provides snackbarContentInset,
+            LocalCustomEmoji provides customEmojiStore.emoji,
         ) {
             Scaffold(
                 modifier =

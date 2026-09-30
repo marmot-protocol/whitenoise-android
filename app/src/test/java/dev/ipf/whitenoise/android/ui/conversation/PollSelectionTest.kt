@@ -48,12 +48,14 @@ class PollSelectionTest {
 
     /** A deadline already reached at first render must never expose an active vote target. */
     @Test
-    fun deadlineClosesAtItsUnixSecond() {
+    fun deadlineIncludesItsUnixSecondAsNativeVotingDoes() {
         assertFalse(pollDeadlineReached(null, 1_700_000_000_000L))
         assertFalse(pollDeadlineReached(1_700_000_001uL, 1_700_000_000_999L))
-        assertTrue(pollDeadlineReached(1_700_000_001uL, 1_700_000_001_000L))
+        assertFalse(pollDeadlineReached(1_700_000_001uL, 1_700_000_001_999L))
+        assertTrue(pollDeadlineReached(1_700_000_001uL, 1_700_000_002_000L))
         val expired = poll(PollTypeFfi.SINGLE_CHOICE, emptyList()).copy(endsAt = 1_700_000_001uL)
-        assertFalse(pollVoteAllowed(expired, 1_700_000_001_000L))
+        assertTrue(pollVoteAllowed(expired, 1_700_000_001_999L))
+        assertFalse(pollVoteAllowed(expired, 1_700_000_002_000L))
     }
 
     /** The first local vote updates the visible count while MDK confirms it. */

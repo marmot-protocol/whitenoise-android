@@ -444,7 +444,7 @@ private fun MarkdownBodyText(
 
     Text(
         text = text,
-        inlineContent = BuiltinEmoji.content(),
+        inlineContent = EmojiShortcodes.content(),
         modifier =
             modifier
                 .then(accessibilityModifier)
@@ -1470,7 +1470,7 @@ private fun AnnotatedString.Builder.appendMarkdownInlines(
         when (inline) {
             is MarkdownInlineFfi.Text -> {
                 val content = markdownSafeDisplayText(inline.content, Int.MAX_VALUE)
-                append(BuiltinEmoji.annotate(AnnotatedString(content)))
+                append(EmojiShortcodes.annotate(AnnotatedString(content)))
             }
             // Chat keeps the author's line breaks: a soft break renders as a
             // newline (not the CommonMark collapse-to-space) to match how the
@@ -1869,7 +1869,7 @@ internal fun markdownDocumentToPreviewAnnotatedString(
     mentionDisplayName: ((String) -> String?)? = null,
 ): AnnotatedString {
     val projection = markdownDocumentToPreviewProjection(document, maxLength, mentionDisplayName, captureStyles = true)
-    return BuiltinEmoji.annotate(
+    return EmojiShortcodes.annotate(
         buildAnnotatedString {
             append(projection.text)
             projection.ranges.forEach { range ->
@@ -1882,7 +1882,7 @@ internal fun markdownDocumentToPreviewAnnotatedString(
                     }
                 addStyle(style, range.start, range.end)
                 if (range.style == MarkdownPreviewStyle.Code) {
-                    addStringAnnotation(BuiltinEmoji.LITERAL_TAG, "", range.start, range.end)
+                    addStringAnnotation(EmojiShortcodes.LITERAL_TAG, "", range.start, range.end)
                 }
             }
         },

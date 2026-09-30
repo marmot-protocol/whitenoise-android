@@ -1,6 +1,9 @@
 package dev.ipf.whitenoise.android.state
 
+import android.os.SystemClock
+import android.util.Log
 import dev.ipf.marmotkit.PollTypeFfi
+import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.whitenoise.android.R
 
 internal const val MAX_POLL_OPTIONS = 10
@@ -42,15 +45,18 @@ internal suspend fun ConversationController.createPoll(
         false
     } else {
         try {
-            appState.marmotIo {
-                createPoll(
-                    account,
-                    group.groupIdHex,
-                    cleanQuestion,
-                    cleanOptions,
-                    pollType,
-                    pollDeadlineEpochSeconds(deadlineDurationSeconds, System.currentTimeMillis()),
-                )
+            appState.withGroupCommitLock(account, group.groupIdHex) {
+                check(canSendMessages && !isDirectConversation)
+                appState.marmotIo {
+                    createPoll(
+                        account,
+                        group.groupIdHex,
+                        cleanQuestion,
+                        cleanOptions,
+                        pollType,
+                        pollDeadlineEpochSeconds(deadlineDurationSeconds, System.currentTimeMillis()),
+                    )
+                }
             }
             true
         } catch (throwable: Throwable) {
@@ -66,21 +72,32 @@ internal suspend fun ConversationController.createPoll(
 internal suspend fun ConversationController.castPollVote(
     pollEventId: String,
     optionIds: List<String>,
-): Boolean {
-    val account = boundAccountRef ?: return false
+): SendAcceptDispositionFfi? {
+    val account = boundAccountRef ?: return null
     val canVote = canSendMessages && pollEventId.isNotBlank() && optionIds.isNotEmpty()
     return if (!canVote) {
-        false
+        null
     } else {
+        val startedAt = SystemClock.elapsedRealtime()
         try {
-            appState.marmotIo {
-                castPollVote(account, group.groupIdHex, pollEventId, optionIds)
-            }
-            true
+            val summary =
+                appState.withGroupCommitLock(account, group.groupIdHex) {
+                    check(canSendMessages)
+                    appState.marmotIo {
+                        castPollVote(account, group.groupIdHex, pollEventId, optionIds)
+                    }
+                }
+            Log.i(
+                "WNPolls",
+                "event=vote_result outcome=${summary.acceptDisposition.name} " +
+                    "elapsed_ms=${SystemClock.elapsedRealtime() - startedAt} option_count=${optionIds.size}",
+            )
+            summary.acceptDisposition
         } catch (throwable: Throwable) {
             rethrowIfCancellation(throwable)
+            Log.i("WNPolls", "event=vote_result outcome=failed elapsed_ms=${SystemClock.elapsedRealtime() - startedAt}")
             appState.presentFailure(R.string.poll_vote_failed, "POLL_VOTE", throwable)
-            false
+            null
         }
     }
 }

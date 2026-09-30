@@ -1,56 +1,42 @@
 # White Noise Android issue triage
 
-The public [White Noise Android project](https://github.com/orgs/marmot-protocol/projects/7)
-is the authoritative product planning view. Hermes Kanban may track agent
-execution, but it must not become a competing product backlog.
+[Project 7](https://github.com/orgs/marmot-protocol/projects/7) is the planning
+authority. Read its live README and field options before metadata changes;
+execution ledgers link GitHub work rather than becoming another backlog.
 
-Every open issue and pull request must appear exactly once in project 7. Open
-pull requests use `In Progress` status. Every open issue must also have:
+## Ownership and publication
 
-- a native `Bug`, `Feature`, `Task`, or `Tracking` issue type;
-- `Priority` set to P0, P1, P2, or P3;
-- one owning `Area`;
-- `Triage health` set;
-- native parent/sub-issue and dependency relationships where applicable.
+- Apply the [MDK/Android boundary](../AGENTS.md#architecture-minimal-android-display-layer).
+  File shared runtime defects in MDK; link missing upstream capabilities as dependencies.
+- Check live assignees, related PRs and current source before implementation;
+  establish sole authorized ownership and preserve active contributors.
+- Search open/closed issues and PRs (including merged PRs) by symptom, subsystem
+  and cause before publication. Update the canonical scope instead of duplicating it.
+- Draft exact title/body, native type, labels, Project fields and relationships.
+  Begin with `## Summary`; include source paths, acceptance criteria and regression tests.
+- Obtain source-grounded independent review of the exact artifact under workspace
+  policy. Publish from the reviewed body; read back issue and Project metadata.
 
-Use native `Tracking`; never recreate the retired `tracking` label. The retired
-`HIGH`, `MEDIUM`, and `LOW` labels are represented by P1, P2, and P3 project
-values. Read the live Project 7 README before changing priority or rank; its
-current steering overrides this static fallback. Product rank is intentionally
-sparse and currently records:
+## Project contract
 
-1. Text-to-speech
-2. Link previews
-3. Pinned messages
-4. Scheduled messages
+- Every open issue/PR appears exactly once; open PRs use `In Progress`.
+- Use native `Bug`, `Feature`, `Task` or `Tracking` types and real parent/dependency
+  relationships. Trackers need bounded completion criteria; preserve user relationships.
+- Set `Status`, `Release gate`, `Priority`, `Area`, `Triage health`, `Impact` and
+  `Confidence` from live steering/evidence; PRs inherit issue classification where
+  appropriate. Inspect optional fields; leave unsupported commitments unset.
+- Follow live priority/health definitions; release gate does not imply priority.
+  Use `Product rank` only for an established product order.
+- Do not recreate retired `CRITICAL`, `HIGH`, `MEDIUM`, `LOW` or `tracking` labels.
+  Bug uses `bug`; Feature uses `enhancement`. Avoid labels duplicating Project fields.
+- Apply `agent-ok` only under current autonomy policy to independently reviewed,
+  executable scopes without unresolved product/upstream gates; never broad trackers.
 
-Before creating or materially editing an implementation issue, inspect the live
-default-branch source, name the owning paths and regression-test target, search
-open and closed issues and pull requests, and pass the workspace
-source-grounded independent review gate on the exact title/body/metadata.
+## Verification
 
-## Access preflight
-
-Use `gh`, not a GitHub plugin requirement:
-
-```bash
-gh auth status
-gh project view 7 --owner marmot-protocol --format json
-gh repo view marmot-protocol/whitenoise-android --json nameWithOwner
-```
-
-The token must expose `repo`, `project`, `read:org`, and `workflow`. Run these
-commands inside the assigned worktree. A missing MCP connector is not a blocker.
-
-## Reconciliation
-
-Run:
-
-```bash
-python3 scripts/check_github_triage.py
-```
-
-Use `--repair-additions` only to add missing open issues. The checker never
-guesses product priority, type, area, or readiness. Resolve those deliberately,
-then rerun until it exits zero. Preserve closed tracker children that GitHub
-automatically adds through native sub-issue relationships.
+Use maintained authenticated tools and workspace discovery/quota rules; mutations
+require uncached live readback. On the shared Hermes host, use its Project tools
+(`gh project item-list` is blocked). Elsewhere, `python3 scripts/check_github_triage.py`
+checks its configured subset only; `--repair-additions` adds missing open issues/PRs
+without classifying them. Verify the full field contract, uniqueness, hierarchy and status
+separately; preserve legitimate history when reconciling obsolete/duplicate work.
