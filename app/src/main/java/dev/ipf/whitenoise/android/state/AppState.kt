@@ -3723,15 +3723,9 @@ class WhiteNoiseAppState private constructor(
     internal val profileGroupPickerRevision: Long
         get() = chatsController?.memberSnapshotsRevision ?: 0L
 
-    /** Uses the live source projection, not the hidden chat-list UI snapshot, and never changes owner. */
-    internal fun currentGroupAvatarItem(
-        accountRef: String?,
-        groupIdHex: String,
-    ): ChatListItem? {
+    internal fun currentGroupAvatarItem(accountRef: String?, groupIdHex: String): ChatListItem? {
         forwardTargetsRevision // Compose observes updates folded while the list is hidden.
-        return chatsController
-            ?.takeIf { accountRef != null && it.boundAccountRef == accountRef }
-            ?.currentGroupAvatarItem(groupIdHex)
+        return chatsController.currentGroupAvatarItem(accountRef, groupIdHex)
     }
 
     internal fun profileAddableGroupsState(accountIdHex: String): ProfileGroupPickerState =
@@ -3742,15 +3736,8 @@ class WhiteNoiseAppState private constructor(
         chatsController?.profilePromotableGroupsState(accountIdHex, activeAccount?.accountIdHex)
             ?: ProfileGroupPickerState.empty()
 
-    internal fun requestProfileGroupMembers(
-        groupIds: Iterable<String>,
-        retry: Boolean = false,
-    ) {
-        if (retry) {
-            chatsController?.retryMemberSnapshots(groupIds)
-        } else {
-            chatsController?.requestMemberSnapshots(groupIds)
-        }
+    internal fun requestProfileGroupMembers(groupIds: Iterable<String>, retry: Boolean = false) {
+        chatsController?.requestProfileGroupMembers(groupIds, retry)
     }
 
     suspend fun promoteProfileInGroup(

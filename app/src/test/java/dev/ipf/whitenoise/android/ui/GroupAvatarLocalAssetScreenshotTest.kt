@@ -719,10 +719,10 @@ private fun productionSurfaceFixture(
         }
     val chats =
         ChatsController(
-                fixture.state,
-                initialAccountRef = ACCOUNT_REF,
-                memberSnapshotLoader = { _, _ -> emptyList() },
-            )
+            fixture.state,
+            initialAccountRef = ACCOUNT_REF,
+            memberSnapshotLoader = { _, _ -> emptyList() },
+        )
     chats.applyChatListRow(
         notificationChatListRow().copy(groupIdHex = GROUP_ID, groupName = record.name, avatarUrl = record.avatarUrl),
     )
