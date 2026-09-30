@@ -417,10 +417,11 @@ internal fun ChatRow(
                     )
                 val snippetText =
                     remember(bodyMatch.snippet, highlightStyle) {
-                        highlightedSnippet(bodyMatch.snippet, highlightStyle)
+                        BuiltinEmoji.annotate(highlightedSnippet(bodyMatch.snippet, highlightStyle))
                     }
                 Text(
                     text = snippetText,
+                    inlineContent = BuiltinEmoji.content(),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )

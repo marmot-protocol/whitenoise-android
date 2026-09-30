@@ -1043,6 +1043,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
         "anchor": "fun ChatRow(",
         "test_ids": [
+          "MSG-022",
           "CHL-001",
           "CHL-002",
           "CHL-011",
