@@ -36,7 +36,13 @@ internal fun validatedReceivedVCard(file: File): SharedContact? {
                 .toString()
         }.getOrNull() ?: return null
     if ('\u0000' in body) return null
-    val lines = body.replace("\r\n", "\n").split('\n').map(String::trim)
+    // Unfold physical lines before trimming: a leading space or tab marks a continuation.
+    val lines =
+        body
+            .replace("\r\n", "\n")
+            .replace(Regex("\n[ \t]"), "")
+            .split('\n')
+            .map(String::trim)
     if (lines.count { it.equals("BEGIN:VCARD", ignoreCase = true) } != 1 ||
         lines.count { it.equals("END:VCARD", ignoreCase = true) } != 1 ||
         !lines.firstOrNull().equals("BEGIN:VCARD", ignoreCase = true) ||
@@ -50,15 +56,28 @@ internal fun validatedReceivedVCard(file: File): SharedContact? {
         lines
             .firstOrNull { it.substringBefore(';').substringBefore(':').equals(name, ignoreCase = true) }
             ?.substringAfter(':', "")
-            ?.replace("\\n", "\n")
-            ?.replace("\\,", ",")
-            ?.replace("\\;", ";")
-            ?.replace("\\\\", "\\")
+            ?.let(::decodeVCardEscapes)
             ?.trim()
             ?.takeIf(String::isNotEmpty)
     val contact = SharedContact(name = field("FN"), phone = field("TEL"), email = field("EMAIL"))
     return contact.takeUnless { it.isEmpty }
 }
+
+/** Decodes each vCard escape once so an escaped backslash cannot become a newline escape. */
+private fun decodeVCardEscapes(value: String): String =
+    buildString(value.length) {
+        var index = 0
+        while (index < value.length) {
+            val character = value[index]
+            if (character == '\\' && index + 1 < value.length) {
+                append(if (value[index + 1] == 'n' || value[index + 1] == 'N') '\n' else value[index + 1])
+                index += 2
+            } else {
+                append(character)
+                index++
+            }
+        }
+    }
 
 /** View uses the platform vCard handler with only a temporary read grant. */
 internal fun viewReceivedContactIntent(uri: Uri): Intent = attachmentOpenIntent(uri, VCARD_MIME_TYPE)

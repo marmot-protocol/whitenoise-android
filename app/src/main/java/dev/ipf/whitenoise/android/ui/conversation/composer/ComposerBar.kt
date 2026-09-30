@@ -45,6 +45,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -95,9 +96,13 @@ import dev.ipf.whitenoise.android.ui.conversation.composerMultilineControlsSuppr
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.conversation.resolveAutomaticComposerCeiling
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 private val ComposerManualMinimumHeight = 144.dp
@@ -543,6 +548,8 @@ internal fun ComposerBar(
         }
     var composerFocused by remember(draftKey, draftAccountRef, draftGroupIdHex) { mutableStateOf(false) }
     var pasteOwnerActive by remember(draftKey, draftAccountRef, draftGroupIdHex) { mutableStateOf(true) }
+    var pasteReadInFlight by remember(draftKey, draftAccountRef, draftGroupIdHex) { mutableStateOf(false) }
+    val pasteScope = rememberCoroutineScope()
     DisposableEffect(draftKey, draftAccountRef, draftGroupIdHex) {
         pasteOwnerActive = true
         onDispose { pasteOwnerActive = false }
@@ -931,33 +938,54 @@ internal fun ComposerBar(
         if (editingMessageId == null) onDraftChange(value)
     }
 
-    /** Reads one current clipboard item only after activation, then uses the same draft publisher as typing. */
+    val livePasteEligible by rememberUpdatedState(
+        !composerFocused &&
+            textFieldValue.text.isEmpty() &&
+            editingMessageId == null &&
+            !hasPendingAttachments &&
+            voiceRecordingController?.isRecording == false &&
+            voiceReview?.clip == null &&
+            composerExpansion.mode == ComposerExpansionMode.Automatic &&
+            !composerUsesMultilineControls &&
+            (!dictationOwnedByComposer || dictationState is ConversationDictationState.Idle),
+    )
+
+    /** Reads provider-backed clipboard content off main, then publishes only to the still-current draft. */
     fun pasteClipboardText(): Boolean {
         /** A retained click cannot paste into a composer that changed owners or mode. */
         fun canPaste(): Boolean =
             pasteOwnerActive &&
-                !composerFocused &&
+                livePasteEligible &&
                 textFieldValue.text.isEmpty() &&
-                editingMessageId == null &&
-                !hasPendingAttachments &&
-                voiceRecordingController?.isRecording == false &&
-                voiceReview?.clip == null &&
-                composerExpansion.mode == ComposerExpansionMode.Automatic &&
-                !composerUsesMultilineControls &&
-                (!dictationOwnedByComposer || dictationState is ConversationDictationState.Idle) &&
                 (appState == null || appState.activeAccountRef == draftAccountRef)
 
-        if (!canPaste()) return true
-        return runCatching {
+        if (!canPaste() || pasteReadInFlight) return true
+        return try {
             clipboardManager.withPrimaryClipForPaste { clip ->
                 if (canPaste()) {
-                    clip
-                        .plainText(context)
-                        ?.let { insertComposerClipboardText(textFieldValue, it) }
-                        ?.let(::applyComposerFieldValue)
+                    pasteReadInFlight = true
+                    pasteScope.launch {
+                        try {
+                            val value =
+                                try {
+                                    withContext(Dispatchers.IO) { clip.plainText(context) }
+                                } catch (cancelled: CancellationException) {
+                                    throw cancelled
+                                } catch (_: RuntimeException) {
+                                    null
+                                }
+                            if (canPaste() && value != null) {
+                                insertComposerClipboardText(textFieldValue, value)?.let(::applyComposerFieldValue)
+                            }
+                        } finally {
+                            pasteReadInFlight = false
+                        }
+                    }
                 }
             }
-        }.getOrDefault(false)
+        } catch (_: SecurityException) {
+            false
+        }
     }
 
     /** Deletes the current selection or previous code point and repairs mention tokens before publishing. */

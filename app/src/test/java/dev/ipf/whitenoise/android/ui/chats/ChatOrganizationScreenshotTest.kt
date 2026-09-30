@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import android.content.Context
-import android.view.View
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -13,12 +12,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.isDialog
-import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -50,8 +46,8 @@ class ChatOrganizationScreenshotTest {
     /** Selection amoled. */
     @Test fun selectionAmoled() = selection("chat_selection_amoled", dark = true, amoled = true)
 
-    /** Selection menu. */
-    @Test fun selectionMenu() = selection("chat_selection_menu", menu = true)
+    /** Single selection exposes direct actions. */
+    @Test fun selectionSingleActions() = selection("chat_selection_menu", menu = true)
 
     /** Selection short rtl large text. */
     @Test
@@ -97,17 +93,11 @@ class ChatOrganizationScreenshotTest {
                 }
             }
         }
-        if (menu) composeRule.onNodeWithContentDescription(context.getString(R.string.actions)).performClick()
         if (menu) {
-            composeRule.onNodeWithText(context.getString(R.string.archive)).assertIsDisplayed()
-            composeRule.onNodeWithText(context.getString(R.string.delete)).assertIsDisplayed()
-            // Popup semantics capture can crop the activity window; draw the actual native popup root.
-            val popup = checkNotNull(composeRule.onNode(isPopup()).fetchSemanticsNode().root as? View).rootView
-            check(popup.javaClass.name == "androidx.compose.ui.window.PopupLayout")
-            popup.captureRoboImage("src/test/snapshots/$name.png")
-        } else {
-            composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
+            composeRule.onNodeWithContentDescription(context.getString(R.string.archive)).assertIsDisplayed()
+            composeRule.onNodeWithContentDescription(context.getString(R.string.delete)).assertIsDisplayed()
         }
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
 
     /** Builds a folder fixture. */

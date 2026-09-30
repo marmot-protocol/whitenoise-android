@@ -22,13 +22,13 @@ class ActionColorSurfaceCoverageTest {
         assertTrue("New message must use the resolved foreground", "colors.content" in chats)
 
         assertEquals(
-            "Both text Send and locked-voice Send must use the resolved container",
-            2,
+            "Paste, text Send and locked-voice Send must use the resolved container",
+            3,
             Regex("""containerColor = actionColors\.container""").findAll(composer).count(),
         )
         assertEquals(
-            "Both text Send and locked-voice Send must use the resolved foreground",
-            2,
+            "Paste, text Send and locked-voice Send must use the resolved foreground",
+            3,
             Regex("""contentColor = actionColors\.content""").findAll(composer).count(),
         )
 

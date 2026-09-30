@@ -75,6 +75,60 @@
         "test_ids": ["ONB-005", "FIND-005", "FIND-006"]
       },
       {
+        "surface": "Composer Paste action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "R.string.paste",
+        "test_ids": ["CON-013", "CON-021"]
+      },
+      {
+        "surface": "Received contact Add action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
+        "anchor": "R.string.contact_add",
+        "test_ids": ["MED-014"]
+      },
+      {
+        "surface": "Received contact Save VCF action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
+        "anchor": "R.string.contact_save_vcf",
+        "test_ids": ["MED-014"]
+      },
+      {
+        "surface": "Received contact View action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
+        "anchor": "R.string.contact_view",
+        "test_ids": ["MED-014"]
+      },
+      {
+        "surface": "Received contact action failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ReceivedContactActions.kt",
+        "anchor": "R.string.contact_action_failed",
+        "test_ids": ["MED-014"]
+      },
+      {
+        "surface": "Received contact invalid VCF",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ReceivedContactActions.kt",
+        "anchor": "R.string.contact_invalid_vcard",
+        "test_ids": ["MED-014"]
+      },
+      {
+        "surface": "Received contact VCF saved",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ReceivedContactActions.kt",
+        "anchor": "R.string.contact_vcf_saved",
+        "test_ids": ["MED-014"]
+      },
+      {
+        "surface": "Received contact media load failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ReceivedContactActions.kt",
+        "anchor": "R.string.media_couldnt_load",
+        "test_ids": ["MED-014"]
+      },
+      {
+        "surface": "Received contact missing handler",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ReceivedContactActions.kt",
+        "anchor": "R.string.media_no_app_to_open",
+        "test_ids": ["MED-014"]
+      },
+      {
         "surface": "content",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiShortcodes.kt",
         "anchor": "fun content(): Map<String, InlineTextContent>",

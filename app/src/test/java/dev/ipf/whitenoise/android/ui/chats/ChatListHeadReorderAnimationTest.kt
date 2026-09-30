@@ -179,11 +179,14 @@ class ChatListHeadReorderAnimationTest {
         val originalOrder = listOf("A", "B", "C", "D", "E", "F")
         val promotedOrder = listOf("E", "A", "B", "C", "D", "F")
         var itemIds by mutableStateOf(originalOrder)
+        val listStateHolder = arrayOf<LazyListState?>(null)
 
         composeRule.setContent {
+            val listState = rememberLazyListState()
+            listStateHolder[0] = listState
             ChatListHeadReorderMotionHarness(
                 itemIds = itemIds,
-                listState = rememberLazyListState(),
+                listState = listState,
                 rowHeight = rowHeight,
             )
         }
@@ -229,6 +232,7 @@ class ChatListHeadReorderAnimationTest {
         promotedOrder.forEachIndexed { index, id ->
             assertEquals("final top for $id", rowHeightPx * index, rowTop(id), 0.5f)
         }
+        assertListFlushAtTop(checkNotNull(listStateHolder[0]), promotedOrder)
         assertTrue(
             "a four-slot promotion should use the bounded long-distance budget",
             sawMotionBeyondAdjacentBudget,
@@ -674,6 +678,18 @@ class ChatListHeadReorderAnimationTest {
         composeRule.runOnIdle { }
         composeRule.onNodeWithTag(chatListHeadReorderRowTag("A")).performClick()
         composeRule.runOnIdle { assertEquals(listOf("A"), openedIds) }
+    }
+
+    /** The final keyed order and scroll coordinate must agree on a flush viewport. */
+    private fun assertListFlushAtTop(
+        listState: LazyListState,
+        expectedOrder: List<String>,
+    ) {
+        composeRule.runOnIdle {
+            assertEquals(expectedOrder, listState.layoutInfo.visibleItemsInfo.map { it.key })
+            assertEquals(0, listState.firstVisibleItemIndex)
+            assertEquals(0, listState.firstVisibleItemScrollOffset)
+        }
     }
 
     private fun rowTop(id: String): Float =

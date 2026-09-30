@@ -34,6 +34,19 @@ class ReceivedContactIntentsTest {
         assertNull(validatedReceivedVCard(invalidUtf8))
     }
 
+    /** Folded fields retain their continuation and escaped backslashes decode only once. */
+    @Test fun unfoldsFieldsAndDecodesEscapesOnce() {
+        val folded =
+            vcardFile(
+                listOf("BEGIN:VCARD", "VERSION:4.0", "FN:Ada ", " Example", "EMAIL:ada@", "\texample.org", "END:VCARD")
+                    .joinToString("\r\n", postfix = "\r\n"),
+            )
+        assertEquals(SharedContact("Ada Example", null, "ada@example.org"), validatedReceivedVCard(folded))
+
+        val escaped = vcardFile("BEGIN:VCARD\nVERSION:4.0\nFN:Backslash \\\\n and comma\\, here\nEND:VCARD\n")
+        assertEquals("Backslash \\n and comma, here", validatedReceivedVCard(escaped)?.name)
+    }
+
     /** View passes the exact content URI as data and ClipData with a temporary read grant. */
     @Test fun viewIntentGrantsOnlyReadAccess() {
         val uri = Uri.parse("content://test.example/contact.vcf")
