@@ -22,6 +22,7 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -65,6 +66,14 @@ class RemoteGiphyMediaBubbleScreenshotTest {
             .onAllNodesWithContentDescription("via GIPHY · Marmot Studio with a very long creator attribution")
             .assertCountEquals(2)
         composeRule.onAllNodesWithTag("giphy.message-footer", useUnmergedTree = true).assertCountEquals(3)
+        val attributions =
+            composeRule.onAllNodesWithTag("giphy.attribution", useUnmergedTree = true).fetchSemanticsNodes()
+        val metadata =
+            composeRule.onAllNodesWithTag("giphy.message-footer", useUnmergedTree = true).fetchSemanticsNodes()
+        attributions.zip(metadata).forEach { (credit, details) ->
+            assertTrue(credit.boundsInRoot.width > 40f)
+            assertTrue(credit.boundsInRoot.left >= details.boundsInRoot.right)
+        }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/giphy_cards_large_rtl.png")
     }
 
@@ -109,7 +118,14 @@ class RemoteGiphyMediaBubbleScreenshotTest {
                             )
                             RemoteGiphyMediaCard(
                                 media = media,
-                                footer = GiphyMessageFooter("10:43 AM", true, MessageStatus.Failed, "Edited", {}),
+                                footer =
+                                    GiphyMessageFooter(
+                                        "10:43 AM",
+                                        true,
+                                        MessageStatus.Failed,
+                                        "Edited a very long time ago",
+                                        {},
+                                    ),
                                 presentation = null,
                                 loading = false,
                                 failed = true,
