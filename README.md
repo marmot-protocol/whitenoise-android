@@ -4,9 +4,16 @@ Android client for White Noise, backed by the Marmot bindings.
 
 ## Project Shape
 
-The app is a Kotlin/Jetpack Compose Android app backed by the Marmot bindings. The native protocol layer owns protocol data and stores it in SQLite. The Android app should render that data, manage Android platform behavior, and keep UI lifecycle state.
+The Kotlin/Jetpack Compose app is a minimal display and Android platform layer.
+MDK owns the shared product logic, protocol, persistence, queries/projections,
+relay/media operations, validation and recovery. Android renders its typed
+state and supplies platform inputs; it does not recreate those rules in Kotlin.
 
-The Android app should not become a second database for White Noise protocol data. If a screen is slow because a query or projection is expensive, prefer improving the native API or SQLite-backed projection over adding an Android cache.
+See [the agent guide](AGENTS.md#architecture-minimal-android-display-layer) and
+[MDK's host boundary](https://github.com/marmot-protocol/mdk/blob/master/docs/marmot-architecture/overview/app-core-boundary.md#host-app-boundary).
+Improve slow native queries or bindings rather than introducing a second Android
+store for protocol data. Missing shared capabilities are implemented in MDK and
+adopted through a reviewed, published MarmotKit artifact.
 
 ## Common Commands
 
