@@ -116,8 +116,9 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.attemptOpenOrStartProfileChat
 import dev.ipf.whitenoise.android.ui.chats.newchat.recipientNip05Verified
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseTextFieldContainerColor
+import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
-import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
+import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.group.GroupMemberMenuAction
 import dev.ipf.whitenoise.android.ui.group.groupMemberMenuActions
@@ -631,11 +632,11 @@ internal fun ProfileSheet(
         }
     }
     val addableGroupsState =
-        remember(hex, appState.chatListItems, groupPickerRevision) {
+        remember(hex, liveGroupsRevision, groupPickerRevision) {
             hex?.let(appState::profileAddableGroupsState) ?: ProfileGroupPickerState.empty()
         }
     val promotableGroupsState =
-        remember(hex, appState.chatListItems, groupPickerRevision) {
+        remember(hex, liveGroupsRevision, groupPickerRevision) {
             hex?.let(appState::profilePromotableGroupsState) ?: ProfileGroupPickerState.empty()
         }
     LaunchedEffect(page, addableGroupsState.pendingGroupIds, promotableGroupsState.pendingGroupIds) {
@@ -887,8 +888,10 @@ internal fun ProfileSheet(
             onBanner = { if (owner.canAct()) fullBannerOpen = true },
             onCopyLightning = { if (owner.canAct()) lightningAddress?.let { clipboard.setText(AnnotatedString(it)) } },
             sharedAvatars = {
-                PersonSharedGroupAvatars(sharedRows) { id ->
-                    sharedItems[id]?.let { rememberEncryptedGroupAvatar(appState, it.group) }
+                PreparedGroupAvatarContent(appState, shared.groups.take(16).mapNotNull { it.selectedAvatarAsset }) {
+                    PersonSharedGroupAvatars(sharedRows) { id ->
+                        sharedItems[id]?.let { rememberChatListGroupAvatar(appState, it).image }
+                    }
                 }
             },
             error = {
@@ -1004,32 +1007,37 @@ internal fun ProfileSheet(
                         }
                     }
                 ProfileSheetPage.GROUPS_IN_COMMON ->
-                    PersonGroupsInCommonContent(
-                        rows = sharedRows,
-                        unresolved = shared.unresolvedGroupIds.isNotEmpty(),
-                        onBack = { page = ProfileSheetPage.PROFILE },
-                        onOpen = { id ->
-                            if (owner.canAct()) {
-                                appState
-                                    .personSharedGroupsForProfile(hex)
-                                    .groups
-                                    .firstOrNull { it.group.groupIdHex == id }
-                                    ?.let { item -> owner.leave { onOpenGroup(item, false) } }
-                            }
-                        },
-                        onAdd = {
-                            if (owner.canAct()) {
-                                pickerParent = ProfileSheetPage.GROUPS_IN_COMMON
-                                page = ProfileSheetPage.ADD_TO_GROUPS
-                            }
-                        },
-                        onRetry = {
-                            if (owner.canAct()) {
-                                appState.requestProfileGroupMembers(shared.unresolvedGroupIds, retry = true)
-                            }
-                        },
-                        avatar = { id -> sharedItems[id]?.let { rememberEncryptedGroupAvatar(appState, it.group) } },
-                    )
+                    PreparedGroupAvatarContent(
+                        appState,
+                        shared.groups.take(16).mapNotNull { it.selectedAvatarAsset },
+                    ) {
+                        PersonGroupsInCommonContent(
+                            rows = sharedRows,
+                            unresolved = shared.unresolvedGroupIds.isNotEmpty(),
+                            onBack = { page = ProfileSheetPage.PROFILE },
+                            onOpen = { id ->
+                                if (owner.canAct()) {
+                                    appState
+                                        .personSharedGroupsForProfile(hex)
+                                        .groups
+                                        .firstOrNull { it.group.groupIdHex == id }
+                                        ?.let { item -> owner.leave { onOpenGroup(item, false) } }
+                                }
+                            },
+                            onAdd = {
+                                if (owner.canAct()) {
+                                    pickerParent = ProfileSheetPage.GROUPS_IN_COMMON
+                                    page = ProfileSheetPage.ADD_TO_GROUPS
+                                }
+                            },
+                            onRetry = {
+                                if (owner.canAct()) {
+                                    appState.requestProfileGroupMembers(shared.unresolvedGroupIds, retry = true)
+                                }
+                            },
+                            avatar = { id -> sharedItems[id]?.let { rememberChatListGroupAvatar(appState, it).image } },
+                        )
+                    }
                 ProfileSheetPage.PROFILE -> profileContent()
             }
         }
@@ -1279,9 +1287,9 @@ internal fun ProfileAddToGroupsContent(
 ) {
     val groups = state.groups
     val groupTitleCopy = rememberGroupTitleCopy()
-    val selected = remember { mutableStateListOf<String>() }
-    var confirmSelection by remember { mutableStateOf<List<ChatListItem>?>(null) }
-    var query by remember { mutableStateOf("") }
+    val selected = remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateListOf<String>() }
+    var confirmSelection by remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<List<ChatListItem>?>(null) }
+    var query by remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf("") }
     val titledGroups =
         remember(groups, groupTitleCopy) {
             groups.map { it to chatListItemDisplayTitle(it, appState, groupTitleCopy) }
@@ -1300,95 +1308,101 @@ internal fun ProfileAddToGroupsContent(
         selected.removeAll { it !in availableGroupIds }
     }
     val selectedGroups = groups.filter { selected.contains(it.group.groupIdHex) }
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(bottom = 12.dp)
-                .testTag(PROFILE_ADD_TO_GROUPS_CONTENT_TAG),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+    PreparedGroupAvatarContent(
+        appState,
+        filteredGroups.take(16).mapNotNull { it.first.selectedAvatarAsset },
     ) {
-        Text(
-            stringResource(R.string.profile_add_to_groups_title, targetName),
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(horizontal = 24.dp),
-        )
-        Text(
-            stringResource(R.string.profile_add_to_groups_description, targetName),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 24.dp),
-        )
-        if (groups.isEmpty() && state.loadState == ProfileGroupPickerLoadState.READY) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp)
+                    .testTag(PROFILE_ADD_TO_GROUPS_CONTENT_TAG),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             Text(
-                stringResource(R.string.profile_no_addable_groups),
+                stringResource(R.string.profile_add_to_groups_title, targetName),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(horizontal = 24.dp),
+            )
+            Text(
+                stringResource(R.string.profile_add_to_groups_description, targetName),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceMd),
+                modifier = Modifier.padding(horizontal = 24.dp),
             )
-            TextButton(
-                onClick = onClose,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-            ) {
-                Text(stringResource(R.string.close))
-            }
-        } else if (groups.isEmpty()) {
-            ProfileGroupPickerPendingState(state.loadState, onRetry)
-        } else {
-            if (state.loadState != ProfileGroupPickerLoadState.READY) {
+            if (groups.isEmpty() && state.loadState == ProfileGroupPickerLoadState.READY) {
+                Text(
+                    stringResource(R.string.profile_no_addable_groups),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceMd),
+                )
+                TextButton(
+                    onClick = onClose,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                ) {
+                    Text(stringResource(R.string.close))
+                }
+            } else if (groups.isEmpty()) {
                 ProfileGroupPickerPendingState(state.loadState, onRetry)
-            }
-            FlowSearchField(
-                value = query,
-                onValueChange = { query = it },
-                placeholder = stringResource(R.string.forward_search_chats),
-                modifier = Modifier.padding(horizontal = Dimens.spaceLg),
-            )
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
-            ) {
-                if (filteredGroups.isEmpty()) {
-                    item {
-                        Text(
-                            stringResource(R.string.no_matches),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
+            } else {
+                if (state.loadState != ProfileGroupPickerLoadState.READY) {
+                    ProfileGroupPickerPendingState(state.loadState, onRetry)
+                }
+                FlowSearchField(
+                    value = query,
+                    onValueChange = { query = it },
+                    placeholder = stringResource(R.string.forward_search_chats),
+                    modifier = Modifier.padding(horizontal = Dimens.spaceLg),
+                )
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
+                ) {
+                    if (filteredGroups.isEmpty()) {
+                        item {
+                            Text(
+                                stringResource(R.string.no_matches),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
+                            )
+                        }
+                    }
+                    items(
+                        filteredGroups,
+                        key = { (item, _) -> item.group.groupIdHex },
+                    ) { (item, title) ->
+                        val groupId = item.group.groupIdHex
+                        val isSelected = selected.contains(groupId)
+                        val avatar = rememberChatListGroupAvatar(appState, item)
+                        ContactRow(
+                            title = title,
+                            subtitle = stringResource(R.string.members_count, item.memberCount),
+                            avatarSeed = item.group.groupIdHex,
+                            avatarUrl = avatar.pictureUrl,
+                            avatarImage = avatar.image,
+                            enabled = !busy,
+                            onClick = {
+                                if (isSelected) selected.remove(groupId) else selected.add(groupId)
+                            },
+                            trailing = { SelectionIndicator(selected = isSelected) },
                         )
                     }
                 }
-                items(
-                    filteredGroups,
-                    key = { (item, _) -> item.group.groupIdHex },
-                ) { (item, title) ->
-                    val groupId = item.group.groupIdHex
-                    val isSelected = selected.contains(groupId)
-                    ContactRow(
-                        title = title,
-                        subtitle = stringResource(R.string.members_count, item.memberCount),
-                        avatarSeed = item.group.groupIdHex,
-                        avatarUrl = item.group.avatarUrl,
-                        avatarImage = rememberEncryptedGroupAvatar(appState, item.group),
-                        enabled = !busy,
-                        onClick = {
-                            if (isSelected) selected.remove(groupId) else selected.add(groupId)
-                        },
-                        trailing = { SelectionIndicator(selected = isSelected) },
-                    )
+                Button(
+                    onClick = { confirmSelection = selectedGroups },
+                    enabled = selectedGroups.isNotEmpty() && !busy,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                ) {
+                    if (busy) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.profile_add_to_groups_confirm_label))
                 }
-            }
-            Button(
-                onClick = { confirmSelection = selectedGroups },
-                enabled = selectedGroups.isNotEmpty() && !busy,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-            ) {
-                if (busy) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                } else {
-                    Icon(Icons.Default.Add, contentDescription = null)
-                }
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.profile_add_to_groups_confirm_label))
             }
         }
     }
@@ -1429,8 +1443,8 @@ internal fun ProfileMakeAdminContent(
 ) {
     val groups = state.groups
     val groupTitleCopy = rememberGroupTitleCopy()
-    var selectedGroupId by remember { mutableStateOf<String?>(null) }
-    var query by remember { mutableStateOf("") }
+    var selectedGroupId by remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<String?>(null) }
+    var query by remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf("") }
     val titledGroups =
         remember(groups, groupTitleCopy) {
             groups.map { it to chatListItemDisplayTitle(it, appState, groupTitleCopy) }
@@ -1448,90 +1462,96 @@ internal fun ProfileMakeAdminContent(
         if (groups.none { it.group.groupIdHex == selectedGroupId }) selectedGroupId = null
     }
     val selectedGroup = groups.firstOrNull { it.group.groupIdHex == selectedGroupId }
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(bottom = 12.dp)
-                .testTag(PROFILE_MAKE_ADMIN_CONTENT_TAG),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+    PreparedGroupAvatarContent(
+        appState,
+        filteredGroups.take(16).mapNotNull { it.first.selectedAvatarAsset },
     ) {
-        Text(
-            stringResource(R.string.profile_make_admin_title, targetName),
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(horizontal = Dimens.spaceLg),
-        )
-        Text(
-            stringResource(R.string.profile_make_admin_description, targetName),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = Dimens.spaceLg),
-        )
-        if (groups.isEmpty() && state.loadState == ProfileGroupPickerLoadState.READY) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp)
+                    .testTag(PROFILE_MAKE_ADMIN_CONTENT_TAG),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             Text(
-                stringResource(R.string.profile_no_promotable_groups),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceMd),
-            )
-            TextButton(
-                onClick = onClose,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
-            ) {
-                Text(stringResource(R.string.close))
-            }
-        } else if (groups.isEmpty()) {
-            ProfileGroupPickerPendingState(state.loadState, onRetry)
-        } else {
-            if (state.loadState != ProfileGroupPickerLoadState.READY) {
-                ProfileGroupPickerPendingState(state.loadState, onRetry)
-            }
-            FlowSearchField(
-                value = query,
-                onValueChange = { query = it },
-                placeholder = stringResource(R.string.forward_search_chats),
+                stringResource(R.string.profile_make_admin_title, targetName),
+                style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(horizontal = Dimens.spaceLg),
             )
-            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
-                if (filteredGroups.isEmpty()) {
-                    item {
-                        Text(
-                            stringResource(R.string.no_matches),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
+            Text(
+                stringResource(R.string.profile_make_admin_description, targetName),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = Dimens.spaceLg),
+            )
+            if (groups.isEmpty() && state.loadState == ProfileGroupPickerLoadState.READY) {
+                Text(
+                    stringResource(R.string.profile_no_promotable_groups),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceMd),
+                )
+                TextButton(
+                    onClick = onClose,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
+                ) {
+                    Text(stringResource(R.string.close))
+                }
+            } else if (groups.isEmpty()) {
+                ProfileGroupPickerPendingState(state.loadState, onRetry)
+            } else {
+                if (state.loadState != ProfileGroupPickerLoadState.READY) {
+                    ProfileGroupPickerPendingState(state.loadState, onRetry)
+                }
+                FlowSearchField(
+                    value = query,
+                    onValueChange = { query = it },
+                    placeholder = stringResource(R.string.forward_search_chats),
+                    modifier = Modifier.padding(horizontal = Dimens.spaceLg),
+                )
+                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
+                    if (filteredGroups.isEmpty()) {
+                        item {
+                            Text(
+                                stringResource(R.string.no_matches),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
+                            )
+                        }
+                    }
+                    items(
+                        filteredGroups,
+                        key = { (item, _) -> item.group.groupIdHex },
+                    ) { (item, title) ->
+                        val selected = item.group.groupIdHex == selectedGroupId
+                        val avatar = rememberChatListGroupAvatar(appState, item)
+                        ContactRow(
+                            title = title,
+                            subtitle = stringResource(R.string.members_count, item.memberCount),
+                            avatarSeed = item.group.groupIdHex,
+                            avatarUrl = avatar.pictureUrl,
+                            avatarImage = avatar.image,
+                            enabled = !busy,
+                            onClick = { selectedGroupId = item.group.groupIdHex },
+                            trailing = { SelectionIndicator(selected = selected) },
                         )
                     }
                 }
-                items(
-                    filteredGroups,
-                    key = { (item, _) -> item.group.groupIdHex },
-                ) { (item, title) ->
-                    val selected = item.group.groupIdHex == selectedGroupId
-                    ContactRow(
-                        title = title,
-                        subtitle = stringResource(R.string.members_count, item.memberCount),
-                        avatarSeed = item.group.groupIdHex,
-                        avatarUrl = item.group.avatarUrl,
-                        avatarImage = rememberEncryptedGroupAvatar(appState, item.group),
-                        enabled = !busy,
-                        onClick = { selectedGroupId = item.group.groupIdHex },
-                        trailing = { SelectionIndicator(selected = selected) },
-                    )
+                Button(
+                    onClick = { selectedGroup?.let(onPromote) },
+                    enabled = selectedGroup != null && !busy,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
+                ) {
+                    if (busy) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Default.Shield, contentDescription = null)
+                    }
+                    Spacer(Modifier.width(Dimens.spaceSm))
+                    Text(stringResource(R.string.make_admin))
                 }
-            }
-            Button(
-                onClick = { selectedGroup?.let(onPromote) },
-                enabled = selectedGroup != null && !busy,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
-            ) {
-                if (busy) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                } else {
-                    Icon(Icons.Default.Shield, contentDescription = null)
-                }
-                Spacer(Modifier.width(Dimens.spaceSm))
-                Text(stringResource(R.string.make_admin))
             }
         }
     }

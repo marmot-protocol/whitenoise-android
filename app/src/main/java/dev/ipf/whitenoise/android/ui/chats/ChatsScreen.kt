@@ -1716,84 +1716,91 @@ internal fun ChatsScreen(
                             }
                         }
                     else ->
-                        LazyColumn(
-                            modifier =
-                                Modifier
-                                    .fillMaxSize()
-                                    .trackWhiteNoiseHeader(chatListState)
-                                    .clipToBounds()
-                                    .chatListEdgeFade(chatListState)
-                                    .cancelPointersAcrossChatListMotion(chatListInteractionsEnabled)
-                                    .onGloballyPositioned { coordinates ->
-                                        chatListWindowTop = coordinates.positionInWindow().y
-                                        chatListHeightPx = coordinates.size.height.toFloat()
-                                    },
-                            state = chatListState,
-                            contentPadding = PaddingValues(bottom = snackbarContentInset.value),
+                        PreparedGroupAvatarContent(
+                            appState,
+                            visibleItems.drop(chatListState.firstVisibleItemIndex).take(16).mapNotNull { it.selectedAvatarAsset },
+                            controller.boundAccountRef,
+                            surfaceIdentity = controller,
                         ) {
-                            controller.error
-                                ?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }
-                                ?.let { failure ->
-                                    item(key = "chat-list-load-error") {
-                                        InlineErrorBanner(
-                                            error = failure,
-                                            onRetry = controller::retryLoad,
-                                        )
-                                    }
-                                }
-                            if (searchActive) {
-                                if (searchSections.groups.isNotEmpty()) {
-                                    item(
-                                        key = CHAT_LIST_SEARCH_GROUPS_HEADER_KEY,
-                                        contentType = CHAT_LIST_SEARCH_HEADER_CONTENT_TYPE,
-                                    ) {
-                                        ChatListSearchSectionHeader(
-                                            title = stringResource(R.string.chat_list_filter_groups),
-                                            testTag = CHAT_LIST_SEARCH_GROUPS_HEADER_TAG,
-                                        )
-                                    }
-                                }
-                                searchSections.groups.forEachIndexed { targetIndex, item ->
-                                    this.item(
-                                        key = visibleRowId(item),
-                                        contentType = CHAT_LIST_ROW_CONTENT_TYPE,
-                                    ) {
-                                        chatRowContent(item, targetIndex, null)
-                                    }
-                                }
-                                if (searchSections.messages.isNotEmpty()) {
-                                    item(
-                                        key = CHAT_LIST_SEARCH_MESSAGES_HEADER_KEY,
-                                        contentType = CHAT_LIST_SEARCH_HEADER_CONTENT_TYPE,
-                                    ) {
-                                        ChatListSearchSectionHeader(
-                                            title = stringResource(R.string.notification_channel_messages),
-                                            testTag = CHAT_LIST_SEARCH_MESSAGES_HEADER_TAG,
-                                        )
-                                    }
-                                }
-                                searchSections.messages.forEachIndexed { messageIndex, item ->
-                                    val canonicalId = visibleRowId(item)
-                                    this.item(
-                                        key = canonicalId,
-                                        contentType = CHAT_LIST_ROW_CONTENT_TYPE,
-                                    ) {
-                                        val bodyMatch = bodyMatches[canonicalId]
-                                        chatRowContent(item, searchSections.groups.size + messageIndex, bodyMatch)
-                                    }
-                                }
-                            } else {
-                                visibleItems.forEachIndexed { targetIndex, item ->
-                                    if (targetIndex == pinnedBoundary) {
-                                        this.item(
-                                            key = CHAT_LIST_PINNED_BOUNDARY_KEY,
-                                            contentType = CHAT_LIST_PINNED_BOUNDARY_CONTENT_TYPE,
-                                        ) {
-                                            ChatListPinnedBoundary()
+                            LazyColumn(
+                                modifier =
+                                    Modifier
+                                        .fillMaxSize()
+                                        .trackWhiteNoiseHeader(chatListState)
+                                        .clipToBounds()
+                                        .chatListEdgeFade(chatListState)
+                                        .cancelPointersAcrossChatListMotion(chatListInteractionsEnabled)
+                                        .onGloballyPositioned { coordinates ->
+                                            chatListWindowTop = coordinates.positionInWindow().y
+                                            chatListHeightPx = coordinates.size.height.toFloat()
+                                        },
+                                state = chatListState,
+                                contentPadding = PaddingValues(bottom = snackbarContentInset.value),
+                            ) {
+                                controller.error
+                                    ?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }
+                                    ?.let { failure ->
+                                        item(key = "chat-list-load-error") {
+                                            InlineErrorBanner(
+                                                error = failure,
+                                                onRetry = controller::retryLoad,
+                                            )
                                         }
                                     }
-                                    this.item(key = item.id, contentType = CHAT_LIST_ROW_CONTENT_TYPE) {
-                                        chatRowContent(item, targetIndex, null)
+                                if (searchActive) {
+                                    if (searchSections.groups.isNotEmpty()) {
+                                        item(
+                                            key = CHAT_LIST_SEARCH_GROUPS_HEADER_KEY,
+                                            contentType = CHAT_LIST_SEARCH_HEADER_CONTENT_TYPE,
+                                        ) {
+                                            ChatListSearchSectionHeader(
+                                                title = stringResource(R.string.chat_list_filter_groups),
+                                                testTag = CHAT_LIST_SEARCH_GROUPS_HEADER_TAG,
+                                            )
+                                        }
+                                    }
+                                    searchSections.groups.forEachIndexed { targetIndex, item ->
+                                        this.item(
+                                            key = visibleRowId(item),
+                                            contentType = CHAT_LIST_ROW_CONTENT_TYPE,
+                                        ) {
+                                            chatRowContent(item, targetIndex, null)
+                                        }
+                                    }
+                                    if (searchSections.messages.isNotEmpty()) {
+                                        item(
+                                            key = CHAT_LIST_SEARCH_MESSAGES_HEADER_KEY,
+                                            contentType = CHAT_LIST_SEARCH_HEADER_CONTENT_TYPE,
+                                        ) {
+                                            ChatListSearchSectionHeader(
+                                                title = stringResource(R.string.notification_channel_messages),
+                                                testTag = CHAT_LIST_SEARCH_MESSAGES_HEADER_TAG,
+                                            )
+                                        }
+                                    }
+                                    searchSections.messages.forEachIndexed { messageIndex, item ->
+                                        val canonicalId = visibleRowId(item)
+                                        this.item(
+                                            key = canonicalId,
+                                            contentType = CHAT_LIST_ROW_CONTENT_TYPE,
+                                        ) {
+                                            val bodyMatch = bodyMatches[canonicalId]
+                                            chatRowContent(item, searchSections.groups.size + messageIndex, bodyMatch)
+                                        }
+                                    }
+                                } else {
+                                    visibleItems.forEachIndexed { targetIndex, item ->
+                                        if (targetIndex == pinnedBoundary) {
+                                            this.item(
+                                                key = CHAT_LIST_PINNED_BOUNDARY_KEY,
+                                                contentType = CHAT_LIST_PINNED_BOUNDARY_CONTENT_TYPE,
+                                            ) {
+                                                ChatListPinnedBoundary()
+                                            }
+                                        }
+                                        this.item(key = item.id, contentType = CHAT_LIST_ROW_CONTENT_TYPE) {
+                                            chatRowContent(item, targetIndex, null)
+                                        }
                                     }
                                 }
                             }

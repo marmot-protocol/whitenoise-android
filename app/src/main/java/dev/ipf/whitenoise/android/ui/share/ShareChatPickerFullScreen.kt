@@ -67,9 +67,10 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
 import dev.ipf.whitenoise.android.ui.chats.newchat.SectionHeader
 import dev.ipf.whitenoise.android.ui.chats.newchat.SelectionIndicator
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
+import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
-import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
+import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.conversation.messages.forwardTargetAvatarAccount
 import dev.ipf.whitenoise.android.ui.conversation.messages.forwardTargetMembersPreview
@@ -350,51 +351,59 @@ private fun ShareChatPickerTargetList(
     modifier: Modifier,
     listState: androidx.compose.foundation.lazy.LazyListState,
 ) {
-    LazyColumn(
-        modifier = modifier.fillMaxWidth(),
-        state = listState,
-        contentPadding = PaddingValues(bottom = Dimens.spaceLg),
+    PreparedGroupAvatarContent(
+        pickerState.appState,
+        filteredTargets.drop(listState.firstVisibleItemIndex).take(16).mapNotNull {
+            it.item.selectedAvatarAsset
+        },
+        pickerState.selectedAccountRef,
     ) {
-        if (pickerState.targets.isEmpty()) {
-            pickerState.error?.let { failure ->
-                item(key = "share-picker-load-error") {
-                    InlineErrorBanner(error = failure, onRetry = pickerState::retryLoad)
+        LazyColumn(
+            modifier = modifier.fillMaxWidth(),
+            state = listState,
+            contentPadding = PaddingValues(bottom = Dimens.spaceLg),
+        ) {
+            if (pickerState.targets.isEmpty()) {
+                pickerState.error?.let { failure ->
+                    item(key = "share-picker-load-error") {
+                        InlineErrorBanner(error = failure, onRetry = pickerState::retryLoad)
+                    }
                 }
-            }
-            item {
-                Text(
-                    stringResource(R.string.share_no_chats),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
-                )
-            }
-        } else if (filteredTargets.isEmpty()) {
-            item {
-                Text(
-                    stringResource(R.string.share_no_matches),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
-                )
-            }
-        } else {
-            pickerState.error?.let { failure ->
-                item(key = "share-picker-load-error") {
-                    InlineErrorBanner(error = failure, onRetry = pickerState::retryLoad)
+                item {
+                    Text(
+                        stringResource(R.string.share_no_chats),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
+                    )
                 }
-            }
-            item { SectionHeader(stringResource(R.string.recent_chats)) }
-            items(filteredTargets, key = { it.item.group.groupIdHex }) { target ->
-                ShareTargetRow(
-                    item = target.item,
-                    title = target.title,
-                    selected = pickerState.selected.contains(target.item.group.groupIdHex),
-                    selectedAccountIdHex = pickerState.selectedAccountIdHex,
-                    ownerAccountRef = pickerState.selectedAccountRef,
-                    appState = pickerState.appState,
-                    onToggle = pickerState::toggleSelection,
-                )
+            } else if (filteredTargets.isEmpty()) {
+                item {
+                    Text(
+                        stringResource(R.string.share_no_matches),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
+                    )
+                }
+            } else {
+                pickerState.error?.let { failure ->
+                    item(key = "share-picker-load-error") {
+                        InlineErrorBanner(error = failure, onRetry = pickerState::retryLoad)
+                    }
+                }
+                item { SectionHeader(stringResource(R.string.recent_chats)) }
+                items(filteredTargets, key = { it.item.group.groupIdHex }) { target ->
+                    ShareTargetRow(
+                        item = target.item,
+                        title = target.title,
+                        selected = pickerState.selected.contains(target.item.group.groupIdHex),
+                        selectedAccountIdHex = pickerState.selectedAccountIdHex,
+                        ownerAccountRef = pickerState.selectedAccountRef,
+                        appState = pickerState.appState,
+                        onToggle = pickerState::toggleSelection,
+                    )
+                }
             }
         }
     }
@@ -692,6 +701,13 @@ private fun ShareTargetRow(
 ) {
     val groupId = item.group.groupIdHex
     val avatarAccount = forwardTargetAvatarAccount(item)
+    val avatar =
+        rememberChatListGroupAvatar(
+            appState,
+            item,
+            ownerAccountRef,
+            avatarAccount?.let { appState.avatarUrl(it) },
+        )
     val memberIds =
         remember(item, selectedAccountIdHex) {
             item.memberSnapshot
@@ -712,8 +728,8 @@ private fun ShareTargetRow(
         title = title,
         subtitle = membersPreview,
         avatarSeed = avatarAccount ?: item.group.groupIdHex,
-        avatarUrl = item.group.avatarUrl ?: avatarAccount?.let { appState.avatarUrl(it) },
-        avatarImage = rememberEncryptedGroupAvatar(appState, item.group, ownerAccountRef),
+        avatarUrl = avatar.pictureUrl,
+        avatarImage = avatar.image,
         modifier = Modifier.semantics { this.selected = selected },
         onClick = { onToggle(groupId) },
         trailing = { SelectionIndicator(selected = selected) },

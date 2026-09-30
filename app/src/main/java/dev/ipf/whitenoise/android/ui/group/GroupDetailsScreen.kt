@@ -108,6 +108,7 @@ import dev.ipf.whitenoise.android.state.GroupRosterLoadState
 import dev.ipf.whitenoise.android.state.ProfileGroupPickerState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
+import dev.ipf.whitenoise.android.state.retainedAvatarBytesReader
 import dev.ipf.whitenoise.android.ui.chats.ChatFolderPickerSheet
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
@@ -117,8 +118,10 @@ import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
+import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
-import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
+import dev.ipf.whitenoise.android.ui.common.conversationGroupAvatarAsset
+import dev.ipf.whitenoise.android.ui.common.rememberConversationGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTransientNotice
@@ -262,1743 +265,1753 @@ internal fun GroupDetailsScreen(
     onOpenSearch: (() -> Unit)? = null,
     onStartGroupWithPeer: (RecipientSearch.Candidate) -> Unit = {},
 ) {
-    val detailsScrollState = key(controller) { rememberScrollState() }
-    val membersScrollState = key(controller) { rememberScrollState() }
-    var showChatRelays by remember(controller) { mutableStateOf(false) }
-    var showEditGroup by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-    var showGroupInfo by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-    var showNotificationSettings by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-    var showMuteDurationDialog by remember(controller) { mutableStateOf(false) }
-    var showNotifyForDialog by remember { mutableStateOf(false) }
-    var showVibrationPatternDialog by remember { mutableStateOf(false) }
-    var showDmAddToGroups by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-    var addingDmPeerToGroups by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-    // A requested picker stays closed until the roster is authoritative. This
-    // avoids excluding candidates against a stale or empty member snapshot.
-    var showAddMember by rememberSaveable(controller.group.groupIdHex) { mutableStateOf(false) }
-    val addSelection =
-        rememberSaveable(controller.group.groupIdHex, saver = AddMemberSelectionSaver) {
-            mutableStateListOf<RecipientSearch.Candidate>()
-        }
-    var showLargeGroupInviteConfirmation by
-        rememberSaveable(controller.group.groupIdHex) { mutableStateOf(false) }
-    val addMemberAutoOpened = rememberSaveable(controller.group.groupIdHex) { autoOpenAddMember }
-    var membersExpanded by remember(controller) { mutableStateOf(false) }
-    var memberSearchOpen by remember(controller) { mutableStateOf(false) }
-    var memberQuery by remember(controller) { mutableStateOf("") }
-    // Sole-admin "Transfer admin first" picker. Surfaced from the blocked
-    // leave path and the Admins prompt so a trapped sole admin can hand the
-    // role to another member (issue #417).
-    var showTransferAdmin by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-    var disbandConfirmOpen by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-    // #1131: when set, the transfer-admin picker is being used as the first step
-    // of a sole-admin Leave (3+ members) — picking transfers admin then leaves,
-    // rather than the standalone transfer-only action. Holds the group name for
-    // the leave call/toast.
-    var transferThenLeaveName by remember(controller.group.groupIdHex) { mutableStateOf<String?>(null) }
-    // Honor the caller's request to jump straight into the transfer picker
-    // (sole admin routed here from the blocked top-level Leave gate). Gated on
-    // the sole-admin predicate so a stale flag can't pop the sheet once the
-    // user is no longer trapped (e.g. transfer already completed).
-    LaunchedEffect(autoOpenTransferAdmin, controller.isSoleAdminWithOtherMembers) {
-        if (autoOpenTransferAdmin && controller.isSoleAdminWithOtherMembers) {
-            showTransferAdmin = true
-        }
-    }
-    // Disband eligibility, blockers, and any in-flight request are
-    // engine-authoritative; fetch on entry and again whenever the group
-    // record moves, so a remote admin's enable/disband lands here without
-    // reopening the screen.
-    LaunchedEffect(controller, controller.group) {
-        controller.refreshManagementState()
-    }
-    var mlsState by remember(controller.group.groupIdHex) { mutableStateOf<AppGroupMlsStateFfi?>(null) }
-    var mlsLoading by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-    var pushDebugInfo by remember(controller.group.groupIdHex) { mutableStateOf<GroupPushDebugInfoFfi?>(null) }
-    var pushDebugLoading by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-    // Scoped to the visible group; the controller mutation continues on appState
-    // if the user switches conversations, but this sheet stops tracking it.
-    var activeMutation by remember(controller.group.groupIdHex) { mutableStateOf<ActiveGroupMutation?>(null) }
-    // Tap-time archive direction, recorded before the mutation coroutine is
-    // dispatched so the menu's progress label can never read the pre-intent
-    // presented state and show the opposite direction.
-    var pendingConfirm by remember { mutableStateOf<DetailsConfirm?>(null) }
-    val scope = rememberCoroutineScope()
-    val context = LocalContext.current
-    val transcriptSave = rememberConversationTranscriptSave(appState, controller)
-    var transcriptExportInFlight by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-    var pendingTranscriptShareFile by remember(controller.group.groupIdHex) { mutableStateOf<java.io.File?>(null) }
-    val transcriptShareLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-            pendingTranscriptShareFile?.delete()
-            pendingTranscriptShareFile = null
-        }
-    val clipboard = LocalClipboardManager.current
-    val readOnlyInvite = controller.group.pendingConfirmation
-    val isDm = controller.isDm
-    val groupTerminal = controller.group.disbanding || controller.group.disbanded
-    val rosterReady = controller.memberRosterState == GroupRosterLoadState.READY
-    val canEdit = !readOnlyInvite && controller.isSelfMember && controller.isSelfAdmin && !groupTerminal
-    // Presentation-only: a warm member seed plus the admin list on the group
-    // record enables administration on the first frame; the invite commit
-    // still requires the authoritative roster inside the controller.
-    val canAdministerMembers =
-        !isDm && canEdit && memberAdministrationPresentable(controller.memberRosterState, controller.seededSelfMember)
-    val mutationsBlocked = activeMutation != null || controller.mutationInFlight
-    val detailsOpenedAtMs = remember(controller.group.groupIdHex) { SystemClock.elapsedRealtime() }
-    var administrationLatencyReported by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-    LaunchedEffect(canAdministerMembers) {
-        if (canAdministerMembers && !administrationLatencyReported) {
-            administrationLatencyReported = true
-            reportMemberAdministrationEnabledLatency(
-                elapsedMs = SystemClock.elapsedRealtime() - detailsOpenedAtMs,
-                rosterState = controller.memberRosterState,
-            )
-        }
-    }
-    LaunchedEffect(autoOpenAddMember, canAdministerMembers) {
-        if (autoOpenAddMember && canAdministerMembers) {
-            showAddMember = true
-            onAutoOpenAddMemberConsumed()
-        }
-    }
-    LaunchedEffect(canAdministerMembers) {
-        if (!canAdministerMembers) {
-            showAddMember = false
-            showLargeGroupInviteConfirmation = false
-            addSelection.clear()
-        }
-    }
-    val noShareTargetText = stringResource(R.string.no_share_target_available)
-    val groupTitleCopy = rememberGroupTitleCopy()
-    appState.profileRevisionForCompose
-    val conversationTitle = controller.title(groupTitleCopy)
-    val activeAccountIdHex = appState.activeAccount?.accountIdHex
-    val dmPeerAccountIdHex =
-        if (isDm) {
-            controller.avatarAccount
-                ?: controller.members
-                    .firstOrNull { !GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
-                    ?.memberIdHex
-        } else {
-            null
-        }
-    val dmPeerNpub = dmPeerAccountIdHex?.let(appState::npub)
-    val dmAddToGroupsScroll = rememberScrollState()
-    val dmGroupPickerRevision = appState.profileGroupPickerRevision
-    val dmAddableGroupsState =
-        remember(dmPeerAccountIdHex, appState.chatListItems, dmGroupPickerRevision) {
-            dmPeerAccountIdHex?.let(appState::profileAddableGroupsState)
-                ?: ProfileGroupPickerState.empty()
-        }
-    LaunchedEffect(showDmAddToGroups, dmAddableGroupsState.pendingGroupIds) {
-        if (showDmAddToGroups && dmAddableGroupsState.pendingGroupIds.isNotEmpty()) {
-            appState.requestProfileGroupMembers(dmAddableGroupsState.pendingGroupIds)
-        }
-    }
-    if (showDmAddToGroups && dmPeerAccountIdHex != null) {
-        SettingsScaffold(
-            title = stringResource(R.string.person_add_to_group),
-            onBack = { if (!addingDmPeerToGroups) showDmAddToGroups = false },
-        ) {
-            Box(Modifier.fillMaxSize().whiteNoiseVerticalScroll(dmAddToGroupsScroll)) {
-                ProfileAddToGroupsContent(
-                    appState = appState,
-                    targetName = conversationTitle,
-                    state = dmAddableGroupsState,
-                    busy = addingDmPeerToGroups,
-                    onClose = { if (!addingDmPeerToGroups) showDmAddToGroups = false },
-                    onRetry = {
-                        appState.requestProfileGroupMembers(
-                            dmAddableGroupsState.pendingGroupIds,
-                            retry = true,
-                        )
-                    },
-                    onAdd = { groups ->
-                        if (!addingDmPeerToGroups) {
-                            addingDmPeerToGroups = true
-                            appState.launchMutation {
-                                try {
-                                    val added =
-                                        appState.inviteProfileToGroups(
-                                            targetRef = dmPeerAccountIdHex,
-                                            targetGroupIds = groups.map { it.group.groupIdHex },
-                                        )
-                                    if (added) showDmAddToGroups = false
-                                } finally {
-                                    addingDmPeerToGroups = false
-                                }
-                            }
-                        }
-                    },
-                )
-            }
-        }
-        return
-    }
-    val canShowEditAction = !isDm && canEdit
-    LaunchedEffect(canShowEditAction) {
-        if (!canShowEditAction) showEditGroup = false
-    }
-    val chatNotificationState by appState.chatMutePreferences.state.collectAsState()
-    val vibrationSelections by appState.conversationVibrationPreferences.state.collectAsState()
-    val notificationModes = chatNotificationState.notificationModes
-    val conversationNotifyMode =
-        remember(appState.activeAccountRef, controller.group.groupIdHex, notificationModes) {
-            appState.conversationNotifyMode(controller.group.groupIdHex)
-        }
-    val conversationVibrationPattern =
-        remember(appState.activeAccountRef, controller.group.groupIdHex, vibrationSelections) {
-            appState.conversationVibrationPattern(controller.group.groupIdHex)
-        }
-    val engineMuted =
-        controller.latestChatListRow?.muted
-            ?: appState.engineConversationMuted(controller.group.groupIdHex)
-    var targetedMuteSettings by remember(appState.activeAccountRef, controller.group.groupIdHex) {
-        mutableStateOf<dev.ipf.marmotkit.ChatNotificationSettingsFfi?>(null)
-    }
-    LaunchedEffect(appState.activeAccountRef, controller.group.groupIdHex, controller.latestChatListRow) {
-        targetedMuteSettings = null
-        if (controller.latestChatListRow == null) {
-            targetedMuteSettings = appState.authoritativeConversationMuteSettings(controller.group.groupIdHex)
-        }
-    }
-    val muteOverride = appState.conversationMuteOverride(controller.group.groupIdHex)
-    val conversationMuted =
-        muteOverride?.muted
-            ?: controller.latestChatListRow?.muted
-            ?: targetedMuteSettings?.muted
-            ?: engineMuted
-    val muteCommandPending = appState.isConversationMutePending(controller.group.groupIdHex)
-    // Android retains only the All/Only-mentions preference behind MDK's mute.
-    val conversationRestoreMode =
-        remember(
-            appState.activeAccountRef,
-            controller.group.groupIdHex,
-            notificationModes,
-        ) {
-            appState.conversationRestoreNotifyMode(controller.group.groupIdHex)
-        }
-    val conversationMuteExpiry =
-        if (muteOverride != null) {
-            muteOverride.mutedUntilMs
-        } else {
-            controller.latestChatListRow?.mutedUntilMs
-                ?: targetedMuteSettings?.mutedUntilMs
-                ?: appState.conversationMuteExpiryMillis(controller.group.groupIdHex)
-        }
-
-    suspend fun refreshMlsDetails() {
-        if (!appState.developerMode) return
-        mlsLoading = true
-        try {
-            mlsState = controller.groupMlsState()
-        } finally {
-            mlsLoading = false
-        }
-    }
-
-    suspend fun refreshPushDebugInfo() {
-        if (!appState.developerMode) return
-        pushDebugLoading = true
-        try {
-            pushDebugInfo = controller.groupPushDebugInfo()
-        } finally {
-            pushDebugLoading = false
-        }
-    }
-
-    /** Runs a group mutation under the shared lock, recording the action and target for the row status. */
-    fun runGroupMutation(
-        action: GroupMutationAction,
-        mutation: suspend () -> Boolean,
-        target: String? = null,
-        onSuccess: () -> Unit = {},
+    PreparedGroupAvatarContent(
+        appState,
+        listOfNotNull(conversationGroupAvatarAsset(appState, controller)),
+        controller.boundAccountRef,
+        surfaceIdentity = controller,
     ) {
-        // Launched on a process-lifetime scope so the MLS commit + Nostr
-        // publish complete even if the user dismisses this sheet mid-flight.
-        // The refreshMembers() + appState.present(toast) inside each
-        // ConversationController.* method then always run, regardless of
-        // whether this composable is still on screen.
-        activeMutation = ActiveGroupMutation(action, target)
-        controller.clearLastMutationError()
-        appState.launchMutation {
-            try {
-                if (mutation()) onSuccess()
-            } finally {
-                // onSuccess() may have already dismissed this sheet; clearing
-                // detached Compose state is harmless in that case.
-                activeMutation = null
+        val detailsScrollState = key(controller) { rememberScrollState() }
+        val membersScrollState = key(controller) { rememberScrollState() }
+        var showChatRelays by remember(controller) { mutableStateOf(false) }
+        var showEditGroup by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+        var showGroupInfo by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+        var showNotificationSettings by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+        var showMuteDurationDialog by remember(controller) { mutableStateOf(false) }
+        var showNotifyForDialog by remember { mutableStateOf(false) }
+        var showVibrationPatternDialog by remember { mutableStateOf(false) }
+        var showDmAddToGroups by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+        var addingDmPeerToGroups by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+        // A requested picker stays closed until the roster is authoritative. This
+        // avoids excluding candidates against a stale or empty member snapshot.
+        var showAddMember by rememberSaveable(controller.group.groupIdHex) { mutableStateOf(false) }
+        val addSelection =
+            rememberSaveable(controller.group.groupIdHex, saver = AddMemberSelectionSaver) {
+                mutableStateListOf<RecipientSearch.Candidate>()
+            }
+        var showLargeGroupInviteConfirmation by
+            rememberSaveable(controller.group.groupIdHex) { mutableStateOf(false) }
+        val addMemberAutoOpened = rememberSaveable(controller.group.groupIdHex) { autoOpenAddMember }
+        var membersExpanded by remember(controller) { mutableStateOf(false) }
+        var memberSearchOpen by remember(controller) { mutableStateOf(false) }
+        var memberQuery by remember(controller) { mutableStateOf("") }
+        // Sole-admin "Transfer admin first" picker. Surfaced from the blocked
+        // leave path and the Admins prompt so a trapped sole admin can hand the
+        // role to another member (issue #417).
+        var showTransferAdmin by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+        var disbandConfirmOpen by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+        // #1131: when set, the transfer-admin picker is being used as the first step
+        // of a sole-admin Leave (3+ members) — picking transfers admin then leaves,
+        // rather than the standalone transfer-only action. Holds the group name for
+        // the leave call/toast.
+        var transferThenLeaveName by remember(controller.group.groupIdHex) { mutableStateOf<String?>(null) }
+        // Honor the caller's request to jump straight into the transfer picker
+        // (sole admin routed here from the blocked top-level Leave gate). Gated on
+        // the sole-admin predicate so a stale flag can't pop the sheet once the
+        // user is no longer trapped (e.g. transfer already completed).
+        LaunchedEffect(autoOpenTransferAdmin, controller.isSoleAdminWithOtherMembers) {
+            if (autoOpenTransferAdmin && controller.isSoleAdminWithOtherMembers) {
+                showTransferAdmin = true
             }
         }
-    }
-
-    // Route the Leave action (#416) to the right confirm dialog based on the
-    // user's role in the group. Shared by the overflow item and the bottom
-    // destructive button so both surfaces stay in lockstep. The display name
-    // is resolved here (not in the dialog) so the variants read the same title.
-    fun requestLeave(displayName: String) {
-        controller.clearLastMutationError()
-        appState.launchMutation {
-            when (controller.leaveAction()) {
-                LeaveAction.SoleMemberDeletesGroup -> pendingConfirm = DetailsConfirm.LeaveSoleMember(displayName)
-                // #1131: instead of the old Cancel-only dead-end, offer transfer
-                // then leave. One candidate → a single confirm; 3+ → the picker in
-                // leave mode. The (unexpected) no-candidate case keeps the old gate.
-                LeaveAction.SoleAdminMustTransfer -> {
-                    val candidates = controller.transferAdminCandidates()
-                    when {
-                        candidates.size == 1 ->
-                            pendingConfirm = DetailsConfirm.LeaveSoleAdminTransfer(displayName, candidates.first())
-                        candidates.size >= 2 -> {
-                            transferThenLeaveName = displayName
-                            showTransferAdmin = true
-                        }
-                        else -> pendingConfirm = DetailsConfirm.LeaveSoleAdmin(displayName)
-                    }
-                }
-                LeaveAction.Standard -> pendingConfirm = DetailsConfirm.Leave(displayName)
-            }
+        // Disband eligibility, blockers, and any in-flight request are
+        // engine-authoritative; fetch on entry and again whenever the group
+        // record moves, so a remote admin's enable/disband lands here without
+        // reopening the screen.
+        LaunchedEffect(controller, controller.group) {
+            controller.refreshManagementState()
         }
-    }
-
-    /** Exports the transcript through the native save flow. */
-    fun exportTranscript() {
-        if (transcriptExportInFlight || transcriptSave.busy) return
-        transcriptExportInFlight = true
-        appState.launchMutation {
-            var shareSheetLaunched = false
-            try {
-                val file = controller.exportConversationTranscriptFile(context.cacheDir) ?: return@launchMutation
-                pendingTranscriptShareFile = file
-                try {
-                    withContext(Dispatchers.Main) {
-                        transcriptShareLauncher.launch(conversationTranscriptShareIntent(context, file))
-                        shareSheetLaunched = true
-                    }
-                } catch (_: ActivityNotFoundException) {
-                    pendingTranscriptShareFile = null
-                    file.delete()
-                    appState.present(R.string.toast_couldnt_export_transcript, AppText.Plain(noShareTargetText), copyable = true)
-                }
-            } catch (error: Throwable) {
-                if (error is CancellationException) {
-                    if (!shareSheetLaunched) {
-                        pendingTranscriptShareFile?.delete()
-                        pendingTranscriptShareFile = null
-                    }
-                    throw error
-                }
+        var mlsState by remember(controller.group.groupIdHex) { mutableStateOf<AppGroupMlsStateFfi?>(null) }
+        var mlsLoading by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+        var pushDebugInfo by remember(controller.group.groupIdHex) { mutableStateOf<GroupPushDebugInfoFfi?>(null) }
+        var pushDebugLoading by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+        // Scoped to the visible group; the controller mutation continues on appState
+        // if the user switches conversations, but this sheet stops tracking it.
+        var activeMutation by remember(controller.group.groupIdHex) { mutableStateOf<ActiveGroupMutation?>(null) }
+        // Tap-time archive direction, recorded before the mutation coroutine is
+        // dispatched so the menu's progress label can never read the pre-intent
+        // presented state and show the opposite direction.
+        var pendingConfirm by remember { mutableStateOf<DetailsConfirm?>(null) }
+        val scope = rememberCoroutineScope()
+        val context = LocalContext.current
+        val transcriptSave = rememberConversationTranscriptSave(appState, controller)
+        var transcriptExportInFlight by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+        var pendingTranscriptShareFile by remember(controller.group.groupIdHex) { mutableStateOf<java.io.File?>(null) }
+        val transcriptShareLauncher =
+            rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
                 pendingTranscriptShareFile?.delete()
                 pendingTranscriptShareFile = null
-                appState.presentFailure(
-                    R.string.toast_couldnt_export_transcript,
-                    "CONVERSATION_TRANSCRIPT_SHARE",
-                    error,
+            }
+        val clipboard = LocalClipboardManager.current
+        val readOnlyInvite = controller.group.pendingConfirmation
+        val isDm = controller.isDm
+        val groupTerminal = controller.group.disbanding || controller.group.disbanded
+        val rosterReady = controller.memberRosterState == GroupRosterLoadState.READY
+        val canEdit = !readOnlyInvite && controller.isSelfMember && controller.isSelfAdmin && !groupTerminal
+        // Presentation-only: a warm member seed plus the admin list on the group
+        // record enables administration on the first frame; the invite commit
+        // still requires the authoritative roster inside the controller.
+        val canAdministerMembers =
+            !isDm && canEdit && memberAdministrationPresentable(controller.memberRosterState, controller.seededSelfMember)
+        val mutationsBlocked = activeMutation != null || controller.mutationInFlight
+        val detailsOpenedAtMs = remember(controller.group.groupIdHex) { SystemClock.elapsedRealtime() }
+        var administrationLatencyReported by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+        LaunchedEffect(canAdministerMembers) {
+            if (canAdministerMembers && !administrationLatencyReported) {
+                administrationLatencyReported = true
+                reportMemberAdministrationEnabledLatency(
+                    elapsedMs = SystemClock.elapsedRealtime() - detailsOpenedAtMs,
+                    rosterState = controller.memberRosterState,
                 )
-            } finally {
-                transcriptExportInFlight = false
             }
         }
-    }
-
-    LaunchedEffect(
-        appState.developerMode,
-        controller.group.groupIdHex,
-        controller.group.admins,
-        controller.members.map { it.memberIdHex },
-    ) {
-        refreshMlsDetails()
-        refreshPushDebugInfo()
-    }
-
-    // Close the picker only after the controller has accepted the invite and
-    // installed its optimistic row. This avoids dismissing a selection when a
-    // competing mutation won the controller's single-flight guard.
-    LaunchedEffect(showAddMember, controller.pendingInviteMemberRefs) {
-        if (showAddMember && controller.pendingInviteMemberRefs.isNotEmpty()) {
-            showLargeGroupInviteConfirmation = false
-            addSelection.clear()
-            if (addMemberAutoOpened) onBack() else showAddMember = false
-        }
-    }
-
-    val sharedMediaTiles = rememberSharedMediaTiles(controller, appState)
-    var mediaLibraryCategory by remember(controller) { mutableStateOf<SharedContentCategory?>(null) }
-    var showBubbleColors by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-    val ttsAutoReadPrefs by appState.ttsAutoReadPreferences.state.collectAsState()
-    val autoReadOverride =
-        remember(ttsAutoReadPrefs, appState.activeAccountRef, controller.group.groupIdHex) {
-            appState.activeAccountRef?.let { accountRef ->
-                appState.ttsAutoReadPreferences.overrideFor(accountRef, controller.group.groupIdHex)
+        LaunchedEffect(autoOpenAddMember, canAdministerMembers) {
+            if (autoOpenAddMember && canAdministerMembers) {
+                showAddMember = true
+                onAutoOpenAddMemberConsumed()
             }
         }
-    val autoReadSettingLabel =
-        stringResource(
-            ttsAutoReadSettingLabelRes(
-                override = autoReadOverride,
-                globalDefaultEnabled = ttsAutoReadPrefs.globalDefaultEnabled,
-            ),
-        )
-    var showAutoReadPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-    var showDisappearingPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-    var pendingDisappearingSecs by remember(controller.group.groupIdHex) { mutableStateOf<Long?>(null) }
-    var showFolderPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-    var showFolderCreate by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-
-    mediaLibraryCategory?.let { category ->
-        BackHandler { mediaLibraryCategory = null }
-        MediaLibraryRoute(
-            tiles = sharedMediaTiles,
-            controller = controller,
-            appState = appState,
-            category = category,
-            onBack = { mediaLibraryCategory = null },
-            onJumpToMessage = onJumpToMessage,
-        )
-        return
-    }
-
-    if (showBubbleColors) {
-        BackHandler { showBubbleColors = false }
-        ChatBubbleColorsScreen(
-            appState = appState,
-            onBack = { showBubbleColors = false },
-            groupIdHex = controller.group.groupIdHex,
-        )
-        return
-    }
-
-    if (showMuteDurationDialog) {
-        MuteDurationDialog(
-            onDismiss = { showMuteDurationDialog = false },
-            onSelect = { target ->
-                showMuteDurationDialog = false
-                when (target) {
-                    is MuteTarget.After ->
-                        appState.muteConversationFor(
-                            controller.group.groupIdHex,
-                            target.durationMillis,
-                        )
-                    is MuteTarget.At ->
-                        appState.muteConversationUntil(
-                            controller.group.groupIdHex,
-                            target.expiryMillis,
-                        )
-                    MuteTarget.Always ->
-                        appState.muteConversationFor(
-                            controller.group.groupIdHex,
-                            durationMillis = 0L,
-                        )
-                }
-            },
-        )
-    }
-
-    if (showNotificationSettings) {
-        BackHandler { showNotificationSettings = false }
-        ConversationNotificationSettingsScreen(
-            appState = appState,
-            groupIdHex = controller.group.groupIdHex,
-            conversationTitle = conversationTitle,
-            conversationAvatarUrl = controller.avatarUrl,
-            isDm = isDm,
-            isMuted = conversationMuted,
-            muteCommandPending = muteCommandPending,
-            muteExpiryMillis = conversationMuteExpiry,
-            notifyForMode = conversationRestoreMode,
-            vibrationPattern = conversationVibrationPattern,
-            onBack = { showNotificationSettings = false },
-            onToggleMute = { turnOn ->
-                if (turnOn) {
-                    showMuteDurationDialog = true
-                } else {
-                    // Unmute back to the All/Only-mentions preference the mute hid.
-                    appState.setConversationNotifyMode(controller.group.groupIdHex, conversationRestoreMode)
-                }
-            },
-            onChooseNotifyFor = { showNotifyForDialog = true },
-            onChooseVibrationPattern = { showVibrationPatternDialog = true },
-        )
-        if (showNotifyForDialog) {
-            NotifyForDialog(
-                currentMode = conversationRestoreMode,
-                onDismiss = { showNotifyForDialog = false },
-                onSelect = { mode ->
-                    showNotifyForDialog = false
-                    appState.setConversationNotifyForMode(controller.group.groupIdHex, mode)
-                },
-            )
-        }
-        if (showVibrationPatternDialog) {
-            VibrationPatternDialog(
-                currentPattern = conversationVibrationPattern,
-                onDismiss = { showVibrationPatternDialog = false },
-                onSelect = { pattern ->
-                    showVibrationPatternDialog = false
-                    appState.setConversationVibrationPattern(
-                        groupIdHex = controller.group.groupIdHex,
-                        isDm = isDm,
-                        conversationTitle = conversationTitle,
-                        pattern = pattern,
-                    )
-                },
-            )
-        }
-        return
-    }
-
-    BackHandler { onBack() }
-
-    if (showEditGroup) {
-        GroupEditScreen(appState = appState, controller = controller, onBack = { showEditGroup = false })
-        return
-    }
-
-    val folderAccountRef = appState.activeAccountRef
-    if (showFolderCreate && folderAccountRef != null) {
-        ChatFolderEditScreen(
-            appState = appState,
-            accountRef = folderAccountRef,
-            folderId = null,
-            onClose = { showFolderCreate = false },
-            initialManualChatIds = setOf(controller.group.groupIdHex.lowercase(Locale.ROOT)),
-        )
-        return
-    }
-
-    if (showAddMember && canAdministerMembers) {
-        val adding = activeMutation?.action == GroupMutationAction.InviteMember
-        val inviteProjection =
-            largeGroupInviteProjection(
-                rosterReady = rosterReady,
-                authoritativeMemberIds = controller.members.map { it.memberIdHex },
-                activeAccountIdHex = activeAccountIdHex,
-                pendingInviteMemberIds = controller.pendingInviteMemberRefs,
-                stagedRecipientIds = addSelection.map { it.accountIdHex },
-            )
-
-        /** Submits the currently staged, normalized recipients and closes the picker only after native success. */
-        fun submitSelectedInvites() {
-            if (!canAdministerMembers) return
-            val refs = addSelection.map { it.accountIdHex }
-            // Members are added as regular members; admin is granted
-            // per-member afterward from the profile sheet. The old bulk
-            // "add as admin" toggle couldn't express per-member intent for
-            // a multi-select add, so it's gone.
-            runGroupMutation(
-                action = GroupMutationAction.InviteMember,
-                mutation = { controller.inviteMembers(refs, addAsAdmin = false) },
-                onSuccess = {
-                    addSelection.clear()
-                    if (addMemberAutoOpened) onBack() else showAddMember = false
-                },
-            )
-        }
-
-        LaunchedEffect(showLargeGroupInviteConfirmation, inviteProjection?.shouldWarn) {
-            if (showLargeGroupInviteConfirmation && inviteProjection?.shouldWarn == false) {
+        LaunchedEffect(canAdministerMembers) {
+            if (!canAdministerMembers) {
+                showAddMember = false
                 showLargeGroupInviteConfirmation = false
+                addSelection.clear()
             }
         }
-        ContactPickerScreen(
-            appState = appState,
-            title = stringResource(R.string.add_member),
-            selected = addSelection,
-            onBack = {
-                // When auto-opened from the empty-group CTA, Back returns to the
-                // conversation (via the details onBack) rather than exposing the
-                // details body the user never intended to see.
-                if (!adding) {
-                    showLargeGroupInviteConfirmation = false
-                    addSelection.clear()
-                    if (addMemberAutoOpened) onBack() else showAddMember = false
+        val noShareTargetText = stringResource(R.string.no_share_target_available)
+        val groupTitleCopy = rememberGroupTitleCopy()
+        appState.profileRevisionForCompose
+        val conversationTitle = controller.title(groupTitleCopy)
+        val activeAccountIdHex = appState.activeAccount?.accountIdHex
+        val dmPeerAccountIdHex =
+            if (isDm) {
+                controller.avatarAccount
+                    ?: controller.members
+                        .firstOrNull { !GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
+                        ?.memberIdHex
+            } else {
+                null
+            }
+        val dmPeerNpub = dmPeerAccountIdHex?.let(appState::npub)
+        val dmAddToGroupsScroll = rememberScrollState()
+        val dmGroupPickerRevision = appState.profileGroupPickerRevision
+        val dmAddableGroupsState =
+            remember(dmPeerAccountIdHex, appState.chatListItems, dmGroupPickerRevision) {
+                dmPeerAccountIdHex?.let(appState::profileAddableGroupsState)
+                    ?: ProfileGroupPickerState.empty()
+            }
+        LaunchedEffect(showDmAddToGroups, dmAddableGroupsState.pendingGroupIds) {
+            if (showDmAddToGroups && dmAddableGroupsState.pendingGroupIds.isNotEmpty()) {
+                appState.requestProfileGroupMembers(dmAddableGroupsState.pendingGroupIds)
+            }
+        }
+        if (showDmAddToGroups && dmPeerAccountIdHex != null) {
+            SettingsScaffold(
+                title = stringResource(R.string.person_add_to_group),
+                onBack = { if (!addingDmPeerToGroups) showDmAddToGroups = false },
+            ) {
+                Box(Modifier.fillMaxSize().whiteNoiseVerticalScroll(dmAddToGroupsScroll)) {
+                    ProfileAddToGroupsContent(
+                        appState = appState,
+                        targetName = conversationTitle,
+                        state = dmAddableGroupsState,
+                        busy = addingDmPeerToGroups,
+                        onClose = { if (!addingDmPeerToGroups) showDmAddToGroups = false },
+                        onRetry = {
+                            appState.requestProfileGroupMembers(
+                                dmAddableGroupsState.pendingGroupIds,
+                                retry = true,
+                            )
+                        },
+                        onAdd = { groups ->
+                            if (!addingDmPeerToGroups) {
+                                addingDmPeerToGroups = true
+                                appState.launchMutation {
+                                    try {
+                                        val added =
+                                            appState.inviteProfileToGroups(
+                                                targetRef = dmPeerAccountIdHex,
+                                                targetGroupIds = groups.map { it.group.groupIdHex },
+                                            )
+                                        if (added) showDmAddToGroups = false
+                                    } finally {
+                                        addingDmPeerToGroups = false
+                                    }
+                                }
+                            }
+                        },
+                    )
                 }
-            },
-            onConfirm = confirm@{
-                if (!canAdministerMembers || !rosterReady) return@confirm
-                if (inviteProjection?.shouldWarn == true) {
-                    showLargeGroupInviteConfirmation = true
-                } else {
-                    submitSelectedInvites()
+            }
+            return
+        }
+        val canShowEditAction = !isDm && canEdit
+        LaunchedEffect(canShowEditAction) {
+            if (!canShowEditAction) showEditGroup = false
+        }
+        val chatNotificationState by appState.chatMutePreferences.state.collectAsState()
+        val vibrationSelections by appState.conversationVibrationPreferences.state.collectAsState()
+        val notificationModes = chatNotificationState.notificationModes
+        val conversationNotifyMode =
+            remember(appState.activeAccountRef, controller.group.groupIdHex, notificationModes) {
+                appState.conversationNotifyMode(controller.group.groupIdHex)
+            }
+        val conversationVibrationPattern =
+            remember(appState.activeAccountRef, controller.group.groupIdHex, vibrationSelections) {
+                appState.conversationVibrationPattern(controller.group.groupIdHex)
+            }
+        val engineMuted =
+            controller.latestChatListRow?.muted
+                ?: appState.engineConversationMuted(controller.group.groupIdHex)
+        var targetedMuteSettings by remember(appState.activeAccountRef, controller.group.groupIdHex) {
+            mutableStateOf<dev.ipf.marmotkit.ChatNotificationSettingsFfi?>(null)
+        }
+        LaunchedEffect(appState.activeAccountRef, controller.group.groupIdHex, controller.latestChatListRow) {
+            targetedMuteSettings = null
+            if (controller.latestChatListRow == null) {
+                targetedMuteSettings = appState.authoritativeConversationMuteSettings(controller.group.groupIdHex)
+            }
+        }
+        val muteOverride = appState.conversationMuteOverride(controller.group.groupIdHex)
+        val conversationMuted =
+            muteOverride?.muted
+                ?: controller.latestChatListRow?.muted
+                ?: targetedMuteSettings?.muted
+                ?: engineMuted
+        val muteCommandPending = appState.isConversationMutePending(controller.group.groupIdHex)
+        // Android retains only the All/Only-mentions preference behind MDK's mute.
+        val conversationRestoreMode =
+            remember(
+                appState.activeAccountRef,
+                controller.group.groupIdHex,
+                notificationModes,
+            ) {
+                appState.conversationRestoreNotifyMode(controller.group.groupIdHex)
+            }
+        val conversationMuteExpiry =
+            if (muteOverride != null) {
+                muteOverride.mutedUntilMs
+            } else {
+                controller.latestChatListRow?.mutedUntilMs
+                    ?: targetedMuteSettings?.mutedUntilMs
+                    ?: appState.conversationMuteExpiryMillis(controller.group.groupIdHex)
+            }
+
+        suspend fun refreshMlsDetails() {
+            if (!appState.developerMode) return
+            mlsLoading = true
+            try {
+                mlsState = controller.groupMlsState()
+            } finally {
+                mlsLoading = false
+            }
+        }
+
+        suspend fun refreshPushDebugInfo() {
+            if (!appState.developerMode) return
+            pushDebugLoading = true
+            try {
+                pushDebugInfo = controller.groupPushDebugInfo()
+            } finally {
+                pushDebugLoading = false
+            }
+        }
+
+        /** Runs a group mutation under the shared lock, recording the action and target for the row status. */
+        fun runGroupMutation(
+            action: GroupMutationAction,
+            mutation: suspend () -> Boolean,
+            target: String? = null,
+            onSuccess: () -> Unit = {},
+        ) {
+            // Launched on a process-lifetime scope so the MLS commit + Nostr
+            // publish complete even if the user dismisses this sheet mid-flight.
+            // The refreshMembers() + appState.present(toast) inside each
+            // ConversationController.* method then always run, regardless of
+            // whether this composable is still on screen.
+            activeMutation = ActiveGroupMutation(action, target)
+            controller.clearLastMutationError()
+            appState.launchMutation {
+                try {
+                    if (mutation()) onSuccess()
+                } finally {
+                    // onSuccess() may have already dismissed this sheet; clearing
+                    // detached Compose state is harmless in that case.
+                    activeMutation = null
                 }
-            },
-            confirmIcon = Icons.Default.Check,
-            confirmLabel = stringResource(R.string.add_member),
-            // The picker opens optimistically from the seed, but the commit
-            // needs the authoritative roster: hold the confirm busy until it
-            // lands instead of letting a tap hit the controller's gate silently.
-            busy = adding || controller.mutationInFlight || !rosterReady,
-            autoSelectResolvedIdentifier = true,
-            excludeAccountIdHexes =
-                (controller.presentedMembers.map { it.memberIdHex } + controller.pendingInviteMemberRefs).toSet(),
-            footer = {
-                if (inviteProjection?.shouldWarn == true) {
-                    LargeGroupInviteWarningBanner()
+            }
+        }
+
+        // Route the Leave action (#416) to the right confirm dialog based on the
+        // user's role in the group. Shared by the overflow item and the bottom
+        // destructive button so both surfaces stay in lockstep. The display name
+        // is resolved here (not in the dialog) so the variants read the same title.
+        fun requestLeave(displayName: String) {
+            controller.clearLastMutationError()
+            appState.launchMutation {
+                when (controller.leaveAction()) {
+                    LeaveAction.SoleMemberDeletesGroup -> pendingConfirm = DetailsConfirm.LeaveSoleMember(displayName)
+                    // #1131: instead of the old Cancel-only dead-end, offer transfer
+                    // then leave. One candidate → a single confirm; 3+ → the picker in
+                    // leave mode. The (unexpected) no-candidate case keeps the old gate.
+                    LeaveAction.SoleAdminMustTransfer -> {
+                        val candidates = controller.transferAdminCandidates()
+                        when {
+                            candidates.size == 1 ->
+                                pendingConfirm = DetailsConfirm.LeaveSoleAdminTransfer(displayName, candidates.first())
+                            candidates.size >= 2 -> {
+                                transferThenLeaveName = displayName
+                                showTransferAdmin = true
+                            }
+                            else -> pendingConfirm = DetailsConfirm.LeaveSoleAdmin(displayName)
+                        }
+                    }
+                    LeaveAction.Standard -> pendingConfirm = DetailsConfirm.Leave(displayName)
                 }
-            },
-        )
-        if (showLargeGroupInviteConfirmation && inviteProjection?.shouldWarn == true) {
-            LargeGroupInviteConfirmationDialog(
-                onContinue = {
-                    showLargeGroupInviteConfirmation = false
-                    submitSelectedInvites()
+            }
+        }
+
+        /** Exports the transcript through the native save flow. */
+        fun exportTranscript() {
+            if (transcriptExportInFlight || transcriptSave.busy) return
+            transcriptExportInFlight = true
+            appState.launchMutation {
+                var shareSheetLaunched = false
+                try {
+                    val file = controller.exportConversationTranscriptFile(context.cacheDir) ?: return@launchMutation
+                    pendingTranscriptShareFile = file
+                    try {
+                        withContext(Dispatchers.Main) {
+                            transcriptShareLauncher.launch(conversationTranscriptShareIntent(context, file))
+                            shareSheetLaunched = true
+                        }
+                    } catch (_: ActivityNotFoundException) {
+                        pendingTranscriptShareFile = null
+                        file.delete()
+                        appState.present(R.string.toast_couldnt_export_transcript, AppText.Plain(noShareTargetText), copyable = true)
+                    }
+                } catch (error: Throwable) {
+                    if (error is CancellationException) {
+                        if (!shareSheetLaunched) {
+                            pendingTranscriptShareFile?.delete()
+                            pendingTranscriptShareFile = null
+                        }
+                        throw error
+                    }
+                    pendingTranscriptShareFile?.delete()
+                    pendingTranscriptShareFile = null
+                    appState.presentFailure(
+                        R.string.toast_couldnt_export_transcript,
+                        "CONVERSATION_TRANSCRIPT_SHARE",
+                        error,
+                    )
+                } finally {
+                    transcriptExportInFlight = false
+                }
+            }
+        }
+
+        LaunchedEffect(
+            appState.developerMode,
+            controller.group.groupIdHex,
+            controller.group.admins,
+            controller.members.map { it.memberIdHex },
+        ) {
+            refreshMlsDetails()
+            refreshPushDebugInfo()
+        }
+
+        // Close the picker only after the controller has accepted the invite and
+        // installed its optimistic row. This avoids dismissing a selection when a
+        // competing mutation won the controller's single-flight guard.
+        LaunchedEffect(showAddMember, controller.pendingInviteMemberRefs) {
+            if (showAddMember && controller.pendingInviteMemberRefs.isNotEmpty()) {
+                showLargeGroupInviteConfirmation = false
+                addSelection.clear()
+                if (addMemberAutoOpened) onBack() else showAddMember = false
+            }
+        }
+
+        val sharedMediaTiles = rememberSharedMediaTiles(controller, appState)
+        var mediaLibraryCategory by remember(controller) { mutableStateOf<SharedContentCategory?>(null) }
+        var showBubbleColors by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+        val ttsAutoReadPrefs by appState.ttsAutoReadPreferences.state.collectAsState()
+        val autoReadOverride =
+            remember(ttsAutoReadPrefs, appState.activeAccountRef, controller.group.groupIdHex) {
+                appState.activeAccountRef?.let { accountRef ->
+                    appState.ttsAutoReadPreferences.overrideFor(accountRef, controller.group.groupIdHex)
+                }
+            }
+        val autoReadSettingLabel =
+            stringResource(
+                ttsAutoReadSettingLabelRes(
+                    override = autoReadOverride,
+                    globalDefaultEnabled = ttsAutoReadPrefs.globalDefaultEnabled,
+                ),
+            )
+        var showAutoReadPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+        var showDisappearingPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+        var pendingDisappearingSecs by remember(controller.group.groupIdHex) { mutableStateOf<Long?>(null) }
+        var showFolderPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+        var showFolderCreate by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+
+        mediaLibraryCategory?.let { category ->
+            BackHandler { mediaLibraryCategory = null }
+            MediaLibraryRoute(
+                tiles = sharedMediaTiles,
+                controller = controller,
+                appState = appState,
+                category = category,
+                onBack = { mediaLibraryCategory = null },
+                onJumpToMessage = onJumpToMessage,
+            )
+            return
+        }
+
+        if (showBubbleColors) {
+            BackHandler { showBubbleColors = false }
+            ChatBubbleColorsScreen(
+                appState = appState,
+                onBack = { showBubbleColors = false },
+                groupIdHex = controller.group.groupIdHex,
+            )
+            return
+        }
+
+        if (showMuteDurationDialog) {
+            MuteDurationDialog(
+                onDismiss = { showMuteDurationDialog = false },
+                onSelect = { target ->
+                    showMuteDurationDialog = false
+                    when (target) {
+                        is MuteTarget.After ->
+                            appState.muteConversationFor(
+                                controller.group.groupIdHex,
+                                target.durationMillis,
+                            )
+                        is MuteTarget.At ->
+                            appState.muteConversationUntil(
+                                controller.group.groupIdHex,
+                                target.expiryMillis,
+                            )
+                        MuteTarget.Always ->
+                            appState.muteConversationFor(
+                                controller.group.groupIdHex,
+                                durationMillis = 0L,
+                            )
+                    }
                 },
-                onDismiss = { showLargeGroupInviteConfirmation = false },
             )
         }
-        return
-    }
 
-    if (showGroupInfo) {
-        BackHandler { showGroupInfo = false }
-        GroupInfoScreen(
-            groupIdHex = controller.group.groupIdHex,
-            nostrGroupIdHex = controller.group.nostrGroupIdHex,
-            relays = controller.group.relays,
-            onBack = { showGroupInfo = false },
-        )
-        return
-    }
+        if (showNotificationSettings) {
+            BackHandler { showNotificationSettings = false }
+            ConversationNotificationSettingsScreen(
+                appState = appState,
+                groupIdHex = controller.group.groupIdHex,
+                conversationTitle = conversationTitle,
+                conversationAvatarUrl = controller.avatarUrl,
+                isDm = isDm,
+                isMuted = conversationMuted,
+                muteCommandPending = muteCommandPending,
+                muteExpiryMillis = conversationMuteExpiry,
+                notifyForMode = conversationRestoreMode,
+                vibrationPattern = conversationVibrationPattern,
+                onBack = { showNotificationSettings = false },
+                onToggleMute = { turnOn ->
+                    if (turnOn) {
+                        showMuteDurationDialog = true
+                    } else {
+                        // Unmute back to the All/Only-mentions preference the mute hid.
+                        appState.setConversationNotifyMode(controller.group.groupIdHex, conversationRestoreMode)
+                    }
+                },
+                onChooseNotifyFor = { showNotifyForDialog = true },
+                onChooseVibrationPattern = { showVibrationPatternDialog = true },
+            )
+            if (showNotifyForDialog) {
+                NotifyForDialog(
+                    currentMode = conversationRestoreMode,
+                    onDismiss = { showNotifyForDialog = false },
+                    onSelect = { mode ->
+                        showNotifyForDialog = false
+                        appState.setConversationNotifyForMode(controller.group.groupIdHex, mode)
+                    },
+                )
+            }
+            if (showVibrationPatternDialog) {
+                VibrationPatternDialog(
+                    currentPattern = conversationVibrationPattern,
+                    onDismiss = { showVibrationPatternDialog = false },
+                    onSelect = { pattern ->
+                        showVibrationPatternDialog = false
+                        appState.setConversationVibrationPattern(
+                            groupIdHex = controller.group.groupIdHex,
+                            isDm = isDm,
+                            conversationTitle = conversationTitle,
+                            pattern = pattern,
+                        )
+                    },
+                )
+            }
+            return
+        }
 
-    if (showTransferAdmin) {
-        TransferAdminSheet(
-            controller = controller,
-            appState = appState,
-            busy = activeMutation != null || controller.mutationInFlight,
-            onPick = { member ->
-                showTransferAdmin = false
-                val leaveName = transferThenLeaveName
-                transferThenLeaveName = null
-                if (leaveName != null) {
-                    // Sole-admin Leave, 3+ members (#1131): transfer then leave as
-                    // one action. controller.group updates in-place after the
-                    // transfer, so the subsequent leave's gate sees the new admin.
-                    runGroupMutation(
-                        action = GroupMutationAction.Leave,
-                        mutation = {
-                            controller.transferAdmin(member) && controller.leaveGroup(displayName = leaveName)
-                        },
-                        onSuccess = { onLeft() },
-                    )
-                } else {
-                    pendingConfirm = DetailsConfirm.TransferAdmin(member)
+        BackHandler { onBack() }
+
+        if (showEditGroup) {
+            GroupEditScreen(appState = appState, controller = controller, onBack = { showEditGroup = false })
+            return
+        }
+
+        val folderAccountRef = appState.activeAccountRef
+        if (showFolderCreate && folderAccountRef != null) {
+            ChatFolderEditScreen(
+                appState = appState,
+                accountRef = folderAccountRef,
+                folderId = null,
+                onClose = { showFolderCreate = false },
+                initialManualChatIds = setOf(controller.group.groupIdHex.lowercase(Locale.ROOT)),
+            )
+            return
+        }
+
+        if (showAddMember && canAdministerMembers) {
+            val adding = activeMutation?.action == GroupMutationAction.InviteMember
+            val inviteProjection =
+                largeGroupInviteProjection(
+                    rosterReady = rosterReady,
+                    authoritativeMemberIds = controller.members.map { it.memberIdHex },
+                    activeAccountIdHex = activeAccountIdHex,
+                    pendingInviteMemberIds = controller.pendingInviteMemberRefs,
+                    stagedRecipientIds = addSelection.map { it.accountIdHex },
+                )
+
+            /** Submits the currently staged, normalized recipients and closes the picker only after native success. */
+            fun submitSelectedInvites() {
+                if (!canAdministerMembers) return
+                val refs = addSelection.map { it.accountIdHex }
+                // Members are added as regular members; admin is granted
+                // per-member afterward from the profile sheet. The old bulk
+                // "add as admin" toggle couldn't express per-member intent for
+                // a multi-select add, so it's gone.
+                runGroupMutation(
+                    action = GroupMutationAction.InviteMember,
+                    mutation = { controller.inviteMembers(refs, addAsAdmin = false) },
+                    onSuccess = {
+                        addSelection.clear()
+                        if (addMemberAutoOpened) onBack() else showAddMember = false
+                    },
+                )
+            }
+
+            LaunchedEffect(showLargeGroupInviteConfirmation, inviteProjection?.shouldWarn) {
+                if (showLargeGroupInviteConfirmation && inviteProjection?.shouldWarn == false) {
+                    showLargeGroupInviteConfirmation = false
                 }
-            },
-            onDismiss = {
-                showTransferAdmin = false
-                transferThenLeaveName = null
-            },
-        )
-    }
+            }
+            ContactPickerScreen(
+                appState = appState,
+                title = stringResource(R.string.add_member),
+                selected = addSelection,
+                onBack = {
+                    // When auto-opened from the empty-group CTA, Back returns to the
+                    // conversation (via the details onBack) rather than exposing the
+                    // details body the user never intended to see.
+                    if (!adding) {
+                        showLargeGroupInviteConfirmation = false
+                        addSelection.clear()
+                        if (addMemberAutoOpened) onBack() else showAddMember = false
+                    }
+                },
+                onConfirm = confirm@{
+                    if (!canAdministerMembers || !rosterReady) return@confirm
+                    if (inviteProjection?.shouldWarn == true) {
+                        showLargeGroupInviteConfirmation = true
+                    } else {
+                        submitSelectedInvites()
+                    }
+                },
+                confirmIcon = Icons.Default.Check,
+                confirmLabel = stringResource(R.string.add_member),
+                // The picker opens optimistically from the seed, but the commit
+                // needs the authoritative roster: hold the confirm busy until it
+                // lands instead of letting a tap hit the controller's gate silently.
+                busy = adding || controller.mutationInFlight || !rosterReady,
+                autoSelectResolvedIdentifier = true,
+                excludeAccountIdHexes =
+                    (controller.presentedMembers.map { it.memberIdHex } + controller.pendingInviteMemberRefs).toSet(),
+                footer = {
+                    if (inviteProjection?.shouldWarn == true) {
+                        LargeGroupInviteWarningBanner()
+                    }
+                },
+            )
+            if (showLargeGroupInviteConfirmation && inviteProjection?.shouldWarn == true) {
+                LargeGroupInviteConfirmationDialog(
+                    onContinue = {
+                        showLargeGroupInviteConfirmation = false
+                        submitSelectedInvites()
+                    },
+                    onDismiss = { showLargeGroupInviteConfirmation = false },
+                )
+            }
+            return
+        }
 
-    pendingConfirm?.let { confirm ->
-        when (confirm) {
-            is DetailsConfirm.RemoveMember ->
-                ConfirmDialog(
-                    title = stringResource(R.string.confirm_remove_member_title),
-                    message =
-                        stringResource(
-                            R.string.confirm_remove_member_message,
-                            controller.memberDisplayName(confirm.member),
-                        ),
-                    confirmLabel = stringResource(R.string.remove_member),
-                    onConfirm = {
-                        pendingConfirm = null
-                        runGroupMutation(
-                            action = GroupMutationAction.RemoveMember,
-                            mutation = { controller.removeMember(confirm.member) },
-                            target = confirm.member.memberIdHex,
-                        )
-                    },
-                    onDismiss = { pendingConfirm = null },
-                    destructive = true,
-                )
-            is DetailsConfirm.TransferAdmin ->
-                ConfirmDialog(
-                    title = stringResource(R.string.confirm_transfer_admin_title),
-                    message =
-                        stringResource(
-                            R.string.confirm_transfer_admin_message,
-                            controller.memberDisplayName(confirm.member),
-                        ),
-                    confirmLabel = stringResource(R.string.transfer_admin),
-                    onConfirm = {
-                        pendingConfirm = null
-                        runGroupMutation(
-                            action = GroupMutationAction.TransferAdmin,
-                            mutation = { controller.transferAdmin(confirm.member) },
-                            target = confirm.member.memberIdHex,
-                        )
-                    },
-                    onDismiss = { pendingConfirm = null },
-                )
-            is DetailsConfirm.StepDownAdmin ->
-                ConfirmDialog(
-                    title = stringResource(R.string.step_down_as_admin),
-                    message = stringResource(R.string.confirm_step_down_admin_message),
-                    confirmLabel = stringResource(R.string.step_down_as_admin),
-                    onConfirm = {
-                        pendingConfirm = null
-                        runGroupMutation(
-                            action = GroupMutationAction.SelfDemoteAdmin,
-                            mutation = { controller.stepDownAsAdmin() },
-                            target = confirm.member.memberIdHex,
-                        )
-                    },
-                    onDismiss = { pendingConfirm = null },
-                    destructive = true,
-                )
-            DetailsConfirm.StepDownSoleAdmin ->
-                AlertDialog(
-                    onDismissRequest = { pendingConfirm = null },
-                    title = { Text(stringResource(R.string.sole_admin_leave_blocked_title)) },
-                    text = { Text(stringResource(R.string.sole_admin_transfer_hint)) },
-                    confirmButton = {
-                        TextButton(
-                            onClick = {
-                                pendingConfirm = null
-                                showTransferAdmin = true
-                            },
-                        ) {
-                            Text(stringResource(R.string.transfer_admin))
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { pendingConfirm = null }) {
-                            Text(stringResource(R.string.cancel))
-                        }
-                    },
-                )
-            is DetailsConfirm.Leave ->
-                ConfirmDialog(
-                    title = stringResource(R.string.confirm_leave_title_named, confirm.groupName),
-                    message = stringResource(R.string.confirm_leave_message_named),
-                    confirmLabel = stringResource(R.string.leave),
-                    onConfirm = {
-                        pendingConfirm = null
-                        // Process-lifetime scope so a swipe-dismiss mid-leave doesn't
-                        // kill the toast/refresh; onDismiss + onLeft are safe Compose
-                        // state writes from Main.immediate.
-                        runGroupMutation(
-                            action = GroupMutationAction.Leave,
-                            mutation = { controller.leaveGroup(displayName = confirm.groupName) },
-                            onSuccess = {
-                                onLeft()
-                            },
-                        )
-                    },
-                    onDismiss = { pendingConfirm = null },
-                    destructive = true,
-                )
-            is DetailsConfirm.LeaveSoleMember ->
-                // Sole member: leaving dissolves the group entirely through local
-                // cleanup (no other member to coordinate an MLS commit with). The
-                // copy makes the destructive "this deletes the group" consequence clear.
-                ConfirmDialog(
-                    title = stringResource(R.string.confirm_leave_sole_member_title, confirm.groupName),
-                    message = stringResource(R.string.confirm_leave_sole_member_message),
-                    confirmLabel = stringResource(R.string.leave),
-                    onConfirm = {
-                        pendingConfirm = null
-                        runGroupMutation(
-                            action = GroupMutationAction.Leave,
-                            mutation = { controller.leaveGroup(displayName = confirm.groupName) },
-                            onSuccess = {
-                                onLeft()
-                            },
-                        )
-                    },
-                    onDismiss = { pendingConfirm = null },
-                    destructive = true,
-                )
-            is DetailsConfirm.LeaveSoleAdmin ->
-                // Fallback for the (unexpected) no-transfer-candidate case — still
-                // an informational gate. The normal sole-admin Leave now routes to
-                // LeaveSoleAdminTransfer or the picker in leave mode (#1131).
-                AlertDialog(
-                    onDismissRequest = { pendingConfirm = null },
-                    title = { Text(stringResource(R.string.confirm_leave_sole_admin_title)) },
-                    text = { Text(stringResource(R.string.confirm_leave_sole_admin_message, confirm.groupName)) },
-                    confirmButton = {
-                        TextButton(onClick = { pendingConfirm = null }) {
-                            Text(stringResource(R.string.cancel))
-                        }
-                    },
-                )
-            is DetailsConfirm.LeaveSoleAdminTransfer ->
-                ConfirmDialog(
-                    title = stringResource(R.string.confirm_leave_sole_admin_title),
-                    message =
-                        stringResource(
-                            R.string.confirm_sole_admin_transfer_then_leave_message,
-                            controller.memberDisplayName(confirm.newAdmin),
-                        ),
-                    confirmLabel = stringResource(R.string.leave),
-                    onConfirm = {
-                        pendingConfirm = null
+        if (showGroupInfo) {
+            BackHandler { showGroupInfo = false }
+            GroupInfoScreen(
+                groupIdHex = controller.group.groupIdHex,
+                nostrGroupIdHex = controller.group.nostrGroupIdHex,
+                relays = controller.group.relays,
+                onBack = { showGroupInfo = false },
+            )
+            return
+        }
+
+        if (showTransferAdmin) {
+            TransferAdminSheet(
+                controller = controller,
+                appState = appState,
+                busy = activeMutation != null || controller.mutationInFlight,
+                onPick = { member ->
+                    showTransferAdmin = false
+                    val leaveName = transferThenLeaveName
+                    transferThenLeaveName = null
+                    if (leaveName != null) {
+                        // Sole-admin Leave, 3+ members (#1131): transfer then leave as
+                        // one action. controller.group updates in-place after the
+                        // transfer, so the subsequent leave's gate sees the new admin.
                         runGroupMutation(
                             action = GroupMutationAction.Leave,
                             mutation = {
-                                controller.transferAdmin(confirm.newAdmin) &&
-                                    controller.leaveGroup(displayName = confirm.groupName)
+                                controller.transferAdmin(member) && controller.leaveGroup(displayName = leaveName)
                             },
                             onSuccess = { onLeft() },
                         )
-                    },
-                    onDismiss = { pendingConfirm = null },
-                    destructive = true,
-                )
+                    } else {
+                        pendingConfirm = DetailsConfirm.TransferAdmin(member)
+                    }
+                },
+                onDismiss = {
+                    showTransferAdmin = false
+                    transferThenLeaveName = null
+                },
+            )
         }
-    }
 
-    val groupFeedback: @Composable () -> Unit = {
-        controller.lastMutationError?.let { error ->
-            Box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                GroupMutationErrorBanner(error = error, onDismiss = { controller.clearLastMutationError() })
-            }
-        }
-    }
-    val groupNotice: @Composable () -> Unit = {
-        ConversationTransientNotice(
-            notice = appState.transientNotice,
-            accountRef = appState.activeAccountRef,
-            groupIdHex = controller.group.groupIdHex,
-        )
-    }
-    val memberContent: @Composable () -> Unit = {
-        if (!isDm) {
-            // Keep the member header, identities, pending invitations and the
-            // full-roster action in one contiguous primary section. ContactRow
-            // already provides Material touch heights and internal padding.
-            Column(Modifier.testTag("chat_info.members")) {
-                if (!rosterReady) {
-                    GroupRosterLoadStatus(
-                        state = controller.memberRosterState,
-                        onRetry = {
-                            scope.launch { controller.retryMembers() }
+        pendingConfirm?.let { confirm ->
+            when (confirm) {
+                is DetailsConfirm.RemoveMember ->
+                    ConfirmDialog(
+                        title = stringResource(R.string.confirm_remove_member_title),
+                        message =
+                            stringResource(
+                                R.string.confirm_remove_member_message,
+                                controller.memberDisplayName(confirm.member),
+                            ),
+                        confirmLabel = stringResource(R.string.remove_member),
+                        onConfirm = {
+                            pendingConfirm = null
+                            runGroupMutation(
+                                action = GroupMutationAction.RemoveMember,
+                                mutation = { controller.removeMember(confirm.member) },
+                                target = confirm.member.memberIdHex,
+                            )
+                        },
+                        onDismiss = { pendingConfirm = null },
+                        destructive = true,
+                    )
+                is DetailsConfirm.TransferAdmin ->
+                    ConfirmDialog(
+                        title = stringResource(R.string.confirm_transfer_admin_title),
+                        message =
+                            stringResource(
+                                R.string.confirm_transfer_admin_message,
+                                controller.memberDisplayName(confirm.member),
+                            ),
+                        confirmLabel = stringResource(R.string.transfer_admin),
+                        onConfirm = {
+                            pendingConfirm = null
+                            runGroupMutation(
+                                action = GroupMutationAction.TransferAdmin,
+                                mutation = { controller.transferAdmin(confirm.member) },
+                                target = confirm.member.memberIdHex,
+                            )
+                        },
+                        onDismiss = { pendingConfirm = null },
+                    )
+                is DetailsConfirm.StepDownAdmin ->
+                    ConfirmDialog(
+                        title = stringResource(R.string.step_down_as_admin),
+                        message = stringResource(R.string.confirm_step_down_admin_message),
+                        confirmLabel = stringResource(R.string.step_down_as_admin),
+                        onConfirm = {
+                            pendingConfirm = null
+                            runGroupMutation(
+                                action = GroupMutationAction.SelfDemoteAdmin,
+                                mutation = { controller.stepDownAsAdmin() },
+                                target = confirm.member.memberIdHex,
+                            )
+                        },
+                        onDismiss = { pendingConfirm = null },
+                        destructive = true,
+                    )
+                DetailsConfirm.StepDownSoleAdmin ->
+                    AlertDialog(
+                        onDismissRequest = { pendingConfirm = null },
+                        title = { Text(stringResource(R.string.sole_admin_leave_blocked_title)) },
+                        text = { Text(stringResource(R.string.sole_admin_transfer_hint)) },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    pendingConfirm = null
+                                    showTransferAdmin = true
+                                },
+                            ) {
+                                Text(stringResource(R.string.transfer_admin))
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { pendingConfirm = null }) {
+                                Text(stringResource(R.string.cancel))
+                            }
                         },
                     )
-                } else {
-                    Row(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 56.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(Modifier.weight(1f)) {
-                            SettingsSection(stringResource(R.string.members))
-                        }
-                        IconButton(
-                            onClick = {
-                                memberSearchOpen = !memberSearchOpen
-                                if (!memberSearchOpen) memberQuery = ""
-                            },
-                            modifier = Modifier.padding(end = Dimens.spaceSm),
-                        ) {
-                            Icon(
-                                if (memberSearchOpen) Icons.Default.Close else Icons.Default.Search,
-                                contentDescription = stringResource(R.string.search_members),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                    if (memberSearchOpen) {
-                        FlowSearchField(
-                            value = memberQuery,
-                            onValueChange = { memberQuery = it },
-                            placeholder = stringResource(R.string.search_members),
-                            modifier =
-                                Modifier
-                                    .padding(horizontal = Dimens.spaceLg)
-                                    .padding(bottom = Dimens.spaceSm),
-                        )
-                    }
-                    // #612: render members in a deterministic order — you first,
-                    // then other admins alpha by display name, then non-admins
-                    // alpha by display name, with memberIdHex as a stable
-                    // tiebreaker. Display names are resolved once into a map so
-                    // the comparator does pure reads. lowercase(Locale.ROOT) keeps
-                    // ordering consistent across device locales (e.g. Turkish I).
-                    // Prefetch member profiles here so the title map below can stay a
-                    // pure read (contactDisplayNameCached); the profile/nickname
-                    // revision key recomposes the sort once names or local aliases land.
-                    val presentedMembers = controller.presentedMembers
-                    LaunchedEffect(presentedMembers, controller.pendingInviteMemberRefs) {
-                        appState.requestProfiles(
-                            presentedMembers.map { it.memberIdHex } + controller.pendingInviteMemberRefs,
-                        )
-                    }
-                    val memberTitlesByHex =
-                        remember(presentedMembers, appState.profileRevisionForCompose) {
-                            presentedMembers.associate {
-                                it.memberIdHex to appState.contactDisplayNameCached(it.memberIdHex)
-                            }
-                        }
-                    val displayedMembers =
-                        remember(
-                            presentedMembers,
-                            activeAccountIdHex,
-                            memberTitlesByHex,
-                        ) {
-                            presentedMembers.sortedWith(
-                                compareBy(
-                                    { !GroupProjector.isActiveAccountMember(it, activeAccountIdHex) },
-                                    { !controller.isAdmin(it) },
-                                    { memberTitlesByHex[it.memberIdHex]?.lowercase(Locale.ROOT).orEmpty() },
-                                    { it.memberIdHex.lowercase(Locale.ROOT) },
-                                ),
-                            )
-                        }
-                    val memberNeedle = memberQuery.trim()
-                    val visibleMembers =
-                        when {
-                            memberNeedle.isNotEmpty() ->
-                                displayedMembers.filter {
-                                    memberTitlesByHex[it.memberIdHex]
-                                        .orEmpty()
-                                        .contains(memberNeedle, ignoreCase = true)
-                                }
-                            membersExpanded || displayedMembers.size <= GROUP_MEMBERS_PREVIEW_COUNT ->
-                                displayedMembers
-                            else -> displayedMembers.take(GROUP_MEMBERS_PREVIEW_COUNT)
-                        }
-                    if (memberNeedle.isNotEmpty() && visibleMembers.isEmpty()) {
-                        Text(
-                            stringResource(R.string.no_matches),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = Dimens.spaceLg),
-                        )
-                    }
-                    // Row taps route into the profile sheet, which carries the same
-                    // admin actions (grant/revoke admin, remove) the old per-row menu
-                    // exposed (#444/#635 scope rules).
-                    GroupMemberIdentityRows(visibleMembers) { index, member ->
-                        val isSelfRow = GroupProjector.isActiveAccountMember(member, activeAccountIdHex)
-                        val rowMutationPending =
-                            controller.isMemberMutationPending(member.memberIdHex) ||
-                                activeMutation?.target == member.memberIdHex
-                        // Only another member with a presentable identity has a profile to
-                        // open, so self and unresolved rows stay inert and chevron-free.
-                        val profileNpub =
-                            if (isSelfRow) "" else appState.npubForDisplay(member.memberIdHex)
-                        val opensProfile = profileNpub.isNotBlank()
-                        ChatInfoMemberCard(
-                            index = index,
-                            count = visibleMembers.size,
-                            modifier = Modifier.testTag("chat_info.member.${member.memberIdHex}"),
-                        ) {
-                            ContactRow(
-                                title =
-                                    if (isSelfRow) {
-                                        stringResource(R.string.you)
-                                    } else {
-                                        controller.memberDisplayName(member)
-                                    },
-                                subtitle = memberRoleLabel(controller.isAdmin(member), rowMutationPending),
-                                avatarSeed = member.memberIdHex,
-                                avatarUrl = controller.memberAvatarUrl(member),
-                                modifier =
-                                    if (index == 0) {
-                                        Modifier.performanceTestTag(PerformanceTestTags.MEMBER_LIST)
-                                    } else {
-                                        Modifier
-                                    },
-                                onClick =
-                                    if (opensProfile) {
-                                        { appState.presentProfile(profileNpub) }
-                                    } else {
-                                        null
-                                    },
-                                trailing =
-                                    if (opensProfile) {
-                                        { ChatInfoRowChevron() }
-                                    } else {
-                                        null
-                                    },
-                            )
-                        }
-                    }
-                    val canExpandMembers =
-                        memberNeedle.isEmpty() &&
-                            !membersExpanded &&
-                            displayedMembers.size > GROUP_MEMBERS_PREVIEW_COUNT
-                    if (canExpandMembers) {
-                        SettingsGroup(
-                            modifier =
-                                Modifier
-                                    .padding(top = WhiteNoiseSpacing.Related)
-                                    .testTag("chat_info.all_members"),
-                        ) {
-                            row("all_members") { rowContext ->
-                                SettingsLink(
-                                    context = rowContext,
-                                    title = stringResource(R.string.see_all_members),
-                                    onClick = { membersExpanded = true },
-                                    leading = {
-                                        Icon(painterResource(R.drawable.ic_group), contentDescription = null)
-                                    },
-                                )
-                            }
-                        }
-                    }
-                    controller.pendingInviteMemberRefs.forEach { invite ->
-                        val inviteNpub = appState.npubForDisplay(invite)
-                        PendingGroupInviteRow(
-                            title = appState.displayName(invite),
-                            subtitle =
-                                stringResource(
-                                    R.string.invite_pending,
-                                    IdentityFormatter.short(inviteNpub),
-                                ),
-                            avatarSeed = invite,
-                            avatarUrl = appState.avatarUrl(invite),
-                            onClick =
-                                if (inviteNpub.isBlank()) {
-                                    {}
-                                } else {
-                                    { clipboard.setText(AnnotatedString(inviteNpub)) }
+                is DetailsConfirm.Leave ->
+                    ConfirmDialog(
+                        title = stringResource(R.string.confirm_leave_title_named, confirm.groupName),
+                        message = stringResource(R.string.confirm_leave_message_named),
+                        confirmLabel = stringResource(R.string.leave),
+                        onConfirm = {
+                            pendingConfirm = null
+                            // Process-lifetime scope so a swipe-dismiss mid-leave doesn't
+                            // kill the toast/refresh; onDismiss + onLeft are safe Compose
+                            // state writes from Main.immediate.
+                            runGroupMutation(
+                                action = GroupMutationAction.Leave,
+                                mutation = { controller.leaveGroup(displayName = confirm.groupName) },
+                                onSuccess = {
+                                    onLeft()
                                 },
-                        )
-                    }
+                            )
+                        },
+                        onDismiss = { pendingConfirm = null },
+                        destructive = true,
+                    )
+                is DetailsConfirm.LeaveSoleMember ->
+                    // Sole member: leaving dissolves the group entirely through local
+                    // cleanup (no other member to coordinate an MLS commit with). The
+                    // copy makes the destructive "this deletes the group" consequence clear.
+                    ConfirmDialog(
+                        title = stringResource(R.string.confirm_leave_sole_member_title, confirm.groupName),
+                        message = stringResource(R.string.confirm_leave_sole_member_message),
+                        confirmLabel = stringResource(R.string.leave),
+                        onConfirm = {
+                            pendingConfirm = null
+                            runGroupMutation(
+                                action = GroupMutationAction.Leave,
+                                mutation = { controller.leaveGroup(displayName = confirm.groupName) },
+                                onSuccess = {
+                                    onLeft()
+                                },
+                            )
+                        },
+                        onDismiss = { pendingConfirm = null },
+                        destructive = true,
+                    )
+                is DetailsConfirm.LeaveSoleAdmin ->
+                    // Fallback for the (unexpected) no-transfer-candidate case — still
+                    // an informational gate. The normal sole-admin Leave now routes to
+                    // LeaveSoleAdminTransfer or the picker in leave mode (#1131).
+                    AlertDialog(
+                        onDismissRequest = { pendingConfirm = null },
+                        title = { Text(stringResource(R.string.confirm_leave_sole_admin_title)) },
+                        text = { Text(stringResource(R.string.confirm_leave_sole_admin_message, confirm.groupName)) },
+                        confirmButton = {
+                            TextButton(onClick = { pendingConfirm = null }) {
+                                Text(stringResource(R.string.cancel))
+                            }
+                        },
+                    )
+                is DetailsConfirm.LeaveSoleAdminTransfer ->
+                    ConfirmDialog(
+                        title = stringResource(R.string.confirm_leave_sole_admin_title),
+                        message =
+                            stringResource(
+                                R.string.confirm_sole_admin_transfer_then_leave_message,
+                                controller.memberDisplayName(confirm.newAdmin),
+                            ),
+                        confirmLabel = stringResource(R.string.leave),
+                        onConfirm = {
+                            pendingConfirm = null
+                            runGroupMutation(
+                                action = GroupMutationAction.Leave,
+                                mutation = {
+                                    controller.transferAdmin(confirm.newAdmin) &&
+                                        controller.leaveGroup(displayName = confirm.groupName)
+                                },
+                                onSuccess = { onLeft() },
+                            )
+                        },
+                        onDismiss = { pendingConfirm = null },
+                        destructive = true,
+                    )
+            }
+        }
+
+        val groupFeedback: @Composable () -> Unit = {
+            controller.lastMutationError?.let { error ->
+                Box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    GroupMutationErrorBanner(error = error, onDismiss = { controller.clearLastMutationError() })
                 }
             }
         }
-    }
-    if (membersExpanded && !isDm) {
-        BackHandler { membersExpanded = false }
-        GroupMembersScreen(
-            onBack = { membersExpanded = false },
-            scrollState = membersScrollState,
-            feedback = groupFeedback,
-            bottomBar = groupNotice,
-            content = memberContent,
-        )
-        return
-    }
-    if (showChatRelays) {
-        BackHandler { showChatRelays = false }
-        ChatRelaysScreen(
-            relays = controller.group.relays,
-            onBack = { showChatRelays = false },
-            feedback = groupFeedback,
-            bottomBar = groupNotice,
-        )
-        return
-    }
-
-    val encryptedGroupAvatar = rememberEncryptedGroupAvatar(appState, controller.group)
-    var nameBottom by remember(controller) { mutableFloatStateOf(Float.POSITIVE_INFINITY) }
-    var headerBottom by remember { mutableFloatStateOf(0f) }
-    val showHeaderIdentity by remember(detailsScrollState, controller) {
-        derivedStateOf { detailsScrollState.value > 0 && headerBottom > 0f && nameBottom <= headerBottom }
-    }
-    WhiteNoiseScaffold(
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        topBar = {
-            TopAppBar(
-                modifier =
-                    Modifier.onGloballyPositioned {
-                        headerBottom = it.positionInWindow().y + it.size.height
-                    },
-                title = {
-                    if (showHeaderIdentity) {
-                        Row(
-                            modifier = Modifier.testTag("chat_info.header_identity"),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Box(Modifier.size(32.dp).testTag("chat_info.header_avatar")) {
-                                Avatar(
-                                    title = conversationTitle,
-                                    seed = controller.avatarAccount ?: controller.group.groupIdHex,
-                                    size = 32.dp,
-                                    pictureUrl = controller.avatarUrl.takeIf { encryptedGroupAvatar == null },
-                                    picture = encryptedGroupAvatar,
-                                )
-                            }
-                            Text(
-                                conversationTitle,
-                                modifier = Modifier.weight(1f).testTag("chat_info.header_name"),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                style = MaterialTheme.typography.titleLarge,
-                            )
-                        }
-                    }
-                },
-                scrollBehavior = LocalWhiteNoiseHeaderScroll.current,
-                colors =
-                    androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    ),
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            painterResource(R.drawable.ic_arrow_back),
-                            contentDescription = stringResource(R.string.back),
-                        )
-                    }
-                },
-            )
-        },
-        bottomBar = {
+        val groupNotice: @Composable () -> Unit = {
             ConversationTransientNotice(
                 notice = appState.transientNotice,
                 accountRef = appState.activeAccountRef,
                 groupIdHex = controller.group.groupIdHex,
             )
-        },
-    ) { padding ->
-        // The engine rejects all ordinary outbound group work while a disband
-        // converges and forever after it lands; don't advertise actions that
-        // can only fail. Local-only actions (archive, local delete) keep the
-        // plain in-flight gate.
-        val collapseLongMessages = appState.collapseLongMessagesInGroup(controller.group.groupIdHex)
-        Column(
-            Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .whiteNoiseVerticalScroll(detailsScrollState)
-                .testTag("chat_info.list")
-                .padding(bottom = 24.dp),
-        ) {
-            GroupDetailsHeader(
-                title = conversationTitle,
-                subtitle =
-                    if (isDm) {
-                        ""
-                    } else if (!rosterReady) {
-                        stringResource(R.string.members)
-                    } else {
-                        stringResource(R.string.group_details_subtitle, controller.presentedMemberCount)
-                    },
-                description =
-                    if (isDm) {
-                        dmPeerNpub
-                            ?.let { IdentityFormatter.short(it, prefix = 12, suffix = 8) }
-                            .orEmpty()
-                    } else {
-                        controller.group.description
-                    },
-                // Show the DM peer's avatar + initials seed here — the same
-                // peer metadata the top bar and chat-list row resolve (#837).
-                // A group keeps its own avatar (controller.avatarUrl falls back
-                // to the group avatar; avatarAccount is null for groups).
-                seed = controller.avatarAccount ?: controller.group.groupIdHex,
-                pictureUrl = controller.avatarUrl,
-                picture = encryptedGroupAvatar,
-                archived = controller.presentedArchived,
-                onEdit =
-                    if (canShowEditAction) {
-                        { showEditGroup = true }
-                    } else {
-                        null
-                    },
-                editEnabled = activeMutation == null && !controller.mutationInFlight,
-                onAddDescription =
-                    if (!isDm && canEdit && controller.group.description.isBlank()) {
-                        { showEditGroup = true }
-                    } else {
-                        null
-                    },
-                descriptionCopyValue = dmPeerNpub.takeIf { isDm },
-                onNameBottom = { nameBottom = it },
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                if (isDm && dmPeerNpub != null) {
-                    QuickInfoAction(
-                        label = stringResource(R.string.about),
-                        icon = R.drawable.ic_person,
-                        onClick = { appState.presentProfile(dmPeerNpub) },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                QuickInfoAction(
-                    label = stringResource(if (conversationMuted) R.string.chat_row_action_unmute else R.string.mute),
-                    icon = if (conversationMuted) R.drawable.ic_volume_up else R.drawable.ic_notifications_off,
-                    enabled = !muteCommandPending,
-                    onClick = {
-                        if (conversationMuted) {
-                            appState.setConversationNotifyMode(controller.group.groupIdHex, conversationRestoreMode)
-                        } else {
-                            showMuteDurationDialog = true
-                        }
-                    },
-                    modifier = Modifier.weight(1f),
-                )
-                QuickInfoAction(
-                    label = stringResource(R.string.disappearing),
-                    icon = R.drawable.ic_timer,
-                    state = disappearingMessagesLabel(controller.group.disappearingMessageSecs.toLong()),
-                    enabled = canEdit && !mutationsBlocked,
-                    onClick = { showDisappearingPicker = true },
-                    modifier = Modifier.weight(1f),
-                )
-                if (onOpenSearch != null) {
-                    QuickInfoAction(
-                        label = stringResource(R.string.quick_action_search),
-                        icon = R.drawable.ic_search,
-                        onClick = onOpenSearch,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
-            if (isDm && dmPeerAccountIdHex != null && dmPeerNpub != null) {
-                SettingsSection(stringResource(R.string.profile_actions))
-                SettingsGroup(modifier = Modifier.testTag("chat_info.group_actions")) {
-                    row("start_group") { rowContext ->
-                        SettingsAction(
-                            context = rowContext,
-                            title = stringResource(R.string.person_start_group),
-                            onClick = {
-                                onStartGroupWithPeer(
-                                    RecipientSearch.Candidate(
-                                        accountIdHex = dmPeerAccountIdHex,
-                                        displayName = conversationTitle,
-                                        npub = dmPeerNpub,
-                                    ),
-                                )
-                            },
-                            leading = { Icon(painterResource(R.drawable.ic_group_add), contentDescription = null) },
-                            modifier = Modifier.testTag("chat_info.start_group"),
-                        )
-                    }
-                    row("add_to_group") { rowContext ->
-                        SettingsAction(
-                            context = rowContext,
-                            title = stringResource(R.string.person_add_to_group),
-                            onClick = { showDmAddToGroups = true },
-                            enabled = !addingDmPeerToGroups,
-                            leading = { Icon(painterResource(R.drawable.ic_group_add), contentDescription = null) },
-                            modifier = Modifier.testTag("chat_info.add_to_group"),
-                        )
-                    }
-                }
-            }
-            controller.lastMutationError?.let { error ->
-                Box(Modifier.padding(horizontal = Dimens.spaceLg)) {
-                    GroupMutationErrorBanner(
-                        error = error,
-                        onDismiss = { controller.clearLastMutationError() },
-                    )
-                }
-            }
-
-            memberContent()
-
-            if (!isDm && canEdit) {
-                SettingsGroup(
-                    modifier = Modifier.padding(top = WhiteNoiseSpacing.Section).testTag("chat_info.management"),
-                ) {
-                    row("edit_group") { rowContext ->
-                        SettingsLink(
-                            context = rowContext,
-                            title = stringResource(R.string.edit_group_info_title),
-                            onClick = { showEditGroup = true },
-                            enabled = activeMutation == null && !controller.mutationInFlight,
-                            leading = { Icon(painterResource(R.drawable.ic_edit), contentDescription = null) },
-                        )
-                    }
-                    row("add_member") { rowContext ->
-                        SettingsLink(
-                            context = rowContext,
-                            title = stringResource(R.string.add_member),
-                            onClick = { showAddMember = true },
-                            modifier = Modifier.testTag("chat_info.add_people"),
-                            enabled =
-                                memberAdministrationPresentable(
-                                    controller.memberRosterState,
-                                    controller.seededSelfMember,
-                                ) &&
-                                    !mutationsBlocked,
-                            leading = { Icon(painterResource(R.drawable.ic_group_add), contentDescription = null) },
-                        )
-                    }
-                }
-            }
-
-            SharedMediaSection(
-                tiles = sharedMediaTiles,
-                onOpenCategory = { mediaLibraryCategory = it },
-                modifier = Modifier.testTag("chat_info.shared_media"),
-            )
-
-            // Custom folders containing this chat — manual membership or a
-            // live rule match — so the value tracks membership changes made
-            // anywhere (chat list, Settings, or a rule flipping).
-            val folderStoreState by appState.chatFolderPreferences.state.collectAsState()
-            val chatIdLower = controller.group.groupIdHex.lowercase(Locale.ROOT)
-            val folderNames =
-                remember(
-                    folderStoreState,
-                    appState.chatListItems,
-                    appState.profileRevisionForCompose,
-                    folderAccountRef,
-                    chatIdLower,
-                    groupTitleCopy,
-                ) {
-                    val accountRef = folderAccountRef ?: return@remember emptyList()
-                    val thisChatRow = appState.chatListItems.filter { it.id.equals(chatIdLower, ignoreCase = true) }
-                    appState.chatFolderPreferences
-                        .foldersFor(accountRef)
-                        .mapNotNull { folder ->
-                            val manual =
-                                chatIdLower in appState.chatFolderPreferences.membershipFor(accountRef, folder.id)
-                            val effective =
-                                chatIdLower in
-                                    chatFolderChatIds(
-                                        items = thisChatRow,
-                                        manualChatIds =
-                                            appState.chatFolderPreferences.membershipFor(accountRef, folder.id),
-                                        rule = appState.chatFolderPreferences.folderRule(accountRef, folder.id),
-                                        activeAccountIdHex = appState.activeAccount?.accountIdHex,
-                                        isMuted = { groupIdHex ->
-                                            thisChatRow.any {
-                                                it.group.groupIdHex == groupIdHex && it.engineMuted()
-                                            }
-                                        },
-                                        displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
-                                    )
-                            if (effective) folder to manual else null
-                        }
-                }
-
-            SettingsSection(stringResource(if (isDm) R.string.chat_actions else R.string.advanced))
-            SettingsGroup(modifier = Modifier.testTag("chat_info.actions")) {
-                row("collapse_long_messages") { rowContext ->
-                    SettingsSwitch(
-                        context = rowContext,
-                        title = stringResource(R.string.collapse_long_messages),
-                        checked = collapseLongMessages,
-                        onCheckedChange = {
-                            appState.updateCollapseLongMessagesInGroup(controller.group.groupIdHex, it)
-                        },
-                        subtitle = stringResource(R.string.collapse_long_messages_subtitle),
-                        leading = { SettingsLeadingIcon(Icons.AutoMirrored.Filled.WrapText) },
-                    )
-                }
-                if (appState.ttsHasUsableEngine) {
-                    row("auto_read") { rowContext ->
-                        TtsAutoReadGroupActionRow(
-                            context = rowContext,
-                            title = stringResource(R.string.tts_auto_read_title),
-                            provenanceLabel = autoReadSettingLabel,
-                            onClick = { showAutoReadPicker = true },
-                        )
-                    }
-                }
-                row("notifications") { rowContext ->
-                    SettingsLink(
-                        context = rowContext,
-                        title = stringResource(R.string.sounds_and_notifications),
-                        onClick = { showNotificationSettings = true },
-                        modifier = Modifier.performanceTestTag(PerformanceTestTags.GROUP_NOTIFICATION_SETTINGS),
-                        value = notificationModeLabel(conversationNotifyMode),
-                        leading = { SettingsLeadingIcon(Icons.Filled.Notifications) },
-                    )
-                }
-                row("bubble_colors") { rowContext ->
-                    SettingsLink(
-                        context = rowContext,
-                        title = stringResource(R.string.chat_bubble_colors),
-                        onClick = { showBubbleColors = true },
-                        leading = { SettingsLeadingIcon(Icons.Filled.Palette) },
-                    )
-                }
-            }
-
-            if (showAutoReadPicker) {
-                TtsAutoReadPickerDialog(
-                    globalDefaultEnabled = ttsAutoReadPrefs.globalDefaultEnabled,
-                    selectedOverride = autoReadOverride,
-                    onDismiss = { showAutoReadPicker = false },
-                    onSelect = { override ->
-                        appState.setConversationAutoReadOverride(controller.group.groupIdHex, override)
-                    },
-                )
-            }
-
-            if (showDisappearingPicker) {
-                DisappearingMessagesPickerDialog(
-                    currentSecs = controller.group.disappearingMessageSecs.toLong(),
-                    onDismiss = { showDisappearingPicker = false },
-                    onPick = { secs ->
-                        showDisappearingPicker = false
-                        val currentSecs = controller.group.disappearingMessageSecs.toLong()
-                        // Only turning the timer ON (from off) or SHORTENING it prunes
-                        // existing history, so confirm just those. An unchanged pick is
-                        // a no-op; turning off or relaxing (lengthening) the window
-                        // prunes nothing, so apply it directly without the destructive
-                        // warning (#674 review).
-                        val needsConfirm = secs > 0L && (currentSecs == 0L || secs < currentSecs)
-                        when {
-                            secs == currentSecs -> Unit
-                            needsConfirm -> pendingDisappearingSecs = secs
-                            else ->
-                                runGroupMutation(
-                                    action = GroupMutationAction.DisappearingMessages,
-                                    mutation = { controller.updateMessageRetention(secs.toULong()) },
-                                )
-                        }
-                    },
-                )
-            }
-
-            pendingDisappearingSecs?.let { secs ->
-                ConfirmDialog(
-                    title = stringResource(R.string.disappearing_confirm_title),
-                    message = stringResource(R.string.disappearing_confirm_message, disappearingMessagesLabel(secs)),
-                    confirmLabel = stringResource(R.string.disappearing_confirm_button),
-                    onConfirm = {
-                        pendingDisappearingSecs = null
-                        runGroupMutation(
-                            action = GroupMutationAction.DisappearingMessages,
-                            mutation = { controller.updateMessageRetention(secs.toULong()) },
-                        )
-                    },
-                    onDismiss = { pendingDisappearingSecs = null },
-                    destructive = true,
-                )
-            }
-
-            // Rows shared by the DM technical group and the group lifecycle group.
-
-            /** Add to Folder row. */
-            fun SettingsGroupScope.folderRow() {
-                row("folders") { rowContext ->
-                    SettingsLink(
-                        context = rowContext,
-                        title = stringResource(R.string.chat_add_folder),
-                        onClick = { showFolderPicker = true },
-                        modifier = Modifier.testTag("chat_info.folders"),
-                        leading = { Icon(painterResource(R.drawable.ic_add), contentDescription = null) },
-                    )
-                }
-            }
-
-            /** Archive / Unarchive row. */
-            fun SettingsGroupScope.archiveRow() {
-                if (!readOnlyInvite) {
-                    row("archive") { rowContext ->
-                        SettingsAction(
-                            context = rowContext,
-                            title =
-                                stringResource(
-                                    if (controller.presentedArchived) {
-                                        R.string.unarchive_chat
-                                    } else {
-                                        R.string.archive_chat
-                                    },
-                                ),
-                            onClick = {
-                                runGroupMutation(
-                                    action = GroupMutationAction.Archive,
-                                    mutation = { controller.setArchived(!controller.presentedArchived) },
-                                )
-                            },
-                            enabled = !mutationsBlocked,
-                            leading = {
-                                DangerLeading(
-                                    icon =
-                                        if (controller.presentedArchived) {
-                                            R.drawable.ic_unarchive
-                                        } else {
-                                            R.drawable.ic_archive
-                                        },
-                                    inProgress = activeMutation?.action == GroupMutationAction.Archive,
-                                    destructive = false,
-                                )
+        }
+        val memberContent: @Composable () -> Unit = {
+            if (!isDm) {
+                // Keep the member header, identities, pending invitations and the
+                // full-roster action in one contiguous primary section. ContactRow
+                // already provides Material touch heights and internal padding.
+                Column(Modifier.testTag("chat_info.members")) {
+                    if (!rosterReady) {
+                        GroupRosterLoadStatus(
+                            state = controller.memberRosterState,
+                            onRetry = {
+                                scope.launch { controller.retryMembers() }
                             },
                         )
-                    }
-                }
-            }
-
-            /** Leave row. */
-            fun SettingsGroupScope.leaveRow() {
-                if (controller.isSelfMember) {
-                    row("leave") { rowContext ->
-                        SettingsAction(
-                            context = rowContext,
-                            title = stringResource(if (isDm) R.string.leave_chat else R.string.leave_group),
-                            // The engine refuses Leave for disbanding/terminal groups; local delete below is the
-                            // exit for a dead group.
-                            onClick = { requestLeave(controller.title(groupTitleCopy)) },
-                            enabled = !mutationsBlocked && controller.membersLoaded && !groupTerminal,
-                            destructive = true,
-                            leading = {
-                                DangerLeading(
-                                    icon = R.drawable.ic_logout,
-                                    inProgress = activeMutation?.action == GroupMutationAction.Leave,
-                                )
-                            },
-                        )
-                    }
-                }
-            }
-
-            /** Developer-only transcript and transport diagnostics. */
-            @Composable
-            fun developerPanels() {
-                if (!appState.developerMode) return
-                Column(
-                    Modifier.padding(top = WhiteNoiseSpacing.Related),
-                    verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
-                ) {
-                    ConversationTranscriptActions(
-                        shareInFlight = transcriptExportInFlight,
-                        saveInFlight = transcriptSave.busy,
-                        sharePending = pendingTranscriptShareFile != null,
-                        accountAvailable = appState.activeAccountRef != null,
-                        onShare = { exportTranscript() },
-                        onSave = {
-                            if (!transcriptExportInFlight && pendingTranscriptShareFile == null) transcriptSave.save()
-                        },
-                    )
-
-                    DeveloperInfoPanel(title = stringResource(R.string.mls)) {
-                        when {
-                            mlsLoading ->
-                                Text(
-                                    stringResource(R.string.loading_mls_state),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            mlsState == null ->
-                                Text(
-                                    stringResource(R.string.mls_state_unavailable),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            else -> {
-                                val state = requireNotNull(mlsState)
-                                DiagnosticRow(
-                                    stringResource(R.string.group_id),
-                                    IdentityFormatter.short(state.groupIdHex),
-                                    copyValue = state.groupIdHex,
-                                )
-                                DiagnosticRow(stringResource(R.string.epoch), state.epoch.toString())
-                                DiagnosticRow(stringResource(R.string.mls_members), state.memberCount.toString())
-                                DiagnosticRow(
-                                    stringResource(R.string.required_components),
-                                    state.requiredAppComponents.joinToString(", "),
-                                )
+                    } else {
+                        Row(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 56.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(Modifier.weight(1f)) {
+                                SettingsSection(stringResource(R.string.members))
                             }
-                        }
-                    }
-
-                    PushDeliveryDebugSection(
-                        info = pushDebugInfo,
-                        loading = pushDebugLoading,
-                        appState = appState,
-                    )
-                }
-            }
-
-            SettingsGroup(modifier = Modifier.padding(top = WhiteNoiseSpacing.Section).testTag("chat_info.technical")) {
-                row("relays") { rowContext ->
-                    SettingsLink(
-                        context = rowContext,
-                        title = stringResource(R.string.relays),
-                        onClick = { showChatRelays = true },
-                        modifier = Modifier.testTag("chat_info.relays"),
-                        subtitle =
-                            pluralStringResource(
-                                R.plurals.chat_relay_count,
-                                controller.group.relays.size,
-                                controller.group.relays.size,
-                            ),
-                        leading = { Icon(painterResource(R.drawable.ic_tune), contentDescription = null) },
-                    )
-                }
-                if (isDm) {
-                    row("developer_tools") { rowContext ->
-                        SettingsLink(
-                            context = rowContext,
-                            title = stringResource(R.string.developer_tools),
-                            onClick = { showGroupInfo = true },
-                            modifier = Modifier.testTag("chat_info.developer_tools"),
-                            leading = { Icon(painterResource(R.drawable.ic_bug_report), contentDescription = null) },
-                        )
-                    }
-                    folderRow()
-                    archiveRow()
-                    leaveRow()
-                }
-            }
-            if (isDm) developerPanels()
-
-            // Danger zone (#416): leave routes through requestLeave so the
-            // sole-admin and sole-member cases get their own confirm copy. On
-            // failure the controller's lastMutationError surfaces inline here
-            // (in addition to the snackbar) so the user can retry in place.
-            Column(Modifier.padding(top = WhiteNoiseSpacing.Section)) {
-                val selfMember =
-                    controller.members.firstOrNull { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
-                if (!isDm) {
-                    SettingsGroup(modifier = Modifier.testTag("chat_info.lifecycle")) {
-                        folderRow()
-                        if (canEdit) {
-                            row("transfer_admin") { rowContext ->
-                                SettingsAction(
-                                    context = rowContext,
-                                    title = stringResource(R.string.transfer_admin),
-                                    onClick = {
-                                        transferThenLeaveName = null
-                                        showTransferAdmin = true
-                                    },
-                                    modifier = Modifier.testTag("chat_info.transfer_admin"),
-                                    enabled = !mutationsBlocked && controller.transferAdminCandidates().isNotEmpty(),
-                                    leading = {
-                                        Icon(painterResource(R.drawable.ic_swap_vert), contentDescription = null)
-                                    },
-                                )
-                            }
-                        }
-                        if (canEdit && selfMember != null) {
-                            row("step_down") { rowContext ->
-                                SettingsAction(
-                                    context = rowContext,
-                                    title = stringResource(R.string.step_down_as_admin),
-                                    onClick = {
-                                        pendingConfirm =
-                                            if (controller.isSoleAdminWithOtherMembers) {
-                                                DetailsConfirm.StepDownSoleAdmin
-                                            } else {
-                                                DetailsConfirm.StepDownAdmin(selfMember)
-                                            }
-                                    },
-                                    enabled = !mutationsBlocked,
-                                    leading = {
-                                        DangerLeading(
-                                            icon = R.drawable.ic_admin_panel_settings,
-                                            inProgress = activeMutation?.action == GroupMutationAction.SelfDemoteAdmin,
-                                            destructive = false,
-                                        )
-                                    },
-                                )
-                            }
-                        }
-                        archiveRow()
-                        if (controller.isSelfMember) {
-                            groupDisbandRows(
-                                management = controller.managementState,
-                                enabled = !mutationsBlocked,
-                                enableInProgress = activeMutation?.action == GroupMutationAction.EnableDisbanding,
-                                disbandInProgress = activeMutation?.action == GroupMutationAction.Disband,
-                                onEnable = {
-                                    runGroupMutation(
-                                        action = GroupMutationAction.EnableDisbanding,
-                                        mutation = { controller.enableGroupDisbanding() },
-                                    )
+                            IconButton(
+                                onClick = {
+                                    memberSearchOpen = !memberSearchOpen
+                                    if (!memberSearchOpen) memberQuery = ""
                                 },
-                                onDisbandRequested = { disbandConfirmOpen = true },
+                                modifier = Modifier.padding(end = Dimens.spaceSm),
+                            ) {
+                                Icon(
+                                    if (memberSearchOpen) Icons.Default.Close else Icons.Default.Search,
+                                    contentDescription = stringResource(R.string.search_members),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        if (memberSearchOpen) {
+                            FlowSearchField(
+                                value = memberQuery,
+                                onValueChange = { memberQuery = it },
+                                placeholder = stringResource(R.string.search_members),
+                                modifier =
+                                    Modifier
+                                        .padding(horizontal = Dimens.spaceLg)
+                                        .padding(bottom = Dimens.spaceSm),
                             )
                         }
+                        // #612: render members in a deterministic order — you first,
+                        // then other admins alpha by display name, then non-admins
+                        // alpha by display name, with memberIdHex as a stable
+                        // tiebreaker. Display names are resolved once into a map so
+                        // the comparator does pure reads. lowercase(Locale.ROOT) keeps
+                        // ordering consistent across device locales (e.g. Turkish I).
+                        // Prefetch member profiles here so the title map below can stay a
+                        // pure read (contactDisplayNameCached); the profile/nickname
+                        // revision key recomposes the sort once names or local aliases land.
+                        val presentedMembers = controller.presentedMembers
+                        LaunchedEffect(presentedMembers, controller.pendingInviteMemberRefs) {
+                            appState.requestProfiles(
+                                presentedMembers.map { it.memberIdHex } + controller.pendingInviteMemberRefs,
+                            )
+                        }
+                        val memberTitlesByHex =
+                            remember(presentedMembers, appState.profileRevisionForCompose) {
+                                presentedMembers.associate {
+                                    it.memberIdHex to appState.contactDisplayNameCached(it.memberIdHex)
+                                }
+                            }
+                        val displayedMembers =
+                            remember(
+                                presentedMembers,
+                                activeAccountIdHex,
+                                memberTitlesByHex,
+                            ) {
+                                presentedMembers.sortedWith(
+                                    compareBy(
+                                        { !GroupProjector.isActiveAccountMember(it, activeAccountIdHex) },
+                                        { !controller.isAdmin(it) },
+                                        { memberTitlesByHex[it.memberIdHex]?.lowercase(Locale.ROOT).orEmpty() },
+                                        { it.memberIdHex.lowercase(Locale.ROOT) },
+                                    ),
+                                )
+                            }
+                        val memberNeedle = memberQuery.trim()
+                        val visibleMembers =
+                            when {
+                                memberNeedle.isNotEmpty() ->
+                                    displayedMembers.filter {
+                                        memberTitlesByHex[it.memberIdHex]
+                                            .orEmpty()
+                                            .contains(memberNeedle, ignoreCase = true)
+                                    }
+                                membersExpanded || displayedMembers.size <= GROUP_MEMBERS_PREVIEW_COUNT ->
+                                    displayedMembers
+                                else -> displayedMembers.take(GROUP_MEMBERS_PREVIEW_COUNT)
+                            }
+                        if (memberNeedle.isNotEmpty() && visibleMembers.isEmpty()) {
+                            Text(
+                                stringResource(R.string.no_matches),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = Dimens.spaceLg),
+                            )
+                        }
+                        // Row taps route into the profile sheet, which carries the same
+                        // admin actions (grant/revoke admin, remove) the old per-row menu
+                        // exposed (#444/#635 scope rules).
+                        GroupMemberIdentityRows(visibleMembers) { index, member ->
+                            val isSelfRow = GroupProjector.isActiveAccountMember(member, activeAccountIdHex)
+                            val rowMutationPending =
+                                controller.isMemberMutationPending(member.memberIdHex) ||
+                                    activeMutation?.target == member.memberIdHex
+                            // Only another member with a presentable identity has a profile to
+                            // open, so self and unresolved rows stay inert and chevron-free.
+                            val profileNpub =
+                                if (isSelfRow) "" else appState.npubForDisplay(member.memberIdHex)
+                            val opensProfile = profileNpub.isNotBlank()
+                            ChatInfoMemberCard(
+                                index = index,
+                                count = visibleMembers.size,
+                                modifier = Modifier.testTag("chat_info.member.${member.memberIdHex}"),
+                            ) {
+                                ContactRow(
+                                    title =
+                                        if (isSelfRow) {
+                                            stringResource(R.string.you)
+                                        } else {
+                                            controller.memberDisplayName(member)
+                                        },
+                                    subtitle = memberRoleLabel(controller.isAdmin(member), rowMutationPending),
+                                    avatarSeed = member.memberIdHex,
+                                    avatarUrl = controller.memberAvatarUrl(member),
+                                    modifier =
+                                        if (index == 0) {
+                                            Modifier.performanceTestTag(PerformanceTestTags.MEMBER_LIST)
+                                        } else {
+                                            Modifier
+                                        },
+                                    onClick =
+                                        if (opensProfile) {
+                                            { appState.presentProfile(profileNpub) }
+                                        } else {
+                                            null
+                                        },
+                                    trailing =
+                                        if (opensProfile) {
+                                            { ChatInfoRowChevron() }
+                                        } else {
+                                            null
+                                        },
+                                )
+                            }
+                        }
+                        val canExpandMembers =
+                            memberNeedle.isEmpty() &&
+                                !membersExpanded &&
+                                displayedMembers.size > GROUP_MEMBERS_PREVIEW_COUNT
+                        if (canExpandMembers) {
+                            SettingsGroup(
+                                modifier =
+                                    Modifier
+                                        .padding(top = WhiteNoiseSpacing.Related)
+                                        .testTag("chat_info.all_members"),
+                            ) {
+                                row("all_members") { rowContext ->
+                                    SettingsLink(
+                                        context = rowContext,
+                                        title = stringResource(R.string.see_all_members),
+                                        onClick = { membersExpanded = true },
+                                        leading = {
+                                            Icon(painterResource(R.drawable.ic_group), contentDescription = null)
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                        controller.pendingInviteMemberRefs.forEach { invite ->
+                            val inviteNpub = appState.npubForDisplay(invite)
+                            PendingGroupInviteRow(
+                                title = appState.displayName(invite),
+                                subtitle =
+                                    stringResource(
+                                        R.string.invite_pending,
+                                        IdentityFormatter.short(inviteNpub),
+                                    ),
+                                avatarSeed = invite,
+                                avatarUrl = appState.avatarUrl(invite),
+                                onClick =
+                                    if (inviteNpub.isBlank()) {
+                                        {}
+                                    } else {
+                                        { clipboard.setText(AnnotatedString(inviteNpub)) }
+                                    },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        if (membersExpanded && !isDm) {
+            BackHandler { membersExpanded = false }
+            GroupMembersScreen(
+                onBack = { membersExpanded = false },
+                scrollState = membersScrollState,
+                feedback = groupFeedback,
+                bottomBar = groupNotice,
+                content = memberContent,
+            )
+            return
+        }
+        if (showChatRelays) {
+            BackHandler { showChatRelays = false }
+            ChatRelaysScreen(
+                relays = controller.group.relays,
+                onBack = { showChatRelays = false },
+                feedback = groupFeedback,
+                bottomBar = groupNotice,
+            )
+            return
+        }
+
+        val groupAvatar = rememberConversationGroupAvatar(appState, controller)
+        val encryptedGroupAvatar = groupAvatar.image
+        var nameBottom by remember(controller) { mutableFloatStateOf(Float.POSITIVE_INFINITY) }
+        var headerBottom by remember { mutableFloatStateOf(0f) }
+        val showHeaderIdentity by remember(detailsScrollState, controller) {
+            derivedStateOf { detailsScrollState.value > 0 && headerBottom > 0f && nameBottom <= headerBottom }
+        }
+        WhiteNoiseScaffold(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            topBar = {
+                TopAppBar(
+                    modifier =
+                        Modifier.onGloballyPositioned {
+                            headerBottom = it.positionInWindow().y + it.size.height
+                        },
+                    title = {
+                        if (showHeaderIdentity) {
+                            Row(
+                                modifier = Modifier.testTag("chat_info.header_identity"),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Box(Modifier.size(32.dp).testTag("chat_info.header_avatar")) {
+                                    Avatar(
+                                        title = conversationTitle,
+                                        seed = controller.avatarAccount ?: controller.group.groupIdHex,
+                                        size = 32.dp,
+                                        pictureUrl = groupAvatar.pictureUrl.takeIf { encryptedGroupAvatar == null },
+                                        picture = encryptedGroupAvatar,
+                                    )
+                                }
+                                Text(
+                                    conversationTitle,
+                                    modifier = Modifier.weight(1f).testTag("chat_info.header_name"),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = MaterialTheme.typography.titleLarge,
+                                )
+                            }
+                        }
+                    },
+                    scrollBehavior = LocalWhiteNoiseHeaderScroll.current,
+                    colors =
+                        androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        ),
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                painterResource(R.drawable.ic_arrow_back),
+                                contentDescription = stringResource(R.string.back),
+                            )
+                        }
+                    },
+                )
+            },
+            bottomBar = {
+                ConversationTransientNotice(
+                    notice = appState.transientNotice,
+                    accountRef = appState.activeAccountRef,
+                    groupIdHex = controller.group.groupIdHex,
+                )
+            },
+        ) { padding ->
+            // The engine rejects all ordinary outbound group work while a disband
+            // converges and forever after it lands; don't advertise actions that
+            // can only fail. Local-only actions (archive, local delete) keep the
+            // plain in-flight gate.
+            val collapseLongMessages = appState.collapseLongMessagesInGroup(controller.group.groupIdHex)
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .whiteNoiseVerticalScroll(detailsScrollState)
+                    .testTag("chat_info.list")
+                    .padding(bottom = 24.dp),
+            ) {
+                GroupDetailsHeader(
+                    title = conversationTitle,
+                    subtitle =
+                        if (isDm) {
+                            ""
+                        } else if (!rosterReady) {
+                            stringResource(R.string.members)
+                        } else {
+                            stringResource(R.string.group_details_subtitle, controller.presentedMemberCount)
+                        },
+                    description =
+                        if (isDm) {
+                            dmPeerNpub
+                                ?.let { IdentityFormatter.short(it, prefix = 12, suffix = 8) }
+                                .orEmpty()
+                        } else {
+                            controller.group.description
+                        },
+                    // Show the DM peer's avatar + initials seed here — the same
+                    // peer metadata the top bar and chat-list row resolve (#837).
+                    // A group keeps its own avatar (controller.avatarUrl falls back
+                    // to the group avatar; avatarAccount is null for groups).
+                    seed = controller.avatarAccount ?: controller.group.groupIdHex,
+                    pictureUrl = groupAvatar.pictureUrl,
+                    picture = encryptedGroupAvatar,
+                    archived = controller.presentedArchived,
+                    readLocalBytes = appState.retainedAvatarBytesReader(conversationGroupAvatarAsset(appState, controller), controller.boundAccountRef),
+                    onEdit =
+                        if (canShowEditAction) {
+                            { showEditGroup = true }
+                        } else {
+                            null
+                        },
+                    editEnabled = activeMutation == null && !controller.mutationInFlight,
+                    onAddDescription =
+                        if (!isDm && canEdit && controller.group.description.isBlank()) {
+                            { showEditGroup = true }
+                        } else {
+                            null
+                        },
+                    descriptionCopyValue = dmPeerNpub.takeIf { isDm },
+                    onNameBottom = { nameBottom = it },
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (isDm && dmPeerNpub != null) {
+                        QuickInfoAction(
+                            label = stringResource(R.string.about),
+                            icon = R.drawable.ic_person,
+                            onClick = { appState.presentProfile(dmPeerNpub) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    QuickInfoAction(
+                        label = stringResource(if (conversationMuted) R.string.chat_row_action_unmute else R.string.mute),
+                        icon = if (conversationMuted) R.drawable.ic_volume_up else R.drawable.ic_notifications_off,
+                        enabled = !muteCommandPending,
+                        onClick = {
+                            if (conversationMuted) {
+                                appState.setConversationNotifyMode(controller.group.groupIdHex, conversationRestoreMode)
+                            } else {
+                                showMuteDurationDialog = true
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
+                    QuickInfoAction(
+                        label = stringResource(R.string.disappearing),
+                        icon = R.drawable.ic_timer,
+                        state = disappearingMessagesLabel(controller.group.disappearingMessageSecs.toLong()),
+                        enabled = canEdit && !mutationsBlocked,
+                        onClick = { showDisappearingPicker = true },
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (onOpenSearch != null) {
+                        QuickInfoAction(
+                            label = stringResource(R.string.quick_action_search),
+                            icon = R.drawable.ic_search,
+                            onClick = onOpenSearch,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+                if (isDm && dmPeerAccountIdHex != null && dmPeerNpub != null) {
+                    SettingsSection(stringResource(R.string.profile_actions))
+                    SettingsGroup(modifier = Modifier.testTag("chat_info.group_actions")) {
+                        row("start_group") { rowContext ->
+                            SettingsAction(
+                                context = rowContext,
+                                title = stringResource(R.string.person_start_group),
+                                onClick = {
+                                    onStartGroupWithPeer(
+                                        RecipientSearch.Candidate(
+                                            accountIdHex = dmPeerAccountIdHex,
+                                            displayName = conversationTitle,
+                                            npub = dmPeerNpub,
+                                        ),
+                                    )
+                                },
+                                leading = { Icon(painterResource(R.drawable.ic_group_add), contentDescription = null) },
+                                modifier = Modifier.testTag("chat_info.start_group"),
+                            )
+                        }
+                        row("add_to_group") { rowContext ->
+                            SettingsAction(
+                                context = rowContext,
+                                title = stringResource(R.string.person_add_to_group),
+                                onClick = { showDmAddToGroups = true },
+                                enabled = !addingDmPeerToGroups,
+                                leading = { Icon(painterResource(R.drawable.ic_group_add), contentDescription = null) },
+                                modifier = Modifier.testTag("chat_info.add_to_group"),
+                            )
+                        }
+                    }
+                }
+                controller.lastMutationError?.let { error ->
+                    Box(Modifier.padding(horizontal = Dimens.spaceLg)) {
+                        GroupMutationErrorBanner(
+                            error = error,
+                            onDismiss = { controller.clearLastMutationError() },
+                        )
+                    }
+                }
+
+                memberContent()
+
+                if (!isDm && canEdit) {
+                    SettingsGroup(
+                        modifier = Modifier.padding(top = WhiteNoiseSpacing.Section).testTag("chat_info.management"),
+                    ) {
+                        row("edit_group") { rowContext ->
+                            SettingsLink(
+                                context = rowContext,
+                                title = stringResource(R.string.edit_group_info_title),
+                                onClick = { showEditGroup = true },
+                                enabled = activeMutation == null && !controller.mutationInFlight,
+                                leading = { Icon(painterResource(R.drawable.ic_edit), contentDescription = null) },
+                            )
+                        }
+                        row("add_member") { rowContext ->
+                            SettingsLink(
+                                context = rowContext,
+                                title = stringResource(R.string.add_member),
+                                onClick = { showAddMember = true },
+                                modifier = Modifier.testTag("chat_info.add_people"),
+                                enabled =
+                                    memberAdministrationPresentable(
+                                        controller.memberRosterState,
+                                        controller.seededSelfMember,
+                                    ) &&
+                                        !mutationsBlocked,
+                                leading = { Icon(painterResource(R.drawable.ic_group_add), contentDescription = null) },
+                            )
+                        }
+                    }
+                }
+
+                SharedMediaSection(
+                    tiles = sharedMediaTiles,
+                    onOpenCategory = { mediaLibraryCategory = it },
+                    modifier = Modifier.testTag("chat_info.shared_media"),
+                )
+
+                // Custom folders containing this chat — manual membership or a
+                // live rule match — so the value tracks membership changes made
+                // anywhere (chat list, Settings, or a rule flipping).
+                val folderStoreState by appState.chatFolderPreferences.state.collectAsState()
+                val chatIdLower = controller.group.groupIdHex.lowercase(Locale.ROOT)
+                val folderNames =
+                    remember(
+                        folderStoreState,
+                        appState.chatListItems,
+                        appState.profileRevisionForCompose,
+                        folderAccountRef,
+                        chatIdLower,
+                        groupTitleCopy,
+                    ) {
+                        val accountRef = folderAccountRef ?: return@remember emptyList()
+                        val thisChatRow = appState.chatListItems.filter { it.id.equals(chatIdLower, ignoreCase = true) }
+                        appState.chatFolderPreferences
+                            .foldersFor(accountRef)
+                            .mapNotNull { folder ->
+                                val manual =
+                                    chatIdLower in appState.chatFolderPreferences.membershipFor(accountRef, folder.id)
+                                val effective =
+                                    chatIdLower in
+                                        chatFolderChatIds(
+                                            items = thisChatRow,
+                                            manualChatIds =
+                                                appState.chatFolderPreferences.membershipFor(accountRef, folder.id),
+                                            rule = appState.chatFolderPreferences.folderRule(accountRef, folder.id),
+                                            activeAccountIdHex = appState.activeAccount?.accountIdHex,
+                                            isMuted = { groupIdHex ->
+                                                thisChatRow.any {
+                                                    it.group.groupIdHex == groupIdHex && it.engineMuted()
+                                                }
+                                            },
+                                            displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
+                                        )
+                                if (effective) folder to manual else null
+                            }
+                    }
+
+                SettingsSection(stringResource(if (isDm) R.string.chat_actions else R.string.advanced))
+                SettingsGroup(modifier = Modifier.testTag("chat_info.actions")) {
+                    row("collapse_long_messages") { rowContext ->
+                        SettingsSwitch(
+                            context = rowContext,
+                            title = stringResource(R.string.collapse_long_messages),
+                            checked = collapseLongMessages,
+                            onCheckedChange = {
+                                appState.updateCollapseLongMessagesInGroup(controller.group.groupIdHex, it)
+                            },
+                            subtitle = stringResource(R.string.collapse_long_messages_subtitle),
+                            leading = { SettingsLeadingIcon(Icons.AutoMirrored.Filled.WrapText) },
+                        )
+                    }
+                    if (appState.ttsHasUsableEngine) {
+                        row("auto_read") { rowContext ->
+                            TtsAutoReadGroupActionRow(
+                                context = rowContext,
+                                title = stringResource(R.string.tts_auto_read_title),
+                                provenanceLabel = autoReadSettingLabel,
+                                onClick = { showAutoReadPicker = true },
+                            )
+                        }
+                    }
+                    row("notifications") { rowContext ->
+                        SettingsLink(
+                            context = rowContext,
+                            title = stringResource(R.string.sounds_and_notifications),
+                            onClick = { showNotificationSettings = true },
+                            modifier = Modifier.performanceTestTag(PerformanceTestTags.GROUP_NOTIFICATION_SETTINGS),
+                            value = notificationModeLabel(conversationNotifyMode),
+                            leading = { SettingsLeadingIcon(Icons.Filled.Notifications) },
+                        )
+                    }
+                    row("bubble_colors") { rowContext ->
+                        SettingsLink(
+                            context = rowContext,
+                            title = stringResource(R.string.chat_bubble_colors),
+                            onClick = { showBubbleColors = true },
+                            leading = { SettingsLeadingIcon(Icons.Filled.Palette) },
+                        )
+                    }
+                }
+
+                if (showAutoReadPicker) {
+                    TtsAutoReadPickerDialog(
+                        globalDefaultEnabled = ttsAutoReadPrefs.globalDefaultEnabled,
+                        selectedOverride = autoReadOverride,
+                        onDismiss = { showAutoReadPicker = false },
+                        onSelect = { override ->
+                            appState.setConversationAutoReadOverride(controller.group.groupIdHex, override)
+                        },
+                    )
+                }
+
+                if (showDisappearingPicker) {
+                    DisappearingMessagesPickerDialog(
+                        currentSecs = controller.group.disappearingMessageSecs.toLong(),
+                        onDismiss = { showDisappearingPicker = false },
+                        onPick = { secs ->
+                            showDisappearingPicker = false
+                            val currentSecs = controller.group.disappearingMessageSecs.toLong()
+                            // Only turning the timer ON (from off) or SHORTENING it prunes
+                            // existing history, so confirm just those. An unchanged pick is
+                            // a no-op; turning off or relaxing (lengthening) the window
+                            // prunes nothing, so apply it directly without the destructive
+                            // warning (#674 review).
+                            val needsConfirm = secs > 0L && (currentSecs == 0L || secs < currentSecs)
+                            when {
+                                secs == currentSecs -> Unit
+                                needsConfirm -> pendingDisappearingSecs = secs
+                                else ->
+                                    runGroupMutation(
+                                        action = GroupMutationAction.DisappearingMessages,
+                                        mutation = { controller.updateMessageRetention(secs.toULong()) },
+                                    )
+                            }
+                        },
+                    )
+                }
+
+                pendingDisappearingSecs?.let { secs ->
+                    ConfirmDialog(
+                        title = stringResource(R.string.disappearing_confirm_title),
+                        message = stringResource(R.string.disappearing_confirm_message, disappearingMessagesLabel(secs)),
+                        confirmLabel = stringResource(R.string.disappearing_confirm_button),
+                        onConfirm = {
+                            pendingDisappearingSecs = null
+                            runGroupMutation(
+                                action = GroupMutationAction.DisappearingMessages,
+                                mutation = { controller.updateMessageRetention(secs.toULong()) },
+                            )
+                        },
+                        onDismiss = { pendingDisappearingSecs = null },
+                        destructive = true,
+                    )
+                }
+
+                // Rows shared by the DM technical group and the group lifecycle group.
+
+                /** Add to Folder row. */
+                fun SettingsGroupScope.folderRow() {
+                    row("folders") { rowContext ->
+                        SettingsLink(
+                            context = rowContext,
+                            title = stringResource(R.string.chat_add_folder),
+                            onClick = { showFolderPicker = true },
+                            modifier = Modifier.testTag("chat_info.folders"),
+                            leading = { Icon(painterResource(R.drawable.ic_add), contentDescription = null) },
+                        )
+                    }
+                }
+
+                /** Archive / Unarchive row. */
+                fun SettingsGroupScope.archiveRow() {
+                    if (!readOnlyInvite) {
+                        row("archive") { rowContext ->
+                            SettingsAction(
+                                context = rowContext,
+                                title =
+                                    stringResource(
+                                        if (controller.presentedArchived) {
+                                            R.string.unarchive_chat
+                                        } else {
+                                            R.string.archive_chat
+                                        },
+                                    ),
+                                onClick = {
+                                    runGroupMutation(
+                                        action = GroupMutationAction.Archive,
+                                        mutation = { controller.setArchived(!controller.presentedArchived) },
+                                    )
+                                },
+                                enabled = !mutationsBlocked,
+                                leading = {
+                                    DangerLeading(
+                                        icon =
+                                            if (controller.presentedArchived) {
+                                                R.drawable.ic_unarchive
+                                            } else {
+                                                R.drawable.ic_archive
+                                            },
+                                        inProgress = activeMutation?.action == GroupMutationAction.Archive,
+                                        destructive = false,
+                                    )
+                                },
+                            )
+                        }
+                    }
+                }
+
+                /** Leave row. */
+                fun SettingsGroupScope.leaveRow() {
+                    if (controller.isSelfMember) {
+                        row("leave") { rowContext ->
+                            SettingsAction(
+                                context = rowContext,
+                                title = stringResource(if (isDm) R.string.leave_chat else R.string.leave_group),
+                                // The engine refuses Leave for disbanding/terminal groups; local delete below is the
+                                // exit for a dead group.
+                                onClick = { requestLeave(controller.title(groupTitleCopy)) },
+                                enabled = !mutationsBlocked && controller.membersLoaded && !groupTerminal,
+                                destructive = true,
+                                leading = {
+                                    DangerLeading(
+                                        icon = R.drawable.ic_logout,
+                                        inProgress = activeMutation?.action == GroupMutationAction.Leave,
+                                    )
+                                },
+                            )
+                        }
+                    }
+                }
+
+                /** Developer-only transcript and transport diagnostics. */
+                @Composable
+                fun developerPanels() {
+                    if (!appState.developerMode) return
+                    Column(
+                        Modifier.padding(top = WhiteNoiseSpacing.Related),
+                        verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+                    ) {
+                        ConversationTranscriptActions(
+                            shareInFlight = transcriptExportInFlight,
+                            saveInFlight = transcriptSave.busy,
+                            sharePending = pendingTranscriptShareFile != null,
+                            accountAvailable = appState.activeAccountRef != null,
+                            onShare = { exportTranscript() },
+                            onSave = {
+                                if (!transcriptExportInFlight && pendingTranscriptShareFile == null) transcriptSave.save()
+                            },
+                        )
+
+                        DeveloperInfoPanel(title = stringResource(R.string.mls)) {
+                            when {
+                                mlsLoading ->
+                                    Text(
+                                        stringResource(R.string.loading_mls_state),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                mlsState == null ->
+                                    Text(
+                                        stringResource(R.string.mls_state_unavailable),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                else -> {
+                                    val state = requireNotNull(mlsState)
+                                    DiagnosticRow(
+                                        stringResource(R.string.group_id),
+                                        IdentityFormatter.short(state.groupIdHex),
+                                        copyValue = state.groupIdHex,
+                                    )
+                                    DiagnosticRow(stringResource(R.string.epoch), state.epoch.toString())
+                                    DiagnosticRow(stringResource(R.string.mls_members), state.memberCount.toString())
+                                    DiagnosticRow(
+                                        stringResource(R.string.required_components),
+                                        state.requiredAppComponents.joinToString(", "),
+                                    )
+                                }
+                            }
+                        }
+
+                        PushDeliveryDebugSection(
+                            info = pushDebugInfo,
+                            loading = pushDebugLoading,
+                            appState = appState,
+                        )
+                    }
+                }
+
+                SettingsGroup(modifier = Modifier.padding(top = WhiteNoiseSpacing.Section).testTag("chat_info.technical")) {
+                    row("relays") { rowContext ->
+                        SettingsLink(
+                            context = rowContext,
+                            title = stringResource(R.string.relays),
+                            onClick = { showChatRelays = true },
+                            modifier = Modifier.testTag("chat_info.relays"),
+                            subtitle =
+                                pluralStringResource(
+                                    R.plurals.chat_relay_count,
+                                    controller.group.relays.size,
+                                    controller.group.relays.size,
+                                ),
+                            leading = { Icon(painterResource(R.drawable.ic_tune), contentDescription = null) },
+                        )
+                    }
+                    if (isDm) {
+                        row("developer_tools") { rowContext ->
+                            SettingsLink(
+                                context = rowContext,
+                                title = stringResource(R.string.developer_tools),
+                                onClick = { showGroupInfo = true },
+                                modifier = Modifier.testTag("chat_info.developer_tools"),
+                                leading = { Icon(painterResource(R.drawable.ic_bug_report), contentDescription = null) },
+                            )
+                        }
+                        folderRow()
+                        archiveRow()
                         leaveRow()
                     }
                 }
-                if (showFolderPicker) {
-                    ChatFolderPickerSheet(
-                        appState = appState,
-                        targetChatIds = listOf(chatIdLower),
-                        // Rule-matched membership is visible in the row above but
-                        // not toggleable here — the sheet edits manual membership
-                        // only, so it must say why a checked-looking folder shows
-                        // an unchecked box.
-                        ruleMatchedFolderIds =
-                            folderNames
-                                .filterNot { (_, manual) -> manual }
-                                .mapTo(HashSet()) { (folder, _) -> folder.id },
-                        onCreateFolder = {
-                            showFolderPicker = false
-                            showFolderCreate = true
-                        },
-                        onDismiss = { showFolderPicker = false },
-                    )
-                }
-                if (!isDm && controller.isSelfMember) {
-                    GroupDisbandStatus(
-                        management = controller.managementState,
-                        onAcknowledgeFailure = {
-                            runGroupMutation(
-                                action = GroupMutationAction.Disband,
-                                mutation = { controller.acknowledgeDisbandFailure() },
-                            )
-                        },
-                    )
-                }
-                if (disbandConfirmOpen) {
-                    GroupDisbandConfirmDialog(
-                        onConfirm = {
-                            disbandConfirmOpen = false
-                            runGroupMutation(
-                                action = GroupMutationAction.Disband,
-                                mutation = { controller.disbandGroup() },
-                            )
-                        },
-                        onDismiss = { disbandConfirmOpen = false },
-                    )
-                }
-                GroupDetailsLocalDeleteControl(
-                    isDm = isDm,
-                    readOnlyInvite = readOnlyInvite,
-                    isSelfMember = controller.isSelfMember,
-                    membersVerified = controller.membersVerified,
-                    enabled = !mutationsBlocked,
-                    inProgress = activeMutation?.action == GroupMutationAction.Delete,
-                    onDeleteConfirmed = {
-                        runGroupMutation(
-                            action = GroupMutationAction.Delete,
-                            mutation = { controller.deleteGroupLocal() },
-                            onSuccess = onLeft,
-                        )
-                    },
-                )
-                GroupDetailsResetControl(
-                    isDm = isDm,
-                    readOnlyInvite = readOnlyInvite,
-                    enabled = !mutationsBlocked,
-                    inProgress = activeMutation?.action == GroupMutationAction.Reset,
-                    onResetConfirmed = {
-                        runGroupMutation(
-                            action = GroupMutationAction.Reset,
-                            mutation = { controller.forgetGroupLocal() },
-                            onSuccess = onLeft,
-                        )
-                    },
-                )
-            }
+                if (isDm) developerPanels()
 
-            if (!isDm) {
-                SettingsGroup(
-                    modifier = Modifier.padding(top = WhiteNoiseSpacing.Section).testTag("chat_info.developer"),
-                ) {
-                    row("developer_tools") { rowContext ->
-                        SettingsLink(
-                            context = rowContext,
-                            title = stringResource(R.string.developer_tools),
-                            onClick = { showGroupInfo = true },
-                            modifier = Modifier.testTag("chat_info.developer_tools"),
-                            leading = { Icon(painterResource(R.drawable.ic_bug_report), contentDescription = null) },
+                // Danger zone (#416): leave routes through requestLeave so the
+                // sole-admin and sole-member cases get their own confirm copy. On
+                // failure the controller's lastMutationError surfaces inline here
+                // (in addition to the snackbar) so the user can retry in place.
+                Column(Modifier.padding(top = WhiteNoiseSpacing.Section)) {
+                    val selfMember =
+                        controller.members.firstOrNull { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
+                    if (!isDm) {
+                        SettingsGroup(modifier = Modifier.testTag("chat_info.lifecycle")) {
+                            folderRow()
+                            if (canEdit) {
+                                row("transfer_admin") { rowContext ->
+                                    SettingsAction(
+                                        context = rowContext,
+                                        title = stringResource(R.string.transfer_admin),
+                                        onClick = {
+                                            transferThenLeaveName = null
+                                            showTransferAdmin = true
+                                        },
+                                        modifier = Modifier.testTag("chat_info.transfer_admin"),
+                                        enabled = !mutationsBlocked && controller.transferAdminCandidates().isNotEmpty(),
+                                        leading = {
+                                            Icon(painterResource(R.drawable.ic_swap_vert), contentDescription = null)
+                                        },
+                                    )
+                                }
+                            }
+                            if (canEdit && selfMember != null) {
+                                row("step_down") { rowContext ->
+                                    SettingsAction(
+                                        context = rowContext,
+                                        title = stringResource(R.string.step_down_as_admin),
+                                        onClick = {
+                                            pendingConfirm =
+                                                if (controller.isSoleAdminWithOtherMembers) {
+                                                    DetailsConfirm.StepDownSoleAdmin
+                                                } else {
+                                                    DetailsConfirm.StepDownAdmin(selfMember)
+                                                }
+                                        },
+                                        enabled = !mutationsBlocked,
+                                        leading = {
+                                            DangerLeading(
+                                                icon = R.drawable.ic_admin_panel_settings,
+                                                inProgress = activeMutation?.action == GroupMutationAction.SelfDemoteAdmin,
+                                                destructive = false,
+                                            )
+                                        },
+                                    )
+                                }
+                            }
+                            archiveRow()
+                            if (controller.isSelfMember) {
+                                groupDisbandRows(
+                                    management = controller.managementState,
+                                    enabled = !mutationsBlocked,
+                                    enableInProgress = activeMutation?.action == GroupMutationAction.EnableDisbanding,
+                                    disbandInProgress = activeMutation?.action == GroupMutationAction.Disband,
+                                    onEnable = {
+                                        runGroupMutation(
+                                            action = GroupMutationAction.EnableDisbanding,
+                                            mutation = { controller.enableGroupDisbanding() },
+                                        )
+                                    },
+                                    onDisbandRequested = { disbandConfirmOpen = true },
+                                )
+                            }
+                            leaveRow()
+                        }
+                    }
+                    if (showFolderPicker) {
+                        ChatFolderPickerSheet(
+                            appState = appState,
+                            targetChatIds = listOf(chatIdLower),
+                            // Rule-matched membership is visible in the row above but
+                            // not toggleable here — the sheet edits manual membership
+                            // only, so it must say why a checked-looking folder shows
+                            // an unchecked box.
+                            ruleMatchedFolderIds =
+                                folderNames
+                                    .filterNot { (_, manual) -> manual }
+                                    .mapTo(HashSet()) { (folder, _) -> folder.id },
+                            onCreateFolder = {
+                                showFolderPicker = false
+                                showFolderCreate = true
+                            },
+                            onDismiss = { showFolderPicker = false },
                         )
                     }
+                    if (!isDm && controller.isSelfMember) {
+                        GroupDisbandStatus(
+                            management = controller.managementState,
+                            onAcknowledgeFailure = {
+                                runGroupMutation(
+                                    action = GroupMutationAction.Disband,
+                                    mutation = { controller.acknowledgeDisbandFailure() },
+                                )
+                            },
+                        )
+                    }
+                    if (disbandConfirmOpen) {
+                        GroupDisbandConfirmDialog(
+                            onConfirm = {
+                                disbandConfirmOpen = false
+                                runGroupMutation(
+                                    action = GroupMutationAction.Disband,
+                                    mutation = { controller.disbandGroup() },
+                                )
+                            },
+                            onDismiss = { disbandConfirmOpen = false },
+                        )
+                    }
+                    GroupDetailsLocalDeleteControl(
+                        isDm = isDm,
+                        readOnlyInvite = readOnlyInvite,
+                        isSelfMember = controller.isSelfMember,
+                        membersVerified = controller.membersVerified,
+                        enabled = !mutationsBlocked,
+                        inProgress = activeMutation?.action == GroupMutationAction.Delete,
+                        onDeleteConfirmed = {
+                            runGroupMutation(
+                                action = GroupMutationAction.Delete,
+                                mutation = { controller.deleteGroupLocal() },
+                                onSuccess = onLeft,
+                            )
+                        },
+                    )
+                    GroupDetailsResetControl(
+                        isDm = isDm,
+                        readOnlyInvite = readOnlyInvite,
+                        enabled = !mutationsBlocked,
+                        inProgress = activeMutation?.action == GroupMutationAction.Reset,
+                        onResetConfirmed = {
+                            runGroupMutation(
+                                action = GroupMutationAction.Reset,
+                                mutation = { controller.forgetGroupLocal() },
+                                onSuccess = onLeft,
+                            )
+                        },
+                    )
                 }
-            }
 
-            if (!isDm) developerPanels()
+                if (!isDm) {
+                    SettingsGroup(
+                        modifier = Modifier.padding(top = WhiteNoiseSpacing.Section).testTag("chat_info.developer"),
+                    ) {
+                        row("developer_tools") { rowContext ->
+                            SettingsLink(
+                                context = rowContext,
+                                title = stringResource(R.string.developer_tools),
+                                onClick = { showGroupInfo = true },
+                                modifier = Modifier.testTag("chat_info.developer_tools"),
+                                leading = { Icon(painterResource(R.drawable.ic_bug_report), contentDescription = null) },
+                            )
+                        }
+                    }
+                }
+
+                if (!isDm) developerPanels()
+            }
         }
     }
 }
 
 /** Adaptive conversation identity with native edit, full-picture and public-key copy actions. */
 @Composable
+@Suppress("LongParameterList", "LongMethod") // Existing adaptive header keeps its optional viewer action at the presentation boundary.
 internal fun GroupDetailsHeader(
     title: String,
     subtitle: String,
@@ -2012,10 +2025,11 @@ internal fun GroupDetailsHeader(
     onAddDescription: (() -> Unit)? = null,
     descriptionCopyValue: String? = null,
     onNameBottom: (Float) -> Unit = {},
+    readLocalBytes: (suspend () -> ByteArray?)? = null,
 ) {
     val clipboard = LocalClipboardManager.current
     val safePictureUrl = ProfileSanitizer.protocolImageUrl(pictureUrl)
-    val remoteImageAvailable = rememberAvatarImageAvailable(safePictureUrl)
+    val remoteImageAvailable = rememberAvatarImageAvailable(safePictureUrl.takeIf { picture == null })
     val avatarImageAvailable = picture != null || remoteImageAvailable
     var viewerOpen by remember(safePictureUrl, picture) { mutableStateOf(false) }
     var copied by remember(descriptionCopyValue) { mutableStateOf(false) }
@@ -2161,6 +2175,7 @@ internal fun GroupDetailsHeader(
             pictureUrl = safePictureUrl,
             picture = picture,
             onDismiss = { viewerOpen = false },
+            readLocalBytes = readLocalBytes,
         )
     }
 }

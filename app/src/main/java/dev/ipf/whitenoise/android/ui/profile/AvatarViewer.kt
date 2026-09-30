@@ -99,7 +99,9 @@ internal fun rememberAvatarImageAvailable(pictureUrl: String?): Boolean {
     return available
 }
 
+/** Displays supplied pixels immediately; optional retained original bytes preserve the explicit Save action. */
 @Composable
+@Suppress("LongParameterList", "LongMethod") // Viewer chrome and optional export remain one lifecycle-owned surface.
 internal fun AvatarFullScreenViewer(
     title: String,
     seed: String,
@@ -109,6 +111,7 @@ internal fun AvatarFullScreenViewer(
     editActionLabel: String? = null,
     onEditPicture: (() -> Unit)? = null,
     securePolicy: SecureFlagPolicy = SecureFlagPolicy.Inherit,
+    readLocalBytes: (suspend () -> ByteArray?)? = null,
 ) {
     val safePictureUrl = remember(pictureUrl) { ProfileSanitizer.protocolImageUrl(pictureUrl) }
     if (safePictureUrl == null && picture == null) {
@@ -151,14 +154,15 @@ internal fun AvatarFullScreenViewer(
             onDismiss = onDismiss,
             menuOpen = menuOpen,
             onMenuOpenChange = { menuOpen = it },
-            saveEnabled = remote != null,
+            saveEnabled = remote != null || readLocalBytes != null,
             editActionLabel = editActionLabel,
             onEditPicture = onEditPicture,
             onSave = {
-                val bytes = remote?.bytes ?: return@AvatarViewerFrame
                 scope.launch {
                     val outcome =
                         runCatchingCancellable {
+                            val bytes = remote?.bytes ?: readLocalBytes?.invoke()
+                            checkNotNull(bytes) { "Stored avatar is no longer available" }
                             val saved =
                                 withContext(Dispatchers.IO) {
                                     saveImageToGallery(context, bytes, fileName, avatarViewerMimeType(bytes, fileName))

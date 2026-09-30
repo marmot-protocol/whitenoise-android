@@ -76,8 +76,9 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.SelectionIndicator
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
+import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
-import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
+import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.share.ChatPickerSendingAccountRow
 import dev.ipf.whitenoise.android.ui.share.ShareChatPickerAccountSheet
@@ -502,65 +503,67 @@ private fun ForwardTargetList(
     onSelectionChange: (List<String>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    LazyColumn(modifier = modifier.fillMaxWidth(), contentPadding = PaddingValues(bottom = Dimens.spaceLg)) {
-        if (targetLoading && targets.isEmpty()) {
-            item {
-                Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
-                    LoadingScreen()
+    PreparedGroupAvatarContent(appState, filteredTargets.take(16).mapNotNull { it.first.selectedAvatarAsset }, ownerAccountRef) {
+        LazyColumn(modifier = modifier.fillMaxWidth(), contentPadding = PaddingValues(bottom = Dimens.spaceLg)) {
+            if (targetLoading && targets.isEmpty()) {
+                item {
+                    Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
+                        LoadingScreen()
+                    }
                 }
-            }
-        } else if (targetError != null && targets.isEmpty()) {
-            item {
-                Box(Modifier.fillParentMaxSize()) {
-                    ErrorContent(
-                        title = stringResource(R.string.couldnt_load_chats),
-                        error = targetError,
-                        onRetry = retryLoad,
+            } else if (targetError != null && targets.isEmpty()) {
+                item {
+                    Box(Modifier.fillParentMaxSize()) {
+                        ErrorContent(
+                            title = stringResource(R.string.couldnt_load_chats),
+                            error = targetError,
+                            onRetry = retryLoad,
+                        )
+                    }
+                }
+            } else if (forwardPickerHasNoRows(targets.isEmpty(), filteredTargets.isEmpty(), visibleFolderRows.isEmpty())) {
+                item {
+                    Text(
+                        stringResource(if (targets.isEmpty()) R.string.forward_no_chats else R.string.forward_no_matches),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
                     )
                 }
-            }
-        } else if (forwardPickerHasNoRows(targets.isEmpty(), filteredTargets.isEmpty(), visibleFolderRows.isEmpty())) {
-            item {
-                Text(
-                    stringResource(if (targets.isEmpty()) R.string.forward_no_chats else R.string.forward_no_matches),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
-                )
-            }
-        } else {
-            targetError?.let { failure ->
-                item(key = "forward-picker-load-error") {
-                    InlineErrorBanner(error = failure, onRetry = retryLoad)
+            } else {
+                targetError?.let { failure ->
+                    item(key = "forward-picker-load-error") {
+                        InlineErrorBanner(error = failure, onRetry = retryLoad)
+                    }
                 }
-            }
-            if (visibleFolderRows.isNotEmpty()) {
-                item(key = "forward-folder-controls") {
-                    Column {
-                        SectionHeader(stringResource(R.string.chat_folders_title))
-                        key(ownerAccountRef) {
-                            ForwardFolderChips(
-                                folderRows = visibleFolderRows,
-                                selected = selected,
-                                onSelectionChange = onSelectionChange,
-                            )
+                if (visibleFolderRows.isNotEmpty()) {
+                    item(key = "forward-folder-controls") {
+                        Column {
+                            SectionHeader(stringResource(R.string.chat_folders_title))
+                            key(ownerAccountRef) {
+                                ForwardFolderChips(
+                                    folderRows = visibleFolderRows,
+                                    selected = selected,
+                                    onSelectionChange = onSelectionChange,
+                                )
+                            }
                         }
                     }
                 }
-            }
-            if (filteredTargets.isNotEmpty()) item { SectionHeader(stringResource(R.string.recent_chats)) }
-            items(filteredTargets, key = { (item, _) -> item.group.groupIdHex }) { (item, title) ->
-                ForwardTargetRow(
-                    appState = appState,
-                    item = item,
-                    title = title,
-                    ownerAccountRef = ownerAccountRef,
-                    ownerAccountIdHex = ownerAccountIdHex,
-                    selected = item.group.groupIdHex.lowercase(Locale.ROOT) in selected,
-                    onToggle = { groupId ->
-                        onSelectionChange(toggleForwardTargetSelection(selected, groupId))
-                    },
-                )
+                if (filteredTargets.isNotEmpty()) item { SectionHeader(stringResource(R.string.recent_chats)) }
+                items(filteredTargets, key = { (item, _) -> item.group.groupIdHex }) { (item, title) ->
+                    ForwardTargetRow(
+                        appState = appState,
+                        item = item,
+                        title = title,
+                        ownerAccountRef = ownerAccountRef,
+                        ownerAccountIdHex = ownerAccountIdHex,
+                        selected = item.group.groupIdHex.lowercase(Locale.ROOT) in selected,
+                        onToggle = { groupId ->
+                            onSelectionChange(toggleForwardTargetSelection(selected, groupId))
+                        },
+                    )
+                }
             }
         }
     }
@@ -615,6 +618,13 @@ private fun ForwardTargetRow(
     onToggle: (String) -> Unit,
 ) {
     val avatarAccount = forwardTargetAvatarAccount(item)
+    val avatar =
+        rememberChatListGroupAvatar(
+            appState,
+            item,
+            ownerAccountRef,
+            avatarAccount?.let { appState.avatarUrl(it) },
+        )
     val membersPreview =
         remember(item, ownerAccountRef, ownerAccountIdHex, appState.profileRevisionForCompose) {
             forwardTargetMembersPreview(item, ownerAccountIdHex) { memberIdHex ->
@@ -625,8 +635,8 @@ private fun ForwardTargetRow(
         title = title,
         subtitle = membersPreview,
         avatarSeed = avatarAccount ?: item.group.groupIdHex,
-        avatarUrl = item.group.avatarUrl ?: avatarAccount?.let { appState.avatarUrl(it) },
-        avatarImage = rememberEncryptedGroupAvatar(appState, item.group, ownerAccountRef),
+        avatarUrl = avatar.pictureUrl,
+        avatarImage = avatar.image,
         modifier = Modifier.semantics { this.selected = selected },
         onClick = { onToggle(item.group.groupIdHex) },
         trailing = { SelectionIndicator(selected = selected) },

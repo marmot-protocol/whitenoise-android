@@ -1449,6 +1449,7 @@ class WhiteNoiseAppState private constructor(
 
     /** Publishes a runtime, invalidates obsolete permission work, and seeds synchronization for retained accounts. */
     private fun publishMarmotRuntime(runtime: AppMarmotRuntime) {
+        if (marmotRuntime !== runtime) AvatarImageLoader.clearStoredAvatars()
         marmotRuntime = runtime
         hostPerformance.publishEmitter(runtime, runtimeGeneration, runtimeHostPerformanceEmitter(runtime))
         nativeAttachmentPermissions.invalidate(runtime)
@@ -1460,6 +1461,7 @@ class WhiteNoiseAppState private constructor(
     /** Clears only the runtime that failed and immediately fences its permission callbacks. */
     private fun clearMarmotRuntime(runtime: AppMarmotRuntime) {
         if (marmotRuntime !== runtime) return
+        AvatarImageLoader.clearStoredAvatars()
         hostPerformance.clearEmitter(runtime)
         marmotRuntime = null
         nativeAttachmentPermissions.invalidate(null)
@@ -3172,6 +3174,7 @@ class WhiteNoiseAppState private constructor(
     /** Retires observation tickets whenever destructive recovery replaces the runtime generation. */
     private fun applyDestructiveWipeRuntimeState(state: DestructiveAccountWipeRuntimeState) {
         if (runtimeGeneration != state.runtimeGeneration) {
+            AvatarImageLoader.clearStoredAvatars()
             diagnostics.observations.reset()
             nativePushFallback.invalidateAll()
         }
@@ -3716,6 +3719,17 @@ class WhiteNoiseAppState private constructor(
 
     internal val profileGroupPickerRevision: Long
         get() = chatsController?.memberSnapshotsRevision ?: 0L
+
+    /** Uses the live source projection, not the hidden chat-list UI snapshot, and never changes owner. */
+    internal fun currentGroupAvatarItem(
+        accountRef: String?,
+        groupIdHex: String,
+    ): ChatListItem? {
+        forwardTargetsRevision // Compose observes updates folded while the list is hidden.
+        return chatsController
+            ?.takeIf { accountRef != null && it.boundAccountRef == accountRef }
+            ?.currentGroupAvatarItem(groupIdHex)
+    }
 
     internal fun profileAddableGroupsState(accountIdHex: String): ProfileGroupPickerState =
         chatsController?.profileAddableGroupsState(accountIdHex, activeAccount?.accountIdHex)
@@ -6055,6 +6069,7 @@ class WhiteNoiseAppState private constructor(
         accountScopedCaches.clearAll()
         authoritativeMuteOverrides.clear()
         pendingMuteCommands.clear()
+        AvatarImageLoader.clearStoredAvatars()
         GroupAvatarImageLoader.clear()
         pruneIdleGroupCommitLocks()
         profileRevision += 1
