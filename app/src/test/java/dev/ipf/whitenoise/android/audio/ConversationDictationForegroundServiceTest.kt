@@ -122,6 +122,20 @@ class ConversationDictationForegroundServiceTest {
         assertFalse(ConversationDictationForegroundService.notificationControlsAvailable(context))
     }
 
+    @Test
+    fun serviceTraceCorrelatesTheRequestedSession() {
+        ShadowLog.clear()
+        val harness = installHost()
+        val lifecycle = Robolectric.buildService(ConversationDictationForegroundService::class.java).create()
+        try {
+            val service = lifecycle.get()
+            service.onStartCommand(startIntent(service, harness), 0, 1)
+            assertCorrelatedServiceTrace()
+        } finally {
+            lifecycle.destroy()
+        }
+    }
+
     private fun assertCorrelatedServiceTrace() {
         val trace = ShadowLog.getLogsForTag("WNDictation").mapNotNull { DictationDiagnosticSchema.fields(it.msg) }
         assertTrue(trace.any { it["event"] == "foreground_service_on_start" && it["callback_session"] == 1L })
@@ -131,14 +145,11 @@ class ConversationDictationForegroundServiceTest {
     /** Verifies active capture uses a metadata-free notification whose actions reach the controller. */
     @Test
     fun activeSessionUsesGenericForegroundNotificationAndRoutesActions() {
-        ShadowLog.clear()
         val harness = installHost()
         val serviceController = Robolectric.buildService(ConversationDictationForegroundService::class.java).create()
         val service = serviceController.get()
 
         service.onStartCommand(startIntent(service, harness), 0, 1)
-
-        assertCorrelatedServiceTrace()
 
         val notification = shadowOf(service as Service).lastForegroundNotification
         assertNotNull(notification)
