@@ -27,7 +27,10 @@ class SystemPasteIconButtonTest {
         var pastes = 0
         composeRule.setContent {
             CompositionLocalProvider(LocalTextToolbar provides toolbar) {
-                SystemPasteIconButton(onPaste = { pastes++; true }) { Text("Paste") }
+                SystemPasteIconButton(onPaste = {
+                    pastes++
+                    true
+                }) { Text("Paste") }
             }
         }
         composeRule.runOnIdle { assertEquals(0, pastes) }
@@ -44,7 +47,10 @@ class SystemPasteIconButtonTest {
         var pastes = 0
         composeRule.setContent {
             CompositionLocalProvider(LocalTextToolbar provides toolbar) {
-                SystemPasteIconButton(onPaste = { if (readable) pastes++; readable }) { Text("Paste") }
+                SystemPasteIconButton(onPaste = {
+                    if (readable) pastes++
+                    readable
+                }) { Text("Paste") }
             }
         }
         composeRule.onNodeWithText("Paste").performClick()
@@ -62,7 +68,10 @@ class SystemPasteIconButtonTest {
         var attempts = 0
         composeRule.setContent {
             CompositionLocalProvider(LocalTextToolbar provides toolbar) {
-                SystemPasteIconButton(onPaste = { attempts++; false }) { Text("Paste") }
+                SystemPasteIconButton(onPaste = {
+                    attempts++
+                    false
+                }) { Text("Paste") }
             }
         }
         composeRule.onNodeWithText("Paste").performClick()
@@ -77,7 +86,10 @@ class SystemPasteIconButtonTest {
         var attempts = 0
         composeRule.setContent {
             CompositionLocalProvider(LocalTextToolbar provides toolbar) {
-                SystemPasteIconButton(onPaste = { attempts++; true }, enabled = false) { Text("Paste") }
+                SystemPasteIconButton(onPaste = {
+                    attempts++
+                    true
+                }, enabled = false) { Text("Paste") }
             }
         }
         composeRule.onNodeWithText("Paste").performClick()
@@ -94,7 +106,10 @@ class SystemPasteIconButtonTest {
         var pastes = 0
         composeRule.setContent {
             CompositionLocalProvider(LocalTextToolbar provides toolbar) {
-                SystemPasteIconButton(onPaste = { if (readable) pastes++; readable }, enabled = enabled.value) {
+                SystemPasteIconButton(onPaste = {
+                    if (readable) pastes++
+                    readable
+                }, enabled = enabled.value) {
                     Text("Paste")
                 }
             }
@@ -129,7 +144,10 @@ class SystemPasteIconButtonTest {
         var attempts = 0
         composeRule.setContent {
             CompositionLocalProvider(LocalTextToolbar provides toolbar) {
-                if (visible.value) SystemPasteIconButton(onPaste = { attempts++; false }) { Text("Paste") }
+                if (visible.value) SystemPasteIconButton(onPaste = {
+                    attempts++
+                    false
+                }) { Text("Paste") }
             }
         }
         composeRule.onNodeWithText("Paste").performClick()

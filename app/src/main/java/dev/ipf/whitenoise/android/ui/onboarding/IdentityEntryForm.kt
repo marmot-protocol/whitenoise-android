@@ -44,8 +44,8 @@ import dev.ipf.whitenoise.android.core.ClipboardPasteAffordance
 import dev.ipf.whitenoise.android.core.IdentityEntryInput
 import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
 import dev.ipf.whitenoise.android.ui.common.plainText
-import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
+import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
 
 /**

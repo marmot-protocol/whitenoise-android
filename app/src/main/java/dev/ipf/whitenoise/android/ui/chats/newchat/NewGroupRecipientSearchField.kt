@@ -38,8 +38,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
-import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
+import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 
 /** Prototype compact search geometry with the unchanged recipient paste policy and native selection/IME state. */

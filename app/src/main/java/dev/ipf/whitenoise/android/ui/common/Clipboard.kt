@@ -56,11 +56,12 @@ internal fun ClipData.plainText(context: Context): String? =
 
 /** Call only from an explicit Paste action; false requests the trusted system Paste fallback. */
 internal fun android.content.ClipboardManager?.withPrimaryClipForPaste(onPaste: (ClipData) -> Unit): Boolean {
-    val clip = try {
-        this?.primaryClip
-    } catch (_: SecurityException) {
-        null
-    } ?: return false
+    val clip =
+        try {
+            this?.primaryClip
+        } catch (_: SecurityException) {
+            null
+        } ?: return false
     // Readability, not validation success, decides whether another Paste action is necessary.
     onPaste(clip)
     return true
