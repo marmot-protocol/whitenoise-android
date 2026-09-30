@@ -9,13 +9,18 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.chats.ChatRowLayout
@@ -51,6 +56,56 @@ class ChatRowLayoutScreenshotTest {
     fun chatRowStatesAmoled() {
         render(darkTheme = true, amoled = true)
         capture("chat_row_layout_states_amoled.png")
+    }
+
+    /** Captures the short private DM label in a normal light chat row. */
+    @Test
+    fun privateNicknameLight() {
+        renderPrivateNickname(darkTheme = false, amoled = false)
+        capture("chat_row_private_nickname_light.png")
+    }
+
+    /** Captures the same label against the dark palette. */
+    @Test
+    fun privateNicknameDark() {
+        renderPrivateNickname(darkTheme = true, amoled = false)
+        capture("chat_row_private_nickname_dark.png")
+    }
+
+    /** Captures the same label against the AMOLED palette. */
+    @Test
+    fun privateNicknameAmoled() {
+        renderPrivateNickname(darkTheme = true, amoled = true)
+        capture("chat_row_private_nickname_amoled.png")
+    }
+
+    /** Keeps the short nickname legible at large text size in an RTL layout. */
+    @Test
+    fun privateNicknameLargeRtl() {
+        renderPrivateNickname(darkTheme = false, amoled = false, largeRtl = true)
+        capture("chat_row_private_nickname_large_rtl.png")
+    }
+
+    /** Renders the row title selected by the nickname resolution regression test. */
+    private fun renderPrivateNickname(
+        darkTheme: Boolean,
+        amoled: Boolean,
+        largeRtl: Boolean = false,
+    ) {
+        composeRule.setContent {
+            CompositionLocalProvider(
+                LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                LocalDensity provides Density(1f, if (largeRtl) 2f else 1f),
+            ) {
+                WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
+                    Surface(color = MaterialTheme.colorScheme.background) {
+                        Box(Modifier.fillMaxWidth().testTag(TAG)) {
+                            ChatRowFixture(title = "Hermes", preview = "Private nickname for this direct chat")
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private fun render(

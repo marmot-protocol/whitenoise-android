@@ -18,6 +18,7 @@ import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
+import dev.ipf.whitenoise.android.core.chatListItemTitle
 import dev.ipf.whitenoise.android.core.selectedChatPresentationTitle
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -47,6 +48,31 @@ class ChatListTitleTest {
             unnamedGroupTitle = "Unnamed test group",
             unavailableConversationTitle = "Unavailable test conversation",
         )
+
+    /** A local nickname replaces the public DM title, then clearing it restores MDK's title. */
+    @Test
+    fun directRowPrefersPrivateNicknameOverSelectedPublicTitle() {
+        val item =
+            chatItem("dm", name = "", members = listOf(member("me-acc", true), member("peer-acc", false)))
+                .copy(selectedPresentation = presentation(PresentationTextFfi.Literal("Jade Crane")))
+
+        assertEquals(
+            "Hermes",
+            chatListItemTitle(item, { if (it == "peer-acc") "Hermes" else null }, { "Fallback" }, copy),
+        )
+        assertEquals("Jade Crane", chatListItemTitle(item, { null }, { "Fallback" }, copy))
+        assertEquals("Jade Crane", chatListItemTitle(item, { " \u200b " }, { "Fallback" }, copy))
+    }
+
+    /** A two-member named group cannot borrow one member's private label. */
+    @Test
+    fun groupRowNeverUsesMembersPrivateNickname() {
+        val item =
+            chatItem("group", name = "Marmot Lab", members = listOf(member("me-acc", true), member("peer-acc", false)))
+                .copy(selectedPresentation = presentation(PresentationTextFfi.Literal("Marmot Lab")))
+
+        assertEquals("Marmot Lab", chatListItemTitle(item, { error("group nickname lookup") }, { "Fallback" }, copy))
+    }
 
     /** A literal selected title is used directly after hostile-text sanitization. */
     @Test
