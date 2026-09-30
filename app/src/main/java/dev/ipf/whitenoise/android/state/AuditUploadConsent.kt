@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.whitenoise.android.audio.DictationDiagnostics
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -27,6 +28,7 @@ internal class AuditUploadConsent(
     val readyForStartupMarker: Boolean get() = granted && startupUploadConfigured
 
     fun choose(enabled: Boolean) {
+        DictationDiagnostics.setEnabled(false)
         check(
             preferences
                 .edit()
@@ -50,6 +52,7 @@ internal class AuditUploadConsent(
         configureUpload: suspend (Boolean) -> Unit,
         persistSettings: suspend (AuditLogSettingsFfi) -> AuditLogSettingsFfi,
     ): AuditLogSettingsFfi {
+        DictationDiagnostics.setEnabled(false)
         configureUpload(false)
         if (!settings.enabled) {
             // Denial survives recorder-cleanup failure; startup cannot restore the token.
@@ -71,6 +74,7 @@ internal class AuditUploadConsent(
             val stored = persistSettings(settings)
             choose(true)
             configureUpload(true)
+            DictationDiagnostics.setEnabled(stored.enabled && granted)
             stored
         } catch (failure: Exception) {
             // No failed grant should be retried as an accepted choice on startup.
@@ -91,6 +95,7 @@ internal class AuditUploadConsent(
      * An old local-log choice cannot authorize uploads.
      */
     suspend fun prepare(runtime: MarmotInterface) {
+        DictationDiagnostics.setEnabled(false)
         startupUploadConfigured = false
         runtime.configureAuditRuntime(uploadConsentGranted = false)
         if (!granted && runtime.auditLogSettings().enabled) {
@@ -107,6 +112,8 @@ internal class AuditUploadConsent(
                     reportRejected = { Log.w("WhiteNoiseAudit", "v5 audit upload unavailable; retaining local logs") },
                 )
         }
+        val recording = runCatchingCancellable { runtime.auditLogSettings().enabled }.getOrDefault(false)
+        DictationDiagnostics.setEnabled(recording && granted)
     }
 }
 

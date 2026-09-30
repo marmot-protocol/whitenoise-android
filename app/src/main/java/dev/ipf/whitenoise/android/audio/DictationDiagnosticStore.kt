@@ -49,16 +49,14 @@ internal class DictationDiagnosticStore(
             )
             rotations += 1
         }
-        // Appending must not extend the oldest record's retention window.
-        val retainedSince = if (current.exists()) current.lastModified() else nowMillis()
         current.appendBytes(bytes)
-        check(current.setLastModified(retainedSince))
     }
 
     @Synchronized
     fun snapshot(
         enabled: Boolean,
         dropped: Long,
+        filtered: Long = 0,
     ): Map<String, ByteArray> {
         prepare()
         val files = names.map { File(directory, it) }.filter { it.exists() }
@@ -67,6 +65,7 @@ internal class DictationDiagnosticStore(
                 .put("schema", 1)
                 .put("collection_enabled", enabled)
                 .put("dropped_in_process", dropped)
+                .put("filtered_fields_in_process", filtered)
                 .put("max_file_bytes", maxBytes)
                 .put("max_files", names.size)
                 .put("retention_ms", retentionMillis)
@@ -82,12 +81,18 @@ internal class DictationDiagnosticStore(
     }
 
     /** No IO or store lock: native logs can still be exported when the writer barrier is unavailable. */
-    fun unavailableSnapshot(enabled: Boolean, dropped: Long, reason: String): Map<String, ByteArray> =
+    fun unavailableSnapshot(
+        enabled: Boolean,
+        dropped: Long,
+        reason: String,
+        filtered: Long = 0,
+    ): Map<String, ByteArray> =
         mapOf(
             "dictation-manifest.json" to JSONObject()
                 .put("schema", 1)
                 .put("collection_enabled", enabled)
                 .put("dropped_in_process", dropped)
+                .put("filtered_fields_in_process", filtered)
                 .put("coverage", "snapshot_unavailable")
                 .put("snapshot_failure", reason)
                 .put("files", 0)
@@ -98,9 +103,10 @@ internal class DictationDiagnosticStore(
 
     @Synchronized
     fun clear(): Boolean {
-        prepare()
+        prepareDirectory()
         var removed = false
         names.map { File(directory, it) }.filter { it.exists() }.forEach {
+            requireSafeFile(it)
             check(it.delete())
             removed = true
         }
@@ -109,18 +115,29 @@ internal class DictationDiagnosticStore(
 
     /** Fail closed on a symlink or unexpected size rather than exporting another file. */
     private fun prepare() {
-        if (Files.isSymbolicLink(directory.toPath())) throw IOException("Unsafe diagnostic directory")
-        check(directory.mkdirs() || directory.isDirectory)
+        prepareDirectory()
         names.forEach { validateRetainedFile(File(directory, it)) }
     }
 
-    private fun validateRetainedFile(file: File) {
+    private fun prepareDirectory() {
+        if (Files.isSymbolicLink(directory.toPath())) throw IOException("Unsafe diagnostic directory")
+        check(directory.mkdirs() || directory.isDirectory)
+    }
+
+    private fun requireSafeFile(file: File) {
         if (Files.isSymbolicLink(file.toPath())) throw IOException("Unsafe diagnostic file")
+        if (file.exists() && !Files.isRegularFile(file.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+            throw IOException("Invalid diagnostic file")
+        }
+    }
+
+    private fun validateRetainedFile(file: File) {
+        requireSafeFile(file)
         if (file.exists()) {
-            if (!Files.isRegularFile(file.toPath(), LinkOption.NOFOLLOW_LINKS) || file.length() > maxBytes) {
-                throw IOException("Invalid diagnostic file")
-            }
-            val age = nowMillis() - file.lastModified()
+            if (file.length() > maxBytes) throw IOException("Diagnostic file exceeds limit")
+            // Record time is authoritative; appends or unsupported timestamp writes cannot extend retention.
+            val oldest = file.bufferedReader().use { reader -> JSONObject(reader.readLine()).getLong("time_ms") }
+            val age = nowMillis() - oldest
             if (age < 0 || age > retentionMillis) {
                 check(file.delete())
                 expiredFiles += 1

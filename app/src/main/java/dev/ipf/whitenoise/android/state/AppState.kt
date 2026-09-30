@@ -2538,7 +2538,7 @@ class WhiteNoiseAppState private constructor(
     private fun updateNotificationSuppression(next: NotificationSuppression) {
         if (next != suppression) notificationPostEpoch.advance()
         suppression = next
-        dictationDiagnosticLifecycle.originVisibility(conversationDictation) {
+        dictationDiagnosticLifecycle.originVisibility({ conversationDictation }) {
             isConversationDictationOriginVisible(it.accountRef, it.groupIdHex)
         }
     }
@@ -7878,7 +7878,7 @@ class WhiteNoiseAppState private constructor(
             }
         }
         if (foreground) {
-            dictationDiagnosticLifecycle.foreground(conversationDictation)
+            dictationDiagnosticLifecycle.foreground { conversationDictation }
             appLockTtsBoundaryJob?.cancel()
             appLockTtsBoundaryJob = null
             maybeShowAppLockForForeground()

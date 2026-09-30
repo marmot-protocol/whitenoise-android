@@ -124,6 +124,12 @@ internal object DictationDiagnosticSchema {
             "restart",
             "sample_rate",
             "channels",
+            "attempts",
+            "retry",
+            "silence_ms",
+            "buffer_seconds",
+            "version_code",
+            "read",
         )
     private val booleans =
         setOf(
@@ -150,6 +156,11 @@ internal object DictationDiagnosticSchema {
             "active",
             "has_controller",
             "initialized",
+            "requested",
+            "granted",
+            "speech_seen",
+            "same_provider",
+            "acquired",
         )
     private val categories =
         setOf(
@@ -167,6 +178,10 @@ internal object DictationDiagnosticSchema {
             "action",
             "path",
             "source",
+            "fallback",
+            "encoding",
+            "chunk_seconds",
+            "state",
         )
     private val allowedCategoryValues =
         setOf(
@@ -260,44 +275,83 @@ internal object DictationDiagnosticSchema {
             "session_cancelled",
             "connection_restored",
             "removed",
+            "result",
+            "permission",
+            "provider_disconnected",
+            "no_speech_advanced",
+            "retained_transcript",
+            "already_finishing",
+            "retain",
+            "advance",
+            "draft_only",
+            "local",
+            "Done",
+            "provider_microphone",
+            "pcm16",
+            "10-30",
         ) + ConversationDictationFailure.entries.map { it.name } +
             ConversationDictationMode.entries.map { it.name } +
             ConversationDictationDeliveryMode.entries.map { it.name } +
             ConversationDictationTargetValidation.entries.flatMap { listOf(it.name, "target_${it.name}") } +
             ConversationDictationMicrophoneAccess.entries.map { it.name } +
-            ConversationDictationCallerAudioRequirement.entries.map { it.name }
+            ConversationDictationCallerAudioRequirement.entries.map { it.name } +
+            ConversationDictationReadinessPhase.entries.map { it.name }
 
-    /** Unknown fields and free-form values are dropped even when they resemble a known field. */
-    fun fields(event: String): Map<String, Any>? {
+    /** Unknown fields and free-form values are counted and dropped, never copied into the export. */
+    fun fields(event: String): Map<String, Any>? = parse(event)?.fields
+
+    fun parse(event: String): DictationDiagnosticEvent? {
         val tokens =
-            event.takeIf { it.length <= MAX_DIAGNOSTIC_EVENT_CHARS }.orEmpty()
+            event
+                .takeIf { it.length <= MAX_DIAGNOSTIC_EVENT_CHARS }
+                .orEmpty()
                 .split(' ')
                 .mapNotNull { token ->
                     val separator = token.indexOf('=')
                     if (separator <= 0) null else token.substring(0, separator) to token.substring(separator + 1)
                 }.toMap()
         val name = tokens["event"]?.takeIf { it in events } ?: return null
-        return buildMap {
+        var filtered = 0L
+        val fields = buildMap<String, Any> {
             put("event", name)
-            tokens.forEach { (key, value) -> retainField(key, value) }
+            tokens.filterKeys { it != "event" }.forEach { (key, value) ->
+                retainField(key, value)
+                if (!containsKey(key)) filtered += 1
+            }
+        }
+        return DictationDiagnosticEvent(fields, filtered)
+    }
+
+    private fun MutableMap<String, Any>.retainField(
+        key: String,
+        value: String,
+    ) {
+        if (key == "reason" && value.startsWith("read=")) {
+            value.removePrefix("read=").toIntOrNull()?.let {
+                put("reason", "read_failed")
+                put("read_code", it)
+            }
+        } else {
+            retainedValue(key, value)?.let { put(key, it) }
         }
     }
 
-    private fun MutableMap<String, Any>.retainField(key: String, value: String) {
+    private fun retainedValue(key: String, value: String): Any? =
         when {
-            key == "reason" && value.startsWith("read=") ->
-                value.removePrefix("read=").toIntOrNull()?.let {
-                    put("reason", "read_failed")
-                    put("read_code", it)
-                }
-            key in numbers -> value.toLongOrNull()?.let { put(key, it) }
-            key == "type" -> put(key, value.takeIf { it in allowedCategoryValues } ?: "other")
-            key == "peak" -> validPeak(value)?.let { put(key, it) }
-            key in booleans && value in setOf("true", "false") -> put(key, value == "true")
-            key in categories && value in allowedCategoryValues -> put(key, value)
+            key in numbers -> value.toLongOrNull()
+            key == "state" -> value.toLongOrNull() ?: value.takeIf { it == "none" }
+            key in setOf("type", "error") -> value.takeIf { it in allowedCategoryValues } ?: "other"
+            key == "peak" -> validPeak(value)
+            key in booleans -> value.toBooleanStrictOrNull()
+            key in categories -> value.takeIf { it in allowedCategoryValues }
+            else -> null
         }
-    }
 
     private fun validPeak(value: String): Double? =
         value.toDoubleOrNull()?.takeIf { it.isFinite() && it in 0.0..1.0 }
 }
+
+internal data class DictationDiagnosticEvent(
+    val fields: Map<String, Any>,
+    val filteredFields: Long,
+)

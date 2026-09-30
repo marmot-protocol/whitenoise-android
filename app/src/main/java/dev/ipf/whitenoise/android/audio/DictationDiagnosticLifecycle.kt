@@ -5,27 +5,28 @@ internal class DictationDiagnosticLifecycle {
     private var originVisible: Boolean? = null
 
     fun originVisibility(
-        controller: ConversationDictationController,
+        controller: () -> ConversationDictationController,
         visible: (ConversationDictationTarget) -> Boolean,
     ) {
-        val target = if (DictationDiagnostics.activeSession != 0L) controller.state.target else null
-        if (target == null) {
+        if (DictationDiagnostics.activeSession == 0L) {
             originVisible = null
             return
         }
+        val active = controller()
+        val target = active.state.target ?: return
         val next = visible(target)
         if (next != originVisible) {
             originVisible = next
             conversationDictationDiagnostic(
-                "event=origin_visibility visible=$next session=${controller.state.sessionId}",
+                "event=origin_visibility visible=$next session=${active.state.sessionId}",
             )
         }
     }
 
-    fun foreground(controller: ConversationDictationController) {
+    fun foreground(controller: () -> ConversationDictationController) {
         if (DictationDiagnostics.activeSession != 0L) {
             conversationDictationDiagnostic(
-                "event=app_visibility foreground=true durable=${controller.hasDurableSession}",
+                "event=app_visibility foreground=true durable=${controller().hasDurableSession}",
             )
         }
     }

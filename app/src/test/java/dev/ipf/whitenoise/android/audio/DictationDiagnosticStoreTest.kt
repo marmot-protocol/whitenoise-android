@@ -43,6 +43,67 @@ class DictationDiagnosticStoreTest {
     }
 
     @Test
+    fun emittedRetryAndLifecycleFieldsSurviveTheClosedSchema() {
+        val examples =
+            mapOf(
+                "event=recognizer_restart_scheduled reason=provider_disconnected retry=2" to mapOf("reason" to "provider_disconnected", "retry" to 2L),
+                "event=foreground_service_start requested=true" to mapOf("requested" to true),
+                "event=retry path=retained_transcript" to mapOf("path" to "retained_transcript"),
+                "event=completion_action reason=already_finishing" to mapOf("reason" to "already_finishing"),
+                "event=caller_audio_retry_exhausted attempts=3 action=retain" to mapOf("attempts" to 3L, "action" to "retain"),
+                "event=caller_audio_silence_acknowledged action=advance" to mapOf("action" to "advance"),
+                "event=silence_check_complete silence_ms=1000 speech_seen=false" to mapOf("silence_ms" to 1000L, "speech_seen" to false),
+                "event=target_validation source=draft_only" to mapOf("source" to "draft_only"),
+                "event=app_record_audio_permission granted=true" to mapOf("granted" to true),
+            )
+        listOf("result", "permission", "provider_disconnected", "no_speech_advanced").forEach { reason ->
+            val parsed = requireNotNull(DictationDiagnosticSchema.parse("event=recognizer_restart_scheduled reason=$reason"))
+            assertEquals(reason, parsed.fields["reason"])
+            assertEquals(0L, parsed.filteredFields)
+        }
+        assertEquals("local", event("event=target_validation source=local")["source"])
+        examples.forEach { (event, expected) ->
+            val parsed = requireNotNull(DictationDiagnosticSchema.parse(event))
+            expected.forEach { (key, value) -> assertEquals(event, value, parsed.fields[key]) }
+            assertEquals(event, 0L, parsed.filteredFields)
+        }
+    }
+
+    @Test
+    fun filteredAndDroppedCountsResetOnlyAfterSuccessfulClear() {
+        val store = DictationDiagnosticStore(folder.newFolder(), "abcdef012")
+        DictationDiagnosticRecorder(store).use { recorder ->
+            recorder.setEnabled(true)
+            recorder.record("event=session_started transcript=PRIVATE")
+            recorder.record("event=PRIVATE_UNKNOWN")
+            val before = recorder.snapshot().values.joinToString { it.decodeToString() }
+            assertFalse(before.contains("PRIVATE"))
+            val manifest = JSONObject(recorder.snapshot().getValue("dictation-manifest.json").decodeToString())
+            assertEquals(1L, manifest.getLong("filtered_fields_in_process"))
+            assertEquals(1L, manifest.getLong("dropped_in_process"))
+            assertTrue(recorder.clear())
+            val cleared = JSONObject(recorder.snapshot().getValue("dictation-manifest.json").decodeToString())
+            assertEquals(0L, cleared.getLong("filtered_fields_in_process"))
+            assertEquals(0L, cleared.getLong("dropped_in_process"))
+        }
+    }
+
+    @Test
+    fun corruptStoreProducesUnavailableManifestAndCanBeCleared() {
+        val directory = folder.newFolder()
+        File(directory, "dictation-current.jsonl").writeText("PRIVATE_CORRUPTION")
+        DictationDiagnosticRecorder(DictationDiagnosticStore(directory, "abcdef012")).use { recorder ->
+            val snapshot = recorder.snapshot()
+            assertEquals(setOf("dictation-manifest.json"), snapshot.keys)
+            val manifest = snapshot.values.single().decodeToString()
+            assertFalse(manifest.contains("PRIVATE"))
+            assertEquals("store_failed", JSONObject(manifest).getString("snapshot_failure"))
+            assertTrue(recorder.clear())
+            assertEquals("bounded_local_history", JSONObject(recorder.snapshot().values.single().decodeToString()).getString("coverage"))
+        }
+    }
+
+    @Test
     fun restartRetainsHistoryAndDistinctProcessCorrelation() {
         val directory = folder.newFolder()
         val first = DictationDiagnosticStore(directory, "abcdef012")
@@ -85,6 +146,7 @@ class DictationDiagnosticStoreTest {
         val store = DictationDiagnosticStore(directory, "abcdef012", nowMillis = { now }, retentionMillis = 1000)
         store.append(event("event=session_started session=1"))
         now += 2000
+        assertTrue(File(directory, "dictation-current.jsonl").setLastModified(now))
         assertTrue(store.snapshot(false, 0).keys.none { it.endsWith(".jsonl") })
     }
 

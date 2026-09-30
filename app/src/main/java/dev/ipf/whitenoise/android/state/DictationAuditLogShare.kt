@@ -44,9 +44,7 @@ internal suspend fun configureAndroidPrivacyRuntime(
 ) {
     configureTelemetry()
     mutex.withLock {
-        DictationDiagnostics.setEnabled(false)
         consent.prepare(runtime)
-        DictationDiagnostics.setEnabled(runtime.auditLogSettings().enabled && consent.granted)
     }
     runtime.setProductAnalyticsRuntimeConfig(androidProductAnalyticsRuntimeConfig())
 }

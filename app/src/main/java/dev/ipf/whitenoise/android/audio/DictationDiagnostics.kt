@@ -6,11 +6,13 @@ import android.util.Log
 import dev.ipf.whitenoise.android.BuildConfig
 import java.io.File
 import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.coroutines.cancellation.CancellationException
 
 private const val DIAGNOSTIC_BARRIER_TIMEOUT_SECONDS = 5L
 
@@ -63,6 +65,7 @@ internal class DictationDiagnosticRecorder(
             { runnable -> Thread(runnable, "dictation-diagnostics").apply { isDaemon = true } },
         )
     private val dropped = AtomicLong()
+    private val filtered = AtomicLong()
     private val epoch = AtomicLong()
 
     @Volatile private var enabled = false
@@ -79,16 +82,17 @@ internal class DictationDiagnosticRecorder(
     @Synchronized
     fun record(event: String) {
         if (!enabled) return
-        val fields =
-            DictationDiagnosticSchema.fields(event) ?: run {
+        val parsed =
+            DictationDiagnosticSchema.parse(event) ?: run {
                 dropped.incrementAndGet()
                 return
             }
+        filtered.addAndGet(parsed.filteredFields)
         val capturedEpoch = epoch.get()
         runCatching {
             executor.execute {
                 if (enabled && epoch.get() == capturedEpoch) {
-                    runCatching { store.append(fields) }.onFailure { dropped.incrementAndGet() }
+                    runCatching { store.append(parsed.fields) }.onFailure { dropped.incrementAndGet() }
                 }
             }
         }.onFailure { dropped.incrementAndGet() }
@@ -97,21 +101,32 @@ internal class DictationDiagnosticRecorder(
     fun snapshot(): Map<String, ByteArray> =
         try {
             executor
-                .submit<Map<String, ByteArray>> { store.snapshot(enabled, dropped.get()) }
+                .submit<Map<String, ByteArray>> { store.snapshot(enabled, dropped.get(), filtered.get()) }
                 .get(barrierTimeoutSeconds, TimeUnit.SECONDS)
         } catch (_: RejectedExecutionException) {
-            store.unavailableSnapshot(enabled, dropped.get(), "queue_full")
+            store.unavailableSnapshot(enabled, dropped.get(), "queue_full", filtered.get())
         } catch (_: TimeoutException) {
-            store.unavailableSnapshot(enabled, dropped.get(), "barrier_timeout")
+            store.unavailableSnapshot(enabled, dropped.get(), "barrier_timeout", filtered.get())
+        } catch (failure: ExecutionException) {
+            if (failure.cause is CancellationException) throw requireNotNull(failure.cause)
+            store.unavailableSnapshot(enabled, dropped.get(), "store_failed", filtered.get())
+        } catch (failure: InterruptedException) {
+            Thread.currentThread().interrupt()
+            throw failure
         }
 
     fun clear(): Boolean {
         val clearing =
             synchronized(this) {
                 epoch.incrementAndGet()
-                executor.submit<Boolean> { store.clear() }
+                executor.submit<Boolean> {
+                    val removed = store.clear()
+                    dropped.set(0)
+                    filtered.set(0)
+                    removed
+                }
             }
-        return clearing.get(DIAGNOSTIC_BARRIER_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        return clearing.get(barrierTimeoutSeconds, TimeUnit.SECONDS)
     }
 
     override fun close() {
