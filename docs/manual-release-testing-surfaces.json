@@ -3056,7 +3056,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
         "anchor": "val submitMessage: () -> Unit = {",
         "test_ids": [
-          "CON-001",
+          "CON-007",
+          "CON-009",
           "DIC-002"
         ]
       },
