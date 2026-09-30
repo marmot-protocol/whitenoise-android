@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="poll_custom_time">Tempo personalizado</string>
+    <string name="poll_custom_duration">Duração</string>
+    <string name="poll_unit_seconds">Segundos</string>
+    <string name="poll_unit_minutes">Minutos</string>
+    <string name="poll_unit_hours">Horas</string>
+    <string name="poll_unit_days">Dias</string>
+    <string name="poll_custom_duration_error">Introduza um número inteiro entre 1 segundo e 30 dias.</string>
+    <string name="poll_custom_preview">A enquete termina %1$s após a publicação.</string>
+    <string name="poll_cancel_custom_time">Usar o prazo anterior</string>
     <string name="app_name">White Noise</string>
     <string name="poll_preview">Enquete</string>
     <string name="poll_unsupported">Não é possível exibir esta enquete</string>
