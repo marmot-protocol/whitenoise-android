@@ -2,8 +2,6 @@ package dev.ipf.whitenoise.android.core
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
-import dev.ipf.marmotkit.ConversationPresentationFfi
-import dev.ipf.marmotkit.PresentationTextFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
@@ -253,56 +251,3 @@ internal fun applyChatListSearchAndFilter(
         bodyMatchGroupIds = bodyMatchGroupIds,
         folderChatIds = folderChatIds,
     ).orderedItems()
-
-/**
- * Display title shown for a chat-list row. Shared between `ChatRow` (the
- * visible label) and `applyChatListSearchAndFilter` (the searchable
- * label) so a typed query always matches what the user sees on screen.
- *
- * For NAMED groups (`group.name` non-blank) we honour whatever the
- * projection's title field carries — it's a localized rendering of the
- * group name and may differ from the raw `group.name`. Either way the
- * value is peer-supplied, so it renders via
- * [ChatListItem.sanitizedNamedTitle] (ProfileSanitizer.displayName:
- * strip bidi/zero-width spoofing chars, NFKC-fold, cap length — #980),
- * never the raw string; a name that sanitization strips entirely falls
- * through to the unnamed projection below.
- *
- * For UNNAMED groups we deliberately ignore `projectedTitle`: the
- * upstream projection emits the group id hex there when no name is set,
- * and using it would leak hex into the UI. Instead we route through
- * `GroupProjector.displayTitle`, which falls back to (in order)
- * inviter-welcomer copy for pending invites, the other member's title
- * for two-member groups, the "Group of N people" copy for ≥3-member
- * groups, and finally a short hex if no member data has resolved yet.
- * The local fallback then live-updates once `ChatsController` populates
- * the member cache from the `groupMembers` FFI.
- */
-internal fun chatListItemDisplayTitle(
-    item: ChatListItem,
-    appState: WhiteNoiseAppState,
-    copy: GroupTitleCopy,
-): String =
-    selectedChatPresentationTitle(item.selectedPresentation, copy)
-        ?: item.sanitizedNamedTitle
-        ?: GroupProjector.displayTitle(
-            group = item.group,
-            otherMemberAccount = item.presentationOtherMemberAccount,
-            memberCount = item.presentationMemberCount,
-            memberTitle = { appState.chatMemberTitle(it) },
-            copy = copy,
-            conversationKind = item.projection?.conversationKind,
-            soleSelfMember = item.presentationActiveAccountIsSoleMember,
-        )
-
-/** Localizes and sanitizes MDK's typed selected title without re-resolving identity. */
-internal fun selectedChatPresentationTitle(
-    presentation: ConversationPresentationFfi?,
-    copy: GroupTitleCopy,
-): String? =
-    when (val selected = presentation?.title) {
-        is PresentationTextFfi.Literal -> ProfileSanitizer.displayName(selected.text)
-        is PresentationTextFfi.UnnamedGroup -> copy.unnamedGroupTitle
-        PresentationTextFfi.UnavailableConversation -> copy.unavailableConversationTitle
-        null -> null
-    }
