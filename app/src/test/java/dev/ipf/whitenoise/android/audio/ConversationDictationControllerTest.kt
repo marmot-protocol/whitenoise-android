@@ -2557,14 +2557,7 @@ class ConversationDictationControllerTest {
 
             fixture.controller.retry()
             assertTrue(fixture.controller.state is ConversationDictationState.Starting)
-            if (
-                failureCallback == ConversationDictationFailure.ProviderDisconnected ||
-                failureCallback == ConversationDictationFailure.RecognizerBusy
-            ) {
-                fixture.scheduler.runDelay(500L)
-            } else {
-                fixture.scheduler.runDelay(500L)
-            }
+            fixture.scheduler.runDelay(500L)
             fixture.platform.pendingCallerAudio = false
             fixture.platform.listener.onResult("recovered tail")
             assertEquals("first recovered tail", fixture.drafts.getValue(key()).text)

@@ -1705,7 +1705,8 @@ internal class ConversationDictationController internal constructor(
                     if (recognized.isBlank()) {
                         val confirmedSilentCallerAudio = acknowledgeFullyFedSilentCallerAudio()
                         val retainedCallerAudio =
-                            !confirmedSilentCallerAudio && recognitionSession?.retryCallerAudioWithFollowingAudio() == true
+                            !confirmedSilentCallerAudio &&
+                                recognitionSession?.retryCallerAudioWithFollowingAudio() == true
                         clearRecognitionGeneration(cancel = false)
                         when {
                             finishRequested && confirmedSilentCallerAudio ->
@@ -2021,7 +2022,9 @@ internal class ConversationDictationController internal constructor(
         clearRecognitionGeneration(cancel = false)
         finishRequested = true
         val platformOwnsClosure =
-            runCatching { platform.finishCallerAudioCapture { finishPlaybackInterruption(sessionId) } }.getOrDefault(false)
+            runCatching {
+                platform.finishCallerAudioCapture { finishPlaybackInterruption(sessionId) }
+            }.getOrDefault(false)
         if (!platformOwnsClosure) finishPlaybackInterruption(sessionId)
         state =
             ConversationDictationState.Failed(
