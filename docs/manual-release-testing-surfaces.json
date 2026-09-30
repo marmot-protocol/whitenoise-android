@@ -27738,6 +27738,38 @@
           "END-003",
           "END-004"
         ]
+      },
+      {
+        "surface": "R.string.checking_invitation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "R.string.checking_invitation",
+        "test_ids": [
+          "GRP-011"
+        ]
+      },
+      {
+        "surface": "R.string.checking_invitation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+        "anchor": "R.string.checking_invitation",
+        "test_ids": [
+          "GRP-011"
+        ]
+      },
+      {
+        "surface": "R.string.couldnt_check_invitation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+        "anchor": "R.string.couldnt_check_invitation",
+        "test_ids": [
+          "GRP-011"
+        ]
+      },
+      {
+        "surface": "R.string.retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "GRP-011"
+        ]
       }
     ]
   },
