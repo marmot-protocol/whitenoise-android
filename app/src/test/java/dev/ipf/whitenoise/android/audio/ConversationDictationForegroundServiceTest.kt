@@ -371,6 +371,55 @@ class ConversationDictationForegroundServiceTest {
         }
     }
 
+    /** A delayed initial foreground post also precedes restoration when completion comes from the app. */
+    @Test
+    fun connectionRestorationFollowsDelayedInitialControlsPost() {
+        val harness = installHost()
+        val lifecycle = Robolectric.buildService(ConversationDictationForegroundService::class.java).create()
+        val service = lifecycle.get()
+        val manager = service.getSystemService(NotificationManager::class.java)
+        BackgroundConnectionNotification.markForegroundActive(service) { notification ->
+            Handler(Looper.getMainLooper()).post {
+                manager.notify(BackgroundConnectionNotification.NOTIFICATION_ID, notification)
+            }
+        }
+        ConversationDictationForegroundService.foregroundPromoter = { owner, notification ->
+            defaultForegroundPromoter(owner, notification)
+            Handler(Looper.getMainLooper()).post {
+                manager.notify(BackgroundConnectionNotification.NOTIFICATION_ID, notification)
+            }
+        }
+
+        service.onStartCommand(startIntent(service, harness), 0, 1)
+        harness.conversationDictation.cancel()
+        shadowOf(Looper.getMainLooper()).idle()
+
+        val notification = manager.activeNotifications.single().notification
+        assertEquals(
+            "White Noise is connected",
+            notification.extras.getCharSequence(Notification.EXTRA_TITLE).toString(),
+        )
+        assertNull(notification.contentView)
+        lifecycle.destroy()
+        shadowOf(Looper.getMainLooper()).idle()
+    }
+
+    /** Destruction of an old connection service cannot withdraw a replacement's restoration callback. */
+    @Test
+    fun oldConnectionOwnerCannotClearReplacementRestoration() {
+        val context = RuntimeEnvironment.getApplication()
+        val oldOwner = Any()
+        val replacementOwner = Any()
+        var restored = false
+        BackgroundConnectionNotification.markForegroundActive(oldOwner) {}
+        BackgroundConnectionNotification.markForegroundActive(replacementOwner) { restored = true }
+
+        BackgroundConnectionNotification.markForegroundStopped(oldOwner)
+
+        assertTrue(BackgroundConnectionNotification.restoreIfForeground(context))
+        assertTrue(restored)
+    }
+
     private fun assertExplicitNotificationDestinations(
         service: ConversationDictationForegroundService,
         notification: Notification,

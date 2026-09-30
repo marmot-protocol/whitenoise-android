@@ -94,7 +94,11 @@ class NotificationStreamForegroundService : Service() {
         if (syncNativePushRegistration) pendingNativePushRegistrationSync = true
         val recordPendingPushWakeCatchUp = shouldRecordPendingPushWakeCatchUp(trigger, startedForeground)
         if (startedForeground) {
-            BackgroundConnectionNotification.markForegroundActive()
+            BackgroundConnectionNotification.markForegroundActive(this) { notification ->
+                // Restore through the same ActivityManager queue as a dictation foreground
+                // post, so an older captured controls notification cannot arrive afterward.
+                startForeground(NOTIFICATION_ID, notification, foregroundServiceTypeForTrigger(trigger))
+            }
             application.notifyCapabilityFallbackStarted(readyCapabilityFallbacks)
         } else {
             application.notifyCapabilityFallbackUnavailable(
@@ -343,7 +347,7 @@ class NotificationStreamForegroundService : Service() {
     }
 
     override fun onDestroy() {
-        BackgroundConnectionNotification.markForegroundStopped()
+        BackgroundConnectionNotification.markForegroundStopped(this)
         application.notifyCapabilityFallbackUnavailable(capabilityFallbackRequests.onRuntimeUnavailable())
         (application as? WhiteNoiseApplication)
             ?.initializedAppState()
@@ -617,19 +621,37 @@ internal object BackgroundConnectionNotification {
     @Volatile
     private var foregroundActive = false
 
-    fun markForegroundActive() {
+    private var foregroundOwner: Any? = null
+    private var foregroundRestorer: ((Notification) -> Unit)? = null
+
+    fun markForegroundActive(
+        owner: Any? = null,
+        restoreNotification: ((Notification) -> Unit)? = null,
+    ) {
+        foregroundOwner = owner
+        foregroundRestorer = restoreNotification
         foregroundActive = true
     }
 
-    fun markForegroundStopped() {
+    fun markForegroundStopped(owner: Any? = null) {
+        if (owner != null && foregroundOwner !== owner) return
         foregroundActive = false
+        foregroundOwner = null
+        foregroundRestorer = null
     }
 
     /** Restores the shared ID only while a connection foreground service owns it. */
     fun restoreIfForeground(context: Context): Boolean {
         val manager = context.getSystemService(NotificationManager::class.java)
         if (foregroundActive && manager != null) {
-            manager.notify(NOTIFICATION_ID, build(context))
+            val notification = build(context)
+            val restore = foregroundRestorer
+            if (restore != null) {
+                runCatching { restore(notification) }
+                    .onFailure { manager.notify(NOTIFICATION_ID, notification) }
+            } else {
+                manager.notify(NOTIFICATION_ID, notification)
+            }
             return true
         }
         return false
