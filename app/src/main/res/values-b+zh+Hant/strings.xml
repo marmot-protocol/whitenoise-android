@@ -1202,6 +1202,9 @@
     <string name="chat_folder_description_label">描述</string>
     <string name="chat_folder_keyword_label">關鍵字</string>
     <string name="chat_folder_unread_only">僅未讀</string>
+    <string name="chat_folder_unread_mentions_only">僅未讀提及</string>
+    <string name="chat_folder_direct_chats_only">僅私聊</string>
+    <string name="chat_folder_pinned_only">僅置頂聊天</string>
     <string name="chat_folder_include_muted">包含已靜音的聊天</string>
     <string name="chat_folder_groups_only">僅群組</string>
     <string name="chat_folder_archived_only">僅已封存</string>
@@ -1219,7 +1222,7 @@
     <string name="folder_manual_hint">你在此新增的聊天會一直包含在內，即使它們不符合自動規則。</string>
     <string name="folder_rules">自動規則</string>
     <string name="folder_keyword_hint">符合聊天標題或群組說明。包含任一所選人員的聊天也會符合。</string>
-    <string name="folder_rule_hint">聊天只要符合任一選取的人員或關鍵字規則就會配對。類別選項會進一步縮小配對範圍。你移除的聊天若仍然符合規則，就會再次出現。</string>
+    <string name="folder_rule_hint">聊天必須符合任一選取的人員或關鍵字規則，並符合所有選取的類別。未選取人員或關鍵字時，類別可單獨生效。你移除的聊天若仍然符合規則，就會再次出現。</string>
     <string name="folder_preview">預覽</string>
     <string name="folder_discard_title">捨棄變更？</string>
     <string name="folder_discard_detail">你的資料夾變更尚未儲存。</string>
