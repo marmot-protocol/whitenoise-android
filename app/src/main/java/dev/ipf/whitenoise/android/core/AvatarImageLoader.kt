@@ -180,8 +180,8 @@ object AvatarImageLoader {
         }
     }
 
-    /** Shares one bounded fetch and rejects cache publication after an account-scoped clear. */
-    @Suppress("LongMethod", "LongParameterList") // Request deduplication and generation-safe completion form one atomic lifecycle.
+    /** Shares one bounded fetch, with request deduplication and generation-safe completion in one lifecycle. */
+    @Suppress("LongMethod", "LongParameterList")
     private suspend fun load(
         request: ProfileImageRequest,
         expectedGeneration: Long?,

@@ -31,20 +31,11 @@ internal fun rememberGroupAvatarPresentation(
     fallbackPictureUrl: String? = null,
     firstFrameAvatar: ChatListAvatarSeed? = null,
 ): GroupAvatarPresentation {
-    val ownedSeed =
-        firstFrameAvatar?.takeIf {
-            val currentOwner = it.accountRef == null || it.accountRef == accountRef
-            val currentLifetime =
-                it.cacheLifetime == null || it.cacheLifetime == AvatarImageLoader.currentCacheLifetime()
-            currentOwner && currentLifetime
-        }
+    val ownedSeed = firstFrameAvatar?.takeIf { it.matchesAvatarPresentationOwner(accountRef) }
     val durableImage = rememberDurableAvatar(appState, durableAvatar, accountRef)
     if (durableAvatar != null) {
         val durableKey = accountRef?.let { durableAvatar.takeIf { it.isRenderable() }?.cacheKey(it) }
-        val seededImage =
-            ownedSeed
-                ?.takeIf { it.source == ChatListAvatarSource.DURABLE && it.key == durableKey }
-                ?.image
+        val seededImage = ownedSeed?.durableImageFor(durableKey)
         // Missing/invalidated assets must not revive a legacy bitmap or launch a second acquisition.
         return GroupAvatarPresentation(durableImage ?: seededImage, null)
     }
@@ -75,6 +66,17 @@ internal fun rememberGroupAvatarPresentation(
         pictureUrl = legacyUrl ?: fallbackPictureUrl?.takeIf { encryptedImage == null },
     )
 }
+
+/** The public-URL compatibility seed may be unscoped; retained private seeds may not be retired. */
+private fun ChatListAvatarSeed.matchesAvatarPresentationOwner(accountRef: String?): Boolean {
+    val currentOwner = this.accountRef == null || this.accountRef == accountRef
+    val currentLifetime = cacheLifetime == null || cacheLifetime == AvatarImageLoader.currentCacheLifetime()
+    return currentOwner && currentLifetime
+}
+
+/** A selected native identity may only reuse the exact durable presentation seed. */
+private fun ChatListAvatarSeed.durableImageFor(assetKey: String?): ImageBitmap? =
+    image.takeIf { source == ChatListAvatarSource.DURABLE && key == assetKey }
 
 /** The row's selected asset already includes MDK's group/peer selection and membership checks. */
 @Composable

@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.ImageBitmap
@@ -89,6 +90,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.ErrorCollector
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -107,6 +109,8 @@ import kotlin.coroutines.startCoroutine
 @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
 class GroupAvatarLocalAssetScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
+
+    @get:Rule val screenshotErrors = ErrorCollector()
 
     /** Clears process-only pixels and test adapters, never a populated app database. */
     @Before
@@ -154,9 +158,12 @@ class GroupAvatarLocalAssetScreenshotTest {
                     composeRule.onNodeWithText(context.getString(R.string.change_photo)).assertExists()
                 }
                 val kind = if (encrypted) "encrypted" else "public"
-                composeRule.onRoot().captureRoboImage(
-                    "src/test/snapshots/group_stored_avatar_${kind}_surface_$index.png",
-                )
+                // Collect screenshot failures so every route is exercised, but still fail the test at completion.
+                screenshotErrors.checkSucceeds {
+                    composeRule.onRoot().captureRoboImage(
+                        "src/test/snapshots/group_stored_avatar_${kind}_surface_$index.png",
+                    )
+                }
             }
             captureStoredPictureViewer(if (encrypted) "encrypted" else "public")
             assertEquals(0, urlFetches.get())
@@ -194,7 +201,9 @@ class GroupAvatarLocalAssetScreenshotTest {
         composeRule.waitForIdle()
         val dialog = composeRule.onNode(isDialog())
         assertBlueAvatarPixels(dialog)
-        dialog.captureRoboImage("src/test/snapshots/group_stored_avatar_${kind}_viewer.png")
+        screenshotErrors.checkSucceeds {
+            dialog.captureRoboImage("src/test/snapshots/group_stored_avatar_${kind}_viewer.png")
+        }
     }
 
     /** Header hydration/name lag must retain the current row asset, but an image-identity mismatch cannot. */
@@ -472,6 +481,7 @@ class GroupAvatarLocalAssetScreenshotTest {
             Text("refreshing")
         }
         composeRule.waitForIdle()
+        awaitLocal { fixture.requests.get() == 1 }
         assertTrue(frames.isNotEmpty())
         frames.forEach { assertSame(cached, it) }
         assertEquals(0, fixture.reads.get())
@@ -709,10 +719,10 @@ private fun productionSurfaceFixture(
         }
     val chats =
         ChatsController(
-            fixture.state,
-            initialAccountRef = ACCOUNT_REF,
-            memberSnapshotLoader = { _, _ -> emptyList() },
-        )
+                fixture.state,
+                initialAccountRef = ACCOUNT_REF,
+                memberSnapshotLoader = { _, _ -> emptyList() },
+            )
     chats.applyChatListRow(
         notificationChatListRow().copy(groupIdHex = GROUP_ID, groupName = record.name, avatarUrl = record.avatarUrl),
     )
@@ -761,7 +771,7 @@ private fun ProductionAvatarSurface(
                 onClearSearch = {},
                 onCloseSearch = {},
                 onSearchAction = {},
-                searchFocusRequester = FocusRequester(),
+                searchFocusRequester = remember { FocusRequester() },
                 appState = state,
                 controller = controller,
                 groupTitleCopy = GroupTitleCopy.Default,
