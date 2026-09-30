@@ -196,6 +196,67 @@ class NativePushFallbackIntentIntegrationTest {
             }
         }
 
+    /** Explicit Local selection waits for service acknowledgement before writing native delivery off. */
+    @Test
+    fun localSelectionDisablesNativeOnlyAfterAcknowledgedServiceOwner() =
+        runBlocking {
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val fixture = fixture(platform = platform)
+            var transition: Job? = null
+            try {
+                fixture.bootstrap()
+                fixture.replaceNotificationSettings(notificationSettings())
+                val transitionResult =
+                    async {
+                        fixture.appState.setNotificationDeliveryMode(NotificationDeliveryMode.Local)
+                    }
+                transition = transitionResult
+                fixture.runWithMainLooperPumping {
+                    withTimeout(2_000L) {
+                        while (platform.starts.isEmpty()) yield()
+                    }
+                }
+                assertTrue(fixture.nativePushSettingWrites.isEmpty())
+
+                val acknowledgement =
+                    fixture.beginNativePushFallbackRuntimeAcknowledgement(platform.starts.single())
+                        ?: error("local delivery acknowledgement was not accepted")
+                fixture.runWithMainLooperPumping {
+                    assertTrue(transitionResult.await())
+                    acknowledgement.join()
+                }
+
+                assertEquals(listOf(ACCOUNT to false), fixture.nativePushSettingWrites)
+                assertTrue(fixture.appState.backgroundConnectionEnabled)
+                assertFalse(fixture.notificationSettings(ACCOUNT).nativePushEnabled)
+            } finally {
+                closeFixtureAfterJobs(fixture, transition)
+            }
+        }
+
+    /** A rejected service request leaves the previously enabled native path untouched. */
+    @Test
+    fun rejectedLocalSelectionKeepsNativeDeliveryEnabled() =
+        runBlocking {
+            val platform =
+                RecordingNativePushFallbackPlatform(
+                    context = context,
+                    startResults = ArrayDeque(listOf(false)),
+                )
+            val fixture = fixture(platform = platform)
+            try {
+                fixture.bootstrap()
+                fixture.replaceNotificationSettings(notificationSettings())
+
+                assertFalse(fixture.appState.setNotificationDeliveryMode(NotificationDeliveryMode.Local))
+
+                assertTrue(fixture.nativePushSettingWrites.isEmpty())
+                assertTrue(fixture.notificationSettings(ACCOUNT).nativePushEnabled)
+            } finally {
+                closeFixtureAfterJobs(fixture)
+            }
+        }
+
     /** A known background requirement establishes fallback even when the active settings read fails. */
     @Test
     fun activeSettingsFailureStillStartsTheBackgroundAccountsFallback() =

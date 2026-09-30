@@ -36,7 +36,7 @@ class EmojiDataLoadTest {
                 sampleEmojiJson
             }
 
-        assertEquals(listOf("😀"), second.map { it.emoji })
+        assertEquals(listOf("😀", ":marmot:", ":wn:"), second.map { it.emoji })
         assertEquals(2, reads)
     }
 
@@ -55,7 +55,7 @@ class EmojiDataLoadTest {
                 error("successful emoji parse should be served from cache")
             }
 
-        assertEquals(listOf("😀"), first.map { it.emoji })
+        assertEquals(listOf("😀", ":marmot:", ":wn:"), first.map { it.emoji })
         assertEquals(first, second)
         assertEquals(1, reads)
     }
@@ -75,9 +75,21 @@ class EmojiDataLoadTest {
                 error("successful empty emoji parse should be served from cache")
             }
 
-        assertTrue(first.isEmpty())
+        assertEquals(listOf(":marmot:", ":wn:"), first.map { it.emoji })
         assertEquals(first, second)
         assertEquals(1, reads)
+    }
+
+    @Test
+    fun builtinsAreSearchableByNameShortcodeAndBrandWithoutChangingPayload() {
+        val entries = EmojiData.load { sampleEmojiJson }
+        for (query in listOf("marmot", ":marmot:")) {
+            assertEquals(listOf(":marmot:"), EmojiData.search(entries, query).map { it.emoji })
+        }
+        for (query in listOf("wn", ":wn:", "white noise", "whitenoise")) {
+            assertEquals(listOf(":wn:"), EmojiData.search(entries, query).map { it.emoji })
+        }
+        assertTrue(EmojiData.search(entries, ":unknown:").isEmpty())
     }
 
     private fun resetEmojiCache() {

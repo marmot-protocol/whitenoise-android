@@ -66,6 +66,7 @@ class TimelineRecordProfileSendersTest {
         mediaJson = null,
         media = emptyList(),
         agentTextStreamJson = null,
+        poll = null,
         groupSystem = null,
         reactions =
             TimelineReactionSummaryFfi(

@@ -1,11 +1,14 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
@@ -103,6 +106,31 @@ class FocusedMessagePreviewTest {
         assertEquals(5, layout.lineCount)
         assertTrue(layout.isLineEllipsized(4))
         assertEquals(source, layout.layoutInput.text.text)
+    }
+
+    @Test fun textPreviewCompactsAtExactTwoHundredDpBoundary() {
+        composeRule.setContent {
+            WhiteNoiseTheme(fontScale = 2f) {
+                Box(Modifier.width(260.dp).height(200.dp)) {
+                    FocusedTextMessagePreview(
+                        presentation = messageBubblePresentation(deleted = false, mine = false),
+                        mine = false,
+                        text = "A long target message. ".repeat(20),
+                        document = null,
+                        time = "12:34",
+                        status = MessageStatus.Received,
+                        showStatus = false,
+                        reply = { Text("Quoted reply") },
+                    )
+                }
+            }
+        }
+        val results = mutableListOf<TextLayoutResult>()
+        composeRule
+            .onNodeWithTag("message-actions-excerpt")
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(results) }
+        assertEquals(1, results.single().lineCount)
+        composeRule.onNodeWithText("Quoted reply").assertDoesNotExist()
     }
 
     /**

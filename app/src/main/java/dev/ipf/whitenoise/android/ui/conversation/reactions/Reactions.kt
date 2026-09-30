@@ -29,12 +29,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.ReactionParticipant
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.design.BottomAnchoredPopupPositionProvider
@@ -183,7 +185,12 @@ private fun ReactionFilterChips(
             FilterChip(
                 selected = selectedEmoji == emoji,
                 onClick = { onSelectedEmoji(emoji) },
-                label = { Text("$emoji $count") },
+                label = {
+                    Text(
+                        text = EmojiShortcodes.annotate(AnnotatedString("$emoji $count")),
+                        inlineContent = EmojiShortcodes.content(),
+                    )
+                },
             )
         }
     }
@@ -227,7 +234,11 @@ private fun ReactionParticipantRow(
         )
     }
     val trailing: @Composable () -> Unit = {
-        Text(text = participant.emoji, style = MaterialTheme.typography.headlineSmall)
+        Text(
+            text = EmojiShortcodes.annotate(AnnotatedString(participant.emoji)),
+            inlineContent = EmojiShortcodes.content(),
+            style = MaterialTheme.typography.headlineSmall,
+        )
     }
     val colors = ListItemDefaults.colors(containerColor = Color.Transparent)
     if (mine && onRemove != null) {

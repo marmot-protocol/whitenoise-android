@@ -4,8 +4,6 @@ package dev.ipf.whitenoise.android.core.nostr
 object Bip340ComparisonBridge {
     fun legacySignature(): Boolean = LegacyBip340BenchmarkVerifier.verify(PUBLIC_KEY, MESSAGE, SIGNATURE)
 
-    fun replacementSignature(): Boolean = BIP340.verify(PUBLIC_KEY, MESSAGE, SIGNATURE)
-
     fun legacyFullEvent(): Boolean = legacyVerifies(SIGNED_EVENT)
 
     fun replacementFullEvent(): Boolean = NostrEventVerifier.verifies(SIGNED_EVENT)
@@ -17,11 +15,24 @@ object Bip340ComparisonBridge {
             INVALID_SIGNATURE,
         )
 
-    fun replacementRejectsInvalidSignature(): Boolean = !BIP340.verify(PUBLIC_KEY, MESSAGE, INVALID_SIGNATURE)
-
     fun legacyRejectsMutatedEvent(): Boolean = !legacyVerifies(SIGNED_EVENT.copy(content = "mutated"))
 
     fun replacementRejectsMutatedEvent(): Boolean = !NostrEventVerifier.verifies(SIGNED_EVENT.copy(content = "mutated"))
+
+    fun replacementRejectsForgedEvent(): Boolean {
+        val forged = SIGNED_EVENT.copy(content = "mutated")
+        return !NostrEventVerifier.verifies(forged.copy(id = forged.computedIdHex()))
+    }
+
+    fun replacementRejectsMutations(): Boolean =
+        listOf(
+            SIGNED_EVENT.copy(id = "0".repeat(64)),
+            SIGNED_EVENT.copy(pubkey = "0".repeat(64)),
+            SIGNED_EVENT.copy(sig = "0".repeat(128)),
+            SIGNED_EVENT.copy(createdAt = SIGNED_EVENT.createdAt + 1),
+            SIGNED_EVENT.copy(kind = SIGNED_EVENT.kind + 1),
+            SIGNED_EVENT.copy(tags = SIGNED_EVENT.tags + listOf(listOf("extra", "value"))),
+        ).all { !NostrEventVerifier.verifies(it) }
 
     private fun legacyVerifies(event: NostrEvent): Boolean {
         val message = event.computedIdHex()

@@ -52,6 +52,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -242,6 +243,7 @@ private val FocusedReactionStateLayerSize = 40.dp
 private val FocusedReactionSelectedFillSize = 36.dp
 private val FocusedReactionEmojiSize = 28.dp
 private val FocusedMoreIconSize = 24.dp
+internal const val FOCUSED_ACTION_MENU_SCROLL_TEST_TAG = "focused-action-menu-scroll"
 
 /** Prototype reaction rail, inert real-message preview and grouped command menu; preserves the host IME. */
 @Composable
@@ -291,6 +293,9 @@ internal fun FocusedMessageActions(
             // The lifted bubble reports a window coordinate; the frame below starts under the top
             // inset. The stack would rest a status bar too low without converting between them.
             val topInsetPx = WindowInsets.safeDrawing.getTop(LocalDensity.current)
+            // The rail, inter-item gaps and a tappable scroll viewport need roughly 200dp.
+            // On an ordinary full-height frame, the preview keeps its original footprint.
+            val previewHeightLimit = (maxHeight - 200.dp).coerceAtLeast(48.dp)
             var stackHeightPx by remember { mutableIntStateOf(0) }
             var previewCenterInStackPx by remember { mutableStateOf<Int?>(null) }
             val travel =
@@ -316,7 +321,6 @@ internal fun FocusedMessageActions(
                         // Children consume their own taps first, so a tap that reaches the column
                         // landed on empty stack space or its padding and dismisses like the scrim.
                         .pointerInput(Unit) { detectTapGestures { currentOnDismiss() } }
-                        .verticalScroll(rememberScrollState())
                         .padding(horizontal = 16.dp, vertical = FocusedOverlayShadowSafeInset)
                         .semantics {
                             paneTitle = title
@@ -345,6 +349,11 @@ internal fun FocusedMessageActions(
                             Modifier
                                 // The tag precedes clearAndSetSemantics, which wipes semantics set after it.
                                 .testTag("message-actions-preview")
+                                // A five-line text excerpt with a reply/footer can be as tall as
+                                // media at large font sizes. Bound either preview so the action
+                                // scroller retains a tappable viewport above the keyboard.
+                                .heightIn(max = previewHeightLimit)
+                                .clipToBounds()
                                 // Where the lifted message sits inside the stack is what the stack is
                                 // placed by, so the message lands on the bubble it was lifted from.
                                 .onPlaced {
@@ -375,7 +384,18 @@ internal fun FocusedMessageActions(
                                 },
                     ) { preview() }
                 }
-                FocusedActionMenu(actions)
+                // When the IME shortens the safe frame, only the actions overflow. Scrolling the
+                // whole stack would move the lifted message and reactions out of sight, even though
+                // the user is still choosing an action for that message.
+                Box(
+                    modifier =
+                        Modifier
+                            .weight(1f, fill = false)
+                            .verticalScroll(rememberScrollState())
+                            .testTag(FOCUSED_ACTION_MENU_SCROLL_TEST_TAG),
+                ) {
+                    FocusedActionMenu(actions)
+                }
             }
         }
     }

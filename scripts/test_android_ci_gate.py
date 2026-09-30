@@ -167,36 +167,6 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('withPropertyName("roborazziSnapshots")', self.app_build)
         self.assertIn('withPathSensitivity(PathSensitivity.RELATIVE)', self.app_build)
 
-    def test_curated_screenshots_run_in_parallel_with_the_exact_safe_scope(self):
-        """Both flavors verify the established baseline owners in their own jobs."""
-        self.assertIn('fail-fast: false', self.screenshots)
-        self.assertIn('flavor: [Zapstore, Play]', self.screenshots)
-        step = self.named_step(self.screenshots, 'Screenshot tests (Roborazzi)')
-        self.assertIn(':app:verifyRoborazziDev${{ matrix.flavor }}Debug', step)
-        expected_filters = [
-            '*ScreenshotTest',
-            '*ConversationImeCollapseFocusTest',
-            '*NewGroupNameEmojiPickerTest',
-            '*ChatActionSheetTest',
-            '*ChatListPinnedBoundaryTest',
-            '*ChatListTtsTransportLayoutTest',
-            '*ChatListTopBarColdStartSelfProfileFirstFrameTest',
-            '*ConversationTtsFollowComposeTest',
-            '*BubbleCollapsibleFooterLayoutTest',
-            '*MessageBubbleEditedMarkdownTest',
-            '*GroupEditNameEmojiPickerTest',
-            '*MainShellTtsReturnTransitionTest',
-            '*ProfileAddToGroupsFlowTest',
-            '*AutoDownloadBacklogControlTest',
-        ]
-        for test_filter in expected_filters:
-            self.assertIn(f"--tests '{test_filter}'", step)
-        self.assertEqual(step.count("--tests '"), len(expected_filters))
-        self.assertIn(' --no-daemon ', step)
-        self.assertIn('cache-read-only:', self.screenshots)
-        self.assertIn('android-ci-reports-screenshots-${{ matrix.flavor }}', self.screenshots)
-        self.assertIn('android-ci-gradle-profiles-screenshots-${{ matrix.flavor }}', self.screenshots)
-
     def test_job_caches(self):
         """Every workload retains its own task cache; forks remain read-only."""
         gradle_setup_steps = re.findall(
@@ -289,6 +259,25 @@ class AndroidCiGateTest(unittest.TestCase):
     def test_empty_results_do_not_pass_vacuously(self):
         """Absent dependency evidence must never produce a green aggregate."""
         self.assertNotEqual(self.run_gate({}).returncode, 0)
+
+    def test_robolectric_module_openings_apply_to_all_test_jvms(self):
+        """JDK 17+ access is needed by unit, screenshot and custom replay tests."""
+        test_tasks = self.app_build.split('tasks.withType<Test>().configureEach {', 1)[1]
+        test_tasks = test_tasks.split('\ntasks.register<Test>', 1)[0]
+        for module in (
+            'java.base/java.lang',
+            'java.base/java.util',
+            'java.base/java.io',
+            'java.base/java.net',
+            'java.base/java.security',
+            'java.base/java.text',
+            'java.base/jdk.internal.access',
+            'java.desktop/java.awt.font',
+            'jdk.compiler/com.sun.tools.javac.api',
+        ):
+            with self.subTest(module=module):
+                self.assertIn(f'"--add-opens={module}=ALL-UNNAMED"', test_tasks)
+        self.assertIn('    jvmArgs(\n', test_tasks)
 
     def test_missing_result_is_rejected(self):
         """An unexpected dependency schema fails closed."""

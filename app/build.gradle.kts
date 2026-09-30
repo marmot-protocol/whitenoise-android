@@ -141,8 +141,8 @@ fun runtimeConfigProperty(
 
 fun String.asBuildConfigString(): String = "\"" + replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
-// Endpoints and Goggles credentials are shared; OTLP tokens and push identities
-// are flavor-specific. Preview deliberately receives none of these inputs.
+// Release metrics and v5 audit credentials are shared. Development may use its
+// own metrics token; push identities stay flavor-specific. Preview receives none.
 fun environmentRuntimeConfigProperty(
     environment: String,
     suffix: String,
@@ -263,6 +263,10 @@ val productionPushRelayHint =
 // base-branch-only workflow; Gradle never receives the preview signing key.
 val prNumber: String? = System.getenv("PR_NUMBER")?.takeIf { it.isNotBlank() }
 val prPreviewChannel: String? = System.getenv("PR_PREVIEW_CHANNEL")?.takeIf { it.isNotBlank() }
+// The isolated preview's real-relay AndroidTest runs only on an explicit CI invocation.
+val previewE2eTestBuild = providers.gradleProperty("whitenoise.previewE2eTestBuild").map(String::toBoolean).getOrElse(false)
+val previewProviderMatrixBuild =
+    providers.gradleProperty("whitenoise.previewProviderMatrixBuild").map(String::toBoolean).getOrElse(false)
 // Android accepts an update whose versionCode equals the installed version.
 // A fixed preview-only code therefore lets a tester move between any two PR
 // builds without uninstalling and losing the preview app's data.
@@ -283,8 +287,8 @@ android {
         applicationId = "dev.ipf.whitenoise.android"
         minSdk = 30
         targetSdk = 36
-        versionCode = 19
-        versionName = "2026.9.21"
+        versionCode = 20
+        versionName = "2026.9.30"
         manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher"
         manifestPlaceholders["appRoundIcon"] = "@mipmap/ic_launcher_round"
 
@@ -350,13 +354,13 @@ android {
             )
             buildConfigField(
                 "String",
-                "WHITENOISE_AUDIT_LOG_ENDPOINT",
-                environmentRuntimeConfigProperty("dev", "AUDIT_LOG_ENDPOINT").asBuildConfigString(),
+                "WHITENOISE_AUDIT_OTLP_ENDPOINT",
+                environmentRuntimeConfigProperty("dev", "AUDIT_OTLP_ENDPOINT").asBuildConfigString(),
             )
             buildConfigField(
                 "String",
-                "WHITENOISE_AUDIT_LOG_AUTH_TOKEN",
-                environmentRuntimeConfigProperty("dev", "AUDIT_LOG_AUTH_TOKEN").asBuildConfigString(),
+                "WHITENOISE_AUDIT_OTLP_AUTH_TOKEN",
+                environmentRuntimeConfigProperty("dev", "AUDIT_OTLP_AUTH_TOKEN").asBuildConfigString(),
             )
             buildConfigField("String", "WHITENOISE_DEPLOYMENT_ENVIRONMENT", "dev".asBuildConfigString())
             buildConfigField("boolean", "ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS", "true")
@@ -389,8 +393,8 @@ android {
             buildConfigField("String", "WHITENOISE_DEEP_LINK_SCHEME", "whitenoise-preview".asBuildConfigString())
             buildConfigField("String", "WHITENOISE_OTLP_ENDPOINT", "".asBuildConfigString())
             buildConfigField("String", "WHITENOISE_OTLP_AUTH_TOKEN", "".asBuildConfigString())
-            buildConfigField("String", "WHITENOISE_AUDIT_LOG_ENDPOINT", "".asBuildConfigString())
-            buildConfigField("String", "WHITENOISE_AUDIT_LOG_AUTH_TOKEN", "".asBuildConfigString())
+            buildConfigField("String", "WHITENOISE_AUDIT_OTLP_ENDPOINT", "".asBuildConfigString())
+            buildConfigField("String", "WHITENOISE_AUDIT_OTLP_AUTH_TOKEN", "".asBuildConfigString())
             buildConfigField("String", "WHITENOISE_DEPLOYMENT_ENVIRONMENT", "preview".asBuildConfigString())
             buildConfigField("boolean", "ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS", "true")
             buildConfigField("String", "WHITENOISE_TELEMETRY_TENANT", "whitenoise-android-preview".asBuildConfigString())
@@ -431,34 +435,28 @@ android {
             buildConfigField(
                 "String",
                 "WHITENOISE_OTLP_ENDPOINT",
-                runtimeConfigProperty("WHITENOISE_OTLP_ENDPOINT").asBuildConfigString(),
+                runtimeConfigProperty("WHITENOISE_OTLP_ENDPOINT", "https://otlp.whitenoise.chat/v1/metrics")
+                    .asBuildConfigString(),
             )
             buildConfigField(
                 "String",
                 "WHITENOISE_OTLP_AUTH_TOKEN",
-                environmentRuntimeConfigProperty(
-                    environment = "production",
-                    suffix = "OTLP_AUTH_TOKEN",
-                    extraKeys = listOf("OTLP_TOKEN_WHITENOISE_ANDROID"),
-                ).asBuildConfigString(),
+                runtimeConfigProperty("WHITENOISE_OTLP_AUTH_TOKEN").asBuildConfigString(),
             )
             buildConfigField(
                 "String",
-                "WHITENOISE_AUDIT_LOG_ENDPOINT",
-                runtimeConfigProperty("WHITENOISE_AUDIT_LOG_ENDPOINT").asBuildConfigString(),
+                "WHITENOISE_AUDIT_OTLP_ENDPOINT",
+                runtimeConfigProperty("WHITENOISE_AUDIT_OTLP_ENDPOINT", "https://otlp.whitenoise.chat/v1/logs")
+                    .asBuildConfigString(),
             )
-            // Deliberately no OTLP fallback: the audit-log tracker (Goggles) is a
-            // separate service from the OTLP metrics collector. If the dedicated
-            // audit token is unset, leave it empty so uploads skip rather than
-            // authenticating against the wrong API with the OTLP token.
             buildConfigField(
                 "String",
-                "WHITENOISE_AUDIT_LOG_AUTH_TOKEN",
-                runtimeConfigProperty("WHITENOISE_AUDIT_LOG_AUTH_TOKEN").asBuildConfigString(),
+                "WHITENOISE_AUDIT_OTLP_AUTH_TOKEN",
+                runtimeConfigProperty("WHITENOISE_AUDIT_OTLP_AUTH_TOKEN").asBuildConfigString(),
             )
             buildConfigField("String", "WHITENOISE_DEPLOYMENT_ENVIRONMENT", "production".asBuildConfigString())
-            // Compatibility metadata required by MarmotKit. Tenant routing is
-            // selected by the OTLP bearer token, not this fixed resource value.
+            // MarmotKit requires a tenant resource value; deploymentEnvironment
+            // carries the actual flavor for the shared metrics token.
             buildConfigField(
                 "String",
                 "WHITENOISE_TELEMETRY_TENANT",
@@ -497,26 +495,24 @@ android {
             buildConfigField(
                 "String",
                 "WHITENOISE_OTLP_ENDPOINT",
-                runtimeConfigProperty("WHITENOISE_OTLP_ENDPOINT").asBuildConfigString(),
+                runtimeConfigProperty("WHITENOISE_OTLP_ENDPOINT", "https://otlp.whitenoise.chat/v1/metrics")
+                    .asBuildConfigString(),
             )
             buildConfigField(
                 "String",
                 "WHITENOISE_OTLP_AUTH_TOKEN",
-                environmentRuntimeConfigProperty(
-                    environment = "staging",
-                    suffix = "OTLP_AUTH_TOKEN",
-                    extraKeys = listOf("OTLP_TOKEN_WHITENOISE_ANDROID_STAGING"),
-                ).asBuildConfigString(),
+                runtimeConfigProperty("WHITENOISE_OTLP_AUTH_TOKEN").asBuildConfigString(),
             )
             buildConfigField(
                 "String",
-                "WHITENOISE_AUDIT_LOG_ENDPOINT",
-                runtimeConfigProperty("WHITENOISE_AUDIT_LOG_ENDPOINT").asBuildConfigString(),
+                "WHITENOISE_AUDIT_OTLP_ENDPOINT",
+                runtimeConfigProperty("WHITENOISE_AUDIT_OTLP_ENDPOINT", "https://otlp.whitenoise.chat/v1/logs")
+                    .asBuildConfigString(),
             )
             buildConfigField(
                 "String",
-                "WHITENOISE_AUDIT_LOG_AUTH_TOKEN",
-                runtimeConfigProperty("WHITENOISE_AUDIT_LOG_AUTH_TOKEN").asBuildConfigString(),
+                "WHITENOISE_AUDIT_OTLP_AUTH_TOKEN",
+                runtimeConfigProperty("WHITENOISE_AUDIT_OTLP_AUTH_TOKEN").asBuildConfigString(),
             )
             buildConfigField(
                 "boolean",
@@ -530,12 +526,12 @@ android {
             )
             buildConfigField("String", "WHITENOISE_DEPLOYMENT_ENVIRONMENT", "staging".asBuildConfigString())
             buildConfigField("boolean", "ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS", "true")
-            // Compatibility metadata required by MarmotKit. Tenant routing is
-            // selected by the OTLP bearer token, not this fixed resource value.
+            // MarmotKit requires a tenant resource value; deploymentEnvironment
+            // carries the actual flavor for the shared metrics token.
             buildConfigField(
                 "String",
                 "WHITENOISE_TELEMETRY_TENANT",
-                "whitenoise-android-staging".asBuildConfigString(),
+                "whitenoise-android".asBuildConfigString(),
             )
             buildConfigField(
                 "String",
@@ -689,7 +685,9 @@ androidComponents {
                             "benchmarkRelease",
                             "nonMinifiedRelease",
                         )
-                "preview" -> variantBuilder.buildType == "release"
+                "preview" ->
+                    variantBuilder.buildType == "release" ||
+                        ((previewE2eTestBuild || previewProviderMatrixBuild) && variantBuilder.buildType == "debug")
                 "production", "staging" -> variantBuilder.buildType == "release"
                 else -> true
             }
@@ -1109,7 +1107,6 @@ dependencies {
     implementation(libs.androidx.profileinstaller)
     implementation(libs.androidx.tracing)
     implementation(libs.okhttp)
-    implementation(libs.secp256k1.android)
     // One profile is generated from the authenticated dev/zapstore fixture and
     // merged into main for every release consumer. Select that producer
     // configuration explicitly so staging/play/production consumers do not
@@ -1135,7 +1132,6 @@ dependencies {
     testImplementation(libs.roborazzi.junit.rule)
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.androidx.compose.ui.test.junit4)
-    testRuntimeOnly(libs.secp256k1.jvm)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -1149,6 +1145,20 @@ android.sourceSets.named("test") {
 }
 
 tasks.withType<Test>().configureEach {
+    // Robolectric 4.17 requires these module openings on JDK 17+ (including CI).
+    // Apply them to the test JVMs, not the Gradle daemon or the shipped app.
+    // https://robolectric.org/getting-started/#running-with-java-17-and-higher
+    jvmArgs(
+        "--add-opens=java.base/java.lang=ALL-UNNAMED",
+        "--add-opens=java.base/java.util=ALL-UNNAMED",
+        "--add-opens=java.base/java.io=ALL-UNNAMED",
+        "--add-opens=java.base/java.net=ALL-UNNAMED",
+        "--add-opens=java.base/java.security=ALL-UNNAMED",
+        "--add-opens=java.base/java.text=ALL-UNNAMED",
+        "--add-opens=java.base/jdk.internal.access=ALL-UNNAMED",
+        "--add-opens=java.desktop/java.awt.font=ALL-UNNAMED",
+        "--add-opens=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
+    )
     // Resource-backed Robolectric tests retain Android SDK sandboxes across the large unit suite.
     // Double Gradle's 512 MiB worker default while keeping one bounded, non-parallel process per task.
     maxHeapSize = "1g"
@@ -1165,6 +1175,10 @@ tasks.withType<Test>().configureEach {
     // A failed assertion's message (expected vs actual) must reach the CI log: the reports are not uploaded,
     // so the default short format left only "AssertionError at File.kt:162" to diagnose from.
     testLogging.exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+    // A worker killed by the CI timeout never uploads reports. Keep its last entered test visible in the CI log.
+    if (providers.environmentVariable("CI").orNull == "true") {
+        testLogging.events = testLogging.events + org.gradle.api.tasks.testing.logging.TestLogEvent.STARTED
+    }
 }
 
 tasks.register<Test>("replayAppFuzzSyntheticCorpus") {

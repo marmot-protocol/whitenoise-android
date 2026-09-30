@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.MarmotInterface
+import kotlinx.coroutines.async
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -78,6 +80,48 @@ class NativePushFallbackRuntimeReadinessTest {
         assertEquals(replacementOwner, readiness.acknowledge(replacementGeneration) { true })
         assertTrue(readiness.isReady(replacementOwner))
     }
+
+    /** A waiter completes only after the exact service generation acknowledges its live owner. */
+    @Test
+    fun waiterRequiresExactLiveAcknowledgement() =
+        runTest {
+            val readiness = NativePushFallbackRuntimeReadiness()
+            val owner = owner(account = "a", switchGeneration = 1L)
+            val generation = readiness.request(owner)
+            val waiting = async { readiness.await(owner) }
+
+            assertEquals(owner, readiness.acknowledge(generation) { true })
+            assertTrue(waiting.await())
+        }
+
+    /** Superseding a pending service generation releases the old waiter as rejected. */
+    @Test
+    fun supersededWaiterCompletesFalse() =
+        runTest {
+            val readiness = NativePushFallbackRuntimeReadiness()
+            val first = owner(account = "a", switchGeneration = 1L)
+            readiness.request(first)
+            val waiting = async { readiness.await(first) }
+
+            readiness.request(owner(account = "b", switchGeneration = 2L))
+
+            assertFalse(waiting.await())
+        }
+
+    /** Explicit invalidation releases a pending waiter without manufacturing readiness. */
+    @Test
+    fun invalidatedWaiterCompletesFalse() =
+        runTest {
+            val readiness = NativePushFallbackRuntimeReadiness()
+            val owner = owner(account = "a", switchGeneration = 1L)
+            val generation = readiness.request(owner)
+            val waiting = async { readiness.await(owner) }
+
+            readiness.invalidate(generation)
+
+            assertFalse(waiting.await())
+            assertFalse(readiness.isReady(owner))
+        }
 
     /** Builds one owner whose switch generation distinguishes A-to-B-to-A lifetimes. */
     private fun owner(

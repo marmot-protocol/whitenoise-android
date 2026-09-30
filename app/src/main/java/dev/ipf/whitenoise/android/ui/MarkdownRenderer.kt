@@ -398,8 +398,7 @@ private fun MarkdownBodyText(
     val linkDestinations = remember(text) { markdownLinkDestinations(text) }
     val reportsLinks = remember(text) { text.getLinkAnnotations(0, text.length).isNotEmpty() }
     val tracker = remember(leafId, text) { MarkdownTextLayoutTracker() }
-    val fallbackHighlightStyle = rememberMarkdownFallbackHighlightStyle()
-    val highlightStyle = LocalTtsReadAloudHighlightStyle.current ?: fallbackHighlightStyle
+    val highlightStyle = LocalTtsReadAloudHighlightStyle.current ?: rememberMarkdownFallbackHighlightStyle()
     var layoutResult by remember(leafId, text) { mutableStateOf<TextLayoutResult?>(null) }
     val highlight =
         remember(highlightResolver, leafId, text.text) {
@@ -445,6 +444,7 @@ private fun MarkdownBodyText(
 
     Text(
         text = text,
+        inlineContent = EmojiShortcodes.content(),
         modifier =
             modifier
                 .then(accessibilityModifier)
@@ -1468,7 +1468,10 @@ private fun AnnotatedString.Builder.appendMarkdownInlines(
     if (markdownInlineDepthExceeded(depth)) return
     markdownVisibleSiblings(inlines).forEach { inline ->
         when (inline) {
-            is MarkdownInlineFfi.Text -> append(markdownSafeDisplayText(inline.content, Int.MAX_VALUE))
+            is MarkdownInlineFfi.Text -> {
+                val content = markdownSafeDisplayText(inline.content, Int.MAX_VALUE)
+                append(EmojiShortcodes.annotate(AnnotatedString(content)))
+            }
             // Chat keeps the author's line breaks: a soft break renders as a
             // newline (not the CommonMark collapse-to-space) to match how the
             // plaintext fallback has always displayed.
@@ -1866,19 +1869,24 @@ internal fun markdownDocumentToPreviewAnnotatedString(
     mentionDisplayName: ((String) -> String?)? = null,
 ): AnnotatedString {
     val projection = markdownDocumentToPreviewProjection(document, maxLength, mentionDisplayName, captureStyles = true)
-    return buildAnnotatedString {
-        append(projection.text)
-        projection.ranges.forEach { range ->
-            val style =
-                when (range.style) {
-                    MarkdownPreviewStyle.Code -> codeStyle
-                    MarkdownPreviewStyle.Bold -> SpanStyle(fontWeight = FontWeight.Bold)
-                    MarkdownPreviewStyle.Italic -> SpanStyle(fontStyle = FontStyle.Italic)
-                    MarkdownPreviewStyle.Strike -> SpanStyle(textDecoration = TextDecoration.LineThrough)
+    return EmojiShortcodes.annotate(
+        buildAnnotatedString {
+            append(projection.text)
+            projection.ranges.forEach { range ->
+                val style =
+                    when (range.style) {
+                        MarkdownPreviewStyle.Code -> codeStyle
+                        MarkdownPreviewStyle.Bold -> SpanStyle(fontWeight = FontWeight.Bold)
+                        MarkdownPreviewStyle.Italic -> SpanStyle(fontStyle = FontStyle.Italic)
+                        MarkdownPreviewStyle.Strike -> SpanStyle(textDecoration = TextDecoration.LineThrough)
+                    }
+                addStyle(style, range.start, range.end)
+                if (range.style == MarkdownPreviewStyle.Code) {
+                    addStringAnnotation(EmojiShortcodes.LITERAL_TAG, "", range.start, range.end)
                 }
-            addStyle(style, range.start, range.end)
-        }
-    }
+            }
+        },
+    )
 }
 
 internal fun markdownListMarker(

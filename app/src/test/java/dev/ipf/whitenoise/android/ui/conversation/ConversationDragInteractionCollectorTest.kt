@@ -27,6 +27,8 @@ class ConversationDragInteractionCollectorTest {
                         onStarted = { events += "start" },
                         awaitScrollSettled = { neverSettles.await() },
                         onSettled = { events += "settled" },
+                        // These cases script the settle wait themselves, so no frame clock is needed.
+                        awaitFrame = {},
                     )
                 }
             runCurrent()
@@ -54,6 +56,8 @@ class ConversationDragInteractionCollectorTest {
                         onStarted = { events += "start" },
                         awaitScrollSettled = { allowSettle.await() },
                         onSettled = { events += "settled" },
+                        // These cases script the settle wait themselves, so no frame clock is needed.
+                        awaitFrame = {},
                     )
                 }
             runCurrent()
@@ -82,6 +86,8 @@ class ConversationDragInteractionCollectorTest {
                         onStarted = { events += "start" },
                         awaitScrollSettled = { allowSettle.await() },
                         onSettled = { events += "settled" },
+                        // These cases script the settle wait themselves, so no frame clock is needed.
+                        awaitFrame = {},
                     )
                 }
             runCurrent()

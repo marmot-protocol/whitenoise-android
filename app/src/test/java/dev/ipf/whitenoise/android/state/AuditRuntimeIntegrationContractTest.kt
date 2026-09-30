@@ -5,6 +5,7 @@ import org.junit.Test
 import java.io.File
 
 class AuditRuntimeIntegrationContractTest {
+    /** The readiness marker is emitted after startup and uses persisted upload consent. */
     @Test
     fun readinessMarkerFollowsSuccessfulRuntimeStart() {
         val source = appStateSource()
@@ -16,7 +17,7 @@ class AuditRuntimeIntegrationContractTest {
             startBody.indexOf(
                 "runtimeStartResult.await().getOrThrowAtStartupStage(BootstrapStage.RUNTIME_START)",
             )
-        val marker = startBody.indexOf("runtime.marmot.emitAuditRuntimeReadinessAfterStart()")
+        val marker = startBody.indexOf("auditUploadConsent.readyForStartupMarker")
 
         assertTrue(started >= 0)
         assertTrue(marker > started)

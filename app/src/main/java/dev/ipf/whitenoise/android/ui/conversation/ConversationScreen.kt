@@ -108,6 +108,7 @@ import dev.ipf.whitenoise.android.core.timelineRowKind
 import dev.ipf.whitenoise.android.core.usesPersistedFailurePresentation
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.state.AppText
+import dev.ipf.whitenoise.android.state.BlockOutcome
 import dev.ipf.whitenoise.android.state.ChatCreateOpenConversationTimingEvent
 import dev.ipf.whitenoise.android.state.ChatCreateOpenConversationTimingState
 import dev.ipf.whitenoise.android.state.ChatListItem
@@ -115,6 +116,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
 import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.ConversationPagingOrigin
+import dev.ipf.whitenoise.android.state.ConversationPagingTraceSection
 import dev.ipf.whitenoise.android.state.ConversationUnreadJumpState
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.MessageAvailability
@@ -125,13 +127,20 @@ import dev.ipf.whitenoise.android.state.advanceConversationReadAnchor
 import dev.ipf.whitenoise.android.state.attachmentsFor
 import dev.ipf.whitenoise.android.state.chatCreateOpenConversationTimingStage
 import dev.ipf.whitenoise.android.state.conversationWindowCanReportVisible
-import dev.ipf.whitenoise.android.state.countUnreadIncoming
+import dev.ipf.whitenoise.android.state.createPoll
 import dev.ipf.whitenoise.android.state.currentTtsConversationDestination
+import dev.ipf.whitenoise.android.state.dmPeerAccount
 import dev.ipf.whitenoise.android.state.hasKnownTranscriptPresentation
+import dev.ipf.whitenoise.android.state.isLoadingOlder
+import dev.ipf.whitenoise.android.state.isLoadingPage
+import dev.ipf.whitenoise.android.state.isUserBlocked
 import dev.ipf.whitenoise.android.state.loadMessageAvailability
 import dev.ipf.whitenoise.android.state.loadUntilMessageAvailable
+import dev.ipf.whitenoise.android.state.logUnreadBadgeTransition
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
 import dev.ipf.whitenoise.android.state.markComposerReadyForPresentationTiming
+import dev.ipf.whitenoise.android.state.markInboundMessageVisibleForHostPerformance
+import dev.ipf.whitenoise.android.state.markPagingEvent
 import dev.ipf.whitenoise.android.state.markWindowVisibleForPresentationTiming
 import dev.ipf.whitenoise.android.state.mediaReferencesFor
 import dev.ipf.whitenoise.android.state.presentFailure
@@ -140,6 +149,7 @@ import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
 import dev.ipf.whitenoise.android.state.reportVisibleMessage
 import dev.ipf.whitenoise.android.state.returnToLatestWindow
+import dev.ipf.whitenoise.android.state.setUserBlocked
 import dev.ipf.whitenoise.android.state.transcriptPresentationNeedsRetry
 import dev.ipf.whitenoise.android.state.unreadCountDivergenceReport
 import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
@@ -220,6 +230,7 @@ import dev.ipf.whitenoise.android.ui.group.GroupDetailsScreen
 import dev.ipf.whitenoise.android.ui.medialibrary.rememberSharedMediaTiles
 import dev.ipf.whitenoise.android.ui.medialibrary.toConversationViewerPages
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
+import dev.ipf.whitenoise.android.ui.settings.blockOutcomeMessage
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import kotlinx.coroutines.CancellationException
@@ -286,7 +297,7 @@ private fun ConversationController.initialTimelineBackfillSnapshot() =
     ConversationInitialTimelineBackfillSnapshot(
         hasRenderableRows = timeline.any { !MessageProjector.isEdit(it.record) },
         hasMoreBefore = hasMoreBefore,
-        loadInFlight = isLoading || isLoadingOlder,
+        loadInFlight = isLoading || isLoadingPage,
         hasLoadFailure = error != null,
         rawWindowMessageIds = timeline.map { it.id },
     )
@@ -903,7 +914,7 @@ internal fun ConversationScreen(
                     renderedTimeline.isEmpty() &&
                     !controller.hasMoreBefore &&
                     !controller.hasMoreAfterTimeline &&
-                    !controller.isLoadingOlder &&
+                    !controller.isLoadingPage &&
                     !controller.isLoading,
             routePresentationSettled =
                 controller.error == null &&
@@ -938,6 +949,8 @@ internal fun ConversationScreen(
         transcriptReadyToReveal,
         routeTransitionInProgress,
         showDetails,
+        renderedTimeline.lastOrNull()?.id,
+        controller.inboundVisibleHostGeneration,
     ) {
         if (
             !conversationWindowCanReportVisible(
@@ -949,8 +962,11 @@ internal fun ConversationScreen(
         ) {
             return@LaunchedEffect
         }
-        withFrameNanos { }
+        // Compose frame-clock callbacks run before traversal. Waiting twice guarantees the
+        // timeline state observed above has completed one layout/draw pass.
+        repeat(2) { withFrameNanos { } }
         controller.markWindowVisibleForPresentationTiming()
+        controller.markInboundMessageVisibleForHostPerformance()
     }
 
     // First-frame completion waits for the initial anchor and a trustworthy
@@ -1309,7 +1325,78 @@ internal fun ConversationScreen(
             batchDeleteRetryState = null
         }
     }
-    val composerGate = conversationControllerComposerGate(controller, notificationOpenRequestId)
+    val dmPeerAccount = controller.dmPeerAccount
+    val blockMirror = appState.runtimeMirrors.blocks
+    var dmBlocked by
+        remember(controller, conversationAccountRef, dmPeerAccount, appState.runtimeGeneration) {
+            mutableStateOf(blockedDmFromMirror(controller, blockMirror))
+        }
+    var blockedDmUnblockInFlight by
+        remember(controller, conversationAccountRef, dmPeerAccount, appState.runtimeGeneration) {
+            mutableStateOf(false)
+        }
+    LaunchedEffect(
+        controller,
+        conversationAccountRef,
+        dmPeerAccount,
+        appState.runtimeGeneration,
+        blockMirror.revision,
+        blockMirror.available,
+    ) {
+        dmBlocked =
+            if (conversationAccountRef != null && dmPeerAccount != null) {
+                appState.isUserBlocked(conversationAccountRef, dmPeerAccount)
+            } else {
+                null
+            }
+    }
+    val composerGate =
+        blockedDmComposerGate(
+            membershipGate = conversationControllerComposerGate(controller, notificationOpenRequestId),
+            directPeerAccount = dmPeerAccount,
+            blocked = dmBlocked,
+        )
+
+    /** Commits an unblock for the current account and peer, ignoring a later route's result. */
+    fun unblockBlockedDm() {
+        val account = conversationAccountRef
+        val peer = dmPeerAccount
+        val canUnblock = !blockedDmUnblockInFlight && composerGate == ComposerGate.BLOCKED
+        if (account != null && peer != null && canUnblock) {
+            val runtimeGeneration = appState.runtimeGeneration
+            blockedDmUnblockInFlight = true
+            appState.launchMutation {
+                try {
+                    val outcome = appState.setUserBlocked(account, peer, blocked = false)
+                    if (
+                        controller.boundAccountRef == account &&
+                        controller.dmPeerAccount == peer &&
+                        appState.runtimeGeneration == runtimeGeneration
+                    ) {
+                        if (outcome == BlockOutcome.Confirmed) {
+                            dmBlocked = false
+                        } else {
+                            blockOutcomeMessage(outcome)?.let(appState::present)
+                        }
+                    }
+                } finally {
+                    if (
+                        controller.boundAccountRef == account &&
+                        controller.dmPeerAccount == peer &&
+                        appState.runtimeGeneration == runtimeGeneration
+                    ) {
+                        blockedDmUnblockInFlight = false
+                    }
+                }
+            }
+        }
+    }
+
+    fun canWave(): Boolean =
+        controller.canSendMessages &&
+            controller.editingMessageId == null &&
+            controller.replyingTo == null
+
     val timelineUnderlayEnabled =
         composerGate == ComposerGate.COMPOSER &&
             !selectionMode &&
@@ -1421,35 +1508,36 @@ internal fun ConversationScreen(
             )
         }
     }
-    val unreadIncomingCount by
-        remember(
-            controller,
-            chat.id,
-            projectedUnreadCount,
-            entryProjectionAvailable,
-        ) {
-            derivedStateOf {
-                if (!initialTimelineAnchored) {
-                    0
-                } else {
-                    countUnreadIncoming(
-                        timeline = controller.timeline,
-                        readAnchorMessageId = readAnchorMessageId,
-                        missingAnchorUnreadCount = projectedUnreadCount.takeIf { entryProjectionAvailable },
-                    )
-                }
-            }
-        }
+    // One owner for the badge's number (#2726): it follows the loaded rows while the read anchor is
+    // among them and holds while paging moves the anchor off screen, so a history page can never
+    // switch the count between the rows and the projection or count the loaded window itself.
+    val unreadBadgeUi =
+        rememberConversationUnreadBadgeCount(
+            identity = Triple(controller, chat.id, entryUnreadSessionIdentity),
+            anchored = initialTimelineAnchored,
+            timeline = controller.timeline,
+            readAnchorMessageId = readAnchorMessageId,
+            projectionUnread = projectedUnreadCount.takeIf { entryProjectionAvailable },
+            windowReachesTail = !controller.hasMoreAfterTimeline,
+            onTransition = { before, after ->
+                logUnreadBadgeTransition("DMConversation", before, after, controller.timeline.size)
+            },
+        )
+    // The first composition after anchoring has not reconciled yet; exposing 0 there would retire the
+    // two-stage jump target, so the count and its consumers wait for the first reconciliation.
+    val badgeReconciled = unreadBadgeUi.reconciled
+    val unreadIncomingCount = unreadBadgeUi.count
     LaunchedEffect(
         controller,
         initialTimelineAnchored,
         renderedTimeline,
         readAnchorMessageId,
+        badgeReconciled,
         unreadIncomingCount,
         nearBottom,
         unreadJumpState,
     ) {
-        if (!initialTimelineAnchored) return@LaunchedEffect
+        if (!badgeReconciled) return@LaunchedEffect
         unreadJumpState =
             reconcileConversationUnreadJump(
                 current = unreadJumpState,
@@ -1534,23 +1622,45 @@ internal fun ConversationScreen(
 
     /** Reveals the optimistic row using controller state published before the acceptance callback. */
     fun revealSentMessage() {
-        scope.launch {
-            scrollCoordinator.revealSentAtLiveTail(
-                controller = controller,
-                captureLayout = { tailIndex ->
-                    val layoutInfo = timelineViewport.readingLayoutInfo()
-                    val tailInfo = layoutInfo.visibleItemsInfo.firstOrNull { it.index == tailIndex }
-                    ConversationTailLayout(
-                        lastRowHeightPx = tailInfo?.size,
-                        tailOffsetPx = tailInfo?.offset,
-                        tailSizePx = tailInfo?.size,
-                        viewportStartOffsetPx = layoutInfo.viewportStartOffset,
-                        viewportEndOffsetPx = layoutInfo.viewportEndOffset,
-                        beforeContentPaddingPx = layoutInfo.beforeContentPadding,
-                        viewportSizePx = layoutInfo.viewportSize.height,
-                    )
-                },
-            )
+        val visibilityAttempts = controller.claimVisibleHostAttempts()
+        val revealJob =
+            scope.launch {
+                var terminalOutcomeRecorded = false
+                try {
+                    val revealed =
+                        scrollCoordinator.revealSentAtLiveTail(
+                            controller = controller,
+                            captureLayout = { tailIndex ->
+                                val layoutInfo = timelineViewport.readingLayoutInfo()
+                                val tailInfo = layoutInfo.visibleItemsInfo.firstOrNull { it.index == tailIndex }
+                                ConversationTailLayout(
+                                    lastRowHeightPx = tailInfo?.size,
+                                    tailOffsetPx = tailInfo?.offset,
+                                    tailSizePx = tailInfo?.size,
+                                    viewportStartOffsetPx = layoutInfo.viewportStartOffset,
+                                    viewportEndOffsetPx = layoutInfo.viewportEndOffset,
+                                    beforeContentPaddingPx = layoutInfo.beforeContentPadding,
+                                    viewportSizePx = layoutInfo.viewportSize.height,
+                                )
+                            },
+                        )
+                    if (revealed) {
+                        // The reveal can mutate the list during its frame callback; the next full
+                        // frame is the first boundary that proves the optimistic row was drawn.
+                        repeat(2) { withFrameNanos { } }
+                        visibilityAttempts.success()
+                    } else {
+                        visibilityAttempts.cancel()
+                    }
+                    terminalOutcomeRecorded = true
+                } finally {
+                    if (!terminalOutcomeRecorded) visibilityAttempts.cancel()
+                }
+            }
+        // A launch into an already-cancelled scope never executes its body, so keep the claimed
+        // attempts from leaking when the conversation leaves composition at the same instant.
+        revealJob.invokeOnCompletion { failure ->
+            if (failure != null) visibilityAttempts.cancel()
         }
     }
 
@@ -1711,6 +1821,7 @@ internal fun ConversationScreen(
     // Reuses the recipient picker; the selection sends a `nostr:npub…` reference
     // the recipient can tap to open that profile.
     var shareUserPickerOpen by remember(chat.id) { mutableStateOf(false) }
+    var pollCreateOpen by remember(chat.id) { mutableStateOf(false) }
     val shareUserSelection = remember(chat.id) { mutableStateListOf<RecipientSearch.Candidate>() }
     val contactPickerLauncher =
         rememberLauncherForActivityResult(PickContactPhoneRow()) { contactUri ->
@@ -2226,7 +2337,7 @@ internal fun ConversationScreen(
         controller,
         navigationState.initialTimelineLoadStarted,
         controller.isLoading,
-        controller.isLoadingOlder,
+        controller.isLoadingPage,
         latestTimelineItemId,
         navigationState.initialTimelineBackfillRetryGeneration,
     ) {
@@ -2574,14 +2685,44 @@ internal fun ConversationScreen(
     // list keeps history at its high-index end, so an older page appends there
     // and never disturbs the anchored newest edge — the framework holds the
     // visible rows in the same measure pass with no post-hoc scroll.
+    // Counted in its own collector: the prefetch collector below suspends on the page it requests,
+    // and a reader who reaches the edge while that page is in flight is exactly the stop to count.
+    LaunchedEffect(listState, controller) {
+        val edgeStops = PagingEdgeStopTracker()
+        snapshotFlow {
+            val visible = listState.layoutInfo.visibleItemsInfo
+            visible.lastOrNull { conversationAnchorMessageId(it.key) != null }?.index to listState.isScrollInProgress
+        }.collect { (oldestVisibleIndex, scrolling) ->
+            val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
+            if (liveRenderedSize == 0) return@collect
+            val edgeListIndex =
+                conversationTimelineListIndex(
+                    timelineIndex = 0,
+                    timelineSize = liveRenderedSize,
+                    trailingRowCount = controller.conversationTrailingRowCount(liveRenderedSize),
+                )
+            if (edgeStops.observe(oldestVisibleIndex ?: -1, edgeListIndex, controller.hasMoreBefore, scrolling)) {
+                markPagingEvent(ConversationPagingTraceSection.EDGE_STOP)
+            }
+        }
+    }
     LaunchedEffect(listState, controller) {
         snapshotFlow {
             // The reversed list emits the older-loading row, the top error row and the top spacer
             // after the messages, so they hold the highest indexes — exactly the oldest end, and
             // exactly what is on screen when a page is due. Taking the last visible item would pick
             // one of those, resolve no anchor, and page unanchored: the bug this is meant to fix.
-            listState.layoutInfo.visibleItemsInfo.lastOrNull { conversationAnchorMessageId(it.key) != null }
-        }.collect { oldestVisible ->
+            val oldestVisible =
+                listState.layoutInfo.visibleItemsInfo.lastOrNull { conversationAnchorMessageId(it.key) != null }
+            // Read here rather than in the collector: snapshotFlow observes only what this block reads,
+            // and a page that ends without moving the list — a newer page that failed, say — must
+            // re-evaluate the older edge once it no longer blocks it, as must a retry clearing the block.
+            // The two blocks are folded together: a page the engine never answered leaves the reader a
+            // retry row, and a prefetch it answered without older rows stands down until the reader
+            // asks again from the header or a window replacement arrives (#2727).
+            val olderPageBlocked = controller.olderPageBlocked || controller.automaticOlderPagingBlocked
+            Triple(oldestVisible, controller.isLoadingPage, olderPageBlocked)
+        }.collect { (oldestVisible, pageInFlight, olderPageBlocked) ->
             val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
             if (liveRenderedSize == 0) return@collect
             val oldestMessageListIndex =
@@ -2594,20 +2735,22 @@ internal fun ConversationScreen(
                 shouldPrefetchOlder(
                     anchored = initialTimelineAnchored,
                     hasMoreBefore = controller.hasMoreBefore,
-                    isLoadingOlder = controller.isLoadingOlder,
+                    pageInFlight = pageInFlight,
                     // A page the engine never answered leaves the reader a retry row; without this
                     // the effect would re-issue it on every scroll frame, which is the silent stall
                     // this screen used to show. The retry, or a live replacement, clears the block.
-                    olderPageBlocked = controller.olderPageBlocked,
+                    olderPageBlocked = olderPageBlocked,
                     oldestVisibleIndex = oldestVisible?.index ?: -1,
                     oldestMessageListIndex = oldestMessageListIndex,
                 )
             if (!prefetch) return@collect
+            val edgeMessageId = controller.timeline.firstOrNull { !MessageProjector.isEdit(it.record) }?.id
             // MDK places a replacement relative to the window's anchor, so tell it which row the
             // reader is actually on before paging. Without this an upward page is placed against
             // whatever the read pointer last reported, which only ever moves towards newer
             // messages — the reason scrolling up could move the reading position.
-            controller.loadOlder(conversationAnchorMessageId(oldestVisible?.key))
+            controller.loadOlder(conversationAnchorMessageId(oldestVisible?.key), ConversationPagingOrigin.AUTOMATIC)
+            recordOlderPageLanding(controller, listState, edgeMessageId)
         }
     }
     // Loading the authoritative unread boundary can shift a capped subscription
@@ -2625,7 +2768,7 @@ internal fun ConversationScreen(
             shouldPrefetchNewer(
                 anchored = initialTimelineAnchored,
                 hasMoreAfter = controller.hasMoreAfterTimeline,
-                isLoadingOlder = controller.isLoadingOlder,
+                pageInFlight = controller.isLoadingPage,
                 // A send leaves the viewport on this edge, so a forward page the engine could not
                 // answer must not be re-issued on every layout pass (#2764). Any page that
                 // advances, including a live-window update, releases the block.
@@ -3554,6 +3697,8 @@ internal fun ConversationScreen(
                         navigationState.initialTimelineBackfillNoProgress ||
                         transcriptPresentationNeedsRetry,
                 composerGate = composerGate,
+                blockedDmUnblockInFlight = blockedDmUnblockInFlight,
+                onUnblockBlockedDm = ::unblockBlockedDm,
                 controller = controller,
                 appState = appState,
                 messageTextCopy = messageTextCopy,
@@ -3666,6 +3811,12 @@ internal fun ConversationScreen(
                 },
                 onShareUser = { shareUserPickerOpen = true },
                 onShareContact = { contactPickerLauncher.launch(Unit) },
+                onCreatePoll =
+                    if (!controller.isDirectConversation) {
+                        { pollCreateOpen = true }
+                    } else {
+                        null
+                    },
                 onPasteImageUris = { uris ->
                     val openSlots = (MEDIA_PICKER_MAX_ITEMS - pendingMediaSlots.size).coerceAtLeast(0)
                     val pasteCandidates = uris.take(openSlots)
@@ -3803,7 +3954,7 @@ internal fun ConversationScreen(
                     renderedTimeline.isEmpty() &&
                         !controller.hasMoreBefore &&
                         !controller.hasMoreAfterTimeline &&
-                        !controller.isLoadingOlder &&
+                        !controller.isLoadingPage &&
                         !controller.isLoading &&
                         navigationState.initialTimelineLoadStarted -> {
                         if (
@@ -3993,6 +4144,28 @@ internal fun ConversationScreen(
                                         onQuickReactionsSave = { saveQuickReactionEmojis(it) },
                                         onReplyPreviewClick = { navigateToReplyTarget(it) },
                                         composerGate = composerGate,
+                                        blockedDmUnblockInFlight = blockedDmUnblockInFlight,
+                                        onUnblockBlockedDm = ::unblockBlockedDm,
+                                        onWave =
+                                            if (composerGate == ComposerGate.COMPOSER && canWave()) {
+                                                wave@{ accountIdHex, onAccepted ->
+                                                    if (!canWave()) {
+                                                        return@wave
+                                                    }
+                                                    val npub = appState.npubForDisplay(accountIdHex)
+                                                    if (npub.isBlank()) {
+                                                        appState.present(R.string.send_failed)
+                                                        return@wave
+                                                    }
+                                                    controller.send("👋 @$npub", onAccepted = {
+                                                        onAccepted()
+                                                        acceptedSendRevealedTranscript = true
+                                                        revealSentMessage()
+                                                    })
+                                                }
+                                            } else {
+                                                null
+                                            },
                                         onBack = exitConversation,
                                         mentionCandidates = mentionPicker.candidates,
                                         mentionPickerEnabled = mentionPicker.enabled,
@@ -4022,6 +4195,24 @@ internal fun ConversationScreen(
                                                 }
                                             }
                                         }
+                                    }
+                                }
+                                if (
+                                    retentionHistoryBoundaryVisible(
+                                        retentionSeconds = controller.group.disappearingMessageSecs,
+                                        hasMessages = renderedTimeline.isNotEmpty(),
+                                        initialLoadStarted = navigationState.initialTimelineLoadStarted,
+                                        hasMoreBefore = controller.hasMoreBefore,
+                                        isLoading = controller.isLoading,
+                                        isLoadingPage = controller.isLoadingPage,
+                                        isLoadingOlder = controller.isLoadingOlder,
+                                        olderLoadFailed =
+                                            controller.error != null &&
+                                                controller.errorEdge == ConversationLoadFailureEdge.TOP,
+                                    )
+                                ) {
+                                    item(key = "retention-history-boundary") {
+                                        ConversationHistoryBoundary(controller.group.disappearingMessageSecs)
                                     }
                                 }
                                 conversationLoadErrorItem(
@@ -4064,7 +4255,7 @@ internal fun ConversationScreen(
                                     labelState = stickyDayLabelState,
                                 )
                             }
-                            if (transcriptReadyToReveal && !selectionMode) {
+                            if (transcriptReadyToReveal) {
                                 Column(
                                     modifier =
                                         Modifier
@@ -4074,7 +4265,8 @@ internal fun ConversationScreen(
                                     horizontalAlignment = Alignment.End,
                                     verticalArrangement = Arrangement.spacedBy(8.dp),
                                 ) {
-                                    if (ttsFollowHandle.showResumeAction) {
+                                    // Selection hides these controls; paging progress never covers message rows.
+                                    if (!selectionMode && ttsFollowHandle.showResumeAction) {
                                         TtsResumeFollowButton(
                                             onClick = ttsFollowHandle::resumeFollow,
                                         )
@@ -4082,7 +4274,7 @@ internal fun ConversationScreen(
                                     // Jump-to-mention chip: tap visits the oldest unread
                                     // mention and marks it read, so the count steps down.
                                     val mentionCount = unreadMentionMessageIds.size
-                                    if (mentionCount > 0) {
+                                    if (!selectionMode && mentionCount > 0) {
                                         val jumpToMentionLabel = stringResource(R.string.conversation_jump_to_mention)
                                         Surface(
                                             shape = CircleShape,
@@ -4108,7 +4300,7 @@ internal fun ConversationScreen(
                                             }
                                         }
                                     }
-                                    if (!nearBottom) {
+                                    if (!selectionMode && !nearBottom) {
                                         ConversationJumpToNewestButton(
                                             unreadIncomingCount = unreadIncomingCount,
                                             onClick = {
@@ -4313,6 +4505,22 @@ internal fun ConversationScreen(
             onSend = { selected ->
                 pendingContactShare = null
                 mediaSender.sendSharedContact(selected)
+            },
+        )
+    }
+
+    if (pollCreateOpen) {
+        PollCreateDialog(
+            onDismiss = { pollCreateOpen = false },
+            onSubmit = { question, options, type, deadlineDurationSeconds, onResult ->
+                appState.launchMutation {
+                    var created = false
+                    try {
+                        created = controller.createPoll(question, options, type, deadlineDurationSeconds)
+                    } finally {
+                        onResult(created)
+                    }
+                }
             },
         )
     }

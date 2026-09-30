@@ -9,6 +9,7 @@ import dev.ipf.marmotkit.ChatListWindowSubscription
 import dev.ipf.marmotkit.ChatsSubscription
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.PresentedChatListUpdateFfi
+import dev.ipf.marmotkit.PresentedChatRowFfi
 
 /** Rows requested when a chat-list window opens; MDK defaults to the same value and caps requests at 100. */
 internal const val CHAT_LIST_WINDOW_INITIAL_ROWS: UInt = 50u
@@ -158,6 +159,8 @@ internal class ChatListLiveSubscriptions(
     val openChats: suspend (account: String, includeArchived: Boolean) -> ChatsSubscriptionHandle,
     /** Whole-list fallback used only when the bounded windows fail to open; null disables the fallback. */
     val openPresentedChatList: (suspend (account: String) -> ChatListWindowHandle)? = null,
+    /** Keyed MDK read used only when a replacement omits an active row that should still fit in its window. */
+    val presentedRowByGroup: (suspend (account: String, groupIdHex: String) -> PresentedChatRowFfi?)? = null,
 ) {
     companion object {
         /** Binds the seam to the production MarmotKit runtime. */
@@ -182,6 +185,9 @@ internal class ChatListLiveSubscriptions(
                             release = subscription::close,
                         )
                     }
+                },
+                presentedRowByGroup = { account, groupIdHex ->
+                    appState.marmotIo { presentedChatListRow(account, groupIdHex) }
                 },
             )
     }

@@ -82,18 +82,21 @@ The protected `android-release-signing` environment contains:
   `WHITENOISE_PLAY_UPLOAD_KEY_ALIAS`, `WHITENOISE_PLAY_UPLOAD_KEY_PASSWORD`.
 
 The workflow reads the existing repository secrets using the same names Gradle
-uses: shared `WHITENOISE_OTLP_ENDPOINT`, `WHITENOISE_AUDIT_LOG_ENDPOINT`,
-`WHITENOISE_AUDIT_LOG_AUTH_TOKEN`, and `WHITENOISE_PUSH_RELAY_HINT`, plus
-flavor-specific `WHITENOISE_PRODUCTION_OTLP_AUTH_TOKEN` and
+uses: shared `WHITENOISE_OTLP_AUTH_TOKEN`,
+`WHITENOISE_AUDIT_OTLP_AUTH_TOKEN`, and `WHITENOISE_PUSH_RELAY_HINT`, plus
+flavor-specific
 `WHITENOISE_PRODUCTION_PUSH_SERVER_PUBKEY_HEX`. The compatibility tenant remains
-fixed in Gradle. Old production-prefixed endpoint/audit variables are unused.
+fixed in Gradle. The release workflow fixes metrics and audit URLs to the shared
+collector; the old endpoint and production-prefixed audit variables are unused.
+The app does not configure a v4 upload destination. Native v4 records may still
+remain locally for export, while consented upload uses only the v5 OTLP receiver.
 
 Firebase client configuration, MIP-05 push identity/relay, and opt-in telemetry
 are independent systems. Production builds enforce the Firebase/push guards.
 Telemetry credentials are ingest-only and compiled into the app; never put a
 privileged service credential in a BuildConfig field.
 
-Aptabase product analytics is a separate destination from OTLP and Goggles.
+Aptabase product analytics is a separate destination from OTLP metrics and v5 audit delivery.
 For a release intended to include it, provision the environment-specific
 `PRODUCT_EVENTS_ENDPOINT`, `PRODUCT_APP_KEY`, and `PRODUCT_OPERATOR` fields documented in
 [`product-analytics.md`](product-analytics.md). Run
@@ -217,9 +220,13 @@ gh workflow run android-release-distribute.yml --ref master \
 ```
 
 Record this separate distribution run ID, approve `google-play-internal` through
-the authorized reviewer, and wait for success. In Play Console, confirm the
-internal release's version code/name, **Available to internal testers** status,
-and attached mapping file; confirm the production track is unchanged. Retain
+the authorized reviewer, and wait for success. The workflow commits the edit
+without sending it for review, so the internal release waits in Play Console's
+**Publishing overview** under **Changes not yet sent for review**. Read that
+whole list first: **Send for review** submits every change in it, not only this
+internal release. After sending, confirm the internal release's version
+code/name, **Available to internal testers** status, and attached mapping file;
+confirm the production track is unchanged. Retain
 the build/distribution URLs, run attempts, manifest digest, artifact hashes, and
 Console readback with the release evidence. Keep receipts outside the candidate
 directory: its verified file inventory must remain exact.
@@ -286,7 +293,12 @@ candidate bytes are never replaced. Publishing the draft publicly remains a
 separate deliberate action after qualification.
 
 Play uploads the reviewed AAB and mapping, with release notes, to internal
-testing as a completed internal release. Testers may receive it immediately.
+testing as a completed internal release. The workflow always commits the edit
+with `changesNotSentForReview`, because Play rejects automatic submission while
+other changes await review. Every successful upload therefore stops under
+**Changes not yet sent for review**; testers receive it only after the operator
+sends it from **Publishing overview**. That send submits every listed change, so
+review the full list before sending.
 Verify the actual Play track/version and delivered signing lineage in Console.
 If upload fails or a version code was already used, inspect Play before retrying;
 this workflow does not automatically allocate a new code or promote any track.
@@ -361,16 +373,45 @@ This step makes the release public. Do not use it for a build rehearsal.
    job. Verify the candidate identity and that public exposure is intended.
 4. The job retrieves and rechecks the existing bundle, restores its listing,
    and signs a preflight using ZSP offline mode. That preflight can contact the
-   remote signer, but does not upload blobs or publish release events.
-5. Only after the publisher check passes does the online ZSP command run.
-6. Read back the public release events and APK, verify publisher, version,
-   hashes and signer, and exercise the shipped updater. A successful command
-   alone is not final public-receipt verification.
+   remote signer, but does not upload blobs or publish release events. Each
+   attempt is limited to 2 minutes and retried up to three times.
+5. Only after the publisher check passes, and the relay shows no release or
+   asset event for this version, does the online ZSP command run. Each attempt
+   is limited to 8 minutes.
+6. The job then reads back the app, release and asset events from
+   `ZAPSTORE_RELAY`, requires the pinned publisher and the candidate's version,
+   code, commit, APK hash and signing certificate, and downloads the blob from
+   `ZAPSTORE_BLOSSOM` to compare its hash. Exercise the shipped updater
+   separately; the readback does not prove updater behavior.
 
-A failed online command may have partially published. Inspect relay and Blossom
-state before retrying. There is no automatic retry, overwrite-release flag,
-withdrawal, or legacy-listing removal. `org.parres.whitenoise` is a different
-application and cannot migrate installed data by publishing this new package.
+ZSP signs every event before it publishes any release event, so a run stopped
+while waiting for the signer has at most uploaded the APK blob. After a failed
+or stalled online attempt, the job retries once only when the relay still has no
+release or asset event for this version. If any exist, or the relay cannot be
+read, the job stops: inspect relay and Blossom state before another dispatch.
+There is no overwrite-release flag, withdrawal, or legacy-listing removal.
+`org.parres.whitenoise` is a different application and cannot migrate installed
+data by publishing this new package.
+
+### Diagnose remote-signer reply delivery
+
+The signer's replies travel through the relays in the bunker URI. A reply can
+reach those relays yet never reach a new client process; the client then waits
+without error. In the 2026.9.30 release, Keycast answered every request, but
+the CI client missed its reply to the second connection of a run.
+
+**Android Zapstore - NIP-46 Relay Diagnostic (no secrets)** reproduces that
+path from a GitHub runner with throwaway keys and a local stand-in signer. It
+runs fresh client processes back to back, logs every relay frame, and reports,
+for any missed reply, whether the reply was stored on each relay. It reads no
+secrets and needs no environment approval.
+
+```bash
+gh workflow run android-zapstore-relay-diagnostic.yml --ref master \
+  -f relays='wss://relay.primal.net,wss://nos.lol' -f rounds=12
+```
+
+Retain the `nip46-relay-diagnostic` artifact with the investigation.
 
 ### Retire the legacy package
 

@@ -67,7 +67,19 @@ private suspend fun ConversationController.jumpWindowToMessage(messageIdHex: Str
         messageIdHex = messageIdHex,
         targetLoaded = { timelineRecords.containsKey(messageIdHex) },
         jumpIfActive = ::jumpIfSubscriptionActive,
-        installPage = { page -> applyTimelinePage(page, replaceWindow = true, updatePagination = true) },
+        installPage = { page ->
+            tracedPagingSection(ConversationPagingTraceSection.APPLY) {
+                applyTimelinePage(
+                    page,
+                    replaceWindow = false,
+                    updatePagination = true,
+                    reconcileNewExtendedRecords = true,
+                )
+            }
+            // The reader landed somewhere else in history, so an older prefetch that stood
+            // down at the previous edge may ask again from here (#2727).
+            automaticPaging.older.reset()
+        },
     )
 
 /** Runs one exact-message jump under the active-call guard so teardown cannot close the handle mid-call. */
@@ -82,7 +94,9 @@ private suspend fun ConversationController.jumpIfSubscriptionActive(
             }
         if (!stillActive) return@withLock null
         runCatchingCancellable {
-            withContext(Dispatchers.IO) { subscription.jumpToMessage(messageIdHex) }
+            tracedPagingSection(ConversationPagingTraceSection.WINDOW) {
+                withContext(Dispatchers.IO) { subscription.jumpToMessage(messageIdHex) }
+            }
         }.getOrNull()
     }
 
@@ -122,9 +136,13 @@ internal suspend fun retryConversationWindowJump(
                         if (!retry || attempt == CONVERSATION_JUMP_RETRY_ATTEMPTS - 1) {
                             return ConversationWindowJumpResult.RETRYABLE
                         }
-                        if (outcome.reason == ConversationWindowUnchangedReason.NOT_READY) {
-                            delay(CONVERSATION_WINDOW_NOT_READY_RETRY_MS)
-                        }
+                        delay(
+                            if (outcome.reason == ConversationWindowUnchangedReason.NOT_READY) {
+                                CONVERSATION_WINDOW_NOT_READY_RETRY_MS
+                            } else {
+                                CONVERSATION_WINDOW_SUPERSEDED_RETRY_MS
+                            },
+                        )
                     }
                 }
         }

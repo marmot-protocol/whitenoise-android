@@ -26,6 +26,8 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.core.ReactionTally
+import dev.ipf.whitenoise.android.ui.conversation.reactions.ConfigureReactionsSheet
+import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionPillRow
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -146,6 +148,37 @@ class MessageReactionChromeScreenshotTest {
     fun reactionAdjacencyLargeFont() {
         renderAdjacency(mine = false, fontScale = 1.3f)
         capture("message_reactions_adjacency_large_font")
+    }
+
+    @Test
+    fun builtInReactionPills() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface(Modifier.width(360.dp).testTag(ROOT_TAG)) {
+                    ReactionPillRow(
+                        tallies = listOf(ReactionTally(":marmot:", 1, true), ReactionTally(":wn:", 3, false)),
+                        enabled = true,
+                        onOpenDetails = {},
+                    )
+                }
+            }
+        }
+        capture("message_reactions_builtins")
+    }
+
+    @Test
+    fun builtInConfiguredQuickReactions() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ConfigureReactionsSheet(
+                    current = listOf(":marmot:", ":wn:", "👍", "❤️", "😂", "🎉"),
+                    onDismiss = {},
+                    onApply = {},
+                    onPickSlot = { _, _ -> },
+                )
+            }
+        }
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/configure_reactions_builtins.png")
     }
 
     /** Root-space bounds of a tagged row, for the spacing assertions. */

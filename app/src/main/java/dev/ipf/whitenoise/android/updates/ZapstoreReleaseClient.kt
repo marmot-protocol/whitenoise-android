@@ -101,7 +101,12 @@ private fun Throwable.hasRelayTimeoutCause(): Boolean = causes().any { it is Nos
 
 private fun Throwable.causes(): Sequence<Throwable> = generateSequence(this) { it.cause }
 
-internal object ZapstoreEvents {
+internal object ZapstoreEvents : ZapstoreEventPolicy()
+
+/** Immutable verification seam for domain tests; production uses stateless MDK. */
+internal open class ZapstoreEventPolicy(
+    private val verifyEvent: (NostrEvent) -> Boolean = NostrEventVerifier::verifies,
+) {
     /**
      * Latest-release discovery: read the version from a kind-30063 release
      * event, trusting it only when signed by [publisherPubkey] and bound to
@@ -116,7 +121,7 @@ internal object ZapstoreEvents {
     ): String? {
         if (event.kind != KIND_ZAPSTORE_RELEASE) return null
         if (event.pubkey != publisherPubkey) return null
-        if (!NostrEventVerifier.verifies(event)) return null
+        if (!verifyEvent(event)) return null
         return releaseVersionForApp(event, appId)
     }
 
@@ -147,7 +152,7 @@ internal object ZapstoreEvents {
         if (event.pubkey != publisherPubkey) return null
         val dTag = event.firstTagValue("d") ?: return null
         if (dTag != releaseDTag) return null
-        if (!NostrEventVerifier.verifies(event)) return null
+        if (!verifyEvent(event)) return null
         return ZapstoreAddress.versionFromReleaseDTag(dTag, appId)
     }
 }

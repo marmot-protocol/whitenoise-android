@@ -29,6 +29,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.mediaReferencesFor
 import dev.ipf.whitenoise.android.ui.chats.ConversationSearchNavBar
+import dev.ipf.whitenoise.android.ui.conversation.composer.BlockedDmComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerAttachmentSheetState
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
@@ -74,6 +75,8 @@ internal fun ConversationBottomBar(
     onNextSearchMatch: () -> Unit,
     hasError: Boolean,
     composerGate: ComposerGate,
+    blockedDmUnblockInFlight: Boolean = false,
+    onUnblockBlockedDm: () -> Unit = {},
     controller: ConversationController,
     appState: WhiteNoiseAppState,
     messageTextCopy: MessageTextCopy,
@@ -93,6 +96,7 @@ internal fun ConversationBottomBar(
     onShareLocation: () -> Unit,
     onShareUser: () -> Unit,
     onShareContact: () -> Unit,
+    onCreatePoll: (() -> Unit)? = null,
     onPasteImageUris: (List<Uri>) -> Unit,
     voiceRecordingController: VoiceRecordingController,
     voiceReview: VoiceRecordingReview? = null,
@@ -178,6 +182,11 @@ internal fun ConversationBottomBar(
                             )
                         }
                     ComposerGate.NOTICE -> RemovedMemberComposerNotice()
+                    ComposerGate.BLOCKED ->
+                        BlockedDmComposerNotice(
+                            unblockInFlight = blockedDmUnblockInFlight,
+                            onUnblock = onUnblockBlockedDm,
+                        )
                     ComposerGate.FROZEN -> FrozenGroupComposerNotice()
                     ComposerGate.DISBANDED ->
                         DisbandedGroupComposerNotice(disbanded = controller.group.disbanded)
@@ -237,7 +246,7 @@ internal fun ConversationBottomBar(
                             onSendAttachments = onSendAttachments,
                             editingMessageId = controller.editingMessageId,
                             editingInitialText = editingRecord?.let { controller.displayedText(it) },
-                            onCancelEdit = { controller.editingMessageId = null },
+                            onCancelEdit = controller::cancelMessageEdit,
                             onAfterSend = onAfterSend,
                             onPickFromGallery = onPickFromGallery,
                             onCaptureFromCamera = onCaptureFromCamera,
@@ -245,6 +254,7 @@ internal fun ConversationBottomBar(
                             onShareLocation = onShareLocation,
                             onShareUser = onShareUser,
                             onShareContact = onShareContact,
+                            onCreatePoll = onCreatePoll,
                             onPasteImageUris = onPasteImageUris,
                             voiceRecordingController = voiceRecordingController,
                             voiceReview = voiceReview,

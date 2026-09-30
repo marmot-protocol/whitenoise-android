@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="48dp"
+    android:gravity="center_vertical"
+    android:layoutDirection="locale"
+    android:orientation="horizontal">
+
+    <Button
+        android:id="@+id/dictation_notification_cancel"
+        android:layout_width="0dp"
+        android:layout_height="40dp"
+        android:layout_weight="1"
+        android:minWidth="0dp"
+        android:text="@string/cancel"
+        android:textAllCaps="false"
+        android:textSize="12sp" />
+
+    <Button
+        android:id="@+id/dictation_notification_paste"
+        android:layout_width="0dp"
+        android:layout_height="40dp"
+        android:layout_weight="1"
+        android:minWidth="0dp"
+        android:text="@string/paste"
+        android:textAllCaps="false"
+        android:textSize="12sp" />
+
+    <Button
+        android:id="@+id/dictation_notification_send"
+        android:layout_width="0dp"
+        android:layout_height="40dp"
+        android:layout_weight="1"
+        android:minWidth="0dp"
+        android:text="@string/send"
+        android:textAllCaps="false"
+        android:textSize="12sp" />
+</LinearLayout>

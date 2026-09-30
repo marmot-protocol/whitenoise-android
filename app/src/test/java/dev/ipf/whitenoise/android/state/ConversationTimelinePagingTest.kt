@@ -14,6 +14,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.time.Duration
 
 /**
  * A page that the engine never answers must leave the reader a retry affordance rather than a
@@ -97,17 +98,65 @@ class ConversationTimelinePagingTest {
             }
         }
 
-    /** A superseded window is not the engine failing to answer, so it leaves no retry affordance. */
+    /** One stale revision retries inside the same gesture and reaches the newly installed window. */
     @Test
-    fun supersededOlderPageReportsNoProgressWithoutBlocking() =
+    fun supersededOlderPageRetriesAndAdvances() =
         runBlocking {
-            val subscription = subscriptionWith(outcome(ConversationWindowUnchangedReason.SUPERSEDED))
+            val subscription =
+                subscriptionWith(outcome(ConversationWindowUnchangedReason.SUPERSEDED), olderPage())
             withController(subscription) { controller ->
                 settle()
 
                 val load = controller.loadOlderPageInternal()
 
-                assertEquals(ConversationPageLoad.NO_PROGRESS, load)
+                assertEquals(ConversationPageLoad.ADVANCED, load)
+                assertEquals(2, subscription.backwardsCallCount)
+                assertFalse(controller.olderPageBlocked)
+            }
+        }
+
+    /** A not-ready streak cannot consume the separate superseded retry budget. */
+    @Test
+    fun mixedNotReadyAndSupersededPagesStillAdvance() =
+        runBlocking {
+            val subscription =
+                subscriptionWith(
+                    *Array(CONVERSATION_PAGE_NOT_READY_ATTEMPTS - 1) {
+                        outcome(ConversationWindowUnchangedReason.NOT_READY)
+                    },
+                    outcome(ConversationWindowUnchangedReason.SUPERSEDED),
+                    olderPage(),
+                )
+            withController(subscription) { controller ->
+                settle()
+
+                val load = controller.loadOlderPageInternal()
+
+                assertEquals(ConversationPageLoad.ADVANCED, load)
+                assertEquals(CONVERSATION_PAGE_NOT_READY_ATTEMPTS + 1, subscription.backwardsCallCount)
+                assertFalse(controller.olderPageBlocked)
+            }
+        }
+
+    /** A persistently stale window is bounded and offers the reader a retry. */
+    @Test
+    fun supersededOlderPageExhaustsBudgetAndArmsRetry() =
+        runBlocking {
+            val stale =
+                Array(CONVERSATION_PAGE_SUPERSEDED_ATTEMPTS) {
+                    outcome(ConversationWindowUnchangedReason.SUPERSEDED)
+                }
+            val subscription = subscriptionWith(*stale, olderPage())
+            withController(subscription) { controller ->
+                settle()
+
+                val load = controller.loadOlderPageInternal()
+
+                assertEquals(ConversationPageLoad.FAILED, load)
+                assertTrue(controller.olderPageBlocked)
+                assertEquals(CONVERSATION_PAGE_SUPERSEDED_ATTEMPTS, subscription.backwardsCallCount)
+                controller.retryLoadFailure()
+                settle()
                 assertFalse(controller.olderPageBlocked)
             }
         }
@@ -296,6 +345,138 @@ class ConversationTimelinePagingTest {
         }
 
     /**
+     * An automatic older page the engine answers with the rows already held stands the prefetch
+     * down after one ask, without arming the failure banner, so the viewport parked on the oldest
+     * row cannot re-issue it the moment it finishes (#2727).
+     */
+    @Test
+    fun automaticOlderPageWithoutNewRowsStandsThePrefetchDown() =
+        runBlocking {
+            val subscription = subscriptionWith(sameWindow(), sameWindow())
+            withController(subscription) { controller ->
+                settle()
+
+                val first = controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC)
+                val second = controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC)
+
+                assertEquals(ConversationPageLoad.NO_PROGRESS, first)
+                assertEquals(ConversationPageLoad.NO_PROGRESS, second)
+                assertTrue(controller.automaticOlderPagingBlocked)
+                assertFalse("no older rows is an answer, not a failure to answer", controller.olderPageBlocked)
+                assertFalse(controller.isLoadingOlder)
+                assertEquals("a stood-down prefetch stops asking the engine", 1, subscription.backwardsCallCount)
+            }
+        }
+
+    /** The reader's own ask from the header proceeds while the prefetch stands down, and rows release it. */
+    @Test
+    fun explicitOlderPageProceedsWhileThePrefetchStandsDownAndRowsReleaseIt() =
+        runBlocking {
+            val subscription = subscriptionWith(sameWindow(), olderPage())
+            withController(subscription) { controller ->
+                settle()
+                controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC)
+                assertTrue(controller.automaticOlderPagingBlocked)
+
+                val load = controller.loadOlderPageInternal()
+
+                assertEquals(ConversationPageLoad.ADVANCED, load)
+                assertEquals(2, subscription.backwardsCallCount)
+                assertFalse("rows that arrived release the block", controller.automaticOlderPagingBlocked)
+            }
+        }
+
+    /** A deadline on an automatic older page keeps arming the visible retry row rather than the quiet guard. */
+    @Test
+    fun automaticOlderDeadlineStillArmsTheRetryRow() =
+        runBlocking {
+            val subscription = subscriptionWith(outcome(ConversationWindowUnchangedReason.TIMED_OUT))
+            withController(subscription) { controller ->
+                settle()
+
+                val load = controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC)
+
+                assertEquals(ConversationPageLoad.TIMED_OUT, load)
+                assertTrue(controller.olderPageBlocked)
+                assertFalse(controller.automaticOlderPagingBlocked)
+            }
+        }
+
+    /** A stale automatic page also retries within the gesture and can advance history. */
+    @Test
+    fun supersededAutomaticOlderPageRetriesAndAdvances() =
+        runBlocking {
+            val subscription = subscriptionWith(outcome(ConversationWindowUnchangedReason.SUPERSEDED), olderPage())
+            withController(subscription) { controller ->
+                settle()
+
+                val load = controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC)
+
+                assertEquals(ConversationPageLoad.ADVANCED, load)
+                assertEquals(2, subscription.backwardsCallCount)
+                assertFalse(controller.automaticOlderPagingBlocked)
+            }
+        }
+
+    /** Persistent revision churn stops automatic paging and shows the existing retry row. */
+    @Test
+    fun exhaustedSupersededAutomaticOlderPageArmsRetry() =
+        runBlocking {
+            val stale =
+                Array(CONVERSATION_PAGE_SUPERSEDED_ATTEMPTS) {
+                    outcome(ConversationWindowUnchangedReason.SUPERSEDED)
+                }
+            val subscription = subscriptionWith(*stale)
+            withController(subscription) { controller ->
+                settle()
+
+                val load = controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC)
+                assertEquals(ConversationPageLoad.FAILED, load)
+                assertTrue(controller.olderPageBlocked)
+                assertEquals(CONVERSATION_PAGE_SUPERSEDED_ATTEMPTS, subscription.backwardsCallCount)
+            }
+        }
+
+    /** A rebuilt window is a new place in history, so the prefetch may ask again from there. */
+    @Test
+    fun windowReplacementReleasesTheOlderPrefetch() =
+        runBlocking {
+            val subscription = subscriptionWith(sameWindow(), olderPage())
+            withController(subscription) { controller ->
+                settle()
+                controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC)
+                assertTrue(controller.automaticOlderPagingBlocked)
+
+                controller.testRefreshCurrentTimeline(ConversationTimelineTestIds.ACCOUNT_REF) {
+                    page(listOf(record(TARGET_ID, timelineAt = 150uL)), hasMoreBefore = true)
+                }
+                settle()
+
+                assertFalse("a replaced window releases the prefetch", controller.automaticOlderPagingBlocked)
+            }
+        }
+
+    /** An authoritative live window is recovery for the older prefetch too. */
+    @Test
+    fun liveWindowReplacementReleasesTheOlderPrefetch() =
+        runBlocking {
+            val subscription = subscriptionWith(sameWindow())
+            withController(subscription) { controller ->
+                settle()
+                controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC)
+                assertTrue(controller.automaticOlderPagingBlocked)
+
+                awaitConversationCondition { subscription.nextWindowCallCount >= 1 }
+                subscription.emitWindow(page(listOf(record(OLDER_ID)), hasMoreBefore = true))
+                awaitConversationCondition { subscription.nextWindowCallCount >= 2 }
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(10))
+
+                awaitConversationCondition(timeoutMs = 15_000) { !controller.automaticOlderPagingBlocked }
+                assertFalse(controller.automaticOlderPagingBlocked)
+            }
+        }
+
+    /**
      * Every phase a history page can emit is part of the closed WNPerf vocabulary, so a diagnostics
      * session on a tester's device cannot be asked to log a name the schema does not define.
      */
@@ -326,6 +507,12 @@ class ConversationTimelinePagingTest {
 
     /** One older row arriving as a newly installed window. */
     private fun olderPage() = TimelinePageOutcome.Advanced(page(listOf(record(OLDER_ID)), hasMoreBefore = true))
+
+    /** The window the handle already holds, answered again with older history still claimed. */
+    private fun sameWindow(): TimelinePageOutcome {
+        val heldRows = listOf(record(SEED_ID, timelineAt = 200uL))
+        return TimelinePageOutcome.Advanced(page(heldRows, hasMoreBefore = true))
+    }
 
     /** An unchanged outcome that keeps whatever window the handle already holds. */
     private fun outcome(reason: ConversationWindowUnchangedReason) = TimelinePageOutcome.Unchanged(reason, null)

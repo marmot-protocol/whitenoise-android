@@ -23,6 +23,7 @@ internal object PerformanceTestTags {
     const val CONVERSATION_ROUTE_SETTLED = "performance.conversation_route_settled"
     const val MAIN_SHELL_ROUTE_SETTLED = "performance.main_shell_route_settled"
     const val CONVERSATION_CONTROLLER_RELEASED = "performance.conversation_controller_released"
+    const val JUMP_TO_NEWEST = "performance.jump_to_newest"
     const val SHARE_PICKER = "performance.share_picker"
     const val ACTIVITY_INSTANCE_PREFIX = "performance.activity_instance."
 }

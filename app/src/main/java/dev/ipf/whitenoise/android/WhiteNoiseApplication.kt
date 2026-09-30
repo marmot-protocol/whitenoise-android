@@ -5,10 +5,12 @@ import android.util.Log
 import androidx.work.Configuration
 import androidx.work.Operation
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
+import dev.ipf.whitenoise.android.notifications.PushWakeRecoveryScheduler
 import dev.ipf.whitenoise.android.state.DisappearingMessageSweepWorker
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.applyApplicationLanguageTag
 import dev.ipf.whitenoise.android.state.persistedApplicationLanguageTag
+import dev.ipf.whitenoise.android.ui.CustomEmojiStore
 import dev.ipf.whitenoise.android.ui.createRecentEmojiRecentsOwner
 import dev.ipf.whitenoise.android.ui.navigation.MainShellProcessState
 import dev.ipf.whitenoise.android.updates.AppUpdateWorker
@@ -17,6 +19,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 
 internal class BackgroundWorkSchedulingGate {
@@ -46,12 +49,21 @@ open class WhiteNoiseApplication :
      * state behind the same `applicationContext as WhiteNoiseApplication`
      * boundary the production workers use.
      */
-    open val appState: WhiteNoiseAppState by lazy {
-        WhiteNoiseAppState(this)
-    }
+    private val appStateDelegate =
+        lazy {
+            WhiteNoiseAppState(this)
+        }
+    open val appState: WhiteNoiseAppState by appStateDelegate
+
+    /** Inspects an existing runtime without bootstrapping solely to decide push ownership. */
+    internal fun initializedAppState(): WhiteNoiseAppState? = if (appStateDelegate.isInitialized()) appState else null
 
     val recentEmojiRecentsOwner by lazy {
         createRecentEmojiRecentsOwner()
+    }
+
+    internal val customEmojiStore by lazy {
+        CustomEmojiStore(File(filesDir, CustomEmojiStore.DIRECTORY))
     }
 
     private val mainShellProcessStateDelegate =
@@ -94,6 +106,7 @@ open class WhiteNoiseApplication :
         // onCreate on API 32 and lower so it can wrap the Activity context.
         applyApplicationLanguageTag(persistedApplicationLanguageTag(this))
         VoicePlaybackController.attach(this)
+        applicationScope.launch { PushWakeRecoveryScheduler.schedule(this@WhiteNoiseApplication) }
     }
 
     @Suppress("TooGenericExceptionCaught")

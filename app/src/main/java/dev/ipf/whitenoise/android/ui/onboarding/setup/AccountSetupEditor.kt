@@ -5,6 +5,7 @@ package dev.ipf.whitenoise.android.ui.onboarding.setup
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -12,10 +13,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.RandomProfileNameButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 
 /** Text editing lives within one native editor revision; no private key or durable checkpoint is stored here. */
@@ -61,6 +64,7 @@ internal fun SetupEditorContent(
     editor: SetupEditor,
     fields: SetupEditorFields,
     busy: Boolean,
+    randomName: (String?) -> String,
 ) {
     if (editor.action == OnboardingActionFfi.EDIT_PROFILE) {
         WhiteNoiseTextField(
@@ -68,6 +72,15 @@ internal fun SetupEditorContent(
             enabled = !busy,
             lineLimits = TextFieldLineLimits.SingleLine,
             label = { Text(stringResource(R.string.setup_display_name)) },
+            trailingIcon = {
+                RandomProfileNameButton(
+                    enabled = !busy,
+                    onClick = {
+                        fields.displayName.setTextAndPlaceCursorAtEnd(randomName(fields.displayName.text.toString()))
+                    },
+                    modifier = Modifier.testTag("setup.profile.suggest_name"),
+                )
+            },
             modifier = Modifier.fillMaxWidth(),
         )
         WhiteNoiseTextField(

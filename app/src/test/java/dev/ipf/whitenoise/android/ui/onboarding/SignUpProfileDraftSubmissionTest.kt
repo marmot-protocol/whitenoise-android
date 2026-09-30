@@ -89,15 +89,17 @@ class SignUpProfileDraftSubmissionTest {
                         finish = { _, _ -> true },
                     )
                 }
-            WhiteNoiseTheme { SignUpScreen(controller, { true }, {}) }
+            WhiteNoiseTheme { SignUpScreen(controller, { true }, { "Quiet Otter" }, {}) }
         }
         composeRule.onNodeWithTag("onboarding.sign_up.name").performTextInput("Alice")
         composeRule.onNodeWithTag("onboarding.sign_up.about").performTextInput("Current text")
+        composeRule.onNodeWithContentDescription("Suggest name").assertExists()
+        composeRule.onNodeWithTag("onboarding.sign_up.suggest_name").performClick()
         composeRule.runOnIdle { assertEquals(0, creations) }
         composeRule.onNodeWithTag("onboarding.sign_up.action").performClick()
         composeRule.runOnIdle {
             assertEquals(1, creations)
-            assertEquals("Alice", publications.single().displayName)
+            assertEquals("Quiet Otter", publications.single().displayName)
             assertEquals("Current text", publications.single().about)
         }
     }
@@ -125,7 +127,7 @@ class SignUpProfileDraftSubmissionTest {
                         finish = { _, _ -> false },
                     )
                 }
-            WhiteNoiseTheme { SignUpScreen(controller, { false }, {}) }
+            WhiteNoiseTheme { SignUpScreen(controller, { false }, { "Quiet Otter" }, {}) }
         }
         composeRule.onNodeWithTag("onboarding.sign_up.name").performTextInput("Saved locally")
         composeRule.onNodeWithTag("onboarding.sign_up.action").performClick()

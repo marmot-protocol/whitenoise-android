@@ -1,6 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">White Noise</string>
+    <string name="poll_preview">Encuesta</string>
+    <string name="poll_unsupported">No se puede mostrar esta encuesta</string>
+    <string name="poll_closed">Encuesta cerrada</string>
+    <string name="poll_vote_failed">No se pudo enviar el voto</string>
+    <string name="poll_create_failed">No se pudo crear la encuesta</string>
+    <string name="poll_enter_question">Escribe una pregunta.</string>
+    <string name="poll_question_too_long">Esta pregunta es demasiado larga.</string>
+    <string name="poll_add_two_options">Añade al menos dos opciones.</string>
+    <string name="poll_option_too_long">Una de las opciones es demasiado larga.</string>
+    <string name="poll_duplicate_option">Cada opción debe ser diferente.</string>
+    <string name="poll_create">Crear encuesta</string>
+    <string name="poll_question">Pregunta</string>
+    <string name="poll_option">Opción %1$d</string>
+    <string name="poll_add_option">Añadir opción</string>
+    <string name="poll_remove_option">Eliminar opción %1$d</string>
+    <string name="poll_single_choice">Una sola opción</string>
+    <string name="poll_multiple_choice">Varias opciones</string>
+    <string name="poll_submit">Publicar encuesta</string>
+    <string name="poll_deadline">La encuesta termina</string>
+    <string name="poll_no_deadline">Sin fecha límite</string>
+    <string name="poll_30_days">30 días</string>
+    <string name="poll_duration_5_minutes">5 minutos</string>
+    <string name="poll_duration_1_hour">1 hora</string>
+    <string name="poll_duration_1_day">1 día</string>
+    <string name="poll_duration_1_week">1 semana</string>
+    <string name="poll_ends_at">Termina el %1$s</string>
+    <plurals name="poll_option_votes">
+        <item quantity="one">%1$d voto</item>
+        <item quantity="other">%1$d votos</item>
+    </plurals>
+    <plurals name="poll_participants">
+        <item quantity="one">%1$d participante</item>
+        <item quantity="other">%1$d participantes</item>
+    </plurals>
     <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">No se pudo iniciar White Noise</string>
     <string name="startup_taking_too_long">El inicio está tardando más de lo esperado. Inténtalo de nuevo.</string>
@@ -164,8 +198,11 @@
     <string name="leave">Salir</string>
     <string name="couldnt_load_conversation">No se pudo cargar la conversación</string>
     <string name="no_messages_yet">Aún no hay mensajes</string>
+    <string name="wave_hi">Saludar</string>
     <string name="conversation_empty_disappearing_title">No hay mensajes que mostrar</string>
     <string name="conversation_empty_disappearing_body">Los mensajes temporales están activados. Los mensajes nuevos de este chat desaparecen después de %1$s.</string>
+    <string name="conversation_history_may_have_expired">Es posible que los mensajes anteriores hayan caducado</string>
+    <string name="conversation_history_retention_description">%1$s. Mensajes temporales: %2$s.</string>
     <string name="group_empty_only_you_title">Solo estás tú en este grupo</string>
     <string name="group_empty_invite_members">Invita a otras personas cuando quieras.</string>
     <string name="you_are_no_longer_a_member">No puedes enviar mensajes a este grupo porque ya no eres miembro.</string>
@@ -471,14 +508,25 @@
     <string name="developer_mode">Modo desarrollador</string>
     <string name="developer_mode_subtitle">Muestra diagnósticos y elementos internos de MLS.</string>
     <string name="developer_testing_only">Solo para desarrollo y pruebas</string>
+    <string name="developer_seed_fixture">Rellenar conversación de prueba</string>
+    <string name="developer_seed_fixture_subtitle">Enviar mensajes sintéticos a un chat para pruebas de paginación</string>
+    <string name="seed_fixture_title">Rellenar conversación de prueba</string>
+    <string name="seed_fixture_detail">Envía mensajes sintéticos numerados al chat elegido como mensajes reales desde esta cuenta. Usa un grupo de prueba privado; los demás miembros recibirán cada uno de ellos.</string>
+    <string name="seed_fixture_count">Mensajes a enviar</string>
+    <string name="seed_fixture_start">Iniciar</string>
+    <string name="seed_fixture_progress">%1$d de %2$d enviados · %3$d fallidos</string>
+    <string name="seed_fixture_no_groups">Esta cuenta no tiene chats que rellenar.</string>
+    <string name="seed_fixture_stopped">Detenido · %1$d de %2$d enviados</string>
     <string name="developer_testing_only_detail">Estas herramientas pueden exponer información técnica y cambiar el comportamiento de la aplicación.</string>
     <string name="developer_debugging">Depuración</string>
     <string name="diagnostics">Diagnóstico</string>
     <string name="diagnostics_settings_subtitle">Estado del relé y elementos internos de MLS</string>
     <string name="performance_logs">Registros de rendimiento</string>
-    <string name="performance_logs_description">Escribe temporalmente eventos de tiempo respetuosos con la privacidad en Logcat. Se detiene tras 30 minutos o al reiniciar la app.</string>
+    <string name="performance_logs_description">Recopila temporalmente eventos de tiempo que respetan la privacidad en este dispositivo. Se detiene tras 30 minutos o al reiniciar la app.</string>
     <string name="performance_logs_active">Activo · quedan %1$d min</string>
     <string name="performance_logs_inactive">Inactivo</string>
+    <string name="copy_performance_logs">Copiar registros de rendimiento</string>
+    <string name="copy_performance_logs_detail">Copia los eventos limitados y respetuosos con la privacidad de la sesión actual o más reciente.</string>
     <string name="group_system_show_details">Mostrar detalles</string>
     <string name="group_system_hide_details">Ocultar detalles</string>
     <string name="local_notifications">Notificaciones</string>
@@ -725,7 +773,7 @@
     <string name="toast_reaction_failed">La reacción falló</string>
     <string name="toast_couldnt_delete_message">Error al eliminar el mensaje. Por favor, inténtalo de nuevo.</string>
     <string name="toast_couldnt_edit_message">No se pudo editar el mensaje</string>
-    <string name="editing_message">Editando mensaje</string>
+    <string name="edit_message">Editar mensaje</string>
     <string name="cancel_edit">Cancelar edición</string>
     <string name="edited">editado</string>
     <string name="edited_count">editado · %1$d</string>
@@ -838,6 +886,19 @@
     <string name="notifications_are_off">Las notificaciones están desactivadas</string>
     <string name="notifications_are_off_detail">Actívalas en los ajustes de Android para usar estas opciones.</string>
     <string name="delivery">Entrega</string>
+    <string name="notification_delivery_push">Notificaciones push</string>
+    <string name="notification_delivery_push_detail">Se activa brevemente cuando puede haber actividad nueva y comprueba los mensajes de forma segura.</string>
+    <string name="notification_delivery_local_detail">Mantiene una conexión persistente mientras las notificaciones están activadas.</string>
+    <string name="notification_device_policy">Estado del dispositivo</string>
+    <string name="notification_device_policy_detail">El permiso de notificaciones determina si aparecen las alertas. La política de batería puede retrasar la entrega en segundo plano en ambos modos. El estado se actualiza al volver a esta pantalla.</string>
+    <string name="notification_permission_status">Permiso de notificaciones</string>
+    <string name="notification_permission_allowed">Permitido</string>
+    <string name="notification_permission_blocked">Bloqueado</string>
+    <string name="notification_battery_policy">Política de batería</string>
+    <string name="notification_battery_optimized">Optimizada</string>
+    <string name="notification_battery_unrestricted">Sin restricciones</string>
+    <string name="notification_battery_restricted">Restringida</string>
+    <string name="notification_battery_unknown">No disponible</string>
     <string name="local_notifications_detail">Crea notificaciones de mensajes en este dispositivo. Sin push nativo, la entrega puede esperar hasta que White Noise esté activo.</string>
     <string name="native_push_title">Push nativo</string>
     <string name="notification_push_detail">Usa una señal genérica de activación para buscar mensajes nuevos en segundo plano. Los detalles de los mensajes se quedan en este dispositivo.</string>
@@ -974,6 +1035,8 @@
     <string name="media_apk_invalid">El nombre de este archivo indica que es un APK, pero no es un paquete de Android válido</string>
     <string name="media_open">Abrir</string>
     <string name="media_file_too_large">Archivo demasiado grande para adjuntar</string>
+    <string name="media_file_unreadable">No se pudo leer este archivo. Selecciónalo de nuevo.</string>
+    <string name="media_file_empty">No se pueden enviar archivos vacíos.</string>
     <string name="media_album_too_large">Selección demasiado grande para enviar</string>
     <string name="group_image_search_title">Imagen del grupo</string>
     <string name="group_image_search_set">Establecer imagen del grupo</string>
@@ -1159,8 +1222,10 @@
     <string name="folder_none_detail">Crea una carpeta para organizar tus chats.</string>
     <string name="folder_restore_hint">Restaura las carpetas No leídos, Archivados y Grupos que falten. Las carpetas existentes conservan tus cambios.</string>
     <string name="folder_edit">Editar carpeta</string>
+    <string name="folder_delete_action">Eliminar carpeta</string>
     <string name="folder_delete_title">¿Eliminar “%1$s”?</string>
     <string name="folder_delete_detail">¿Eliminar esta carpeta? Tus chats se quedarán donde están.</string>
+    <string name="folder_delete_failed">No se pudo eliminar esta carpeta. Inténtalo de nuevo.</string>
     <string name="actions_for">Acciones para %1$s</string>
     <string name="chat_folder_name">Nombre de la carpeta</string>
     <string name="folder_manual_hint">Los chats que añadas aquí seguirán incluidos aunque no cumplan las reglas automáticas.</string>
@@ -1366,6 +1431,7 @@
     <string name="onboarding_continue_as">Continuar como %1$s</string>
     <string name="onboarding_offline_setup_message">Sin conexión a internet. Conéctate por Wi-Fi, datos móviles u otra red y vuelve a intentarlo.</string>
     <string name="toast_couldnt_login_amber">No se pudo iniciar sesión con Amber</string>
+    <string name="amber_identity_already_added">Esta cuenta ya está añadida a White Noise. Selecciónala en el selector de cuentas.</string>
     <string name="toast_amber_sign_in_cancelled">Inicio de sesión con Amber cancelado</string>
     <string name="onboarding_sign_up">Registrarse</string>
     <string name="sign_in_error_public_key">Esa es una clave pública. Introduce tu clave secreta (nsec) para iniciar sesión.</string>
@@ -1414,6 +1480,18 @@
     <string name="notification_channel_app_updates_global_description">Comportamiento de alertas de Android para las actualizaciones de White Noise</string>
 
     <string name="chat_bubble_colors">Colores de las burbujas</string>
+    <string name="custom_emoji">Emoji personalizados</string>
+    <string name="custom_emoji_detail">Las imágenes que añadas aquí se convierten en emoji :código: en mensajes y reacciones. Se quedan en este dispositivo y los demás ven el código como texto.</string>
+    <string name="custom_emoji_empty">Aún no hay emoji personalizados.</string>
+    <string name="custom_emoji_name_title">Nombra este emoji</string>
+    <string name="custom_emoji_name_label">Código</string>
+    <string name="custom_emoji_name_help">Letras, números y guiones bajos.</string>
+    <string name="custom_emoji_replaces">Sustituye tu %1$s actual.</string>
+    <string name="custom_emoji_remove_title">¿Quitar %1$s?</string>
+    <string name="custom_emoji_remove_detail">La imagen se elimina de este dispositivo. Los mensajes conservan el código como texto.</string>
+    <string name="custom_emoji_too_large">Esa imagen supera 1 MB.</string>
+    <string name="custom_emoji_not_image">Ese archivo no es una imagen que White Noise pueda mostrar.</string>
+    <string name="custom_emoji_save_failed">No se pudo guardar ese emoji.</string>
     <string name="action_color">Color de acción</string>
     <string name="action_color_no_active_account">Selecciona una cuenta activa antes de configurar su color de acento.</string>
     <string name="bubble_color_preview">Vista previa</string>
@@ -1804,6 +1882,9 @@
     <string name="group_recovery_failed_reinvites">No se pudieron restaurar algunas invitaciones. Vuelve a invitar a esas personas desde Detalles del grupo.</string>
     <string name="group_recovery_review_invitation_from">Revisar invitación de %1$s · época %2$s</string>
     <string name="group_recovery_check_failed">No se pudo comprobar la recuperación del grupo. Inténtalo de nuevo.</string>
+    <string name="group_history_may_be_incomplete">Es posible que falten algunos mensajes anteriores en este chat.</string>
+    <string name="account_history_may_be_incomplete">Es posible que falten algunos mensajes en esta cuenta. White Noise no pudo confirmar que llegaran todos los mensajes.</string>
+    <string name="history_notice_dismiss_failed">No se pudo descartar el aviso del historial. Inténtalo de nuevo.</string>
     <string name="group_rejoin_title">¿Volver a unirse al grupo?</string>
     <string name="group_rejoin_invited_by">Invitación de %1$s\n%2$s</string>
     <string name="group_rejoin_replaces_state">Volver a unirte sustituye los datos de cifrado de este dispositivo para el grupo. Tu historial de mensajes se conserva.</string>
@@ -2015,7 +2096,7 @@
     <string name="audit_upload_title">Compartir registros de diagnóstico de grupos</string>
     <string name="audit_upload_subtitle">Comparte los registros de diagnóstico de grupos de todos los perfiles de este dispositivo.</string>
     <string name="audit_upload_confirm_title">¿Compartir registros de diagnóstico de grupos con White Noise?</string>
-    <string name="audit_upload_disclosure">White Noise graba registros de diagnóstico de grupos de todos los perfiles de este dispositivo y los sube a Goggles, operado por Internet Privacy Foundation. También pueden subirse los registros ya guardados aquí. Los registros pueden incluir identificadores de grupos y mensajes, direcciones de relays, marcas de tiempo, referencias seudónimas de cuentas, un identificador de instalación, el modelo de tu dispositivo y la versión de la app. Nunca incluyen el contenido de los mensajes ni claves privadas. Son datos sensibles y los usamos para investigar problemas de fiabilidad. Se mantienen separados del envío de datos de uso y telemetría. Desactivar el envío detiene las nuevas grabaciones y las nuevas subidas, aunque una subida en curso puede terminar. Los registros de este dispositivo y los ya subidos se quedan donde están. Cancelar mantiene desactivado el envío.</string>
+    <string name="audit_upload_disclosure">White Noise graba registros de diagnóstico de grupos de todos los perfiles de este dispositivo y los sube al colector de auditoría de White Noise, operado por Internet Privacy Foundation. También pueden subirse los registros ya guardados aquí. Los registros pueden incluir identificadores de grupos y mensajes, direcciones de relays, marcas de tiempo, referencias seudónimas de cuentas, un identificador de instalación, el modelo de tu dispositivo y la versión de la app. Nunca incluyen el contenido de los mensajes ni claves privadas. Son datos sensibles y los usamos para investigar problemas de fiabilidad. Se mantienen separados del envío de datos de uso y telemetría. Desactivar el envío detiene las nuevas grabaciones y las nuevas subidas, aunque una subida en curso puede terminar. Los registros de este dispositivo y los ya subidos se quedan donde están. Cancelar mantiene desactivado el envío.</string>
     <string name="audit_upload_confirm">Activar envío automático</string>
     <string name="audit_upload_renew">Los detalles del envío han cambiado. Revísalos antes de volver a activar los registros de diagnóstico de grupos.</string>
     <string name="diagnostics_group_disclosure">Los registros de diagnóstico de grupos ayudan a investigar problemas de fiabilidad. Se refieren a los miembros mediante referencias hash. Cada registro puede contener identificadores técnicos y cambios de miembros con marca de tiempo. Nunca incluyen el contenido de los mensajes, nombres de perfiles, nombres de grupos ni claves privadas.</string>
@@ -2041,4 +2122,7 @@
     <string name="export_audit_logs_confirm_action">Continuar</string>
     <string name="toast_couldnt_export_audit_logs">No se pudieron preparar los registros de diagnóstico para exportarlos</string>
     <string name="toast_no_audit_logs_to_export">No hay registros de diagnóstico para exportar</string>
+    <string name="dictation_pause_other_audio_title">Pausar otro audio</string>
+    <string name="dictation_pause_other_audio_subtitle">Pausa la música y los pódcasts mientras dictas; pueden reanudarse al terminar la grabación. La voz y los mensajes de voz de White Noise siempre se pausan por seguridad.</string>
+    <string name="dictation_audio_focus_unavailable">No se pudo pausar otro audio. Inténtalo de nuevo o desactiva esta opción en los ajustes de dictado.</string>
 </resources>

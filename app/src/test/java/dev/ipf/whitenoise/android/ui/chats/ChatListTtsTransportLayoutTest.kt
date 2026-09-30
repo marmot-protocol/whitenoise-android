@@ -22,6 +22,7 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -45,6 +46,8 @@ import org.robolectric.annotation.GraphicsMode
 private const val ROOT_TAG = "chat-list-tts-root"
 private const val TRANSPORT_TAG = "chat-list-tts-transport"
 private const val FIRST_ROW_TAG = "chat-list-tts-first-row"
+private const val HISTORY_NOTICE_TAG = "chat-list-history-notice"
+private const val CHAT_ROWS_TAG = "chat-list-tts-rows"
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -119,6 +122,27 @@ class ChatListTtsTransportLayoutTest {
         capture("chat_list_tts_transport_error_dark.png")
     }
 
+    /** The notice remains visible above the empty state at large RTL text. */
+    @Test
+    fun historyNoticeAppearsAboveEmptyList() {
+        render(
+            state = ChatListFixtureState.Empty,
+            showNotice = true,
+            fontScale = 1.5f,
+            layoutDirection = LayoutDirection.Rtl,
+        )
+        composeRule.onNodeWithTag(HISTORY_NOTICE_TAG).assertIsDisplayed()
+        capture("chat_list_history_notice_empty_large_rtl.png")
+    }
+
+    /** Scrolling chat rows cannot move the account-wide notice out of view. */
+    @Test
+    fun historyNoticeStaysVisibleWhenRowsScroll() {
+        render(showNotice = true)
+        composeRule.onNodeWithTag(CHAT_ROWS_TAG).performScrollToIndex(10)
+        composeRule.onNodeWithTag(HISTORY_NOTICE_TAG).assertIsDisplayed()
+    }
+
     /** Composes the surface under test with the given fixture. */
     private fun render(
         state: ChatListFixtureState = ChatListFixtureState.Loaded,
@@ -126,6 +150,7 @@ class ChatListTtsTransportLayoutTest {
         fontScale: Float = 1f,
         layoutDirection: LayoutDirection = LayoutDirection.Ltr,
         onFirstRowClick: () -> Unit = {},
+        showNotice: Boolean = false,
     ) {
         composeRule.setContent {
             CompositionLocalProvider(
@@ -133,7 +158,7 @@ class ChatListTtsTransportLayoutTest {
             ) {
                 WhiteNoiseTheme(darkTheme = darkTheme, fontScale = fontScale) {
                     CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
-                        ChatListFixture(state, onFirstRowClick)
+                        ChatListFixture(state, onFirstRowClick, showNotice)
                     }
                 }
             }
@@ -147,10 +172,12 @@ class ChatListTtsTransportLayoutTest {
     }
 }
 
+/** Arranges the transport, optional notice, and chat-list state for layout checks. */
 @Composable
 private fun ChatListFixture(
     state: ChatListFixtureState,
     onFirstRowClick: () -> Unit,
+    showNotice: Boolean,
 ) {
     ChatListBodyFrame(
         modifier =
@@ -160,6 +187,15 @@ private fun ChatListFixture(
                 .testTag(ROOT_TAG),
         ttsTransport = {
             TtsFixtureTransport()
+        },
+        notice = {
+            if (showNotice) {
+                AccountHistoryNoticeBanner(
+                    dismissing = false,
+                    onDismiss = {},
+                    modifier = Modifier.testTag(HISTORY_NOTICE_TAG),
+                )
+            }
         },
     ) {
         when (state) {
@@ -175,16 +211,25 @@ private fun ChatListFixture(
                         ),
                     onRetry = {},
                 )
-            ChatListFixtureState.Loaded -> LoadedChatList(onFirstRowClick)
+            ChatListFixtureState.Loaded -> LoadedChatList(onFirstRowClick, showNotice)
         }
     }
 }
 
+/** Adds offscreen rows only when testing whether scrolling leaves the notice visible. */
 @Composable
-private fun LoadedChatList(onFirstRowClick: () -> Unit) {
-    LazyColumn(Modifier.fillMaxSize()) {
+private fun LoadedChatList(
+    onFirstRowClick: () -> Unit,
+    includeExtraRows: Boolean,
+) {
+    val chatTitles =
+        buildList {
+            addAll(listOf("Design team", "Family", "Weekend plans"))
+            if (includeExtraRows) addAll((4..20).map { "Chat $it" })
+        }
+    LazyColumn(Modifier.fillMaxSize().testTag(CHAT_ROWS_TAG)) {
         items(
-            items = listOf("Design team", "Family", "Weekend plans"),
+            items = chatTitles,
             key = { it },
         ) { title ->
             ListItem(

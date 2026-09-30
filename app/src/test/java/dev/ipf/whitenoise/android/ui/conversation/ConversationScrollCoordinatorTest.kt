@@ -12,6 +12,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import java.util.concurrent.CancellationException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @Suppress("LargeClass") // Scroll state-machine invariants share one command/writer harness.
@@ -594,8 +595,192 @@ class ConversationScrollCoordinatorTest {
 
             assertTrue(revealed)
             assertEquals(1, awaitedFrames)
-            assertEquals(listOf(ScrollWrite.Animate(0, 0)), writer.writes)
+            assertEquals(listOf(ScrollWrite.Snap(0, 0)), writer.writes)
             assertTrue(coordinator.isFollowingTail)
+        }
+
+    /** History sends use the same bounded geometry chase and resolve a replaced live tail each frame. */
+    @Test
+    fun historySendSettlesTheChangingTailAboveTheComposerWithoutAnimating() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator =
+                ConversationScrollCoordinator(
+                    writer,
+                    initialMode = ConversationScrollMode.ReadingHistory("old-date", 40),
+                )
+            var frame = 0
+            var prepared = false
+            val resolvedIndexes = mutableListOf<Int>()
+            val revealed =
+                coordinator.revealSentAtLiveTail(
+                    prepareLatest = {
+                        prepared = true
+                        true
+                    },
+                    resolveTailIndex = {
+                        check(prepared)
+                        // A pending/canonical replacement or a concurrent arrival changes the rendered tail.
+                        if (frame < 5) 2 else 0
+                    },
+                    captureLayout = { index ->
+                        resolvedIndexes += index
+                        SentTailGeometry(
+                            tailOffset = if (frame < 11) -8 else 0,
+                            viewportEnd = if (frame < 10) 424 else 432,
+                            padding = if (frame < 10) 72 else 64,
+                            viewportSize = 496,
+                        ).asTailLayout()
+                    },
+                    awaitFrame = { frame++ },
+                )
+
+            assertTrue(revealed)
+            assertEquals(13, frame)
+            assertTrue(writer.writes.all { it is ScrollWrite.Snap })
+            assertEquals(ScrollWrite.Snap(0, 0), writer.writes.last())
+            assertTrue(resolvedIndexes.contains(2))
+            assertTrue(resolvedIndexes.contains(0))
+            assertTrue(coordinator.isFollowingTail)
+        }
+
+    /** No stale-window snap is allowed when authoritative newest preparation fails. */
+    @Test
+    fun historySendWaitsForDelayedNewestPublicationBeforeResolvingTail() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer, ConversationScrollMode.ReadingHistory("old", 20))
+            val releaseNewest = CompletableDeferred<Unit>()
+            var newestPublished = false
+            val reveal =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    assertTrue(
+                        coordinator.revealSentAtLiveTail(
+                            prepareLatest = {
+                                releaseNewest.await()
+                                newestPublished = true
+                                true
+                            },
+                            resolveTailIndex = {
+                                check(newestPublished)
+                                0
+                            },
+                            awaitFrame = {},
+                        ),
+                    )
+                }
+            assertTrue(writer.writes.isEmpty())
+            releaseNewest.complete(Unit)
+            reveal.join()
+            assertEquals(listOf(ScrollWrite.Snap(0, 0)), writer.writes)
+        }
+
+    /** The latest accepted send owns the snap; a suspended earlier preparation cannot scroll later. */
+    @Test
+    fun rapidAcceptedSendsCancelTheOlderDelayedHistoryReveal() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer, ConversationScrollMode.ReadingHistory("old", 20))
+            val firstPrepared = CompletableDeferred<Unit>()
+            var firstResult = true
+            val first =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    firstResult =
+                        coordinator.revealSentAtLiveTail(
+                            prepareLatest = {
+                                firstPrepared.await()
+                                true
+                            },
+                            resolveTailIndex = { 7 },
+                            awaitFrame = {},
+                        )
+                }
+            assertTrue(coordinator.revealSentAtLiveTail(resolveTailIndex = { 0 }, awaitFrame = {}))
+            firstPrepared.complete(Unit)
+            first.join()
+            assertFalse(firstResult)
+            assertEquals(listOf(ScrollWrite.Snap(0, 0)), writer.writes)
+            assertTrue(coordinator.isFollowingTail)
+        }
+
+    /** Reply/search navigation retires a suspended send rather than allowing a late return to newest. */
+    @Test
+    fun newerNavigationCancelsHistorySendPreparation() =
+        runTest {
+            for (reason in listOf(ConversationScrollReason.Reply, ConversationScrollReason.Search)) {
+                val writer = RecordingScrollWriter()
+                val coordinator = ConversationScrollCoordinator(writer)
+                val prepared = CompletableDeferred<Unit>()
+                var revealed = true
+                val send =
+                    launch(start = CoroutineStart.UNDISPATCHED) {
+                        revealed =
+                            coordinator.revealSentAtLiveTail(
+                                prepareLatest = {
+                                    prepared.await()
+                                    true
+                                },
+                                resolveTailIndex = { 0 },
+                                awaitFrame = {},
+                            )
+                    }
+                assertTrue(coordinator.programmaticJump("target", reason) { scrollToItem(18, 12) })
+                prepared.complete(Unit)
+                send.join()
+                assertFalse(revealed)
+                assertEquals(listOf(ScrollWrite.Snap(18, 12)), writer.writes)
+            }
+        }
+
+    /** No stale-window snap is allowed when authoritative newest preparation fails. */
+    @Test
+    fun unavailableNewestWindowPreservesHistoryWithoutWriting() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val history = ConversationScrollMode.ReadingHistory("old-date", 40)
+            val coordinator = ConversationScrollCoordinator(writer, initialMode = history)
+
+            assertFalse(
+                coordinator.revealSentAtLiveTail(
+                    prepareLatest = { false },
+                    resolveTailIndex = { error("an unavailable newest window has no valid tail") },
+                    awaitFrame = { error("no layout should be awaited") },
+                ),
+            )
+            assertTrue(writer.writes.isEmpty())
+            assertEquals(history, coordinator.mode)
+        }
+
+    /** A reader can cancel the send while the newest window is still being prepared. */
+    @Test
+    fun newerGestureCancelsHistorySendDuringNewestPreparation() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            val preparing = CompletableDeferred<Unit>()
+            val prepared = CompletableDeferred<Unit>()
+            var result = true
+            val reveal =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    result =
+                        coordinator.revealSentAtLiveTail(
+                            prepareLatest = {
+                                preparing.complete(Unit)
+                                prepared.await()
+                                true
+                            },
+                            resolveTailIndex = { 0 },
+                            awaitFrame = {},
+                        )
+                }
+            preparing.await()
+            coordinator.onUserGestureStarted(anchor(messageId = "reader", listIndex = 10, pixelOffset = 24))
+            prepared.complete(Unit)
+            reveal.join()
+
+            assertFalse(result)
+            assertTrue(writer.writes.isEmpty())
+            assertEquals(ConversationScrollMode.ReadingHistory("reader", 24), coordinator.mode)
         }
 
     @Test
@@ -730,6 +915,114 @@ class ConversationScrollCoordinatorTest {
             assertFalse(chaseResult)
             assertEquals(listOf(ScrollWrite.Snap(50, 0)), writer.writes)
             assertEquals(ConversationScrollMode.ReadingHistory("reader", 24), coordinator.mode)
+        }
+
+    /**
+     * A gesture settles only once its fling rests, so a command the reader started while the list
+     * was still coasting owns the settle: it is neither cancelled nor overruled by the stale gesture
+     * intent, and it commits its own resulting mode (#2727).
+     */
+    @Test
+    fun gestureSettlingAfterACommandTookOwnershipLeavesTheCommandAlive() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            val engineAnswered = CompletableDeferred<Unit>()
+            var jumpResult = false
+            coordinator.onUserGestureStarted(anchor(messageId = "reader", listIndex = 10, pixelOffset = 24))
+            val jump =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    jumpResult =
+                        coordinator.programmaticJump(
+                            targetMessageId = null,
+                            reason = ConversationScrollReason.Send,
+                            resultingMode = ConversationScrollMode.FollowingTail,
+                        ) {
+                            engineAnswered.await()
+                            scrollToTail(0)
+                        }
+                }
+            runCurrent()
+
+            val released = anchor(messageId = "reader", listIndex = 8, pixelOffset = 0)
+            coordinator.onUserGestureSettled(released, nearBottom = false)
+            engineAnswered.complete(Unit)
+            jump.join()
+
+            assertTrue(jumpResult)
+            assertEquals(listOf(ScrollWrite.Snap(0, 0)), writer.writes)
+            assertEquals(ConversationScrollMode.FollowingTail, coordinator.mode)
+            assertTrue(coordinator.isFollowingTail)
+        }
+
+    /**
+     * When the command that owned the settle then fails, the fallback is where the gesture ended,
+     * not the anchor captured when the finger first landed (#2727).
+     */
+    @Test
+    fun failedCommandFallsBackToWhereTheGestureEnded() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            val engineAnswered = CompletableDeferred<Unit>()
+            var jumpResult = true
+            coordinator.onUserGestureStarted(anchor(messageId = "pressed", listIndex = 10, pixelOffset = 24))
+            val jump =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    jumpResult =
+                        coordinator.programmaticJump(
+                            targetMessageId = null,
+                            reason = ConversationScrollReason.UnreadTail,
+                            resultingMode = ConversationScrollMode.FollowingTail,
+                        ) {
+                            engineAnswered.await()
+                            throw CancellationException("newest edge was not available")
+                        }
+                }
+            runCurrent()
+            val released = anchor(messageId = "released", listIndex = 3, pixelOffset = 8)
+            coordinator.onUserGestureSettled(released, nearBottom = false)
+            assertTrue(
+                "the owning command keeps its transient mode",
+                coordinator.mode is ConversationScrollMode.ProgrammaticJump,
+            )
+
+            engineAnswered.complete(Unit)
+            jump.join()
+
+            assertFalse(jumpResult)
+            assertTrue(writer.writes.isEmpty())
+            assertEquals(ConversationScrollMode.ReadingHistory("released", 8), coordinator.mode)
+            assertEquals("released", coordinator.bookmark(released).anchor.messageId)
+        }
+
+    /**
+     * A command that finishes before the delayed settle keeps its result, the settle only confirms
+     * the live geometry.
+     */
+    @Test
+    fun commandFinishingBeforeTheDelayedSettleKeepsItsResult() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            coordinator.onUserGestureStarted(anchor(messageId = "pressed", listIndex = 10, pixelOffset = 24))
+            val completed =
+                coordinator.programmaticJump(
+                    targetMessageId = null,
+                    reason = ConversationScrollReason.JumpToNewest,
+                    resultingMode = ConversationScrollMode.FollowingTail,
+                ) { scrollToTail(0) }
+            assertTrue(completed)
+            assertTrue(coordinator.isFollowingTail)
+
+            coordinator.onUserGestureSettled(
+                anchor(messageId = "newest", listIndex = 0, pixelOffset = 0),
+                nearBottom = true,
+            )
+
+            assertEquals(listOf(ScrollWrite.Snap(0, 0)), writer.writes)
+            assertEquals(ConversationScrollMode.FollowingTail, coordinator.mode)
+            assertTrue(coordinator.isFollowingTail)
         }
 
     @Test
@@ -950,14 +1243,43 @@ class ConversationScrollCoordinatorTest {
                 assertTrue(jumped)
                 assertEquals(
                     listOf(
-                        ScrollWrite.Snap(78, 0),
-                        ScrollWrite.Animate(88, 0),
+                        ScrollWrite.Snap(88, 0),
                     ),
                     writer.writes,
                 )
                 assertEquals(ConversationScrollMode.FollowingTail, coordinator.mode)
                 assertTrue(coordinator.isFollowingTail)
             }
+        }
+
+    /** A far tail lands in one snap; a tail index that moved during the snap gets one corrective snap. */
+    @Test
+    fun farJumpToNewestSnapsOnceAndCorrectsAMovedTail() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            var resolutions = 0
+
+            val completed =
+                coordinator.jumpToNewest(targetIndex = 88) {
+                    resolutions += 1
+                    if (resolutions == 1) 88 else 89
+                }
+
+            assertTrue(completed)
+            assertEquals(listOf(ScrollWrite.Snap(88, 0), ScrollWrite.Snap(89, 0)), writer.writes)
+            assertEquals(ConversationScrollMode.FollowingTail, coordinator.mode)
+        }
+
+    /** A tail already within ten rows keeps its animation. */
+    @Test
+    fun nearJumpToNewestStillAnimates() =
+        runTest {
+            val writer = RecordingScrollWriter().apply { firstVisibleItemIndex = 6 }
+            val coordinator = ConversationScrollCoordinator(writer)
+
+            assertTrue(coordinator.jumpToNewest(targetIndex = 0))
+            assertEquals(listOf(ScrollWrite.Animate(0, 0)), writer.writes)
         }
 
     @Test
@@ -1018,8 +1340,7 @@ class ConversationScrollCoordinatorTest {
                 listOf(
                     ScrollWrite.Snap(30, 0),
                     ScrollWrite.Animate(40, 0),
-                    ScrollWrite.Snap(78, 0),
-                    ScrollWrite.Animate(88, 0),
+                    ScrollWrite.Snap(88, 0),
                 ),
                 writer.writes,
             )
@@ -1107,8 +1428,7 @@ class ConversationScrollCoordinatorTest {
                 assertEquals(ConversationJumpToNewestOutcome.Tail, outcome)
                 assertEquals(
                     listOf(
-                        ScrollWrite.Snap(78, 0),
-                        ScrollWrite.Animate(88, 0),
+                        ScrollWrite.Snap(88, 0),
                     ),
                     writer.writes,
                 )
@@ -1139,8 +1459,7 @@ class ConversationScrollCoordinatorTest {
                 listOf(
                     ScrollWrite.Snap(30, 0),
                     ScrollWrite.Animate(40, 0),
-                    ScrollWrite.Snap(78, 0),
-                    ScrollWrite.Animate(88, 0),
+                    ScrollWrite.Snap(88, 0),
                 ),
                 writer.writes,
             )

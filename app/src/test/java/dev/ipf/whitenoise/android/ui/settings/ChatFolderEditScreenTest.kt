@@ -2,9 +2,12 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
 import androidx.compose.material3.Surface
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -13,6 +16,7 @@ import dev.ipf.whitenoise.android.state.ChatFolderPreferences
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.WHITE_NOISE_TOP_BAR_BACK_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -76,6 +80,61 @@ class ChatFolderEditScreenTest {
                 .foldersFor(ACCOUNT_REF)
                 .first { it.id == ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID }
         assertEquals("Catch up", unread.name)
+    }
+
+    @Test
+    fun deleteFromEditorConfirmsExactFolderWithoutSavingDraft() {
+        val appState = appState()
+        appState.chatFolderPreferences.foldersFor(ACCOUNT_REF)
+        var closed = false
+        renderEditor(appState, onClose = { closed = true })
+
+        composeRule
+            .onNodeWithText(app.getString(R.string.chat_list_filter_unread))
+            .performTextReplacement("Unsaved name")
+        composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag("folder.delete"))
+        composeRule.onNodeWithTag("folder.delete").performClick()
+        composeRule.onNodeWithText(app.getString(R.string.folder_delete_title, "Unread")).assertExists()
+        composeRule.onNodeWithText(app.getString(R.string.folder_delete_detail)).assertExists()
+        composeRule.onNodeWithText(app.getString(R.string.cancel)).performClick()
+        composeRule.onNodeWithText("Unsaved name").assertExists()
+        val folderStillExists =
+            appState.chatFolderPreferences.foldersFor(ACCOUNT_REF).any {
+                it.id == ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID
+            }
+        assertTrue(folderStillExists)
+
+        composeRule.onNodeWithTag("folder.delete").performClick()
+        composeRule.onNodeWithTag("folder.delete_confirm").performClick()
+        assertTrue(closed)
+        val remaining = appState.chatFolderPreferences.foldersFor(ACCOUNT_REF)
+        assertTrue(remaining.none { it.id == ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID })
+        assertTrue(remaining.any { it.id == ChatFolderPreferences.SYSTEM_FOLDER_ARCHIVED_ID })
+        assertTrue(remaining.none { it.name == "Unsaved name" })
+    }
+
+    @Test
+    fun backWhileDeleteConfirmationOpenKeepsUnsavedEdits() {
+        val appState = appState()
+        appState.chatFolderPreferences.foldersFor(ACCOUNT_REF)
+        var closed = false
+        renderEditor(appState, onClose = { closed = true })
+        composeRule
+            .onNodeWithText(app.getString(R.string.chat_list_filter_unread))
+            .performTextReplacement("Unsaved name")
+        composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag("folder.delete"))
+        composeRule.onNodeWithTag("folder.delete").performClick()
+
+        composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
+
+        composeRule.onNodeWithTag("folder.delete_dialog").assertDoesNotExist()
+        composeRule.onNodeWithText("Unsaved name").assertExists()
+        assertTrue(!closed)
+        val folderStillExists =
+            appState.chatFolderPreferences.foldersFor(ACCOUNT_REF).any {
+                it.id == ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID
+            }
+        assertTrue(folderStillExists)
     }
 
     private fun renderEditor(

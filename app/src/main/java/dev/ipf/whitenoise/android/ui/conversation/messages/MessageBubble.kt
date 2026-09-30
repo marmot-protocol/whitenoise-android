@@ -120,6 +120,7 @@ import dev.ipf.whitenoise.android.state.reportsFor
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.ttsStartFailureMessage
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
+import dev.ipf.whitenoise.android.ui.LocalReceivedEmoji
 import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayout
 import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
 import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
@@ -132,6 +133,7 @@ import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutR
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutSink
 import dev.ipf.whitenoise.android.ui.conversation.InvitationActions
 import dev.ipf.whitenoise.android.ui.conversation.InviteAcceptanceResolutionStatus
+import dev.ipf.whitenoise.android.ui.conversation.composer.BlockedDmComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
@@ -147,6 +149,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.messageHasShareablePaylo
 import dev.ipf.whitenoise.android.ui.conversation.media.presentAttachmentSaveOutcome
 import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachments
 import dev.ipf.whitenoise.android.ui.conversation.media.shareMessageExternally
+import dev.ipf.whitenoise.android.ui.conversation.media.shouldExpandCaptionedPortrait
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ConfigureReactionsSheet
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionDetailsSheet
@@ -346,6 +349,8 @@ internal fun MessageBubble(
     onQuickReactionsSave: (List<String>) -> Unit,
     onReplyPreviewClick: (TimelineMessage) -> Unit,
     composerGate: ComposerGate,
+    blockedDmUnblockInFlight: Boolean = false,
+    onUnblockBlockedDm: () -> Unit = {},
     groupDisbanded: Boolean = false,
     inviteMutationInFlight: Boolean,
     onJoinInvite: () -> Unit,
@@ -366,13 +371,17 @@ internal fun MessageBubble(
     parseMarkdown: suspend (String) -> MarkdownDocumentFfi = { appState.parseMarkdownOrEmpty(it) },
 ) {
     val record = item.record
-    val messageAttachments =
+    val protocolAttachments =
         rememberMessageAttachments(
             tags = record.tags,
             messageIdHex = record.messageIdHex,
             sourceEpoch = record.sourceEpoch,
             projectedMedia = item.projected?.media,
         )
+    // NIP-30 artwork renders inline in the text, so it is not listed as a shared file.
+    val receivedEmoji = LocalReceivedEmoji.current
+    val messageAttachments =
+        remember(protocolAttachments, receivedEmoji) { protocolAttachments.withoutEmoji(receivedEmoji) }
     val mediaReferences = messageAttachments.references
     val keptMessages = LocalKeptMessages.current
     // Null until the controller has bound an account, which is also the only
@@ -1318,7 +1327,10 @@ internal fun MessageBubble(
             record.kind == 9uL -> editState?.latestText ?: record.plaintext
             else -> null
         }?.takeIf { it.isNotBlank() }
-    val protocolAttachmentCount = remember(record.tags) { record.tags.count { it.values.firstOrNull() == "imeta" } }
+    val protocolAttachmentCount =
+        remember(record.tags, receivedEmoji) {
+            record.tags.count { it.values.firstOrNull() == "imeta" } - receivedEmoji.attachmentIndexes.size
+        }
     val canShareMessage =
         !deleted &&
             !invalidated &&
@@ -1941,6 +1953,27 @@ internal fun MessageBubble(
                     )
                 val bodyOrWarningInsideBubble =
                     shouldFrameMessageBubbleSupplement(bodyTextToRender, outerInvalidationWarning)
+                val soleCaptionedVisual =
+                    if (bubbleMedia.hasConfirmedMedia) {
+                        bubbleMedia.visuals.singleOrNull()?.value.takeIf {
+                            bubbleMedia.audio.isEmpty() && bubbleMedia.files.isEmpty()
+                        }
+                    } else {
+                        bubbleMedia.pendingVisuals.singleOrNull()?.value.takeIf {
+                            bubbleMedia.pendingAudio.isEmpty()
+                        }
+                    }
+                val expandCaptionedNarrowVisual =
+                    bodyOrWarningInsideBubble &&
+                        sharedLocation == null &&
+                        sharedContact == null &&
+                        sharedUser == null &&
+                        remoteGiphyMedia == null &&
+                        bubbleMedia.rejected.isEmpty() &&
+                        shouldExpandCaptionedPortrait(
+                            hasCaption = mediaCaption != null,
+                            dim = soleCaptionedVisual?.dim,
+                        )
                 // The footer's time and delivery glyph are secondary metadata: a quiet
                 // gray against the resolved bubble fill, the error pairing for a
                 // persisted failure, and the AMOLED directional accent. Media scrim
@@ -2144,6 +2177,8 @@ internal fun MessageBubble(
                                                 sharedContact = sharedContact,
                                                 sharedUser = sharedUser,
                                                 remoteGiphyMedia = remoteGiphyMedia,
+                                                giphyEditedLabel = footerLabel,
+                                                onGiphyEditedClick = onEditedClick,
                                                 deleted = deleted,
                                                 mine = mine,
                                                 showStatus = showOutgoingStatus,
@@ -2154,6 +2189,7 @@ internal fun MessageBubble(
                                                 onMediaLongPress = onMediaLongPress,
                                                 focusedPreview = isActionMenuOpen,
                                                 hasCaption = mediaCaption != null,
+                                                expandNarrowVisualToStandardWidth = expandCaptionedNarrowVisual,
                                             )
                                         }
                                     }
@@ -2189,13 +2225,12 @@ internal fun MessageBubble(
                                     bubbleContentColor = bubbleContentColor,
                                     timestampColor = timestampColor,
                                     statusContainerColor = colorFromArgb(bubblePresentation.backgroundArgb),
-                                    showStatus = showOutgoingStatus && !fileFooterInCard,
-                                    retentionOwnedByFileCard = fileFooterInCard,
-                                    editedLabel = footerLabel,
-                                    onEditedClick = onEditedClick,
+                                    showStatus = showOutgoingStatus && !fileFooterInCard && remoteGiphyMedia == null,
+                                    editedLabel = footerLabel.takeIf { remoteGiphyMedia == null },
+                                    onEditedClick = onEditedClick.takeIf { remoteGiphyMedia == null },
                                     footerOnVisualMedia = footerOnVisualMedia,
                                     footerOnPendingVisual = footerOnPendingVisual,
-                                    showTimestamp = !fileFooterInCard,
+                                    showTimestamp = !fileFooterInCard && remoteGiphyMedia == null,
                                     invalidationWarning = outerInvalidationWarning,
                                     mine = mine,
                                     onExpand = { if (!deleted) expandedFullView = true },
@@ -2228,6 +2263,8 @@ internal fun MessageBubble(
                                                 sharedContact = sharedContact,
                                                 sharedUser = sharedUser,
                                                 remoteGiphyMedia = remoteGiphyMedia,
+                                                giphyEditedLabel = footerLabel,
+                                                onGiphyEditedClick = onEditedClick,
                                                 deleted = deleted,
                                                 mine = mine,
                                                 showStatus = showOutgoingStatus,
@@ -2238,6 +2275,7 @@ internal fun MessageBubble(
                                                 onMediaLongPress = onMediaLongPress,
                                                 focusedPreview = isActionMenuOpen,
                                                 hasCaption = mediaCaption != null,
+                                                expandNarrowVisualToStandardWidth = expandCaptionedNarrowVisual,
                                             )
                                         }
                                     }
@@ -2276,13 +2314,12 @@ internal fun MessageBubble(
                                     bubbleContentColor = bubbleContentColor,
                                     timestampColor = timestampColor,
                                     statusContainerColor = colorFromArgb(bubblePresentation.backgroundArgb),
-                                    showStatus = showOutgoingStatus && !fileFooterInCard,
-                                    retentionOwnedByFileCard = fileFooterInCard,
-                                    editedLabel = footerLabel,
-                                    onEditedClick = onEditedClick,
+                                    showStatus = showOutgoingStatus && !fileFooterInCard && remoteGiphyMedia == null,
+                                    editedLabel = footerLabel.takeIf { remoteGiphyMedia == null },
+                                    onEditedClick = onEditedClick.takeIf { remoteGiphyMedia == null },
                                     footerOnVisualMedia = footerOnVisualMedia,
                                     footerOnPendingVisual = footerOnPendingVisual,
-                                    showTimestamp = !fileFooterInCard,
+                                    showTimestamp = !fileFooterInCard && remoteGiphyMedia == null,
                                     invalidationWarning = outerInvalidationWarning,
                                     mine = mine,
                                     onExpand = { if (!deleted) expandedFullView = true },
@@ -2347,7 +2384,6 @@ internal fun MessageBubble(
                             timestampColor = timestampColor,
                             statusContainerColor = bubbleBackgroundColor,
                             showStatus = shouldShowMessageStatus(mine, deleted, invalidationPresentation),
-                            retentionOwnedByFileCard = false,
                             editedLabel = footerLabel,
                             onEditedClick = onEditedClick,
                             footerOnVisualMedia = footerOnVisualMedia,
@@ -2428,7 +2464,7 @@ internal fun MessageBubble(
                             // edit modes are mutually exclusive in the
                             // composer banner.
                             controller.replyingTo = null
-                            controller.editingMessageId = record.messageIdHex
+                            controller.beginMessageEdit(record.messageIdHex)
                         }
                     },
                     onCopyText = ::copyMessageText,
@@ -2498,35 +2534,15 @@ internal fun MessageBubble(
                         },
                     previewReady = !hasMedia || focusedMediaReady,
                     preview = {
-                        val previewRetention =
-                            record
-                                .retentionIndicatorInput(
-                                    controllerKey = controller,
-                                    accountRef = controller.boundAccountRef,
-                                    deleted = deleted,
-                                    retentionAtSendSeconds = item.retentionAtSendSeconds,
-                                ).takeUnless { fileFooterInCard }
-                        val previewReserveRetention =
-                            !fileFooterInCard &&
-                                !deleted &&
-                                shouldReserveRetentionIndicatorSpace(
-                                    input = previewRetention,
-                                    projectedRetentionSeconds = record.retentionSeconds,
-                                    mine = mine,
-                                    status = item.status,
-                                    groupRetentionSeconds = controller.group.disappearingMessageSecs,
-                                )
                         val previewFooter: @Composable () -> Unit = {
                             MessageInlineFooter(
                                 timeText = rememberedMessageBubbleTime(record.recordedAt),
                                 color = timestampColor,
-                                showStatus = showOutgoingStatus && !fileFooterInCard,
+                                showStatus = showOutgoingStatus && !fileFooterInCard && remoteGiphyMedia == null,
                                 status = item.status,
-                                editedLabel = footerLabel,
+                                editedLabel = footerLabel.takeIf { remoteGiphyMedia == null },
                                 onEditedClick = null,
-                                retention = previewRetention,
-                                reserveRetentionSpace = previewReserveRetention,
-                                showTime = !fileFooterInCard,
+                                showTime = !fileFooterInCard && remoteGiphyMedia == null,
                                 statusContainerColor = colorFromArgb(bubblePresentation.backgroundArgb),
                             )
                         }
@@ -2578,7 +2594,7 @@ internal fun MessageBubble(
                                     )
                                 }
                                 mediaPreview?.invoke()
-                                if (!footerOnVisualMedia && !footerOnPendingVisual) {
+                                if (!footerOnVisualMedia && !footerOnPendingVisual && remoteGiphyMedia == null) {
                                     previewFooter()
                                 }
                             }
@@ -2603,13 +2619,6 @@ internal fun MessageBubble(
                                 footerContent = previewFooter,
                                 warning = outerInvalidationWarning,
                                 editedLabel = footerLabel,
-                                retention =
-                                    record.retentionIndicatorInput(
-                                        controllerKey = controller,
-                                        accountRef = controller.boundAccountRef,
-                                        deleted = deleted,
-                                        retentionAtSendSeconds = item.retentionAtSendSeconds,
-                                    ),
                                 mentionedSelf = mentionedSelf,
                                 mentionedYouLabel = mentionedYouLabel,
                                 reply =
@@ -2735,6 +2744,11 @@ internal fun MessageBubble(
                                         )
                                     }
                                 ComposerGate.NOTICE -> RemovedMemberComposerNotice()
+                                ComposerGate.BLOCKED ->
+                                    BlockedDmComposerNotice(
+                                        unblockInFlight = blockedDmUnblockInFlight,
+                                        onUnblock = onUnblockBlockedDm,
+                                    )
                                 ComposerGate.FROZEN -> FrozenGroupComposerNotice()
                                 ComposerGate.DISBANDED -> DisbandedGroupComposerNotice(disbanded = groupDisbanded)
                                 ComposerGate.INVITE ->
@@ -2776,7 +2790,7 @@ internal fun MessageBubble(
                                             textState = composerTextState,
                                             editingMessageId = controller.editingMessageId,
                                             editingInitialText = editingRecord?.let { controller.displayedText(it) },
-                                            onCancelEdit = { controller.editingMessageId = null },
+                                            onCancelEdit = controller::cancelMessageEdit,
                                             appState = appState,
                                             mentionCandidates = mentionCandidates,
                                             mentionPickerEnabled = mentionPickerEnabled,

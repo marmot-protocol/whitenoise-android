@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.AppPerformanceOperationSnapshotFfi
 internal enum class MediaProbeNativePhase(
     val wireName: String,
 ) {
+    UPLOAD("upload"),
     DOWNLOAD("download"),
     QUEUE_WAIT("queue_wait"),
     PREPARATION("preparation"),

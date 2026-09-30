@@ -10,6 +10,111 @@ import java.util.Collections
 import java.util.concurrent.CountDownLatch
 
 class PushTokenStoreTest {
+    /** A failed durable marker commit must be visible to dispatch even if preferences updated memory. */
+    @Test
+    fun wakeMarkerReportsCommitFailure() {
+        val preferences = FakeSharedPreferences(ArrayDeque(listOf(false, true)))
+        val store = PushTokenStore(preferences)
+        assertFalse(store.recordPendingPushWakeCatchUp())
+        assertTrue(store.recordPendingPushWakeCatchUp())
+        assertEquals(2, preferences.commitCalls)
+    }
+
+    /** A new generation and its eligible exhausted-budget reset must share one commit. */
+    @Test
+    fun wakeRecordAndEpisodeAdmissionCommitAtomically() {
+        val preferences = FakeSharedPreferences()
+        val store = PushTokenStore(preferences)
+        assertTrue(store.recordPendingPushWakeCatchUp())
+        repeat(PUSH_WAKE_MAX_ATTEMPTS) {
+            assertTrue(store.claimPushWakeAttempt(1_000L) != null)
+        }
+        val exhaustedGeneration = store.pendingPushWakeCatchUpGeneration()
+        val commitsBeforeWake = preferences.commitCalls
+
+        assertTrue(store.recordPendingPushWakeCatchUpAndAdmitEpisode(241_001L))
+
+        assertEquals(commitsBeforeWake + 1, preferences.commitCalls)
+        assertTrue(store.pendingPushWakeCatchUpGeneration() > exhaustedGeneration)
+        assertEquals(0, store.pushWakeAttempts())
+        assertEquals(0L, store.pushWakeRetryDelay(241_001L))
+    }
+
+    /** A failed combined commit cannot report a recorded wake while leaving the exhausted budget durable. */
+    @Test
+    fun wakeRecordAndEpisodeAdmissionShareTheSameFailureResult() {
+        val commitResults = ArrayDeque<Boolean>()
+        repeat(1 + PUSH_WAKE_MAX_ATTEMPTS) { commitResults += true }
+        commitResults += false
+        val preferences = FakeSharedPreferences(commitResults)
+        val store = PushTokenStore(preferences)
+        assertTrue(store.recordPendingPushWakeCatchUp())
+        repeat(PUSH_WAKE_MAX_ATTEMPTS) {
+            assertTrue(store.claimPushWakeAttempt(1_000L) != null)
+        }
+
+        assertFalse(store.recordPendingPushWakeCatchUpAndAdmitEpisode(241_001L))
+
+        assertEquals(2 + PUSH_WAKE_MAX_ATTEMPTS, preferences.commitCalls)
+    }
+
+    /** Native work must not run when reserving its finite budget fails on disk. */
+    @Test
+    fun wakeBudgetReportsCommitFailure() {
+        val preferences = FakeSharedPreferences(ArrayDeque(listOf(true, false)))
+        val store = PushTokenStore(preferences)
+        assertTrue(store.recordPendingPushWakeCatchUp())
+        assertEquals(
+            PushTokenStore.PushWakeAttemptReservation.PersistenceFailed,
+            store.reservePushWakeAttempt(1_000L),
+        )
+    }
+
+    /** A wake that cannot consume the bounded budget remains a normal rejection. */
+    @Test
+    fun wakeBudgetKeepsNormalRejectionDistinctFromPersistenceFailure() {
+        assertEquals(
+            PushTokenStore.PushWakeAttemptReservation.Rejected,
+            store().reservePushWakeAttempt(1_000L),
+        )
+    }
+
+    /** Losing acknowledgement can cause another fetch after restart but cannot report durable success. */
+    @Test
+    fun wakeAcknowledgementReportsCommitFailure() {
+        val preferences = FakeSharedPreferences(ArrayDeque(listOf(true, false)))
+        val store = PushTokenStore(preferences)
+        store.recordPendingPushWakeCatchUp()
+        assertFalse(store.clearPendingPushWakeCatchUp(store.pendingPushWakeCatchUpGeneration()))
+    }
+
+    /** A successful quiet episode releases the failure budget while a newer wake stays pending. */
+    @Test
+    fun quietSuccessPreservesNewerGenerationAndEndsFailureEpisode() {
+        val store = store()
+        store.recordPendingPushWakeCatchUp()
+        val observed = store.pendingPushWakeCatchUpGeneration()
+        assertTrue(store.claimPushWakeAttempt(1_000L) != null)
+        store.recordPendingPushWakeCatchUp()
+        assertTrue(store.completePushWakeAttempt())
+        assertFalse(store.clearPendingPushWakeCatchUp(observed))
+        assertTrue(store.pushWakeCatchUpPending())
+        assertEquals(0, store.pushWakeAttempts())
+    }
+
+    /** A lifecycle fence that closes during admission restores the exact durable attempt budget. */
+    @Test
+    fun abandonedAttemptRestoresBudgetWithoutClearingWake() {
+        val store = store()
+        store.recordPendingPushWakeCatchUp()
+        val claim = requireNotNull(store.claimPushWakeAttempt(1_000L))
+
+        assertTrue(store.releasePushWakeAttempt(claim))
+        assertEquals(0, store.pushWakeAttempts())
+        assertTrue(store.pushWakeCatchUpPending())
+        assertEquals(0L, store.pushWakeRetryDelay(1_000L))
+    }
+
     @Test
     fun setTokenAndLastTokenRoundTrip() {
         val store = store()
@@ -431,7 +536,7 @@ class PushTokenStoreTest {
         override fun getInt(
             key: String?,
             defValue: Int,
-        ): Int = defValue
+        ): Int = (values[key] as? Int) ?: defValue
 
         override fun getLong(
             key: String?,

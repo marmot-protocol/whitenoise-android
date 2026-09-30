@@ -1911,6 +1911,7 @@ internal fun MainShell(
                     selectedConversationSurfaceState.hasVisibleComposer(
                         controller,
                         selectedChatOpenContext.notificationOpenRequestId,
+                        appState.runtimeMirrors.blocks,
                     )
                 } == true &&
                     appState.pendingProfileNpub == null &&

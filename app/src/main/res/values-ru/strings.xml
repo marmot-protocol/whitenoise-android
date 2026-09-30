@@ -1,6 +1,44 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">White Noise</string>
+    <string name="poll_preview">Опрос</string>
+    <string name="poll_unsupported">Не удалось показать этот опрос</string>
+    <string name="poll_closed">Опрос закрыт</string>
+    <string name="poll_vote_failed">Не удалось отправить голос</string>
+    <string name="poll_create_failed">Не удалось создать опрос</string>
+    <string name="poll_enter_question">Введите вопрос.</string>
+    <string name="poll_question_too_long">Этот вопрос слишком длинный.</string>
+    <string name="poll_add_two_options">Добавьте не менее двух вариантов.</string>
+    <string name="poll_option_too_long">Один из вариантов слишком длинный.</string>
+    <string name="poll_duplicate_option">Все варианты должны отличаться.</string>
+    <string name="poll_create">Создать опрос</string>
+    <string name="poll_question">Вопрос</string>
+    <string name="poll_option">Вариант %1$d</string>
+    <string name="poll_add_option">Добавить вариант</string>
+    <string name="poll_remove_option">Удалить вариант %1$d</string>
+    <string name="poll_single_choice">Один вариант</string>
+    <string name="poll_multiple_choice">Несколько вариантов</string>
+    <string name="poll_submit">Опубликовать опрос</string>
+    <string name="poll_deadline">Опрос завершится</string>
+    <string name="poll_no_deadline">Без срока</string>
+    <string name="poll_30_days">30 дней</string>
+    <string name="poll_duration_5_minutes">5 минут</string>
+    <string name="poll_duration_1_hour">1 час</string>
+    <string name="poll_duration_1_day">1 день</string>
+    <string name="poll_duration_1_week">1 неделя</string>
+    <string name="poll_ends_at">Завершится %1$s</string>
+    <plurals name="poll_option_votes">
+        <item quantity="one">%1$d голос</item>
+        <item quantity="few">%1$d голоса</item>
+        <item quantity="many">%1$d голосов</item>
+        <item quantity="other">%1$d голоса</item>
+    </plurals>
+    <plurals name="poll_participants">
+        <item quantity="one">%1$d участник</item>
+        <item quantity="few">%1$d участника</item>
+        <item quantity="many">%1$d участников</item>
+        <item quantity="other">%1$d участника</item>
+    </plurals>
     <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">Не удалось запустить White Noise</string>
     <string name="startup_taking_too_long">Запуск занимает больше времени, чем ожидалось. Повторите попытку.</string>
@@ -180,8 +218,11 @@
     <string name="leave">Покинуть</string>
     <string name="couldnt_load_conversation">Не удалось загрузить беседу</string>
     <string name="no_messages_yet">Пока нет сообщений</string>
+    <string name="wave_hi">Помахать</string>
     <string name="conversation_empty_disappearing_title">Нет сообщений для показа</string>
     <string name="conversation_empty_disappearing_body">Исчезающие сообщения включены. Новые сообщения в этом чате исчезают через %1$s.</string>
+    <string name="conversation_history_may_have_expired">Более ранние сообщения могли исчезнуть</string>
+    <string name="conversation_history_retention_description">%1$s. Исчезающие сообщения: %2$s.</string>
     <string name="group_empty_only_you_title">В этой группе пока только вы</string>
     <string name="group_empty_invite_members">Пригласите людей, когда будете готовы.</string>
     <string name="you_are_no_longer_a_member">Вы не можете отправлять сообщения в эту группу, так как больше не являетесь её участником.</string>
@@ -501,14 +542,25 @@
     <string name="developer_mode">Режим разработчика</string>
     <string name="developer_mode_subtitle">Показывает диагностику и внутренние компоненты MLS.</string>
     <string name="developer_testing_only">Только для разработки и тестирования</string>
+    <string name="developer_seed_fixture">Заполнить тестовый чат</string>
+    <string name="developer_seed_fixture_subtitle">Отправить синтетические сообщения в чат для тестов подгрузки истории</string>
+    <string name="seed_fixture_title">Заполнить тестовый чат</string>
+    <string name="seed_fixture_detail">Отправляет пронумерованные синтетические сообщения в выбранный чат как настоящие сообщения от этого аккаунта. Используйте приватную тестовую группу: остальные участники получат каждое из них.</string>
+    <string name="seed_fixture_count">Сколько сообщений отправить</string>
+    <string name="seed_fixture_start">Начать</string>
+    <string name="seed_fixture_progress">Отправлено %1$d из %2$d · ошибок: %3$d</string>
+    <string name="seed_fixture_no_groups">В этом аккаунте нет чатов для заполнения.</string>
+    <string name="seed_fixture_stopped">Остановлено · отправлено %1$d из %2$d</string>
     <string name="developer_testing_only_detail">Эти инструменты могут раскрывать технические сведения и изменять поведение приложения.</string>
     <string name="developer_debugging">Отладка</string>
     <string name="diagnostics">Диагностика</string>
     <string name="diagnostics_settings_subtitle">Состояние реле и внутреннее устройство MLS</string>
     <string name="performance_logs">Журналы производительности</string>
-    <string name="performance_logs_description">Временно записывает безопасные для конфиденциальности временные события в Logcat. Отключается через 30 минут или при перезапуске приложения.</string>
+    <string name="performance_logs_description">Временно собирает на этом устройстве события измерения времени без личных данных. Отключается через 30 минут или при перезапуске приложения.</string>
     <string name="performance_logs_active">Активно · осталось %1$d мин</string>
     <string name="performance_logs_inactive">Неактивно</string>
+    <string name="copy_performance_logs">Копировать журналы производительности</string>
+    <string name="copy_performance_logs_detail">Копирует ограниченный набор событий без личных данных из текущего или последнего сеанса.</string>
     <string name="group_system_show_details">Показать подробности</string>
     <string name="group_system_hide_details">Скрыть подробности</string>
     <string name="local_notifications">Уведомления</string>
@@ -755,7 +807,7 @@
     <string name="toast_reaction_failed">Реакция не удалась</string>
     <string name="toast_couldnt_delete_message">Не удалось удалить сообщение. Попробуйте снова.</string>
     <string name="toast_couldnt_edit_message">Не удалось изменить сообщение</string>
-    <string name="editing_message">Редактирование сообщения</string>
+    <string name="edit_message">Редактировать сообщение</string>
     <string name="cancel_edit">Отменить редактирование</string>
     <string name="edited">изменено</string>
     <string name="edited_count">изменено · %1$d</string>
@@ -870,6 +922,19 @@
     <string name="notifications_are_off">Уведомления отключены</string>
     <string name="notifications_are_off_detail">Включите их в настройках Android, чтобы использовать эти параметры.</string>
     <string name="delivery">Доставка</string>
+    <string name="notification_delivery_push">Push-уведомления</string>
+    <string name="notification_delivery_push_detail">Кратковременно пробуждает приложение при возможной новой активности, затем безопасно проверяет сообщения.</string>
+    <string name="notification_delivery_local_detail">Поддерживает постоянное соединение, пока уведомления включены.</string>
+    <string name="notification_device_policy">Состояние устройства</string>
+    <string name="notification_device_policy_detail">Разрешение на уведомления определяет, будут ли видны оповещения. Настройки батареи могут задерживать доставку в фоне в обоих режимах. Состояние обновится при возврате на этот экран.</string>
+    <string name="notification_permission_status">Разрешение уведомлений</string>
+    <string name="notification_permission_allowed">Разрешено</string>
+    <string name="notification_permission_blocked">Заблокировано</string>
+    <string name="notification_battery_policy">Политика батареи</string>
+    <string name="notification_battery_optimized">Оптимизировано</string>
+    <string name="notification_battery_unrestricted">Без ограничений</string>
+    <string name="notification_battery_restricted">Ограничено</string>
+    <string name="notification_battery_unknown">Недоступно</string>
     <string name="local_notifications_detail">Создайте уведомления о сообщениях на этом устройстве. Без встроенной push доставка может подождать, пока White Noise не станет активным.</string>
     <string name="native_push_title">Родной толчок</string>
     <string name="notification_push_detail">Используйте общий сигнал пробуждения для проверки наличия новых сообщений в фоновом режиме. Информация о сообщении останется на этом устройстве.</string>
@@ -1014,6 +1079,8 @@
     <string name="media_apk_invalid">Файл называется как APK, но не является допустимым пакетом Android</string>
     <string name="media_open">Открыть</string>
     <string name="media_file_too_large">Файл слишком большой для отправки</string>
+    <string name="media_file_unreadable">Не удалось прочитать этот файл. Выберите его снова.</string>
+    <string name="media_file_empty">Пустые файлы нельзя отправить.</string>
     <string name="media_album_too_large">Выбор слишком большой для отправки</string>
     <string name="group_image_search_title">Изображение группы</string>
     <string name="group_image_search_set">Задать изображение группы</string>
@@ -1201,8 +1268,10 @@
     <string name="folder_none_detail">Создайте папку для организации своих чатов.</string>
     <string name="folder_restore_hint">Восстановите отсутствующие папки «Непрочитанные», «Архивированные» и «Группы». Существующие папки сохраняют ваши изменения.</string>
     <string name="folder_edit">Редактировать папку</string>
+    <string name="folder_delete_action">Удалить папку</string>
     <string name="folder_delete_title">Удалить «%1$s»?</string>
     <string name="folder_delete_detail">Удалить эту папку? Ваши чаты останутся там, где они есть.</string>
+    <string name="folder_delete_failed">Не удалось удалить эту папку. Попробуйте ещё раз.</string>
     <string name="actions_for">Действия для %1$s</string>
     <string name="chat_folder_name">Имя папки</string>
     <string name="folder_manual_hint">Чаты, которые вы сюда добавляете, остаются включенными, даже если они не соответствуют автоматическим правилам.</string>
@@ -1418,6 +1487,7 @@
     <string name="onboarding_continue_as">Продолжить как %1$s</string>
     <string name="onboarding_offline_setup_message">Нет подключения к интернету. Подключитесь по Wi-Fi, через мобильную сеть или другую сеть и повторите попытку.</string>
     <string name="toast_couldnt_login_amber">Не удалось войти через Amber</string>
+    <string name="amber_identity_already_added">Эта учётная запись уже добавлена в White Noise. Выберите её в переключателе учётных записей.</string>
     <string name="toast_amber_sign_in_cancelled">Вход через Amber отменён</string>
     <string name="onboarding_sign_up">Регистрация</string>
     <string name="sign_in_error_public_key">Это открытый ключ. Введите свой секретный ключ (nsec) для входа.</string>
@@ -1466,6 +1536,18 @@
     <string name="notification_channel_app_updates_global_description">Уведомления Android об обновлениях приложения White Noise</string>
 
     <string name="chat_bubble_colors">Цвета сообщений</string>
+    <string name="custom_emoji">Свои эмодзи</string>
+    <string name="custom_emoji_detail">Добавленные здесь изображения становятся эмодзи :код: в сообщениях и реакциях. Они остаются на этом устройстве, а другие видят код как текст.</string>
+    <string name="custom_emoji_empty">Своих эмодзи пока нет.</string>
+    <string name="custom_emoji_name_title">Название эмодзи</string>
+    <string name="custom_emoji_name_label">Код</string>
+    <string name="custom_emoji_name_help">Буквы, цифры и подчёркивания.</string>
+    <string name="custom_emoji_replaces">Заменит текущий %1$s.</string>
+    <string name="custom_emoji_remove_title">Удалить %1$s?</string>
+    <string name="custom_emoji_remove_detail">Изображение удаляется с этого устройства. В сообщениях код останется текстом.</string>
+    <string name="custom_emoji_too_large">Изображение больше 1 МБ.</string>
+    <string name="custom_emoji_not_image">Этот файл не является изображением, которое White Noise может показать.</string>
+    <string name="custom_emoji_save_failed">Не удалось сохранить эмодзи.</string>
     <string name="action_color">Цвет действия</string>
     <string name="action_color_no_active_account">Выберите активную учётную запись, прежде чем настраивать её акцентный цвет.</string>
     <string name="bubble_color_preview">Предпросмотр</string>
@@ -1858,6 +1940,9 @@
     <string name="group_recovery_failed_reinvites">Некоторые приглашения не удалось восстановить. Пригласите этих людей снова в разделе сведений о группе.</string>
     <string name="group_recovery_review_invitation_from">Проверить приглашение от %1$s · эпоха %2$s</string>
     <string name="group_recovery_check_failed">Не удалось проверить восстановление группы. Повторите попытку.</string>
+    <string name="group_history_may_be_incomplete">В этом чате могут отсутствовать некоторые более ранние сообщения.</string>
+    <string name="account_history_may_be_incomplete">В этом аккаунте могут отсутствовать некоторые сообщения. White Noise не удалось подтвердить, что все сообщения были получены.</string>
+    <string name="history_notice_dismiss_failed">Не удалось закрыть уведомление об истории. Попробуйте ещё раз.</string>
     <string name="group_rejoin_title">Вернуться в группу?</string>
     <string name="group_rejoin_invited_by">Приглашение от %1$s\n%2$s</string>
     <string name="group_rejoin_replaces_state">При возвращении в группу данные шифрования группы на этом устройстве будут заменены. История сообщений сохранится.</string>
@@ -2075,7 +2160,7 @@
     <string name="audit_upload_title">Делиться диагностическими журналами групп</string>
     <string name="audit_upload_subtitle">Передаёт диагностические журналы групп для всех профилей на этом устройстве.</string>
     <string name="audit_upload_confirm_title">Отправлять диагностические журналы групп в White Noise?</string>
-    <string name="audit_upload_disclosure">White Noise записывает диагностические журналы групп для всех профилей на этом устройстве и загружает их в Goggles, которым управляет Internet Privacy Foundation. Уже сохранённые здесь журналы тоже могут быть загружены. Журналы могут содержать идентификаторы групп и сообщений, адреса реле, метки времени, псевдонимные ссылки на аккаунты, идентификатор установки, модель вашего устройства и версию приложения. Они никогда не содержат содержимое сообщений и закрытые ключи. Эти данные чувствительны, и мы используем их для изучения проблем надёжности. Они остаются отдельными от передачи данных об использовании и телеметрии. Отключение передачи останавливает новую запись и новые загрузки, хотя уже начавшаяся загрузка может завершиться. Журналы на этом устройстве и уже загруженные копии остаются на месте. Отмена оставляет передачу выключенной.</string>
+    <string name="audit_upload_disclosure">White Noise записывает диагностические журналы групп для всех профилей на этом устройстве и загружает их в аудиторский коллектор White Noise, которым управляет Internet Privacy Foundation. Уже сохранённые здесь журналы тоже могут быть загружены. Журналы могут содержать идентификаторы групп и сообщений, адреса реле, метки времени, псевдонимные ссылки на аккаунты, идентификатор установки, модель вашего устройства и версию приложения. Они никогда не содержат содержимое сообщений и закрытые ключи. Эти данные чувствительны, и мы используем их для изучения проблем надёжности. Они остаются отдельными от передачи данных об использовании и телеметрии. Отключение передачи останавливает новую запись и новые загрузки, хотя уже начавшаяся загрузка может завершиться. Журналы на этом устройстве и уже загруженные копии остаются на месте. Отмена оставляет передачу выключенной.</string>
     <string name="audit_upload_confirm">Включить автоматическую отправку</string>
     <string name="audit_upload_renew">Условия передачи изменились. Ознакомьтесь с ними, прежде чем снова включать диагностические журналы групп.</string>
     <string name="diagnostics_group_disclosure">Диагностические журналы групп помогают разбираться в проблемах надёжности. Участники обозначаются в них хешированными ссылками. Каждый журнал может содержать технические идентификаторы и изменения состава участников с метками времени. Они никогда не содержат содержимого сообщений, имён профилей, названий групп или закрытых ключей.</string>
@@ -2101,4 +2186,7 @@
     <string name="export_audit_logs_confirm_action">Продолжить</string>
     <string name="toast_couldnt_export_audit_logs">Не удалось подготовить диагностические журналы к экспорту</string>
     <string name="toast_no_audit_logs_to_export">Нет диагностических журналов для экспорта</string>
+    <string name="dictation_pause_other_audio_title">Приостанавливать другое аудио</string>
+    <string name="dictation_pause_other_audio_subtitle">Музыка и подкасты приостанавливаются во время диктовки и могут возобновиться после окончания записи. Озвучивание и голосовые сообщения в White Noise всегда приостанавливаются для безопасности.</string>
+    <string name="dictation_audio_focus_unavailable">Не удалось приостановить другое аудио. Повторите попытку или отключите этот параметр в настройках диктовки.</string>
 </resources>

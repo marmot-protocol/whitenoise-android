@@ -27,6 +27,9 @@ class SignUpScreenshotTest {
     /** Initial light form. */
     @Test fun light() = render("signup_light")
 
+    /** A fresh account begins without a name but keeps the dice beside the editable field. */
+    @Test fun emptyName() = render("signup_empty_name", initialName = "")
+
     /** Dark theme neutral avatar and tonal fields. */
     @Test fun dark() = render("signup_dark", dark = true)
 
@@ -58,6 +61,7 @@ class SignUpScreenshotTest {
         scale: Float = 1f,
         offline: Boolean = false,
         stage: SignUpStage = SignUpStage.Editing,
+        initialName: String = "Alice",
     ) {
         composeRule.mainClock.autoAdvance = false
         composeRule.setContent {
@@ -66,13 +70,14 @@ class SignUpScreenshotTest {
             ) {
                 WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = scale) {
                     SignUpContent(
-                        TextFieldState("Alice"),
+                        TextFieldState(initialName),
                         TextFieldState("A local profile description"),
                         null,
                         stage,
                         editable = stage == SignUpStage.Editing,
                         preparingPhoto = false,
                         offline = offline,
+                        onSuggestName = {},
                         onSubmit = {},
                         onContinueWithoutProfile = {},
                         onBack = {},

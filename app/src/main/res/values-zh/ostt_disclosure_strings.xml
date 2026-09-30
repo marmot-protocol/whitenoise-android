@@ -1,0 +1,5 @@
+<resources>
+    <string name="dictation_disclosure_offline_title">离线语音识别</string>
+    <string name="dictation_disclosure_offline_message">Offline Speech to Text 会在此设备上处理你的语音。White Noise 仅在你粘贴或发送前保留返回的文字。除非你在听写设置中开启，否则自动发送保持关闭。</string>
+    <string name="dictation_settings_explainer_offline">Offline Speech to Text 会在此设备上处理听写。White Noise 仅在你粘贴或发送前保留返回的文字。</string>
+</resources>

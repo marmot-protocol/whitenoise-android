@@ -36,9 +36,14 @@ import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import dev.ipf.whitenoise.android.core.MessageAttachments
+import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollCoordinator
+import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollMode
+import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollWriter
+import dev.ipf.whitenoise.android.ui.conversation.revealSentAtLiveTail
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -52,6 +57,103 @@ import java.lang.reflect.Proxy
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class ConversationMediaSendReconciliationIntegrationTest {
+    /** Both a file and a multi-image album reveal after durable acceptance, including a canonical echo. */
+    @Test
+    fun acceptedFileAndAlbumFromHistorySnapAfterCanonicalReplacement() =
+        runTest {
+            for (count in listOf(1, 2)) {
+                val reference =
+                    if (count == 1) {
+                        mediaReference().copy(mediaType = "application/pdf", fileName = "file.pdf")
+                    } else {
+                        mediaReference()
+                    }
+                val controller =
+                    ConversationController(
+                        appState = appState(),
+                        initialGroup = group(),
+                        initialMemberSnapshot = memberSnapshot(),
+                        groupRosterReader = { _, _ -> authoritativeRoster() },
+                        mediaUploader = { _, _, _ ->
+                            uploadResult(reference).copy(
+                                attachments = List(count) { MediaUploadAttachmentResultFfi(reference, 4uL) },
+                                sent = null,
+                            )
+                        },
+                        mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
+                        mediaPublisher = { _, _, _, _ -> acceptedPendingSummary() },
+                    )
+                controller.retryMembers()
+                try {
+                    assertMediaHistoryReveal(controller, count, reference)
+                } finally {
+                    controller.onCleared()
+                }
+            }
+        }
+
+    /** Uses the production queue/upload callback and replaces its row during the first layout frame. */
+    private suspend fun kotlinx.coroutines.CoroutineScope.assertMediaHistoryReveal(
+        controller: ConversationController,
+        count: Int,
+        reference: MediaAttachmentReferenceFfi,
+    ) {
+        val snaps = mutableListOf<Int>()
+        val writer = recordingMediaWriter(snaps)
+        val coordinator = ConversationScrollCoordinator(writer, ConversationScrollMode.ReadingHistory("old", 0))
+        val queued =
+            checkNotNull(
+                controller.queueAttachments(
+                    List(count) { PendingAttachment(byteArrayOf(1, 2, 3, 4), reference.mediaType, reference.fileName) },
+                    "hello",
+                ),
+            )
+        var reveal: kotlinx.coroutines.Job? = null
+        controller.uploadQueued(queued, onDurablyAccepted = {
+            reveal =
+                launch {
+                    assertTrue(
+                        coordinator.revealSentAtLiveTail(controller, awaitFrame = {
+                            val pending = controller.timeline.single().record
+                            applyProjection(
+                                controller,
+                                projectedMediaMessage(pending.recordedAt, reference).copy(
+                                    media = MessageAttachments.acceptedOutcomes(List(count) { reference }),
+                                ),
+                            )
+                        }),
+                    )
+                }
+        })
+        checkNotNull(reveal).join()
+        assertEquals(listOf(0), snaps)
+        assertTrue(coordinator.isFollowingTail)
+        assertEquals(
+            CONFIRMED_MESSAGE_ID,
+            controller.timeline
+                .single()
+                .record.messageIdHex,
+        )
+    }
+
+    /** Rejects animation so an intermediate glide cannot masquerade as a correct final position. */
+    private fun recordingMediaWriter(snaps: MutableList<Int>): ConversationScrollWriter =
+        object : ConversationScrollWriter {
+            override val firstVisibleItemIndex: Int = 0
+
+            override suspend fun scrollToItem(
+                index: Int,
+                scrollOffset: Int,
+            ) {
+                snaps += index
+            }
+
+            override suspend fun animateScrollToItem(
+                index: Int,
+                scrollOffset: Int,
+            ) = error("send must snap")
+        }
+
     @Test
     fun cancellationBeforeNativeMediaAdmissionSkipsMarmotCall() =
         assertDraftlessMediaUsesTokenBoundNativeAdmission(
@@ -366,287 +468,299 @@ class ConversationMediaSendReconciliationIntegrationTest {
         assertEquals(MessageStatus.Pending, controller.timeline.single().status)
         assertFalse(controller.deleteMessage(pending, presentFailure = false))
     }
+}
 
-    private fun attachedChatsController(appState: WhiteNoiseAppState): ChatsController =
-        ChatsController(
-            appState = appState,
-            initialAccountRef = ACCOUNT_REF,
-            memberSnapshotLoader = { _, _ -> emptyList() },
-        ).also { chatsController ->
-            appState.attachChatsController(chatsController)
-            chatsController.setChatListVisible(false)
-            chatsController.applyChatListRow(chatListRow())
-        }
-
-    private fun applyProjection(
-        controller: ConversationController,
-        message: TimelineMessageRecordFfi,
-    ) {
-        controller.testApplyLiveTimelineChangesAndRegisterStreams(
-            listOf(
-                TimelineMessageChangeFfi.Upsert(
-                    trigger = TimelineUpdateTriggerFfi.NEW_MESSAGE,
-                    message = message,
-                ),
-            ),
-        )
+/** Mounts the existing chat-list bridge so accepted media preview replacement remains observable. */
+private fun attachedChatsController(appState: WhiteNoiseAppState): ChatsController =
+    ChatsController(
+        appState = appState,
+        initialAccountRef = ACCOUNT_REF,
+        memberSnapshotLoader = { _, _ -> emptyList() },
+    ).also { chatsController ->
+        appState.attachChatsController(chatsController)
+        chatsController.setChatListVisible(false)
+        chatsController.applyChatListRow(chatListRow())
     }
 
-    private fun uploadResult(reference: MediaAttachmentReferenceFfi) =
-        MediaUploadResultFfi(
-            attachments =
-                listOf(
-                    MediaUploadAttachmentResultFfi(
-                        reference = reference,
-                        encryptedSizeBytes = 4uL,
-                    ),
+/** Delivers a canonical native timeline upsert through the production live-change path. */
+private fun applyProjection(
+    controller: ConversationController,
+    message: TimelineMessageRecordFfi,
+) {
+    controller.testApplyLiveTimelineChangesAndRegisterStreams(
+        listOf(
+            TimelineMessageChangeFfi.Upsert(
+                trigger = TimelineUpdateTriggerFfi.NEW_MESSAGE,
+                message = message,
+            ),
+        ),
+    )
+}
+
+/** Returns a native upload result referencing one validated synthetic attachment. */
+private fun uploadResult(reference: MediaAttachmentReferenceFfi) =
+    MediaUploadResultFfi(
+        attachments =
+            listOf(
+                MediaUploadAttachmentResultFfi(
+                    reference = reference,
+                    encryptedSizeBytes = 4uL,
                 ),
-            sent =
-                SendSummaryFfi(
-                    published = 1u,
-                    messageIds = listOf(CONFIRMED_MESSAGE_ID),
-                    acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
-                    maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
-                ),
-        )
-
-    private fun acceptedPendingSummary() =
-        SendSummaryFfi(
-            published = 0u,
-            messageIds = listOf(CONFIRMED_MESSAGE_ID),
-            acceptDisposition = SendAcceptDispositionFfi.ACCEPTED_PENDING,
-            maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
-        )
-
-    private fun mediaReference() =
-        MediaAttachmentReferenceFfi(
-            locators =
-                listOf(
-                    MediaLocatorFfi(
-                        kind = "blossom-v1",
-                        value = "https://blossom.example/photo.jpg",
-                    ),
-                ),
-            ciphertextSha256 = "a".repeat(64),
-            plaintextSha256 = "b".repeat(64),
-            nonceHex = "c".repeat(24),
-            fileName = "photo.jpg",
-            mediaType = "image/jpeg",
-            version = EncryptedMediaVersionFfi.V1,
-            sourceEpoch = 1uL,
-            dim = null,
-            thumbhash = null,
-        )
-
-    private fun mediaImetaTag() = MessageTagFfi(listOf("imeta", "m image/jpeg"))
-
-    /** Creates the authoritative media projection used to reconcile one optimistic send token. */
-    private fun projectedMediaMessage(
-        recordedAt: ULong,
-        reference: MediaAttachmentReferenceFfi,
-    ) = TimelineMessageRecordFfi(
-        clientToken = null,
-        messageIdHex = CONFIRMED_MESSAGE_ID,
-        sourceMessageIdHex = "d4".repeat(32),
-        direction = "sent",
-        groupIdHex = GROUP_ID,
-        sender = ACCOUNT_ID,
-        plaintext = "hello",
-        contentTokens = emptyMarkdownDocument(),
-        kind = 9uL,
-        tags = listOf(mediaImetaTag()),
-        timelineAt = recordedAt,
-        receivedAt = recordedAt,
-        replyToMessageIdHex = null,
-        replyPreview = null,
-        mediaJson = null,
-        media = MessageAttachments.acceptedOutcomes(listOf(reference)),
-        agentTextStreamJson = null,
-        groupSystem = null,
-        hasReports = false,
-        edit = null,
-        reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
-        deleted = false,
-        deletionSource = DeletionSourceFfi.UNKNOWN,
-        deletedByMessageIdHex = null,
-        invalidationStatus = null,
-        sourceEpoch = null,
-        retentionSeconds = null,
-        retentionExpiresAt = null,
+            ),
+        sent =
+            SendSummaryFfi(
+                published = 1u,
+                messageIds = listOf(CONFIRMED_MESSAGE_ID),
+                acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
+                maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+            ),
     )
 
-    private fun appState() =
-        WhiteNoiseAppState(
-            context = ApplicationProvider.getApplicationContext(),
-            draftStore = DraftStore(TestDraftPersistence()),
-            accountIdHexResolver = { ACCOUNT_ID },
-            accounts =
-                listOf(
-                    AccountSummaryFfi(
-                        label = ACCOUNT_REF,
-                        accountIdHex = ACCOUNT_ID,
-                        localSigning = true,
-                        externalSigning = false,
-                        signedOut = false,
-                        running = true,
-                    ),
-                ),
-            activeAccountRef = ACCOUNT_REF,
-        )
+/** Represents durable acceptance without waiting for relay publication. */
+private fun acceptedPendingSummary() =
+    SendSummaryFfi(
+        published = 0u,
+        messageIds = listOf(CONFIRMED_MESSAGE_ID),
+        acceptDisposition = SendAcceptDispositionFfi.ACCEPTED_PENDING,
+        maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+    )
 
-    private fun memberSnapshot() =
-        GroupMemberSnapshot(
+/** Pins one immutable encrypted-media identity independent of its optimistic message ID. */
+private fun mediaReference() =
+    MediaAttachmentReferenceFfi(
+        locators =
             listOf(
-                AppGroupMemberRecordFfi(
+                MediaLocatorFfi(
+                    kind = "blossom-v1",
+                    value = "https://blossom.example/photo.jpg",
+                ),
+            ),
+        ciphertextSha256 = "a".repeat(64),
+        plaintextSha256 = "b".repeat(64),
+        nonceHex = "c".repeat(24),
+        fileName = "photo.jpg",
+        mediaType = "image/jpeg",
+        version = EncryptedMediaVersionFfi.V1,
+        sourceEpoch = 1uL,
+        dim = null,
+        thumbhash = null,
+    )
+
+/** Supplies the legacy media hint used by existing native-boundary fixtures. */
+private fun mediaImetaTag() = MessageTagFfi(listOf("imeta", "m image/jpeg"))
+
+/** Creates the authoritative media projection used to reconcile one optimistic send token. */
+private fun projectedMediaMessage(
+    recordedAt: ULong,
+    reference: MediaAttachmentReferenceFfi,
+) = TimelineMessageRecordFfi(
+    clientToken = null,
+    messageIdHex = CONFIRMED_MESSAGE_ID,
+    sourceMessageIdHex = "d4".repeat(32),
+    direction = "sent",
+    groupIdHex = GROUP_ID,
+    sender = ACCOUNT_ID,
+    plaintext = "hello",
+    contentTokens = emptyMarkdownDocument(),
+    kind = 9uL,
+    tags = listOf(mediaImetaTag()),
+    timelineAt = recordedAt,
+    receivedAt = recordedAt,
+    replyToMessageIdHex = null,
+    replyPreview = null,
+    mediaJson = null,
+    media = MessageAttachments.acceptedOutcomes(listOf(reference)),
+    agentTextStreamJson = null,
+    poll = null,
+    groupSystem = null,
+    hasReports = false,
+    edit = null,
+    reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
+    deleted = false,
+    deletionSource = DeletionSourceFfi.UNKNOWN,
+    deletedByMessageIdHex = null,
+    invalidationStatus = null,
+    sourceEpoch = null,
+    retentionSeconds = null,
+    retentionExpiresAt = null,
+)
+
+/** Builds a single account owner with process-local drafts and no real relay connection. */
+private fun appState() =
+    WhiteNoiseAppState(
+        context = ApplicationProvider.getApplicationContext(),
+        draftStore = DraftStore(TestDraftPersistence()),
+        accountIdHexResolver = { ACCOUNT_ID },
+        accounts =
+            listOf(
+                AccountSummaryFfi(
+                    label = ACCOUNT_REF,
+                    accountIdHex = ACCOUNT_ID,
+                    localSigning = true,
+                    externalSigning = false,
+                    signedOut = false,
+                    running = true,
+                ),
+            ),
+        activeAccountRef = ACCOUNT_REF,
+    )
+
+/** Provides authoritative self-membership for send-admission guards. */
+private fun memberSnapshot() =
+    GroupMemberSnapshot(
+        listOf(
+            AppGroupMemberRecordFfi(
+                memberIdHex = ACCOUNT_ID,
+                account = ACCOUNT_REF,
+                local = true,
+            ),
+        ),
+    )
+
+/** Returns the native roster used to admit this account to media mutations. */
+private fun authoritativeRoster() =
+    GroupRosterFfi(
+        groupIdHex = GROUP_ID,
+        members =
+            listOf(
+                GroupMemberDetailsFfi(
                     memberIdHex = ACCOUNT_ID,
                     account = ACCOUNT_REF,
                     local = true,
+                    isAdmin = true,
+                    isSelf = true,
+                    npub = "npub-$ACCOUNT_ID",
+                    displayName = null,
                 ),
             ),
-        )
+        epoch = 1uL,
+        rosterRevision = 1uL,
+        selfMembership = SelfMembershipFfi.MEMBER,
+        memberCount = 1u,
+        lifecycleState = GroupLifecycleStateFfi.STABLE,
+    )
 
-    private fun authoritativeRoster() =
-        GroupRosterFfi(
-            groupIdHex = GROUP_ID,
-            members =
-                listOf(
-                    GroupMemberDetailsFfi(
-                        memberIdHex = ACCOUNT_ID,
-                        account = ACCOUNT_REF,
-                        local = true,
-                        isAdmin = true,
-                        isSelf = true,
-                        npub = "npub-$ACCOUNT_ID",
-                        displayName = null,
-                    ),
+/** Provides a stable group generation for accepted sends and canonical replacement. */
+private fun group() =
+    AppGroupRecordFfi(
+        groupIdHex = GROUP_ID,
+        protocolProfile = AppProtocolProfileFfi.LEGACY,
+        endpoint = "wss://relay.example",
+        profilePresent = true,
+        name = "Retry group",
+        description = "",
+        admins = listOf(ACCOUNT_ID),
+        relays = listOf("wss://relay.example"),
+        nostrGroupIdHex = "04".repeat(32),
+        avatarUrl = null,
+        avatarDim = null,
+        avatarThumbhash = null,
+        imageHashHex = null,
+        encryptedMedia = encryptedMediaComponent(),
+        disappearingMessageSecs = 0uL,
+        archived = false,
+        pendingConfirmation = false,
+        unrecoverable = false,
+        selfMembership = SelfMembershipFfi.MEMBER,
+        leaveRequestPending = false,
+        leaveRequestedAtMs = null,
+        disbanding = false,
+        disbandRequest = null,
+        disbanded = false,
+        welcomerAccountIdHex = null,
+        viaWelcomeMessageIdHex = null,
+    )
+
+/** Matches the existing encrypted-media capability expected by the upload path. */
+private fun encryptedMediaComponent() =
+    AppGroupEncryptedMediaComponentFfi(
+        componentId = 0x8008u,
+        component = "marmot.group.encrypted-media.v1",
+        required = true,
+        version = EncryptedMediaVersionFfi.V1,
+        mediaFormat = "encrypted-media-v1",
+        allowedLocatorKinds = listOf("blossom-v1"),
+        defaultBlobEndpoints =
+            listOf(
+                AppBlobEndpointFfi(
+                    locatorKind = "blossom-v1",
+                    baseUrl = "https://blossom.example",
                 ),
-            epoch = 1uL,
-            rosterRevision = 1uL,
-            selfMembership = SelfMembershipFfi.MEMBER,
-            memberCount = 1u,
-            lifecycleState = GroupLifecycleStateFfi.STABLE,
-        )
+            ),
+    )
 
-    private fun group() =
-        AppGroupRecordFfi(
-            groupIdHex = GROUP_ID,
-            protocolProfile = AppProtocolProfileFfi.LEGACY,
-            endpoint = "wss://relay.example",
-            profilePresent = true,
-            name = "Retry group",
-            description = "",
-            admins = listOf(ACCOUNT_ID),
-            relays = listOf("wss://relay.example"),
-            nostrGroupIdHex = "04".repeat(32),
-            avatarUrl = null,
-            avatarDim = null,
-            avatarThumbhash = null,
-            imageHashHex = null,
-            encryptedMedia = encryptedMediaComponent(),
-            disappearingMessageSecs = 0uL,
-            archived = false,
-            pendingConfirmation = false,
-            unrecoverable = false,
-            selfMembership = SelfMembershipFfi.MEMBER,
-            leaveRequestPending = false,
-            leaveRequestedAtMs = null,
-            disbanding = false,
-            disbandRequest = null,
-            disbanded = false,
-            welcomerAccountIdHex = null,
-            viaWelcomeMessageIdHex = null,
-        )
+/** Supplies the pre-send authoritative row for optimistic chat-list reconciliation. */
+private fun chatListRow() =
+    ChatListRowFfi(
+        selfMembership = SelfMembershipFfi.MEMBER,
+        unreadMentionCount = 0uL,
+        unreadMention = false,
+        groupIdHex = GROUP_ID,
+        archived = false,
+        pendingConfirmation = false,
+        title = "Retry group",
+        groupName = "Retry group",
+        avatarUrl = null,
+        avatar = null,
+        lastMessage =
+            ChatListMessagePreviewFfi(
+                retentionSeconds = null,
+                retentionExpiresAt = null,
+                messageIdHex = "d4".repeat(32),
+                sender = ACCOUNT_ID,
+                senderDisplayName = null,
+                plaintext = "before send",
+                contentTokens = emptyMarkdownDocument(),
+                kind = 9uL,
+                timelineAt = 10uL,
+                deleted = false,
+                deletionSource = DeletionSourceFfi.UNKNOWN,
+                attachmentKind = null,
+                attachmentCount = 0u,
+                groupSystem = null,
+                deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+            ),
+        unreadCount = 0uL,
+        hasUnread = false,
+        firstUnreadMessageIdHex = null,
+        lastReadMessageIdHex = null,
+        lastReadTimelineAt = null,
+        conversationCreatedAt = 0uL,
+        activitySortAt = 10uL,
+        updatedAt = 10uL,
+        leaveRequestPending = false,
+        leaveRequestedAtMs = null,
+        manuallyMarkedUnread = false,
+        conversationKind = ChatConversationKindFfi.UNKNOWN,
+        muted = false,
+        mutedUntilMs = null,
+        pinned = false,
+        pinnedPosition = null,
+        lifecycleState = GroupLifecycleStateFfi.STABLE,
+        disbanding = false,
+        disbandRequest = null,
+    )
 
-    private fun encryptedMediaComponent() =
-        AppGroupEncryptedMediaComponentFfi(
-            componentId = 0x8008u,
-            component = "marmot.group.encrypted-media.v1",
-            required = true,
-            version = EncryptedMediaVersionFfi.V1,
-            mediaFormat = "encrypted-media-v1",
-            allowedLocatorKinds = listOf("blossom-v1"),
-            defaultBlobEndpoints =
-                listOf(
-                    AppBlobEndpointFfi(
-                        locatorKind = "blossom-v1",
-                        baseUrl = "https://blossom.example",
-                    ),
-                ),
-        )
+/** Keeps media fixtures independent of asynchronous Markdown hydration. */
+private fun emptyMarkdownDocument() =
+    MarkdownDocumentFfi(
+        truncated = false,
+        blocks = emptyList(),
+        blankLinesBefore = ByteArray(0),
+    )
 
-    private fun chatListRow() =
-        ChatListRowFfi(
-            selfMembership = SelfMembershipFfi.MEMBER,
-            unreadMentionCount = 0uL,
-            unreadMention = false,
-            groupIdHex = GROUP_ID,
-            archived = false,
-            pendingConfirmation = false,
-            title = "Retry group",
-            groupName = "Retry group",
-            avatarUrl = null,
-            avatar = null,
-            lastMessage =
-                ChatListMessagePreviewFfi(
-                    retentionSeconds = null,
-                    retentionExpiresAt = null,
-                    messageIdHex = "d4".repeat(32),
-                    sender = ACCOUNT_ID,
-                    senderDisplayName = null,
-                    plaintext = "before send",
-                    contentTokens = emptyMarkdownDocument(),
-                    kind = 9uL,
-                    timelineAt = 10uL,
-                    deleted = false,
-                    deletionSource = DeletionSourceFfi.UNKNOWN,
-                    attachmentKind = null,
-                    attachmentCount = 0u,
-                    groupSystem = null,
-                    deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
-                ),
-            unreadCount = 0uL,
-            hasUnread = false,
-            firstUnreadMessageIdHex = null,
-            lastReadMessageIdHex = null,
-            lastReadTimelineAt = null,
-            conversationCreatedAt = 0uL,
-            activitySortAt = 10uL,
-            updatedAt = 10uL,
-            leaveRequestPending = false,
-            leaveRequestedAtMs = null,
-            manuallyMarkedUnread = false,
-            conversationKind = ChatConversationKindFfi.UNKNOWN,
-            muted = false,
-            mutedUntilMs = null,
-            pinned = false,
-            pinnedPosition = null,
-            lifecycleState = GroupLifecycleStateFfi.STABLE,
-            disbanding = false,
-            disbandRequest = null,
-        )
+private class TestDraftPersistence : DraftPersistence {
+    override fun read(): Map<String, String> = emptyMap()
 
-    private fun emptyMarkdownDocument() =
-        MarkdownDocumentFfi(
-            truncated = false,
-            blocks = emptyList(),
-            blankLinesBefore = ByteArray(0),
-        )
-
-    private class TestDraftPersistence : DraftPersistence {
-        override fun read(): Map<String, String> = emptyMap()
-
-        override fun write(
-            key: String,
-            value: String?,
-        ) = Unit
-    }
-
-    private companion object {
-        const val ACCOUNT_REF = "alice"
-        val ACCOUNT_ID = "a1".repeat(32)
-        val GROUP_ID = "b2".repeat(32)
-        val CONFIRMED_MESSAGE_ID = "c3".repeat(32)
-        const val VIDEO_MEDIA_TYPE = "video/mp4"
-        val VIDEO_BYTES = byteArrayOf(0, 0, 0, 24, 102, 116, 121, 112, 105, 115, 111, 109)
-    }
+    override fun write(
+        key: String,
+        value: String?,
+    ) = Unit
 }
+
+private const val ACCOUNT_REF = "alice"
+private val ACCOUNT_ID = "a1".repeat(32)
+private val GROUP_ID = "b2".repeat(32)
+private val CONFIRMED_MESSAGE_ID = "c3".repeat(32)
+private const val VIDEO_MEDIA_TYPE = "video/mp4"
+private val VIDEO_BYTES = byteArrayOf(0, 0, 0, 24, 102, 116, 121, 112, 105, 115, 111, 109)

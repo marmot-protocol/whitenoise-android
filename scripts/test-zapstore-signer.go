@@ -19,6 +19,11 @@ import (
 	"github.com/nbd-wtf/go-nostr/nip46"
 )
 
+const (
+	reconnectAttempts = 3
+	reconnectTimeout  = 45 * time.Second
+)
+
 func main() {
 	if err := testSigner(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -35,7 +40,7 @@ func testSigner() error {
 	if len(os.Args) != 3 {
 		return fmt.Errorf("expected pinned ZSP and fixture APK")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	connection := os.Getenv("SIGN_WITH")
 	clientKey := os.Getenv("BUNKER_CLIENT_KEY")
@@ -106,7 +111,26 @@ func testSigner() error {
 	fmt.Println("Verified offline signatures for kinds 3063, 30063, 32267")
 	// Reconnect exactly as the publisher does: reuse the persistent client key
 	// with the original bunker URI for the second ZSP invocation.
-	bunker, err := nip46.ConnectBunker(ctx, clientKey, connection, nil, func(string) {})
+	// A reply can be lost between the relays and a new client process, so bound
+	// each attempt and retry with a fresh connection, as publication does.
+	var bunker *nip46.BunkerClient
+	for attempt := 1; attempt <= reconnectAttempts; attempt++ {
+		// The bunker's reply subscription lives on this context, so bound only
+		// the connect wait and keep a successful attempt's context open.
+		attemptCtx, attemptCancel := context.WithCancel(ctx)
+		timer := time.AfterFunc(reconnectTimeout, attemptCancel)
+		bunker, err = nip46.ConnectBunker(attemptCtx, clientKey, connection, nil, func(string) {})
+		if err == nil && timer.Stop() {
+			defer attemptCancel()
+			fmt.Printf("Reconnected on attempt %d of %d\n", attempt, reconnectAttempts)
+			break
+		}
+		attemptCancel()
+		if err == nil {
+			err = fmt.Errorf("connect timed out")
+		}
+		fmt.Printf("Reconnect attempt %d of %d got no signer reply within %s\n", attempt, reconnectAttempts, reconnectTimeout)
+	}
 	if err != nil {
 		return fmt.Errorf("paired-client reconnect failed (remote details withheld)")
 	}

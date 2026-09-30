@@ -11,13 +11,10 @@ import kotlinx.coroutines.CancellationException
  * Reveals the latest rendered row only after the controller has published the
  * optimistic send.
  *
- * A reader already following the tail gets the same treatment as an incoming
- * message: wait for the frame that measures the new row, then pin the list's
- * origin. Animating there would glide across the lines the composer released
- * when it emptied, which reads as the bubble blinking after the transcript was reversed in #2627. A reader up in
- * history is carried to the new row instead, and the resolver stays live through
- * that far-target approach so a concurrent projection cannot leave the newly
- * sent row below the viewport.
+ * Every accepted send snaps to the physical tail, including sends from older
+ * history. Prepare the authoritative newest window before resolving its row,
+ * then keep resolving that live tail while the bottom input finishes measuring.
+ * A newer gesture or navigation still cancels the coordinator-owned transaction.
  */
 internal suspend fun ConversationScrollCoordinator.revealSentAtLiveTail(
     controller: ConversationController,
@@ -26,13 +23,14 @@ internal suspend fun ConversationScrollCoordinator.revealSentAtLiveTail(
 ): Boolean =
     revealSentAtLiveTail(
         prepareLatest = {
-            loadConversationTimelineToNewest(
-                hasMoreAfter = { controller.hasMoreAfterTimeline },
-                // The reveal follows a send rather than a request for newer pages, so a window the
-                // engine cannot answer recovers quietly instead of reporting a paging failure (#2764).
-                loadNewer = { controller.loadNewerTimelinePage(ConversationPagingOrigin.AUTOMATIC) },
-                returnToLatest = controller::returnToLatestWindow,
-            )
+            !controller.hasMoreAfterTimeline ||
+                loadConversationTimelineToNewest(
+                    hasMoreAfter = { controller.hasMoreAfterTimeline },
+                    // The reveal follows a send rather than a request for newer pages, so a window the
+                    // engine cannot answer recovers quietly instead of reporting a paging failure (#2764).
+                    loadNewer = { controller.loadNewerTimelinePage(ConversationPagingOrigin.AUTOMATIC) },
+                    returnToLatest = controller::returnToLatestWindow,
+                )
         },
         resolveTailIndex = {
             val renderedTimelineSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
@@ -55,32 +53,22 @@ internal suspend fun ConversationScrollCoordinator.revealSentAtLiveTail(
     captureLayout: ((tailIndex: Int) -> ConversationTailLayout)? = null,
     awaitFrame: suspend () -> Unit = { withFrameNanos { } },
 ): Boolean {
-    // Read the settled intent before the jump replaces it with its transient mode.
-    val readerFollowsTail = isFollowingTail
     val revealed =
         programmaticJump(
             targetMessageId = null,
             reason = ConversationScrollReason.Send,
             resultingMode = ConversationScrollMode.FollowingTail,
         ) {
-            if (readerFollowsTail) {
-                awaitFrame()
-                scrollToTail(resolveTailIndex())
-            } else {
-                if (!prepareLatest()) {
-                    throw CancellationException("Conversation newest edge was not available after send")
-                }
-                // The controller replacement is synchronous, but the reversed
-                // LazyColumn needs one frame to install that newest window
-                // before index zero denotes the physical conversation tail.
-                awaitFrame()
-                animateScrollToTail(
-                    index = resolveTailIndex(),
-                    resolveIndex = { resolveTailIndex() },
-                )
+            if (!prepareLatest()) {
+                throw CancellationException("Conversation newest edge was not available after send")
             }
+            // The controller replacement is synchronous, but the reversed
+            // LazyColumn needs one frame to install that newest window before
+            // index zero denotes the physical conversation tail.
+            awaitFrame()
+            scrollToTail(resolveTailIndex())
         }
-    if (!revealed || !readerFollowsTail || captureLayout == null) return revealed
+    if (!revealed || captureLayout == null) return revealed
 
     // Dictation completion can dismiss its controls after the optimistic row
     // has entered the list. Keep the accepted-send owner alive across that

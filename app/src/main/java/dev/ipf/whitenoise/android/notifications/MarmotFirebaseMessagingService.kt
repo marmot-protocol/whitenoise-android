@@ -5,6 +5,7 @@ import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
+import kotlinx.coroutines.runBlocking
 
 /**
  * Receives MIP-05 silent wake pushes and FCM token rotations.
@@ -60,30 +61,31 @@ class MarmotFirebaseMessagingService : FirebaseMessagingService() {
         // on the background-connection preference would silently drop every
         // fetch for a user who runs native push without a persistent
         // connection (the whole point of native push).
-        fcmDebug { "MIP-05 wake push received; starting foreground stream" }
-        wakeForegroundStream()
+        dispatchWake(message.priority, message.originalPriority)
     }
 
-    private fun wakeForegroundStream() {
-        // Record before asking Android to start the service. A start can be
-        // accepted and still fail inside notification-runtime bootstrap; the
-        // durable obligation must survive that in-runtime failure or process
-        // death, not only a synchronous foreground-start rejection.
-        recordPendingPushWakeCatchUp()
+    /** A deleted backlog is an account synchronization obligation, not a list of missing messages. */
+    override fun onDeletedMessages() {
+        dispatchWake(deleted = true)
+    }
+
+    /** Completes the short durable handoff before the platform callback returns. */
+    private fun dispatchWake(
+        priority: Int = RemoteMessage.PRIORITY_UNKNOWN,
+        originalPriority: Int = priority,
+        deleted: Boolean = false,
+    ) {
         try {
-            NotificationStreamForegroundService.start(applicationContext, ForegroundStartTrigger.PushWake)
+            val app = applicationContext as? WhiteNoiseApplication ?: return
+            runBlocking {
+                app.pushWakeCoordinator().receive(
+                    pushWakePriority(priority),
+                    pushWakePriority(originalPriority),
+                    deleted,
+                )
+            }
         } catch (_: Exception) {
-            Log.w(TAG, "push_wake_foreground_start_failed")
-        }
-    }
-
-    private fun recordPendingPushWakeCatchUp() {
-        val recordError =
-            runCatching {
-                PushTokenStore.create(applicationContext).recordPendingPushWakeCatchUp()
-            }.exceptionOrNull()
-        if (recordError != null) {
-            Log.w(TAG, "push_wake_catch_up_record_failed")
+            Log.w(TAG, "push_wake_dispatch_failed")
         }
     }
 
@@ -142,3 +144,11 @@ private inline fun fcmDebug(message: () -> String) {
     // Debug-only so operational push logs don't ship in release logcat. See #39.
     if (BuildConfig.DEBUG) Log.d("MarmotFcmService", message())
 }
+
+/** Maps only the received platform priority into execution policy. */
+internal fun pushWakePriority(priority: Int): PushWakePriority =
+    when (priority) {
+        RemoteMessage.PRIORITY_HIGH -> PushWakePriority.High
+        RemoteMessage.PRIORITY_NORMAL -> PushWakePriority.Normal
+        else -> PushWakePriority.Unknown
+    }

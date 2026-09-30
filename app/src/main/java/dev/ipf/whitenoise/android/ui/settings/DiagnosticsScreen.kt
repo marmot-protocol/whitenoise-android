@@ -35,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -183,6 +184,7 @@ internal fun DiagnosticsScreen(
     var sendingPing by remember { mutableStateOf(false) }
     var performanceStatus by remember { mutableStateOf(PerformanceDiagnostics.status()) }
     val scope = rememberCoroutineScope()
+    val clipboard = LocalClipboardManager.current
     val sentPingFormat = stringResource(R.string.diagnostic_sent_ping_to_self)
     val sendToSelfFailedFormat = stringResource(R.string.diagnostic_send_to_self_failed)
 
@@ -300,7 +302,15 @@ internal fun DiagnosticsScreen(
         onPerformanceEnabledChange = { enabled ->
             performanceStatus = if (enabled) PerformanceDiagnostics.start() else PerformanceDiagnostics.stop()
         },
+        onCopyPerformanceLogs = { copyPerformanceLogs(clipboard) },
     )
+}
+
+/** Copies only the bounded, closed-schema records retained by the current process session. */
+@Suppress("DEPRECATION")
+private fun copyPerformanceLogs(clipboard: ClipboardManager) {
+    val lines = PerformanceDiagnostics.exportLines()
+    if (lines.isNotEmpty()) clipboard.setText(AnnotatedString(lines.joinToString("\n")))
 }
 
 /** Presents real diagnostic events in the prototype's card; operational data stays in Health. */
@@ -314,6 +324,7 @@ internal fun DiagnosticsContent(
     onSendToSelf: () -> Unit,
     onClear: () -> Unit,
     onPerformanceEnabledChange: (Boolean) -> Unit,
+    onCopyPerformanceLogs: () -> Unit = {},
 ) {
     var showActions by remember { mutableStateOf(false) }
     var showHealth by remember { mutableStateOf(false) }
@@ -324,6 +335,7 @@ internal fun DiagnosticsContent(
             onRefresh = onRefresh,
             onSendToSelf = onSendToSelf,
             onPerformanceEnabledChange = onPerformanceEnabledChange,
+            onCopyPerformanceLogs = onCopyPerformanceLogs,
         )
     }
     SettingsScaffold(
@@ -475,6 +487,7 @@ private fun DiagnosticsHealthSheet(
     onRefresh: () -> Unit,
     onSendToSelf: () -> Unit,
     onPerformanceEnabledChange: (Boolean) -> Unit,
+    onCopyPerformanceLogs: () -> Unit,
 ) {
     WhiteNoiseModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -505,7 +518,11 @@ private fun DiagnosticsHealthSheet(
                 }
             }
             if (DiagnosticsSection.Performance in state.sections) {
-                PerformanceDiagnosticsGroup(state.performanceStatus, onPerformanceEnabledChange)
+                PerformanceDiagnosticsGroup(
+                    status = state.performanceStatus,
+                    onEnabledChange = onPerformanceEnabledChange,
+                    onCopy = onCopyPerformanceLogs,
+                )
             }
             SettingsSection(stringResource(R.string.relay_health))
             if (state.showRelayHealthEmptyState) {
@@ -541,6 +558,7 @@ private fun DiagnosticsHealthSheet(
 private fun PerformanceDiagnosticsGroup(
     status: PerformanceDiagnosticStatus,
     onEnabledChange: (Boolean) -> Unit,
+    onCopy: () -> Unit,
 ) {
     SettingsSection(stringResource(R.string.performance_logs))
     SettingsGroup {
@@ -559,6 +577,17 @@ private fun PerformanceDiagnosticsGroup(
                         stringResource(R.string.performance_logs_inactive)
                     },
             )
+        }
+        if (status.emittedCount > 0) {
+            row("performance-copy") { context ->
+                SettingsAction(
+                    context = context,
+                    title = stringResource(R.string.copy_performance_logs),
+                    subtitle = stringResource(R.string.copy_performance_logs_detail),
+                    onClick = onCopy,
+                    modifier = Modifier.testTag("diagnostics.performance.copy"),
+                )
+            }
         }
     }
     SettingsExplainer(stringResource(R.string.performance_logs_description))

@@ -12,6 +12,30 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DefaultNotificationDeliveryTest {
+    /** Projects one mode from the existing native and persistent runtime truths. */
+    @Test
+    fun deliveryModeProjectionConvergesLegacyStates() {
+        val push = notificationSettings("account", nativePushEnabled = true)
+        val local = notificationSettings("account", nativePushEnabled = false)
+
+        assertEquals(
+            NotificationDeliveryMode.Fcm,
+            notificationDeliveryMode(push, false, NativePushCapability.Available),
+        )
+        assertEquals(
+            NotificationDeliveryMode.Local,
+            notificationDeliveryMode(push, true, NativePushCapability.Available),
+        )
+        assertEquals(
+            NotificationDeliveryMode.Local,
+            notificationDeliveryMode(local, false, NativePushCapability.Available),
+        )
+        assertEquals(
+            NotificationDeliveryMode.Local,
+            notificationDeliveryMode(push, false, NativePushCapability.FirebaseUnavailable),
+        )
+    }
+
     /** Requires both global registration success and an active-account fingerprint. */
     @Test
     fun nativePushEnablementRequiresAllAccountsAndActiveRegistration() {

@@ -9,13 +9,13 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
-import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /** Acceptance matrix for the app-lifetime coordinator contract in issue #2030. */
@@ -217,12 +217,16 @@ class ConversationDictationCoordinatorTest {
         assertEquals(0, oldSession.destroyCalls)
 
         assertTrue(fixture.controller.requestStart(ACCOUNT, OTHER_GROUP, fixture.draft))
-        val replacementListener = fixture.platform.listener
         assertEquals(1, oldSession.cancelCalls)
         assertEquals(1, oldSession.destroyCalls)
         assertTrue(fixture.controller.isOwnedBy(ACCOUNT, OTHER_GROUP))
 
         oldListener.onResult("stale")
+        assertEquals(0, fixture.writes)
+        assertTrue(fixture.controller.state is ConversationDictationState.Starting)
+        shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(500L))
+        val replacementListener = fixture.platform.listener
+        oldListener.onResult("stale after restart")
         assertEquals(0, fixture.writes)
         fixture.controller.stop()
         replacementListener.onResult("replacement")
@@ -391,7 +395,6 @@ class ConversationDictationCoordinatorTest {
                 releaseMicrophone = { releases += 1 },
                 disclosureAccepted = { accepted },
                 markDisclosureAccepted = { accepted = true },
-                scheduleTimeout = { _, _ -> ConversationDictationTimeoutHandle {} },
             )
         return Fixture(
             controller = controller,

@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -14,6 +15,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
+import dev.ipf.whitenoise.android.ui.LocalReceivedEmoji
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOpenRequest
@@ -21,6 +23,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubble
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsQuickTransportViewportLock
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudProgress
+import dev.ipf.whitenoise.android.ui.conversation.messages.rememberReceivedEmoji
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -96,6 +99,8 @@ internal fun TimelineRowMessageBubble(
     onQuickReactionsSave: (List<String>) -> Unit,
     onReplyPreviewClick: (TimelineMessage) -> Unit,
     composerGate: ComposerGate,
+    blockedDmUnblockInFlight: Boolean = false,
+    onUnblockBlockedDm: () -> Unit = {},
     onBack: () -> Unit,
     mentionCandidates: List<MentionComposer.Candidate>,
     mentionPickerEnabled: Boolean,
@@ -118,65 +123,70 @@ internal fun TimelineRowMessageBubble(
             ttsSentenceLayoutSink?.unmountRow(messageIdHex, ttsRowInstance)
         }
     }
-    MessageBubble(
-        item = item,
-        controller = controller,
-        appState = appState,
-        onOpenConversationMedia = onOpenConversationMedia,
-        eventCardResolver = eventCardResolver,
-        documentSaveFallback = documentSaveFallback,
-        composerTextState = composerTextState,
-        highlighted = highlighted,
-        selectionMode = selectionMode,
-        textSelectionMode = textSelectionMode,
-        onTextSelectionModeChange = onTextSelectionModeChange,
-        onTextSelectionBoundsChange = onTextSelectionBoundsChange,
-        batchSelectable = batchSelectable,
-        selected = selected,
-        onToggleSelection = onToggleSelection,
-        rangeDragActive = rangeDragActive,
-        onDragSelectionStart = onDragSelectionStart,
-        onDragSelection = onDragSelection,
-        onDragSelectionEnd = onDragSelectionEnd,
-        onDragSelectionCancel = onDragSelectionCancel,
-        quickReactionEmojis = quickReactionEmojis,
-        recentEmojis = recentEmojis,
-        onEmojiUsed = onEmojiUsed,
-        isActionMenuOpen = isActionMenuOpen,
-        onActionMenuOpenChange = onActionMenuOpenChange,
-        onQuickReactionsSave = onQuickReactionsSave,
-        onReplyPreviewClick = onReplyPreviewClick,
-        composerGate = composerGate,
-        groupDisbanded = controller.group.disbanded,
-        inviteMutationInFlight = controller.mutationInFlight,
-        onJoinInvite = {
-            appState.launchMutation {
-                controller.acceptInvite(
-                    renderedGroupIdHex = renderedInviteGroupIdHex,
-                    renderedWelcomeMessageIdHex = renderedInviteWelcomeMessageIdHex,
-                )
-            }
-        },
-        onDeclineInvite = {
-            appState.launchMutation {
-                if (controller.declineInvite()) onBack()
-            }
-        },
-        mentionCandidates = mentionCandidates,
-        mentionPickerEnabled = mentionPickerEnabled,
-        showSenderName = showSenderName,
-        showSenderAvatar = showSenderAvatar,
-        collapseLongMessages = collapseLongMessages,
-        readOnly = readOnly,
-        ttsHighlightPassage = ttsHighlightState.passage,
-        ttsReadAloudProgress = ttsHighlightState.progress,
-        ttsFollowTarget = ttsHighlightState.followTarget,
-        ttsQuickTransportViewportLock = ttsQuickTransportViewportLock,
-        ttsSentenceLayoutSink = ttsSentenceLayoutSink,
-        onTtsSentenceSeek = onTtsSentenceSeek,
-        ttsRowInstance = ttsRowInstance,
-        parseMarkdown = parseMarkdown,
-    )
+    val receivedEmoji = rememberReceivedEmoji(item, controller, appState)
+    CompositionLocalProvider(LocalReceivedEmoji provides receivedEmoji) {
+        MessageBubble(
+            item = item,
+            controller = controller,
+            appState = appState,
+            onOpenConversationMedia = onOpenConversationMedia,
+            eventCardResolver = eventCardResolver,
+            documentSaveFallback = documentSaveFallback,
+            composerTextState = composerTextState,
+            highlighted = highlighted,
+            selectionMode = selectionMode,
+            textSelectionMode = textSelectionMode,
+            onTextSelectionModeChange = onTextSelectionModeChange,
+            onTextSelectionBoundsChange = onTextSelectionBoundsChange,
+            batchSelectable = batchSelectable,
+            selected = selected,
+            onToggleSelection = onToggleSelection,
+            rangeDragActive = rangeDragActive,
+            onDragSelectionStart = onDragSelectionStart,
+            onDragSelection = onDragSelection,
+            onDragSelectionEnd = onDragSelectionEnd,
+            onDragSelectionCancel = onDragSelectionCancel,
+            quickReactionEmojis = quickReactionEmojis,
+            recentEmojis = recentEmojis,
+            onEmojiUsed = onEmojiUsed,
+            isActionMenuOpen = isActionMenuOpen,
+            onActionMenuOpenChange = onActionMenuOpenChange,
+            onQuickReactionsSave = onQuickReactionsSave,
+            onReplyPreviewClick = onReplyPreviewClick,
+            composerGate = composerGate,
+            blockedDmUnblockInFlight = blockedDmUnblockInFlight,
+            onUnblockBlockedDm = onUnblockBlockedDm,
+            groupDisbanded = controller.group.disbanded,
+            inviteMutationInFlight = controller.mutationInFlight,
+            onJoinInvite = {
+                appState.launchMutation {
+                    controller.acceptInvite(
+                        renderedGroupIdHex = renderedInviteGroupIdHex,
+                        renderedWelcomeMessageIdHex = renderedInviteWelcomeMessageIdHex,
+                    )
+                }
+            },
+            onDeclineInvite = {
+                appState.launchMutation {
+                    if (controller.declineInvite()) onBack()
+                }
+            },
+            mentionCandidates = mentionCandidates,
+            mentionPickerEnabled = mentionPickerEnabled,
+            showSenderName = showSenderName,
+            showSenderAvatar = showSenderAvatar,
+            collapseLongMessages = collapseLongMessages,
+            readOnly = readOnly,
+            ttsHighlightPassage = ttsHighlightState.passage,
+            ttsReadAloudProgress = ttsHighlightState.progress,
+            ttsFollowTarget = ttsHighlightState.followTarget,
+            ttsQuickTransportViewportLock = ttsQuickTransportViewportLock,
+            ttsSentenceLayoutSink = ttsSentenceLayoutSink,
+            onTtsSentenceSeek = onTtsSentenceSeek,
+            ttsRowInstance = ttsRowInstance,
+            parseMarkdown = parseMarkdown,
+        )
+    }
 }
 
 @Composable

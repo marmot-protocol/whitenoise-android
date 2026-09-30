@@ -70,6 +70,7 @@ class AmberActivityCoordinatorTest {
     }
 
     private inner class CapturingLauncher : androidx.activity.result.ActivityResultLauncher<Intent>() {
+        /** Records the latest intent and ordered launch history for ordinary coordinator assertions. */
         override fun launch(
             input: Intent,
             options: androidx.core.app.ActivityOptionsCompat?,
@@ -93,6 +94,7 @@ class AmberActivityCoordinatorTest {
         var onNewIntentCount = 0
             private set
 
+        /** Records whether each launch reaches Amber's cold-create or warm-intent lifecycle path. */
         override fun launch(
             input: Intent,
             options: androidx.core.app.ActivityOptionsCompat?,
@@ -142,16 +144,18 @@ class AmberActivityCoordinatorTest {
         return relayLaunch!!
     }
 
+    /** Drains posted main-thread work until the selected launcher has observed [expected] intents. */
     private fun awaitLaunchCount(
         expected: Int,
+        observedLaunches: Collection<Intent> = launches,
         timeoutMs: Long = 2_000,
     ): List<Intent> {
         val deadline = System.currentTimeMillis() + timeoutMs
         var bootstrapWindowAdvanced = false
         while (System.currentTimeMillis() < deadline) {
             shadowOf(Looper.getMainLooper()).idle()
-            if (launches.size >= expected) return launches.toList()
-            if (expected > 1 && launches.isNotEmpty() && !bootstrapWindowAdvanced) {
+            if (observedLaunches.size >= expected) return observedLaunches.toList()
+            if (expected > 1 && observedLaunches.isNotEmpty() && !bootstrapWindowAdvanced) {
                 shadowOf(Looper.getMainLooper()).idleFor(
                     Duration.ofMillis(AmberActivityCoordinator.GROUPED_SESSION_BOOTSTRAP_MS + 1),
                 )
@@ -159,8 +163,8 @@ class AmberActivityCoordinatorTest {
             }
             Thread.sleep(5)
         }
-        assertEquals(expected, launches.size)
-        return launches.toList()
+        assertEquals(expected, observedLaunches.size)
+        return observedLaunches.toList()
     }
 
     @Test
@@ -689,6 +693,7 @@ class AmberActivityCoordinatorTest {
         assertEquals(requestId, outcome.data?.getStringExtra(AmberSignerRelay.EXTRA_REQUEST_ID))
     }
 
+    /** A simultaneous cold burst opens Amber once, then merges every remaining request exactly once. */
     @Test
     fun groupedBurstWaitsForColdSignerBeforeMergingEveryRequestExactlyOnce() {
         AmberActivityCoordinator.detach(coordinatorLauncher)
@@ -728,10 +733,9 @@ class AmberActivityCoordinatorTest {
             Thread.sleep(5)
         }
 
-        shadowOf(Looper.getMainLooper()).idle()
         assertEquals(requestIds.size, AmberActivityCoordinator.groupedPendingCountForTest())
+        assertEquals(1, awaitLaunchCount(1, signer.launched).size)
         assertEquals("only the bootstrap request may open a cold signer screen", 1, signer.onCreateCount)
-        assertEquals(1, signer.launched.size)
 
         signer.activityReady = true
         shadowOf(Looper.getMainLooper()).idleFor(
@@ -751,6 +755,7 @@ class AmberActivityCoordinatorTest {
         }
     }
 
+    /** Completes a grouped approval with one correlated result for every [requestIds] entry. */
     private fun deliverGroupedResults(requestIds: List<String>) {
         val aggregate =
             JSONArray().apply {

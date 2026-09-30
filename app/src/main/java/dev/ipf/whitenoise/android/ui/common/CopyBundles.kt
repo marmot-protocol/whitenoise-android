@@ -34,6 +34,7 @@ internal fun rememberGroupTitleCopy(): GroupTitleCopy =
         unavailableConversationTitle = stringResource(R.string.conversation_unavailable),
     )
 
+/** Resolves localized message labels once for both conversation and chat-list projections. */
 @Composable
 internal fun rememberMessageTextCopy(): MessageTextCopy =
     MessageTextCopy(
@@ -54,6 +55,7 @@ internal fun rememberMessageTextCopy(): MessageTextCopy =
         mediaAlbum = stringResource(R.string.media_album),
         mediaCountedFormat = stringResource(R.string.media_counted_format),
         message = stringResource(R.string.generic_message),
+        poll = stringResource(R.string.poll_preview),
         giphyMedia = stringResource(R.string.giphy_media_preview),
         groupSystem = rememberGroupSystemCopy(),
     )

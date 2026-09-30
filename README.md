@@ -4,9 +4,10 @@ Android client for White Noise, backed by the Marmot bindings.
 
 ## Project Shape
 
-The app is a Kotlin/Jetpack Compose Android app backed by the Marmot bindings. The native protocol layer owns protocol data and stores it in SQLite. The Android app should render that data, manage Android platform behavior, and keep UI lifecycle state.
-
-The Android app should not become a second database for White Noise protocol data. If a screen is slow because a query or projection is expensive, prefer improving the native API or SQLite-backed projection over adding an Android cache.
+The Kotlin/Jetpack Compose app is a minimal display and Android platform layer.
+MDK owns shared product logic and authoritative state. Follow [the agent guide](AGENTS.md#architecture-minimal-android-display-layer)
+and [MDK's host boundary](https://github.com/marmot-protocol/mdk/blob/master/docs/marmot-architecture/overview/app-core-boundary.md#host-app-boundary)
+when choosing where to implement a change.
 
 ## Common Commands
 
@@ -139,10 +140,8 @@ secrets:
 - `WHITENOISE_STAGING_KEYSTORE_PASSWORD`
 - `WHITENOISE_STAGING_KEY_ALIAS`
 - `WHITENOISE_STAGING_KEY_PASSWORD`
-- `WHITENOISE_OTLP_ENDPOINT`
-- `WHITENOISE_STAGING_OTLP_AUTH_TOKEN`
-- `WHITENOISE_AUDIT_LOG_ENDPOINT`
-- `WHITENOISE_AUDIT_LOG_AUTH_TOKEN`
+- `WHITENOISE_OTLP_AUTH_TOKEN`
+- `WHITENOISE_AUDIT_OTLP_AUTH_TOKEN`
 - `WHITENOISE_STAGING_PUSH_SERVER_PUBKEY_HEX`
 - `WHITENOISE_PUSH_RELAY_HINT`
 
@@ -178,6 +177,15 @@ broken layout. The tests render real composables on the JVM via Robolectric — 
 emulator — and cover onboarding, chat lists, conversations, settings, media,
 account switching, and other committed UI states across themes and accessibility
 configurations.
+
+Robolectric 4.17 on JDK 17+ needs explicit Java module openings. The shared
+`tasks.withType<Test>()` configuration in `app/build.gradle.kts` supplies the
+[upstream-required flags](https://robolectric.org/getting-started/#running-with-java-17-and-higher)
+to unit-test JVMs, including screenshot and synthetic-corpus replay tasks.
+Keep these flags on the test processes rather than in `org.gradle.jvmargs`;
+they are not app/runtime configuration. An `IllegalAccessException` mentioning
+`jdk.internal.access.SharedSecrets` during sandbox startup indicates missing
+test-JVM flags, not a screenshot mismatch; do not re-record baselines for it.
 
 Baseline PNGs live under `app/src/test/snapshots/` and are committed to git. CI
 runs `:app:verifyRoborazziDevZapstoreDebug` and
@@ -252,26 +260,23 @@ Runtime configuration is also read from `local.properties` or environment variab
 
 **Shared runtime values:**
 
-- `WHITENOISE_OTLP_ENDPOINT` — shared by dev, staging, and production.
-- `WHITENOISE_AUDIT_LOG_ENDPOINT` — shared by staging and production.
-- `WHITENOISE_AUDIT_LOG_AUTH_TOKEN` — shared by staging and production, separate from OTLP auth.
+- `WHITENOISE_OTLP_ENDPOINT` — optional metrics override; staging and production default to `https://otlp.whitenoise.chat/v1/metrics`.
+- `WHITENOISE_OTLP_AUTH_TOKEN` — one shared metrics write token for staging and production.
+- `WHITENOISE_AUDIT_OTLP_ENDPOINT` — optional override for the shared v5 audit destination, which defaults to `https://otlp.whitenoise.chat/v1/logs` in staging and production.
+- `WHITENOISE_AUDIT_OTLP_AUTH_TOKEN` — shared ingest-only v5 audit token, separate from metrics auth.
 - `WHITENOISE_PUSH_RELAY_HINT` — shared by staging and production (production defaults to `wss://relay.eu.whitenoise.chat`).
 
-**Flavor-specific OTLP tokens:**
+**Development metrics token:**
 
 - `WHITENOISE_DEV_OTLP_AUTH_TOKEN`
-- `WHITENOISE_STAGING_OTLP_AUTH_TOKEN`
-- `WHITENOISE_PRODUCTION_OTLP_AUTH_TOKEN`
-
-The token selects the telemetry tenant. There is no shared token fallback.
-Legacy token aliases `OTLP_TOKEN_WHITENOISE_ANDROID_DEV`,
-`OTLP_TOKEN_WHITENOISE_ANDROID_STAGING`, and `OTLP_TOKEN_WHITENOISE_ANDROID`
-remain accepted for their respective flavors.
+The development flavor continues to accept `OTLP_TOKEN_WHITENOISE_ANDROID_DEV`.
+Staging and production use the same metrics write token and the deployment
+environment resource attribute identifies the flavor in the metrics data.
 
 No tenant secret is read. MarmotKit requires a nonempty tenant resource attribute,
-so Android supplies fixed compatibility values (`whitenoise-android`,
-`whitenoise-android-staging`, and `whitenoise-android-dev`). HTTP authentication
-and tenant routing use the bearer token. The separate deployment environment
+so staging and production both supply `whitenoise-android`; development supplies
+`whitenoise-android-dev`. HTTP authentication
+uses the bearer token. The separate deployment environment
 attribute remains `production`, `staging`, or `development`, respectively.
 
 **Push identities (MIP-05):**
@@ -282,11 +287,11 @@ attribute remains `production`, `staging`, or `development`, respectively.
 
 **Dev audit and push:**
 
-Dev does not inherit shared Goggles credentials or staging/production push
+Dev does not inherit shared audit credentials or staging/production push
 identities. Explicit dev configuration remains available:
 
-- `WHITENOISE_DEV_AUDIT_LOG_ENDPOINT`
-- `WHITENOISE_DEV_AUDIT_LOG_AUTH_TOKEN`
+- `WHITENOISE_DEV_AUDIT_OTLP_ENDPOINT`
+- `WHITENOISE_DEV_AUDIT_OTLP_AUTH_TOKEN`
 - `WHITENOISE_DEV_PUSH_SERVER_PUBKEY_HEX`
 - `WHITENOISE_DEV_PUSH_RELAY_HINT`
 
@@ -396,3 +401,9 @@ Keep Compose work cheap. Do not call slow binding, database, or network paths fr
 Use White Noise streams and SQLite-backed projections as the fast path. If Android needs a shape that is expensive to assemble, add or improve the native projection rather than storing a duplicate copy in the Android app.
 
 Close native subscriptions when screens or services stop using them.
+
+## License
+
+Copyright (c) 2024-2026 White Noise developers.
+
+White Noise Android is licensed under the GNU Affero General Public License version 3.0 only (AGPL-3.0-only). See [LICENSE](LICENSE).

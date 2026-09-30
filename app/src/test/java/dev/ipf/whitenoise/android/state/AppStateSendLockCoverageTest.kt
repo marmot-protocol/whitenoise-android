@@ -150,6 +150,59 @@ class AppStateSendLockCoverageTest {
         )
     }
 
+    /** Keeps delivery cutover cleanup atomic with registration sync and suppresses competing token work. */
+    @Test
+    fun notificationDeliveryCleanupSerializesWithNativePushSync() {
+        val disableBody = appStateFunctionBody("disableNativePushForPersistentDelivery")
+        val rollbackBody = appStateFunctionBody("rollbackNativePushMode")
+        val rotationBody = appStateFunctionBody("onPushTokenRotated")
+        val finishBody = appStateFunctionBody("finishNotificationDeliveryModeTransaction")
+        val modeEntryBodies =
+            listOf(
+                appStateFunctionBody("setNotificationDeliveryMode"),
+                appStateFunctionBody("launchNotificationDeliveryModeReconciliation"),
+            )
+
+        listOf(disableBody, rollbackBody).forEach { body ->
+            val lockIndex = body.indexOf("nativePushSyncMutex.withLock")
+            val fingerprintIndex = body.indexOf("perAccountSyncedFingerprints.remove")
+            val clearIndex = body.indexOf("clearPushRegistrationForNotificationDeliveryOwnerLocked")
+            assertTrue("delivery cleanup must acquire the native-push sync mutex", lockIndex >= 0)
+            assertTrue("fingerprints must be removed after acquiring the sync mutex", fingerprintIndex > lockIndex)
+            assertTrue("registration clear must run after acquiring the sync mutex", clearIndex > lockIndex)
+        }
+        assertTrue(
+            "token rotation must not start registration sync during a delivery-mode transaction",
+            rotationBody.indexOf("if (!notificationDeliveryModeBusy)") in
+                0 until rotationBody.indexOf("syncNativePushRegistrationIfEnabled()"),
+        )
+        assertTrue(
+            "token rotation must serialize its busy check with the delivery-mode transaction",
+            rotationBody.indexOf("notificationDeliveryModeMutex.withLock") in
+                0 until rotationBody.indexOf("if (!notificationDeliveryModeBusy)"),
+        )
+        assertTrue(
+            "a token rotation must retain a durable retry marker before inspecting cutover state",
+            rotationBody.indexOf("recordPendingNativePushRegistrationSync()") in
+                0 until rotationBody.indexOf("if (!notificationDeliveryModeBusy)"),
+        )
+        assertTrue(
+            "the latest delivery transaction must drain token work after clearing busy state under its mutex",
+            finishBody.indexOf("notificationDeliveryModeMutex.withLock") in
+                0 until finishBody.indexOf("notificationDeliveryModeBusy = false") &&
+                finishBody.indexOf("notificationDeliveryModeBusy = false") in
+                0 until finishBody.indexOf("nativePushRegistrationSyncPending()") &&
+                finishBody.indexOf("nativePushRegistrationSyncPending()") in
+                0 until finishBody.indexOf("syncNativePushRegistrationIfEnabled()"),
+        )
+        modeEntryBodies.forEach { body ->
+            assertTrue(
+                "every busy delivery-mode entry point must settle through the token-work handoff",
+                body.contains("finishNotificationDeliveryModeTransaction"),
+            )
+        }
+    }
+
     @Test
     fun failedDestructiveWipeBranchesExitBeforeProcessGlobalProfileCachesAreCleared() {
         val body = appStateFunctionBody("signOutAndWipeActiveAccount")

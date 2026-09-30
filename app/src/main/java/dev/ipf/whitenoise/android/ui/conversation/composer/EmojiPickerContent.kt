@@ -52,10 +52,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.EmojiArtImage
 import dev.ipf.whitenoise.android.ui.EmojiCategory
 import dev.ipf.whitenoise.android.ui.EmojiData
 import dev.ipf.whitenoise.android.ui.EmojiEntry
 import dev.ipf.whitenoise.android.ui.EmojiSection
+import dev.ipf.whitenoise.android.ui.EmojiShortcodes
+import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
+import dev.ipf.whitenoise.android.ui.LocalReceivedEmoji
+import dev.ipf.whitenoise.android.ui.customEmojiSearchSection
 import dev.ipf.whitenoise.android.ui.emojiBrowseSections
 import dev.ipf.whitenoise.android.ui.emojiSearchSections
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -100,18 +105,39 @@ private class EmojiPickerModel(
     val sectionRanges = emojiSectionRanges(sections)
 }
 
-/** Filtered sections for the query with the recents section first. */
+/** Filtered sections for the query with the user's emoji and then recents first. */
 @Composable
 private fun rememberEmojiPickerModel(
     query: String,
     recentEmojis: List<String>,
+    purpose: EmojiPickerPurpose,
 ): EmojiPickerModel {
     val context = LocalContext.current
-    val entries by produceState(initialValue = emptyList<EmojiEntry>(), context) {
-        value = withContext(Dispatchers.IO) { EmojiData.load(context) }
+    val entries by produceState(initialValue = emptyList<EmojiEntry>(), context, purpose) {
+        value =
+            withContext(Dispatchers.IO) {
+                val loaded = EmojiData.load(context)
+                if (purpose == EmojiPickerPurpose.GROUP_IMAGE) {
+                    loaded.filter { !EmojiShortcodes.isShortcode(it.emoji) }
+                } else {
+                    loaded
+                }
+            }
     }
-    val recents = remember(recentEmojis) { recentEmojis.filter { it.isNotBlank() }.distinct() }
-    val browseSections = remember(entries, recents) { emojiBrowseSections(entries, recents) }
+    // Group images are drawn from a system-font glyph, so artwork emoji cannot become one.
+    val customEmoji = LocalCustomEmoji.current
+    val custom =
+        remember(customEmoji, purpose) {
+            if (purpose == EmojiPickerPurpose.GROUP_IMAGE) emptyList() else customEmoji.entries.map { it.shortcode }
+        }
+    val recents =
+        remember(recentEmojis, purpose) {
+            recentEmojis
+                .filter {
+                    it.isNotBlank() && (purpose != EmojiPickerPurpose.GROUP_IMAGE || !EmojiShortcodes.isShortcode(it))
+                }.distinct()
+        }
+    val browseSections = remember(entries, recents, custom) { emojiBrowseSections(entries, recents, custom) }
     var searchSections by remember { mutableStateOf<List<EmojiSection>>(emptyList()) }
     var searchedQuery by remember { mutableStateOf("") }
     LaunchedEffect(query, entries) {
@@ -124,9 +150,14 @@ private fun rememberEmojiPickerModel(
         searchedQuery = query
     }
     val searching = query.isNotBlank()
-    return remember(browseSections, searchSections, searching, searchedQuery) {
+    return remember(browseSections, searchSections, searching, searchedQuery, custom) {
         EmojiPickerModel(
-            sections = if (searching) searchSections else browseSections,
+            sections =
+                if (searching) {
+                    listOfNotNull(customEmojiSearchSection(custom, searchedQuery)) + searchSections
+                } else {
+                    browseSections
+                },
             searching = searching,
             searchedQuery = searchedQuery,
         )
@@ -151,7 +182,7 @@ internal fun EmojiPickerContent(
     selectionEnabled: Boolean = true,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
-    val model = rememberEmojiPickerModel(query, recentEmojis)
+    val model = rememberEmojiPickerModel(query, recentEmojis, purpose)
     val gridState = rememberLazyGridState()
     val categoryState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -166,7 +197,7 @@ internal fun EmojiPickerContent(
     /** Delivers a picked emoji and records it as used when the picker serves the composer. */
     fun pick(emoji: String) {
         if (!selectionEnabled) return
-        if (purpose == EmojiPickerPurpose.USE) onEmojiUsed(emoji)
+        if (purpose != EmojiPickerPurpose.CONFIGURE_QUICK_REACTION) onEmojiUsed(emoji)
         onEmojiPicked(emoji)
     }
 
@@ -361,13 +392,18 @@ private fun EmojiCell(
     }
 }
 
-/** A system-font emoji fitted into a fixed square, the way the prototype draws its 32dp sprites. */
+/** Shortcode artwork or a system-font emoji fitted into the picker's fixed square. */
 @Composable
 internal fun EmojiGlyph(
     emoji: String,
     modifier: Modifier = Modifier,
     size: Dp = EmojiPickerEmojiSize,
 ) {
+    val art = EmojiShortcodes.art(emoji, LocalCustomEmoji.current, LocalReceivedEmoji.current.art)
+    if (art != null) {
+        EmojiArtImage(art, contentDescription = emoji, modifier = modifier.size(size))
+        return
+    }
     val baseStyle = MaterialTheme.typography.headlineMedium
     val (fontSize, lineHeight) =
         emojiPickerCellTextMetrics(

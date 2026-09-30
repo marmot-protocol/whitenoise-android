@@ -332,6 +332,7 @@ internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
         SettingsDetail.ActionColor,
         SettingsDetail.ChatBubbleColors,
         SettingsDetail.Language,
+        SettingsDetail.CustomEmoji,
         -> SettingsDetail.Appearance
         SettingsDetail.About,
         SettingsDetail.BugReport,
@@ -437,12 +438,15 @@ private fun SettingsDetailRoute(
                 onOpenActionColor = { onDetailChange(SettingsDetail.ActionColor) },
                 onOpenChatBubbleColors = { onDetailChange(SettingsDetail.ChatBubbleColors) },
                 onOpenLanguage = { onDetailChange(SettingsDetail.Language) },
+                onOpenCustomEmoji = { onDetailChange(SettingsDetail.CustomEmoji) },
             )
         SettingsDetail.ActionColor ->
             ActionColorScreen(appState, onBack = { onDetailChange(SettingsDetail.Appearance) })
         SettingsDetail.ChatBubbleColors ->
             ChatBubbleColorsScreen(appState, onBack = { onDetailChange(SettingsDetail.Appearance) })
         SettingsDetail.Language -> LanguageScreen(appState, onBack = { onDetailChange(SettingsDetail.Appearance) })
+        SettingsDetail.CustomEmoji ->
+            CustomEmojiScreen(appState, onBack = { onDetailChange(SettingsDetail.Appearance) })
         SettingsDetail.Data -> DataUsageScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Profile ->
             ProfileEditScreen(
@@ -503,6 +507,7 @@ private fun SettingsDetailRoute(
                 onBack = { onDetailChange(null) },
                 onOpenDiagnostics = onOpenDiagnostics,
                 onOpenKeyPackages = { onDetailChange(SettingsDetail.KeyPackages) },
+                onOpenDemoChat = onOpenSupportChat,
             )
     }
 }

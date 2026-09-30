@@ -424,8 +424,10 @@ jobs:
           ./gradlew \
             :app:verifyRoborazziDev${{ matrix.flavor }}Debug \
             --tests '*ScreenshotTest' \
+            --tests '*ComposerAttachmentMenuTest' \
             --tests '*ConversationImeCollapseFocusTest' \
             --tests '*NewGroupNameEmojiPickerTest' \
+            --tests '*EmojiPickerRecentsBehaviorTest' \
             --tests '*ChatActionSheetTest' \
             --tests '*ChatListPinnedBoundaryTest' \
             --tests '*ChatListTtsTransportLayoutTest' \

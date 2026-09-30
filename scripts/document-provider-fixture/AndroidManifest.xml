@@ -1,0 +1,22 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="dev.ipf.fixture">
+    <application android:label="WN document test fixtures" android:allowBackup="false">
+        <provider
+            android:name=".FixtureDocumentsProvider"
+            android:authorities="dev.ipf.fixture.documents"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS">
+            <intent-filter>
+                <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
+            </intent-filter>
+        </provider>
+        <activity android:name=".FixtureViewerActivity" android:exported="true" android:label="WN PDF test viewer">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" android:mimeType="application/pdf" />
+            </intent-filter>
+        </activity>
+        <provider android:name=".FixtureStatusProvider" android:authorities="dev.ipf.fixture.status" android:exported="true" />
+    </application>
+</manifest>

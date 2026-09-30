@@ -48,6 +48,6 @@ internal interface NotificationContentSource {
     /** Classifies media from the exact stored message. */
     suspend fun mediaKind(update: NotificationUpdateFfi): ReplyMediaKind
 
-    /** Counts current signing accounts when recipient subtext is being resolved. */
-    fun signedInAccountCount(): Int
+    /** Returns current signing-account identities for conversation-specific recipient relevance. */
+    fun signedInAccountIds(): Set<String>
 }

@@ -24,6 +24,7 @@ import androidx.lifecycle.LifecycleOwner
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
+import dev.ipf.whitenoise.android.state.isLoadingOlder
 import kotlinx.coroutines.channels.Channel
 import java.util.concurrent.atomic.AtomicBoolean
 

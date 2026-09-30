@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -40,6 +41,7 @@ class ProfileEditNameActionsTest {
     @Test
     fun suggestingANameEnablesRestore() {
         renderEditing(saved = SAVED_NAME)
+        composeRule.onNodeWithContentDescription("Suggest name").assertExists()
         composeRule.onNodeWithTag("profile.suggest_name").performClick()
         composeRule.onNodeWithText(SUGGESTED_NAME).assertExists()
         composeRule.onNodeWithTag("profile.restore_name").assertIsEnabled()

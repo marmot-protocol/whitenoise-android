@@ -55,6 +55,7 @@ import dev.ipf.whitenoise.android.state.TransientNotice
 import dev.ipf.whitenoise.android.state.WarmResumeRenderedSurface
 import dev.ipf.whitenoise.android.state.WarmResumeTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.randomProfilePseudonym
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.ui.common.AppLockScreen
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
@@ -403,7 +404,7 @@ internal fun WhiteNoiseApp(
                     copyText = toast.diagnosticReport,
                 ),
             )
-            appState.clearToast()
+            appState.clearToast(toast)
         }
     }
     TransientNoticeTimeoutEffect(transientNotice, appState::clearTransientNotice)
@@ -461,6 +462,7 @@ internal fun WhiteNoiseApp(
         }
     }
 
+    val customEmojiStore = rememberCustomEmojiStore(context)
     // Privacy hardening (#405): when "Force incognito keyboard" is on, wrap the
     // whole app UI so every descendant text field requests incognito mode from
     // the IME (no learning / suggestion history / cloud sync of typed content).
@@ -468,6 +470,7 @@ internal fun WhiteNoiseApp(
         CompositionLocalProvider(
             LocalSnackbarBottomInset provides snackbarBottomInset,
             LocalSnackbarContentInset provides snackbarContentInset,
+            LocalCustomEmoji provides customEmojiStore.emoji,
         ) {
             Scaffold(
                 modifier =
@@ -514,7 +517,7 @@ internal fun WhiteNoiseApp(
                         AppSelfUpdateDialog(appState = appState)
                         val setupController = appState.accountSetup.controller
                         if (setupController != null) {
-                            AccountSetupScreen(setupController) {
+                            AccountSetupScreen(setupController, appState::randomProfilePseudonym) {
                                 appState.launchMutation { appState.accountSetup.later() }
                             }
                         } else if (appState.profileSignUpForPresentation != null) {
@@ -522,6 +525,7 @@ internal fun WhiteNoiseApp(
                                 dev.ipf.whitenoise.android.ui.onboarding.SignUpScreen(
                                     controller = checkNotNull(appState.profileSignUpForPresentation),
                                     hasValidatedInternet = appState::hasValidatedInternet,
+                                    randomName = appState::randomProfilePseudonym,
                                     onBack = { appState.dismissProfileSignUp() },
                                 )
                             }
@@ -696,9 +700,22 @@ internal fun WhiteNoiseApp(
         DictationProviderChooser(appState, onSelected = dictation::onProviderSelected, onDismiss = dictation::cancel)
     }
     if (!appState.appLockScreenVisible && dictationState is ConversationDictationState.DisclosureRequired) {
+        val offlineSpeechToTextSelected = dictationState.usesOfflineSpeechToText
+        val disclosureTitle =
+            if (offlineSpeechToTextSelected) {
+                R.string.dictation_disclosure_offline_title
+            } else {
+                R.string.dictation_disclosure_title
+            }
+        val disclosureMessage =
+            if (offlineSpeechToTextSelected) {
+                R.string.dictation_disclosure_offline_message
+            } else {
+                R.string.dictation_disclosure_message
+            }
         ConfirmDialog(
-            title = stringResource(R.string.dictation_disclosure_title),
-            message = stringResource(R.string.dictation_disclosure_message),
+            title = stringResource(disclosureTitle),
+            message = stringResource(disclosureMessage),
             confirmLabel = stringResource(R.string.dictation_continue),
             onConfirm = dictation::acceptDisclosure,
             onDismiss = dictation::cancel,

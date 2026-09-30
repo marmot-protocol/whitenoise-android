@@ -1,0 +1,897 @@
+{
+  "aggregates": [
+    {
+      "duration_ms": {
+        "max": 2.898,
+        "p50": 0.664,
+        "p95": 2.292
+      },
+      "failures": 0,
+      "network_bytes": null,
+      "operation": "preparation",
+      "payload_bytes_per_sample": 65536,
+      "payload_bytes_total": 1310720,
+      "peak_heap_bytes": {
+        "java": 14865856,
+        "native": 45335936
+      },
+      "samples": 20,
+      "schema": 1,
+      "size": "small",
+      "successes": 20
+    },
+    {
+      "duration_ms": {
+        "max": 5878.956,
+        "p50": 2713.038,
+        "p95": 2985.365
+      },
+      "failures": 0,
+      "network_bytes": null,
+      "operation": "upload",
+      "payload_bytes_per_sample": 65536,
+      "payload_bytes_total": 1310720,
+      "peak_heap_bytes": {
+        "java": 15029248,
+        "native": 51178496
+      },
+      "samples": 20,
+      "schema": 1,
+      "size": "small",
+      "successes": 20
+    },
+    {
+      "duration_ms": {
+        "max": 3222.743,
+        "p50": 1169.337,
+        "p95": 1878.521
+      },
+      "failures": 0,
+      "network_bytes": null,
+      "operation": "download",
+      "payload_bytes_per_sample": 65536,
+      "payload_bytes_total": 1310720,
+      "peak_heap_bytes": {
+        "java": 15132328,
+        "native": 45487040
+      },
+      "samples": 20,
+      "schema": 1,
+      "size": "small",
+      "successes": 20
+    },
+    {
+      "duration_ms": {
+        "max": 6.464,
+        "p50": 2.549,
+        "p95": 6.464
+      },
+      "failures": 0,
+      "network_bytes": null,
+      "operation": "preparation",
+      "payload_bytes_per_sample": 1048576,
+      "payload_bytes_total": 5242880,
+      "peak_heap_bytes": {
+        "java": 30778256,
+        "native": 44297136
+      },
+      "samples": 5,
+      "schema": 1,
+      "size": "medium",
+      "successes": 5
+    },
+    {
+      "duration_ms": {
+        "max": 4626.63,
+        "p50": 4331.097,
+        "p95": 4626.63
+      },
+      "failures": 0,
+      "network_bytes": null,
+      "operation": "upload",
+      "payload_bytes_per_sample": 1048576,
+      "payload_bytes_total": 5242880,
+      "peak_heap_bytes": {
+        "java": 30794640,
+        "native": 46486144
+      },
+      "samples": 5,
+      "schema": 1,
+      "size": "medium",
+      "successes": 5
+    },
+    {
+      "duration_ms": {
+        "max": 3271.998,
+        "p50": 1826.816,
+        "p95": 3271.998
+      },
+      "failures": 0,
+      "network_bytes": null,
+      "operation": "download",
+      "payload_bytes_per_sample": 1048576,
+      "payload_bytes_total": 5242880,
+      "peak_heap_bytes": {
+        "java": 26547088,
+        "native": 46848000
+      },
+      "samples": 5,
+      "schema": 1,
+      "size": "medium",
+      "successes": 5
+    },
+    {
+      "duration_ms": {
+        "max": 12.949,
+        "p50": 10.942,
+        "p95": 12.949
+      },
+      "failures": 0,
+      "network_bytes": null,
+      "operation": "preparation",
+      "payload_bytes_per_sample": 8388608,
+      "payload_bytes_total": 25165824,
+      "peak_heap_bytes": {
+        "java": 54226904,
+        "native": 44157136
+      },
+      "samples": 3,
+      "schema": 1,
+      "size": "large",
+      "successes": 3
+    },
+    {
+      "duration_ms": {
+        "max": 8507.77,
+        "p50": 6885.305,
+        "p95": 8507.77
+      },
+      "failures": 0,
+      "network_bytes": null,
+      "operation": "upload",
+      "payload_bytes_per_sample": 8388608,
+      "payload_bytes_total": 25165824,
+      "peak_heap_bytes": {
+        "java": 37408336,
+        "native": 61057728
+      },
+      "samples": 3,
+      "schema": 1,
+      "size": "large",
+      "successes": 3
+    },
+    {
+      "duration_ms": {
+        "max": 4593.557,
+        "p50": 4554.56,
+        "p95": 4593.557
+      },
+      "failures": 0,
+      "network_bytes": null,
+      "operation": "download",
+      "payload_bytes_per_sample": 8388608,
+      "payload_bytes_total": 25165824,
+      "peak_heap_bytes": {
+        "java": 45833824,
+        "native": 60955024
+      },
+      "samples": 3,
+      "schema": 1,
+      "size": "large",
+      "successes": 3
+    }
+  ],
+  "app_apk_sha256": "d8440fbc932712bbcf09b721686b18036e1d7cb8a705702c676b7c8d9e4b67bb",
+  "complete": true,
+  "component_metrics": [],
+  "device_class": "emulator",
+  "mdk_sha": "946e0547485c9a2c393c2048ec3a968fd50fb441",
+  "native_phases": [
+    {
+      "attempts": 20,
+      "duration_sum_ms": 48894,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "upload",
+      "size": "small",
+      "successes": 20
+    },
+    {
+      "count": 9,
+      "phase": "upload",
+      "size": "small",
+      "upper_bound_ms": 2000
+    },
+    {
+      "count": 10,
+      "phase": "upload",
+      "size": "small",
+      "upper_bound_ms": 3000
+    },
+    {
+      "count": 1,
+      "phase": "upload",
+      "size": "small",
+      "upper_bound_ms": 7500
+    },
+    {
+      "attempts": 20,
+      "duration_sum_ms": 26675,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "download",
+      "size": "small",
+      "successes": 20
+    },
+    {
+      "count": 17,
+      "phase": "download",
+      "size": "small",
+      "upper_bound_ms": 1500
+    },
+    {
+      "count": 2,
+      "phase": "download",
+      "size": "small",
+      "upper_bound_ms": 2000
+    },
+    {
+      "count": 1,
+      "phase": "download",
+      "size": "small",
+      "upper_bound_ms": 5000
+    },
+    {
+      "attempts": 20,
+      "duration_sum_ms": 4,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "queue_wait",
+      "size": "small",
+      "successes": 20
+    },
+    {
+      "count": 18,
+      "phase": "queue_wait",
+      "size": "small",
+      "upper_bound_ms": 1
+    },
+    {
+      "count": 2,
+      "phase": "queue_wait",
+      "size": "small",
+      "upper_bound_ms": 2
+    },
+    {
+      "attempts": 20,
+      "duration_sum_ms": 15,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "preparation",
+      "size": "small",
+      "successes": 20
+    },
+    {
+      "count": 18,
+      "phase": "preparation",
+      "size": "small",
+      "upper_bound_ms": 1
+    },
+    {
+      "count": 2,
+      "phase": "preparation",
+      "size": "small",
+      "upper_bound_ms": 10
+    },
+    {
+      "attempts": 20,
+      "duration_sum_ms": 997,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "host_setup",
+      "size": "small",
+      "successes": 20
+    },
+    {
+      "count": 19,
+      "phase": "host_setup",
+      "size": "small",
+      "upper_bound_ms": 1
+    },
+    {
+      "count": 1,
+      "phase": "host_setup",
+      "size": "small",
+      "upper_bound_ms": 1000
+    },
+    {
+      "attempts": 20,
+      "duration_sum_ms": 23823,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "response_headers",
+      "size": "small",
+      "successes": 20
+    },
+    {
+      "count": 2,
+      "phase": "response_headers",
+      "size": "small",
+      "upper_bound_ms": 1000
+    },
+    {
+      "count": 16,
+      "phase": "response_headers",
+      "size": "small",
+      "upper_bound_ms": 1500
+    },
+    {
+      "count": 1,
+      "phase": "response_headers",
+      "size": "small",
+      "upper_bound_ms": 2000
+    },
+    {
+      "count": 1,
+      "phase": "response_headers",
+      "size": "small",
+      "upper_bound_ms": 3000
+    },
+    {
+      "attempts": 20,
+      "duration_sum_ms": 16,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "first_byte",
+      "size": "small",
+      "successes": 20
+    },
+    {
+      "count": 18,
+      "phase": "first_byte",
+      "size": "small",
+      "upper_bound_ms": 1
+    },
+    {
+      "count": 2,
+      "phase": "first_byte",
+      "size": "small",
+      "upper_bound_ms": 10
+    },
+    {
+      "attempts": 20,
+      "duration_sum_ms": 1473,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "body_transfer",
+      "size": "small",
+      "successes": 20
+    },
+    {
+      "count": 13,
+      "phase": "body_transfer",
+      "size": "small",
+      "upper_bound_ms": 50
+    },
+    {
+      "count": 2,
+      "phase": "body_transfer",
+      "size": "small",
+      "upper_bound_ms": 75
+    },
+    {
+      "count": 2,
+      "phase": "body_transfer",
+      "size": "small",
+      "upper_bound_ms": 100
+    },
+    {
+      "count": 2,
+      "phase": "body_transfer",
+      "size": "small",
+      "upper_bound_ms": 200
+    },
+    {
+      "count": 1,
+      "phase": "body_transfer",
+      "size": "small",
+      "upper_bound_ms": 300
+    },
+    {
+      "attempts": 0,
+      "duration_sum_ms": 0,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "locator_failover",
+      "size": "small",
+      "successes": 0
+    },
+    {
+      "attempts": 20,
+      "duration_sum_ms": 0,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "ciphertext_verify",
+      "size": "small",
+      "successes": 20
+    },
+    {
+      "count": 20,
+      "phase": "ciphertext_verify",
+      "size": "small",
+      "upper_bound_ms": 1
+    },
+    {
+      "attempts": 20,
+      "duration_sum_ms": 0,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "decrypt",
+      "size": "small",
+      "successes": 20
+    },
+    {
+      "count": 20,
+      "phase": "decrypt",
+      "size": "small",
+      "upper_bound_ms": 1
+    },
+    {
+      "attempts": 20,
+      "duration_sum_ms": 0,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "plaintext_verify",
+      "size": "small",
+      "successes": 20
+    },
+    {
+      "count": 20,
+      "phase": "plaintext_verify",
+      "size": "small",
+      "upper_bound_ms": 1
+    },
+    {
+      "attempts": 5,
+      "duration_sum_ms": 20230,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "upload",
+      "size": "medium",
+      "successes": 5
+    },
+    {
+      "count": 5,
+      "phase": "upload",
+      "size": "medium",
+      "upper_bound_ms": 5000
+    },
+    {
+      "attempts": 5,
+      "duration_sum_ms": 10054,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "download",
+      "size": "medium",
+      "successes": 5
+    },
+    {
+      "count": 1,
+      "phase": "download",
+      "size": "medium",
+      "upper_bound_ms": 1500
+    },
+    {
+      "count": 2,
+      "phase": "download",
+      "size": "medium",
+      "upper_bound_ms": 2000
+    },
+    {
+      "count": 1,
+      "phase": "download",
+      "size": "medium",
+      "upper_bound_ms": 3000
+    },
+    {
+      "count": 1,
+      "phase": "download",
+      "size": "medium",
+      "upper_bound_ms": 5000
+    },
+    {
+      "attempts": 5,
+      "duration_sum_ms": 0,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "queue_wait",
+      "size": "medium",
+      "successes": 5
+    },
+    {
+      "count": 5,
+      "phase": "queue_wait",
+      "size": "medium",
+      "upper_bound_ms": 1
+    },
+    {
+      "attempts": 5,
+      "duration_sum_ms": 1,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "preparation",
+      "size": "medium",
+      "successes": 5
+    },
+    {
+      "count": 5,
+      "phase": "preparation",
+      "size": "medium",
+      "upper_bound_ms": 1
+    },
+    {
+      "attempts": 5,
+      "duration_sum_ms": 0,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "host_setup",
+      "size": "medium",
+      "successes": 5
+    },
+    {
+      "count": 5,
+      "phase": "host_setup",
+      "size": "medium",
+      "upper_bound_ms": 1
+    },
+    {
+      "attempts": 5,
+      "duration_sum_ms": 8922,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "response_headers",
+      "size": "medium",
+      "successes": 5
+    },
+    {
+      "count": 2,
+      "phase": "response_headers",
+      "size": "medium",
+      "upper_bound_ms": 1500
+    },
+    {
+      "count": 2,
+      "phase": "response_headers",
+      "size": "medium",
+      "upper_bound_ms": 2000
+    },
+    {
+      "count": 1,
+      "phase": "response_headers",
+      "size": "medium",
+      "upper_bound_ms": 5000
+    },
+    {
+      "attempts": 5,
+      "duration_sum_ms": 0,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "first_byte",
+      "size": "medium",
+      "successes": 5
+    },
+    {
+      "count": 5,
+      "phase": "first_byte",
+      "size": "medium",
+      "upper_bound_ms": 1
+    },
+    {
+      "attempts": 5,
+      "duration_sum_ms": 1091,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "body_transfer",
+      "size": "medium",
+      "successes": 5
+    },
+    {
+      "count": 2,
+      "phase": "body_transfer",
+      "size": "medium",
+      "upper_bound_ms": 75
+    },
+    {
+      "count": 2,
+      "phase": "body_transfer",
+      "size": "medium",
+      "upper_bound_ms": 200
+    },
+    {
+      "count": 1,
+      "phase": "body_transfer",
+      "size": "medium",
+      "upper_bound_ms": 750
+    },
+    {
+      "attempts": 0,
+      "duration_sum_ms": 0,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "locator_failover",
+      "size": "medium",
+      "successes": 0
+    },
+    {
+      "attempts": 5,
+      "duration_sum_ms": 8,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "ciphertext_verify",
+      "size": "medium",
+      "successes": 5
+    },
+    {
+      "count": 2,
+      "phase": "ciphertext_verify",
+      "size": "medium",
+      "upper_bound_ms": 1
+    },
+    {
+      "count": 3,
+      "phase": "ciphertext_verify",
+      "size": "medium",
+      "upper_bound_ms": 2
+    },
+    {
+      "attempts": 5,
+      "duration_sum_ms": 7,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "decrypt",
+      "size": "medium",
+      "successes": 5
+    },
+    {
+      "count": 3,
+      "phase": "decrypt",
+      "size": "medium",
+      "upper_bound_ms": 1
+    },
+    {
+      "count": 2,
+      "phase": "decrypt",
+      "size": "medium",
+      "upper_bound_ms": 2
+    },
+    {
+      "attempts": 5,
+      "duration_sum_ms": 9,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "plaintext_verify",
+      "size": "medium",
+      "successes": 5
+    },
+    {
+      "count": 1,
+      "phase": "plaintext_verify",
+      "size": "medium",
+      "upper_bound_ms": 1
+    },
+    {
+      "count": 4,
+      "phase": "plaintext_verify",
+      "size": "medium",
+      "upper_bound_ms": 2
+    },
+    {
+      "attempts": 3,
+      "duration_sum_ms": 21901,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "upload",
+      "size": "large",
+      "successes": 3
+    },
+    {
+      "count": 2,
+      "phase": "upload",
+      "size": "large",
+      "upper_bound_ms": 7500
+    },
+    {
+      "count": 1,
+      "phase": "upload",
+      "size": "large",
+      "upper_bound_ms": 10000
+    },
+    {
+      "attempts": 3,
+      "duration_sum_ms": 12748,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "download",
+      "size": "large",
+      "successes": 3
+    },
+    {
+      "count": 3,
+      "phase": "download",
+      "size": "large",
+      "upper_bound_ms": 5000
+    },
+    {
+      "attempts": 3,
+      "duration_sum_ms": 1,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "queue_wait",
+      "size": "large",
+      "successes": 3
+    },
+    {
+      "count": 3,
+      "phase": "queue_wait",
+      "size": "large",
+      "upper_bound_ms": 1
+    },
+    {
+      "attempts": 3,
+      "duration_sum_ms": 0,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "preparation",
+      "size": "large",
+      "successes": 3
+    },
+    {
+      "count": 3,
+      "phase": "preparation",
+      "size": "large",
+      "upper_bound_ms": 1
+    },
+    {
+      "attempts": 3,
+      "duration_sum_ms": 1,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "host_setup",
+      "size": "large",
+      "successes": 3
+    },
+    {
+      "count": 3,
+      "phase": "host_setup",
+      "size": "large",
+      "upper_bound_ms": 1
+    },
+    {
+      "attempts": 3,
+      "duration_sum_ms": 8514,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "response_headers",
+      "size": "large",
+      "successes": 3
+    },
+    {
+      "count": 1,
+      "phase": "response_headers",
+      "size": "large",
+      "upper_bound_ms": 2000
+    },
+    {
+      "count": 2,
+      "phase": "response_headers",
+      "size": "large",
+      "upper_bound_ms": 5000
+    },
+    {
+      "attempts": 3,
+      "duration_sum_ms": 9,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "first_byte",
+      "size": "large",
+      "successes": 3
+    },
+    {
+      "count": 2,
+      "phase": "first_byte",
+      "size": "large",
+      "upper_bound_ms": 1
+    },
+    {
+      "count": 1,
+      "phase": "first_byte",
+      "size": "large",
+      "upper_bound_ms": 10
+    },
+    {
+      "attempts": 3,
+      "duration_sum_ms": 4078,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "body_transfer",
+      "size": "large",
+      "successes": 3
+    },
+    {
+      "count": 2,
+      "phase": "body_transfer",
+      "size": "large",
+      "upper_bound_ms": 1500
+    },
+    {
+      "count": 1,
+      "phase": "body_transfer",
+      "size": "large",
+      "upper_bound_ms": 2000
+    },
+    {
+      "attempts": 0,
+      "duration_sum_ms": 0,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "locator_failover",
+      "size": "large",
+      "successes": 0
+    },
+    {
+      "attempts": 3,
+      "duration_sum_ms": 54,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "ciphertext_verify",
+      "size": "large",
+      "successes": 3
+    },
+    {
+      "count": 2,
+      "phase": "ciphertext_verify",
+      "size": "large",
+      "upper_bound_ms": 20
+    },
+    {
+      "count": 1,
+      "phase": "ciphertext_verify",
+      "size": "large",
+      "upper_bound_ms": 30
+    },
+    {
+      "attempts": 3,
+      "duration_sum_ms": 38,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "decrypt",
+      "size": "large",
+      "successes": 3
+    },
+    {
+      "count": 3,
+      "phase": "decrypt",
+      "size": "large",
+      "upper_bound_ms": 20
+    },
+    {
+      "attempts": 3,
+      "duration_sum_ms": 44,
+      "failures": 0,
+      "overflow_count": 0,
+      "phase": "plaintext_verify",
+      "size": "large",
+      "successes": 3
+    },
+    {
+      "count": 3,
+      "phase": "plaintext_verify",
+      "size": "large",
+      "upper_bound_ms": 20
+    }
+  ],
+  "network_profile": "unknown",
+  "schema": 1,
+  "source_sha": "212528dd27ad8c6d59a9840f8292f2dcf7fe0485",
+  "test_apk_sha256": "ec2867eaf7a757aa2c8691123a0d260a546dd15ec13cc1bb1df8e6089890d02d"
+}

@@ -27,7 +27,6 @@ val appProductionRoot = rootProject.file("app/src/main/java")
 val fuzzProductionIncludes =
     listOf(
         "dev/ipf/whitenoise/android/core/nostr/NostrEvent.kt",
-        "dev/ipf/whitenoise/android/core/nostr/BIP340.kt",
         "dev/ipf/whitenoise/android/core/nostr/NostrRelayFrames.kt",
         "dev/ipf/whitenoise/android/core/ProfileLink.kt",
         "dev/ipf/whitenoise/android/core/RecipientReference.kt",
@@ -55,8 +54,6 @@ sourceSets {
 
 dependencies {
     implementation(libs.org.json)
-    implementation(libs.secp256k1.common)
-    runtimeOnly(libs.secp256k1.jvm)
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.jazzer.junit)
 }

@@ -7,10 +7,22 @@ name: Android Instrumented Tests
 # not run it, but MarmotKit artifact-integration changes must prove the pinned
 # x86_64 native library loads before merge.
 #
-# Dev debug variant only: no signing secrets, no Firebase config,
-# matching the unit-test workflow's no-credentials posture.
+# Ordinary runs use dev debug. The opt-in review demo and document matrix use
+# unsigned isolated preview debug builds and disposable identities.
 
 on:
+  workflow_dispatch:
+    inputs:
+      review_demo_e2e:
+        description: Run the opt-in isolated-preview real-relay demo test
+        required: true
+        type: boolean
+        default: false
+      document_provider_matrix:
+        description: Run the opt-in isolated-preview real provider and relay matrix
+        required: true
+        type: boolean
+        default: false
   push:
     branches: [master]
   pull_request:
@@ -28,12 +40,15 @@ on:
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/TimelineRowTtsHighlightPaintAndroidTest.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/TtsHighlightPlacementAndroidTest.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/TtsRichLeafPlacementAndroidTest.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/messages/LongCjkBubbleScrollAndroidTest.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/TtsReadAloudHighlight.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/MediaReferenceSupportFuzzIntegrationTest.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/media/MediaReferenceSupport.kt'
       - 'cryptoBenchmark/**'
       - 'settings.gradle.kts'
-      - 'app/src/main/java/dev/ipf/whitenoise/android/core/nostr/BIP340.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/core/nostr/NostrEvent.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/core/nostr/NostrEventVerifier.kt'
+      - 'gradle/libs.versions.toml'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/share/ExternalShareDispatchActivity.java'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/share/ExternalShareTestFileProvider.java'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/share/InboundShareTaskReuseDeviceTest.kt'
@@ -108,7 +123,7 @@ jobs:
           disable-animations: true
           # android-emulator-runner executes this input through /bin/sh. Keep it
           # to one command and delegate conditional selection to the executable.
-          script: ./scripts/run-android-instrumented-tests.sh "${{ github.event_name }}"
+          script: ./scripts/run-android-instrumented-tests.sh "${{ github.event_name }}" "${{ inputs.review_demo_e2e }}" "${{ inputs.document_provider_matrix }}"
 
       - name: Upload instrumented test reports
         if: always()
@@ -121,5 +136,6 @@ jobs:
             app/build/outputs/connected_android_test_additional_output/
             cryptoBenchmark/build/reports/androidTests/
             cryptoBenchmark/build/outputs/androidTest-results/
+            app/build/reports/document-provider-matrix/
           if-no-files-found: ignore
           retention-days: 7

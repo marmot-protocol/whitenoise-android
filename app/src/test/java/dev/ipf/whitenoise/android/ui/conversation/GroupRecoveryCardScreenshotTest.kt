@@ -1,6 +1,12 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -16,6 +22,8 @@ import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.marmotkit.GroupRejoinInvitationFfi
+import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.whitenoise.android.state.groupRecoveryReadFailureIsPresentable
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -135,6 +143,118 @@ class GroupRecoveryCardScreenshotTest {
         composeRule.onNodeWithText("Couldn’t check group recovery. Try again.").assertDoesNotExist()
         composeRule.onNodeWithText("Retry").assertDoesNotExist()
     }
+
+    /** Captures the clean conversation chrome retained after an exhausted transient worker read. */
+    @Test
+    fun aTransientWorkerClosureWithoutRecoveryEvidenceShowsNoCard() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface(
+                    modifier = Modifier.width(360.dp).height(180.dp).testTag("healthy-conversation"),
+                    color = MaterialTheme.colorScheme.background,
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Wednesday", style = MaterialTheme.typography.labelSmall)
+                        Text("Earlier messages remain visible", style = MaterialTheme.typography.bodyMedium)
+                        GroupRecoveryCard(
+                            status = null,
+                            busy = false,
+                            inviterName = { it },
+                            inviterIdentity = { it },
+                            onConfirm = {},
+                            onDecline = {},
+                            readFailed =
+                                groupRecoveryReadFailureIsPresentable(
+                                    lastConfirmedStatus = null,
+                                    freshlyCreated = false,
+                                    failure = MarmotKitException.TransportClosed(),
+                                ),
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Couldn’t check group recovery. Try again.").assertDoesNotExist()
+        composeRule.onNodeWithText("Retry").assertDoesNotExist()
+        composeRule.onNodeWithTag("healthy-conversation").captureRoboImage(
+            "src/test/snapshots/group_recovery_transient_read_hidden_light.png",
+        )
+    }
+
+    /** A group-scoped history notice explains the gap and lets only the user dismiss it. */
+    @Test
+    fun historyNoticeLight() = captureHistoryNotice(dark = false, amoled = false, largeRtl = false)
+
+    /** Wide RTL and large typography keep the history notice and its Dismiss action reachable. */
+    @Test
+    @Config(qualifiers = "en-w600dp-h900dp-mdpi")
+    fun historyNoticeAmoledLargeRtl() = captureHistoryNotice(dark = true, amoled = true, largeRtl = true)
+
+    /** Without a notice id there is nothing to dismiss, so no Dismiss action is offered. */
+    @Test
+    fun historyNoticeWithoutIdsOffersNoDismiss() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                GroupRecoveryCard(
+                    status = historyNoticeStatus(noticeIds = emptyList()),
+                    busy = false,
+                    inviterName = { it },
+                    inviterIdentity = { it },
+                    onConfirm = {},
+                    onDecline = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Some earlier messages in this chat may be missing.").assertExists()
+        composeRule.onNodeWithText("Dismiss").assertDoesNotExist()
+    }
+
+    /** Renders the group history notice and records its screenshot baseline. */
+    private fun captureHistoryNotice(
+        dark: Boolean,
+        amoled: Boolean,
+        largeRtl: Boolean,
+    ) {
+        var dismissals = 0
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (largeRtl) 2f else 1f) {
+                CompositionLocalProvider(
+                    LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                ) {
+                    GroupRecoveryCard(
+                        status = historyNoticeStatus(noticeIds = listOf("d".repeat(48))),
+                        busy = false,
+                        inviterName = { it },
+                        inviterIdentity = { it },
+                        onConfirm = {},
+                        onDecline = {},
+                        onDismissHistoryNotices = { dismissals++ },
+                        modifier = Modifier.width(if (largeRtl) 600.dp else 360.dp).testTag("group-recovery-card"),
+                    )
+                }
+            }
+        }
+        composeRule.onNodeWithText("Some earlier messages in this chat may be missing.").assertIsDisplayed()
+        val name = if (largeRtl) "amoled_large_rtl" else "light"
+        composeRule
+            .onNodeWithTag("group-recovery-card")
+            .captureRoboImage("src/test/snapshots/group_recovery_history_notice_$name.png")
+        composeRule.onNodeWithText("Dismiss").assertIsDisplayed().performClick()
+        composeRule.runOnIdle { assertEquals(1, dismissals) }
+    }
+
+    private fun historyNoticeStatus(noticeIds: List<String>) =
+        GroupRecoveryStatusFfi(
+            groupIdHex = "group",
+            automaticRecoveryFailed = false,
+            pendingReinvites = 0u,
+            failedReinvites = 0u,
+            rejoinInvitations = emptyList(),
+            historyMayBeIncomplete = true,
+            historyNoticeIds = noticeIds,
+        )
 
     /** Dark recovery keeps the native retry action visible within the prototype notice frame. */
     @Test

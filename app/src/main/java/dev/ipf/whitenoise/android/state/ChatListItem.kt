@@ -361,6 +361,7 @@ data class ChatListItem(
     /** Projected conversation kind first, presentation headcount heuristic as fallback. */
     fun isDm(): Boolean = GroupProjector.isDm(projection?.conversationKind, presentationMemberCount, group.name)
 
+    /** Converts the latest native projection to chat-list copy without rendering poll wire data. */
     fun projectedPreviewText(
         copy: MessageTextCopy = MessageTextCopy.Default,
         empty: String = "No messages yet",
@@ -368,6 +369,7 @@ data class ChatListItem(
         val preview = projection?.lastMessage ?: return MessageProjector.previewText(latest, copy, empty)
         return when {
             preview.deleted -> copy.deleted
+            MessageProjector.isPollKind(preview.kind) -> copy.poll
             preview.kind == 1200uL -> preview.plaintext.ifBlank { copy.agentStreamStarted }
             // Kind-1009 edits are an in-place mutation of an existing
             // message body; they must not bump the chat-list preview to

@@ -167,7 +167,7 @@ class ReceivedApkAttachmentOpenIntegrationTest {
 
     /** Rejects filename-inferred APKs whose verified payload is not an Android package. */
     @Test
-    fun genericApkNameWithNonApkArtifactIsRejectedBeforeDispatch() =
+    fun declaredOrInferredApkWithNonApkArtifactIsRejectedBeforeDispatch() =
         runTest {
             val context = RecordingContext(applicationContext())
             val invalidArtifacts =
@@ -181,16 +181,18 @@ class ReceivedApkAttachmentOpenIntegrationTest {
                 )
 
             invalidArtifacts.forEach { source ->
-                val result =
-                    openAttachmentExternally(
-                        context = context,
-                        source = source,
-                        mediaType = GENERIC_BINARY_MIME,
-                        fileName = "release.apk",
-                        selfUpdateEnabled = true,
-                        canRequestPackageInstalls = { true },
-                    )
-                assertEquals(OpenAttachmentResult.InvalidPackage, result)
+                listOf(GENERIC_BINARY_MIME, ANDROID_PACKAGE_MIME).forEach { advertisedMime ->
+                    val result =
+                        openAttachmentExternally(
+                            context = context,
+                            source = source,
+                            mediaType = advertisedMime,
+                            fileName = if (advertisedMime == ANDROID_PACKAGE_MIME) "payload.bin" else "release.apk",
+                            selfUpdateEnabled = true,
+                            canRequestPackageInstalls = { true },
+                        )
+                    assertEquals(OpenAttachmentResult.InvalidPackage, result)
+                }
             }
             assertNull(context.startedIntent)
         }
@@ -276,6 +278,32 @@ class ReceivedApkAttachmentOpenIntegrationTest {
 
             assertEquals(OpenAttachmentResult.NoInstaller, noInstaller)
             assertEquals(OpenAttachmentResult.SecurityFailure, securityFailure)
+        }
+
+    @Test
+    fun generalDocumentOpensWithAViewerAndReportsMissingViewer() =
+        runTest {
+            val source = artifact("report.pdf").also { it.writeBytes(byteArrayOf(1, 2, 3)) }
+            val viewer = RecordingContext(applicationContext())
+            val opened =
+                openAttachmentExternally(
+                    context = viewer,
+                    source = source,
+                    mediaType = "application/pdf; charset=binary",
+                    fileName = "report.pdf",
+                )
+            val noViewer =
+                openAttachmentExternally(
+                    context = RecordingContext(applicationContext(), ActivityNotFoundException()),
+                    source = source,
+                    mediaType = "application/pdf",
+                    fileName = "report.pdf",
+                )
+
+            assertEquals(OpenAttachmentResult.Opened, opened)
+            assertEquals(Intent.ACTION_VIEW, viewer.startedIntent?.action)
+            assertEquals("application/pdf", viewer.startedIntent?.type)
+            assertEquals(OpenAttachmentResult.NoHandler, noViewer)
         }
 
     @Test

@@ -3,8 +3,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -331,36 +329,38 @@ internal fun rememberTtsReadAloudHighlightStyle(
         }
     }
 
+/**
+ * Hosts a rendered message body and publishes polite read-aloud progress on
+ * that bounded node without introducing a measurable accessibility child.
+ */
 @Composable
 internal fun readAloudMessageSemantics(
     progress: TtsReadAloudProgress?,
     modifier: Modifier = Modifier,
     messageContent: @Composable () -> Unit,
 ) {
-    Box(modifier = modifier) {
-        messageContent()
+    val progressLabel =
         progress?.let { readAloudProgress ->
-            val progressLabel =
-                stringResource(
-                    R.string.tts_bar_progress,
-                    readAloudProgress.sentenceIndex + 1,
-                    readAloudProgress.sentenceCount,
-                    readAloudProgress.messageIndex + 1,
-                    readAloudProgress.messageCount,
-                )
-            Text(
-                text = progressLabel,
-                modifier =
-                    Modifier
-                        .size(0.dp)
-                        .testTag("tts-read-aloud-progress")
-                        .semantics {
-                            liveRegion = LiveRegionMode.Polite
-                            contentDescription = progressLabel
-                        },
+            stringResource(
+                R.string.tts_bar_progress,
+                readAloudProgress.sentenceIndex + 1,
+                readAloudProgress.sentenceCount,
+                readAloudProgress.messageIndex + 1,
+                readAloudProgress.messageCount,
             )
         }
-    }
+    val progressSemantics =
+        if (progressLabel == null) {
+            Modifier
+        } else {
+            Modifier
+                .testTag("tts-read-aloud-progress")
+                .semantics {
+                    liveRegion = LiveRegionMode.Polite
+                    contentDescription = progressLabel
+                }
+        }
+    Box(modifier = modifier.then(progressSemantics)) { messageContent() }
 }
 
 internal fun ttsHighlightTextRange(

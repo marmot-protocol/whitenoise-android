@@ -1,27 +1,37 @@
-# BIP-340 verifier comparison
+# Native event verifier comparison
 
-`cryptoBenchmark` is an isolated test app. Its optimized release APK compiles
-the production `BIP340.kt` and `NostrEvent.kt` sources directly, plus the
-benchmark-only copy of the removed verifier. It does not install or mutate White
-Noise. The test APK calls each implementation through the same bridge and first
-checks a valid signature, an invalid signature, a valid signed event, and a
-mutated event. A failure aborts measurement.
+`cryptoBenchmark` is an isolated minified Android app. It compiles the production
+`NostrEvent.kt` and `NostrEventVerifier.kt` adapter and loads the exact MarmotKit
+artifact pinned by the app. No account, Android Keyring, or SQLCipher initialization
+runs in this APK. MDK owns canonical event-ID and Schnorr verification.
+
+The benchmark compares full-event verification against a benchmark-only copy of
+the removed Kotlin verifier. Both workloads include serialization and event-ID
+verification. Before measurement it verifies the signed fixture and rejects
+mutated IDs, public keys, signatures, timestamps, kinds, tags, and content. It
+also rejects a content mutation with a recomputed ID and the original signature.
+The replacement has no signature-only binding or additional secp256k1 JNI library.
 
 Each operation gets 10 untimed warmups and 20 timed samples of 8 operations.
-Each sample records monotonic elapsed nanoseconds divided by 8. The reported
-median is the midpoint of the two central samples; throughput is
-`1,000,000,000 / medianNs`. Signature-only calls verify Bitcoin BIP-340 vector
-0; full-event calls recompute a canonical Nostr event ID before verification.
-Both implementations run in the same optimized APK, on the same device and
-corpus. Quartz is not compared because White Noise does not pin or ship it.
+Each sample retains monotonic nanoseconds per operation. The median is the
+midpoint of the two central samples; throughput is `1,000,000,000 / medianNs`.
+First-call native loading is excluded from the warmed timings.
 
-Build both APKs with `./gradlew :cryptoBenchmark:assembleRelease
-:cryptoBenchmark:assembleReleaseAndroidTest`; then run
-`:cryptoBenchmark:connectedReleaseAndroidTest` on a physical Android device.
-The shared fixture requires its guarded device session and install wrappers.
-Save the `bench_json` instrumentation status, target/test APK SHA-256 values,
-device fingerprint, ABI, battery and thermal state for every published run.
-Emulator runs are correctness smoke tests, not publishable performance numbers.
+Build `:cryptoBenchmark:assembleRelease :cryptoBenchmark:assembleReleaseAndroidTest`
+and run `:cryptoBenchmark:connectedReleaseAndroidTest`. On the shared physical
+fixture use its guarded session and install wrappers. Retain `bench_json`, exact
+source revision, MarmotKit artifact SHA-256, APK hashes, ABI, build fingerprint,
+battery and thermal state. Emulator results establish correctness only.
+
+JVM fuzzing covers the parser and serialization roundtrip; cryptographic rejection
+runs in this isolated Android APK using the real native library. Domain unit tests
+inject immutable verifier decisions and do not claim cryptographic validation.
+
+## Historical ACINQ measurements
+
+The following retained samples measure the earlier ACINQ/libsecp256k1 candidate.
+They are not measurements of the current MDK adapter. The original JSON is
+preserved unchanged; signature-only results have no current counterpart.
 
 The [2026-09-23 Pixel 6a raw samples](performance-data/bip340-2026-09-23-pixel6a.json)
 come from one guarded physical-device run on Android 17 / arm64-v8a. Battery

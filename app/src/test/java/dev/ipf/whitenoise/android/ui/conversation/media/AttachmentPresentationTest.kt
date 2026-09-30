@@ -190,7 +190,7 @@ class AttachmentPresentationTest {
     }
 
     @Test
-    fun nonApkAndExplicitPackageMimeDoNotNeedFilenameInference() {
+    fun explicitPackageMimeStillRequiresPackageValidation() {
         var archiveChecks = 0
         val unexpectedCheck = {
             archiveChecks += 1
@@ -202,10 +202,10 @@ class AttachmentPresentationTest {
             classifyAttachmentOpen("", "notes.pdf", unexpectedCheck),
         )
         assertEquals(
-            AttachmentOpenClassification.Ready(ANDROID_PACKAGE_MIME),
+            AttachmentOpenClassification.InvalidAndroidPackage,
             classifyAttachmentOpen(" Application/Vnd.Android.Package-Archive ", "payload.bin", unexpectedCheck),
         )
-        assertEquals(0, archiveChecks)
+        assertEquals(1, archiveChecks)
     }
 
     @Test

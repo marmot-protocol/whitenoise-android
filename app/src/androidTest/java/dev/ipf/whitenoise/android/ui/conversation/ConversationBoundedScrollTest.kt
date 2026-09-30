@@ -30,6 +30,53 @@ class ConversationBoundedScrollTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Accepted sends from far history compose only the destination viewport, never intervening rows. */
+    @Test
+    fun acceptedSendFromFarHistorySnapsWithoutComposingInterveningRows() {
+        val composed = Collections.synchronizedSet(mutableSetOf<Int>())
+        val finished = AtomicBoolean(false)
+        lateinit var coordinator: ConversationScrollCoordinator
+        lateinit var listState: LazyListState
+        lateinit var scope: CoroutineScope
+        composeRule.setContent {
+            listState = rememberLazyListState(initialFirstVisibleItemIndex = TARGET_INDEX)
+            coordinator =
+                remember(listState) {
+                    ConversationScrollCoordinator(
+                        LazyListConversationScrollWriter(listState),
+                        ConversationScrollMode.ReadingHistory("message-$TARGET_INDEX", 0),
+                    )
+                }
+            scope = rememberCoroutineScope()
+            LazyColumn(state = listState, reverseLayout = true, modifier = Modifier.height(240.dp)) {
+                items((0 until ITEM_COUNT).toList(), key = { it }) { index ->
+                    SideEffect { composed += index }
+                    Text("Message $index", Modifier.fillMaxWidth().height(40.dp).testTag("send-row-$index"))
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        val initial = synchronized(composed) { composed.toSet() }
+        composeRule.runOnIdle {
+            scope.launch {
+                assertTrue(coordinator.revealSentAtLiveTail(resolveTailIndex = { 0 }))
+                finished.set(true)
+            }
+        }
+        composeRule.waitUntil(5_000) { finished.get() }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("send-row-0").assertIsDisplayed()
+        composeRule.runOnIdle {
+            val newRows = synchronized(composed) { composed.toSet() - initial }
+            assertEquals(0, listState.firstVisibleItemIndex)
+            assertFalse(listState.canScrollBackward)
+            assertTrue(coordinator.isFollowingTail)
+            assertTrue(newRows.isNotEmpty())
+            assertTrue("only the newest viewport is composed: $newRows", newRows.all { it in 0..20 })
+            assertTrue(newRows.size < 40)
+        }
+    }
+
     @Test
     fun farJumpDoesNotComposeTheInterveningHistoryAndSettlesAtTheTarget() {
         val composedIndices = Collections.synchronizedSet(mutableSetOf<Int>())

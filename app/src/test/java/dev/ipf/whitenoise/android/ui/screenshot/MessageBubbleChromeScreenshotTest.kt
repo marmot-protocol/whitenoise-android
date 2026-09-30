@@ -29,10 +29,10 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.core.ReactionTally
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
 import dev.ipf.whitenoise.android.ui.conversation.messages.MediaCaptionFrame
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubbleFrame
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageInlineFooter
-import dev.ipf.whitenoise.android.ui.conversation.messages.RetentionIndicatorInput
 import dev.ipf.whitenoise.android.ui.conversation.messages.colorFromArgb
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleBorder
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleFillColor
@@ -74,7 +74,7 @@ class MessageBubbleChromeScreenshotTest {
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/message_bubble_chrome_dark.png")
     }
 
-    /** Long captions widen narrow portrait media while preserving directional media alignment. */
+    /** Long captions and narrow portrait media share the prototype's inset frame. */
     @Test
     fun narrowMediaWithLongCaptionsUsesReadableSharedWidth() {
         composeRule.setContent {
@@ -99,6 +99,35 @@ class MessageBubbleChromeScreenshotTest {
             .captureRoboImage("src/test/snapshots/message_bubble_narrow_media_long_caption_light.png")
     }
 
+    /** A dark image keeps the bubble-fill frame visible around the media. */
+    @Test
+    fun darkNarrowMediaWithLongCaptionsKeepsVisibleBubbleFrame() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                Surface(color = MaterialTheme.colorScheme.background) {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                            .testTag(NARROW_MEDIA_CAPTION_TAG),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        NarrowCaptionBubble(mine = false, mediaColor = Color.Black)
+                        NarrowCaptionBubble(
+                            mine = true,
+                            mediaColor = Color.Black,
+                            modifier = Modifier.align(Alignment.End),
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule
+            .onNodeWithTag(NARROW_MEDIA_CAPTION_TAG)
+            .captureRoboImage("src/test/snapshots/message_bubble_narrow_media_long_caption_dark.png")
+    }
+
     @Test
     fun acceptedPendingFooterLight() {
         composeRule.setContent {
@@ -113,7 +142,6 @@ class MessageBubbleChromeScreenshotTest {
                             status = MessageStatus.Pending,
                             editedLabel = null,
                             onEditedClick = null,
-                            retention = null,
                         )
                     }
                 }
@@ -123,6 +151,50 @@ class MessageBubbleChromeScreenshotTest {
         composeRule
             .onNodeWithTag(TAG)
             .captureRoboImage("src/test/snapshots/message_bubble_accepted_pending_light.png")
+    }
+
+    @Test
+    fun pendingRevisionLight() {
+        renderPendingRevision(darkTheme = false)
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/message_pending_revision_light.png")
+    }
+
+    @Test
+    fun pendingRevisionDark() {
+        renderPendingRevision(darkTheme = true)
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/message_pending_revision_dark.png")
+    }
+
+    private fun renderPendingRevision(darkTheme: Boolean) {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = darkTheme) {
+                Surface(color = MaterialTheme.colorScheme.background) {
+                    Column(modifier = Modifier.width(360.dp).padding(16.dp).testTag(TAG)) {
+                        MessageBubbleFrame(
+                            presentation = messageBubblePresentation(deleted = false, mine = true),
+                            highlighted = false,
+                            mine = true,
+                            mentionedSelf = false,
+                            mentionedYouLabel = "Mentioned you",
+                            modifier = Modifier.align(Alignment.End),
+                        ) {
+                            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)) {
+                                Text("Revised before delivery")
+                                MessageInlineFooter(
+                                    timeText = "12:36",
+                                    color = messageBubbleTimestampColor(mine = true, deleted = false),
+                                    showStatus = true,
+                                    status = MessageStatus.Pending,
+                                    editedLabel = "Edited",
+                                    onEditedClick = null,
+                                    modifier = Modifier.align(Alignment.End),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /** Recent labels stay compact beside incoming and outgoing delivery chrome. */
@@ -299,7 +371,7 @@ class MessageBubbleChromeScreenshotTest {
     }
 
     @Test
-    fun disappearingFootersLargeFontRtl() {
+    fun ordinaryFootersLargeFontRtl() {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true, amoled = true, fontScale = 1.6f) {
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
@@ -320,7 +392,7 @@ class MessageBubbleChromeScreenshotTest {
 
         composeRule
             .onNodeWithTag(TAG)
-            .captureRoboImage("src/test/snapshots/message_bubble_retention_amoled_large_rtl.png")
+            .captureRoboImage("src/test/snapshots/message_bubble_footer_amoled_large_rtl.png")
     }
 
     /** Captures sent and received unavailable quotes in the same deterministic frame. */
@@ -424,8 +496,6 @@ class MessageBubbleChromeScreenshotTest {
                             status = MessageStatus.Sent,
                             editedLabel = "edited",
                             onEditedClick = null,
-                            retention = retentionInput("light-active", expiresAtEpochSeconds = 200uL),
-                            retentionClockMillis = { 150_000L },
                         )
                         MessageInlineFooter(
                             timeText = "12:35",
@@ -434,7 +504,6 @@ class MessageBubbleChromeScreenshotTest {
                             status = MessageStatus.Failed,
                             editedLabel = null,
                             onEditedClick = null,
-                            retention = retentionInput("light-waiting", expiresAtEpochSeconds = null),
                         )
                         ReplyPreviewCard(
                             senderTitle = "Alex",
@@ -470,6 +539,7 @@ class MessageBubbleChromeScreenshotTest {
 private fun NarrowCaptionBubble(
     mine: Boolean,
     modifier: Modifier = Modifier,
+    mediaColor: Color = if (mine) Color(0xFF6A4C93) else Color(0xFF2A9D8F),
 ) {
     MediaCaptionFrame(
         presentation = messageBubblePresentation(deleted = false, mine = mine),
@@ -482,9 +552,9 @@ private fun NarrowCaptionBubble(
         media = {
             Box(
                 Modifier
-                    .width(82.dp)
+                    .width(ConversationMessageMetrics.RichContentCanvasWidth)
                     .height(138.dp)
-                    .background(if (mine) Color(0xFF6A4C93) else Color(0xFF2A9D8F)),
+                    .background(mediaColor),
             )
         },
     ) {
@@ -560,7 +630,7 @@ private fun CustomAmoledMediaCaptionBubble(highlighted: Boolean) {
         mentionedSelf = false,
         mentionedYouLabel = "Mentioned you",
         alignEnd = true,
-        media = { Box(Modifier.width(180.dp).height(80.dp).background(Color(0xFF303030))) },
+        media = { Box(Modifier.fillMaxWidth().height(80.dp).background(Color(0xFF303030))) },
     ) {
         Text("Highlighted media caption")
         Text(
@@ -628,8 +698,6 @@ private fun DirectionalBubble(
                 status = if (mine) MessageStatus.Sent else MessageStatus.Received,
                 editedLabel = null,
                 onEditedClick = null,
-                retention = retentionInput(if (mine) "outgoing" else "incoming", expiresAtEpochSeconds = 200uL),
-                retentionClockMillis = { 150_000L },
                 modifier = Modifier.align(Alignment.End),
             )
         }
@@ -682,24 +750,8 @@ private fun AmoledReactionBubble(
     }
 }
 
-/** Retention input. */
-private fun retentionInput(
-    messageIdHex: String,
-    expiresAtEpochSeconds: ULong?,
-): RetentionIndicatorInput =
-    RetentionIndicatorInput(
-        controllerKey = screenshotControllerKey,
-        accountRef = "personal",
-        groupIdHex = "group",
-        messageIdHex = messageIdHex,
-        sourceEpoch = 1uL,
-        durationSeconds = 100uL,
-        expiresAtEpochSeconds = expiresAtEpochSeconds,
-    )
-
 private const val CUSTOM_AMOLED_ARGB = 0xFFFFC107L
 private const val OUTGOING_CUSTOM_AMOLED_ARGB = 0xFF9C27B0L
-private val screenshotControllerKey = Any()
 
 /** The Appearance font-size preview bubble, kept here for the message-chrome baselines it anchors. */
 @Composable

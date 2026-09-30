@@ -16,6 +16,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListAttachmentKindFfi
 import dev.ipf.marmotkit.ChatListDraftPreviewFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
@@ -91,6 +92,54 @@ class ChatRowsPortScreenshotTest {
         composeRule.onNodeWithContentDescription(context.getString(R.string.sending)).assertDoesNotExist()
         composeRule.onNodeWithContentDescription(context.getString(R.string.sent)).assertExists()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/chat_row_accepted_pending_delivered_light.png")
+    }
+
+    /** The last coherent pinned DM and group remain on screen while an incomplete window reopens. */
+    @Test fun retainedChatsDuringWindowRecoveryLight() = captureRetainedChats(dark = false)
+
+    @Test fun retainedChatsDuringWindowRecoveryDark() = captureRetainedChats(dark = true)
+
+    private fun captureRetainedChats(dark: Boolean) {
+        val state = ChatRowPortFixtures.state(context)
+        val dmBase = ChatRowPortFixtures.item(pinned = true, preview = "Last confirmed direct message")
+        val groupBase = ChatRowPortFixtures.item(preview = "Last confirmed group message")
+        val dm =
+            dmBase.copy(
+                group = dmBase.group.copy(groupIdHex = "a".repeat(64), name = "Pinned DM"),
+                projection =
+                    checkNotNull(dmBase.projection).copy(
+                        groupIdHex = "a".repeat(64),
+                        title = "Pinned DM",
+                        groupName = "Pinned DM",
+                        conversationKind = ChatConversationKindFfi.DIRECT,
+                    ),
+            )
+        val group =
+            groupBase.copy(
+                group = groupBase.group.copy(groupIdHex = "b".repeat(64), name = "Active group"),
+                projection =
+                    checkNotNull(groupBase.projection).copy(
+                        groupIdHex = "b".repeat(64),
+                        title = "Active group",
+                        groupName = "Active group",
+                    ),
+            )
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = dark) {
+                Surface(Modifier.fillMaxSize()) {
+                    Column {
+                        listOf(dm, group).forEach { item ->
+                            ChatRow(item = item, appState = state, onClick = {}, onOpenProfile = {})
+                        }
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Pinned DM").assertExists()
+        composeRule.onNodeWithText("Active group").assertExists()
+        val theme = if (dark) "dark" else "light"
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/chat_list_recovery_retained_$theme.png")
     }
 
     /** Rows light. */

@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -48,6 +49,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.RandomProfileNameButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
@@ -65,6 +67,7 @@ import kotlinx.coroutines.withContext
 internal fun SignUpScreen(
     controller: SignUpController,
     hasValidatedInternet: () -> Boolean,
+    randomName: (String?) -> String,
     onBack: () -> Unit,
 ) {
     val name = remember(controller) { TextFieldState(controller.draft?.name.orEmpty()) }
@@ -125,6 +128,7 @@ internal fun SignUpScreen(
         editable = editable,
         preparingPhoto = preparingPhoto,
         offline = offline,
+        onSuggestName = { name.setTextAndPlaceCursorAtEnd(randomName(name.text.toString())) },
         onSubmit = ::submit,
         onContinueWithoutProfile = controller::continueWithoutProfile,
         onBack = ::back,
@@ -169,6 +173,7 @@ internal fun SignUpContent(
     editable: Boolean,
     preparingPhoto: Boolean,
     offline: Boolean,
+    onSuggestName: () -> Unit,
     onSubmit: () -> Unit,
     onContinueWithoutProfile: () -> Unit,
     onBack: () -> Unit,
@@ -255,6 +260,13 @@ internal fun SignUpContent(
                         modifier = Modifier.fillMaxWidth().testTag("onboarding.sign_up.name"),
                         enabled = editable,
                         label = { Text(stringResource(R.string.name)) },
+                        trailingIcon = {
+                            RandomProfileNameButton(
+                                enabled = editable,
+                                onClick = onSuggestName,
+                                modifier = Modifier.testTag("onboarding.sign_up.suggest_name"),
+                            )
+                        },
                         lineLimits = TextFieldLineLimits.SingleLine,
                         keyboardOptions =
                             KeyboardOptions(

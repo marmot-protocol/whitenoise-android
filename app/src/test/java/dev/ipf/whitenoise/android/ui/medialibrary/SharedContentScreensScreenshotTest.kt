@@ -20,10 +20,14 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.marmotkit.EncryptedMediaVersionFfi
+import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaInventory
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -47,21 +51,49 @@ class SharedContentScreensScreenshotTest {
     @Test
     fun categoryRowsLightOpenTheirExactDestination() {
         val opened = mutableListOf<SharedContentCategory>()
-        val tiles = buildVisibleSharedMediaTiles(emptyList(), null, emptySet(), emptySet(), 1uL)
-        composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = false) {
-                Surface(color = MaterialTheme.colorScheme.surfaceContainerLow) {
-                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                        SharedMediaSection(tiles, onOpenCategory = { opened += it })
-                    }
-                }
-            }
-        }
+        val tile = sampleTile()
+        val row = sampleRow()
+        val tiles =
+            emptyTiles().copy(
+                visuals = listOf(tile),
+                images = listOf(tile),
+                urls = listOf(MediaInventory.UrlEntry("link", "alice", 1_700_000_000uL, "https://example.org")),
+                files = listOf(row),
+                voice = listOf(row),
+            )
+        renderCategories(tiles, onOpen = { opened += it })
         SharedContentCategory.entries.forEach { category ->
             composeRule.onNodeWithTag("shared.category.${category.name}").assertIsDisplayed().performClick()
         }
         assertEquals(SharedContentCategory.entries, opened)
         composeRule.onRoot().captureRoboImage("src/test/snapshots/shared_content_categories_light.png")
+    }
+
+    /** A chat with no loaded content has neither category rows nor an empty section heading. */
+    @Test
+    fun emptyChatHidesSharedContentSection() {
+        renderCategories(emptyTiles())
+        composeRule.onNodeWithText("Shared in Chat").assertDoesNotExist()
+        SharedContentCategory.entries.forEach { category ->
+            composeRule.onNodeWithTag("shared.category.${category.name}").assertDoesNotExist()
+        }
+    }
+
+    /** A picture-only chat has one category, including at large font scale and in RTL. */
+    @Test
+    fun pictureOnlyChatShowsOnlyMediaRtlLargeFont() {
+        val tile = sampleTile()
+        renderCategories(
+            emptyTiles().copy(visuals = listOf(tile), images = listOf(tile)),
+            rtl = true,
+            fontScale = 2f,
+        )
+        composeRule.onNodeWithText("Shared in Chat").assertIsDisplayed()
+        composeRule.onNodeWithTag("shared.category.Media").assertIsDisplayed()
+        listOf("Links", "Documents", "Voice").forEach { category ->
+            composeRule.onNodeWithTag("shared.category.$category").assertDoesNotExist()
+        }
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/shared_content_media_only_rtl_200.png")
     }
 
     /** Media filters dark preserve selected category and dispatch changes. */
@@ -165,4 +197,69 @@ class SharedContentScreensScreenshotTest {
             }
         }
     }
+
+    private fun renderCategories(
+        tiles: SharedMediaTiles,
+        rtl: Boolean = false,
+        fontScale: Float = 1f,
+        onOpen: (SharedContentCategory) -> Unit = {},
+    ) {
+        composeRule.setContent {
+            CompositionLocalProvider(
+                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
+                WhiteNoiseTheme(darkTheme = false, fontScale = fontScale) {
+                    Surface(color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                            SharedMediaSection(tiles, onOpenCategory = onOpen)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun emptyTiles(): SharedMediaTiles =
+        buildVisibleSharedMediaTiles(
+            emptyList(),
+            null,
+            emptySet(),
+            emptySet(),
+            1uL,
+        )
+
+    private fun sampleTile(): SharedMediaTile =
+        SharedMediaTile(
+            "picture",
+            0,
+            sampleReference(),
+            false,
+            1_700_000_000uL,
+            "alice",
+            false,
+        )
+
+    private fun sampleRow(): SharedMediaRow =
+        SharedMediaRow(
+            "attachment",
+            0,
+            sampleReference(),
+            false,
+            1_700_000_000uL,
+            "alice",
+        )
+
+    private fun sampleReference(): MediaAttachmentReferenceFfi =
+        MediaAttachmentReferenceFfi(
+            locators = listOf(MediaLocatorFfi(kind = "blossom-v1", value = "https://example.org/attachment")),
+            ciphertextSha256 = "a".repeat(64),
+            plaintextSha256 = "b".repeat(64),
+            nonceHex = "c".repeat(24),
+            fileName = "attachment.jpg",
+            mediaType = "image/jpeg",
+            version = EncryptedMediaVersionFfi.V1,
+            sourceEpoch = 0uL,
+            dim = null,
+            thumbhash = null,
+        )
 }

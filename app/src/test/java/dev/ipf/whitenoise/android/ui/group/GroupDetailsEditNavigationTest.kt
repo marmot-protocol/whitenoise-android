@@ -158,18 +158,18 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNodeWithText(context.getString(R.string.mute_for)).assertIsDisplayed()
     }
 
-    /** Group details prioritize people and administration, then files, while developer tools remain last. */
+    /** Empty group details prioritize people and administration while developer tools remain last. */
     @Test
     fun overviewSectionsFollowThePrimaryActionOrder() {
         render(controller(group(), verifiedRoster = true))
 
         composeRule.onRoot().captureRoboImage("src/test/snapshots/group_details_primary_order_light.png")
+        composeRule.onNodeWithTag("chat_info.shared_media").assertDoesNotExist()
 
         val sectionTops =
             listOf(
                 "chat_info.members",
                 "chat_info.management",
-                "chat_info.shared_media",
                 "chat_info.actions",
                 "chat_info.technical",
                 "chat_info.lifecycle",
@@ -187,10 +187,10 @@ class GroupDetailsEditNavigationTest {
         render(controller(group(admin = false), verifiedRoster = true))
 
         composeRule.onNodeWithTag("chat_info.management").assertDoesNotExist()
+        composeRule.onNodeWithTag("chat_info.shared_media").assertDoesNotExist()
         val sectionTops =
             listOf(
                 "chat_info.members",
-                "chat_info.shared_media",
                 "chat_info.actions",
                 "chat_info.technical",
                 "chat_info.lifecycle",
@@ -220,10 +220,10 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNodeWithTag("chat_info.add_to_group").assertIsDisplayed().performClick()
         composeRule.onNodeWithTag(PROFILE_ADD_TO_GROUPS_CONTENT_TAG).assertExists()
         composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
+        composeRule.onNodeWithTag("chat_info.shared_media").assertDoesNotExist()
         val sectionTops =
             listOf(
                 "chat_info.group_actions",
-                "chat_info.shared_media",
                 "chat_info.actions",
                 "chat_info.technical",
             ).map(::contentTop)

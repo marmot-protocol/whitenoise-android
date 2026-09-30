@@ -4,7 +4,9 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -23,6 +25,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -31,7 +34,8 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.state.MessageStatus
-import dev.ipf.whitenoise.android.ui.markdownDocumentToPreviewText
+import dev.ipf.whitenoise.android.ui.EmojiShortcodes
+import dev.ipf.whitenoise.android.ui.markdownDocumentToPreviewAnnotatedString
 import dev.ipf.whitenoise.android.ui.markdownInlinesToAnnotatedString
 import dev.ipf.whitenoise.android.ui.previewTake
 import kotlin.math.ceil
@@ -43,7 +47,7 @@ internal fun focusedMessagePreviewText(
     mentionDisplayName: ((String) -> String?)? = null,
     isGroupMember: ((String) -> Boolean)? = null,
 ): AnnotatedString {
-    if (document == null || document.blocks.isEmpty()) return AnnotatedString(source)
+    if (document == null || document.blocks.isEmpty()) return EmojiShortcodes.annotate(AnnotatedString(source))
     val paragraph = document.blocks.singleOrNull() as? MarkdownBlockFfi.Paragraph
     return if (paragraph != null) {
         val styled =
@@ -61,22 +65,23 @@ internal fun focusedMessagePreviewText(
                     ?.style
                     ?.let { style -> AnnotatedString.Range(style, range.start, range.end) }
             }
-        AnnotatedString(styled.text, styled.spanStyles + inertLinkStyles)
+        EmojiShortcodes.annotate(AnnotatedString(styled.text, styled.spanStyles + inertLinkStyles))
     } else {
         // Multi-block excerpts follow the prototype's plain-text projection, preserving block separation.
         val text =
-            buildString {
+            buildAnnotatedString {
                 for (block in document.blocks) {
                     if (length >= FOCUSED_PREVIEW_TEXT_BUDGET) break
-                    if (isNotEmpty()) append("\n\n")
+                    if (length > 0) append("\n\n")
                     val remaining = (FOCUSED_PREVIEW_TEXT_BUDGET - length).coerceAtLeast(0)
                     append(
                         when (block) {
-                            is MarkdownBlockFfi.CodeBlock -> block.content.previewTake(remaining)
-                            is MarkdownBlockFfi.MathBlock -> block.content.previewTake(remaining)
+                            is MarkdownBlockFfi.CodeBlock -> AnnotatedString(block.content.previewTake(remaining))
+                            is MarkdownBlockFfi.MathBlock -> AnnotatedString(block.content.previewTake(remaining))
                             else ->
-                                markdownDocumentToPreviewText(
+                                markdownDocumentToPreviewAnnotatedString(
                                     document = document.copy(blocks = listOf(block)),
+                                    codeStyle = SpanStyle(fontFamily = FontFamily.Monospace),
                                     maxLength = remaining,
                                     mentionDisplayName = mentionDisplayName,
                                 )
@@ -84,7 +89,7 @@ internal fun focusedMessagePreviewText(
                     )
                 }
             }
-        AnnotatedString(text)
+        text
     }
 }
 
@@ -106,8 +111,6 @@ internal fun FocusedTextMessagePreview(
     media: (@Composable () -> Unit)? = null,
     warning: String? = null,
     editedLabel: String? = null,
-    retention: RetentionIndicatorInput? = null,
-    reserveRetentionSpace: Boolean = false,
     mentionedSelf: Boolean = false,
     mentionedYouLabel: String = "",
     footerContent: (@Composable () -> Unit)? = null,
@@ -127,12 +130,10 @@ internal fun FocusedTextMessagePreview(
                 status = status,
                 editedLabel = editedLabel,
                 onEditedClick = null,
-                retention = retention,
-                reserveRetentionSpace = reserveRetentionSpace,
                 statusContainerColor = colorFromArgb(presentation.backgroundArgb),
             )
         }
-    val content: @Composable () -> Unit = {
+    val content: @Composable (Boolean) -> Unit = { compact ->
         senderName?.let { Text(it, style = MaterialTheme.typography.labelMedium) }
         BubbleFooterLayout(
             footer = footer,
@@ -142,8 +143,9 @@ internal fun FocusedTextMessagePreview(
             Column {
                 Text(
                     text = excerpt,
+                    inlineContent = EmojiShortcodes.content(),
                     style = MaterialTheme.typography.bodyLarge,
-                    maxLines = FOCUSED_PREVIEW_TEXT_LINES,
+                    maxLines = if (compact) 1 else FOCUSED_PREVIEW_TEXT_LINES,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.testTag("message-actions-excerpt"),
                     onTextLayout = { layout ->
@@ -161,31 +163,54 @@ internal fun FocusedTextMessagePreview(
         }
     }
     if (media == null) {
-        MessageBubbleFrame(
-            presentation = presentation,
-            highlighted = false,
-            mine = mine,
-            mentionedSelf = mentionedSelf,
-            mentionedYouLabel = mentionedYouLabel,
-        ) {
-            reply?.invoke()
-            content()
-        }
-    } else {
-        Column(
-            horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            reply?.invoke()
-            MediaCaptionFrame(
+        BoxWithConstraints {
+            // A short IME viewport cannot fit the quoted reply, five lines and footer.
+            // Keep the target excerpt and footer instead of clipping both out of view.
+            val compact = maxHeight <= 200.dp
+            MessageBubbleFrame(
                 presentation = presentation,
                 highlighted = false,
                 mine = mine,
                 mentionedSelf = mentionedSelf,
                 mentionedYouLabel = mentionedYouLabel,
-                alignEnd = mine,
-                media = { media() },
-            ) { content() }
+            ) {
+                if (!compact) reply?.invoke()
+                content(compact)
+            }
+        }
+    } else {
+        BoxWithConstraints {
+            val compact = maxHeight <= 200.dp
+            // The media envelope measures artwork before its caption. In a short IME frame a
+            // full-height artwork would otherwise consume the entire preview and clip the
+            // caption/footer. Retain an unscaled crop and reserve room for native-size text.
+            val mediaHeightLimit = (maxHeight - 100.dp).coerceAtLeast(24.dp)
+            Column(
+                horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (!compact) reply?.invoke()
+                MediaCaptionFrame(
+                    presentation = presentation,
+                    highlighted = false,
+                    mine = mine,
+                    mentionedSelf = mentionedSelf,
+                    mentionedYouLabel = mentionedYouLabel,
+                    alignEnd = mine,
+                    media = {
+                        if (compact) {
+                            Box(
+                                Modifier
+                                    .heightIn(max = mediaHeightLimit)
+                                    .clipToBounds()
+                                    .testTag("message-actions-media-viewport"),
+                            ) { media() }
+                        } else {
+                            media()
+                        }
+                    },
+                ) { content(compact) }
+            }
         }
     }
 }

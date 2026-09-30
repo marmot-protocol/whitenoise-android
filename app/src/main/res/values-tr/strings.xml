@@ -1,6 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">White Noise</string>
+    <string name="poll_preview">Anket</string>
+    <string name="poll_unsupported">Bu anket görüntülenemiyor</string>
+    <string name="poll_closed">Anket kapandı</string>
+    <string name="poll_vote_failed">Oy gönderilemedi</string>
+    <string name="poll_create_failed">Anket oluşturulamadı</string>
+    <string name="poll_enter_question">Bir soru girin.</string>
+    <string name="poll_question_too_long">Bu soru çok uzun.</string>
+    <string name="poll_add_two_options">En az iki seçenek ekleyin.</string>
+    <string name="poll_option_too_long">Seçeneklerden biri çok uzun.</string>
+    <string name="poll_duplicate_option">Her seçenek farklı olmalıdır.</string>
+    <string name="poll_create">Anket oluştur</string>
+    <string name="poll_question">Soru</string>
+    <string name="poll_option">Seçenek %1$d</string>
+    <string name="poll_add_option">Seçenek ekle</string>
+    <string name="poll_remove_option">%1$d. seçeneği kaldır</string>
+    <string name="poll_single_choice">Tek seçim</string>
+    <string name="poll_multiple_choice">Çoklu seçim</string>
+    <string name="poll_submit">Anketi yayınla</string>
+    <string name="poll_deadline">Anket bitişi</string>
+    <string name="poll_no_deadline">Bitiş tarihi yok</string>
+    <string name="poll_30_days">30 gün</string>
+    <string name="poll_duration_5_minutes">5 dakika</string>
+    <string name="poll_duration_1_hour">1 saat</string>
+    <string name="poll_duration_1_day">1 gün</string>
+    <string name="poll_duration_1_week">1 hafta</string>
+    <string name="poll_ends_at">Bitiş: %1$s</string>
+    <plurals name="poll_option_votes">
+        <item quantity="one">%1$d oy</item>
+        <item quantity="other">%1$d oy</item>
+    </plurals>
+    <plurals name="poll_participants">
+        <item quantity="one">%1$d katılımcı</item>
+        <item quantity="other">%1$d katılımcı</item>
+    </plurals>
     <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">White Noise başlatılamadı</string>
     <string name="startup_taking_too_long">Başlatma beklenenden uzun sürüyor. Lütfen tekrar deneyin.</string>
@@ -164,8 +198,11 @@
     <string name="leave">Ayrıl</string>
     <string name="couldnt_load_conversation">Konuşma yüklenemedi</string>
     <string name="no_messages_yet">Henüz mesaj yok</string>
+    <string name="wave_hi">El salla</string>
     <string name="conversation_empty_disappearing_title">Gösterilecek mesaj yok</string>
     <string name="conversation_empty_disappearing_body">Kaybolan mesajlar açık. Bu sohbetteki yeni mesajlar %1$s sonra kaybolur.</string>
+    <string name="conversation_history_may_have_expired">Önceki mesajların süresi dolmuş olabilir</string>
+    <string name="conversation_history_retention_description">%1$s. Kaybolan mesajlar: %2$s.</string>
     <string name="group_empty_only_you_title">Bu grupta yalnızca sen varsın</string>
     <string name="group_empty_invite_members">Hazır olduğunda kişileri davet et.</string>
     <string name="you_are_no_longer_a_member">Artık bu grubun üyesi olmadığınız için bu gruba mesaj gönderemezsiniz.</string>
@@ -471,14 +508,25 @@
     <string name="developer_mode">Geliştirici modu</string>
     <string name="developer_mode_subtitle">Teşhisleri ve MLS dahili bilgilerini gösterir.</string>
     <string name="developer_testing_only">Yalnızca geliştirme ve test amaçlıdır</string>
+    <string name="developer_seed_fixture">Test sohbetini doldur</string>
+    <string name="developer_seed_fixture_subtitle">Sayfalama ölçümleri için bir sohbete yapay mesajlar gönder</string>
+    <string name="seed_fixture_title">Test sohbetini doldur</string>
+    <string name="seed_fixture_detail">Seçilen sohbete bu hesaptan gerçek mesajlar olarak numaralandırılmış yapay mesajlar gönderir. Özel bir test grubu kullanın; diğer üyeler hepsini alır.</string>
+    <string name="seed_fixture_count">Gönderilecek mesaj sayısı</string>
+    <string name="seed_fixture_start">Başlat</string>
+    <string name="seed_fixture_progress">%2$d mesajdan %1$d gönderildi · %3$d başarısız</string>
+    <string name="seed_fixture_no_groups">Bu hesapta doldurulacak sohbet yok.</string>
+    <string name="seed_fixture_stopped">Durduruldu · %2$d mesajdan %1$d gönderildi</string>
     <string name="developer_testing_only_detail">Bu araçlar teknik bilgileri açığa çıkarabilir ve uygulamanın davranışını değiştirebilir.</string>
     <string name="developer_debugging">Hata ayıklama</string>
     <string name="diagnostics">Teşhis</string>
     <string name="diagnostics_settings_subtitle">Aktarma durumu ve MLS dahili bilgileri</string>
     <string name="performance_logs">Performans günlükleri</string>
-    <string name="performance_logs_description">Gizliliği koruyan zamanlama olaylarını geçici olarak Logcat’e yazar. 30 dakika sonra veya uygulama yeniden başlatıldığında durur.</string>
+    <string name="performance_logs_description">Gizliliği koruyan zamanlama olaylarını bu cihazda geçici olarak toplar. 30 dakika sonra veya uygulama yeniden başlatıldığında durur.</string>
     <string name="performance_logs_active">Etkin · %1$d dk kaldı</string>
     <string name="performance_logs_inactive">Etkin değil</string>
+    <string name="copy_performance_logs">Performans günlüklerini kopyala</string>
+    <string name="copy_performance_logs_detail">Geçerli veya en son oturumdaki sınırlı, gizliliği koruyan olayları kopyalar.</string>
     <string name="group_system_show_details">Ayrıntıları göster</string>
     <string name="group_system_hide_details">Ayrıntıları gizle</string>
     <string name="local_notifications">Bildirimler</string>
@@ -725,7 +773,7 @@
     <string name="toast_reaction_failed">Tepki başarısız oldu</string>
     <string name="toast_couldnt_delete_message">Mesaj silinemedi. Lütfen tekrar deneyin.</string>
     <string name="toast_couldnt_edit_message">Mesaj düzenlenemedi</string>
-    <string name="editing_message">Mesaj düzenleniyor</string>
+    <string name="edit_message">Mesajı düzenle</string>
     <string name="cancel_edit">Düzenlemeyi iptal et</string>
     <string name="edited">düzenlendi</string>
     <string name="edited_count">düzenlendi · %1$d</string>
@@ -838,6 +886,19 @@
     <string name="notifications_are_off">Bildirimler kapalı</string>
     <string name="notifications_are_off_detail">Bu seçenekleri kullanmak için Android Ayarlar\'da bunları açın.</string>
     <string name="delivery">Teslimat</string>
+    <string name="notification_delivery_push">Push bildirimleri</string>
+    <string name="notification_delivery_push_detail">Yeni etkinlik olabileceğinde kısa süreli uyanır, ardından mesajları güvenli şekilde kontrol eder.</string>
+    <string name="notification_delivery_local_detail">Bildirimler etkinken kalıcı bir bağlantı sürdürür.</string>
+    <string name="notification_device_policy">Cihaz durumu</string>
+    <string name="notification_device_policy_detail">Bildirim izni, uyarıların görünüp görünmeyeceğini belirler. Pil politikası her iki modda da arka plan teslimatını geciktirebilir. Bu ekrana döndüğünüzde durum yenilenir.</string>
+    <string name="notification_permission_status">Bildirim izni</string>
+    <string name="notification_permission_allowed">İzin verildi</string>
+    <string name="notification_permission_blocked">Engellendi</string>
+    <string name="notification_battery_policy">Pil politikası</string>
+    <string name="notification_battery_optimized">Optimize edildi</string>
+    <string name="notification_battery_unrestricted">Kısıtlanmadı</string>
+    <string name="notification_battery_restricted">Kısıtlandı</string>
+    <string name="notification_battery_unknown">Kullanılamıyor</string>
     <string name="local_notifications_detail">Bu cihazda mesaj bildirimleri oluşturun. Yerel gönderim olmadan teslimat, White Noise etkinleşene kadar bekleyebilir.</string>
     <string name="native_push_title">Yerel itme</string>
     <string name="notification_push_detail">Arka planda yeni mesajları kontrol etmek için genel bir uyandırma sinyali kullanın. Mesaj ayrıntıları bu cihazda kalır.</string>
@@ -974,6 +1035,8 @@
     <string name="media_apk_invalid">Bu dosya APK olarak adlandırılmış ancak geçerli bir Android paketi değil</string>
     <string name="media_open">Aç</string>
     <string name="media_file_too_large">Dosya eklenemeyecek kadar büyük</string>
+    <string name="media_file_unreadable">Bu dosya okunamadı. Yeniden seçin.</string>
+    <string name="media_file_empty">Boş dosyalar gönderilemez.</string>
     <string name="media_album_too_large">Seçim gönderilemeyecek kadar büyük</string>
     <string name="group_image_search_title">Grup görseli</string>
     <string name="group_image_search_set">Grup görseli ayarla</string>
@@ -1157,8 +1220,10 @@
     <string name="folder_none_detail">Sohbetlerinizi düzenlemek için bir klasör oluşturun.</string>
     <string name="folder_restore_hint">Eksik Okunmamış, Arşivlenmiş ve Gruplar klasörlerini geri yükleyin. Mevcut klasörler değişikliklerinizi korur.</string>
     <string name="folder_edit">Klasörü Düzenle</string>
+    <string name="folder_delete_action">Klasörü sil</string>
     <string name="folder_delete_title">“%1$s” silinsin mi?</string>
     <string name="folder_delete_detail">Bu klasör silinsin mi? Sohbetleriniz oldukları yerde kalacak.</string>
+    <string name="folder_delete_failed">Bu klasör silinemedi. Tekrar deneyin.</string>
     <string name="actions_for">%1$s için eylemler</string>
     <string name="chat_folder_name">Klasör adı</string>
     <string name="folder_manual_hint">Buraya eklediğiniz sohbetler, otomatik kurallarla eşleşmese bile dahil olmaya devam eder.</string>
@@ -1364,6 +1429,7 @@
     <string name="onboarding_continue_as">%1$s olarak devam et</string>
     <string name="onboarding_offline_setup_message">İnternet bağlantısı yok. Wi-Fi, mobil veri veya başka bir ağ üzerinden bağlanıp tekrar deneyin.</string>
     <string name="toast_couldnt_login_amber">Amber ile giriş yapılamadı</string>
+    <string name="amber_identity_already_added">Bu hesap White Noise uygulamasına zaten eklenmiş. Hesap değiştiriciden seçin.</string>
     <string name="toast_amber_sign_in_cancelled">Amber girişi iptal edildi</string>
     <string name="onboarding_sign_up">Kayıt Ol</string>
     <string name="sign_in_error_public_key">Bu bir genel anahtar. Giriş yapmak için gizli anahtarınızı (nsec) girin.</string>
@@ -1412,6 +1478,18 @@
     <string name="notification_channel_app_updates_global_description">White Noise uygulama güncellemeleri için Android uyarı davranışı</string>
 
     <string name="chat_bubble_colors">Sohbet balonu renkleri</string>
+    <string name="custom_emoji">Özel emoji</string>
+    <string name="custom_emoji_detail">Buraya eklediğin görseller mesajlarda ve tepkilerde :kısakod: emojisine dönüşür. Bu cihazda kalırlar; diğer kişiler kısa kodu metin olarak görür.</string>
+    <string name="custom_emoji_empty">Henüz özel emoji yok.</string>
+    <string name="custom_emoji_name_title">Bu emojiye ad ver</string>
+    <string name="custom_emoji_name_label">Kısa kod</string>
+    <string name="custom_emoji_name_help">Harfler, rakamlar ve alt çizgiler.</string>
+    <string name="custom_emoji_replaces">Mevcut %1$s yerine geçer.</string>
+    <string name="custom_emoji_remove_title">%1$s kaldırılsın mı?</string>
+    <string name="custom_emoji_remove_detail">Görsel bu cihazdan silinir. Mesajlar kısa kodu metin olarak korur.</string>
+    <string name="custom_emoji_too_large">Bu görsel 1 MB’tan büyük.</string>
+    <string name="custom_emoji_not_image">Bu dosya White Noise’un gösterebileceği bir görsel değil.</string>
+    <string name="custom_emoji_save_failed">Emoji kaydedilemedi.</string>
     <string name="action_color">Eylem rengi</string>
     <string name="action_color_no_active_account">Uygulama vurgu rengini ayarlamadan önce etkin bir hesap seçin.</string>
     <string name="bubble_color_preview">Önizleme</string>
@@ -1802,6 +1880,9 @@
     <string name="group_recovery_failed_reinvites">Bazı davetler geri yüklenemedi. Bu kişileri Grup Ayrıntıları’ndan yeniden davet edin.</string>
     <string name="group_recovery_review_invitation_from">%1$s kişisinin davetini incele · dönem %2$s</string>
     <string name="group_recovery_check_failed">Grup kurtarma denetlenemedi. Tekrar deneyin.</string>
+    <string name="group_history_may_be_incomplete">Bu sohbetteki bazı eski mesajlar eksik olabilir.</string>
+    <string name="account_history_may_be_incomplete">Bu hesapta bazı mesajlar eksik olabilir. White Noise tüm mesajların ulaştığını doğrulayamadı.</string>
+    <string name="history_notice_dismiss_failed">Geçmiş bildirimi kapatılamadı. Yeniden deneyin.</string>
     <string name="group_rejoin_title">Gruba yeniden katılınsın mı?</string>
     <string name="group_rejoin_invited_by">Davet eden: %1$s\n%2$s</string>
     <string name="group_rejoin_replaces_state">Yeniden katılmak, bu cihazdaki grup şifreleme verilerini değiştirir. Mesaj geçmişiniz korunur.</string>
@@ -2013,7 +2094,7 @@
     <string name="audit_upload_title">Grup tanılama günlüklerini paylaş</string>
     <string name="audit_upload_subtitle">Bu cihazdaki tüm profiller için grup tanılama günlüklerini paylaşır.</string>
     <string name="audit_upload_confirm_title">Grup tanılama günlükleri White Noise ile paylaşılsın mı?</string>
-    <string name="audit_upload_disclosure">White Noise, bu cihazdaki tüm profiller için grup tanılama günlüklerini kaydeder ve Internet Privacy Foundation tarafından işletilen Goggles’a yükler. Burada zaten saklanan günlükler de yüklenebilir. Günlükler grup ve mesaj kimliklerini, röle adreslerini, zaman damgalarını, takma adlı hesap referanslarını, bir kurulum kimliğini, cihaz modelinizi ve uygulama sürümünü içerebilir. Mesaj içeriklerini veya özel anahtarları asla içermez. Bu günlükler hassastır; güvenilirlik sorunlarını araştırmak için kullanırız. Kullanım ve telemetri paylaşımından ayrı tutulur. Paylaşımı kapatmak yeni kayıtları ve yeni yüklemeleri durdurur; ancak sürmekte olan bir yükleme tamamlanabilir. Bu cihazdaki günlükler ve daha önce yüklenmiş günlükler olduğu yerde kalır. İptal, paylaşımı kapalı bırakır.</string>
+    <string name="audit_upload_disclosure">White Noise, bu cihazdaki tüm profiller için grup tanılama günlüklerini kaydeder ve Internet Privacy Foundation tarafından işletilen White Noise denetim toplayıcısına yükler. Burada zaten saklanan günlükler de yüklenebilir. Günlükler grup ve mesaj kimliklerini, röle adreslerini, zaman damgalarını, takma adlı hesap referanslarını, bir kurulum kimliğini, cihaz modelinizi ve uygulama sürümünü içerebilir. Mesaj içeriklerini veya özel anahtarları asla içermez. Bu günlükler hassastır; güvenilirlik sorunlarını araştırmak için kullanırız. Kullanım ve telemetri paylaşımından ayrı tutulur. Paylaşımı kapatmak yeni kayıtları ve yeni yüklemeleri durdurur; ancak sürmekte olan bir yükleme tamamlanabilir. Bu cihazdaki günlükler ve daha önce yüklenmiş günlükler olduğu yerde kalır. İptal, paylaşımı kapalı bırakır.</string>
     <string name="audit_upload_confirm">Otomatik paylaşımı etkinleştir</string>
     <string name="audit_upload_renew">Paylaşım ayrıntıları değişti. Grup tanılama günlüklerini yeniden açmadan önce bunları inceleyin.</string>
     <string name="diagnostics_group_disclosure">Grup tanılama günlükleri, güvenilirlik sorunlarını araştırmaya yardımcı olur. Üyelere karma referanslarla atıfta bulunur. Her günlük teknik tanımlayıcılar ve zaman damgalı üyelik değişiklikleri içerebilir. Mesaj içeriklerini, profil adlarını, grup adlarını veya özel anahtarları asla içermez.</string>
@@ -2039,4 +2120,7 @@
     <string name="export_audit_logs_confirm_action">Devam</string>
     <string name="toast_couldnt_export_audit_logs">Tanılama günlükleri dışa aktarmaya hazırlanamadı</string>
     <string name="toast_no_audit_logs_to_export">Dışa aktarılacak tanılama günlüğü yok</string>
+    <string name="dictation_pause_other_audio_title">Diğer sesleri duraklat</string>
+    <string name="dictation_pause_other_audio_subtitle">Dikte sırasında müzik ve podcast yayınlarını duraklatır; kayıt bittiğinde devam edebilirler. White Noise sesli okuma ve sesli mesajları güvenlik için her zaman duraklatılır.</string>
+    <string name="dictation_audio_focus_unavailable">Diğer sesler duraklatılamadı. Tekrar deneyin veya Dikte ayarlarında bu seçeneği kapatın.</string>
 </resources>

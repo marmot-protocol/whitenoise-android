@@ -41,6 +41,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.contextmenu.data.TextContextMenuKeys
+import androidx.compose.foundation.text.contextmenu.modifier.filterTextContextMenuComponents
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Key
@@ -70,6 +72,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.compositeOver
@@ -83,11 +86,14 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -101,6 +107,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -122,6 +129,8 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.ui.common.TextEntryEmojiAction
+import dev.ipf.whitenoise.android.ui.common.primaryClipPlainText
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
 import dev.ipf.whitenoise.android.ui.conversation.ComposerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.composerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.media.receiveContentImageUriOrNull
@@ -412,6 +421,8 @@ internal fun ComposerPill(
     compactOuterEndInset: Dp = 0.dp,
     forceEditingLayout: Boolean = false,
     accessoryContent: (@Composable () -> Unit)? = null,
+    // Sits in the bottom action row directly before the trailing Send slot.
+    sendAccessoryContent: (@Composable () -> Unit)? = null,
     voiceReviewContent: (@Composable () -> Unit)? = null,
     inputContentVisible: Boolean = true,
     inputFocusEnabled: Boolean = true,
@@ -434,13 +445,28 @@ internal fun ComposerPill(
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val textToolbar = LocalTextToolbar.current
+    val clipboardManager = remember(context) { context.getSystemService(android.content.ClipboardManager::class.java) }
+    val canOfferPaste = rememberClipboardCanOfferPaste(clipboardManager)
+    val latestCanOfferPaste by rememberUpdatedState(canOfferPaste)
+    var editorBounds by remember { mutableStateOf(Rect.Zero) }
+    DisposableEffect(textToolbar) { onDispose { textToolbar.hide() } }
     val resizeComposerDescription = stringResource(R.string.composer_resize)
     val latestOnPasteImageUris by rememberUpdatedState(onPasteImageUris)
+    val latestOnValueChange by rememberUpdatedState(onValueChange)
     val latestOnPreImeBack by rememberUpdatedState(onPreImeBack)
     val latestOnHeightDragStarted by rememberUpdatedState(onHeightDragStarted)
     val latestOnHeightDrag by rememberUpdatedState(onHeightDrag)
     val latestOnHeightDragStopped by rememberUpdatedState(onHeightDragStopped)
     var composerFocused by remember { mutableStateOf(false) }
+    var showKeyboardAfterTouchTap by remember { mutableStateOf(false) }
+    LaunchedEffect(composerFocused, showKeyboardAfterTouchTap) {
+        if (composerFocused && showKeyboardAfterTouchTap) {
+            keyboardController?.show()
+            showKeyboardAfterTouchTap = false
+        }
+    }
     // Gesture/predictive Back reaches the IME before the activity's ordinary
     // BackHandler. While this field owns focus, register ahead of the IME so an
     // explicit Back clears focus; IME-only geometry changes (including a
@@ -566,9 +592,27 @@ internal fun ComposerPill(
     // is a plain value check readable during measure — which preserves the
     // paste/dictation/bulk-replacement first-frame caret guarantees.
     var readingScrollAnchor by remember { mutableStateOf<ComposerReadingAnchor?>(null) }
-    // The gesture owner below lives in a pointerInput(Unit) block, so it must
-    // read the live field value at arm time rather than a stale capture.
+    // Gesture handlers below outlive recomposition, so read the live field and
+    // visual transformation instead of values captured when a handler started.
     val latestTextFieldValue by rememberUpdatedState(textFieldValue)
+    val latestTransformedText by rememberUpdatedState(transformedText)
+    val pasteFromClipboard: () -> Unit = {
+        val pastedText = clipboardManager?.primaryClipPlainText(context)
+        if (!pastedText.isNullOrEmpty()) {
+            val value = latestTextFieldValue
+            val start = value.selection.min.coerceIn(0, value.text.length)
+            val end = value.selection.max.coerceIn(start, value.text.length)
+            val updated = value.text.replaceRange(start, end, pastedText)
+            latestOnValueChange(
+                value.copy(
+                    text = updated,
+                    selection = TextRange(start + pastedText.length),
+                    composition = null,
+                ),
+            )
+        }
+        textToolbar.hide()
+    }
     val caretFollowSuspended =
         readingScrollAnchor?.matches(textFieldValue) == true
     SideEffect {
@@ -889,8 +933,8 @@ internal fun ComposerPill(
                                 // lives here, covering the whole editor viewport:
                                 // early vertical drags and wheel/trackpad ticks drive
                                 // composerScrollState directly and arm reading
-                                // intent, while taps and long-press selection pass
-                                // through untouched.
+                                // intent, while focused taps and long-press selection
+                                // pass through untouched.
                                 .pointerInput(Unit) {
                                     composerEditorReadingScrollGestures(
                                         scrollBy = { delta ->
@@ -1009,7 +1053,48 @@ internal fun ComposerPill(
                                     // commits can follow the real selection, not merely
                                     // the final text line or the conversation tail.
                                     .verticalScroll(composerScrollState)
-                                    .focusProperties { canFocus = inputFocusEnabled }
+                                    .onGloballyPositioned { editorBounds = it.boundsInWindow() }
+                                    .pointerInput(composerFocused, inputContentVisible, inputFocusEnabled) {
+                                        if (!composerFocused && inputContentVisible && inputFocusEnabled) {
+                                            composerUnfocusedTouchFocusGestures(
+                                                onTap = { position ->
+                                                    textToolbar.hide()
+                                                    val value = latestTextFieldValue
+                                                    textLayoutSnapshot
+                                                        ?.takeIf {
+                                                            it.sourceText == value.text &&
+                                                                it.transformedText == latestTransformedText
+                                                        }?.let { snapshot ->
+                                                            val transformedOffset =
+                                                                snapshot.result.getOffsetForPosition(position)
+                                                            val originalOffset =
+                                                                snapshot.transformedText.offsetMapping
+                                                                    .transformedToOriginal(transformedOffset)
+                                                                    .coerceIn(0, value.text.length)
+                                                            if (value.selection.start != originalOffset ||
+                                                                value.selection.end != originalOffset
+                                                            ) {
+                                                                latestOnValueChange(
+                                                                    value.copy(selection = TextRange(originalOffset)),
+                                                                )
+                                                            }
+                                                        }
+                                                    showKeyboardAfterTouchTap = composerFocus.requestFocus()
+                                                },
+                                                onLongPress = {
+                                                    if (latestCanOfferPaste) {
+                                                        textToolbar.showMenu(
+                                                            rect = editorBounds,
+                                                            onPasteRequested = pasteFromClipboard,
+                                                        )
+                                                    }
+                                                },
+                                            )
+                                        }
+                                    }.filterTextContextMenuComponents { component ->
+                                        textFieldValue.text.isNotEmpty() ||
+                                            component.key !== TextContextMenuKeys.AutofillKey
+                                    }.focusProperties { canFocus = inputFocusEnabled }
                                     .contentReceiver(pasteImageReceiver)
                                     .onPreInterceptKeyBeforeSoftKeyboard { event ->
                                         when (
@@ -1207,6 +1292,19 @@ internal fun ComposerPill(
                                     modifier = Modifier.size(24.dp),
                                 )
                             }
+                        }
+                        if (sendAccessoryContent != null && inputContentVisible) {
+                            Box(
+                                Modifier.layout { measurable, constraints ->
+                                    // Stays clear of the leading tools; the label ellipsizes first.
+                                    val reserved =
+                                        (leadingControlsWidth + reservedTrailingWidth + dictationControlWidth)
+                                            .roundToPx()
+                                    val available = (constraints.maxWidth - reserved).coerceAtLeast(0)
+                                    val child = measurable.measure(constraints.copy(minWidth = 0, maxWidth = available))
+                                    layout(child.width, child.height) { child.placeRelative(0, 0) }
+                                },
+                            ) { sendAccessoryContent() }
                         }
                         if (expandedTrailingActionInset > 0.dp) {
                             Spacer(

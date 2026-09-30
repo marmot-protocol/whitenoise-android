@@ -78,6 +78,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.ChatListViewFfi
+import dev.ipf.marmotkit.HostPerformanceOperationFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
 import dev.ipf.whitenoise.android.core.GlobalAttachmentItem
@@ -127,16 +128,18 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold as Scaffold
 
-/** Keeps the process-wide TTS transport in normal flow above every chat-list state. */
+/** Keeps TTS transport and account notices visible above every chat-list state. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun ChatListBodyFrame(
     ttsTransport: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    notice: @Composable () -> Unit = {},
     content: @Composable BoxScope.() -> Unit,
 ) {
     Column(modifier) {
         ttsTransport()
+        notice()
         Box(
             modifier =
                 Modifier
@@ -150,7 +153,7 @@ internal fun ChatListBodyFrame(
 /** Renders the active account's authoritative chat-list projection and actions. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-@Suppress("ReturnCount", "FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
+@Suppress("ReturnCount", "FunctionNaming", "LongMethod", "CyclomaticComplexMethod", "TooGenericExceptionCaught")
 internal fun ChatsScreen(
     appState: WhiteNoiseAppState,
     controller: ChatsController,
@@ -629,15 +632,26 @@ internal fun ChatsScreen(
             bodyMatches,
             messageSearchConstraints,
         ) {
-            projectChatListSearchSections(
-                source = scopedSourceList,
-                rawQuery = trimmedQuery,
-                appState = appState,
-                titleCopy = groupTitleCopy,
-                bodyMatchGroupIds = bodyMatches.keys,
-                folderChatIds = effectiveFolderChatIds,
-                messageOnly = messageSearchConstraints != null,
-            )
+            val attempt =
+                if (searchActive) {
+                    appState.beginHostPerformance(HostPerformanceOperationFfi.CONVERSATION_SEARCH)
+                } else {
+                    null
+                }
+            try {
+                projectChatListSearchSections(
+                    source = scopedSourceList,
+                    rawQuery = trimmedQuery,
+                    appState = appState,
+                    titleCopy = groupTitleCopy,
+                    bodyMatchGroupIds = bodyMatches.keys,
+                    folderChatIds = effectiveFolderChatIds,
+                    messageOnly = messageSearchConstraints != null,
+                ).also { attempt?.success() }
+            } catch (throwable: Throwable) {
+                attempt?.failure()
+                throw throwable
+            }
         }
     val visibleItems = remember(searchSections) { searchSections.orderedItems() }
 
@@ -656,6 +670,8 @@ internal fun ChatsScreen(
         remember(visibleItems, searchActive) {
             visibleItems.map(::visibleRowId)
         }
+    val historyNotices = rememberAccountHistoryNotices(appState)
+    val showHistoryNotice = !searchActive && !browsingAttachments && historyNotices?.notices?.isNotEmpty() == true
     val leadingChatListItemCount =
         if (controller.error != null && loadFailurePlacement == LoadFailurePlacement.Inline) 1 else 0
     val visiblePinnedOrder =
@@ -1636,6 +1652,14 @@ internal fun ChatsScreen(
                         appState = appState,
                         onBodyClick = onTtsTransportBodyClick,
                     )
+                },
+                notice = {
+                    historyNotices?.takeIf { showHistoryNotice }?.let { owner ->
+                        AccountHistoryNoticeBanner(
+                            dismissing = owner.dismissing,
+                            onDismiss = { appState.launchMutation { owner.dismissAll() } },
+                        )
+                    }
                 },
             ) {
                 when {

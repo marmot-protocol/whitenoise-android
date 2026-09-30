@@ -454,24 +454,6 @@ class ComposerBarScreenshotTest {
         assertEquals(1, cancelled)
     }
 
-    /** The edit accessory shares the surface while retaining its native cancellation callback. */
-    @Test
-    fun editingAccessoryIsInsideTheSurfaceAndStillCancels() {
-        var cancelled = 0
-        render(
-            darkTheme = true,
-            draft = "Preserved draft",
-            width = 320,
-            fontScale = 2f,
-            rtl = true,
-            showEdit = true,
-            onCancelEdit = { cancelled += 1 },
-        )
-        assertAccessoryInsideSurface(R.string.cancel_edit)
-        composeRule.onNodeWithContentDescription(app.getString(R.string.cancel_edit)).performClick()
-        assertEquals(1, cancelled)
-    }
-
     /** Checks the real accessory control, editor, and border target occupy one bounded surface. */
     private fun assertAccessoryInsideSurface(label: Int) {
         val surface = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).fetchSemanticsNode().boundsInRoot
@@ -512,7 +494,6 @@ class ComposerBarScreenshotTest {
         showEdit: Boolean = false,
         voiceRecordingController: VoiceRecordingController? = null,
         attachmentsEnabled: Boolean = false,
-        onCancelEdit: () -> Unit = {},
     ) {
         val dictation = dictationPreview?.let { createDictationPreview(it, TextFieldValue(draft)) }
         composeRule.setContent {
@@ -536,7 +517,6 @@ class ComposerBarScreenshotTest {
                             onPickFromGallery = {}.takeIf { attachmentsEnabled },
                             onPickDocument = {}.takeIf { attachmentsEnabled },
                             initialDraft = TextFieldValue(draft),
-                            onCancelEdit = onCancelEdit,
                             editingMessageId = "edited-message".takeIf { showEdit },
                             editingInitialText = "Message being edited".takeIf { showEdit },
                             dictationController = dictation,

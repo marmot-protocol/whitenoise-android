@@ -23,15 +23,12 @@ class Bip340PhysicalBenchmark {
     fun compare() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
+        // No Application/Keyring/SQLCipher initialization exists in this isolated APK.
+        assertTrue("native verifier rejects recomputed-ID forgery", Bip340ComparisonBridge.replacementRejectsForgedEvent())
+        assertTrue("native verifier rejects field mutations", Bip340ComparisonBridge.replacementRejectsMutations())
         val before = deviceState(context)
         val results =
             listOf(
-                measure("legacySignature", Bip340ComparisonBridge::legacySignature, Bip340ComparisonBridge::legacyRejectsInvalidSignature),
-                measure(
-                    "replacementSignature",
-                    Bip340ComparisonBridge::replacementSignature,
-                    Bip340ComparisonBridge::replacementRejectsInvalidSignature,
-                ),
                 measure("legacyFullEvent", Bip340ComparisonBridge::legacyFullEvent, Bip340ComparisonBridge::legacyRejectsMutatedEvent),
                 measure(
                     "replacementFullEvent",
@@ -41,7 +38,8 @@ class Bip340PhysicalBenchmark {
             )
         val report =
             JSONObject()
-                .put("schema", 1)
+                .put("schema", 2)
+                .put("implementation", "MDK 0.11.0 stateless full-event verifier")
                 .put("buildFingerprint", Build.FINGERPRINT)
                 .put("abi", Build.SUPPORTED_ABIS.first())
                 .put("warmupOperations", WARMUP_OPERATIONS)

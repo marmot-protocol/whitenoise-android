@@ -87,6 +87,10 @@ object DiagnosticFormatter {
                 "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] welcome pending for ${identity.publicIdentity(
                     event.recipientHex,
                 )} in group ${IdentityFormatter.short(event.groupIdHex)}"
+            is MarmotEventFfi.HistoryNoticesChanged ->
+                // Notices carry no relay, message or key identities; the list
+                // itself is re-read from the runtime, never copied here.
+                "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] history notices changed"
         }
 
     private const val MAX_ERROR_LEN = 80
@@ -195,6 +199,7 @@ object DiagnosticFormatter {
         return "contention=$code"
     }
 
+    /** Classifies the first known native cause without copying private exception messages into a report. */
     @Suppress("CyclomaticComplexMethod") // One ordered taxonomy prevents error-code precedence from drifting.
     internal fun errorCode(throwable: Throwable): String {
         val chain = causeChain(throwable)
@@ -206,6 +211,7 @@ object DiagnosticFormatter {
             chain.any { it is java.util.concurrent.CancellationException } -> "CANCELLED"
             diagnosticError != null -> stableCode(diagnosticError.diagnosticErrorCode)
             marmotError is MarmotKitException.ExternalSignerRejected -> "CANCELLED"
+            marmotError is MarmotKitException.DuplicateIdentity -> "ALREADY_EXISTS"
             marmotError is MarmotKitException.InvalidChatPin ||
                 marmotError is MarmotKitException.InvalidMessageDraft ||
                 marmotError is MarmotKitException.InvalidMediaReference ||

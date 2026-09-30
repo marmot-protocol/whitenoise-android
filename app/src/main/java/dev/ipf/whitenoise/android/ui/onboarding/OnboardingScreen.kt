@@ -15,6 +15,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityEntryInput
 import dev.ipf.whitenoise.android.state.IdentityImportOutcome
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.randomProfilePseudonym
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.ui.common.clearSensitiveClipboard
 import kotlinx.coroutines.launch
@@ -161,7 +162,12 @@ internal fun OnboardingScreen(
 
     val signUp = appState.profileSignUpForPresentation
     if (signUp != null) {
-        SignUpScreen(signUp, hasValidatedInternet, onBack = { appState.dismissProfileSignUp() })
+        SignUpScreen(
+            signUp,
+            hasValidatedInternet,
+            randomName = appState::randomProfilePseudonym,
+            onBack = { appState.dismissProfileSignUp() },
+        )
         return
     }
 

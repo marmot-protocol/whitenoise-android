@@ -9,7 +9,7 @@ class ComposeHotPathCoverageTest {
     @Test
     fun composerReplyProjectionAndMentionResolverAreRemembered() {
         val source = source("conversation/composer/ComposerBar.kt").readText()
-        val replyMarker = "} else if (replyingTo != null) {"
+        val replyMarker = "if (replyingTo != null) {"
         val replyStart = source.indexOf(replyMarker)
         require(replyStart >= 0) { "Reply branch marker missing" }
         val replyBodyStart = replyStart + replyMarker.length

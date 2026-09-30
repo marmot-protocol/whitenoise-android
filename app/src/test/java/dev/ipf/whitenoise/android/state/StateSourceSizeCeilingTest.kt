@@ -49,8 +49,26 @@ class StateSourceSizeCeilingTest {
         // reconciliation on top of that. PR #2798 adds 32 net lines for off-main
         // window application and commit-time index revalidation. Its prior green
         // head covered 4,787 / 6,614 controller lines in Kover. Exact-head CI
-        // rechecks coverage. Keep this merged-source ratchet exact.
-        const val CONTROLLERS_MAX_LINES = 13179
+        // rechecks coverage. Issue #2784 adds a narrow controller check before
+        // dropping a still-active top-window row; its ordering guard and tests
+        // live in smaller files. Revision-bound publication across views brings
+        // the controller to 13,240 lines; focused race regressions and exact-head
+        // CI recheck the corresponding coverage and style contracts. Android host
+        // telemetry adds only the controller integration boundaries; attempt ownership,
+        // replay and settlement remain in the focused HostPerformanceTelemetry unit.
+        // PR #2856 adds 23 covered lines to keep transient group-recovery reads out of
+        // persistent presentation state; the policy and regression tests stay elsewhere.
+        // The pending-message edit handoff adds native confirmation, retry, and
+        // edit-target switch settlement paths;
+        // keep the combined source ceiling exact and recheck coverage in CI.
+        // History-notice dismissal adds 16 lines for the conversation's dismiss action
+        // and seven for guarded post-suspension refresh; the account-wide notice owner
+        // lives in AccountHistoryNotices.kt.
+        // PR #2869 adds 17 net lines to keep dismissal busy through refresh and
+        // report native failures; per-id failure handling lives in HistoryNoticeDismissal.kt.
+        // Dev Zapstore Kover covers 5,049 / 6,821 controller lines, including this
+        // dismissal path, and all six executable helper lines.
+        const val CONTROLLERS_MAX_LINES = 13446
 
         // Master includes the covered draft lifecycle and host-timing changes. PR #2534
         // adds 38 lines for the async prepared-speech handoff while keeping preparation
@@ -65,8 +83,18 @@ class StateSourceSizeCeilingTest {
         // The interactive account-switch avatar seed (#2155) adds 8 covered lines: the
         // bounded top-bar seed set now feeds both switch paths from one computation, and
         // the interactive branch loads and fences it before publication.
+        // Durable push-wake recovery adds the covered lifecycle owner, generation fences,
+        // finite attempt settlement, and notification-delivery cutover orchestration.
+        // Its covered final settlement needs one formatter-required expression-body continuation.
+        // Current master also adds pending-send and bounded-window recovery state;
         // Play/Zapstore unit tests and Kover run in required CI; keep merged size exact.
-        const val APP_STATE_MAX_LINES = 10417
+        // Android host telemetry adds the runtime, queue, profile and durable-settings
+        // integration boundaries while its concurrency and replay logic stays in the
+        // smaller HostPerformanceTelemetry unit. Review-added frame callback ownership
+        // fencing keeps stale Activity samples out of replacement MDK runtimes (+27 lines);
+        // exact-head Kover rechecks the wiring and this ratchet stays at the source size.
+        // The pending-edit handoff adds process-scoped ownership and sign-out cleanup.
+        const val APP_STATE_MAX_LINES = 11491
 
         /** Counts physical source lines with the same trailing-newline semantics as `wc -l`. */
         internal fun sourceLineCount(file: File): Int = file.bufferedReader().useLines { lines -> lines.count() }

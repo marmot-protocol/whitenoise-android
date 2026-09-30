@@ -1,6 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">White Noise</string>
+    <string name="poll_preview">Poll</string>
+    <string name="poll_unsupported">This poll cannot be displayed</string>
+    <string name="poll_closed">Poll closed</string>
+    <string name="poll_vote_failed">Couldn\'t submit vote</string>
+    <string name="poll_create_failed">Couldn\'t create poll</string>
+    <string name="poll_enter_question">Enter a question.</string>
+    <string name="poll_question_too_long">This question is too long.</string>
+    <string name="poll_add_two_options">Add at least two options.</string>
+    <string name="poll_option_too_long">One of the options is too long.</string>
+    <string name="poll_duplicate_option">Each option must be different.</string>
+    <string name="poll_create">Create poll</string>
+    <string name="poll_question">Question</string>
+    <string name="poll_option">Option %1$d</string>
+    <string name="poll_add_option">Add option</string>
+    <string name="poll_remove_option">Remove option %1$d</string>
+    <string name="poll_single_choice">Single choice</string>
+    <string name="poll_multiple_choice">Multiple choice</string>
+    <string name="poll_submit">Post poll</string>
+    <string name="poll_deadline">Poll closes</string>
+    <string name="poll_no_deadline">No deadline</string>
+    <string name="poll_30_days">30 days</string>
+    <string name="poll_duration_5_minutes">5 minutes</string>
+    <string name="poll_duration_1_hour">1 Hour</string>
+    <string name="poll_duration_1_day">1 Day</string>
+    <string name="poll_duration_1_week">1 Week</string>
+    <string name="poll_ends_at">Closes %1$s</string>
+    <plurals name="poll_option_votes">
+        <item quantity="one">%1$d vote</item>
+        <item quantity="other">%1$d votes</item>
+    </plurals>
+    <plurals name="poll_participants">
+        <item quantity="one">%1$d participant</item>
+        <item quantity="other">%1$d participants</item>
+    </plurals>
     <!-- In-app brand wordmark (onboarding landing). Always the product name and
          deliberately NOT app_name: the debug build type overrides app_name to
          "White Noise Dev" for the launcher label, but the in-app brand stays
@@ -77,8 +111,10 @@
     <string name="folder_none_detail">Create a folder to organize your chats.</string>
     <string name="folder_restore_hint">Restore missing Unread, Archived and Groups folders. Existing folders keep your changes.</string>
     <string name="folder_edit">Edit Folder</string>
+    <string name="folder_delete_action">Delete folder</string>
     <string name="folder_delete_title">Delete “%1$s”?</string>
     <string name="folder_delete_detail">Delete this folder? Your chats will stay where they are.</string>
+    <string name="folder_delete_failed">Could not delete this folder. Try again.</string>
     <string name="actions_for">Actions for %1$s</string>
     <string name="chat_folder_name">Folder name</string>
     <string name="folder_manual_hint">Chats you add here stay included, even when they do not match the automatic rules.</string>
@@ -220,8 +256,11 @@
     <string name="couldnt_load_conversation">Couldn\'t load conversation</string>
     <string name="error_conversation_membership_unavailable">Couldn\'t verify this conversation\'s members. Retry to show your messages.</string>
     <string name="no_messages_yet">No messages yet</string>
+    <string name="wave_hi">Wave hi</string>
     <string name="conversation_empty_disappearing_title">No messages to show</string>
     <string name="conversation_empty_disappearing_body">Disappearing messages are on. New messages in this chat disappear after %1$s.</string>
+    <string name="conversation_history_may_have_expired">Earlier messages may have expired</string>
+    <string name="conversation_history_retention_description">%1$s. Disappearing messages: %2$s.</string>
     <string name="group_empty_only_you_title">This group is only you</string>
     <string name="group_empty_invite_members">Invite people when you are ready.</string>
     <string name="you_are_no_longer_a_member">You can\'t send messages to this group because you\'re no longer a member.</string>
@@ -439,6 +478,7 @@
     <string name="emoji_search_hint">Search emoji</string>
     <string name="emoji_search_clear">Clear emoji search</string>
     <string name="emoji_search_no_results">No emoji found</string>
+    <string name="emoji_category_custom" translatable="false">Custom</string>
     <string name="emoji_category_recent" translatable="false">Recently Used</string>
     <string name="emoji_category_smileys_people" translatable="false">Smileys &amp; People</string>
     <string name="emoji_category_animals_nature" translatable="false">Animals &amp; Nature</string>
@@ -595,14 +635,60 @@
     <string name="developer_mode">Developer mode</string>
     <string name="developer_mode_subtitle">Shows diagnostics and MLS internals.</string>
     <string name="developer_testing_only">For development and testing only</string>
+    <string name="developer_seed_fixture">Seed conversation fixture</string>
+    <string name="developer_seed_fixture_subtitle">Send synthetic messages to one chat for paging benchmarks</string>
+    <string name="seed_fixture_title">Seed conversation fixture</string>
+    <string name="seed_fixture_detail">Sends numbered synthetic messages into the chosen chat as real messages from this account. Use a private test group; the other members will receive every one.</string>
+    <string name="seed_fixture_count">Messages to send</string>
+    <string name="seed_fixture_start">Start</string>
+    <string name="seed_fixture_progress">%1$d of %2$d sent · %3$d failed</string>
+    <string name="seed_fixture_no_groups">This account has no chats to seed.</string>
+    <string name="seed_fixture_stopped">Stopped · %1$d of %2$d sent</string>
     <string name="developer_testing_only_detail">These tools can expose technical information and change how the app behaves.</string>
     <string name="developer_debugging">Debugging</string>
+    <string translatable="false" name="review_demo_section">Review environment</string>
+    <string translatable="false" name="review_demo_create">Create demo conversation</string>
+    <string translatable="false" name="review_demo_resume">Resume demo setup</string>
+    <string translatable="false" name="review_demo_open">Open demo conversation</string>
+    <string translatable="false" name="review_demo_description">Create Johnny Appleseed as a second profile and exchange encrypted messages.</string>
+    <string translatable="false" name="review_demo_ready">The real two-profile conversation is ready.</string>
+    <string translatable="false" name="review_demo_unavailable">Use a local-signing profile while White Noise is open and ready.</string>
+    <string translatable="false" name="review_demo_confirm_title">Create a real demo conversation?</string>
+    <string translatable="false" name="review_demo_confirm_body">This creates one additional profile and publishes real profile, KeyPackage, group, message, reply, and reaction events to your configured relays. Setup can take a minute and can be resumed.</string>
+    <string translatable="false" name="review_demo_confirm_action">Create demo</string>
+    <string translatable="false" name="review_demo_resume_confirm_title">Resume the demo conversation?</string>
+    <string translatable="false" name="review_demo_resume_confirm_body">White Noise will inspect the saved account and conversation before continuing. Any remaining real events will be sent to your configured relays.</string>
+    <string translatable="false" name="review_demo_resume_confirm_action">Resume setup</string>
+    <string translatable="false" name="review_demo_clear">Clear saved demo setup</string>
+    <string translatable="false" name="review_demo_clear_explanation">Clearing the saved setup only removes the local resume record. It does not delete either profile, the conversation, or events already published to relays.</string>
+    <string translatable="false" name="review_demo_preparing">Preparing the demo</string>
+    <string translatable="false" name="review_demo_creating_account">Creating the second profile</string>
+    <string translatable="false" name="review_demo_publishing_profile">Publishing the demo profile</string>
+    <string translatable="false" name="review_demo_creating_conversation">Creating the encrypted conversation</string>
+    <string translatable="false" name="review_demo_sending_original">Sending the first messages</string>
+    <string translatable="false" name="review_demo_accepting_invitation">Accepting the invitation</string>
+    <string translatable="false" name="review_demo_sending_demo">Sending from the second profile</string>
+    <string translatable="false" name="review_demo_verifying">Verifying delivery on both profiles</string>
+    <string translatable="false" name="review_demo_returning">Returning to the original profile</string>
+    <string translatable="false" name="review_demo_stage_error">%1$s: %2$s</string>
+    <string translatable="false" name="review_demo_invalid_checkpoint">The saved setup is damaged or from another version. Clear it before starting again.</string>
+    <string translatable="false" name="review_demo_original_missing">The original profile is unavailable. Clear the saved setup to start again.</string>
+    <string translatable="false" name="review_demo_account_missing">The saved demo profile is unavailable. Clear the saved setup to start again.</string>
+    <string translatable="false" name="review_demo_ambiguous_account">More than one new profile exists. Clear the saved setup only after checking which profile was created.</string>
+    <string translatable="false" name="review_demo_owner_changed">The active profile changed during setup. Return to Developer Tools to resume.</string>
+    <string translatable="false" name="review_demo_setup_timed_out">Secure profile setup is still pending. Check the connection and resume.</string>
+    <string translatable="false" name="review_demo_delivery_timed_out">The invitation or a message is still pending. Check the connection and resume.</string>
+    <string translatable="false" name="review_demo_reaction_uncertain">A reaction may already have been sent. Wait for it to appear before resuming.</string>
+    <string translatable="false" name="review_demo_interrupted">Setup was interrupted. Resume it when the app is active.</string>
+    <string translatable="false" name="review_demo_operation_failed">Setup could not finish. Check the connection and resume.</string>
     <string name="diagnostics">Diagnostics</string>
     <string name="diagnostics_settings_subtitle">Relay health and MLS internals</string>
     <string name="performance_logs">Performance logs</string>
-    <string name="performance_logs_description">Temporarily write privacy-safe timing events to Logcat. Stops after 30 minutes or when White Noise restarts.</string>
+    <string name="performance_logs_description">Temporarily collect privacy-safe timing events on this device. Stops after 30 minutes or when White Noise restarts.</string>
     <string name="performance_logs_active">Active · %1$d min remaining</string>
     <string name="performance_logs_inactive">Inactive</string>
+    <string name="copy_performance_logs">Copy performance logs</string>
+    <string name="copy_performance_logs_detail">Copy the bounded, privacy-safe events from the current or most recent session.</string>
     <string name="streaming_debug" translatable="false">Streaming debug</string>
     <string name="streaming_debug_subtitle" translatable="false">Show agent-stream and MLS signaling events inline in conversations</string>
     <string name="ai_agents">AI Agents</string>
@@ -1010,7 +1096,7 @@
     <string name="toast_reaction_failed">Reaction failed</string>
     <string name="toast_couldnt_delete_message">Couldn\'t delete message</string>
     <string name="toast_couldnt_edit_message">Couldn\'t edit message</string>
-    <string name="editing_message">Editing message</string>
+    <string name="edit_message">Edit message</string>
     <string name="cancel_edit">Cancel edit</string>
     <string name="edited">edited</string>
     <string name="edited_count">edited · %1$d</string>
@@ -1087,6 +1173,9 @@
     <string name="group_recovery_failed_reinvites">Some invitations could not be restored. Invite those people again from Group Details.</string>
     <string name="group_recovery_review_invitation_from">Review invitation from %1$s · epoch %2$s</string>
     <string name="group_recovery_check_failed">Couldn’t check group recovery. Try again.</string>
+    <string name="group_history_may_be_incomplete">Some earlier messages in this chat may be missing.</string>
+    <string name="account_history_may_be_incomplete">Some messages may be missing from this account. White Noise couldn’t confirm that every message arrived.</string>
+    <string name="history_notice_dismiss_failed">Couldn\'t dismiss the history notice. Try again.</string>
     <string name="group_rejoin_title">Rejoin group?</string>
     <string name="group_rejoin_invited_by">Invited by %1$s\n%2$s</string>
     <string name="group_rejoin_replaces_state">Rejoining replaces this device’s encryption data for the group. Your message history stays.</string>
@@ -1148,6 +1237,19 @@
     <string name="notifications_are_off">Notifications are off</string>
     <string name="notifications_are_off_detail">Turn them on in Android Settings to use these options.</string>
     <string name="delivery">Delivery</string>
+    <string name="notification_delivery_push">Push notifications</string>
+    <string name="notification_delivery_push_detail">Wake briefly when new activity may be available, then check securely for messages.</string>
+    <string name="notification_delivery_local_detail">Keep a persistent connection while notifications are enabled.</string>
+    <string name="notification_device_policy">Device status</string>
+    <string name="notification_device_policy_detail">Notification permission controls whether alerts appear. Battery policy may delay background delivery in either mode. Status refreshes when you return to this screen.</string>
+    <string name="notification_permission_status">Notification permission</string>
+    <string name="notification_permission_allowed">Allowed</string>
+    <string name="notification_permission_blocked">Blocked</string>
+    <string name="notification_battery_policy">Battery policy</string>
+    <string name="notification_battery_optimized">Optimized</string>
+    <string name="notification_battery_unrestricted">Unrestricted</string>
+    <string name="notification_battery_restricted">Restricted</string>
+    <string name="notification_battery_unknown">Unavailable</string>
     <string name="local_notifications_detail">Create message notifications on this device. Without native push, delivery may wait until White Noise is active.</string>
     <string name="native_push_title">Native push</string>
     <string name="notification_push_detail">Use a generic wake-up signal to check for new messages in the background. Message details stay on this device.</string>
@@ -1310,6 +1412,8 @@
     <string name="attachment_type_image">Image</string>
     <string name="attachment_type_file">File</string>
     <string name="media_file_too_large">File too large to attach</string>
+    <string name="media_file_unreadable">Couldn\'t read this file. Select it again.</string>
+    <string name="media_file_empty">Empty files can\'t be sent</string>
     <string name="media_album_too_large">Selection too large to send</string>
     <string name="group_image_search_title">Group image</string>
     <string name="group_image_search_set">Set group image</string>
@@ -1425,6 +1529,7 @@
     <string name="dictation_microphone_muted">Microphone access is off</string>
     <string name="dictation_microphone_muted_help">Turn on microphone access in Android privacy settings or Quick Settings, then try dictation again.</string>
     <string name="dictation_microphone_in_use">The microphone is already in use</string>
+    <string name="dictation_audio_focus_unavailable">Could not pause other audio. Try again or turn off Pause other audio in Dictation settings.</string>
     <string name="dictation_no_speech">No speech was recognized</string>
     <string name="dictation_network_error">Speech service couldn’t connect</string>
     <string name="dictation_recognizer_busy">Speech service is busy</string>
@@ -1435,9 +1540,14 @@
     <string name="open_app_settings">Open app settings</string>
     <string name="dictation_disclosure_title">External speech recognition</string>
     <string name="dictation_disclosure_message">The speech service installed on this device processes what you say and may send the audio to its provider. White Noise keeps the text it returns only until you paste or send it. Sending automatically is off unless you turn it on in Dictation settings.</string>
+    <string name="dictation_disclosure_offline_title">Offline speech recognition</string>
+    <string name="dictation_disclosure_offline_message">Offline Speech to Text processes what you say on this device. White Noise keeps the text it returns only until you paste or send it. Sending automatically is off unless you turn it on in Dictation settings.</string>
     <string name="dictation_continue">Continue</string>
     <string name="dictation_settings_title">Dictation</string>
+    <string name="dictation_pause_other_audio_title">Pause other audio</string>
+    <string name="dictation_pause_other_audio_subtitle">Pause music and podcasts during dictation; they can resume when recording stops. White Noise speech and voice messages always pause for safety.</string>
     <string name="dictation_settings_explainer">The speech service installed on this device processes the audio and may send it to its provider. White Noise keeps the text it returns only until you paste or send it.</string>
+    <string name="dictation_settings_explainer_offline">Offline Speech to Text processes dictation on this device. White Noise keeps the text it returns only until you paste or send it.</string>
     <string name="dictation_ostt_recommendation_title">Get Offline Speech to Text</string>
     <string name="dictation_ostt_recommendation_summary">Recommended transcription app for private, on-device dictation. Available from Zapstore, not Google Play.</string>
     <string name="dictation_ostt_recommendation_open_failed">Couldn’t open the Offline Speech to Text page on Zapstore.</string>
@@ -1578,6 +1688,7 @@
     <string name="onboarding_continue_as">Continue as %1$s</string>
     <string name="onboarding_offline_setup_message">No internet connection. Connect with Wi-Fi, mobile data, or another network, then retry.</string>
     <string name="toast_couldnt_login_amber">Couldn\'t sign in with Amber</string>
+    <string name="amber_identity_already_added">This account is already added to White Noise. Select it in the account switcher.</string>
     <string name="toast_amber_sign_in_cancelled">Amber sign-in cancelled</string>
     <string name="sign_in_error_public_key">That\'s a public key. Enter your secret key (nsec) to sign in.</string>
     <string name="sign_in_error_setup_retry">Account setup didn\'t finish. Tap sign in again to resume it.</string>
@@ -1628,6 +1739,18 @@
     <string name="notification_channel_app_updates_global_description">Android alert behavior for White Noise app updates</string>
 
     <string name="chat_bubble_colors">Chat bubble colors</string>
+    <string name="custom_emoji">Custom emoji</string>
+    <string name="custom_emoji_detail">Images you add here become :shortcode: emoji in messages and reactions. They stay on this device, and other people see the shortcode as text.</string>
+    <string name="custom_emoji_empty">No custom emoji yet.</string>
+    <string name="custom_emoji_name_title">Name this emoji</string>
+    <string name="custom_emoji_name_label">Shortcode</string>
+    <string name="custom_emoji_name_help">Letters, numbers and underscores.</string>
+    <string name="custom_emoji_replaces">Replaces your current %1$s.</string>
+    <string name="custom_emoji_remove_title">Remove %1$s?</string>
+    <string name="custom_emoji_remove_detail">The image is deleted from this device. Messages keep the shortcode as text.</string>
+    <string name="custom_emoji_too_large">That image is larger than 1 MB.</string>
+    <string name="custom_emoji_not_image">That file isn’t an image White Noise can show.</string>
+    <string name="custom_emoji_save_failed">Couldn’t save that emoji.</string>
     <string name="action_color">Action color</string>
     <string name="action_color_no_active_account">Choose an active account before setting its app accent color.</string>
     <string name="bubble_color_preview">Preview</string>
@@ -2145,7 +2268,7 @@
     <string name="audit_upload_title">Share group diagnostic logs</string>
     <string name="audit_upload_subtitle">Shares group diagnostic logs for every profile on this device.</string>
     <string name="audit_upload_confirm_title">Share group diagnostic logs with White Noise?</string>
-    <string name="audit_upload_disclosure">White Noise records group diagnostic logs for every profile on this device and uploads them to Goggles, operated by the Internet Privacy Foundation. Logs already stored here may be uploaded too. Logs can include group and message IDs, relay addresses, timestamps, pseudonymous account references, an installation ID, your device model, and the app version. They never include message contents or private keys. These logs are sensitive, and we use them to investigate reliability problems. They stay separate from usage and telemetry sharing. Turning sharing off stops new recording and new uploads, though an upload already under way may finish. Logs on this device and logs already uploaded stay where they are. Cancel leaves sharing off.</string>
+    <string name="audit_upload_disclosure">White Noise records group diagnostic logs for every profile on this device and uploads them to the White Noise audit collector, operated by the Internet Privacy Foundation. Logs already stored here may be uploaded too. Logs can include group and message IDs, relay addresses, timestamps, pseudonymous account references, an installation ID, your device model, and the app version. They never include message contents or private keys. These logs are sensitive, and we use them to investigate reliability problems. They stay separate from usage and telemetry sharing. Turning sharing off stops new recording and new uploads, though an upload already under way may finish. Logs on this device and logs already uploaded stay where they are. Cancel leaves sharing off.</string>
     <string name="audit_upload_confirm">Enable automatic sharing</string>
     <string name="audit_upload_renew">The sharing details have changed. Review them before turning group diagnostic logs back on.</string>
     <string name="diagnostics_group_disclosure">Group diagnostic logs help investigate reliability problems. They refer to members by hashed references. Each log can carry technical identifiers and timestamped membership changes. They never include message contents, profile names, group names, or private keys.</string>

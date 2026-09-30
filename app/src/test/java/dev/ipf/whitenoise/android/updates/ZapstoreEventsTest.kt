@@ -1,20 +1,28 @@
 package dev.ipf.whitenoise.android.updates
 
 import dev.ipf.whitenoise.android.core.nostr.NostrEvent
-import dev.ipf.whitenoise.android.core.nostr.NostrEventVerifier
 import dev.ipf.whitenoise.android.fuzz.FuzzSyntheticCorpusReplay
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ZapstoreEventsTest {
+    // Domain fake only. Real cryptographic assertions run in the isolated Android APK.
+    private val policy = ZapstoreEventPolicy { it.sig != "0".repeat(128) }
+
     @Test
     fun replaysSyntheticFuzzCorpus() {
         FuzzSyntheticCorpusReplay.replaySuite(FuzzSyntheticCorpusReplay.Suite.ZapstoreEvents)
+    }
+
+    @Test
+    fun otherwiseValidReleaseCannotPassWhenVerifierRejectsIt() {
+        val rejected = ZapstoreEventPolicy { false }
+        val event = signedEvent(SIGNED_RELEASE_EVENT_JSON)
+        assertNull(rejected.latestReleaseVersion(event, APP_ID, TEST_PUBLISHER_PUBKEY))
+        assertNull(rejected.versionFromReleaseEvent(event, APP_ID, TEST_PUBLISHER_PUBKEY, "$APP_ID@$VERSION"))
     }
 
     // --- Latest-release discovery (signature-gated). Reads the version straight
@@ -24,22 +32,20 @@ class ZapstoreEventsTest {
     @Test
     fun latestReleaseVersionReadsSignedReleaseBoundByDTag() {
         val releaseEvent = signedEvent(SIGNED_RELEASE_EVENT_JSON)
-        assertTrue(NostrEventVerifier.verifies(releaseEvent))
-        assertEquals(VERSION, ZapstoreEvents.latestReleaseVersion(releaseEvent, APP_ID, TEST_PUBLISHER_PUBKEY))
+        assertEquals(VERSION, policy.latestReleaseVersion(releaseEvent, APP_ID, TEST_PUBLISHER_PUBKEY))
     }
 
     @Test
     fun latestReleaseVersionRejectsWrongAuthorWrongAppOrInvalidSignature() {
         val releaseEvent = signedEvent(SIGNED_RELEASE_EVENT_JSON)
 
-        assertNull(ZapstoreEvents.latestReleaseVersion(releaseEvent, APP_ID, "0".repeat(64)))
+        assertNull(policy.latestReleaseVersion(releaseEvent, APP_ID, "0".repeat(64)))
         // A release for another app under the same publisher must not be read as
         // this app's latest — this is the Dark Matter / White Noise boundary.
-        assertNull(ZapstoreEvents.latestReleaseVersion(releaseEvent, "org.parres.whitenoise", TEST_PUBLISHER_PUBKEY))
+        assertNull(policy.latestReleaseVersion(releaseEvent, "org.parres.whitenoise", TEST_PUBLISHER_PUBKEY))
 
         val mutatedSignature = releaseEvent.copy(sig = "0".repeat(128))
-        assertFalse(NostrEventVerifier.verifies(mutatedSignature))
-        assertNull(ZapstoreEvents.latestReleaseVersion(mutatedSignature, APP_ID, TEST_PUBLISHER_PUBKEY))
+        assertNull(policy.latestReleaseVersion(mutatedSignature, APP_ID, TEST_PUBLISHER_PUBKEY))
     }
 
     // --- Exact-d-tag validation used by the download/asset-resolution path. ---
@@ -50,15 +56,15 @@ class ZapstoreEventsTest {
 
         assertEquals(
             VERSION,
-            ZapstoreEvents.versionFromReleaseEvent(releaseEvent, APP_ID, TEST_PUBLISHER_PUBKEY, "$APP_ID@$VERSION"),
+            policy.versionFromReleaseEvent(releaseEvent, APP_ID, TEST_PUBLISHER_PUBKEY, "$APP_ID@$VERSION"),
         )
         assertNull(
-            ZapstoreEvents.versionFromReleaseEvent(releaseEvent, APP_ID, TEST_PUBLISHER_PUBKEY, "$APP_ID@2026.6.21"),
+            policy.versionFromReleaseEvent(releaseEvent, APP_ID, TEST_PUBLISHER_PUBKEY, "$APP_ID@2026.6.21"),
         )
 
         val mutatedSignature = releaseEvent.copy(sig = "0".repeat(128))
         assertNull(
-            ZapstoreEvents.versionFromReleaseEvent(mutatedSignature, APP_ID, TEST_PUBLISHER_PUBKEY, "$APP_ID@$VERSION"),
+            policy.versionFromReleaseEvent(mutatedSignature, APP_ID, TEST_PUBLISHER_PUBKEY, "$APP_ID@$VERSION"),
         )
     }
 
@@ -69,19 +75,19 @@ class ZapstoreEventsTest {
     @Test
     fun releaseVersionForAppPrefersExplicitVersionTag() {
         val event = releaseEvent(identifierTag = APP_ID, versionTag = "2026.5.22", dTag = "$APP_ID@2026.5.22")
-        assertEquals("2026.5.22", ZapstoreEvents.releaseVersionForApp(event, APP_ID))
+        assertEquals("2026.5.22", policy.releaseVersionForApp(event, APP_ID))
     }
 
     @Test
     fun releaseVersionForAppFallsBackToDTagSuffixWhenVersionTagAbsent() {
         val event = releaseEvent(identifierTag = APP_ID, versionTag = null, dTag = "$APP_ID@2026.5.7")
-        assertEquals("2026.5.7", ZapstoreEvents.releaseVersionForApp(event, APP_ID))
+        assertEquals("2026.5.7", policy.releaseVersionForApp(event, APP_ID))
     }
 
     @Test
     fun releaseVersionForAppBindsByDTagWhenIdentifierTagAbsent() {
         val event = releaseEvent(identifierTag = null, versionTag = null, dTag = "$APP_ID@2026.4.1")
-        assertEquals("2026.4.1", ZapstoreEvents.releaseVersionForApp(event, APP_ID))
+        assertEquals("2026.4.1", policy.releaseVersionForApp(event, APP_ID))
     }
 
     @Test
@@ -92,13 +98,13 @@ class ZapstoreEventsTest {
                 versionTag = "2026.5.22",
                 dTag = "org.parres.whitenoise@2026.5.22",
             )
-        assertNull(ZapstoreEvents.releaseVersionForApp(event, APP_ID))
+        assertNull(policy.releaseVersionForApp(event, APP_ID))
     }
 
     @Test
     fun releaseVersionForAppIgnoresNonCalVerVersionTag() {
         val event = releaseEvent(identifierTag = APP_ID, versionTag = "beta", dTag = "$APP_ID@2026.1.1")
-        assertEquals("2026.1.1", ZapstoreEvents.releaseVersionForApp(event, APP_ID))
+        assertEquals("2026.1.1", policy.releaseVersionForApp(event, APP_ID))
     }
 
     private fun signedEvent(json: String): NostrEvent = NostrEvent.fromJson(JSONObject(json)) ?: error("valid signed Nostr event fixture")

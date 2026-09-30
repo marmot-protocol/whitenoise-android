@@ -15,7 +15,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalContext
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
-import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.state.AttachmentOpenIntentClaim
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -219,8 +218,8 @@ internal fun createDocumentIntent(
 ): Intent =
     Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
         addCategory(Intent.CATEGORY_OPENABLE)
-        type = mediaType.ifBlank { "application/octet-stream" }
-        putExtra(Intent.EXTRA_TITLE, MediaPipeline.safeDisplayName(fileName))
+        type = normalizeDocumentMime(mediaType)
+        putExtra(Intent.EXTRA_TITLE, safeDocumentDisplayName(fileName))
     }
 
 internal suspend fun saveDocumentWithFallback(

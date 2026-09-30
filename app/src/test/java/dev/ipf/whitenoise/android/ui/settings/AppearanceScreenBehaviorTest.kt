@@ -41,6 +41,7 @@ class AppearanceScreenBehaviorTest {
     private var actionColorCount = 0
     private var bubbleColorsCount = 0
     private var languageCount = 0
+    private var customEmojiCount = 0
 
     /** Start each test from default appearance preferences and fresh callback counters. */
     @Before
@@ -67,22 +68,25 @@ class AppearanceScreenBehaviorTest {
                     onOpenActionColor = { actionColorCount++ },
                     onOpenChatBubbleColors = { bubbleColorsCount++ },
                     onOpenLanguage = { languageCount++ },
+                    onOpenCustomEmoji = { customEmojiCount++ },
                 )
             }
         }
     }
 
-    /** Back, the two colour editor rows and the language row each invoke their caller exactly once per tap. */
+    /** Back, the colour editor, custom emoji and language rows each invoke their caller exactly once per tap. */
     @Test
     fun navigationCallbacksFireOncePerTap() {
         composeRule.onNodeWithContentDescription("Back").performClick()
         composeRule.onNodeWithText("Action color").performClick()
         composeRule.onNodeWithText("Chat bubble colors").performClick()
+        composeRule.onNodeWithText("Custom emoji").performClick()
         composeRule.onNodeWithText("Language").performClick()
         composeRule.runOnIdle {
             assertEquals(1, backCount)
             assertEquals(1, actionColorCount)
             assertEquals(1, bubbleColorsCount)
+            assertEquals(1, customEmojiCount)
             assertEquals(1, languageCount)
             assertEquals("", appState.languageTag)
         }

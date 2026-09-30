@@ -511,6 +511,7 @@ internal fun MediaVideoBubble(
     appState: WhiteNoiseAppState,
     onOpenConversationMedia: (ConversationMediaViewerOpenRequest) -> Unit,
     mine: Boolean,
+    modifier: Modifier = Modifier,
     videoFileResolver: VideoViewerFileResolver = ::resolveVideoViewerFile,
     onLongPress: () -> Unit = {},
     uploading: Boolean = false,
@@ -746,7 +747,7 @@ internal fun MediaVideoBubble(
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = ConversationRichContentShape,
-        modifier = imageBubbleSizing(bubbleAspectRatio, sourceShortSideFromDim(reference.dim)),
+        modifier = modifier.then(imageBubbleSizing(bubbleAspectRatio, sourceShortSideFromDim(reference.dim))),
     ) {
         Box(contentAlignment = Alignment.Center) {
             val poster = posterBitmap

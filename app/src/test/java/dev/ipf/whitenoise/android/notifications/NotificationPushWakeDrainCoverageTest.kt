@@ -15,7 +15,7 @@ class NotificationPushWakeDrainCoverageTest {
         assertTrue(
             "push wake starts must await one notification drain before releasing their wakelock",
             "trigger == ForegroundStartTrigger.PushWake" in service &&
-                "appState.ensureNotificationRuntimeStartedAndAwaitPushDrain()" in service &&
+                "appState.runPushWakeRecoveryAttempt()" in service &&
                 "appState.ensureNotificationRuntimeStarted()" in service,
         )
     }
@@ -187,9 +187,9 @@ class NotificationPushWakeDrainCoverageTest {
                 "recordPendingPushWakeCatchUp(applicationContext)" !in onStart,
         )
         assertTrue(
-            "rejected push-wake starts must persist the marker off-main on an owned scope, not gating stopSelf",
+            "rejected push-wake starts must schedule their persisted marker off-main on an owned scope",
             "applicationScope.launch" in recordAfterStop &&
-                "recordPendingPushWakeCatchUp(applicationContext)" in recordAfterStop &&
+                "PushWakeRecoveryScheduler.schedule(applicationContext)" in recordAfterStop &&
                 "stopSelf(startId)" !in recordAfterStop &&
                 "CoroutineScope(" !in recordAfterStop,
         )
@@ -197,13 +197,14 @@ class NotificationPushWakeDrainCoverageTest {
 
     @Test
     fun everyPushWakeRecordsDurableCatchUpBeforeStartingTheService() {
-        val wake = firebaseServiceFunctionBody("wakeForegroundStream")
+        val source = File(serviceSource().parentFile, "PushWakeRecoveryCoordinator.kt").readText()
+        val wake = source.kotlinFunctionBody("receive")
 
         assertTrue(
             "an accepted foreground start can still fail in-runtime, so every wake must be durable before start()",
-            "recordPendingPushWakeCatchUp()" in wake &&
-                wake.indexOf("recordPendingPushWakeCatchUp()") <
-                wake.indexOf("NotificationStreamForegroundService.start("),
+            "recordPendingPushWakeCatchUpAndAdmitEpisode(now)" in wake &&
+                wake.indexOf("recordPendingPushWakeCatchUpAndAdmitEpisode(now)") <
+                wake.indexOf("runCatching(startService)"),
         )
     }
 
@@ -212,7 +213,7 @@ class NotificationPushWakeDrainCoverageTest {
     fun pendingPushWakeDrainUsesSingleFlightAndGenerationClear() {
         val appState = appStateSource().readText()
         val drain = appStateFunctionBody("drainPendingPushWakeCatchUpIfNeeded")
-        val clearObserved = appStateFunctionBody("clearPendingPushWakeCatchUpIfObserved")
+        val acknowledgeObserved = appStateFunctionBody("acknowledgePendingPushWakeCatchUp")
         val reconnect = notificationNetworkRecoverySource().readText().kotlinFunctionBody("schedule")
         val schedule = appStateFunctionBody("schedulePendingPushWakeCatchUpDrain")
         val expectedPushWakeCatchUp =
@@ -231,8 +232,10 @@ class NotificationPushWakeDrainCoverageTest {
             expectedPushWakeCatchUp.containsMatchIn(drain),
         )
         assertTrue(
-            "clear helper must only clear the observed durable marker generation",
-            "clearPendingPushWakeCatchUp(pendingGeneration)" in clearObserved,
+            "acknowledgement must clear only the observed marker and fence both sides of storage IO",
+            "clearPendingPushWakeCatchUp(pendingGeneration)" in acknowledgeObserved &&
+                acknowledgeObserved.split("isCatchUpKeyCurrent(key)").size == 3 &&
+                "recordPendingPushWakeCatchUp()" in acknowledgeObserved,
         )
         assertTrue(
             "connectivity callbacks must defer push-wake drain while reconnect owns receiver readiness",
@@ -258,19 +261,14 @@ class NotificationPushWakeDrainCoverageTest {
                 "onDrainCompleted = ::schedulePendingPushWakeCatchUpDrain" in appState,
         )
         assertTrue(
-            "foreground catch-up must use the same generation clear helper as runtime-start drains",
-            "clearPendingPushWakeCatchUpIfObserved" in appState,
+            "foreground catch-up must use the same generation-fenced acknowledgement as runtime-start drains",
+            "acknowledgePendingPushWakeCatchUp" in appState,
         )
     }
 
     private fun serviceFunctionBody(functionName: String): String = serviceSource().readText().kotlinFunctionBody(functionName)
 
     private fun appStateFunctionBody(functionName: String): String = appStateSource().readText().kotlinFunctionBody(functionName)
-
-    private fun firebaseServiceFunctionBody(functionName: String): String {
-        val source = firebaseServiceSource().readText()
-        return source.kotlinFunctionBody(functionName)
-    }
 
     private fun serviceSource(): File =
         listOf(
@@ -293,13 +291,6 @@ class NotificationPushWakeDrainCoverageTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/state/NotificationNetworkRecovery.kt"),
         ).firstOrNull { it.exists() }
             ?: error("Missing NotificationNetworkRecovery.kt source file")
-
-    private fun firebaseServiceSource(): File =
-        listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/notifications/MarmotFirebaseMessagingService.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/notifications/MarmotFirebaseMessagingService.kt"),
-        ).firstOrNull { it.exists() }
-            ?: error("Missing MarmotFirebaseMessagingService.kt source file")
 
     private fun String.kotlinFunctionBody(functionName: String): String {
         val start =

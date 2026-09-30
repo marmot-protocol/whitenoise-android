@@ -56,7 +56,7 @@ class ProfileEditScreenshotTest {
             directPictureActions = true,
         )
 
-    /** Edit and Suggest name use light action text against the dark form surfaces. */
+    /** The name-field dice remains visible against the dark form surface. */
     @Test fun profileEditingDark() = capture("profile_editing_dark", editing = true, dark = true)
 
     /** Suggest name fills the name field from MDK's pseudonym generator while editing (#1584). */

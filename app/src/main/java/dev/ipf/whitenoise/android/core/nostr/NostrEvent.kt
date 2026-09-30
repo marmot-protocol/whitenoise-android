@@ -45,6 +45,18 @@ internal data class NostrEvent(
 
     fun computedIdHex(): String = sha256(canonicalJson().toByteArray(Charsets.UTF_8)).toHex()
 
+    /** Complete event object; MDK owns canonical ID and signature validation. */
+    fun toJson(): String =
+        JSONObject()
+            .put("id", id)
+            .put("pubkey", pubkey)
+            .put("created_at", createdAt)
+            .put("kind", kind)
+            .put("tags", JSONArray(tags.map { JSONArray(it) }))
+            .put("content", content)
+            .put("sig", sig)
+            .toString()
+
     companion object {
         fun fromJson(json: JSONObject): NostrEvent? {
             val tags = json.optJSONArray("tags") ?: return null
@@ -70,18 +82,6 @@ internal data class NostrEvent(
                 sig = (json.opt("sig") as? String)?.lowercase(Locale.US)?.takeIf { it.isHex(128) } ?: return null,
             )
         }
-    }
-}
-
-internal object NostrEventVerifier {
-    fun verifies(event: NostrEvent): Boolean {
-        val message = event.computedIdHex()
-        if (!message.equals(event.id, ignoreCase = true)) return false
-        return BIP340.verify(
-            publicKeyHex = event.pubkey,
-            messageHex = message,
-            signatureHex = event.sig,
-        )
     }
 }
 

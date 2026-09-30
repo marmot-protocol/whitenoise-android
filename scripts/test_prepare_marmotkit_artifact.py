@@ -36,6 +36,7 @@ def fake_elf(
     export_binding: int = 1,
     export_section: int = 3,
     trailing_data: bytes = b"",
+    load_alignment: int | None = None,
 ) -> bytes:
     symbols = PREPARE.REQUIRED_ELF_EXPORTS if include_exports else ()
     strings = bytearray(b"\0")
@@ -53,10 +54,19 @@ def fake_elf(
         section_format = "<IIQQQQIIQQ"
         symbol_format = "<IBBHQQ"
     header_size = struct.calcsize(header_format)
+    if elf_class == 1:
+        program_format = "<IIIIIIII"
+        program = (1, 0, 0, 0, 0, 0, 5, load_alignment or 4096)
+    else:
+        program_format = "<IIQQQQQQ"
+        program = (1, 5, 0, 0, 0, 0, 0, load_alignment or 16384)
+    program_size = struct.calcsize(program_format)
     section_size = struct.calcsize(section_format)
     symbol_size = struct.calcsize(symbol_format)
 
     data = bytearray(header_size)
+    program_offset = len(data)
+    data.extend(struct.pack(program_format, *program))
     string_offset = len(data)
     data.extend(strings)
     while len(data) % 8:
@@ -91,12 +101,12 @@ def fake_elf(
         machine,
         1,
         0,
-        0,
+        program_offset,
         section_offset,
         0,
         header_size,
-        0,
-        0,
+        program_size,
+        1,
         section_size,
         len(sections),
         0,
@@ -118,6 +128,7 @@ def manifest(source_sha: str = SOURCE_SHA) -> dict[str, object]:
         "android_ndk_home": "/opt/android/ndk/27.2.12479018",
         "android_api": "26",
         "contents": list(PREPARE.MANIFEST_CONTENTS),
+        "elf_validation": PREPARE.ELF_METADATA_FILE,
     }
 
 
@@ -144,8 +155,11 @@ class MarmotKitArtifactPreparationTest(unittest.TestCase):
         raw_entry: str | None = None,
         symlink_entry: str | None = None,
         manifest_bytes: bytes | None = None,
+        elf_metadata_value: dict[str, object] | None = None,
+        load_alignment_overrides: dict[str, int] | None = None,
     ) -> None:
         omitted = omitted or set()
+        load_alignment_overrides = load_alignment_overrides or {}
         entries: dict[str, bytes] = {
             relative: b"package fixture\n" for relative in PREPARE.KOTLIN_FILES
         }
@@ -176,7 +190,25 @@ class MarmotKitArtifactPreparationTest(unittest.TestCase):
                 elf_class,
                 machine,
                 include_exports=abi != missing_exports_abi,
+                load_alignment=load_alignment_overrides.get(abi),
             )
+        if elf_metadata_value is None:
+            libraries = {}
+            for abi, (elf_class, machine) in PREPARE.ABI_MACHINES.items():
+                relative = f"jniLibs/{abi}/libmarmot_uniffi.so"
+                libraries[relative] = {
+                    "abi": abi,
+                    "elf_class": 32 if elf_class == 1 else 64,
+                    "load_alignments": [load_alignment_overrides.get(abi, 4096 if elf_class == 1 else 16384)],
+                    "machine": machine,
+                    "sha256": hashlib.sha256(entries[relative]).hexdigest(),
+                }
+            elf_metadata_value = {
+                "schema_version": 1,
+                "minimum_64bit_load_alignment": 16384,
+                "libraries": libraries,
+            }
+        entries[PREPARE.ELF_METADATA_FILE] = json.dumps(elf_metadata_value).encode()
         entries["manifest.json"] = manifest_bytes or json.dumps(manifest_value or manifest()).encode()
         with zipfile.ZipFile(self.archive, "w", compression=zipfile.ZIP_DEFLATED) as output:
             for relative, data in entries.items():
@@ -321,6 +353,34 @@ class MarmotKitArtifactPreparationTest(unittest.TestCase):
         self.write_archive(omitted={"jniLibs/x86_64/libmarmot_uniffi.so"})
         self.write_lock()
         self.assert_rejected("missing archive entries")
+
+    def test_missing_elf_metadata_fails_closed(self) -> None:
+        self.write_archive(omitted={PREPARE.ELF_METADATA_FILE})
+        self.write_lock()
+        self.assert_rejected("missing archive entries")
+
+    def test_elf_metadata_checksum_mismatch_fails_closed(self) -> None:
+        self.write_archive()
+        with zipfile.ZipFile(self.archive) as archive:
+            metadata = json.loads(archive.read(f"{ROOT}/{PREPARE.ELF_METADATA_FILE}"))
+        metadata["libraries"][PREPARE.JNI_FILES[0]]["sha256"] = "0" * 64
+        self.write_archive(elf_metadata_value=metadata)
+        self.write_lock()
+        self.assert_rejected("mismatched library checksum")
+
+    def test_elf_metadata_alignment_mismatch_fails_closed(self) -> None:
+        self.write_archive()
+        with zipfile.ZipFile(self.archive) as archive:
+            metadata = json.loads(archive.read(f"{ROOT}/{PREPARE.ELF_METADATA_FILE}"))
+        metadata["libraries"][PREPARE.JNI_FILES[-1]]["load_alignments"] = [4096]
+        self.write_archive(elf_metadata_value=metadata)
+        self.write_lock()
+        self.assert_rejected("mismatched load alignments")
+
+    def test_64_bit_library_below_alignment_policy_fails_closed(self) -> None:
+        self.write_archive(load_alignment_overrides={"x86_64": 4096})
+        self.write_lock()
+        self.assert_rejected("does not satisfy the 64-bit load alignment policy")
 
     def test_duplicate_entry_fails_closed(self) -> None:
         self.write_archive(duplicate="kotlin/dev/ipf/marmotkit/marmot_uniffi.kt")

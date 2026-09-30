@@ -717,6 +717,7 @@ class NotificationFirstPostIntegrationTest {
             mediaJson = null,
             media = emptyList(),
             agentTextStreamJson = null,
+            poll = null,
             groupSystem = groupSystem,
             hasReports = false,
             edit = null,
