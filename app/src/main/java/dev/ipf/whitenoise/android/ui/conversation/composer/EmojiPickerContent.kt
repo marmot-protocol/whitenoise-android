@@ -2,7 +2,6 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -53,11 +52,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.BuiltinEmoji
+import dev.ipf.whitenoise.android.ui.EmojiArtImage
 import dev.ipf.whitenoise.android.ui.EmojiCategory
 import dev.ipf.whitenoise.android.ui.EmojiData
 import dev.ipf.whitenoise.android.ui.EmojiEntry
 import dev.ipf.whitenoise.android.ui.EmojiSection
+import dev.ipf.whitenoise.android.ui.EmojiShortcodes
+import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
+import dev.ipf.whitenoise.android.ui.LocalReceivedEmoji
+import dev.ipf.whitenoise.android.ui.customEmojiSearchSection
 import dev.ipf.whitenoise.android.ui.emojiBrowseSections
 import dev.ipf.whitenoise.android.ui.emojiSearchSections
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -102,7 +105,7 @@ private class EmojiPickerModel(
     val sectionRanges = emojiSectionRanges(sections)
 }
 
-/** Filtered sections for the query with the recents section first. */
+/** Filtered sections for the query with the user's emoji and then recents first. */
 @Composable
 private fun rememberEmojiPickerModel(
     query: String,
@@ -115,20 +118,26 @@ private fun rememberEmojiPickerModel(
             withContext(Dispatchers.IO) {
                 val loaded = EmojiData.load(context)
                 if (purpose == EmojiPickerPurpose.GROUP_IMAGE) {
-                    loaded.filter { BuiltinEmoji.drawable(it.emoji) == null }
+                    loaded.filter { !EmojiShortcodes.isShortcode(it.emoji) }
                 } else {
                     loaded
                 }
             }
     }
+    // Group images are drawn from a system-font glyph, so artwork emoji cannot become one.
+    val customEmoji = LocalCustomEmoji.current
+    val custom =
+        remember(customEmoji, purpose) {
+            if (purpose == EmojiPickerPurpose.GROUP_IMAGE) emptyList() else customEmoji.entries.map { it.shortcode }
+        }
     val recents =
         remember(recentEmojis, purpose) {
             recentEmojis
                 .filter {
-                    it.isNotBlank() && (purpose != EmojiPickerPurpose.GROUP_IMAGE || BuiltinEmoji.drawable(it) == null)
+                    it.isNotBlank() && (purpose != EmojiPickerPurpose.GROUP_IMAGE || !EmojiShortcodes.isShortcode(it))
                 }.distinct()
         }
-    val browseSections = remember(entries, recents) { emojiBrowseSections(entries, recents) }
+    val browseSections = remember(entries, recents, custom) { emojiBrowseSections(entries, recents, custom) }
     var searchSections by remember { mutableStateOf<List<EmojiSection>>(emptyList()) }
     var searchedQuery by remember { mutableStateOf("") }
     LaunchedEffect(query, entries) {
@@ -141,9 +150,14 @@ private fun rememberEmojiPickerModel(
         searchedQuery = query
     }
     val searching = query.isNotBlank()
-    return remember(browseSections, searchSections, searching, searchedQuery) {
+    return remember(browseSections, searchSections, searching, searchedQuery, custom) {
         EmojiPickerModel(
-            sections = if (searching) searchSections else browseSections,
+            sections =
+                if (searching) {
+                    listOfNotNull(customEmojiSearchSection(custom, searchedQuery)) + searchSections
+                } else {
+                    browseSections
+                },
             searching = searching,
             searchedQuery = searchedQuery,
         )
@@ -378,16 +392,16 @@ private fun EmojiCell(
     }
 }
 
-/** Bundled artwork or a system-font emoji fitted into the picker's fixed square. */
+/** Shortcode artwork or a system-font emoji fitted into the picker's fixed square. */
 @Composable
 internal fun EmojiGlyph(
     emoji: String,
     modifier: Modifier = Modifier,
     size: Dp = EmojiPickerEmojiSize,
 ) {
-    val drawable = BuiltinEmoji.drawable(emoji)
-    if (drawable != null) {
-        Image(painterResource(drawable), contentDescription = emoji, modifier = modifier.size(size))
+    val art = EmojiShortcodes.art(emoji, LocalCustomEmoji.current, LocalReceivedEmoji.current.art)
+    if (art != null) {
+        EmojiArtImage(art, contentDescription = emoji, modifier = modifier.size(size))
         return
     }
     val baseStyle = MaterialTheme.typography.headlineMedium

@@ -8,11 +8,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import dev.ipf.marmotkit.MarkdownInlineFfi
+import dev.ipf.whitenoise.android.R
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class BuiltinEmojiTest {
+class EmojiShortcodesTest {
     @Test
     fun closingFenceBoundaries() {
         val fencedBodies =
@@ -25,7 +29,7 @@ class BuiltinEmojiTest {
             )
         for (body in fencedBodies) {
             val source = "$body\n:wn:"
-            val rendered = BuiltinEmoji.annotate(AnnotatedString(source))
+            val rendered = EmojiShortcodes.annotate(AnnotatedString(source))
             assertEquals(source, rendered.text)
             assertEquals(
                 body,
@@ -36,22 +40,46 @@ class BuiltinEmojiTest {
     }
 
     @Test
-    fun exactShortcodesKeepTextStylesLinksAndOffsets() {
+    fun everyShortcodeKeepsTextStylesLinksAndOffsets() {
         val source =
             buildAnnotatedString {
                 withLink(LinkAnnotation.Url("https://example.com/:wn:")) {
                     withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                        append(":marmot::wn::wn: :WN: :unknown:")
+                        append(":marmot::wn::wn: :WN: :unknown: 12:30 :a b:")
                     }
                 }
             }
-        val rendered = BuiltinEmoji.annotate(source)
+        val rendered = EmojiShortcodes.annotate(source)
         assertEquals(source.text, rendered.text)
         assertEquals(source.spanStyles, rendered.spanStyles)
         assertEquals(source.getLinkAnnotations(0, source.length), rendered.getLinkAnnotations(0, rendered.length))
         val shortcodeRanges = rendered.getStringAnnotations(0, rendered.length).map { it.start to it.end }
-        assertEquals(listOf(0 to 8, 8 to 12, 12 to 16), shortcodeRanges)
-        assertEquals(rendered, BuiltinEmoji.annotate(rendered))
+        // Undefined codes are marked too: they have no inline content, so they draw as text.
+        assertEquals(listOf(0 to 8, 8 to 12, 12 to 16, 17 to 21, 22 to 31), shortcodeRanges)
+        assertEquals(rendered, EmojiShortcodes.annotate(rendered))
+    }
+
+    @Test
+    fun shortcodeAlphabetAndLength() {
+        assertTrue(EmojiShortcodes.isShortcode(":party-parrot_2:"))
+        assertTrue(EmojiShortcodes.isShortcode(":${"a".repeat(64)}:"))
+        assertFalse(EmojiShortcodes.isShortcode(":${"a".repeat(65)}:"))
+        assertFalse(EmojiShortcodes.isShortcode("::"))
+        assertFalse(EmojiShortcodes.isShortcode(":a b:"))
+        assertFalse(EmojiShortcodes.isShortcode(":café:"))
+        assertFalse(EmojiShortcodes.isShortcode("party"))
+    }
+
+    @Test
+    fun userFileBeatsReceivedArtworkWhichBeatsBuiltIn() {
+        val received = EmojiArt.Bundled(R.drawable.ic_image)
+        assertEquals(
+            EmojiArt.Bundled(R.drawable.builtin_emoji_wn),
+            EmojiShortcodes.art(":wn:", CustomEmojiSet.Empty, emptyMap()),
+        )
+        assertSame(received, EmojiShortcodes.art(":wn:", CustomEmojiSet.Empty, mapOf(":wn:" to received)))
+        assertNull(EmojiShortcodes.art(":party:", CustomEmojiSet.Empty, mapOf(":wn:" to received)))
+        assertNull(EmojiShortcodes.art(":WN:", CustomEmojiSet.Empty, emptyMap()))
     }
 
     @Test
@@ -69,10 +97,10 @@ class BuiltinEmojiTest {
     @Test
     fun plaintextCodeSpansAndFencesStayLiteral() {
         val source = ":wn: `:wn:`\n```\n:marmot:\n```\n:wn:\n~~~\n:wn:\n~~~"
-        val rendered = BuiltinEmoji.annotate(AnnotatedString(source))
+        val rendered = EmojiShortcodes.annotate(AnnotatedString(source))
         assertEquals(source, rendered.text)
         val shortcodeStarts = rendered.getStringAnnotations(0, rendered.length).map { it.start }
         assertEquals(listOf(0, source.indexOf(":wn:\n~~~")), shortcodeStarts)
-        assertTrue(BuiltinEmoji.annotate(AnnotatedString("```\n:wn:")).getStringAnnotations(0, 8).isEmpty())
+        assertTrue(EmojiShortcodes.annotate(AnnotatedString("```\n:wn:")).getStringAnnotations(0, 8).isEmpty())
     }
 }

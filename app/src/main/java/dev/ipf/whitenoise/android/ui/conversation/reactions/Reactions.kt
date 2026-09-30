@@ -36,7 +36,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.ReactionParticipant
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.BuiltinEmoji
+import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.design.BottomAnchoredPopupPositionProvider
@@ -187,8 +187,8 @@ private fun ReactionFilterChips(
                 onClick = { onSelectedEmoji(emoji) },
                 label = {
                     Text(
-                        text = BuiltinEmoji.annotate(AnnotatedString("$emoji $count")),
-                        inlineContent = BuiltinEmoji.content(),
+                        text = EmojiShortcodes.annotate(AnnotatedString("$emoji $count")),
+                        inlineContent = EmojiShortcodes.content(),
                     )
                 },
             )
@@ -235,8 +235,8 @@ private fun ReactionParticipantRow(
     }
     val trailing: @Composable () -> Unit = {
         Text(
-            text = BuiltinEmoji.annotate(AnnotatedString(participant.emoji)),
-            inlineContent = BuiltinEmoji.content(),
+            text = EmojiShortcodes.annotate(AnnotatedString(participant.emoji)),
+            inlineContent = EmojiShortcodes.content(),
             style = MaterialTheme.typography.headlineSmall,
         )
     }

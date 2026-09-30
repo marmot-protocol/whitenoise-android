@@ -39,7 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.BuiltinEmoji
+import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerAccessoryRemoveButton
 import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentPresentation
 import dev.ipf.whitenoise.android.ui.conversation.media.fileIconFor
@@ -202,8 +202,8 @@ internal fun ReplyPreviewCard(
                             )
                         }
                         Text(
-                            remember(bodyText) { BuiltinEmoji.annotate(AnnotatedString(bodyText)) },
-                            inlineContent = BuiltinEmoji.content(),
+                            remember(bodyText) { EmojiShortcodes.annotate(AnnotatedString(bodyText)) },
+                            inlineContent = EmojiShortcodes.content(),
                             style = MaterialTheme.typography.bodySmall,
                             color = resolvedContentColor,
                             maxLines = 2,

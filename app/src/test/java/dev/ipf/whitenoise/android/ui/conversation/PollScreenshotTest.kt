@@ -60,6 +60,59 @@ class PollScreenshotTest {
         composeRule.onNodeWithTag("poll-card").captureRoboImage("src/test/snapshots/poll_card_closed_dark_rtl.png")
     }
 
+    /** A selected received poll stays clearly outlined against the AMOLED black surface. */
+    @Test fun selectedPollAmoled() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                Surface(Modifier.width(360.dp).testTag("poll-card")) {
+                    PollCard(poll(), canVote = true, onVote = {})
+                }
+            }
+        }
+        composeRule.onNodeWithTag("poll-card").captureRoboImage("src/test/snapshots/poll_card_selected_amoled.png")
+    }
+
+    /** Slow publication explains why the option controls are temporarily disabled. */
+    @Test fun pendingPollAmoled() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                Surface(Modifier.width(360.dp).testTag("poll-card")) {
+                    PollCard(poll(), canVote = false, onVote = {}, status = PollVoteStatus.SUBMITTING)
+                }
+            }
+        }
+        composeRule.onNodeWithTag("poll-card").captureRoboImage("src/test/snapshots/poll_card_pending_amoled.png")
+    }
+
+    /** Failed votes keep an inline explanation and allow tapping an option to try again. */
+    @Test fun failedPollAmoled() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                Surface(Modifier.width(360.dp).testTag("poll-card")) {
+                    PollCard(
+                        poll().copy(localSelection = emptyList()),
+                        canVote = true,
+                        onVote = {},
+                        status = PollVoteStatus.FAILED,
+                    )
+                }
+            }
+        }
+        composeRule.onNodeWithTag("poll-card").captureRoboImage("src/test/snapshots/poll_card_failed_amoled.png")
+    }
+
+    /** An ambiguous native completion must not look like a confirmed publication. */
+    @Test fun unconfirmedPollAmoled() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                Surface(Modifier.width(360.dp).testTag("poll-card")) {
+                    PollCard(poll(), canVote = true, onVote = {}, status = PollVoteStatus.UNCONFIRMED)
+                }
+            }
+        }
+        composeRule.onNodeWithTag("poll-card").captureRoboImage("src/test/snapshots/poll_card_unconfirmed_amoled.png")
+    }
+
     /** The group composer offers question, options and choice type before publishing. */
     @Test fun createFormLight() {
         composeRule.setContent {

@@ -1478,6 +1478,18 @@
     <string name="notification_channel_app_updates_global_description">White Noise uygulama güncellemeleri için Android uyarı davranışı</string>
 
     <string name="chat_bubble_colors">Sohbet balonu renkleri</string>
+    <string name="custom_emoji">Özel emoji</string>
+    <string name="custom_emoji_detail">Buraya eklediğin görseller mesajlarda ve tepkilerde :kısakod: emojisine dönüşür. Bu cihazda kalırlar; diğer kişiler kısa kodu metin olarak görür.</string>
+    <string name="custom_emoji_empty">Henüz özel emoji yok.</string>
+    <string name="custom_emoji_name_title">Bu emojiye ad ver</string>
+    <string name="custom_emoji_name_label">Kısa kod</string>
+    <string name="custom_emoji_name_help">Harfler, rakamlar ve alt çizgiler.</string>
+    <string name="custom_emoji_replaces">Mevcut %1$s yerine geçer.</string>
+    <string name="custom_emoji_remove_title">%1$s kaldırılsın mı?</string>
+    <string name="custom_emoji_remove_detail">Görsel bu cihazdan silinir. Mesajlar kısa kodu metin olarak korur.</string>
+    <string name="custom_emoji_too_large">Bu görsel 1 MB’tan büyük.</string>
+    <string name="custom_emoji_not_image">Bu dosya White Noise’un gösterebileceği bir görsel değil.</string>
+    <string name="custom_emoji_save_failed">Emoji kaydedilemedi.</string>
     <string name="action_color">Eylem rengi</string>
     <string name="action_color_no_active_account">Uygulama vurgu rengini ayarlamadan önce etkin bir hesap seçin.</string>
     <string name="bubble_color_preview">Önizleme</string>
