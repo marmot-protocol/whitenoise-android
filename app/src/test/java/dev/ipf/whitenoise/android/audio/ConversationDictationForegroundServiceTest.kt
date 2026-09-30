@@ -73,6 +73,9 @@ class ConversationDictationForegroundServiceTest {
                     if (autoReady) ready()
                     true
                 },
+                stopDurableSession = {
+                    ConversationDictationForegroundService.stop(RuntimeEnvironment.getApplication())
+                },
                 silenceDeliveryMode = { preference },
                 sendTranscriptIfOriginUnchanged = { request ->
                     request.beginDispatch().also { if (it) sent += request.payload }
@@ -251,6 +254,50 @@ class ConversationDictationForegroundServiceTest {
         )
     }
 
+    /** A completed result removes controls without waiting for a service-destruction callback. */
+    @Test
+    fun pasteCompletionRestoresConnectionBeforeServiceDestruction() {
+        BackgroundConnectionNotification.markForegroundActive()
+        val harness = installHost()
+        val lifecycle = Robolectric.buildService(ConversationDictationForegroundService::class.java).create()
+        val service = lifecycle.get()
+        service.onStartCommand(startIntent(service, harness), 0, 1)
+
+        harness.conversationDictation.paste()
+        harness.platform.listener.onResult("completed transcript")
+
+        assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)
+        assertTrue(shadowOf(service as Service).isForegroundStopped)
+        assertNull(ConversationDictationForegroundService.activeNotificationOrNull())
+        val restored =
+            service
+                .getSystemService(NotificationManager::class.java)
+                .activeNotifications
+                .single()
+                .notification
+        assertEquals("White Noise is connected", restored.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
+        lifecycle.destroy()
+    }
+
+    /** A Cancel delivered as the first command still removes the notification it just promoted. */
+    @Test
+    fun cancelDuringFirstStartRemovesPromotedNotificationImmediately() {
+        val harness = installHost()
+        val lifecycle = Robolectric.buildService(ConversationDictationForegroundService::class.java).create()
+        val service = lifecycle.get()
+
+        service.onStartCommand(
+            actionCommand(service, harness, ConversationDictationForegroundService.ACTION_CANCEL),
+            0,
+            1,
+        )
+
+        assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)
+        assertTrue(shadowOf(service as Service).isForegroundStopped)
+        assertTrue(service.getSystemService(NotificationManager::class.java).activeNotifications.isEmpty())
+        lifecycle.destroy()
+    }
+
     private fun assertExplicitNotificationDestinations(
         service: ConversationDictationForegroundService,
         notification: Notification,
@@ -325,6 +372,12 @@ class ConversationDictationForegroundServiceTest {
                     listener.onResult("stale duplicate")
 
                     assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)
+                    assertTrue(shadowOf(service as Service).isForegroundStopped)
+                    assertNull(ConversationDictationForegroundService.activeNotificationOrNull())
+                    assertTrue(service.getSystemService(NotificationManager::class.java).activeNotifications.isEmpty())
+                    Snapshot.sendApplyNotifications()
+                    shadowOf(android.os.Looper.getMainLooper()).idle()
+                    assertTrue(service.getSystemService(NotificationManager::class.java).activeNotifications.isEmpty())
                     assertEquals(if (actionIndex == 1) "notification transcript" else "", harness.draft.text)
                     assertEquals(
                         if (actionIndex == 2) listOf("notification transcript") else emptyList<String>(),
