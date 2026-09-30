@@ -74,6 +74,23 @@ class AddProfileScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/add_profile_amber_failure.png")
     }
 
+    /** The duplicate-account guidance remains readable in the actual Add Profile feedback host. */
+    @Test fun amberDuplicateIdentity() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                AddProfileFeedbackDialog(
+                    ToastMessage(
+                        AppText.Resource(R.string.toast_couldnt_login_amber),
+                        AppText.Resource(R.string.amber_identity_already_added),
+                        copyable = true,
+                        diagnosticReport = "operation=AMBER_SIGN_IN\nerror=ALREADY_EXISTS\nmarmot=DuplicateIdentity",
+                    ),
+                ) {}
+            }
+        }
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/add_profile_amber_duplicate_identity.png")
+    }
+
     /** Renders state only; private key input remains empty and every native callback is a no-op. */
     @Suppress("LongParameterList")
     private fun capture(

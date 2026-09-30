@@ -16,6 +16,21 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DiagnosticFormatterTest {
+    /** A duplicate account is an expected conflict and never copies its native account value. */
+    @Test
+    fun duplicateIdentityReportIsClassifiedAndPrivate() {
+        val secret = "private-account-id"
+        val report =
+            DiagnosticFormatter.errorReport(
+                "AMBER_SIGN_IN",
+                MarmotKitException.DuplicateIdentity(secret),
+                DiagnosticFormatter.ErrorReportContext("test", "17", "now"),
+            )
+        assertTrue(report.contains("error=ALREADY_EXISTS"))
+        assertTrue(report.contains("marmot=DuplicateIdentity"))
+        assertFalse(report.contains(secret))
+    }
+
     /** Copies only allowlisted busy subtypes, even when native errors contain private payloads. */
     @Test
     fun busyReportIdentifiesContentionWithoutCopyingNativeMessages() {

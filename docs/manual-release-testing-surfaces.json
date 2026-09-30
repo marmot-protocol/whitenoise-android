@@ -27339,6 +27339,24 @@
         ]
       },
       {
+        "surface": "R.string.amber_identity_already_added",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AmberSignInFailure.kt",
+        "anchor": "R.string.amber_identity_already_added",
+        "test_ids": ["ONB-012"]
+      },
+      {
+        "surface": "R.string.error_try_again",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AmberSignInFailure.kt",
+        "anchor": "R.string.error_try_again",
+        "test_ids": ["ONB-012"]
+      },
+      {
+        "surface": "R.string.toast_couldnt_login_amber",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.toast_couldnt_login_amber",
+        "test_ids": ["ONB-012"]
+      },
+      {
         "surface": "Person profile current viewer callback lifetime",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfilePresentation.kt",
         "anchor": "internal class PersonProfileOwner(",

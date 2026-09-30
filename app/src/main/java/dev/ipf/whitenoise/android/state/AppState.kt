@@ -1803,6 +1803,9 @@ class WhiteNoiseAppState private constructor(
 
     private val amberSigner = AmberSignerController(appContext)
 
+    /** Isolated sign-in tests replace only the signer round trip. */
+    internal var amberPublicKeyRequest: () -> String = amberSigner::requestPublicKey
+
     // Per-account (platform, token, server-pubkey, relay-hint) fingerprint
     // of the most recent successful `upsertPushRegistration`. Skip redundant
     // FFI calls when nothing has changed across foreground/token-rotation/
@@ -5013,21 +5016,11 @@ class WhiteNoiseAppState private constructor(
     /** Whether a NIP-55 external signer (Amber) is installed — gates the UI entry point. */
     fun isAmberSignerInstalled(): Boolean = amberSigner.isSignerInstalled()
 
-    /**
-     * Accept an identity from the NIP-55 external signer (Amber), then open its
-     * staged setup before activating it. The foreground public-key request
-     * establishes signer grants; MDK owns the saved setup checkpoint and later
-     * signing decisions. Existing accounts that cannot enter staged setup use
-     * the legacy login and signer-reconciliation path.
-     *
-     * Typed engine/protocol errors are surfaced distinctly: a user cancel/reject
-     * is a gentle "cancelled" toast; every other
-     * failure (unavailable / mismatch / runtime) is a copyable failure toast.
-     */
+    /** Opens staged Amber setup or the legacy path; failures keep existing accounts intact. */
     suspend fun loginWithAmber() {
         try {
             amberSignInStage = 1
-            val reportedPubkey = withContext(Dispatchers.IO) { amberSigner.requestPublicKey() }
+            val reportedPubkey = withContext(Dispatchers.IO) { amberPublicKeyRequest() }
             // Normalize npub/hex to the canonical hex the account is keyed by, so
             // the login-time signer and the startup re-registration signer share
             // the same current_user.
@@ -5082,7 +5075,12 @@ class WhiteNoiseAppState private constructor(
                 presentTransient(R.string.toast_amber_sign_in_cancelled)
             } else {
                 appStateDebug(error) { "amber login failed: ${error.readableMessage()}" }
-                presentFailure(R.string.toast_couldnt_login_amber, "AMBER_SIGN_IN", error)
+                presentFailure(
+                    R.string.toast_couldnt_login_amber,
+                    "AMBER_SIGN_IN",
+                    error,
+                    detail = amberSignInFailureDetail(error),
+                )
             }
         } finally {
             amberSignInStage = null
