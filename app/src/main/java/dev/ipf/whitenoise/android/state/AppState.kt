@@ -4753,7 +4753,6 @@ class WhiteNoiseAppState private constructor(
     private suspend fun ensureNotificationReceiverForNetworkReconnect(): Boolean {
         if (!bootstrapCompleted) bootstrap()
         if (!bootstrapCompleted || networkNotificationRecoverySuppressed) return false
-
         localNotificationPresenter.ensureChannels()
         refreshLocalNotificationPermission()
         val receiverReady =
@@ -10423,8 +10422,9 @@ class WhiteNoiseAppState private constructor(
         presentTransient(AppText.Plain(title), detail?.let(AppText::Plain))
     }
 
-    fun clearToast() {
-        toast = null
+    /** Retire only the toast observed by the caller, preserving a newer notice. */
+    fun clearToast(notice: ToastMessage? = toast) {
+        if (toast === notice) toast = null
     }
 
     fun clearTransientNotice(notice: TransientNotice? = transientNotice) {

@@ -22,6 +22,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,6 +46,7 @@ import dev.ipf.whitenoise.android.media.ImageUploadDraft
 import dev.ipf.whitenoise.android.media.renderIdentityImageDraft
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaQuality
+import dev.ipf.whitenoise.android.state.ScopedGroupImageMutation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
@@ -108,6 +110,11 @@ internal fun GroupEditScreen(
     var avatarViewerOpen by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var imageSaving by remember { mutableStateOf(false) }
+    val imageFailureScope =
+        remember(appState, appState.activeAccountRef, appState.runtimeGeneration, controller.group.groupIdHex) {
+            GroupImageFailureScope({ appState.toast }, { appState.clearToast(it) })
+        }
+    DisposableEffect(imageFailureScope) { onDispose { imageFailureScope.dispose() } }
     val context = LocalContext.current
     val recentEmojiRecentsOwner = rememberRecentEmojiRecentsOwner(context)
     val canEdit = controller.isSelfMember && controller.isSelfAdmin && !controller.group.unrecoverable
@@ -144,68 +151,87 @@ internal fun GroupEditScreen(
         }
     }
 
+    /** Apply or remove the encrypted group image and own any preparation failure shown here. */
     @Suppress("TooGenericExceptionCaught") // The callback can surface any non-cancellation preparation failure.
     fun updateImage(prepare: suspend () -> ImageUploadDraft?) {
         if (imageSaving || controller.mutationInFlight) return
+        val failureAttempt = imageFailureScope.begin()
         imageSaving = true
         controller.clearLastMutationError()
         appState.launchMutation {
             try {
                 val draft = prepare()
-                if (controller.updateGroupImage(draft)) {
+                val change = ScopedGroupImageMutation(draft) { imageFailureScope.isCurrent(failureAttempt) }
+                if (controller.updateGroupImage(change)) {
                     showImageSearch = false
                     showGroupEmojiImagePicker = false
+                } else if (controller.lastMutationError != null) {
+                    imageFailureScope.captureFailure(failureAttempt)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
+                if (!imageFailureScope.isCurrent(failureAttempt)) return@launchMutation
                 appState.presentFailure(
                     R.string.toast_couldnt_prepare_image,
                     "GROUP_IMAGE_PREPARE",
                     error,
                 )
+                imageFailureScope.captureFailure(failureAttempt)
             } finally {
                 imageSaving = false
             }
         }
     }
 
+    /** Validate and publish a public HTTPS avatar URL for this group's current editor. */
     @Suppress("TooGenericExceptionCaught") // The FFI boundary can surface unchecked non-cancellation failures.
     fun setPublicAvatarUrl(url: String) {
         if (imageSaving || controller.mutationInFlight) return
+        val failureAttempt = imageFailureScope.begin()
         // Same HTTPS/credential/loopback policy the upload path enforces, but a
         // hand-typed URL earns a toast rather than safeAvatarUploadUrl's throw.
         val safeUrl = ProfileSanitizer.androidOwnedHttpsImageUrl(url)
         if (safeUrl == null) {
             appState.present(R.string.profile_picture_invalid, copyable = true)
+            imageFailureScope.captureFailure(failureAttempt)
             return
         }
         imageSaving = true
         controller.clearLastMutationError()
         appState.launchMutation {
             try {
-                if (controller.updateGroupAvatarUrl(safeUrl)) showImageSearch = false
+                val change = ScopedGroupImageMutation(safeUrl) { imageFailureScope.isCurrent(failureAttempt) }
+                if (controller.updateGroupAvatarUrl(change)) {
+                    showImageSearch = false
+                } else if (controller.lastMutationError != null) {
+                    imageFailureScope.captureFailure(failureAttempt)
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
+                if (!imageFailureScope.isCurrent(failureAttempt)) return@launchMutation
                 appState.presentFailure(
                     R.string.toast_couldnt_upload_group_image,
                     "GROUP_AVATAR_UPDATE",
                     error,
                 )
+                imageFailureScope.captureFailure(failureAttempt)
             } finally {
                 imageSaving = false
             }
         }
     }
 
-    // A device photo becomes a public avatar by uploading the plaintext bytes
-    // to Blossom first: the encrypted group image is unreadable to anyone
-    // outside the group, so invite previews and QR codes can't render it.
+    /**
+     * Upload a device photo as a public avatar after preparation. Its plaintext bytes go to
+     * Blossom because people outside the encrypted group cannot read the private group image.
+     */
     @Suppress("TooGenericExceptionCaught") // Preparation, upload, and FFI calls have different failure types.
     fun uploadPublicAvatar(load: suspend () -> ImageUploadDraft) {
         val accountRef = appState.activeAccountRef ?: return
         if (imageSaving || controller.mutationInFlight) return
+        val failureAttempt = imageFailureScope.begin()
         imageSaving = true
         controller.clearLastMutationError()
         appState.launchMutation {
@@ -223,12 +249,20 @@ internal fun GroupEditScreen(
                     appState.marmotIo {
                         uploadProfileImage(accountRef, draft.plaintext, draft.mediaType, null)
                     }
-                if (controller.updateGroupAvatarUrl(safeAvatarUploadUrl(uploaded))) {
+                val change =
+                    ScopedGroupImageMutation(safeAvatarUploadUrl(uploaded)) {
+                        imageFailureScope.isCurrent(failureAttempt)
+                    }
+                val updated = controller.updateGroupAvatarUrl(change)
+                if (updated) {
                     showImageSearch = false
+                } else if (controller.lastMutationError != null) {
+                    imageFailureScope.captureFailure(failureAttempt)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
+                if (!imageFailureScope.isCurrent(failureAttempt)) return@launchMutation
                 appState.presentFailure(
                     titleRes =
                         if (prepared) {
@@ -239,6 +273,7 @@ internal fun GroupEditScreen(
                     operationCode = if (prepared) "GROUP_IMAGE_UPLOAD" else "GROUP_IMAGE_PREPARE",
                     throwable = error,
                 )
+                imageFailureScope.captureFailure(failureAttempt)
             } finally {
                 imageSaving = false
             }
@@ -264,7 +299,10 @@ internal fun GroupEditScreen(
     IdentityImageCropFlow(
         uri = pendingCropUri,
         shape = IdentityImageCropShape.RoundedSquare,
-        onDismiss = { pendingCropUri = null },
+        onDismiss = {
+            imageFailureScope.clear()
+            pendingCropUri = null
+        },
         onUnreadable = { picked ->
             uploadPublicAvatar { GroupImageDraftProcessor.fromContentUri(context.contentResolver, picked) }
         },
@@ -329,7 +367,10 @@ internal fun GroupEditScreen(
                 if (imageSaving) LinearProgressIndicator(Modifier.fillMaxWidth())
                 Box {
                     WhiteNoiseFilledTonalButton(
-                        onClick = { photoMenuOpen = true },
+                        onClick = {
+                            imageFailureScope.clear()
+                            photoMenuOpen = true
+                        },
                         enabled = canEdit && !imageSaving,
                         modifier = Modifier.testTag("group_edit.photoAction"),
                     ) {
@@ -338,15 +379,28 @@ internal fun GroupEditScreen(
                     GroupEditPhotoMenu(
                         expanded = photoMenuOpen,
                         hasImage = hasGroupImage,
-                        onDismiss = { photoMenuOpen = false },
+                        onDismiss = {
+                            imageFailureScope.clear()
+                            photoMenuOpen = false
+                        },
                         onChoosePhoto = {
+                            imageFailureScope.clear()
                             photoPicker.launch(
                                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                             )
                         },
-                        onChooseFile = { filePicker.launch(IMAGE_DOCUMENT_MIME_TYPES) },
-                        onFindWebImage = { showImageSearch = true },
-                        onCreateEmoji = { showGroupEmojiImagePicker = true },
+                        onChooseFile = {
+                            imageFailureScope.clear()
+                            filePicker.launch(IMAGE_DOCUMENT_MIME_TYPES)
+                        },
+                        onFindWebImage = {
+                            imageFailureScope.clear()
+                            showImageSearch = true
+                        },
+                        onCreateEmoji = {
+                            imageFailureScope.clear()
+                            showGroupEmojiImagePicker = true
+                        },
                         onRemove = { updateImage { null } },
                     )
                 }
@@ -391,6 +445,7 @@ internal fun GroupEditScreen(
                 if (canEdit) {
                     {
                         avatarViewerOpen = false
+                        imageFailureScope.clear()
                         showImageSearch = true
                     }
                 } else {
@@ -412,12 +467,22 @@ internal fun GroupEditScreen(
                 // Removal clears both the public URL and any encrypted image.
                 if (picked == null) updateImage { null } else setPublicAvatarUrl(picked)
             },
-            onPickPhoto = { uri -> pendingCropUri = uri },
+            onPickPhoto = { uri ->
+                if (imageSaving || controller.mutationInFlight) return@ImageSearchSheet
+                imageFailureScope.clear()
+                pendingCropUri = uri
+            },
             onPickEmoji = {
+                imageFailureScope.clear()
                 showImageSearch = false
                 showGroupEmojiImagePicker = true
             },
-            onDismiss = { showImageSearch = false },
+            onDismiss = {
+                if (!imageSaving && !controller.mutationInFlight) {
+                    imageFailureScope.clear()
+                    showImageSearch = false
+                }
+            },
         )
     }
 
@@ -427,7 +492,12 @@ internal fun GroupEditScreen(
             recentEmojis = recentEmojiRecentsOwner.recents,
             onEmojiUsed = recentEmojiRecentsOwner::onEmojiUsed,
             onApply = { draft -> updateImage { draft } },
-            onDismiss = { if (!imageSaving && !controller.mutationInFlight) showGroupEmojiImagePicker = false },
+            onDismiss = {
+                if (!imageSaving && !controller.mutationInFlight) {
+                    imageFailureScope.clear()
+                    showGroupEmojiImagePicker = false
+                }
+            },
         )
     }
 

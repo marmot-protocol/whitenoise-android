@@ -21,6 +21,8 @@ import dev.ipf.whitenoise.android.state.dismissSendFailureNotice
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.common.ToastSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -39,6 +41,22 @@ class SendFailureNoticeDismissalTest {
     val composeRule = createComposeRule()
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
+
+    /** Cleaning up a group-image failure must leave a newer unrelated toast visible. */
+    @Test
+    fun scopedToastCleanupPreservesNewerError() {
+        val appState = appState()
+        presentNotice(appState, R.string.toast_couldnt_prepare_image, "GROUP_IMAGE_PREPARE", null)
+        val imageFailure = requireNotNull(appState.toast)
+        presentNotice(appState, R.string.toast_couldnt_update_group, "GROUP_UPDATE", null)
+        val newerError = requireNotNull(appState.toast)
+
+        appState.clearToast(imageFailure)
+        assertSame(newerError, appState.toast)
+
+        appState.clearToast(newerError)
+        assertNull(appState.toast)
+    }
 
     /** The notice stays through an unrelated send's recovery and goes when its own send recovers. */
     @Test

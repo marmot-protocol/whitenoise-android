@@ -1677,7 +1677,8 @@
         "test_ids": [
           "NCH-002",
           "ACC-017",
-          "SET-028"
+          "SET-028",
+          "GRP-025"
         ]
       },
       {
@@ -1909,7 +1910,16 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Snackbar.kt",
         "anchor": "fun SwipeDismissibleSnackbar(",
         "test_ids": [
-          "AXY-001"
+          "AXY-001",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "Diagnostic snackbar dismiss action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Snackbar.kt",
+        "anchor": "R.string.dismiss",
+        "test_ids": [
+          "GRP-025"
         ]
       },
       {
@@ -2721,6 +2731,24 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "R.string.history_notice_dismiss_failed",
         "test_ids": ["GRP-024"]
+      },
+      {
+        "surface": "Group avatar update failure notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_couldnt_update_group",
+        "test_ids": ["GRP-025"]
+      },
+      {
+        "surface": "Group image cleanup failure notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_group_image_uploaded_cleanup_failed",
+        "test_ids": ["GRP-025"]
+      },
+      {
+        "surface": "Group image mutation failure owner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "internal suspend fun updateGroupImage(",
+        "test_ids": ["GRP-025"]
       },
       {
         "surface": "Fresh group creation recovery-read policy",
@@ -5701,7 +5729,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "fun GroupEditScreen(",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "GRP-025"
         ]
       },
       {

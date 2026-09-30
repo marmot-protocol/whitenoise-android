@@ -404,7 +404,7 @@ internal fun WhiteNoiseApp(
                     copyText = toast.diagnosticReport,
                 ),
             )
-            appState.clearToast()
+            appState.clearToast(toast)
         }
     }
     TransientNoticeTimeoutEffect(transientNotice, appState::clearTransientNotice)
