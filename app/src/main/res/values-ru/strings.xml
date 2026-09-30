@@ -1487,6 +1487,7 @@
     <string name="onboarding_continue_as">Продолжить как %1$s</string>
     <string name="onboarding_offline_setup_message">Нет подключения к интернету. Подключитесь по Wi-Fi, через мобильную сеть или другую сеть и повторите попытку.</string>
     <string name="toast_couldnt_login_amber">Не удалось войти через Amber</string>
+    <string name="amber_identity_already_added">Эта учётная запись уже добавлена в White Noise. Выберите её в переключателе учётных записей.</string>
     <string name="toast_amber_sign_in_cancelled">Вход через Amber отменён</string>
     <string name="onboarding_sign_up">Регистрация</string>
     <string name="sign_in_error_public_key">Это открытый ключ. Введите свой секретный ключ (nsec) для входа.</string>
