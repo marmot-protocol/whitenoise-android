@@ -296,7 +296,8 @@ class ConversationDictationForegroundServiceTest {
                     // the system handler. STOP_FOREGROUND_REMOVE cannot cancel a shared ID
                     // while the connection service still owns it.
                     Handler(Looper.getMainLooper()).post {
-                        service.getSystemService(NotificationManager::class.java)
+                        service
+                            .getSystemService(NotificationManager::class.java)
                             .notify(BackgroundConnectionNotification.NOTIFICATION_ID, notification)
                     }
                 }
@@ -313,8 +314,11 @@ class ConversationDictationForegroundServiceTest {
                 shadowOf(Looper.getMainLooper()).idle()
 
                 val notification =
-                    service.getSystemService(NotificationManager::class.java)
-                        .activeNotifications.single().notification
+                    service
+                        .getSystemService(NotificationManager::class.java)
+                        .activeNotifications
+                        .single()
+                        .notification
                 assertEquals(
                     "White Noise is connected",
                     notification.extras.getCharSequence(Notification.EXTRA_TITLE).toString(),
@@ -360,8 +364,11 @@ class ConversationDictationForegroundServiceTest {
             assertEquals(0, harness.platform.sessionsCreated)
             assertNull(shadowOf(service as Service).lastForegroundNotification)
             val notification =
-                service.getSystemService(NotificationManager::class.java)
-                    .activeNotifications.single().notification
+                service
+                    .getSystemService(NotificationManager::class.java)
+                    .activeNotifications
+                    .single()
+                    .notification
             assertEquals(
                 "White Noise is connected",
                 notification.extras.getCharSequence(Notification.EXTRA_TITLE).toString(),
