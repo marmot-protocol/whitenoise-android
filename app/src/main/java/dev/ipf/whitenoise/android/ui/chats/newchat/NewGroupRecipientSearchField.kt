@@ -39,6 +39,7 @@ import androidx.core.content.ContextCompat
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
+import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 
 /** Prototype compact search geometry with the unchanged recipient paste policy and native selection/IME state. */
@@ -120,13 +121,15 @@ internal fun NewGroupRecipientSearchField(
                         } else {
                             if (offerPaste) {
                                 SystemPasteIconButton({
-                                    dispatchRecipientPaste(
-                                        state,
-                                        clipboard?.primaryClip?.directRecipientPasteItems(),
-                                        false,
-                                        isValidNpub,
-                                        onPasteRejected,
-                                    )
+                                    clipboard.withPrimaryClipForPaste { clip ->
+                                        dispatchRecipientPaste(
+                                            state,
+                                            clip.directRecipientPasteItems(),
+                                            false,
+                                            isValidNpub,
+                                            onPasteRejected,
+                                        )
+                                    }
                                 }) {
                                     Icon(Icons.Default.ContentPaste, stringResource(R.string.paste))
                                 }

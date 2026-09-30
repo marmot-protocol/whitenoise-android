@@ -43,8 +43,9 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ClipboardPasteAffordance
 import dev.ipf.whitenoise.android.core.IdentityEntryInput
 import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
-import dev.ipf.whitenoise.android.ui.common.primaryClipPlainText
+import dev.ipf.whitenoise.android.ui.common.plainText
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
+import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
 
 /**
@@ -113,9 +114,11 @@ internal fun IdentityEntryForm(
                                     onPaste = {
                                         // Identity-specific paste: ClipboardPasteAffordance
                                         // is public-identifier-only and would reject an nsec.
-                                        IdentityEntryInput
-                                            .pasteValue(clipboardManager?.primaryClipPlainText(context))
-                                            ?.let(onIdentityChange)
+                                        clipboardManager.withPrimaryClipForPaste { clip ->
+                                            IdentityEntryInput
+                                                .pasteValue(clip.plainText(context))
+                                                ?.let(onIdentityChange)
+                                        }
                                     },
                                     enabled = !busy,
                                 ) {
@@ -218,12 +221,10 @@ internal fun PublicIdentifierFieldTrailingAction(
         canOfferPaste -> {
             SystemPasteIconButton(
                 onPaste = {
-                    val pasteValue =
-                        ClipboardPasteAffordance.pasteValue(
-                            clipboardManager?.primaryClipPlainText(context),
-                            allowHexPublicKey,
-                        )
-                    if (pasteValue != null) onValueChange(pasteValue)
+                    clipboardManager.withPrimaryClipForPaste { clip ->
+                        val pasteValue = ClipboardPasteAffordance.pasteValue(clip.plainText(context), allowHexPublicKey)
+                        if (pasteValue != null) onValueChange(pasteValue)
+                    }
                 },
                 enabled = enabled,
             ) {

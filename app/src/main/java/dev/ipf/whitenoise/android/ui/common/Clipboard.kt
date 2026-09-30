@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.common
 
 import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.os.Build
 import androidx.compose.runtime.Composable
@@ -45,12 +46,26 @@ internal fun rememberClipboardCanOfferPaste(clipboardManager: android.content.Cl
 private fun android.content.ClipboardManager?.canOfferTextPaste(): Boolean =
     this?.primaryClipDescription?.hasMimeType(ClipboardPasteAffordance.TEXT_MIME_TYPE_PATTERN) ?: false
 
-internal fun android.content.ClipboardManager.primaryClipPlainText(context: android.content.Context): String? =
-    primaryClip
-        ?.takeIf { it.itemCount > 0 }
+internal fun ClipboardManager.primaryClipPlainText(context: Context): String? = primaryClip?.plainText(context)
+
+internal fun ClipData.plainText(context: Context): String? =
+    takeIf { it.itemCount > 0 }
         ?.getItemAt(0)
         ?.coerceToText(context)
         ?.toString()
+
+/** Call only from an explicit Paste action; false requests the trusted system Paste fallback. */
+internal fun android.content.ClipboardManager?.withPrimaryClipForPaste(onPaste: (ClipData) -> Unit): Boolean {
+    val clip =
+        try {
+            this?.primaryClip
+        } catch (_: SecurityException) {
+            null
+        } ?: return false
+    // Readability, not validation success, decides whether another Paste action is necessary.
+    onPaste(clip)
+    return true
+}
 
 internal fun clearSensitiveClipboard(context: Context) {
     val clipboard = context.getSystemService(android.content.ClipboardManager::class.java) ?: return
