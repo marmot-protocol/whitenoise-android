@@ -177,6 +177,22 @@
         ]
       },
       {
+        "surface": "string:namecoin_resolve_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.namecoin_resolve_failed",
+        "test_ids": [
+          "FIND-018"
+        ]
+      },
+      {
+        "surface": "string:namecoin_resolvers_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.namecoin_resolvers_unavailable",
+        "test_ids": [
+          "FIND-018"
+        ]
+      },
+      {
         "surface": "R.string.delete_from_device",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
         "anchor": "R.string.delete_from_device",

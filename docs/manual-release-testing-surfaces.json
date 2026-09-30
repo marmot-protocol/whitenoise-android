@@ -13833,6 +13833,30 @@
         ]
       },
       {
+        "surface": "string:namecoin_lookup_resolving",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/RecipientResolution.kt",
+        "anchor": "R.string.namecoin_lookup_resolving",
+        "test_ids": [
+          "FIND-018"
+        ]
+      },
+      {
+        "surface": "string:namecoin_resolve_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/RecipientResolution.kt",
+        "anchor": "R.string.namecoin_resolve_failed",
+        "test_ids": [
+          "FIND-018"
+        ]
+      },
+      {
+        "surface": "string:namecoin_resolvers_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/RecipientResolution.kt",
+        "anchor": "R.string.namecoin_resolvers_unavailable",
+        "test_ids": [
+          "FIND-018"
+        ]
+      },
+      {
         "surface": "string:scan_qr_code",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
         "anchor": "R.string.scan_qr_code",
