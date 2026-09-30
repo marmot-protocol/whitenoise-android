@@ -245,12 +245,15 @@ internal fun rememberChatListConnectivityState(
         if (presentation != renderedPresentation) presentation = renderedPresentation
     }
     val foregroundEpoch = rememberConnectivityForegroundEpoch()
+    // Built once per appState rather than invoking map{} directly in the composable body, which
+    // would construct a new Flow on every recomposition (FlowOperatorInvokedInComposition).
+    val relaysConnectedFlow = remember(appState) { appState.connectivitySignals.map { it.relaysConnected } }
     RelayConnectivityPollingEffect(
         effectOwner = controller,
         displayed = renderedPresentation.displayed,
         foregroundEpoch = foregroundEpoch,
         connectivitySignals = { appState.connectivitySignals.value },
-        relaysConnectedFlow = appState.connectivitySignals.map { it.relaysConnected },
+        relaysConnectedFlow = relaysConnectedFlow,
         refreshRelayConnectivity = appState::refreshRelayConnectivity,
         revalidateConnectionReadiness = controller::revalidateConnectionReadiness,
     )
