@@ -7599,6 +7599,24 @@
         ]
       },
       {
+        "surface": "string:chat_folder_unread_mentions_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
+        "anchor": "R.string.chat_folder_unread_mentions_only",
+        "test_ids": ["FLD-003", "SET-009"]
+      },
+      {
+        "surface": "string:chat_folder_direct_chats_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
+        "anchor": "R.string.chat_folder_direct_chats_only",
+        "test_ids": ["FLD-003", "SET-009"]
+      },
+      {
+        "surface": "string:chat_folder_pinned_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
+        "anchor": "R.string.chat_folder_pinned_only",
+        "test_ids": ["FLD-003", "SET-009"]
+      },
+      {
         "surface": "ChatFolderEditContent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
         "anchor": "fun ChatFolderEditContent(",
@@ -7606,7 +7624,8 @@
           "SET-009",
           "FLD-001",
           "FLD-002",
-          "ACC-017"
+          "ACC-017",
+          "FLD-003"
         ]
       },
       {
@@ -7617,7 +7636,8 @@
           "SET-009",
           "FLD-001",
           "FLD-002",
-          "ACC-017"
+          "ACC-017",
+          "FLD-003"
         ]
       },
       {
@@ -7628,7 +7648,8 @@
           "SET-009",
           "FLD-001",
           "FLD-002",
-          "ACC-017"
+          "ACC-017",
+          "FLD-003"
         ]
       },
       {
@@ -18518,7 +18539,8 @@
           "SET-009",
           "FLD-001",
           "FLD-002",
-          "ACC-017"
+          "ACC-017",
+          "FLD-003"
         ]
       },
       {
@@ -18529,7 +18551,8 @@
           "SET-009",
           "FLD-001",
           "FLD-002",
-          "ACC-017"
+          "ACC-017",
+          "FLD-003"
         ]
       },
       {
@@ -18540,7 +18563,8 @@
           "SET-009",
           "FLD-001",
           "FLD-002",
-          "ACC-017"
+          "ACC-017",
+          "FLD-003"
         ]
       },
       {
@@ -18551,7 +18575,8 @@
           "SET-009",
           "FLD-001",
           "FLD-002",
-          "ACC-017"
+          "ACC-017",
+          "FLD-003"
         ]
       },
       {
@@ -18562,7 +18587,8 @@
           "SET-009",
           "FLD-001",
           "FLD-002",
-          "ACC-017"
+          "ACC-017",
+          "FLD-003"
         ]
       },
       {
@@ -18573,7 +18599,8 @@
           "SET-009",
           "FLD-001",
           "FLD-002",
-          "ACC-017"
+          "ACC-017",
+          "FLD-003"
         ]
       },
       {
@@ -18584,7 +18611,8 @@
           "SET-009",
           "FLD-001",
           "FLD-002",
-          "ACC-017"
+          "ACC-017",
+          "FLD-003"
         ]
       },
       {
@@ -18595,7 +18623,8 @@
           "SET-009",
           "FLD-001",
           "FLD-002",
-          "ACC-017"
+          "ACC-017",
+          "FLD-003"
         ]
       },
       {
@@ -18606,7 +18635,8 @@
           "SET-009",
           "FLD-001",
           "FLD-002",
-          "ACC-017"
+          "ACC-017",
+          "FLD-003"
         ]
       },
       {
@@ -18617,7 +18647,8 @@
           "SET-009",
           "FLD-001",
           "FLD-002",
-          "ACC-017"
+          "ACC-017",
+          "FLD-003"
         ]
       },
       {
@@ -18628,7 +18659,8 @@
           "SET-009",
           "FLD-001",
           "FLD-002",
-          "ACC-017"
+          "ACC-017",
+          "FLD-003"
         ]
       },
       {
@@ -18639,7 +18671,8 @@
           "SET-009",
           "FLD-001",
           "FLD-002",
-          "ACC-017"
+          "ACC-017",
+          "FLD-003"
         ]
       },
       {
@@ -18650,7 +18683,8 @@
           "SET-009",
           "FLD-001",
           "FLD-002",
-          "ACC-017"
+          "ACC-017",
+          "FLD-003"
         ]
       },
       {
@@ -18661,7 +18695,8 @@
           "SET-009",
           "FLD-001",
           "FLD-002",
-          "ACC-017"
+          "ACC-017",
+          "FLD-003"
         ]
       },
       {
@@ -18672,7 +18707,8 @@
           "SET-009",
           "FLD-001",
           "FLD-002",
-          "ACC-017"
+          "ACC-017",
+          "FLD-003"
         ]
       },
       {
@@ -18683,7 +18719,8 @@
           "SET-009",
           "FLD-001",
           "FLD-002",
-          "ACC-017"
+          "ACC-017",
+          "FLD-003"
         ]
       },
       {
@@ -18694,7 +18731,8 @@
           "SET-009",
           "FLD-001",
           "FLD-002",
-          "ACC-017"
+          "ACC-017",
+          "FLD-003"
         ]
       },
       {
@@ -18705,7 +18743,8 @@
           "SET-009",
           "FLD-001",
           "FLD-002",
-          "ACC-017"
+          "ACC-017",
+          "FLD-003"
         ]
       },
       {
@@ -18716,7 +18755,8 @@
           "SET-009",
           "FLD-001",
           "FLD-002",
-          "ACC-017"
+          "ACC-017",
+          "FLD-003"
         ]
       },
       {
@@ -18727,7 +18767,8 @@
           "SET-009",
           "FLD-001",
           "FLD-002",
-          "ACC-017"
+          "ACC-017",
+          "FLD-003"
         ]
       },
       {
@@ -18738,7 +18779,8 @@
           "SET-009",
           "FLD-001",
           "FLD-002",
-          "ACC-017"
+          "ACC-017",
+          "FLD-003"
         ]
       },
       {
@@ -18749,7 +18791,8 @@
           "SET-009",
           "FLD-001",
           "FLD-002",
-          "ACC-017"
+          "ACC-017",
+          "FLD-003"
         ]
       },
       {
@@ -18760,7 +18803,8 @@
           "SET-009",
           "FLD-001",
           "FLD-002",
-          "ACC-017"
+          "ACC-017",
+          "FLD-003"
         ]
       },
       {
@@ -18846,7 +18890,8 @@
         "anchor": "R.string.folder_delete_action",
         "test_ids": [
           "SET-009",
-          "ACC-017"
+          "ACC-017",
+          "FLD-003"
         ]
       },
       {
@@ -18865,7 +18910,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
         "anchor": "R.string.folder_delete_failed",
         "test_ids": [
-          "SET-009"
+          "SET-009",
+          "FLD-003"
         ]
       },
       {

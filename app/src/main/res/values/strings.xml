@@ -113,6 +113,9 @@
     <string name="chat_folder_keyword_label">Keyword</string>
     <string name="chat_folder_unread_only">Unread only</string>
     <string name="chat_folder_include_muted">Include muted chats</string>
+    <string name="chat_folder_unread_mentions_only">Unread mentions only</string>
+    <string name="chat_folder_direct_chats_only">Direct chats only</string>
+    <string name="chat_folder_pinned_only">Pinned chats only</string>
     <string name="chat_folder_groups_only">Groups only</string>
     <string name="chat_folder_archived_only">Archived only</string>
     <string name="chat_folder_people">People</string>

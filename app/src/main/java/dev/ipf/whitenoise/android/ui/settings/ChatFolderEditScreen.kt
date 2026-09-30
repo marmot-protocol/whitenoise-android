@@ -53,7 +53,7 @@ internal const val CHAT_FOLDER_EDIT_CONTENT_TAG = "chat-folder-edit-content"
 
 /**
  * Create/edit form for one chat folder: name and description, Included Chats, the automatic rules (People,
- * Keyword, four switches) and a live Preview. Nothing persists until Save; Back asks before discarding a dirty draft,
+ * Keyword, category switches) and a live Preview. Nothing persists until Save; Back asks before discarding a dirty draft,
  * and a failed save keeps every field (M027, M028).
  */
 @Composable
@@ -115,6 +115,9 @@ private fun ChatFolderEditSession(
     var includeMuted by rememberSaveable { mutableStateOf(existingRule?.includeMuted ?: false) }
     var groupsOnly by rememberSaveable { mutableStateOf(existingRule?.groupsOnly ?: false) }
     var archivedOnly by rememberSaveable { mutableStateOf(existingRule?.archivedOnly ?: false) }
+    var unreadMentionsOnly by rememberSaveable { mutableStateOf(existingRule?.unreadMentionsOnly ?: false) }
+    var directChatsOnly by rememberSaveable { mutableStateOf(existingRule?.directChatsOnly ?: false) }
+    var pinnedOnly by rememberSaveable { mutableStateOf(existingRule?.pinnedOnly ?: false) }
     val initialManual =
         remember {
             folderId?.let { store.membershipFor(accountRef, it) }
@@ -142,6 +145,9 @@ private fun ChatFolderEditSession(
                     .takeIf { it.isNotBlank() },
             groupsOnly = groupsOnly,
             archivedOnly = archivedOnly,
+            unreadMentionsOnly = unreadMentionsOnly,
+            directChatsOnly = directChatsOnly,
+            pinnedOnly = pinnedOnly,
         )
     val initialRule = existingRule ?: ChatFolderRule()
     val missing = folderId != null && existing == null
@@ -279,6 +285,9 @@ private fun ChatFolderEditSession(
                 includeMuted = includeMuted,
                 groupsOnly = groupsOnly,
                 archivedOnly = archivedOnly,
+                unreadMentionsOnly = unreadMentionsOnly,
+                directChatsOnly = directChatsOnly,
+                pinnedOnly = pinnedOnly,
                 manualChatCount = manualChatIds.size,
                 peopleCount = memberHexes.size,
                 previewCount = previewRows.size,
@@ -294,7 +303,16 @@ private fun ChatFolderEditSession(
             ),
         onUnreadOnlyChange = { unreadOnly = it },
         onIncludeMutedChange = { includeMuted = it },
-        onGroupsOnlyChange = { groupsOnly = it },
+        onGroupsOnlyChange = {
+            groupsOnly = it
+            if (it) directChatsOnly = false
+        },
+        onUnreadMentionsOnlyChange = { unreadMentionsOnly = it },
+        onDirectChatsOnlyChange = {
+            directChatsOnly = it
+            if (it) groupsOnly = false
+        },
+        onPinnedOnlyChange = { pinnedOnly = it },
         onArchivedOnlyChange = { archivedOnly = it },
         onOpenManualChats = { picker = FolderPicker.Chats },
         onOpenPeople = { picker = FolderPicker.People },
@@ -371,6 +389,9 @@ internal data class ChatFolderEditFormState(
     val canSave: Boolean,
     val canDelete: Boolean = !isNew,
     val error: String? = null,
+    val unreadMentionsOnly: Boolean = false,
+    val directChatsOnly: Boolean = false,
+    val pinnedOnly: Boolean = false,
 )
 
 /** The form without any store access, so tests can render every draft. */
@@ -388,6 +409,9 @@ internal fun ChatFolderEditContent(
     onSave: () -> Unit,
     onDelete: () -> Unit,
     onBack: () -> Unit,
+    onUnreadMentionsOnlyChange: (Boolean) -> Unit,
+    onDirectChatsOnlyChange: (Boolean) -> Unit,
+    onPinnedOnlyChange: (Boolean) -> Unit,
 ) {
     SettingsScaffold(
         title = stringResource(if (state.isNew) R.string.folder_new_title else R.string.folder_edit),
@@ -472,9 +496,25 @@ internal fun ChatFolderEditContent(
                         val title = stringResource(R.string.chat_folder_unread_only)
                         SettingsSwitch(context, title, state.unreadOnly, onUnreadOnlyChange)
                     }
+                    row("mentions") { context ->
+                        val title = stringResource(R.string.chat_folder_unread_mentions_only)
+                        SettingsSwitch(context, title, state.unreadMentionsOnly, onUnreadMentionsOnlyChange)
+                    }
+                    row("pinned") { context ->
+                        val title = stringResource(R.string.chat_folder_pinned_only)
+                        SettingsSwitch(context, title, state.pinnedOnly, onPinnedOnlyChange)
+                    }
+                }
+            }
+            item {
+                SettingsGroup {
                     row("groups") { context ->
                         val title = stringResource(R.string.chat_folder_groups_only)
                         SettingsSwitch(context, title, state.groupsOnly, onGroupsOnlyChange)
+                    }
+                    row("direct") { context ->
+                        val title = stringResource(R.string.chat_folder_direct_chats_only)
+                        SettingsSwitch(context, title, state.directChatsOnly, onDirectChatsOnlyChange)
                     }
                     row("archived") { context ->
                         val title = stringResource(R.string.chat_folder_archived_only)
