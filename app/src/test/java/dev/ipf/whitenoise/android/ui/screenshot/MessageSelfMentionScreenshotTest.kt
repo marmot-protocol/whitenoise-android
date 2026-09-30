@@ -261,7 +261,6 @@ private fun ColumnScope.MentionTimestamp(time: String) {
         status = MessageStatus.Received,
         editedLabel = null,
         onEditedClick = null,
-        retention = null,
         modifier = Modifier.align(Alignment.End),
     )
 }

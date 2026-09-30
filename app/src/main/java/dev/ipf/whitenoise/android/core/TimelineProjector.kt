@@ -85,13 +85,6 @@ private fun replyPreviewMediaKind(
         mediaFallback?.kind ?: replyMediaKindFromJson(mediaJson)
     }
 
-/**
- * Whether a bubble shows the disappearing-message indicator. An explicit
- * `0` means retention was disabled for this message, so only a positive
- * duration counts.
- */
-fun retentionIndicatorVisible(retentionSeconds: ULong?): Boolean = (retentionSeconds ?: 0uL) > 0uL
-
 internal enum class TimelineInvalidationPresentation {
     None,
     PartialVisibility,

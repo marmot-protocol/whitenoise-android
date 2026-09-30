@@ -2564,8 +2564,15 @@
           "CON-001",
           "NTF-009",
           "GRP-021",
-          "DIC-002"
+          "DIC-002",
+          "CON-023"
         ]
+      },
+      {
+        "surface": "ConversationHistoryBoundary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationHistoryBoundary.kt",
+        "anchor": "fun ConversationHistoryBoundary(",
+        "test_ids": ["CON-023"]
       },
       {
         "surface": "ConversationSeededTailAlignmentRecovery",
@@ -4957,38 +4964,6 @@
         "anchor": "fun BoxScope.MessageReplySwipeGlyph(",
         "test_ids": [
           "MSG-001"
-        ]
-      },
-      {
-        "surface": "MessageRetentionIndicator",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageRetentionIndicator.kt",
-        "anchor": "fun MessageRetentionIndicator(",
-        "test_ids": [
-          "GRP-017"
-        ]
-      },
-      {
-        "surface": "MessageRetentionIndicatorSlot",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageRetentionIndicator.kt",
-        "anchor": "fun MessageRetentionIndicatorSlot(",
-        "test_ids": [
-          "GRP-017"
-        ]
-      },
-      {
-        "surface": "RetentionProgressRing",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageRetentionIndicator.kt",
-        "anchor": "fun RetentionProgressRing(",
-        "test_ids": [
-          "GRP-017"
-        ]
-      },
-      {
-        "surface": "RunningRetentionIndicator",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageRetentionIndicator.kt",
-        "anchor": "fun RunningRetentionIndicator(",
-        "test_ids": [
-          "GRP-017"
         ]
       },
       {
@@ -9308,6 +9283,18 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
         "anchor": "R.string.poll_preview",
         "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "Oldest-history retention boundary notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationHistoryBoundary.kt",
+        "anchor": "R.string.conversation_history_may_have_expired",
+        "test_ids": ["CON-023"]
+      },
+      {
+        "surface": "Oldest-history retention boundary accessibility description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationHistoryBoundary.kt",
+        "anchor": "R.string.conversation_history_retention_description",
+        "test_ids": ["CON-023"]
       }
     ],
     "settings_controls": [

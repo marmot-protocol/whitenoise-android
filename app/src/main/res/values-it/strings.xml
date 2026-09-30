@@ -201,6 +201,8 @@
     <string name="wave_hi">Saluta</string>
     <string name="conversation_empty_disappearing_title">Nessun messaggio da mostrare</string>
     <string name="conversation_empty_disappearing_body">I messaggi effimeri sono attivi. I nuovi messaggi in questa chat scompaiono dopo %1$s.</string>
+    <string name="conversation_history_may_have_expired">I messaggi precedenti potrebbero essere scaduti</string>
+    <string name="conversation_history_retention_description">%1$s. Messaggi effimeri: %2$s.</string>
     <string name="group_empty_only_you_title">Questo gruppo contiene solo te</string>
     <string name="group_empty_invite_members">Invita persone quando sei pronto.</string>
     <string name="you_are_no_longer_a_member">Non puoi inviare messaggi a questo gruppo perché non ne fai più parte.</string>

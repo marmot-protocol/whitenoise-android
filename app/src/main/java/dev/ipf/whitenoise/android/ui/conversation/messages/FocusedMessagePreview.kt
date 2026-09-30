@@ -111,8 +111,6 @@ internal fun FocusedTextMessagePreview(
     media: (@Composable () -> Unit)? = null,
     warning: String? = null,
     editedLabel: String? = null,
-    retention: RetentionIndicatorInput? = null,
-    reserveRetentionSpace: Boolean = false,
     mentionedSelf: Boolean = false,
     mentionedYouLabel: String = "",
     footerContent: (@Composable () -> Unit)? = null,
@@ -132,8 +130,6 @@ internal fun FocusedTextMessagePreview(
                 status = status,
                 editedLabel = editedLabel,
                 onEditedClick = null,
-                retention = retention,
-                reserveRetentionSpace = reserveRetentionSpace,
                 statusContainerColor = colorFromArgb(presentation.backgroundArgb),
             )
         }

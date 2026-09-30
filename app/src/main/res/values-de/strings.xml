@@ -201,6 +201,8 @@
     <string name="wave_hi">Zuwinken</string>
     <string name="conversation_empty_disappearing_title">Keine Nachrichten zum Anzeigen</string>
     <string name="conversation_empty_disappearing_body">Verschwindende Nachrichten sind aktiviert. Neue Nachrichten in diesem Chat verschwinden nach %1$s.</string>
+    <string name="conversation_history_may_have_expired">Frühere Nachrichten sind möglicherweise abgelaufen</string>
+    <string name="conversation_history_retention_description">%1$s. Verschwindende Nachrichten: %2$s.</string>
     <string name="group_empty_only_you_title">Diese Gruppe besteht nur aus dir</string>
     <string name="group_empty_invite_members">Lade Leute ein, wenn du bereit bist.</string>
     <string name="you_are_no_longer_a_member">Du kannst dieser Gruppe keine Nachrichten mehr senden, weil du kein Mitglied mehr bist.</string>

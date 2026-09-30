@@ -4197,6 +4197,24 @@ internal fun ConversationScreen(
                                         }
                                     }
                                 }
+                                if (
+                                    retentionHistoryBoundaryVisible(
+                                        retentionSeconds = controller.group.disappearingMessageSecs,
+                                        hasMessages = renderedTimeline.isNotEmpty(),
+                                        initialLoadStarted = navigationState.initialTimelineLoadStarted,
+                                        hasMoreBefore = controller.hasMoreBefore,
+                                        isLoading = controller.isLoading,
+                                        isLoadingPage = controller.isLoadingPage,
+                                        isLoadingOlder = controller.isLoadingOlder,
+                                        olderLoadFailed =
+                                            controller.error != null &&
+                                                controller.errorEdge == ConversationLoadFailureEdge.TOP,
+                                    )
+                                ) {
+                                    item(key = "retention-history-boundary") {
+                                        ConversationHistoryBoundary(controller.group.disappearingMessageSecs)
+                                    }
+                                }
                                 conversationLoadErrorItem(
                                     key = "conversation-load-error-top",
                                     error = controller.error,
