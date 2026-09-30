@@ -1091,6 +1091,7 @@ class WhiteNoiseAppState private constructor(
     initialActiveAccountRef: String?,
 ) {
     private val dictationDiagnosticLifecycle = DictationDiagnosticLifecycle()
+
     /** Interactive imports stay separate from the active account until MDK certifies readiness. */
     internal val accountSetup by lazy {
         AccountSetupCoordinator(
@@ -2533,7 +2534,6 @@ class WhiteNoiseAppState private constructor(
     // drift across the separate places that update them (issue #821).
     @Volatile
     private var suppression = NotificationSuppression()
-
 
     private fun updateNotificationSuppression(next: NotificationSuppression) {
         if (next != suppression) notificationPostEpoch.advance()
