@@ -1153,6 +1153,20 @@ android.sourceSets.named("test") {
 }
 
 tasks.withType<Test>().configureEach {
+    // Robolectric 4.17 requires these module openings on JDK 17+ (including CI).
+    // Apply them to the test JVMs, not the Gradle daemon or the shipped app.
+    // https://robolectric.org/getting-started/#running-with-java-17-and-higher
+    jvmArgs(
+        "--add-opens=java.base/java.lang=ALL-UNNAMED",
+        "--add-opens=java.base/java.util=ALL-UNNAMED",
+        "--add-opens=java.base/java.io=ALL-UNNAMED",
+        "--add-opens=java.base/java.net=ALL-UNNAMED",
+        "--add-opens=java.base/java.security=ALL-UNNAMED",
+        "--add-opens=java.base/java.text=ALL-UNNAMED",
+        "--add-opens=java.base/jdk.internal.access=ALL-UNNAMED",
+        "--add-opens=java.desktop/java.awt.font=ALL-UNNAMED",
+        "--add-opens=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
+    )
     // Resource-backed Robolectric tests retain Android SDK sandboxes across the large unit suite.
     // Double Gradle's 512 MiB worker default while keeping one bounded, non-parallel process per task.
     maxHeapSize = "1g"

@@ -179,6 +179,15 @@ emulator — and cover onboarding, chat lists, conversations, settings, media,
 account switching, and other committed UI states across themes and accessibility
 configurations.
 
+Robolectric 4.17 on JDK 17+ needs explicit Java module openings. The shared
+`tasks.withType<Test>()` configuration in `app/build.gradle.kts` supplies the
+[upstream-required flags](https://robolectric.org/getting-started/#running-with-java-17-and-higher)
+to unit-test JVMs, including screenshot and synthetic-corpus replay tasks.
+Keep these flags on the test processes rather than in `org.gradle.jvmargs`;
+they are not app/runtime configuration. An `IllegalAccessException` mentioning
+`jdk.internal.access.SharedSecrets` during sandbox startup indicates missing
+test-JVM flags, not a screenshot mismatch; do not re-record baselines for it.
+
 Baseline PNGs live under `app/src/test/snapshots/` and are committed to git. CI
 runs `:app:verifyRoborazziDevZapstoreDebug` and
 `:app:verifyRoborazziDevPlayDebug` in parallel jobs, filtered to the established

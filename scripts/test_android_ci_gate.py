@@ -167,6 +167,25 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('withPropertyName("roborazziSnapshots")', self.app_build)
         self.assertIn('withPathSensitivity(PathSensitivity.RELATIVE)', self.app_build)
 
+    def test_robolectric_module_openings_apply_to_all_test_jvms(self):
+        """JDK 17+ access is needed by unit, screenshot and custom replay tests."""
+        test_tasks = self.app_build.split('tasks.withType<Test>().configureEach {', 1)[1]
+        test_tasks = test_tasks.split('\ntasks.register<Test>', 1)[0]
+        for module in (
+            'java.base/java.lang',
+            'java.base/java.util',
+            'java.base/java.io',
+            'java.base/java.net',
+            'java.base/java.security',
+            'java.base/java.text',
+            'java.base/jdk.internal.access',
+            'java.desktop/java.awt.font',
+            'jdk.compiler/com.sun.tools.javac.api',
+        ):
+            with self.subTest(module=module):
+                self.assertIn(f'"--add-opens={module}=ALL-UNNAMED"', test_tasks)
+        self.assertIn('    jvmArgs(\n', test_tasks)
+
     def test_curated_screenshots_run_in_parallel_with_the_exact_safe_scope(self):
         """Both flavors verify the established baseline owners in their own jobs."""
         self.assertIn('fail-fast: false', self.screenshots)
