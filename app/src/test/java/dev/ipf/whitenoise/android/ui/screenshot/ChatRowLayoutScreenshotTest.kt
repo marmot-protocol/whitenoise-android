@@ -40,18 +40,21 @@ class ChatRowLayoutScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Keeps ordinary, unread, invitation, search, draft, and selection rows legible in light mode. */
     @Test
     fun chatRowStatesLight() {
         render(darkTheme = false, amoled = false)
         capture("chat_row_layout_states_light.png")
     }
 
+    /** Checks the same row states against the dark surface and metadata colors. */
     @Test
     fun chatRowStatesDark() {
         render(darkTheme = true, amoled = false)
         capture("chat_row_layout_states_dark.png")
     }
 
+    /** Checks the same row states against AMOLED black and its high-contrast text. */
     @Test
     fun chatRowStatesAmoled() {
         render(darkTheme = true, amoled = true)
