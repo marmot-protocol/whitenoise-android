@@ -154,7 +154,7 @@ class ConversationDictationForegroundService : Service() {
         super.onDestroy()
         // notify() may have refreshed the shared ID after foreground promotion.
         // A replacement dictation may also have claimed it before this callback.
-        Handler(Looper.getMainLooper()).post { restoreNotification() }
+        Handler(Looper.getMainLooper()).post { restoreDictationNotification(this) }
     }
 
     /** Removes completed controls before Android asynchronously destroys the service. */
@@ -168,26 +168,7 @@ class ConversationDictationForegroundService : Service() {
         promotedController = null
         promotedSessionToken = null
         if (activeService === this) activeService = null
-        restoreNotification()
-    }
-
-    /** Preserves a newer dictation or a connection owner of the shared notification ID. */
-    private fun restoreNotification() {
-        val replacement = activeNotificationOrNull()
-        val manager = getSystemService(NotificationManager::class.java)
-        when {
-            replacement != null -> {
-                manager?.notify(NOTIFICATION_ID, replacement)
-                conversationDictationDiagnostic("event=foreground_notification_closed outcome=replaced")
-            }
-            BackgroundConnectionNotification.restoreIfForeground(applicationContext) -> {
-                conversationDictationDiagnostic("event=foreground_notification_closed outcome=connection_restored")
-            }
-            else -> {
-                manager?.cancel(NOTIFICATION_ID)
-                conversationDictationDiagnostic("event=foreground_notification_closed outcome=removed")
-            }
-        }
+        restoreDictationNotification(this)
     }
 
     /** Builds a public but metadata-free notification with the only actions valid off-screen. */
@@ -398,3 +379,23 @@ private fun dictationNotificationStatus(controller: ConversationDictationControl
 /** Recognizes API 31+'s explicit foreground-start rejection without resolving that class on older Android. */
 private fun Throwable.isForegroundServiceStartRejection(): Boolean =
     Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && this is ForegroundServiceStartNotAllowedException
+
+/** Preserves a newer dictation or a connection owner of the shared notification ID. */
+private fun restoreDictationNotification(context: Context) {
+    val replacement = ConversationDictationForegroundService.activeNotificationOrNull()
+    val notificationId = BackgroundConnectionNotification.NOTIFICATION_ID
+    val manager = context.getSystemService(NotificationManager::class.java)
+    when {
+        replacement != null -> {
+            manager?.notify(notificationId, replacement)
+            conversationDictationDiagnostic("event=foreground_notification_closed outcome=replaced")
+        }
+        BackgroundConnectionNotification.restoreIfForeground(context.applicationContext) -> {
+            conversationDictationDiagnostic("event=foreground_notification_closed outcome=connection_restored")
+        }
+        else -> {
+            manager?.cancel(notificationId)
+            conversationDictationDiagnostic("event=foreground_notification_closed outcome=removed")
+        }
+    }
+}
