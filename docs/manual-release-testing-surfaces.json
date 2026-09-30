@@ -9063,6 +9063,12 @@
         "test_ids": ["SET-020"]
       },
       {
+        "surface": "PollVotingCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
+        "anchor": "internal fun PollVotingCard(",
+        "test_ids": ["MSG-021"]
+      },
+      {
         "surface": "PollCard",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
         "anchor": "internal fun PollCard(",
@@ -9258,6 +9264,24 @@
         "surface": "string:poll_submit",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
         "anchor": "R.string.poll_submit",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "Poll vote submission status",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
+        "anchor": "R.string.sending",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "Poll inline vote failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
+        "anchor": "R.string.poll_vote_failed",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "Poll unconfirmed vote",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
+        "anchor": "R.string.delivery_not_confirmed",
         "test_ids": ["MSG-021"]
       },
       {

@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.PollOptionResultFfi
 import dev.ipf.marmotkit.PollProjectionFfi
 import dev.ipf.marmotkit.PollTypeFfi
+import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -90,7 +91,7 @@ internal fun pollResultFraction(
 internal fun pollDeadlineReached(
     endsAt: ULong?,
     nowMillis: Long,
-): Boolean = endsAt != null && endsAt <= (nowMillis / POLL_MILLIS_PER_SECOND).toULong()
+): Boolean = endsAt != null && endsAt < (nowMillis / POLL_MILLIS_PER_SECOND).toULong()
 
 /** Rejects a tap against an expired projection even before Compose's deadline timer fires. */
 internal fun pollVoteAllowed(
@@ -128,17 +129,15 @@ internal fun PollTimelineRow(
         Text(stringResource(R.string.poll_preview), Modifier.padding(16.dp))
         return
     }
-    var voting by remember(item.record.messageIdHex) { mutableStateOf(false) }
-    var pendingSelection by remember(item.record.messageIdHex) { mutableStateOf<List<String>?>(null) }
-    LaunchedEffect(poll.localSelection, poll.open) {
-        if (!poll.open || pendingSelection?.toSet() == poll.localSelection.toSet()) pendingSelection = null
-    }
-    val displayedPoll = pendingSelection?.let { optimisticPollProjection(poll, it) } ?: poll
     var deadlineReached by remember(poll.endsAt) {
         mutableStateOf(pollDeadlineReached(poll.endsAt, System.currentTimeMillis()))
     }
     LaunchedEffect(poll.endsAt) {
-        val deadline = poll.endsAt?.toLong()?.times(1000L) ?: return@LaunchedEffect
+        val deadline =
+            poll.endsAt
+                ?.toLong()
+                ?.plus(1L)
+                ?.times(POLL_MILLIS_PER_SECOND) ?: return@LaunchedEffect
         val remaining = deadline - System.currentTimeMillis()
         if (remaining > 0L) delay(remaining)
         deadlineReached = true
@@ -163,30 +162,66 @@ internal fun PollTimelineRow(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                PollCard(
-                    poll = displayedPoll,
-                    canVote = open && controller.canSendMessages && !selectionMode && !voting,
-                    onVote = { optionId ->
-                        val replacement = replacementPollSelection(displayedPoll, optionId)
-                        if (replacement != null && pollVoteAllowed(poll, System.currentTimeMillis())) {
-                            voting = true
-                            pendingSelection = replacement
-                            appState.launchMutation {
-                                var accepted = false
-                                try {
-                                    accepted = controller.castPollVote(item.record.messageIdHex, replacement)
-                                } finally {
-                                    if (!accepted) pendingSelection = null
-                                    voting = false
-                                }
+                PollVotingCard(
+                    poll = poll,
+                    voteKey = controller.boundAccountRef to item.record.messageIdHex,
+                    canVote = open && controller.canSendMessages && !selectionMode,
+                    open = open,
+                    submitVote = { replacement, onCompleted ->
+                        appState.launchMutation {
+                            var outcome: SendAcceptDispositionFfi? = null
+                            try {
+                                outcome = controller.castPollVote(item.record.messageIdHex, replacement)
+                            } finally {
+                                onCompleted(outcome)
                             }
                         }
                     },
-                    open = open,
                 )
             }
         }
     }
+}
+
+/** Keeps the pending and failed vote visible, including when a native call waits on publication. */
+@Composable
+@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
+internal fun PollVotingCard(
+    poll: PollProjectionFfi,
+    voteKey: Pair<String?, String>,
+    canVote: Boolean,
+    submitVote: (List<String>, (SendAcceptDispositionFfi?) -> Unit) -> Unit,
+    open: Boolean = poll.open,
+) {
+    var voting by remember(voteKey) { mutableStateOf(false) }
+    var pendingSelection by remember(voteKey) { mutableStateOf<List<String>?>(null) }
+    var status by remember(voteKey) { mutableStateOf(PollVoteStatus.IDLE) }
+    LaunchedEffect(voteKey, poll.localSelection, open) {
+        if (!open || pendingSelection?.toSet() == poll.localSelection.toSet()) {
+            pendingSelection = null
+            status = PollVoteStatus.IDLE
+        }
+    }
+    val displayedPoll = pendingSelection?.let { optimisticPollProjection(poll, it) } ?: poll
+    PollCard(
+        poll = displayedPoll,
+        canVote = canVote && open && !voting,
+        open = open,
+        status = status,
+        onVote = { optionId ->
+            val replacement = replacementPollSelection(displayedPoll, optionId)
+            if (!voting && canVote && open && replacement != null && pollVoteAllowed(poll, System.currentTimeMillis())) {
+                voting = true
+                status = PollVoteStatus.SUBMITTING
+                pendingSelection = replacement
+                submitVote(replacement) { outcome ->
+                    status = if (pendingSelection == null) PollVoteStatus.IDLE else outcome.voteStatus()
+                    if (outcome == null) pendingSelection = null
+                    voting = false
+                }
+            }
+        },
+    )
 }
 
 /** Uses the same tappable group sender avatar as nearby transcript rows. */
@@ -208,6 +243,16 @@ private fun PollSenderAvatar(
     }
 }
 
+internal enum class PollVoteStatus { IDLE, SUBMITTING, UNCONFIRMED, FAILED }
+
+private fun SendAcceptDispositionFfi?.voteStatus(): PollVoteStatus =
+    when (this) {
+        SendAcceptDispositionFfi.PUBLISHED -> PollVoteStatus.IDLE
+        SendAcceptDispositionFfi.ACCEPTED_PENDING -> PollVoteStatus.SUBMITTING
+        SendAcceptDispositionFfi.COMPLETION_UNKNOWN -> PollVoteStatus.UNCONFIRMED
+        null -> PollVoteStatus.FAILED
+    }
+
 /** Renders the projected question, live tally, local selection, and closed state. */
 @Composable
 @Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
@@ -216,12 +261,14 @@ internal fun PollCard(
     canVote: Boolean,
     onVote: (String) -> Unit,
     open: Boolean = poll.open,
+    status: PollVoteStatus = PollVoteStatus.IDLE,
 ) {
     val locale = LocalConfiguration.current.locales[0]
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(
@@ -264,6 +311,15 @@ internal fun PollCard(
                         .format(Date(endsAt.toLong() * 1_000L))
                 Text(stringResource(R.string.poll_ends_at, deadline), style = MaterialTheme.typography.labelSmall)
             }
+            if (status == PollVoteStatus.SUBMITTING) Text(stringResource(R.string.sending), style = MaterialTheme.typography.labelMedium)
+            if (status == PollVoteStatus.UNCONFIRMED) Text(stringResource(R.string.delivery_not_confirmed), style = MaterialTheme.typography.labelMedium)
+            if (status == PollVoteStatus.FAILED) {
+                Text(
+                    stringResource(R.string.poll_vote_failed),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
             if (!open) Text(stringResource(R.string.poll_closed), style = MaterialTheme.typography.labelMedium)
         }
     }
@@ -286,8 +342,13 @@ private fun PollOptionRow(
                 .fillMaxWidth()
                 .defaultMinSize(minHeight = 48.dp)
                 .clip(shape)
-                .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape)
-                .clickable(enabled = canVote, role = Role.Button) { onVote(option.id) }
+                .border(
+                    BorderStroke(
+                        if (selected) 2.dp else 1.dp,
+                        if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                    ),
+                    shape,
+                ).clickable(enabled = canVote, role = Role.Button) { onVote(option.id) }
                 .semantics { this.selected = selected }
                 .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
