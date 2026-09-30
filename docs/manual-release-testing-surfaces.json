@@ -3721,6 +3721,12 @@
         ]
       },
       {
+        "surface": "GIPHY attribution and message metadata footer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "MessageInlineFooter(",
+        "test_ids": ["MED-021"]
+      },
+      {
         "surface": "MediaImageGridTile",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageBubbles.kt",
         "anchor": "fun MediaImageGridTile(",
