@@ -91,6 +91,7 @@ class ComposerBarScreenshotTest {
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_bar_idle_amoled.png")
     }
 
+    /** Records the unchanged short draft height and action row in the default theme. */
     @Test
     fun composerBarDraftLight() {
         render(darkTheme = false, amoled = false, draft = "Draft message text")
@@ -177,6 +178,7 @@ class ComposerBarScreenshotTest {
         }
     }
 
+    /** Records the end caret after automatic growth and internal scrolling. */
     @Test
     fun composerBarLongDraftEndSelectionLight() {
         renderLongComposer(darkTheme = false, selectionAtEnd = true)
@@ -548,6 +550,10 @@ class ComposerBarScreenshotTest {
         }
     }
 
+    /**
+     * Shares the long draft across theme, RTL, font-scale, and selection baselines
+     * so changes in their rendered height can be compared directly.
+     */
     private fun renderLongComposer(
         darkTheme: Boolean,
         amoled: Boolean = false,

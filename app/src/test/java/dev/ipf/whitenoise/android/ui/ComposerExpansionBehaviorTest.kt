@@ -295,6 +295,7 @@ class ComposerExpansionBehaviorTest {
         assertExpandedSendInset(LayoutDirection.Rtl)
     }
 
+    /** A short draft keeps its natural control row despite the higher automatic ceiling. */
     @Test
     fun twoLinesKeepTheExistingCompactComposer() {
         render("First line\nSecond line")
@@ -652,6 +653,7 @@ class ComposerExpansionBehaviorTest {
         assertTrue("the unchanged draft must keep one composer height", abs(finalHeight - settledHeight) <= 1f)
     }
 
+    /** Removing most of a long draft restores the compact action layout without a manual resize. */
     @Test
     fun deletingAnAutomaticLongDraftBackToOneLineRestoresCompactControls() {
         val draft = longDraft()

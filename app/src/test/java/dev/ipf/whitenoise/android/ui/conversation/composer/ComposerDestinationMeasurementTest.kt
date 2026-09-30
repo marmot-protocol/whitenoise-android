@@ -22,6 +22,7 @@ class ComposerDestinationMeasurementTest {
         assertTrue(
             measuresAtEditingWidth(compactLineCount = COMPOSER_MULTILINE_CONTROL_LINES + 4),
         )
+        assertTrue(measuresAtEditingWidth(compactLineCount = 48))
     }
 
     /** A draft still short of the crossover keeps the compact width it is rendered at. */

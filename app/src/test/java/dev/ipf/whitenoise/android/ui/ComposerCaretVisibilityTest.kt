@@ -76,7 +76,8 @@ class ComposerCaretVisibilityTest {
     fun clipboardBulkReplacementKeepsSelectionAndCaretVisibleOnEveryExpansionFrame() {
         val harness = renderComposerBar(TextFieldValue("Short"))
         val field = composeRule.onNode(hasSetTextAction())
-        val replacement = longDraft()
+        // The larger automatic allowance must still hand a much longer draft to internal scrolling.
+        val replacement = (1..48).joinToString("\n", transform = ::longDraftLine)
 
         field.performClick()
         composeRule.mainClock.autoAdvance = false

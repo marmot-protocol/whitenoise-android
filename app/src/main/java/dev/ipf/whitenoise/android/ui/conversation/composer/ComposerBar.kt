@@ -894,17 +894,20 @@ internal fun ComposerBar(
         }
     }
 
+    /** Updates the active text owner and publishes a draft only when this is not an edit. */
     fun applyComposerFieldValue(value: TextFieldValue) {
         textState.updateValue(value)
         if (editingMessageId == null) onDraftChange(value)
     }
 
+    /** Deletes the current selection or previous code point and repairs mention tokens before publishing. */
     fun deleteFromComposer() {
         val proposedValue = deleteComposerSelectionOrPreviousCodePoint(textFieldValue) ?: return
         val updatedValue = repairComposerMentionEdit(textFieldValue, proposedValue, mentionPickerEnabled)
         applyComposerFieldValue(updatedValue)
     }
 
+    /** Switches the bottom inset to the emoji pane while retaining its measured height for the composer cap. */
     fun openComposerEmojiPane() {
         attachmentSheetState.dismiss()
         if (composerKeyboardRestorePending) {
@@ -932,6 +935,7 @@ internal fun ComposerBar(
         keyboardController?.hide()
     }
 
+    /** Returns from the emoji pane to the IME without keeping the former pane in the height budget. */
     fun showKeyboardFromEmojiPane() {
         attachmentSheetState.dismiss()
         restoreKeyboardFromEmojiPane()
