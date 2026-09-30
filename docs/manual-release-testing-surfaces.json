@@ -3727,6 +3727,18 @@
         "test_ids": ["MED-021"]
       },
       {
+        "surface": "GiphyCardFooter",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "fun GiphyCardFooter(",
+        "test_ids": ["MED-021"]
+      },
+      {
+        "surface": "RowScope.GiphyMetadataRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "fun RowScope.GiphyMetadataRow(",
+        "test_ids": ["MED-021"]
+      },
+      {
         "surface": "MediaImageGridTile",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageBubbles.kt",
         "anchor": "fun MediaImageGridTile(",
