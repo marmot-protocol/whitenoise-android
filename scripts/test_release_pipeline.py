@@ -268,78 +268,156 @@ class PublicationGuardTests(unittest.TestCase):
 
 
 class ZapstoreIntegrationTests(unittest.TestCase):
+    def publication_fixture(self, root, signer_matches=True, zsp_body='', readback_body=''):
+        (root / 'scripts').mkdir()
+        (root / 'config').mkdir()
+        (root / 'app').mkdir()
+        for name in ('publish-zapstore.sh', 'release_bundle.py', 'release-properties.sh'):
+            (root / 'scripts' / name).write_bytes((ROOT / 'scripts' / name).read_bytes())
+        (root / 'config/android-release.properties').write_bytes((ROOT / 'config/android-release.properties').read_bytes())
+        policy = bundle.properties()
+        (root / 'app/build.gradle.kts').write_text(
+            f'applicationId = "{policy["APPLICATION_ID"]}"\nversionName = "{VERSION}"\nversionCode = 13\n')
+        notes_name = 'fastlane/metadata/android/en-US/changelogs/13.txt'
+        notes = root / notes_name
+        notes.parent.mkdir(parents=True)
+        notes.write_text('Release notes')
+        (root / 'zapstore.yaml').write_text('release_source: ./build/production-release/*.apk\n')
+        def git(*args):
+            return subprocess.check_output(['git', *args], cwd=root, stderr=subprocess.DEVNULL).decode().strip()
+        git('init')
+        git('add', '.')
+        git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-m', 'Fixture')
+        source = git('rev-parse', 'HEAD')
+        git('remote', 'add', 'origin', str(root))
+        out = root / 'build/production-release'
+        out.mkdir(parents=True)
+        for name in (f'whitenoise-android-{VERSION}-arm64-v8a.apk', f'whitenoise-android-{VERSION}-play.aab',
+                     f'mapping-{VERSION}-play.txt', f'mapping-{VERSION}-zapstore.txt'):
+            (out / name).write_bytes(b'synthetic fixture, never a real artifact')
+        (out / 'release-notes-en-US.txt').write_text('Release notes')
+        with zipfile.ZipFile(out / f'store-assets-{VERSION}.zip', 'w') as z:
+            for name in (notes_name, 'zapstore.yaml'):
+                z.write(root / name, name)
+        manifest = dict(schemaVersion=2, sourceCommit=source, versionName=VERSION, versionCode=13,
+                        buildRunId=RUN_ID, buildRunAttempt='1', worktreeDirty=False,
+                        productionRuntimeConfigurationComplete=True, missingProductionRuntimeConfiguration=[],
+                        applicationId=policy['APPLICATION_ID'], appSigningCertificateSha256=policy['APP_SIGNING_SHA256'],
+                        playUploadCertificateSha256=policy['PLAY_UPLOAD_SHA256'], zspVersion=policy['ZSP_VERSION'],
+                        files={f.name: {'bytes': f.stat().st_size, 'sha256': bundle.sha256(f)} for f in out.iterdir()})
+        (out / 'release-manifest.json').write_text(json.dumps(manifest))
+        digest = bundle.sha256(out / 'release-manifest.json')
+        (out / 'checksums-sha256.txt').write_text(''.join(
+            f'{bundle.sha256(out / name)}  ./{name}\n' for name in sorted(set(manifest['files']) | {'release-manifest.json'})))
+        publisher = policy['ZAPSTORE_PUBLISHER_PUBKEY'] if signer_matches else '0' * 64
+        events = [dict(kind=kind, pubkey=publisher, sig='f' * 128) for kind in (32267, 30063)]
+        # The fakes log each call; a per-mode counter lets a body fail or hang on a given attempt.
+        fake = root / 'fake-zsp'
+        fake.write_text('#!/usr/bin/env python3\nimport json,os,sys,time\n'
+                        'with open(os.environ["ZSP_CALL_LOG"], "a") as log: log.write(" ".join(sys.argv[1:])+"\\n")\n'
+                        'mode = "offline" if "--offline" in sys.argv else "online"\n'
+                        'counter = os.path.join(os.environ["FAKE_STATE"], mode)\n'
+                        'attempt = int(open(counter).read()) + 1 if os.path.exists(counter) else 1\n'
+                        'open(counter, "w").write(str(attempt))\n'
+                        f'{zsp_body}\n'
+                        f'if mode == "offline":\n    for event in {events!r}: print(json.dumps(event))\n')
+        fake.chmod(0o755)
+        readback = root / 'fake-readback'
+        readback.write_text('#!/usr/bin/env python3\nimport os,sys\n'
+                            'with open(os.environ["ZSP_CALL_LOG"], "a") as log: log.write("readback "+" ".join(sys.argv[1:])+"\\n")\n'
+                            'mode = sys.argv[1]\n'
+                            'counter = os.path.join(os.environ["FAKE_STATE"], "readback-" + mode)\n'
+                            'attempt = int(open(counter).read()) + 1 if os.path.exists(counter) else 1\n'
+                            'open(counter, "w").write(str(attempt))\n'
+                            f'{readback_body}\n')
+        readback.chmod(0o755)
+        (root / 'state').mkdir()
+        env = {**os.environ, 'PYTHONDONTWRITEBYTECODE': '1', 'GITHUB_ACTIONS': 'true',
+               'GITHUB_REF': 'refs/heads/master', 'GITHUB_WORKFLOW': 'Android Zapstore - PUBLIC Publication',
+               'EXPECTED_VERSION': VERSION, 'CONFIRMATION': f'PUBLISH ZAPSTORE {VERSION}',
+               'MANIFEST_SHA256': digest, 'SIGN_WITH': 'bunker://' + 'b' * 64,
+               'BUNKER_CLIENT_KEY': 'c' * 64, 'ZSP_CALL_LOG': str(root / 'calls'), 'FAKE_STATE': str(root / 'state'),
+               'ZSP_PREFLIGHT_TIMEOUT_SECONDS': '2', 'ZSP_PUBLISH_TIMEOUT_SECONDS': '2', 'ZSP_RETRY_DELAY_SECONDS': '0'}
+        def publish():
+            result = subprocess.run(['bash', str(root / 'scripts/publish-zapstore.sh'), str(fake), str(readback)],
+                                    env=env, capture_output=True, text=True, timeout=120)
+            calls = (root / 'calls').read_text().splitlines() if (root / 'calls').exists() else []
+            return result, calls
+        return publish
+
     def test_online_publication_only_follows_matching_signed_preflight(self):
         for signer_matches in (False, True):
             with self.subTest(signer_matches=signer_matches), tempfile.TemporaryDirectory() as directory:
-                root = Path(directory)
-                (root / 'scripts').mkdir()
-                (root / 'config').mkdir()
-                (root / 'app').mkdir()
-                for name in ('publish-zapstore.sh', 'release_bundle.py', 'release-properties.sh'):
-                    (root / 'scripts' / name).write_bytes((ROOT / 'scripts' / name).read_bytes())
-                (root / 'config/android-release.properties').write_bytes((ROOT / 'config/android-release.properties').read_bytes())
-                policy = bundle.properties()
-                (root / 'app/build.gradle.kts').write_text(
-                    f'applicationId = "{policy["APPLICATION_ID"]}"\nversionName = "{VERSION}"\nversionCode = 13\n')
-                notes_name = 'fastlane/metadata/android/en-US/changelogs/13.txt'
-                notes = root / notes_name
-                notes.parent.mkdir(parents=True)
-                notes.write_text('Release notes')
-                (root / 'zapstore.yaml').write_text('release_source: ./build/production-release/*.apk\n')
-                def git(*args):
-                    return subprocess.check_output(['git', *args], cwd=root, stderr=subprocess.DEVNULL).decode().strip()
-                git('init')
-                git('add', '.')
-                git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-m', 'Fixture')
-                source = git('rev-parse', 'HEAD')
-                git('remote', 'add', 'origin', str(root))
-                out = root / 'build/production-release'
-                out.mkdir(parents=True)
-                for name in (f'whitenoise-android-{VERSION}-arm64-v8a.apk', f'whitenoise-android-{VERSION}-play.aab',
-                             f'mapping-{VERSION}-play.txt', f'mapping-{VERSION}-zapstore.txt'):
-                    (out / name).write_bytes(b'synthetic fixture, never a real artifact')
-                (out / 'release-notes-en-US.txt').write_text('Release notes')
-                with zipfile.ZipFile(out / f'store-assets-{VERSION}.zip', 'w') as z:
-                    for name in (notes_name, 'zapstore.yaml'):
-                        z.write(root / name, name)
-                manifest = dict(schemaVersion=2, sourceCommit=source, versionName=VERSION, versionCode=13,
-                                buildRunId=RUN_ID, buildRunAttempt='1', worktreeDirty=False,
-                                productionRuntimeConfigurationComplete=True, missingProductionRuntimeConfiguration=[],
-                                applicationId=policy['APPLICATION_ID'], appSigningCertificateSha256=policy['APP_SIGNING_SHA256'],
-                                playUploadCertificateSha256=policy['PLAY_UPLOAD_SHA256'], zspVersion=policy['ZSP_VERSION'],
-                                files={f.name: {'bytes': f.stat().st_size, 'sha256': bundle.sha256(f)} for f in out.iterdir()})
-                (out / 'release-manifest.json').write_text(json.dumps(manifest))
-                digest = bundle.sha256(out / 'release-manifest.json')
-                (out / 'checksums-sha256.txt').write_text(''.join(
-                    f'{bundle.sha256(out / name)}  ./{name}\n' for name in sorted(set(manifest['files']) | {'release-manifest.json'})))
-                publisher = policy['ZAPSTORE_PUBLISHER_PUBKEY'] if signer_matches else '0' * 64
-                events = [dict(kind=kind, pubkey=publisher, sig='f' * 128) for kind in (32267, 30063)]
-                fake = root / 'fake-zsp'
-                fake.write_text('#!/usr/bin/env python3\nimport json,os,sys\n'
-                                'with open(os.environ["ZSP_CALL_LOG"], "a") as log: log.write(" ".join(sys.argv[1:])+"\\n")\n'
-                                f'if "--offline" in sys.argv:\n    for event in {events!r}: print(json.dumps(event))\n')
-                fake.chmod(0o755)
-                env = {**os.environ, 'PYTHONDONTWRITEBYTECODE': '1', 'GITHUB_ACTIONS': 'true',
-                       'GITHUB_REF': 'refs/heads/master', 'GITHUB_WORKFLOW': 'Android Zapstore - PUBLIC Publication',
-                       'EXPECTED_VERSION': VERSION, 'CONFIRMATION': f'PUBLISH ZAPSTORE {VERSION}',
-                       'MANIFEST_SHA256': digest, 'SIGN_WITH': 'bunker://' + 'b' * 64,
-                       'BUNKER_CLIENT_KEY': 'c' * 64, 'ZSP_CALL_LOG': str(root / 'calls')}
-                result = subprocess.run(['bash', str(root / 'scripts/publish-zapstore.sh'), str(fake)],
-                                        env=env, capture_output=True, text=True)
-                calls = (root / 'calls').read_text().splitlines()
+                result, calls = self.publication_fixture(Path(directory), signer_matches)()
                 self.assertIn('--offline', calls[0])
                 self.assertIn('--no-compress', calls[0])
                 if signer_matches:
                     self.assertEqual(result.returncode, 0, result.stderr)
-                    self.assertEqual(len(calls), 2)
-                    self.assertNotIn('--offline', calls[1])
-                    self.assertIn('--no-compress', calls[1])
-                    self.assertIn('--skip-metadata', calls[1])
-                    self.assertIn('--skip-certificate-linking', calls[1])
+                    self.assertEqual(len(calls), 4)
+                    self.assertTrue(calls[1].startswith('readback absent'))
+                    self.assertNotIn('--offline', calls[2])
+                    self.assertIn('--no-compress', calls[2])
+                    self.assertIn('--skip-metadata', calls[2])
+                    self.assertIn('--skip-certificate-linking', calls[2])
+                    self.assertTrue(calls[3].startswith('readback verify'))
+                    self.assertIn('-relay wss://relay.zapstore.dev', calls[3])
+                    self.assertIn('-blossom https://cdn.zapstore.dev', calls[3])
+                    self.assertIn('-version-code 13', calls[3])
+                    self.assertIn('verified on the relay and CDN', result.stdout)
                 else:
                     self.assertNotEqual(result.returncode, 0)
                     self.assertEqual(len(calls), 1)
                     self.assertIn('signer differs', result.stderr)
+
+    def test_unanswered_signing_preflight_is_retried(self):
+        with tempfile.TemporaryDirectory() as directory:
+            hang = 'if mode == "offline" and attempt == 1: time.sleep(30)'
+            result, calls = self.publication_fixture(Path(directory), zsp_body=hang)()
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('did not answer within 2s', result.stderr)
+            self.assertEqual([call.split()[0] for call in calls], ['publish', 'publish', 'readback', 'publish', 'readback'])
+            self.assertIn('--offline', calls[1])
+
+    def test_signing_preflight_gives_up_without_publishing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result, calls = self.publication_fixture(Path(directory), zsp_body='sys.exit(1)')()
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(len(calls), 3)
+            self.assertTrue(all('--offline' in call for call in calls))
+            self.assertIn('nothing was publicly published', result.stderr)
+
+    def test_stalled_publication_is_retried_only_when_nothing_was_published(self):
+        with tempfile.TemporaryDirectory() as directory:
+            hang = 'if mode == "online" and attempt == 1: time.sleep(30)'
+            result, calls = self.publication_fixture(Path(directory), zsp_body=hang)()
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('did not finish within 2s', result.stderr)
+            kinds = [' '.join(call.split()[:2]) if call.startswith('readback') else 'online'
+                     for call in calls[1:]]
+            self.assertEqual(kinds, ['readback absent', 'online', 'readback absent', 'online', 'readback verify'])
+
+    def test_partial_publication_is_not_retried(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fail = 'if mode == "online": sys.exit(1)'
+            present_after_attempt = 'if mode == "absent" and attempt > 1: sys.exit(3)'
+            result, calls = self.publication_fixture(Path(directory), zsp_body=fail,
+                                                     readback_body=present_after_attempt)()
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('partial or its state is unknown', result.stderr)
+            self.assertEqual(sum(1 for call in calls if call.startswith('publish') and '--offline' not in call), 1)
+
+    def test_existing_release_is_never_published_over(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result, calls = self.publication_fixture(Path(directory), readback_body='if mode == "absent": sys.exit(3)')()
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('already has events for this version', result.stderr)
+            self.assertFalse(any(call.startswith('publish') and '--offline' not in call for call in calls))
+
+    def test_publication_that_does_not_read_back_fails(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result, _ = self.publication_fixture(Path(directory), readback_body='if mode == "verify": sys.exit(1)')()
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('does not match the reviewed candidate', result.stderr)
 
 
 class ApkCertificateOutputTests(unittest.TestCase):
