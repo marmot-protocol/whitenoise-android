@@ -53,8 +53,10 @@ class PollVotingInteractionTest {
                     participants = 1uL,
                     options = listOf(PollOptionResultFfi("native-a", "Soup", 0uL), PollOptionResultFfi("native-b", "Salad", 1uL)),
                 )
-            checkNotNull(complete)(SendAcceptDispositionFfi.PUBLISHED)
         }
+        composeRule.onNodeWithText("Sending").assertExists()
+        composeRule.onNodeWithText("Salad", substring = true).assertIsNotEnabled()
+        composeRule.runOnIdle { checkNotNull(complete)(SendAcceptDispositionFfi.PUBLISHED) }
         composeRule.onNodeWithText("Sending").assertDoesNotExist()
         composeRule.onNodeWithText("Salad", substring = true).assertIsSelected().assertIsEnabled()
         composeRule.onNodeWithText("Soup", substring = true).performClick()

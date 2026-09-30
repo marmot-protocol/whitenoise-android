@@ -207,7 +207,7 @@ internal fun PollVotingCard(
         poll = displayedPoll,
         canVote = canVote && open && !voting,
         open = open,
-        status = status,
+        status = if (voting) PollVoteStatus.SUBMITTING else status,
         onVote = { optionId ->
             val replacement = replacementPollSelection(displayedPoll, optionId)
             if (!voting && canVote && open && replacement != null && pollVoteAllowed(poll, System.currentTimeMillis())) {
