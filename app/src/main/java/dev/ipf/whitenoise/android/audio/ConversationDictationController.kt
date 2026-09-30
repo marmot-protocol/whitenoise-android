@@ -1881,13 +1881,12 @@ internal class ConversationDictationController internal constructor(
     }
 
     /** Silence is resolved only when its exact supplied chunk was acknowledged successfully. */
-    private fun acknowledgeFullyFedSilentCallerAudio(): Boolean =
-        hasFullyFedSilentCallerAudio() && recognitionSession?.acknowledgeCallerAudio() == true
-
-    /** Only digital silence with successful feed completion is safe to acknowledge without text. */
-    private fun hasFullyFedSilentCallerAudio(): Boolean =
-        recognitionSession?.callerAudioContainsSpeech() == false &&
-            recognitionSession?.callerAudioFullyFed() == true
+    private fun acknowledgeFullyFedSilentCallerAudio(): Boolean {
+        val session = recognitionSession ?: return false
+        return session.callerAudioContainsSpeech() == false &&
+            session.callerAudioFullyFed() &&
+            session.acknowledgeCallerAudio()
+    }
 
     /** Lets Android finish unbinding before any logical session creates a replacement recognizer. */
     private fun deferRecognitionUntilTeardownSettles(
@@ -1904,7 +1903,8 @@ internal class ConversationDictationController internal constructor(
         restartTimeoutHandle =
             scheduleTimeout(delayMillis) {
                 if (
-                    state.sessionId == sessionId && state is ConversationDictationState.Starting &&
+                    state.sessionId == sessionId &&
+                    state is ConversationDictationState.Starting &&
                     restartId == scheduledRestartId
                 ) {
                     restartTimeoutHandle = null
