@@ -47,7 +47,7 @@ class ConversationDictationForegroundService : Service() {
     private var promotedSessionToken: String? = null
     private var foregroundPromoted = false
 
-    private fun conversationDictationDiagnostic(event: String) {
+    private val conversationDictationDiagnostic: (String) -> Unit = { event ->
         val session = promotedSessionToken?.substringAfterLast(':')?.toLongOrNull() ?: 0L
         DictationDiagnostics.record("$event session=$session")
     }

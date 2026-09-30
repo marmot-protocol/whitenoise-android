@@ -8,13 +8,16 @@ import java.nio.file.LinkOption
 import java.nio.file.StandardCopyOption
 import java.util.UUID
 
+private const val MAX_DIAGNOSTIC_FILE_BYTES = 256 * 1024
+private const val DIAGNOSTIC_RETENTION_MILLIS = 24 * 60 * 60 * 1000L
+
 /** Local technical metadata only, outside the engine's automatic-upload directory. */
 internal class DictationDiagnosticStore(
     private val directory: File,
     private val buildRevision: String,
     private val nowMillis: () -> Long = System::currentTimeMillis,
-    private val maxBytes: Int = 256 * 1024,
-    private val retentionMillis: Long = 24 * 60 * 60 * 1000L,
+    private val maxBytes: Int = MAX_DIAGNOSTIC_FILE_BYTES,
+    private val retentionMillis: Long = DIAGNOSTIC_RETENTION_MILLIS,
 ) {
     private val process = UUID.randomUUID().toString()
     private val names = listOf("dictation-current.jsonl", "dictation-previous.jsonl")
@@ -108,18 +111,19 @@ internal class DictationDiagnosticStore(
     private fun prepare() {
         if (Files.isSymbolicLink(directory.toPath())) throw IOException("Unsafe diagnostic directory")
         check(directory.mkdirs() || directory.isDirectory)
-        names.forEach { name ->
-            val file = File(directory, name)
-            if (Files.isSymbolicLink(file.toPath())) throw IOException("Unsafe diagnostic file")
-            if (file.exists()) {
-                if (!Files.isRegularFile(file.toPath(), LinkOption.NOFOLLOW_LINKS) || file.length() > maxBytes) {
-                    throw IOException("Invalid diagnostic file")
-                }
-                val age = nowMillis() - file.lastModified()
-                if (age < 0 || age > retentionMillis) {
-                    check(file.delete())
-                    expiredFiles += 1
-                }
+        names.forEach { validateRetainedFile(File(directory, it)) }
+    }
+
+    private fun validateRetainedFile(file: File) {
+        if (Files.isSymbolicLink(file.toPath())) throw IOException("Unsafe diagnostic file")
+        if (file.exists()) {
+            if (!Files.isRegularFile(file.toPath(), LinkOption.NOFOLLOW_LINKS) || file.length() > maxBytes) {
+                throw IOException("Invalid diagnostic file")
+            }
+            val age = nowMillis() - file.lastModified()
+            if (age < 0 || age > retentionMillis) {
+                check(file.delete())
+                expiredFiles += 1
             }
         }
     }

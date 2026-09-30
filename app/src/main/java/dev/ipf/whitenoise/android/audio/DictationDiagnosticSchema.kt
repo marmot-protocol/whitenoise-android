@@ -269,9 +269,8 @@ internal object DictationDiagnosticSchema {
 
     /** Unknown fields and free-form values are dropped even when they resemble a known field. */
     fun fields(event: String): Map<String, Any>? {
-        if (event.length > MAX_DIAGNOSTIC_EVENT_CHARS) return null
         val tokens =
-            event
+            event.takeIf { it.length <= MAX_DIAGNOSTIC_EVENT_CHARS }.orEmpty()
                 .split(' ')
                 .mapNotNull { token ->
                     val separator = token.indexOf('=')
@@ -280,24 +279,25 @@ internal object DictationDiagnosticSchema {
         val name = tokens["event"]?.takeIf { it in events } ?: return null
         return buildMap {
             put("event", name)
-            tokens.forEach { (key, value) ->
-                when {
-                    key == "reason" && value.startsWith("read=") ->
-                        value.removePrefix("read=").toIntOrNull()?.let {
-                            put("reason", "read_failed")
-                            put("read_code", it)
-                        }
-                    key in numbers -> value.toLongOrNull()?.let { put(key, it) }
-                    key == "type" -> put(key, value.takeIf { it in allowedCategoryValues } ?: "other")
-                    key == "peak" ->
-                        value
-                            .toDoubleOrNull()
-                            ?.takeIf { it.isFinite() && it in 0.0..1.0 }
-                            ?.let { put(key, it) }
-                    key in booleans && value in setOf("true", "false") -> put(key, value == "true")
-                    key in categories && value in allowedCategoryValues -> put(key, value)
-                }
-            }
+            tokens.forEach { (key, value) -> retainField(key, value) }
         }
     }
+
+    private fun MutableMap<String, Any>.retainField(key: String, value: String) {
+        when {
+            key == "reason" && value.startsWith("read=") ->
+                value.removePrefix("read=").toIntOrNull()?.let {
+                    put("reason", "read_failed")
+                    put("read_code", it)
+                }
+            key in numbers -> value.toLongOrNull()?.let { put(key, it) }
+            key == "type" -> put(key, value.takeIf { it in allowedCategoryValues } ?: "other")
+            key == "peak" -> validPeak(value)?.let { put(key, it) }
+            key in booleans && value in setOf("true", "false") -> put(key, value == "true")
+            key in categories && value in allowedCategoryValues -> put(key, value)
+        }
+    }
+
+    private fun validPeak(value: String): Double? =
+        value.toDoubleOrNull()?.takeIf { it.isFinite() && it in 0.0..1.0 }
 }
