@@ -63,6 +63,12 @@ internal val CompactViableComposerHeight = 132.dp
 /** The fraction of the post-inset remainder a regular-height automatic composer may take. */
 private const val REGULAR_COMPOSER_CEILING_FRACTION = 0.5f
 
+/** Leaves part of the post-inset remainder available for reading the conversation. */
+private const val MAX_AUTOMATIC_COMPOSER_SHARE = 0.7f
+
+/** Additional rendered editor lines allowed in the automatic mode when space permits. */
+private const val EXTRA_AUTOMATIC_COMPOSER_LINES = 5
+
 /**
  * Observes whether the conversation should present compact-height chrome.
  * Deriving on the IME's animation target keeps the decision to one flip per
@@ -112,22 +118,29 @@ internal fun conversationUsesCompactHeight(
 
 /**
  * Automatic-mode height ceiling for the composer inside its post-inset
- * remainder. A regular viewport keeps the long-standing half-remainder cap; a
- * compact remainder (landscape with the IME open) instead guarantees a viable
- * composer up to [CompactViableComposerHeight], because halving an already
- * tiny remainder crushed banners and the editor into an unusable strip.
+ * remainder. The base preserves the compact viable allowance; regular windows
+ * add up to five measured editor lines while reserving a reading viewport.
+ * Growth ramps from the compact threshold so a tiny window never jumps to a
+ * nearly full-height composer when its remainder changes by a pixel.
  * Deliberately independent of the screen-level compact-chrome flag: the
  * composer's own post-inset remainder is the authoritative input here.
  */
 internal fun resolveAutomaticComposerCeiling(
     maximumComposerHeight: Dp,
     minimumViableHeight: Dp = CompactViableComposerHeight,
-): Dp =
-    maxOf(
-        maximumComposerHeight * REGULAR_COMPOSER_CEILING_FRACTION,
-        minOf(maximumComposerHeight, minimumViableHeight),
-    ).coerceAtLeast(44.dp)
-        .coerceAtMost(maximumComposerHeight)
+    measuredEditorLineHeight: Dp = 0.dp,
+): Dp {
+    val base =
+        maxOf(
+            maximumComposerHeight * REGULAR_COMPOSER_CEILING_FRACTION,
+            minOf(maximumComposerHeight, minimumViableHeight),
+        ).coerceAtLeast(44.dp)
+            .coerceAtMost(maximumComposerHeight)
+    val compactHeadroom = (maximumComposerHeight - minimumViableHeight * 2).coerceAtLeast(0.dp)
+    val readingHeadroom = (maximumComposerHeight * MAX_AUTOMATIC_COMPOSER_SHARE - base).coerceAtLeast(0.dp)
+    val requestedGrowth = measuredEditorLineHeight.coerceAtLeast(0.dp) * EXTRA_AUTOMATIC_COMPOSER_LINES
+    return base + minOf(requestedGrowth, compactHeadroom, readingHeadroom)
+}
 
 /**
  * Whether the composer must pin its inline single-row controls. Keyed on the

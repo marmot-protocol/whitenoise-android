@@ -197,6 +197,24 @@ class ComposerBarScreenshotTest {
         composeRule.onNodeWithTag(LONG_TAG).captureRoboImage("src/test/snapshots/composer_bar_long_draft_amoled.png")
     }
 
+    /** The automatic height shows more of a long draft while preserving the reading viewport. */
+    @Test
+    fun composerBarAutomaticLongDraftAmoled() {
+        renderLongComposer(darkTheme = true, amoled = true, selectionAtEnd = true)
+        composeRule
+            .onNodeWithTag(LONG_TAG)
+            .captureRoboImage("src/test/snapshots/composer_bar_auto_long_draft_amoled.png")
+    }
+
+    /** Larger RTL text still leaves the editor and send controls inside the safe viewport. */
+    @Test
+    fun composerBarAutomaticLongDraftLargeRtl() {
+        renderLongComposer(darkTheme = true, largeRtl = true, selectionAtEnd = true)
+        composeRule
+            .onNodeWithTag(LONG_TAG)
+            .captureRoboImage("src/test/snapshots/composer_bar_auto_long_draft_large_rtl.png")
+    }
+
     /** Captures the first, next, and settled frames after one long bulk replacement. */
     @Test
     fun composerBulkPasteFirstNextAndSettledFrames() {

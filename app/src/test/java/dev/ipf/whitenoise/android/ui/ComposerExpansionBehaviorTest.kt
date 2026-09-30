@@ -664,9 +664,9 @@ class ComposerExpansionBehaviorTest {
         resizeHandle().assertDoesNotExist()
     }
 
-    /** Automatic growth stops near half of the available viewport. */
+    /** The longer automatic draft uses the new allowance without consuming the reading viewport. */
     @Test
-    fun automaticGrowthStopsNearHalfOfTheAvailableViewport() {
+    fun automaticGrowthAddsCapacityWhilePreservingTheReadingViewport() {
         render((1..40).joinToString("\n") { "Draft line $it" })
 
         val height =
@@ -674,10 +674,9 @@ class ComposerExpansionBehaviorTest {
                 .onNodeWithTag(TAG)
                 .fetchSemanticsNode()
                 .boundsInRoot.height
-        // This mdpi test renders inside a 720dp-tall Surface, so the automatic
-        // half-viewport ceiling is 360px; 300px proves the long draft grew.
-        assertTrue("a long draft should grow well beyond the compact composer", height >= 300f)
-        assertTrue("automatic growth should preserve roughly half the viewport", height <= 360f)
+        // The old half-viewport ceiling was below 360px in this fixture.
+        assertTrue("a long draft should use the additional automatic lines", height > 360f)
+        assertTrue("automatic growth should leave a reading area", height <= 720f * 0.7f)
     }
 
     /** Upward fling settles at the full screen endpoint. */

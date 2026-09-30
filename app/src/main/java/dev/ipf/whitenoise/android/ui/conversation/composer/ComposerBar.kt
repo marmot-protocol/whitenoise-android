@@ -64,6 +64,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -99,6 +100,18 @@ private val ComposerManualMinimumHeight = 144.dp
 
 /** How close to an endpoint a release still counts as landing on it rather than resting free. */
 private val ComposerSettleDeadband = 24.dp
+
+/** Measures the same body text line spacing used by the composer editor at the current font scale. */
+@Composable
+private fun rememberComposerEditorLineHeight(): Dp {
+    val density = LocalDensity.current
+    val style = MaterialTheme.typography.bodyLarge
+    val measurer = rememberTextMeasurer()
+    return remember(density, style, measurer) {
+        val layout = measurer.measure("M\nM", style = style)
+        with(density) { (layout.getLineTop(1) - layout.getLineTop(0)).toDp() }
+    }
+}
 
 /**
  * Whether the composer bottom cluster (reply preview, edit banner, mention
@@ -440,6 +453,7 @@ internal fun ComposerBar(
     val actionColors = accountActionColors(appState)
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
+    val editorLineHeight = rememberComposerEditorLineHeight()
     var composerEmojiPickerOpen by remember { mutableStateOf(false) }
     var composerEmojiPickerRequested by remember { mutableStateOf(false) }
     var composerEmojiSearchActive by remember { mutableStateOf(false) }
@@ -960,7 +974,11 @@ internal fun ComposerBar(
             boundedHeight - statusBarTop - topInteractionClearance - bottomInset - customInputPaneHeight
         val prototypeTopGap = if (composerRemainder - 18.dp >= CompactViableComposerHeight) 18.dp else 0.dp
         val maximumComposerHeight = (composerRemainder - prototypeTopGap).coerceAtLeast(44.dp)
-        val automaticComposerCeiling = resolveAutomaticComposerCeiling(maximumComposerHeight)
+        val automaticComposerCeiling =
+            resolveAutomaticComposerCeiling(
+                maximumComposerHeight,
+                measuredEditorLineHeight = editorLineHeight,
+            )
         val maximumComposerHeightPx = with(density) { maximumComposerHeight.toPx() }
         val minimumManualComposerHeightPx =
             with(density) {
