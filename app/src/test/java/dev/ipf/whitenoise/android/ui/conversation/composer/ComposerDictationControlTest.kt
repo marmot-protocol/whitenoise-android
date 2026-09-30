@@ -28,7 +28,6 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
-import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
 import dev.ipf.whitenoise.android.audio.VoiceRecordingController
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.state.timelineAppMessage
@@ -43,6 +42,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
@@ -228,6 +228,8 @@ class ComposerDictationControlTest {
         FakeDictationPlatform.listener.onResult("first")
         assertTrue(controller.state is ConversationDictationState.Idle)
         composeRule.onNodeWithContentDescription("Dictate text").performClick()
+        assertTrue(controller.state is ConversationDictationState.Starting)
+        shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(500L))
         action("Send")
         val late = FakeDictationPlatform.listener
         action("Cancel")
@@ -291,7 +293,6 @@ class ComposerDictationControlTest {
             writeDraft = { _, _, _, _ -> true },
             disclosureAccepted = { true },
             markDisclosureAccepted = {},
-            scheduleTimeout = { _, _ -> ConversationDictationTimeoutHandle {} },
         )
 
     private data object FakeDictationPlatform : ConversationDictationPlatform {

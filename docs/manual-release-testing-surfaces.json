@@ -23886,6 +23886,22 @@
         ]
       },
       {
+        "surface": "Dictation fully-fed caller-audio settlement",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "fun callerAudioFullyFed(): Boolean = false",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "Dictation caller-audio successful pipe completion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationCallerAudio.kt",
+        "anchor": "fun fullyFed(): Boolean = fullyFed.get()",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
         "surface": "Dictation caller-audio chunks keep a stable identity across recognizer generations",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationCallerAudio.kt",
         "anchor": "fun chunkId(): Long? = chunk.get()?.chunkId",
@@ -23952,7 +23968,7 @@
       {
         "surface": "Dictation no-speech retries are bounded to the exact speech-bearing caller-audio chunk",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
-        "anchor": "private fun advancePastRejectedCallerAudio(",
+        "anchor": "val rejectedCallerAudioExhausted =",
         "test_ids": [
           "DIC-002"
         ]
