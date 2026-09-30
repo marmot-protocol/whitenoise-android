@@ -9352,8 +9352,8 @@
       },
       {
         "surface": "string:cancel",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
-        "anchor": "R.string.cancel",
+        "source": "app/src/main/res/layout/notification_dictation_compact.xml",
+        "anchor": "@string/cancel",
         "test_ids": [
           "DIC-001",
           "DIC-002"
@@ -9397,8 +9397,8 @@
       },
       {
         "surface": "string:paste",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
-        "anchor": "R.string.paste",
+        "source": "app/src/main/res/layout/notification_dictation_compact.xml",
+        "anchor": "@string/paste",
         "test_ids": [
           "DIC-001",
           "DIC-002"
@@ -9406,8 +9406,8 @@
       },
       {
         "surface": "string:send",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
-        "anchor": "R.string.send",
+        "source": "app/src/main/res/layout/notification_dictation_compact.xml",
+        "anchor": "@string/send",
         "test_ids": [
           "DIC-001",
           "DIC-002"

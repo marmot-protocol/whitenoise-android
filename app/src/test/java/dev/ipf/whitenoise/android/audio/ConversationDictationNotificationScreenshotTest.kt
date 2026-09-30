@@ -17,7 +17,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** The three actions must fit the notification's compact 48dp content, without requiring expansion. */
+/** The sole dictation notification surface fits its three controls in a compact 48dp row. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en-rUS-w360dp-h780dp-mdpi")
@@ -25,6 +25,11 @@ class ConversationDictationNotificationScreenshotTest {
     @Test
     fun compactActionsLight() {
         capture("dictation_notification_compact_light")
+    }
+
+    @Test
+    fun compactOnlyProcessingControls() {
+        capture("dictation_notification_compact_processing", completionEnabled = false)
     }
 
     @Test
@@ -42,14 +47,16 @@ class ConversationDictationNotificationScreenshotTest {
     private fun capture(
         name: String,
         rtl: Boolean = false,
+        completionEnabled: Boolean = true,
     ) {
         Robolectric.buildActivity(Activity::class.java).setup().use { controller ->
             val activity = controller.get()
             val parent = FrameLayout(activity)
             activity.setContentView(parent, ViewGroup.LayoutParams(360, ViewGroup.LayoutParams.WRAP_CONTENT))
-            val content =
-                RemoteViews(activity.packageName, R.layout.notification_dictation_compact)
-                    .apply(activity, parent)
+            val notificationView = RemoteViews(activity.packageName, R.layout.notification_dictation_compact)
+            notificationView.setBoolean(R.id.dictation_notification_paste, "setEnabled", completionEnabled)
+            notificationView.setBoolean(R.id.dictation_notification_send, "setEnabled", completionEnabled)
+            val content = notificationView.apply(activity, parent)
             if (rtl) content.layoutDirection = View.LAYOUT_DIRECTION_RTL
             parent.addView(content)
             parent.measure(
@@ -64,6 +71,7 @@ class ConversationDictationNotificationScreenshotTest {
                     R.id.dictation_notification_send,
                 ).map { parent.findViewById<Button>(it) }
             assertEquals(listOf("Cancel", "Paste", "Send"), buttons.map { it.text.toString() })
+            assertEquals(listOf(true, completionEnabled, completionEnabled), buttons.map { it.isEnabled })
             assertTrue(buttons.all { it.width > 0 && it.height > 0 && it.isShown })
             parent.captureRoboImage("src/test/snapshots/$name.png")
         }
