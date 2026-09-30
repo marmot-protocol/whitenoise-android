@@ -304,10 +304,11 @@ internal class ConversationDictationCallerAudio internal constructor(
         progress.record(read, peak, buffer.bufferedBytes)
         val chunkHasSpeech = currentChunkHasSpeech || readHasSpeech
         val quietMillis = elapsedRealtime() - lastSpeechAt.get()
+        val atSentenceBoundary = chunkHasSpeech && quietMillis >= SENTENCE_BOUNDARY_SILENCE_MILLIS
         val sealed =
-            chunkHasSpeech &&
-                quietMillis >= SENTENCE_BOUNDARY_SILENCE_MILLIS &&
-                buffer.sealCurrentIfAtLeast(MIN_SENTENCE_CHUNK_BYTES)
+            synchronized(this) {
+                !finishing.get() && atSentenceBoundary && buffer.sealCurrentIfAtLeast(MIN_SENTENCE_CHUNK_BYTES)
+            }
         if (sealed) {
             conversationDictationDiagnostic("event=caller_audio_chunk_sealed reason=silence")
         }
@@ -414,6 +415,7 @@ internal class ConversationDictationCallerAudioStream(
     private val feeding = AtomicBoolean(false)
     private val settled = AtomicBoolean(false)
     private val feedClosed = AtomicBoolean(false)
+    private val fullyFed = AtomicBoolean(false)
     private val feedClosedCallbacks = ConcurrentLinkedQueue<() -> Unit>()
     private val cancelled = AtomicBoolean(false)
     private val failureReported = AtomicBoolean(false)
@@ -447,6 +449,9 @@ internal class ConversationDictationCallerAudioStream(
 
     /** Returns capture-side speech evidence for this generation's exact chunk, when claimed. */
     fun containsSpeech(): Boolean? = chunk.get()?.hasSpeech
+
+    /** True only after every byte of this generation's exact chunk was supplied successfully. */
+    fun fullyFed(): Boolean = fullyFed.get()
 
     /** Returns the stable identity of this generation's exact claimed chunk. */
     fun chunkId(): Long? = chunk.get()?.chunkId
@@ -534,6 +539,7 @@ internal class ConversationDictationCallerAudioStream(
             "event=caller_audio_chunk_fed chunk=${owned.chunkId} first_sample=${owned.firstSample} " +
                 "last_sample=${owned.lastSampleExclusive} bytes=$offset",
         )
+        fullyFed.set(offset == owned.pcm.size && !cancelled.get() && !settled.get())
     }
 
     /** Releases the active-stream lease exactly once, even before a chunk has been acquired. */

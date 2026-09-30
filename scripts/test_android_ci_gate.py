@@ -260,6 +260,25 @@ class AndroidCiGateTest(unittest.TestCase):
         """Absent dependency evidence must never produce a green aggregate."""
         self.assertNotEqual(self.run_gate({}).returncode, 0)
 
+    def test_robolectric_module_openings_apply_to_all_test_jvms(self):
+        """JDK 17+ access is needed by unit, screenshot and custom replay tests."""
+        test_tasks = self.app_build.split('tasks.withType<Test>().configureEach {', 1)[1]
+        test_tasks = test_tasks.split('\ntasks.register<Test>', 1)[0]
+        for module in (
+            'java.base/java.lang',
+            'java.base/java.util',
+            'java.base/java.io',
+            'java.base/java.net',
+            'java.base/java.security',
+            'java.base/java.text',
+            'java.base/jdk.internal.access',
+            'java.desktop/java.awt.font',
+            'jdk.compiler/com.sun.tools.javac.api',
+        ):
+            with self.subTest(module=module):
+                self.assertIn(f'"--add-opens={module}=ALL-UNNAMED"', test_tasks)
+        self.assertIn('    jvmArgs(\n', test_tasks)
+
     def test_missing_result_is_rejected(self):
         """An unexpected dependency schema fails closed."""
         outcomes = self.successful_outcomes()

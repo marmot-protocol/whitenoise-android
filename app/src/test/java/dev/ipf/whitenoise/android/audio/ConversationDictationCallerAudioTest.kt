@@ -48,6 +48,7 @@ class ConversationDictationCallerAudioTest {
         assertTrue(first.start())
         assertTrue(feedClosed.await(2, TimeUnit.SECONDS))
 
+        assertFalse(first.fullyFed())
         assertTrue(buffer.hasPending)
         assertNotNull(capture.openProviderStream())
         capture.discard {}
@@ -83,6 +84,7 @@ class ConversationDictationCallerAudioTest {
             assertTrue(feedClosed.await(2, TimeUnit.SECONDS))
             assertEquals(6, device.readCount.get())
             assertEquals(24, writes.sum())
+            assertTrue(stream.fullyFed())
             assertEquals(true, stream.containsSpeech())
             assertTrue(buffer.hasPending)
         } finally {
@@ -344,6 +346,41 @@ class ConversationDictationCallerAudioTest {
         }
     }
 
+    /** Finishing keeps the six recorder tail reads together instead of creating a tiny final request. */
+    @Test
+    fun finishDoesNotSplitAtASentenceBoundaryDuringRecorderDrain() {
+        val clock = FakeElapsedRealtime()
+        val device = QuietGapCaptureDevice(clock, finalRead = true)
+        val writes = CopyOnWriteArrayList<Int>()
+        val buffer = ConversationDictationAudioChunkBuffer(sessionId = 9L)
+        val capture =
+            callerAudio(
+                device = device,
+                buffer = buffer,
+                writer = ConversationDictationAudioPipeWriter { _, _, _, length -> length.also(writes::add) },
+                elapsedRealtime = clock::now,
+            )
+        val stream = checkNotNull(capture.openProviderStream())
+        val closed = CountDownLatch(1)
+        try {
+            assertTrue(stream.start())
+            assertTrue(device.waitingForQuiet.await(2, TimeUnit.SECONDS))
+            stream.finishCapture(closed::countDown)
+            device.allowQuiet.countDown()
+            assertTrue(device.waitingForEnd.await(2, TimeUnit.SECONDS))
+            device.allowEnd.countDown()
+            assertTrue(closed.await(2, TimeUnit.SECONDS))
+            await { writes.isNotEmpty() }
+            assertEquals(listOf(339_200), writes)
+        } finally {
+            device.allowQuiet.countDown()
+            device.allowEnd.countDown()
+            stream.cancel()
+            stream.closeProviderEnd()
+            capture.discard {}
+        }
+    }
+
     /** Startup quiet is unknown until PCM speech is observed, then silence follows the capture clock. */
     @Test
     fun silenceMillisStartsOnlyAfterActualCallerAudioSpeech() {
@@ -553,6 +590,7 @@ class ConversationDictationCallerAudioTest {
     /** Holds the recorder after continuous speech and again after the exact five-read quiet gap. */
     private class QuietGapCaptureDevice(
         private val clock: FakeElapsedRealtime,
+        private val finalRead: Boolean = false,
     ) : ConversationDictationAudioCaptureDevice {
         val waitingForQuiet = CountDownLatch(1)
         val allowQuiet = CountDownLatch(1)
@@ -584,7 +622,8 @@ class ConversationDictationCallerAudioTest {
                 else -> {
                     waitingForEnd.countDown()
                     check(allowEnd.await(2, TimeUnit.SECONDS))
-                    return 0
+                    if (!finalRead) return 0
+                    target.fill(1)
                 }
             }
             clock.advance(100L)
