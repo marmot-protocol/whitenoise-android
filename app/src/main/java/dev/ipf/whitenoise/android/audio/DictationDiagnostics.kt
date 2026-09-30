@@ -98,6 +98,7 @@ internal class DictationDiagnosticRecorder(
         }.onFailure { dropped.incrementAndGet() }
     }
 
+    @Suppress("SwallowedException") // Export a closed failure code rather than private exception detail.
     fun snapshot(): Map<String, ByteArray> =
         try {
             executor

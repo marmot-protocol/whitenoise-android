@@ -327,7 +327,9 @@ class AuditUploadConsentTest {
                 val first = DictationDiagnostics.snapshot().getValue("dictation-current.jsonl").decodeToString()
                 consent.applyChoice(AuditLogSettingsFfi(false), configureUpload = {}, persistSettings = { it })
                 DictationDiagnostics.record("event=session_started session=2")
-                assertEquals(first, DictationDiagnostics.snapshot().getValue("dictation-current.jsonl").decodeToString())
+                val afterRevocation =
+                    DictationDiagnostics.snapshot().getValue("dictation-current.jsonl").decodeToString()
+                assertEquals(first, afterRevocation)
             } finally {
                 DictationDiagnostics.setEnabled(false)
                 DictationDiagnostics.clear()
@@ -349,12 +351,17 @@ class AuditUploadConsentTest {
                 assertTrue(DictationDiagnostics.snapshot().keys.none { it.endsWith(".jsonl") })
                 consent.applyChoice(AuditLogSettingsFfi(true), configureUpload = {}, persistSettings = { it })
                 expectFailure {
-                    consent.applyChoice(AuditLogSettingsFfi(false), configureUpload = {}, persistSettings = { error("Unavailable") })
+                    consent.applyChoice(
+                        AuditLogSettingsFfi(false),
+                        configureUpload = {},
+                        persistSettings = { error("Unavailable") },
+                    )
                 }
                 DictationDiagnostics.record("event=session_started session=2")
                 val snapshot = DictationDiagnostics.snapshot()
                 assertTrue(snapshot.keys.none { it.endsWith(".jsonl") })
-                assertFalse(JSONObject(snapshot.getValue("dictation-manifest.json").decodeToString()).getBoolean("collection_enabled"))
+                val manifest = JSONObject(snapshot.getValue("dictation-manifest.json").decodeToString())
+                assertFalse(manifest.getBoolean("collection_enabled"))
             } finally {
                 DictationDiagnostics.setEnabled(false)
                 DictationDiagnostics.clear()

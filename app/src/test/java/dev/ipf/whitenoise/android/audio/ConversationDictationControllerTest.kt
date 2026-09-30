@@ -51,7 +51,11 @@ class ConversationDictationControllerTest {
         assertTrue(logs.contains("event=session_abort reason=service_destroyed accepted=true"))
         assertTrue(logs.contains("event=state_changed session=1 from=Processing to=Idle"))
         val retained = ShadowLog.getLogsForTag("WNDictation").mapNotNull { DictationDiagnosticSchema.fields(it.msg) }
-        assertTrue(retained.any { it["event"] == "app_visibility" && it["phase"] == "Processing" && it["outcome"] == "continued" })
+        assertTrue(
+            retained.any {
+                it["event"] == "app_visibility" && it["phase"] == "Processing" && it["outcome"] == "continued"
+            },
+        )
         assertTrue(retained.any { it["event"] == "foreground_service_start" && it["requested"] == true })
         assertFalse(logs.contains("PRIVATE_DRAFT"))
         assertFalse(logs.contains(ACCOUNT))
