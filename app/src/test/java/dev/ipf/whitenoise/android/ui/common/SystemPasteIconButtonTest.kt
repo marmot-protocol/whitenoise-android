@@ -144,10 +144,12 @@ class SystemPasteIconButtonTest {
         var attempts = 0
         composeRule.setContent {
             CompositionLocalProvider(LocalTextToolbar provides toolbar) {
-                if (visible.value) SystemPasteIconButton(onPaste = {
-                    attempts++
-                    false
-                }) { Text("Paste") }
+                if (visible.value) {
+                    SystemPasteIconButton(onPaste = {
+                        attempts++
+                        false
+                    }) { Text("Paste") }
+                }
             }
         }
         composeRule.onNodeWithText("Paste").performClick()
