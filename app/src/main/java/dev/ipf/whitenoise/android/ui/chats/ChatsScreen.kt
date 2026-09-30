@@ -110,6 +110,7 @@ import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarContentInset
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
+import dev.ipf.whitenoise.android.ui.common.VISIBLE_GROUP_AVATAR_LIMIT
 import dev.ipf.whitenoise.android.ui.common.anchoredDragSelection
 import dev.ipf.whitenoise.android.ui.common.dragSelectionAutoScrollDelta
 import dev.ipf.whitenoise.android.ui.common.dragSelectionEndpoint
@@ -1719,7 +1720,10 @@ internal fun ChatsScreen(
                     else ->
                         PreparedGroupAvatarContent(
                             appState,
-                            visibleItems.drop(chatListState.firstVisibleItemIndex).take(16).mapNotNull { it.selectedAvatarAsset },
+                            visibleItems
+                                .drop(chatListState.firstVisibleItemIndex)
+                                .take(VISIBLE_GROUP_AVATAR_LIMIT)
+                                .mapNotNull { it.selectedAvatarAsset },
                             controller.boundAccountRef,
                             surfaceIdentity = controller,
                         ) {

@@ -69,18 +69,21 @@ class AvatarImageLoaderTest {
                     }
                 }
             withTimeout(5_000) { started.await() }
-            val publicImage = ImageBitmap(2, 2)
+            val publicImage = solidImage(2, 2)
             AvatarImageLoader.putCached("https://public.example/avatar.png", publicImage)
             AvatarImageLoader.clearStoredAvatars()
             AvatarImageLoader.clearStoredAvatars()
             assertSame(publicImage, AvatarImageLoader.peek("https://public.example/avatar.png"))
             assertNull(withTimeout(5_000) { old.await() })
-            val current = ImageBitmap(2, 2)
+            val current = solidImage(2, 2)
             AvatarImageLoader.putCached(key, current)
             assertNull(AvatarImageLoader.loadStored(key, lifetime) { error("retired read") })
             release.complete(Unit)
             // Current pixels belong to the new lifetime even when account/ref/revision text is identical.
-            assertSame(current, AvatarImageLoader.loadStored(key, AvatarImageLoader.currentCacheLifetime()) { error("cache hit") })
+            assertSame(
+                current,
+                AvatarImageLoader.loadStored(key, AvatarImageLoader.currentCacheLifetime()) { error("cache hit") },
+            )
         }
 
     /** A transient local miss is not a network failure and cannot impose the URL failure cooldown. */

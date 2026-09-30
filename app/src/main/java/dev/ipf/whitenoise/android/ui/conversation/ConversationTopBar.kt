@@ -117,7 +117,10 @@ internal fun ConversationTopBar(
             .currentGroupAvatarItem(controller.boundAccountRef, presentedGroup.groupIdHex)
     val currentRow =
         liveRow
-            ?.takeIf { it.group.avatarUrl == presentedGroup.avatarUrl && it.group.imageHashHex == presentedGroup.imageHashHex }
+            ?.takeIf {
+                it.group.avatarUrl == presentedGroup.avatarUrl &&
+                    it.group.imageHashHex == presentedGroup.imageHashHex
+            }
     val selectedAsset =
         if (freezeRoutePresentation || controller.window.header == null) {
             currentRow?.selectedAvatarAsset
@@ -194,7 +197,10 @@ internal fun ConversationTopBar(
                                     title = presentedTitle,
                                     seed = presentedAvatarAccount ?: presentedGroup.groupIdHex,
                                     size = if (compactHeight) 28.dp else 40.dp,
-                                    fallbackPictureUrl = presentedAvatarAccount?.takeUnless { explicitSelectionMissing }?.let(appState::avatarUrl),
+                                    fallbackPictureUrl =
+                                        presentedAvatarAccount
+                                            ?.takeUnless { explicitSelectionMissing }
+                                            ?.let(appState::avatarUrl),
                                     firstFrameAvatar = firstFrameAvatar,
                                     accountRef = controller.boundAccountRef,
                                     durableAvatar = selectedAsset,
@@ -245,7 +251,8 @@ internal fun ConversationTopBar(
                                                 Icon(
                                                     painterResource(R.drawable.ic_timer),
                                                     contentDescription = null,
-                                                    modifier = Modifier.size(12.dp).testTag("conversation.header.timer"),
+                                                    modifier =
+                                                        Modifier.size(12.dp).testTag("conversation.header.timer"),
                                                     tint = labelColor,
                                                 )
                                                 Text(

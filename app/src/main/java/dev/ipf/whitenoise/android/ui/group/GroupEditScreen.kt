@@ -79,7 +79,8 @@ import kotlinx.coroutines.CancellationException
  * become the group's public avatar.
  */
 @Suppress("MaxLineLength")
-internal fun safeAvatarUploadUrl(url: String): String = ProfileSanitizer.androidOwnedHttpsImageUrl(url) ?: error("unsafe upload URL")
+internal fun safeAvatarUploadUrl(url: String): String =
+    ProfileSanitizer.androidOwnedHttpsImageUrl(url) ?: error("unsafe upload URL")
 
 /** The name field accepts emoji only for an admin while no save or mutation runs. */
 internal fun groupNameEmojiEditable(
@@ -136,9 +137,12 @@ internal fun GroupEditScreen(
         val groupAvatar = rememberConversationGroupAvatar(appState, controller)
         val groupAvatarUrl = groupAvatar.pictureUrl
         val encryptedGroupAvatar = groupAvatar.image
-        val legacyGroupAvatarAvailable = rememberAvatarImageAvailable(groupAvatarUrl.takeIf { encryptedGroupAvatar == null })
+        val legacyGroupAvatarAvailable =
+            rememberAvatarImageAvailable(groupAvatarUrl.takeIf { encryptedGroupAvatar == null })
         val groupAvatarImageAvailable = encryptedGroupAvatar != null || legacyGroupAvatarAvailable
-        val hasGroupImage = ProfileSanitizer.protocolImageUrl(controller.group.avatarUrl) != null || controller.group.imageHashHex != null
+        val hasGroupImage =
+            ProfileSanitizer.protocolImageUrl(controller.group.avatarUrl) != null ||
+                controller.group.imageHashHex != null
         val saveEnabled =
             !saving &&
                 !controller.mutationInFlight &&
@@ -355,7 +359,10 @@ internal fun GroupEditScreen(
                     verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
                 ) {
                     Text(stringResource(R.string.group_private_image), style = MaterialTheme.typography.titleMedium)
-                    Text(stringResource(R.string.group_private_image_detail), style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        stringResource(R.string.group_private_image_detail),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
                     Box(
                         modifier =
                             Modifier
@@ -450,7 +457,11 @@ internal fun GroupEditScreen(
                 pictureUrl = groupAvatarUrl,
                 picture = encryptedGroupAvatar,
                 onDismiss = { avatarViewerOpen = false },
-                readLocalBytes = appState.retainedAvatarBytesReader(conversationGroupAvatarAsset(appState, controller), controller.boundAccountRef),
+                readLocalBytes =
+                    appState.retainedAvatarBytesReader(
+                        conversationGroupAvatarAsset(appState, controller),
+                        controller.boundAccountRef,
+                    ),
                 editActionLabel = if (canEdit) stringResource(R.string.group_image_search_edit) else null,
                 onEditPicture =
                     if (canEdit) {

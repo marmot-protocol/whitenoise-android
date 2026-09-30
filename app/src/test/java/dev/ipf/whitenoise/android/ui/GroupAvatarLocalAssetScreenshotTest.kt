@@ -139,7 +139,9 @@ class GroupAvatarLocalAssetScreenshotTest {
             composeRule.setContent {
                 WhiteNoiseTheme(darkTheme = false) {
                     Surface(color = MaterialTheme.colorScheme.background) {
-                        key(step.value) { ProductionAvatarSurface(step.value, fixture.state, surface.item, surface.controller) }
+                        key(step.value) {
+                            ProductionAvatarSurface(step.value, fixture.state, surface.item, surface.controller)
+                        }
                     }
                 }
             }
@@ -152,7 +154,9 @@ class GroupAvatarLocalAssetScreenshotTest {
                     composeRule.onNodeWithText(context.getString(R.string.change_photo)).assertExists()
                 }
                 val kind = if (encrypted) "encrypted" else "public"
-                composeRule.onRoot().captureRoboImage("src/test/snapshots/group_stored_avatar_${kind}_surface_$index.png")
+                composeRule.onRoot().captureRoboImage(
+                    "src/test/snapshots/group_stored_avatar_${kind}_surface_$index.png",
+                )
             }
             captureStoredPictureViewer(if (encrypted) "encrypted" else "public")
             assertEquals(0, urlFetches.get())
@@ -198,10 +202,21 @@ class GroupAvatarLocalAssetScreenshotTest {
     fun detailsReuseTheHiddenRowSelectionAcrossRenameWithoutLegacyFallback() {
         val fixture = AvatarLocalFixture()
         val selected = asset()
-        val chats = ChatsController(fixture.state, initialAccountRef = ACCOUNT_REF, memberSnapshotLoader = { _, _ -> emptyList() })
+        val chats =
+            ChatsController(
+                fixture.state,
+                initialAccountRef = ACCOUNT_REF,
+                memberSnapshotLoader = { _, _ -> emptyList() },
+            )
         chats.setChatListVisible(false)
         val original = group().copy(name = "Old group name", avatarUrl = "https://old.example/picture.png")
-        chats.applyChatListRow(notificationChatListRow().copy(groupIdHex = GROUP_ID, groupName = original.name, avatarUrl = original.avatarUrl))
+        chats.applyChatListRow(
+            notificationChatListRow().copy(
+                groupIdHex = GROUP_ID,
+                groupName = original.name,
+                avatarUrl = original.avatarUrl,
+            ),
+        )
         chats.applyLocalGroupUpdate(original)
         ChatsController::class.java
             .getDeclaredField("selectedAvatarAssetsByGroup")
@@ -229,7 +244,9 @@ class GroupAvatarLocalAssetScreenshotTest {
             composeRule.waitForIdle()
             assertSame(cached, observed)
             composeRule.runOnIdle {
-                conversation.applyGroupStateForTest(original.copy(name = "Renamed group", avatarUrl = "https://new.example/picture.png"))
+                conversation.applyGroupStateForTest(
+                    original.copy(name = "Renamed group", avatarUrl = "https://new.example/picture.png"),
+                )
             }
             composeRule.waitForIdle()
             assertNull(observed)
@@ -519,7 +536,10 @@ class GroupAvatarLocalAssetScreenshotTest {
             WhiteNoiseAppState::class.java
                 .getDeclaredMethod("applyDestructiveWipeRuntimeState", DestructiveAccountWipeRuntimeState::class.java)
                 .apply { isAccessible = true }
-                .invoke(fixture.state, DestructiveAccountWipeRuntimeState(ACCOUNT_REF, null, null, fixture.state.runtimeGeneration + 1))
+                .invoke(
+                    fixture.state,
+                    DestructiveAccountWipeRuntimeState(ACCOUNT_REF, null, null, fixture.state.runtimeGeneration + 1),
+                )
         }
         composeRule.waitForIdle()
         assertNull(AvatarImageLoader.cachedImage(imageKey))
@@ -575,7 +595,12 @@ class StoredAvatarExportTest {
             fixture.state.clearCrossAccountCachesForTest()
             assertNull(reader())
             assertEquals(1, fixture.reads.get())
-            assertNull(fixture.state.retainedAvatarBytesReader(asset().copy(availability = AvatarAvailabilityFfi.INVALIDATED), ACCOUNT_REF))
+            assertNull(
+                fixture.state.retainedAvatarBytesReader(
+                    asset().copy(availability = AvatarAvailabilityFfi.INVALIDATED),
+                    ACCOUNT_REF,
+                ),
+            )
         }
 
     /** Original plaintext bytes returning after an account clear cannot complete a gallery export. */
@@ -676,9 +701,21 @@ private fun productionSurfaceFixture(
     encrypted: Boolean,
 ): ProductionSurfaceFixture {
     val selected = asset()
-    val record = if (encrypted) group().copy(imageHashHex = "encrypted-picture") else group().copy(avatarUrl = "https://old.example/picture.png")
-    val chats = ChatsController(fixture.state, initialAccountRef = ACCOUNT_REF, memberSnapshotLoader = { _, _ -> emptyList() })
-    chats.applyChatListRow(notificationChatListRow().copy(groupIdHex = GROUP_ID, groupName = record.name, avatarUrl = record.avatarUrl))
+    val record =
+        if (encrypted) {
+            group().copy(imageHashHex = "encrypted-picture")
+        } else {
+            group().copy(avatarUrl = "https://old.example/picture.png")
+        }
+    val chats =
+        ChatsController(
+            fixture.state,
+            initialAccountRef = ACCOUNT_REF,
+            memberSnapshotLoader = { _, _ -> emptyList() },
+        )
+    chats.applyChatListRow(
+        notificationChatListRow().copy(groupIdHex = GROUP_ID, groupName = record.name, avatarUrl = record.avatarUrl),
+    )
     chats.applyLocalGroupUpdate(record)
     ChatsController::class.java
         .getDeclaredField("selectedAvatarAssetsByGroup")
@@ -686,8 +723,19 @@ private fun productionSurfaceFixture(
         .set(chats, mapOf(GROUP_ID to selected))
     fixture.state.attachChatsController(chats)
     val item = checkNotNull(fixture.state.currentGroupAvatarItem(ACCOUNT_REF, GROUP_ID))
-    val controller = ConversationController(fixture.state, initialGroup = record, initialMemberSnapshot = GroupMemberSnapshot(emptyList()))
-    assertNotNull(AvatarImageLoader.decodeAndCache(checkNotNull(selected.cacheKey(ACCOUNT_REF)), solidPng(), AvatarImageLoader.currentCacheLifetime()))
+    val controller =
+        ConversationController(
+            fixture.state,
+            initialGroup = record,
+            initialMemberSnapshot = GroupMemberSnapshot(emptyList()),
+        )
+    assertNotNull(
+        AvatarImageLoader.decodeAndCache(
+            checkNotNull(selected.cacheKey(ACCOUNT_REF)),
+            solidPng(),
+            AvatarImageLoader.currentCacheLifetime(),
+        ),
+    )
     return ProductionSurfaceFixture(chats, item, controller)
 }
 

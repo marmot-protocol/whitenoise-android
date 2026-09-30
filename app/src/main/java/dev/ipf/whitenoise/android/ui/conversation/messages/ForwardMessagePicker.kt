@@ -77,6 +77,7 @@ import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
+import dev.ipf.whitenoise.android.ui.common.VISIBLE_GROUP_AVATAR_LIMIT
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
@@ -503,7 +504,11 @@ private fun ForwardTargetList(
     onSelectionChange: (List<String>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    PreparedGroupAvatarContent(appState, filteredTargets.take(16).mapNotNull { it.first.selectedAvatarAsset }, ownerAccountRef) {
+    PreparedGroupAvatarContent(
+        appState,
+        filteredTargets.take(VISIBLE_GROUP_AVATAR_LIMIT).mapNotNull { it.first.selectedAvatarAsset },
+        ownerAccountRef,
+    ) {
         LazyColumn(modifier = modifier.fillMaxWidth(), contentPadding = PaddingValues(bottom = Dimens.spaceLg)) {
             if (targetLoading && targets.isEmpty()) {
                 item {
@@ -521,10 +526,14 @@ private fun ForwardTargetList(
                         )
                     }
                 }
-            } else if (forwardPickerHasNoRows(targets.isEmpty(), filteredTargets.isEmpty(), visibleFolderRows.isEmpty())) {
+            } else if (
+                forwardPickerHasNoRows(targets.isEmpty(), filteredTargets.isEmpty(), visibleFolderRows.isEmpty())
+            ) {
                 item {
                     Text(
-                        stringResource(if (targets.isEmpty()) R.string.forward_no_chats else R.string.forward_no_matches),
+                        stringResource(
+                            if (targets.isEmpty()) R.string.forward_no_chats else R.string.forward_no_matches,
+                        ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),

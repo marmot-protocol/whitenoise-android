@@ -352,7 +352,8 @@ internal fun GroupDetailsScreen(
         // record enables administration on the first frame; the invite commit
         // still requires the authoritative roster inside the controller.
         val canAdministerMembers =
-            !isDm && canEdit && memberAdministrationPresentable(controller.memberRosterState, controller.seededSelfMember)
+            !isDm && canEdit &&
+                memberAdministrationPresentable(controller.memberRosterState, controller.seededSelfMember)
         val mutationsBlocked = activeMutation != null || controller.mutationInFlight
         val detailsOpenedAtMs = remember(controller.group.groupIdHex) { SystemClock.elapsedRealtime() }
         var administrationLatencyReported by remember(controller.group.groupIdHex) { mutableStateOf(false) }
@@ -588,7 +589,11 @@ internal fun GroupDetailsScreen(
                     } catch (_: ActivityNotFoundException) {
                         pendingTranscriptShareFile = null
                         file.delete()
-                        appState.present(R.string.toast_couldnt_export_transcript, AppText.Plain(noShareTargetText), copyable = true)
+                        appState.present(
+                            R.string.toast_couldnt_export_transcript,
+                            AppText.Plain(noShareTargetText),
+                            copyable = true,
+                        )
                     }
                 } catch (error: Throwable) {
                     if (error is CancellationException) {
@@ -1402,7 +1407,11 @@ internal fun GroupDetailsScreen(
                     pictureUrl = groupAvatar.pictureUrl,
                     picture = encryptedGroupAvatar,
                     archived = controller.presentedArchived,
-                    readLocalBytes = appState.retainedAvatarBytesReader(conversationGroupAvatarAsset(appState, controller), controller.boundAccountRef),
+                    readLocalBytes =
+                        appState.retainedAvatarBytesReader(
+                            conversationGroupAvatarAsset(appState, controller),
+                            controller.boundAccountRef,
+                        ),
                     onEdit =
                         if (canShowEditAction) {
                             { showEditGroup = true }
@@ -1433,7 +1442,8 @@ internal fun GroupDetailsScreen(
                         )
                     }
                     QuickInfoAction(
-                        label = stringResource(if (conversationMuted) R.string.chat_row_action_unmute else R.string.mute),
+                        label =
+                            stringResource(if (conversationMuted) R.string.chat_row_action_unmute else R.string.mute),
                         icon = if (conversationMuted) R.drawable.ic_volume_up else R.drawable.ic_notifications_off,
                         enabled = !muteCommandPending,
                         onClick = {
@@ -1666,7 +1676,8 @@ internal fun GroupDetailsScreen(
                 pendingDisappearingSecs?.let { secs ->
                     ConfirmDialog(
                         title = stringResource(R.string.disappearing_confirm_title),
-                        message = stringResource(R.string.disappearing_confirm_message, disappearingMessagesLabel(secs)),
+                        message =
+                            stringResource(R.string.disappearing_confirm_message, disappearingMessagesLabel(secs)),
                         confirmLabel = stringResource(R.string.disappearing_confirm_button),
                         onConfirm = {
                             pendingDisappearingSecs = null
@@ -1771,7 +1782,9 @@ internal fun GroupDetailsScreen(
                             accountAvailable = appState.activeAccountRef != null,
                             onShare = { exportTranscript() },
                             onSave = {
-                                if (!transcriptExportInFlight && pendingTranscriptShareFile == null) transcriptSave.save()
+                                if (!transcriptExportInFlight && pendingTranscriptShareFile == null) {
+                                    transcriptSave.save()
+                                }
                             },
                         )
 
@@ -1812,7 +1825,9 @@ internal fun GroupDetailsScreen(
                     }
                 }
 
-                SettingsGroup(modifier = Modifier.padding(top = WhiteNoiseSpacing.Section).testTag("chat_info.technical")) {
+                SettingsGroup(
+                    modifier = Modifier.padding(top = WhiteNoiseSpacing.Section).testTag("chat_info.technical"),
+                ) {
                     row("relays") { rowContext ->
                         SettingsLink(
                             context = rowContext,
@@ -1835,7 +1850,9 @@ internal fun GroupDetailsScreen(
                                 title = stringResource(R.string.developer_tools),
                                 onClick = { showGroupInfo = true },
                                 modifier = Modifier.testTag("chat_info.developer_tools"),
-                                leading = { Icon(painterResource(R.drawable.ic_bug_report), contentDescription = null) },
+                                leading = {
+                                    Icon(painterResource(R.drawable.ic_bug_report), contentDescription = null)
+                                },
                             )
                         }
                         folderRow()
@@ -1865,7 +1882,8 @@ internal fun GroupDetailsScreen(
                                             showTransferAdmin = true
                                         },
                                         modifier = Modifier.testTag("chat_info.transfer_admin"),
-                                        enabled = !mutationsBlocked && controller.transferAdminCandidates().isNotEmpty(),
+                                        enabled =
+                                            !mutationsBlocked && controller.transferAdminCandidates().isNotEmpty(),
                                         leading = {
                                             Icon(painterResource(R.drawable.ic_swap_vert), contentDescription = null)
                                         },
@@ -1889,7 +1907,8 @@ internal fun GroupDetailsScreen(
                                         leading = {
                                             DangerLeading(
                                                 icon = R.drawable.ic_admin_panel_settings,
-                                                inProgress = activeMutation?.action == GroupMutationAction.SelfDemoteAdmin,
+                                                inProgress =
+                                                    activeMutation?.action == GroupMutationAction.SelfDemoteAdmin,
                                                 destructive = false,
                                             )
                                         },
@@ -1997,7 +2016,9 @@ internal fun GroupDetailsScreen(
                                 title = stringResource(R.string.developer_tools),
                                 onClick = { showGroupInfo = true },
                                 modifier = Modifier.testTag("chat_info.developer_tools"),
-                                leading = { Icon(painterResource(R.drawable.ic_bug_report), contentDescription = null) },
+                                leading = {
+                                    Icon(painterResource(R.drawable.ic_bug_report), contentDescription = null)
+                                },
                             )
                         }
                     }
@@ -2011,7 +2032,8 @@ internal fun GroupDetailsScreen(
 
 /** Adaptive conversation identity with native edit, full-picture and public-key copy actions. */
 @Composable
-@Suppress("LongParameterList", "LongMethod") // Existing adaptive header keeps its optional viewer action at the presentation boundary.
+// Existing adaptive header keeps its optional viewer action at the presentation boundary.
+@Suppress("FunctionNaming", "LongParameterList", "LongMethod")
 internal fun GroupDetailsHeader(
     title: String,
     subtitle: String,
@@ -2331,7 +2353,10 @@ private fun PushDeliveryDebugSection(
                 DiagnosticRow(stringResource(R.string.push_debug_total_tokens), info.totalTokenCount.toString())
                 DiagnosticRow(stringResource(R.string.push_debug_active_tokens), info.activeTokenCount.toString())
                 DiagnosticRow(stringResource(R.string.push_debug_stale_tokens), info.staleTokenCount.toString())
-                DiagnosticRow(stringResource(R.string.push_debug_missing_relay_hints), info.missingRelayHintCount.toString())
+                DiagnosticRow(
+                    stringResource(R.string.push_debug_missing_relay_hints),
+                    info.missingRelayHintCount.toString(),
+                )
                 info.lastTokenListUpdatedAtMs?.let { updatedAtMs ->
                     val updatedAtText = updatedAtMs.toString()
                     DiagnosticRow(
@@ -2350,7 +2375,10 @@ private fun PushDeliveryDebugSection(
                 val local = info.localRegistration
                 DiagnosticRow(stringResource(R.string.push_debug_registered), yesNo(local.registered))
                 DiagnosticRow(stringResource(R.string.push_debug_shareable), yesNo(local.shareable))
-                DiagnosticRow(stringResource(R.string.push_debug_local_notifications_enabled), yesNo(local.localNotificationsEnabled))
+                DiagnosticRow(
+                    stringResource(R.string.push_debug_local_notifications_enabled),
+                    yesNo(local.localNotificationsEnabled),
+                )
                 DiagnosticRow(stringResource(R.string.native_push), yesNo(local.nativePushEnabled))
                 local.localLeafIndex?.let { leafIndex ->
                     DiagnosticRow(stringResource(R.string.push_debug_local_leaf_index), leafIndex.toString())

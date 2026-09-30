@@ -117,6 +117,7 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.recipientNip05Verified
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseTextFieldContainerColor
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
+import dev.ipf.whitenoise.android.ui.common.VISIBLE_GROUP_AVATAR_LIMIT
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
@@ -888,7 +889,10 @@ internal fun ProfileSheet(
             onBanner = { if (owner.canAct()) fullBannerOpen = true },
             onCopyLightning = { if (owner.canAct()) lightningAddress?.let { clipboard.setText(AnnotatedString(it)) } },
             sharedAvatars = {
-                PreparedGroupAvatarContent(appState, shared.groups.take(16).mapNotNull { it.selectedAvatarAsset }) {
+                PreparedGroupAvatarContent(
+                    appState,
+                    shared.groups.take(VISIBLE_GROUP_AVATAR_LIMIT).mapNotNull { it.selectedAvatarAsset },
+                ) {
                     PersonSharedGroupAvatars(sharedRows) { id ->
                         sharedItems[id]?.let { rememberChatListGroupAvatar(appState, it).image }
                     }
@@ -1009,7 +1013,7 @@ internal fun ProfileSheet(
                 ProfileSheetPage.GROUPS_IN_COMMON ->
                     PreparedGroupAvatarContent(
                         appState,
-                        shared.groups.take(16).mapNotNull { it.selectedAvatarAsset },
+                        shared.groups.take(VISIBLE_GROUP_AVATAR_LIMIT).mapNotNull { it.selectedAvatarAsset },
                     ) {
                         PersonGroupsInCommonContent(
                             rows = sharedRows,
@@ -1288,7 +1292,9 @@ internal fun ProfileAddToGroupsContent(
     val groups = state.groups
     val groupTitleCopy = rememberGroupTitleCopy()
     val selected = remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateListOf<String>() }
-    var confirmSelection by remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<List<ChatListItem>?>(null) }
+    var confirmSelection by remember(appState.activeAccountRef, appState.runtimeGeneration) {
+        mutableStateOf<List<ChatListItem>?>(null)
+    }
     var query by remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf("") }
     val titledGroups =
         remember(groups, groupTitleCopy) {
@@ -1310,7 +1316,7 @@ internal fun ProfileAddToGroupsContent(
     val selectedGroups = groups.filter { selected.contains(it.group.groupIdHex) }
     PreparedGroupAvatarContent(
         appState,
-        filteredGroups.take(16).mapNotNull { it.first.selectedAvatarAsset },
+        filteredGroups.take(VISIBLE_GROUP_AVATAR_LIMIT).mapNotNull { it.first.selectedAvatarAsset },
     ) {
         Column(
             modifier =
@@ -1443,7 +1449,9 @@ internal fun ProfileMakeAdminContent(
 ) {
     val groups = state.groups
     val groupTitleCopy = rememberGroupTitleCopy()
-    var selectedGroupId by remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<String?>(null) }
+    var selectedGroupId by remember(appState.activeAccountRef, appState.runtimeGeneration) {
+        mutableStateOf<String?>(null)
+    }
     var query by remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf("") }
     val titledGroups =
         remember(groups, groupTitleCopy) {
@@ -1464,7 +1472,7 @@ internal fun ProfileMakeAdminContent(
     val selectedGroup = groups.firstOrNull { it.group.groupIdHex == selectedGroupId }
     PreparedGroupAvatarContent(
         appState,
-        filteredGroups.take(16).mapNotNull { it.first.selectedAvatarAsset },
+        filteredGroups.take(VISIBLE_GROUP_AVATAR_LIMIT).mapNotNull { it.first.selectedAvatarAsset },
     ) {
         Column(
             modifier =

@@ -101,7 +101,8 @@ internal fun rememberAvatarImageAvailable(pictureUrl: String?): Boolean {
 
 /** Displays supplied pixels immediately; optional retained original bytes preserve the explicit Save action. */
 @Composable
-@Suppress("LongParameterList", "LongMethod") // Viewer chrome and optional export remain one lifecycle-owned surface.
+// Viewer chrome and optional export remain one lifecycle-owned surface.
+@Suppress("FunctionNaming", "LongParameterList", "LongMethod")
 internal fun AvatarFullScreenViewer(
     title: String,
     seed: String,

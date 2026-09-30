@@ -3943,7 +3943,8 @@ class ChatsController private constructor(
     }
 
     /** Reads the current source row even while the chat-list UI is intentionally frozen. */
-    internal fun currentGroupAvatarItem(groupIdHex: String): ChatListItem? = chatRows.firstOrNull { it.groupIdHex == groupIdHex }?.let { projectChatRow(it) }
+    internal fun currentGroupAvatarItem(groupIdHex: String): ChatListItem? =
+        chatRows.firstOrNull { it.groupIdHex == groupIdHex }?.let { projectChatRow(it) }
 
     private fun optimisticArchiveRow(row: ChatListRowFfi): ChatListRowFfi =
         optimisticArchiveByGroup[chatRowKey(row.groupIdHex)]
@@ -5119,45 +5120,8 @@ class ChatsController private constructor(
         item.latest?.sender?.let(appState::preWarmProfileAvatar)
     }
 
-    @Suppress("ReturnCount") // Mirrors [GroupAvatar] URL-over-encrypted precedence with early exits.
-    private fun firstFrameAvatarSeed(item: ChatListItem): ChatListAvatarSeed? {
-        item.selectedAvatarAsset?.let { asset ->
-            val key = accountRef?.let { asset.takeIf { it.isRenderable() }?.cacheKey(it) }
-            return key?.let(AvatarImageLoader::cachedImage)?.let { image ->
-                avatarSeed(ChatListAvatarSource.DURABLE, checkNotNull(key), image)
-            }
-        }
-        val legacyUrl = ProfileSanitizer.protocolImageUrl(item.group.avatarUrl)
-        if (legacyUrl != null) {
-            return AvatarImageLoader.peek(legacyUrl)?.let { image ->
-                avatarSeed(ChatListAvatarSource.LEGACY_URL, legacyUrl, image)
-            }
-        }
-
-        val encryptedCacheKey = encryptedGroupAvatarCacheKey(accountRef, item.group)
-        if (encryptedCacheKey != null) {
-            GroupAvatarImageLoader.peek(encryptedCacheKey)?.let { image ->
-                return avatarSeed(ChatListAvatarSource.ENCRYPTED_GROUP, encryptedCacheKey, image)
-            }
-        }
-
-        val fallbackUrl =
-            GroupProjector
-                .avatarAccount(item.group, item.presentationOtherMemberAccount, item.presentationMemberCount)
-                ?.let { appState.avatarUrl(it) }
-        return fallbackUrl?.let { url ->
-            AvatarImageLoader.peek(url)?.let { image ->
-                avatarSeed(ChatListAvatarSource.FALLBACK_URL, url, image)
-            }
-        }
-    }
-
-    /** A retained navigation seed cannot revive plaintext after an A-to-B-to-A account switch. */
-    private fun avatarSeed(
-        source: ChatListAvatarSource,
-        key: String,
-        image: androidx.compose.ui.graphics.ImageBitmap,
-    ) = ChatListAvatarSeed(source, key, image, accountRef, AvatarImageLoader.currentCacheLifetime())
+    private fun firstFrameAvatarSeed(item: ChatListItem): ChatListAvatarSeed? =
+        firstFrameGroupAvatarSeed(item, accountRef, appState::avatarUrl)
 
     /**
      * Called by the shell when a conversation is foregrounded (`false`) or the

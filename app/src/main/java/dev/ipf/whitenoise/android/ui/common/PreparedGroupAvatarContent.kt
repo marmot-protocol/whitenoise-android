@@ -24,13 +24,6 @@ import dev.ipf.whitenoise.android.state.durableAvatar
 import dev.ipf.whitenoise.android.state.isRenderable
 import kotlinx.coroutines.withTimeoutOrNull
 
-/** Short-lived decoded-pixel pins for at most one bounded visible working set, not a protocol cache. */
-internal data class PreparedGroupAvatarPixels(
-    val accountRef: String?,
-    val lifetime: Long,
-    val images: Map<String, ImageBitmap>,
-)
-
 internal val LocalPreparedGroupAvatarPixels = staticCompositionLocalOf<PreparedGroupAvatarPixels?> { null }
 
 /**
@@ -67,7 +60,8 @@ internal fun PreparedGroupAvatarContent(
         SideEffect { hasPublished = true }
         key(appState, appState.runtimeGeneration, accountRef, lifetime, surfaceIdentity) {
             CompositionLocalProvider(
-                LocalPreparedGroupAvatarPixels provides PreparedGroupAvatarPixels(accountRef, lifetime, preparation.images),
+                LocalPreparedGroupAvatarPixels provides
+                    PreparedGroupAvatarPixels(accountRef, lifetime, preparation.images),
                 content = content,
             )
         }
@@ -115,5 +109,5 @@ private data class AvatarPixelPreparation(
     val ready: Boolean,
 )
 
-private const val VISIBLE_GROUP_AVATAR_LIMIT = 16
+internal const val VISIBLE_GROUP_AVATAR_LIMIT = 16
 private const val LOCAL_GROUP_AVATAR_PREPARATION_BUDGET_MILLIS = 1_000L

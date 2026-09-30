@@ -94,9 +94,10 @@ internal fun WhiteNoiseAppState.retainedAvatarBytesReader(
     asset: AvatarAssetFfi?,
     accountRef: String?,
 ): (suspend () -> ByteArray?)? {
-    val selected = asset?.takeIf { it.isRenderable() }?.copy() ?: return null
-    val account = accountRef ?: return null
-    val owner = captureHostPerformanceRuntimeOwner() ?: return null
+    val selected = asset?.takeIf { it.isRenderable() }?.copy()
+    val account = accountRef
+    val owner = if (selected != null && account != null) captureHostPerformanceRuntimeOwner() else null
+    if (selected == null || account == null || owner == null) return null
     val lifetime = AvatarImageLoader.currentCacheLifetime()
     return {
         if (ownsHostPerformanceRuntimeOwner(owner) && AvatarImageLoader.currentCacheLifetime() == lifetime) {

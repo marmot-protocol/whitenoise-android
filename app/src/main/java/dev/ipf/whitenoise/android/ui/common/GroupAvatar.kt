@@ -20,12 +20,6 @@ import dev.ipf.whitenoise.android.state.adoptableSelectedAvatarAsset
 import dev.ipf.whitenoise.android.state.cacheKey
 import dev.ipf.whitenoise.android.state.isRenderable
 
-/** Pixels and a legacy URL belong to the same current, explicitly owned presentation. */
-internal data class GroupAvatarPresentation(
-    val image: ImageBitmap?,
-    val pictureUrl: String?,
-)
-
 /** All group surfaces consume the selected MDK asset; legacy acquisition is only a compatibility path. */
 @Composable
 @Suppress("LongParameterList")
@@ -40,7 +34,8 @@ internal fun rememberGroupAvatarPresentation(
     val ownedSeed =
         firstFrameAvatar?.takeIf {
             val currentOwner = it.accountRef == null || it.accountRef == accountRef
-            val currentLifetime = it.cacheLifetime == null || it.cacheLifetime == AvatarImageLoader.currentCacheLifetime()
+            val currentLifetime =
+                it.cacheLifetime == null || it.cacheLifetime == AvatarImageLoader.currentCacheLifetime()
             currentOwner && currentLifetime
         }
     val durableImage = rememberDurableAvatar(appState, durableAvatar, accountRef)
@@ -176,7 +171,8 @@ internal fun rememberEncryptedGroupAvatar(
  * optional DM-peer profile URL, matching AppGroupRecordFfi precedence.
  */
 @Composable
-@Suppress("FunctionNaming", "LongParameterList") // Compatibility and selected-asset presentations share the existing avatar entry point.
+// Compatibility and selected-asset presentations share the existing avatar entry point.
+@Suppress("FunctionNaming", "LongParameterList")
 internal fun GroupAvatar(
     appState: WhiteNoiseAppState,
     group: AppGroupRecordFfi,
