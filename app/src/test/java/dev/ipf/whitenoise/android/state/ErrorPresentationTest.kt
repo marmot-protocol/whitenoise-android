@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.kotlinBlockFrom
 import dev.ipf.whitenoise.android.ui.profile.ProfileImageTarget
@@ -12,6 +14,46 @@ import org.junit.Test
 import java.io.File
 
 class ErrorPresentationTest {
+    /** A duplicate account has actionable copy and an expected, redacted diagnostic. */
+    @Test
+    fun amberDuplicateIdentityUsesExpectedErrorPresentation() {
+        val secret = "nsec1" + "q".repeat(60)
+        val duplicate = MarmotKitException.DuplicateIdentity("account $secret")
+        val presentation =
+            privacySafeErrorPresentation(
+                operationCode = "AMBER_SIGN_IN",
+                throwable = duplicate,
+                message = amberSignInFailureDetail(duplicate),
+                appVersion = "test",
+                androidVersion = "test",
+                occurredAtUtc = "2026-09-30T00:00:00Z",
+            )
+
+        assertEquals(AppText.Resource(R.string.amber_identity_already_added), presentation.message)
+        assertTrue(presentation.report.contains("error=ALREADY_EXISTS"))
+        assertTrue(presentation.report.contains("marmot=DuplicateIdentity"))
+        assertFalse(presentation.report.contains(secret))
+    }
+
+    /** An unrelated signer failure keeps the generic visible retry detail. */
+    @Test
+    fun unrelatedAmberFailureKeepsGenericErrorPresentation() {
+        val failure = MarmotKitException.ExternalSignerUnavailable("private account")
+        val presentation =
+            privacySafeErrorPresentation(
+                operationCode = "AMBER_SIGN_IN",
+                throwable = failure,
+                message = amberSignInFailureDetail(failure),
+                appVersion = "test",
+                androidVersion = "test",
+                occurredAtUtc = "2026-09-30T00:00:00Z",
+            )
+
+        assertEquals(AppText.Resource(R.string.error_try_again), presentation.message)
+        assertTrue(presentation.report.contains("operation=AMBER_SIGN_IN"))
+        assertFalse(presentation.report.contains("private account"))
+    }
+
     @Test
     fun identicalTransientCopyStillProducesDistinctNoticeKeys() {
         val title = AppText.Plain("Saved")
