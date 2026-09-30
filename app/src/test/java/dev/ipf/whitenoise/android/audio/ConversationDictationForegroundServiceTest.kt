@@ -17,7 +17,9 @@ import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.text.input.TextFieldValue
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import dev.ipf.whitenoise.android.notifications.BackgroundConnectionNotification
+import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
@@ -425,6 +427,54 @@ class ConversationDictationForegroundServiceTest {
 
         assertTrue(BackgroundConnectionNotification.restoreIfForeground(context))
         assertTrue(restored)
+    }
+
+    /** Completion updates the real connection service's foreground card, not only NotificationManager. */
+    @Test
+    @Config(application = WhiteNoiseApplication::class)
+    fun completionRestoresRealConnectionServiceForegroundNotification() {
+        val context = RuntimeEnvironment.getApplication()
+        val connectionLifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
+        val connectionService = connectionLifecycle.get()
+        assertTrue(NotificationStreamForegroundService.start(context))
+        connectionService.onStartCommand(shadowOf(context).nextStartedService, 0, 1)
+        val harness = installHost()
+        val dictationLifecycle = Robolectric.buildService(ConversationDictationForegroundService::class.java).create()
+        val dictationService = dictationLifecycle.get()
+        dictationService.onStartCommand(startIntent(dictationService, harness), 0, 1)
+
+        harness.conversationDictation.cancel()
+
+        val notification = shadowOf(connectionService as Service).lastForegroundNotification
+        assertEquals(
+            "White Noise is connected",
+            notification.extras.getCharSequence(Notification.EXTRA_TITLE).toString(),
+        )
+        assertNull(notification.contentView)
+        dictationLifecycle.destroy()
+        connectionLifecycle.destroy()
+        shadowOf(Looper.getMainLooper()).idle()
+    }
+
+    /** Android rejection of a foreground refresh still replaces the controls using notify. */
+    @Test
+    fun rejectedConnectionRestorationFallsBackToPlainConnectionCard() {
+        val context = RuntimeEnvironment.getApplication()
+        BackgroundConnectionNotification.markForegroundActive(Any()) { throw IllegalStateException("rejected") }
+
+        assertTrue(BackgroundConnectionNotification.restoreIfForeground(context))
+
+        val notification =
+            context
+                .getSystemService(NotificationManager::class.java)
+                .activeNotifications
+                .single()
+                .notification
+        assertEquals(
+            "White Noise is connected",
+            notification.extras.getCharSequence(Notification.EXTRA_TITLE).toString(),
+        )
+        assertNull(notification.contentView)
     }
 
     private fun assertExplicitNotificationDestinations(

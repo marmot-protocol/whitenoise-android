@@ -621,7 +621,10 @@ internal object BackgroundConnectionNotification {
     @Volatile
     private var foregroundActive = false
 
+    @Volatile
     private var foregroundOwner: Any? = null
+
+    @Volatile
     private var foregroundRestorer: ((Notification) -> Unit)? = null
 
     fun markForegroundActive(
