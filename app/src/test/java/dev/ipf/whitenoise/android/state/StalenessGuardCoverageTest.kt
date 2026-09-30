@@ -154,7 +154,19 @@ class StalenessGuardCoverageTest {
                     listOf(
                         "beginMemberRosterRefresh",
                         "memberRosterRefreshGeneration.runIfCurrent",
+                        "ownsCurrentMemberRead",
+                        "readAndApplyMembers",
+                    ),
+                "Controllers.kt:readAndApplyMembers" to
+                    listOf("memberRosterRefreshGeneration.runIfCurrent", "ownsCurrentMemberRead"),
+                "Controllers.kt:settleMemberReadFailure" to
+                    listOf("memberRosterRefreshGeneration.runIfCurrent", "ownsCurrentMemberRead"),
+                "Controllers.kt:ownsCurrentMemberRead" to
+                    listOf(
+                        "!controllerCleared",
+                        "!accountTeardownRequested",
                         "memberRosterRefreshGeneration.isCurrent",
+                        "appState.runtimeGeneration == runtimeGeneration",
                     ),
                 "Controllers.kt:performMediaUpload" to
                     listOf("shouldAcceptMediaUploadForAccount", "mediaUploadSessionEpoch"),

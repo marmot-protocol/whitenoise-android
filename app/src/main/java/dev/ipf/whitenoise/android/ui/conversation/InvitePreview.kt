@@ -147,13 +147,13 @@ internal fun InviteAcceptanceResolutionStatus(
             horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (state == GroupRosterLoadState.LOADING) {
+            val checking = state == GroupRosterLoadState.LOADING
+            val label = if (checking) R.string.checking_invitation else R.string.couldnt_check_invitation
+            if (checking) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
             }
             Text(
-                stringResource(
-                    if (state == GroupRosterLoadState.LOADING) R.string.checking_invitation else R.string.couldnt_check_invitation,
-                ),
+                stringResource(label),
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

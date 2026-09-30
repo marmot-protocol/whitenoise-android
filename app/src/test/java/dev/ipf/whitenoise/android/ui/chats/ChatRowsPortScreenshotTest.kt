@@ -67,18 +67,20 @@ class ChatRowsPortScreenshotTest {
         }
         composeRule.onNodeWithText(context.getString(R.string.checking_invitation)).assertDoesNotExist()
         composeRule.onNodeWithText(ChatRowPortFixtures.PREVIEW).assertExists()
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/chat_row_terminal_before_invite_confirmation_dark.png")
+        val snapshotPath = "src/test/snapshots/chat_row_terminal_before_invite_confirmation_dark.png"
+        composeRule.onRoot().captureRoboImage(snapshotPath)
     }
 
     private fun captureCheckingInvitation(dark: Boolean) {
         val state = ChatRowPortFixtures.state(context)
         val base = ChatRowPortFixtures.item()
         val item = base.copy(inviteConfirmationUnresolved = true, selectedPreview = SelectedChatPreviewFfi.Message)
+        val savedDraft = ChatListDraftPreviewFfi("Saved draft", false, 0uL, null)
         val draftItem =
             base.copy(
                 group = base.group.copy(groupIdHex = "b".repeat(64)),
                 inviteConfirmationUnresolved = true,
-                selectedPreview = SelectedChatPreviewFfi.Draft(ChatListDraftPreviewFfi("Saved draft", false, 0uL, null)),
+                selectedPreview = SelectedChatPreviewFfi.Draft(savedDraft),
             )
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = dark) {

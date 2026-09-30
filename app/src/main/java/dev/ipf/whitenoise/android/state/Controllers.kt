@@ -6362,7 +6362,11 @@ class ConversationController(
     // staleness-exempt: captured subscription-start token, not a counter owner.
     private var lastStartedGeneration: Long? = null
     private var conversationScope: CoroutineScope? = null
+
+    @Volatile
     internal var accountTeardownRequested = false
+
+    @Volatile
     private var controllerCleared = false
     internal val inboundVisibleHostAttempt = HostPerformanceAttemptSlot()
     internal var inboundVisibleHostGeneration by mutableLongStateOf(0L)
@@ -12700,7 +12704,9 @@ class ConversationController(
     /** Starts a roster read only while this controller still owns its account presentation. */
     private fun beginMemberRosterRefresh(): Long? =
         synchronized(liveSubscriptionLock) {
-            if (accountTeardownRequested || controllerCleared) null else memberRosterRefreshGeneration.advance()
+            val resolvingElsewhere = inviteAcceptanceResolutionPending && inviteAuthorityReadInFlight
+            val cannotRefresh = accountTeardownRequested || controllerCleared || resolvingElsewhere
+            if (cannotRefresh) null else memberRosterRefreshGeneration.advance()
         }
 
     /** Resolves conflicting list snapshots only while the opening controller still owns the read. */
@@ -12731,11 +12737,13 @@ class ConversationController(
         return ownsCurrentMemberRead(refreshGeneration, runtimeGeneration) && (ownsRead || resolvedByUpdate)
     }
 
+    // Publication holds the generation lock; never acquire liveSubscriptionLock here.
     private fun ownsCurrentMemberRead(
         generation: Long,
         runtimeGeneration: Int,
     ): Boolean =
-        ownsInviteAcceptanceResult &&
+        !controllerCleared &&
+            !accountTeardownRequested &&
             memberRosterRefreshGeneration.isCurrent(generation) &&
             appState.runtimeGeneration == runtimeGeneration
 
@@ -12744,7 +12752,7 @@ class ConversationController(
         retryOnPendingRead: Boolean = true,
         prefetchedRoster: Deferred<Result<GroupRosterFfi>>? = null,
     ) {
-        val account = conversationAccountRef?.takeUnless { inviteAcceptanceResolutionPending && inviteAuthorityReadInFlight } ?: return
+        val account = conversationAccountRef ?: return
         val generation = beginMemberRosterRefresh() ?: return
         val runtimeGeneration = appState.runtimeGeneration
         if (inviteAcceptanceResolutionPending) inviteAcceptanceResolutionState = GroupRosterLoadState.LOADING
@@ -12758,9 +12766,11 @@ class ConversationController(
                 }
             }
         } catch (cancel: CancellationException) {
-            if (ownsCurrentMemberRead(generation, runtimeGeneration)) {
-                memberRosterLoadTracker.restoreAfterCancellation()
-                if (inviteAcceptanceResolutionPending) inviteAcceptanceResolutionState = GroupRosterLoadState.FAILED
+            memberRosterRefreshGeneration.runIfCurrent(generation) {
+                if (ownsCurrentMemberRead(generation, runtimeGeneration)) {
+                    memberRosterLoadTracker.restoreAfterCancellation()
+                    if (inviteAcceptanceResolutionPending) inviteAcceptanceResolutionState = GroupRosterLoadState.FAILED
+                }
             }
             throw cancel
         }
@@ -12806,12 +12816,27 @@ class ConversationController(
         if (retryOnPendingRead && (hydrationPending || superseded)) {
             if (hydrationPending) delay(GROUP_HYDRATION_RETRY_DELAY_MS)
             if (ownsCurrentMemberRead(generation, runtimeGeneration)) refreshMembers(retryOnPendingRead = false)
-        } else if (failure.isUseAfterEviction()) {
-            markActiveAccountRemovedFromMembers(account)
         } else {
-            memberRosterLoadTracker.transition(GroupRosterRefreshEvent.FAILED)
-            if (inviteAcceptanceResolutionPending) inviteAcceptanceResolutionState = GroupRosterLoadState.FAILED
-            if (BuildConfig.DEBUG) Log.w("DMConversation", "refresh members failed", failure)
+            settleMemberReadFailure(account, generation, runtimeGeneration, failure)
+        }
+    }
+
+    /** Settles a failure atomically with its roster generation, without holding a lock over IO. */
+    private fun settleMemberReadFailure(
+        account: String,
+        generation: Long,
+        runtimeGeneration: Int,
+        failure: Throwable,
+    ) {
+        memberRosterRefreshGeneration.runIfCurrent(generation) {
+            if (!ownsCurrentMemberRead(generation, runtimeGeneration)) return@runIfCurrent
+            if (failure.isUseAfterEviction()) {
+                markActiveAccountRemovedFromMembers(account)
+            } else {
+                memberRosterLoadTracker.transition(GroupRosterRefreshEvent.FAILED)
+                if (inviteAcceptanceResolutionPending) inviteAcceptanceResolutionState = GroupRosterLoadState.FAILED
+                if (BuildConfig.DEBUG) Log.w("DMConversation", "refresh members failed", failure)
+            }
         }
     }
 

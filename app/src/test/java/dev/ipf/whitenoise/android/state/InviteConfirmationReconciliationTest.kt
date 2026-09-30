@@ -11,12 +11,15 @@ import dev.ipf.whitenoise.android.state.InviteAcceptanceTestData.group
 import dev.ipf.whitenoise.android.state.InviteAcceptanceTestData.memberRoster
 import dev.ipf.whitenoise.android.state.InviteAcceptanceTestData.memberSnapshot
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -25,6 +28,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /** Exercises native Join results and independently delivered confirmation snapshots (#2567). */
 @RunWith(RobolectricTestRunner::class)
@@ -211,7 +216,8 @@ class InviteConfirmationReconciliationTest {
     @Test
     fun conflictingRowsRemainIdentifiableAndTerminalRowsWin() {
         for (rowPending in listOf(false, true)) {
-            val item = chatListItemFromProjection(chatListRow(pending = rowPending), group = group(pending = !rowPending, welcome = OLD_WELCOME))
+            val canonical = group(pending = !rowPending, welcome = OLD_WELCOME)
+            val item = chatListItemFromProjection(chatListRow(pending = rowPending), group = canonical)
             assertTrue(item.checkingInvitation)
             assertEquals(rowPending, item.group.pendingConfirmation)
             assertFalse(item.copy(group = item.group.copy(unrecoverable = true)).checkingInvitation)
@@ -222,7 +228,8 @@ class InviteConfirmationReconciliationTest {
     @Test
     fun terminalRowPresentationWinsBeforeTheGroupRecordArrives() {
         val ordinary = chatListRow(pending = false)
-        for (row in listOf(ordinary.copy(disbanding = true), ordinary.copy(lifecycleState = GroupLifecycleStateFfi.DISBANDED))) {
+        val disbanded = ordinary.copy(lifecycleState = GroupLifecycleStateFfi.DISBANDED)
+        for (row in listOf(ordinary.copy(disbanding = true), disbanded)) {
             val item = chatListItemFromProjection(row, group = pending())
             assertTrue(item.inviteConfirmationUnresolved)
             assertFalse(item.group.disbanded)
@@ -369,6 +376,51 @@ class InviteConfirmationReconciliationTest {
             assertEquals(2, rosterReads)
             assertEquals(GroupRosterLoadState.READY, controller.memberRosterState)
             assertEquals("New metadata", controller.group.name)
+            assertTrue(controller.canSendMessages)
+        }
+
+    /** Roster publication must not nest the subscription lock inside its generation lock. */
+    @Test
+    fun rosterPublicationCompletesWhileSubscriptionMaintenanceHoldsItsLock() =
+        runTest {
+            val started = CompletableDeferred<Unit>()
+            val releaseRoster = CompletableDeferred<Unit>()
+            val lockHeld = CountDownLatch(1)
+            val releaseLock = CountDownLatch(1)
+            val controller =
+                conflictController(
+                    chatListItemFromProjection(chatListRow(pending = false), group = accepted()),
+                    roster = {
+                        started.complete(Unit)
+                        releaseRoster.await()
+                        memberRoster()
+                    },
+                    cold = true,
+                ) { error("unexpected canonical read") }
+            val read = async(Dispatchers.Default) { controller.retryMembers() }
+            started.await()
+            val maintenance =
+                Thread {
+                    synchronized(controller.liveSubscriptionLock) {
+                        lockHeld.countDown()
+                        releaseLock.await(5, TimeUnit.SECONDS)
+                    }
+                }.apply {
+                    isDaemon = true
+                    start()
+                }
+            val completedWhileLockHeld =
+                try {
+                    withContext(Dispatchers.IO) { assertTrue(lockHeld.await(5, TimeUnit.SECONDS)) }
+                    releaseRoster.complete(Unit)
+                    withContext(Dispatchers.Default) { withTimeoutOrNull(2_000) { read.await() } } != null
+                } finally {
+                    releaseLock.countDown()
+                    withContext(Dispatchers.IO) { maintenance.join(5_000) }
+                }
+            read.await()
+            assertTrue("Roster publication waited for the subscription lock", completedWhileLockHeld)
+            assertEquals(GroupRosterLoadState.READY, controller.memberRosterState)
             assertTrue(controller.canSendMessages)
         }
 
