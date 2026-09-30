@@ -8,15 +8,17 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 
 /** Fences preparing/enriching writes, then removes only matching live OS generations. */
+@Suppress("LongParameterList") // Separate platform read/schedule seams keep async dismissal tests deterministic.
 internal suspend fun dismissNotificationGroupGenerations(
     context: Context,
     children: List<NotificationGroupChild>,
     fence: NotificationGroupDismissalFence? = null,
     pacer: NotificationPostPacer = NotificationPostPacer.shared,
     read: (NotificationManager) -> Array<StatusBarNotification> = { it.activeNotifications },
+    request: () -> Unit = { NotificationGroupReconciler.shared(context).request() },
 ) {
     synchronized(UserEventNotificationGroup.mutationLock) {
-        fence?.let(NotificationCardGenerations::dismissThrough)
+        fence?.let { NotificationCardGenerations.dismissThrough(it, children) }
         children.forEach { NotificationCardGenerations.dismiss(it.generation) }
     }
     val manager = context.getSystemService(NotificationManager::class.java) ?: return
@@ -38,7 +40,7 @@ internal suspend fun dismissNotificationGroupGenerations(
                 val complete =
                     try {
                         ConversationCardPostSynchronizer.withLock(target.tag, target.id, ConversationCardOp.DISMISS_CANCEL) {
-                            NotificationGroupReconciler.mutate(context) {
+                            NotificationGroupReconciler.mutate(context, request) {
                                 val live = read(manager).firstOrNull { it.tag == target.tag && it.id == target.id }
                                 if (live == null || UserEventNotificationGroup.child(live) != target) return@mutate true
                                 compat.cancel(target.tag, target.id)
@@ -56,7 +58,7 @@ internal suspend fun dismissNotificationGroupGenerations(
             }
         }
     } finally {
-        NotificationGroupReconciler.shared(context).request()
+        request()
     }
 }
 

@@ -74,32 +74,36 @@ internal class NotificationGroupReconciler(
         val children = first.mapNotNull(UserEventNotificationGroup::child)
         val old = first.firstOrNull { it.tag == UserEventNotificationGroup.SUMMARY_TAG && it.id == UserEventNotificationGroup.SUMMARY_ID }
         if (children.isEmpty() && !allowEmpty) return false
-        val fence = NotificationCardGenerations.captureFence()
-        if (children.isNotEmpty() && matches(old, UserEventNotificationGroup.summaryState(children, fence))) return true
+        if (children.isNotEmpty() && matches(old, UserEventNotificationGroup.summaryState(children))) return true
         if (children.isEmpty() && old == null) return true
         if (manager.getNotificationChannel(NotificationChannelSpec.USER_EVENT_SUMMARY.id) == null) NotificationChannels.ensureChannels(context)
         // Pacing and coroutine suspension happen before the commit gate. Re-read after waiting.
         pacer.awaitSlot()
         return synchronized(UserEventNotificationGroup.mutationLock) {
             if (revision.get() != expected) return@synchronized false
-            val latest = read(manager)
-            val liveChildren = latest.mapNotNull(UserEventNotificationGroup::child)
-            val liveSummary = latest.firstOrNull { it.tag == UserEventNotificationGroup.SUMMARY_TAG && it.id == UserEventNotificationGroup.SUMMARY_ID }
-            if (liveChildren.isEmpty()) {
-                if (!allowEmpty) return@synchronized false
-                if (liveSummary != null) cancel(compat, UserEventNotificationGroup.SUMMARY_TAG, UserEventNotificationGroup.SUMMARY_ID)
-            } else {
-                val liveFence = NotificationCardGenerations.captureFence()
-                if (!matches(liveSummary, UserEventNotificationGroup.summaryState(liveChildren, liveFence))) {
-                    post(compat, UserEventNotificationGroup.SUMMARY_TAG, UserEventNotificationGroup.SUMMARY_ID, UserEventNotificationGroup.summary(context, liveChildren, liveFence))
-                }
-            }
-            // A subsequent bounded read confirms asynchronous platform visibility, including cancels.
-            val after = read(manager)
-            val afterChildren = after.mapNotNull(UserEventNotificationGroup::child)
-            val afterSummary = after.firstOrNull { it.tag == UserEventNotificationGroup.SUMMARY_TAG && it.id == UserEventNotificationGroup.SUMMARY_ID }
-            if (afterChildren.isEmpty()) afterSummary == null else matches(afterSummary, UserEventNotificationGroup.summaryState(afterChildren, NotificationCardGenerations.captureFence()))
+            commitSummary(manager, compat, allowEmpty)
         }
+    }
+
+    /** Called only under the group mutation gate, after pacing and revision validation. */
+    private fun commitSummary(manager: NotificationManager, compat: NotificationManagerCompat, allowEmpty: Boolean): Boolean {
+        val latest = read(manager)
+        val liveChildren = latest.mapNotNull(UserEventNotificationGroup::child)
+        val liveSummary = latest.firstOrNull { it.tag == UserEventNotificationGroup.SUMMARY_TAG && it.id == UserEventNotificationGroup.SUMMARY_ID }
+        if (liveChildren.isEmpty()) {
+            if (!allowEmpty) return false
+            if (liveSummary != null) cancel(compat, UserEventNotificationGroup.SUMMARY_TAG, UserEventNotificationGroup.SUMMARY_ID)
+        } else {
+            val liveFence = NotificationCardGenerations.captureFence()
+            if (!matches(liveSummary, UserEventNotificationGroup.summaryState(liveChildren))) {
+                post(compat, UserEventNotificationGroup.SUMMARY_TAG, UserEventNotificationGroup.SUMMARY_ID, UserEventNotificationGroup.summary(context, liveChildren, liveFence))
+            }
+        }
+        // A subsequent bounded read confirms asynchronous platform visibility, including cancels.
+        val after = read(manager)
+        val afterChildren = after.mapNotNull(UserEventNotificationGroup::child)
+        val afterSummary = after.firstOrNull { it.tag == UserEventNotificationGroup.SUMMARY_TAG && it.id == UserEventNotificationGroup.SUMMARY_ID }
+        return if (afterChildren.isEmpty()) afterSummary == null else matches(afterSummary, UserEventNotificationGroup.summaryState(afterChildren))
     }
 
     private fun matches(summary: StatusBarNotification?, state: String): Boolean =
@@ -125,6 +129,7 @@ internal class NotificationGroupReconciler(
                     val adopted = UserEventNotificationGroup.decorateChild(context, builder, NotificationGroupChild(requireNotNull(live.tag), live.id, generation), silent = true)
                         .setOnlyAlertOnce(true).setSilent(true).build()
                     post(compat, requireNotNull(live.tag), live.id, adopted)
+                    ConversationCardPostedRegistry.markPosted(requireNotNull(live.tag), live.id, live.postTime)
                     changed = true
                 }
             }

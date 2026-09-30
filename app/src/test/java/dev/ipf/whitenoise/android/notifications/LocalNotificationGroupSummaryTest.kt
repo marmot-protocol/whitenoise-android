@@ -71,7 +71,7 @@ class LocalNotificationGroupSummaryTest {
             assertEquals(Notification.VISIBILITY_PRIVATE, summary.visibility)
             assertEquals(NotificationCompat.GROUP_ALERT_CHILDREN, summary.groupAlertBehavior)
             assertNull(summary.sound)
-            assertTrue(summary.vibrate.isNullOrEmpty())
+            assertTrue(summary.vibrate?.isEmpty() != false)
             val publicText = summary.publicVersion.extras.toString()
             assertFalse(publicText.contains("Alice") || publicText.contains("General") || publicText.contains("account-a"))
             assertEquals(3, fixture.childWrites)
@@ -93,6 +93,36 @@ class LocalNotificationGroupSummaryTest {
             fixture.presenter.cancel(keyB.tag, keyB.id)
             settle()
             assertTrue(manager.activeNotifications.isEmpty())
+        }
+
+    @Test
+    fun restoringALegacyCardPreservesActionsAndMessageWhileExcludingServiceAndUpdateCards() =
+        runTest {
+            val fixture = GroupFixture(context, backgroundScope)
+            val original = fixture.send("account-a", "group-a", "legacy-message")
+            fixture.coordinator.close()
+            val extras = android.os.Bundle(original.extras).apply {
+                remove(UserEventNotificationGroup.EXTRA_GENERATION)
+                remove(UserEventNotificationGroup.EXTRA_CHILD)
+            }
+            manager.notify("account-a|group-a", 0, NotificationCompat.Builder(context, original).setGroup(null).setExtras(extras).build())
+            val unrelated = NotificationCompat.Builder(context, NotificationChannelSpec.APP_UPDATES.id)
+                .setSmallIcon(dev.ipf.whitenoise.android.R.drawable.ic_stat_whitenoise).setContentTitle("synthetic service").setOngoing(true).build()
+            manager.notify("connections", 0, unrelated)
+            manager.notify("update", 77, unrelated)
+            val restored = NotificationGroupReconciler(context, backgroundScope, fixture.pacer)
+            restored.request()
+            settle()
+            val children = manager.activeNotifications.mapNotNull(UserEventNotificationGroup::child)
+            assertEquals(1, children.size)
+            val adopted = manager.activeNotifications.single { it.tag == "account-a|group-a" }.notification
+            assertEquals("legacy-message", adopted.extras.getString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX))
+            assertEquals(original.actions.size, adopted.actions.size)
+            assertEquals(original.contentIntent, adopted.contentIntent)
+            assertEquals("1 notification", requireNotNull(fixture.summary()).extras.getCharSequence(Notification.EXTRA_TEXT))
+            assertNull(manager.activeNotifications.single { it.tag == "connections" }.notification.group)
+            assertNull(manager.activeNotifications.single { it.tag == "update" }.notification.group)
+            restored.close()
         }
 
     @Test
@@ -168,7 +198,7 @@ class LocalNotificationGroupSummaryTest {
             val old = fixture.send("account-a", "group-a", "old")
             val intent = shadowOf(old.deleteIntent).savedIntent
             fixture.send("account-a", "group-a", "new")
-            dismissNotificationGroupGenerations(context, requireNotNull(UserEventNotificationGroup.dismissalChildren(intent)), pacer = fixture.pacer)
+            dismissNotificationGroupGenerations(context, requireNotNull(UserEventNotificationGroup.dismissalChildren(intent)), pacer = fixture.pacer, request = fixture.coordinator::request)
             settle()
             val live = manager.activeNotifications.single { UserEventNotificationGroup.child(it) != null }.notification
             assertEquals("new", live.extras.getString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX))
@@ -186,13 +216,13 @@ class LocalNotificationGroupSummaryTest {
             fixture.send("account-b", "group-b", "new-b")
             val children = requireNotNull(UserEventNotificationGroup.dismissalChildren(intent))
             val fence = NotificationGroupDismissalFence(requireNotNull(intent.getStringExtra(UserEventNotificationGroup.EXTRA_FENCE_SESSION)), intent.getLongExtra(UserEventNotificationGroup.EXTRA_FENCE_SEQUENCE, -1L))
-            dismissNotificationGroupGenerations(context, children, fence, fixture.pacer)
+            dismissNotificationGroupGenerations(context, children, fence, fixture.pacer, request = fixture.coordinator::request)
             fixture.coordinator.request()
             settle()
             val live = manager.activeNotifications.single { UserEventNotificationGroup.child(it) != null }.notification
             assertEquals("new-b", live.extras.getString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX))
             assertEquals("1 notification", requireNotNull(fixture.summary()).extras.getCharSequence(Notification.EXTRA_TEXT))
-            dismissNotificationGroupGenerations(context, children, fence, fixture.pacer)
+            dismissNotificationGroupGenerations(context, children, fence, fixture.pacer, request = fixture.coordinator::request)
             assertEquals(1, manager.activeNotifications.count { UserEventNotificationGroup.child(it) != null })
         }
 
@@ -232,6 +262,34 @@ class LocalNotificationGroupSummaryTest {
             val live = manager.activeNotifications.single { it.tag == key.tag && it.id == key.id }.notification
             assertEquals("new-generation", live.extras.getString(UserEventNotificationGroup.EXTRA_GENERATION))
             assertNull(live.extras.getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY))
+        }
+
+    @Test
+    fun aRefusedPreparingPostDoesNotCancelANewerVisibleCard() =
+        runTest {
+            val fixture = GroupFixture(context, backgroundScope)
+            val original = fixture.send("account-a", "group-a", "original")
+            val represented = manager.activeNotifications.mapNotNull(UserEventNotificationGroup::child)
+            val replacement = NotificationCompat.Builder(context, original)
+                .addExtras(android.os.Bundle().apply {
+                    putString(UserEventNotificationGroup.EXTRA_GENERATION, "later-generation")
+                    putString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX, "later-visible")
+                }).build()
+            ConversationCardPostSynchronizer.testHook = object : ConversationCardTestHook {
+                override fun onBarrier(op: ConversationCardOp, barrier: ConversationCardBarrier, notificationTag: String, notificationId: Int) {
+                    if (barrier == ConversationCardBarrier.BEFORE_PLATFORM_WRITE) {
+                        // Simulate the summary callback after the show precheck and a newer OS card.
+                        NotificationCardGenerations.dismissThrough(NotificationCardGenerations.captureFence(), represented)
+                        manager.notify(notificationTag, notificationId, replacement)
+                    }
+                }
+            }
+            fixture.now += 6_000
+            assertFalse(fixture.presenter.show(alertBudgetUpdate("refused", fixture.now, false, "account-a", "group-a"), shortNpub = { it }))
+            val live = manager.activeNotifications.single { it.tag == "account-a|group-a" }.notification
+            assertEquals("later-generation", live.extras.getString(UserEventNotificationGroup.EXTRA_GENERATION))
+            assertEquals("later-visible", live.extras.getString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX))
+            assertEquals(1, fixture.childWrites)
         }
 
     private fun TestScope.settle() {

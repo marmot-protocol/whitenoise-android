@@ -100,10 +100,9 @@ internal object UserEventNotificationGroup {
 
     fun isSummary(notification: Notification): Boolean = notification.flags and Notification.FLAG_GROUP_SUMMARY != 0
 
-    fun summaryState(children: List<NotificationGroupChild>, fence: NotificationGroupDismissalFence): String {
+    fun summaryState(children: List<NotificationGroupChild>): String {
         val bytes =
-            (children.sortedWith(compareBy({ it.tag }, { it.id })).joinToString("\n") { "${it.tag}\u0000${it.id}\u0000${it.generation}" } +
-                "\n${fence.session}:${fence.sequence}").toByteArray()
+            children.sortedWith(compareBy({ it.tag }, { it.id })).joinToString("\n") { "${it.tag}\u0000${it.id}\u0000${it.generation}" }.toByteArray()
         return MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
     }
 
@@ -113,7 +112,7 @@ internal object UserEventNotificationGroup {
         fence: NotificationGroupDismissalFence,
     ): Notification {
         require(children.isNotEmpty() && children.size <= MAX_CHILDREN)
-        val state = summaryState(children, fence)
+        val state = summaryState(children)
         val publicVersion =
             NotificationCompat.Builder(context, NotificationChannelSpec.USER_EVENT_SUMMARY.id)
                 .setSmallIcon(R.drawable.ic_stat_whitenoise)

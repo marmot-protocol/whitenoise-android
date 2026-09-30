@@ -7,6 +7,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 internal class NotificationCardGeneration(
     val id: String,
     val sequence: Long,
+    val tag: String,
+    val notificationId: Int,
 ) {
     val dismissed = AtomicBoolean()
     var references = 1
@@ -28,9 +30,9 @@ internal object NotificationCardGenerations {
     private var sequence = 0L
     private val active = mutableMapOf<String, NotificationCardGeneration>()
 
-    fun register(): NotificationCardGeneration =
+    fun register(tag: String, notificationId: Int): NotificationCardGeneration =
         synchronized(lock) {
-            NotificationCardGeneration(UUID.randomUUID().toString(), ++sequence).also { active[it.id] = it }
+            NotificationCardGeneration(UUID.randomUUID().toString(), ++sequence, tag, notificationId).also { active[it.id] = it }
         }
 
     fun retain(generation: NotificationCardGeneration): Boolean =
@@ -56,10 +58,12 @@ internal object NotificationCardGenerations {
 
     fun isDismissed(generationId: String?): Boolean = synchronized(lock) { active[generationId]?.dismissed?.get() == true }
 
-    fun dismissThrough(fence: NotificationGroupDismissalFence) {
+    fun dismissThrough(fence: NotificationGroupDismissalFence, children: List<NotificationGroupChild>) {
         synchronized(lock) {
             if (fence.session != session) return
-            active.values.filter { it.sequence <= fence.sequence }.forEach { it.dismissed.set(true) }
+            active.values.filter { generation ->
+                generation.sequence <= fence.sequence && children.any { it.tag == generation.tag && it.id == generation.notificationId }
+            }.forEach { it.dismissed.set(true) }
         }
     }
 }

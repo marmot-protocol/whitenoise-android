@@ -18,6 +18,7 @@ internal enum class ConversationCardBarrier {
     AFTER_READ,
     BEFORE_WRITE,
     AFTER_WRITE,
+    BEFORE_PLATFORM_WRITE,
 }
 
 internal data class ConversationCardShowToken(
@@ -99,7 +100,7 @@ internal object ConversationCardPostSynchronizer {
                     conversationScope = conversationScope,
                     dismissalGeneration = state.dismissals.capture(),
                     showGeneration = state.shows.advance(),
-                    notificationGeneration = NotificationCardGenerations.register(),
+                    notificationGeneration = NotificationCardGenerations.register(notificationTag, notificationId),
                 )
             }
         return try {
