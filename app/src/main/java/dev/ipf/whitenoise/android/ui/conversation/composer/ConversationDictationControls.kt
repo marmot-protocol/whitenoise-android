@@ -153,6 +153,13 @@ internal fun ConversationDictationCompactActions(
             if (state.hasActiveRecognitionActions) {
                 ConversationDictationActiveActions(controller, actionColors)
             } else {
+                if (state is ConversationDictationState.Failed &&
+                    state.reason == ConversationDictationFailure.SendBlocked
+                ) {
+                    IconButton(onClick = controller::paste, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Default.ContentPaste, contentDescription = stringResource(R.string.paste))
+                    }
+                }
                 ConversationDictationPrimaryAction(
                     state = state,
                     controller = controller,
@@ -211,6 +218,8 @@ private fun ConversationDictationState.compactActionsWidth(captureInProgress: Bo
         is ConversationDictationState.Listening,
         is ConversationDictationState.Processing,
         -> if (captureInProgress) DICTATION_ACTIVE_ACTIONS_WIDTH else DICTATION_PROCESSING_ACTIONS_WIDTH
+        is ConversationDictationState.Failed ->
+            if (reason == ConversationDictationFailure.SendBlocked) 144.dp else 96.dp
         else -> 96.dp
     }
 
@@ -253,7 +262,11 @@ private fun ConversationDictationActiveActions(
         }
     }
     if (controller.processingDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {
-        IconButton(onClick = controller::send, enabled = false, modifier = Modifier.size(48.dp)) {
+        IconButton(
+            onClick = controller::send,
+            enabled = controller.completionActionsEnabled,
+            modifier = Modifier.size(48.dp),
+        ) {
             CircularProgressIndicator(
                 modifier =
                     Modifier
@@ -361,7 +374,7 @@ private fun ConversationDictationFailureAction(
     controller: ConversationDictationController,
 ) {
     val context = LocalContext.current
-    val recovery = dictationFailureRecovery(state.reason)
+    val recovery = dictationFailureRecovery(state.cause ?: state.reason)
     IconButton(
         onClick =
             when (recovery) {
@@ -384,7 +397,12 @@ private fun ConversationDictationFailureAction(
                     when (recovery) {
                         ConversationDictationRecovery.AppSettings -> R.string.open_app_settings
                         ConversationDictationRecovery.SpeechProviderSetup -> R.string.dictation_open_speech_service
-                        ConversationDictationRecovery.Retry -> R.string.retry
+                        ConversationDictationRecovery.Retry ->
+                            if (state.reason == ConversationDictationFailure.SendBlocked) {
+                                R.string.dictation_retry_send
+                            } else {
+                                R.string.retry
+                            }
                     },
                 ),
         )
@@ -435,7 +453,14 @@ private fun dictationStatusLabel(
             stringResource(
                 if (captureInProgress) R.string.dictation_listening else R.string.dictation_processing,
             )
-        is ConversationDictationState.Failed -> dictationFailureLabel(state.reason)
+        is ConversationDictationState.Failed -> {
+            val failureLabel = dictationFailureLabel(state.cause ?: state.reason)
+            if (state.reason == ConversationDictationFailure.SendBlocked && state.cause != null) {
+                "${stringResource(R.string.dictation_send_blocked)} · $failureLabel"
+            } else {
+                failureLabel
+            }
+        }
         is ConversationDictationState.Idle -> ""
     }
 
@@ -458,6 +483,7 @@ private fun dictationFailureLabel(reason: ConversationDictationFailure): String 
             ConversationDictationFailure.RecognizerBusy -> R.string.dictation_recognizer_busy
             ConversationDictationFailure.AudioBufferFull -> R.string.dictation_audio_buffer_full
             ConversationDictationFailure.TimedOut -> R.string.dictation_timed_out
+            ConversationDictationFailure.SendBlocked -> R.string.dictation_send_blocked
             ConversationDictationFailure.DeliveryUnknown -> R.string.delivery_not_confirmed
             ConversationDictationFailure.Unknown -> R.string.dictation_failed
         },

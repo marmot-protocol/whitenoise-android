@@ -290,7 +290,7 @@ class ComposerDictationControlTest {
         ConversationDictationController(
             platform = FakeDictationPlatform,
             readDraft = { _, _ -> ConversationDictationDraftSnapshot(draft, 0L) },
-            writeDraft = { _, _, _, _ -> true },
+            writeDraft = { _, _, _, _ -> 0L },
             disclosureAccepted = { true },
             markDisclosureAccepted = {},
         )

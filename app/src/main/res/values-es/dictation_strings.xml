@@ -18,5 +18,7 @@
     <string name="dictation_result_paste_description">Revisar o editar el texto antes de enviarlo</string>
     <string name="dictation_result_send">Enviar mensaje</string>
     <string name="dictation_result_send_description">Solo se envía si el chat y el borrador no han cambiado</string>
-    <string name="dictation_send_safety_note">Si el chat o el borrador cambian antes de que se envíe el mensaje, el texto se queda en tu borrador para que puedas revisarlo.</string>
+    <string name="dictation_send_safety_note">Si el chat o el borrador cambia antes del envío, el dictado quedará sin enviar. Reintenta el envío o elige Pegar para revisar el texto.</string>
+    <string name="dictation_send_blocked">No enviado</string>
+    <string name="dictation_retry_send">Reintentar envío</string>
 </resources>

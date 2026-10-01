@@ -18,5 +18,7 @@
     <string name="dictation_result_paste_description">Rever ou editar o texto antes de enviar</string>
     <string name="dictation_result_send">Enviar mensagem</string>
     <string name="dictation_result_send_description">Envia apenas se a conversa e o rascunho não tiverem mudado</string>
-    <string name="dictation_send_safety_note">Se a conversa ou o rascunho mudar antes de a mensagem ser enviada, o texto permanece no seu rascunho para você revisar.</string>
+    <string name="dictation_send_safety_note">Se a conversa ou o rascunho mudar antes do envio, o ditado ficará por enviar. Tente enviar novamente ou escolha Colar para rever o texto.</string>
+    <string name="dictation_send_blocked">Não enviado</string>
+    <string name="dictation_retry_send">Tentar enviar novamente</string>
 </resources>
