@@ -42,6 +42,7 @@ import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
+import dev.ipf.whitenoise.android.ui.common.readerScrollIndicator
 
 internal const val MESSAGE_FULL_SCREEN_TAG = "message-full-screen"
 internal const val MESSAGE_FULL_SCREEN_BODY_TAG = "message-full-screen-body"
@@ -81,6 +82,8 @@ internal fun MessageFullScreenView(
 ) {
     val selectionKey = remember(body, bodyMarkdownDocument) { Any() }
     val selection = rememberReaderTextSelectionController(selectionKey, selectionController)
+    // Save with the owning message, outside the dialog’s separate saveable registry.
+    val scrollState = rememberScrollState()
     Dialog(
         onDismissRequest = onDismiss,
         properties =
@@ -201,7 +204,12 @@ internal fun MessageFullScreenView(
                     onNostrProfileTap = onNostrProfileTap,
                     onCopyMarkdownLink = onCopyMarkdownLink,
                     selectionController = selection,
-                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .readerScrollIndicator(scrollState, selectionKey, enabled = !selection.active)
+                            .verticalScroll(scrollState)
+                            .padding(16.dp),
                 )
             }
         }

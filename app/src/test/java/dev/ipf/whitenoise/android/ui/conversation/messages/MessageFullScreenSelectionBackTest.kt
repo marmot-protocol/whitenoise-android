@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
@@ -124,6 +126,40 @@ class MessageFullScreenSelectionBackTest {
             assertTrue(body.contains(selected))
             assertFalse(selected == body)
         }
+    }
+
+    /** Editing content and recreating the saved composition retain its native reading position. */
+    @Test
+    fun editsAndSavedStateRestorePreserveTheReaderPosition() {
+        val lines = (1..80).joinToString("\n") { index -> "Reader line $index has selectable words" }
+        val body = mutableStateOf(lines)
+        val restorationTester = StateRestorationTester(composeRule)
+        restorationTester.setContent {
+            WhiteNoiseTheme {
+                reader(body.value, rememberReaderTextSelectionController(body.value))
+            }
+        }
+        val readerBody = composeRule.onNodeWithTag(MESSAGE_FULL_SCREEN_BODY_TAG)
+        readerBody.performTouchInput { swipeUp() }
+        composeRule.waitForIdle()
+        val before = readerBody.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+        assertTrue(before > 0f)
+
+        composeRule.runOnIdle { body.value = lines.replace("selectable", "changeable") }
+        composeRule.waitForIdle()
+        assertEquals(
+            before,
+            readerBody.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value(),
+            1f,
+        )
+
+        restorationTester.emulateSavedInstanceStateRestore()
+        composeRule.waitForIdle()
+        assertEquals(
+            before,
+            readerBody.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value(),
+            1f,
+        )
     }
 
     /** Mounts one full-screen reader and returns its selection controller. */
