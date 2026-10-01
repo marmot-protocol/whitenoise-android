@@ -40,6 +40,16 @@ internal class ComposerAttachmentMenuPositionProvider(
     private val gapPx: Int,
     private val edgePx: Int,
 ) : PopupPositionProvider {
+    /** A raised Add button bounds the viewport even when the popup measures the full window. */
+    fun maxHeight(
+        windowHeightPx: Int,
+        minimumViewportPx: Int,
+    ): Int {
+        val above = (minOf(sourceBounds.top, windowHeightPx) - gapPx - edgePx).coerceAtLeast(0)
+        val below = (windowHeightPx - sourceBounds.bottom - gapPx - edgePx).coerceAtLeast(0)
+        return if (above >= minimumViewportPx) above else maxOf(above, below)
+    }
+
     /** Anchors the menu above the attachment button, clamped to the window. */
     override fun calculatePosition(
         anchorBounds: IntRect,
@@ -63,7 +73,9 @@ internal class ComposerAttachmentMenuPositionProvider(
         val aboveY = sourceBounds.top - gapPx - popupContentSize.height
         val belowY = sourceBounds.bottom + gapPx
         val fitsBelow = belowY + popupContentSize.height <= windowSize.height - edgePx
-        val y = if (aboveY >= edgePx || !fitsBelow) aboveY.coerceAtLeast(edgePx) else belowY
+        val preferredY = if (aboveY >= edgePx || !fitsBelow) aboveY else belowY
+        val lastY = (windowSize.height - edgePx - popupContentSize.height).coerceAtLeast(edgePx)
+        val y = preferredY.coerceIn(edgePx, lastY)
         return IntOffset(x, y)
     }
 }
@@ -111,7 +123,10 @@ internal fun ComposerAttachmentMenu(
         }
     KeyboardSafePopup(expanded, onDismiss, position) {
         BoxWithConstraints {
-            val menuMaxHeight = (maxHeight - 16.dp).coerceAtLeast(0.dp)
+            val menuMaxHeight =
+                with(density) {
+                    position.maxHeight(maxHeight.roundToPx(), 48.dp.roundToPx()).toDp()
+                }
             // A popup hands its content the window's width, and the Expressive menu rows fill
             // whatever they are given, so without this the menu ran edge to edge. The prototype's
             // menu popup sizes to its widest label; wrapping to the intrinsic width matches it.
@@ -119,13 +134,13 @@ internal fun ComposerAttachmentMenu(
                 shapes = MenuDefaults.groupShapes(),
                 border = amoledOutlineBorder(),
                 shadowElevation = MenuDefaults.ShadowElevation,
-                modifier = Modifier.width(IntrinsicSize.Max).testTag("conversation.attachment.menu"),
-            ) {
-                Column(
+                modifier =
                     Modifier
+                        .width(IntrinsicSize.Max)
                         .heightIn(max = menuMaxHeight)
-                        .verticalScroll(rememberScrollState()),
-                ) {
+                        .testTag("conversation.attachment.menu"),
+            ) {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
                     items.forEachIndexed { index, item ->
                         DropdownMenuItem(
                             text = { Text(item.label) },

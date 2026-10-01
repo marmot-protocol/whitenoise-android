@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.GroupLifecycleStateFfi
+import dev.ipf.marmotkit.GroupRosterFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.state.InviteAcceptanceTestData.OLD_WELCOME
 import dev.ipf.whitenoise.android.state.InviteAcceptanceTestData.appState
@@ -9,12 +11,15 @@ import dev.ipf.whitenoise.android.state.InviteAcceptanceTestData.group
 import dev.ipf.whitenoise.android.state.InviteAcceptanceTestData.memberRoster
 import dev.ipf.whitenoise.android.state.InviteAcceptanceTestData.memberSnapshot
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -23,6 +28,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /** Exercises native Join results and independently delivered confirmation snapshots (#2567). */
 @RunWith(RobolectricTestRunner::class)
@@ -196,12 +203,248 @@ class InviteConfirmationReconciliationTest {
             assertTrue(controller.inviteAcceptanceResolutionPending)
             assertFalse(controller.canSendMessages)
             assertEquals(GroupRosterLoadState.FAILED, controller.memberRosterState)
+            assertEquals(GroupRosterLoadState.FAILED, controller.inviteAcceptanceResolutionState)
             assertEquals(1, closed)
             available = true
             controller.retryInviteAcceptanceAuthority()
             assertFalse(controller.inviteAcceptanceResolutionPending)
             assertFalse(controller.group.pendingConfirmation)
             assertEquals(2, closed)
+        }
+
+    /** Both stream orders retain invitation identity without rewriting protocol confirmation. */
+    @Test
+    fun conflictingRowsRemainIdentifiableAndTerminalRowsWin() {
+        for (rowPending in listOf(false, true)) {
+            val canonical = group(pending = !rowPending, welcome = OLD_WELCOME)
+            val item = chatListItemFromProjection(chatListRow(pending = rowPending), group = canonical)
+            assertTrue(item.checkingInvitation)
+            assertEquals(rowPending, item.group.pendingConfirmation)
+            assertFalse(item.copy(group = item.group.copy(unrecoverable = true)).checkingInvitation)
+        }
+    }
+
+    /** A terminal row can precede the group stream without becoming an invitation-check label. */
+    @Test
+    fun terminalRowPresentationWinsBeforeTheGroupRecordArrives() {
+        val ordinary = chatListRow(pending = false)
+        val disbanded = ordinary.copy(lifecycleState = GroupLifecycleStateFfi.DISBANDED)
+        for (row in listOf(ordinary.copy(disbanding = true), disbanded)) {
+            val item = chatListItemFromProjection(row, group = pending())
+            assertTrue(item.inviteConfirmationUnresolved)
+            assertFalse(item.group.disbanded)
+            assertFalse(item.checkingInvitation)
+        }
+    }
+
+    /** Resume and startup retries coalesce while the canonical read owns its handle. */
+    @Test
+    fun overlappingResolutionRequestsDoNotReplaceTheAuthorityRead() =
+        runTest {
+            val release = CompletableDeferred<Unit>()
+            var reads = 0
+            var closed = 0
+            val item = chatListItemFromProjection(chatListRow(pending = false), group = pending())
+            val controller =
+                conflictController(item) {
+                    reads += 1
+                    release.await()
+                    object : ConversationGroupStateSubscriptionHandle {
+                        override fun snapshot() = pending()
+
+                        override suspend fun next(): AppGroupRecordFfi? = null
+
+                        override fun close() {
+                            closed += 1
+                        }
+                    }
+                }
+            val first = async { controller.retryInviteAcceptanceAuthority() }
+            runCurrent()
+            controller.retryMembers()
+            val duplicate = async { controller.retryInviteAcceptanceAuthority() }
+            runCurrent()
+            assertEquals(1, reads)
+            assertTrue(controller.inviteAcceptanceResolutionPending)
+            assertEquals(GroupRosterLoadState.LOADING, controller.inviteAcceptanceResolutionState)
+            release.complete(Unit)
+            first.await()
+            duplicate.await()
+            assertEquals(1, reads)
+            assertEquals(1, closed)
+            assertFalse(controller.inviteAcceptanceResolutionPending)
+            assertTrue(controller.group.pendingConfirmation)
+        }
+
+    /** Cancellation remains retryable; a later foreground check restores actions without Join. */
+    @Test
+    fun cancelledConflictReadCanResolveOnReturn() =
+        runTest {
+            val release = CompletableDeferred<Unit>()
+            var available = false
+            val item = chatListItemFromProjection(chatListRow(pending = false), group = pending())
+            val controller =
+                conflictController(item) {
+                    if (!available) release.await()
+                    ScriptedConversationGroupStateSubscription(pending())
+                }
+            val read = async { controller.retryInviteAcceptanceAuthority() }
+            runCurrent()
+            read.cancelAndJoin()
+            assertTrue(controller.inviteAcceptanceResolutionPending)
+            assertEquals(GroupRosterLoadState.FAILED, controller.inviteAcceptanceResolutionState)
+            assertFalse(controller.acceptInvite(notify = false))
+            assertFalse(controller.declineInvite())
+            available = true
+            controller.retryInviteAcceptanceAuthority()
+            assertFalse(controller.inviteAcceptanceResolutionPending)
+            assertTrue(controller.group.pendingConfirmation)
+        }
+
+    /** A newer terminal native observation cannot be undone by a held conflict read. */
+    @Test
+    fun terminalUpdateSupersedesHeldAuthorityRead() =
+        runTest {
+            val release = CompletableDeferred<Unit>()
+            val item = chatListItemFromProjection(chatListRow(pending = false), group = pending())
+            val controller =
+                conflictController(item) {
+                    release.await()
+                    ScriptedConversationGroupStateSubscription(pending())
+                }
+            val read = async { controller.retryInviteAcceptanceAuthority() }
+            runCurrent()
+            controller.applyGroupStateForTest(accepted().copy(disbanded = true))
+            release.complete(Unit)
+            read.await()
+            assertTrue(controller.group.disbanded)
+            assertFalse(controller.group.pendingConfirmation)
+            assertFalse(controller.inviteAcceptanceResolutionPending)
+        }
+
+    /** A newer nonterminal group observation replaces a held canonical read, but still loads members. */
+    @Test
+    fun acceptedUpdateDuringConflictReadStillLoadsFreshMembers() =
+        runTest {
+            val release = CompletableDeferred<Unit>()
+            var rosterReads = 0
+            val controller =
+                conflictController(
+                    chatListItemFromProjection(chatListRow(pending = false), group = pending()),
+                    roster = {
+                        rosterReads += 1
+                        memberRoster()
+                    },
+                    cold = true,
+                ) {
+                    release.await()
+                    ScriptedConversationGroupStateSubscription(pending())
+                }
+            val read = async { controller.retryInviteAcceptanceAuthority() }
+            runCurrent()
+            controller.applyGroupStateForTest(accepted().copy(name = "New native title"))
+            release.complete(Unit)
+            read.await()
+            assertEquals(1, rosterReads)
+            assertEquals(GroupRosterLoadState.READY, controller.memberRosterState)
+            assertEquals("New native title", controller.group.name)
+            assertFalse(controller.group.pendingConfirmation)
+            assertTrue(controller.canSendMessages)
+        }
+
+    /** A group update invalidates an older roster without stranding a cold screen in loading. */
+    @Test
+    fun metadataDuringColdRosterReadRetriesOnce() =
+        runTest {
+            val release = CompletableDeferred<Unit>()
+            var rosterReads = 0
+            val controller =
+                conflictController(
+                    chatListItemFromProjection(chatListRow(pending = false), group = accepted()),
+                    roster = {
+                        rosterReads += 1
+                        if (rosterReads == 1) release.await()
+                        memberRoster()
+                    },
+                    cold = true,
+                ) { error("unexpected canonical read") }
+            val read = async { controller.retryMembers() }
+            runCurrent()
+            controller.applyGroupStateForTest(accepted().copy(name = "New metadata"))
+            release.complete(Unit)
+            read.await()
+            assertEquals(2, rosterReads)
+            assertEquals(GroupRosterLoadState.READY, controller.memberRosterState)
+            assertEquals("New metadata", controller.group.name)
+            assertTrue(controller.canSendMessages)
+        }
+
+    /** Roster publication must not nest the subscription lock inside its generation lock. */
+    @Test
+    fun rosterPublicationCompletesWhileSubscriptionMaintenanceHoldsItsLock() =
+        runTest {
+            val started = CompletableDeferred<Unit>()
+            val releaseRoster = CompletableDeferred<Unit>()
+            val lockHeld = CountDownLatch(1)
+            val releaseLock = CountDownLatch(1)
+            val controller =
+                conflictController(
+                    chatListItemFromProjection(chatListRow(pending = false), group = accepted()),
+                    roster = {
+                        started.complete(Unit)
+                        releaseRoster.await()
+                        memberRoster()
+                    },
+                    cold = true,
+                ) { error("unexpected canonical read") }
+            val read = async(Dispatchers.Default) { controller.retryMembers() }
+            started.await()
+            val maintenance =
+                Thread {
+                    synchronized(controller.liveSubscriptionLock) {
+                        lockHeld.countDown()
+                        releaseLock.await(5, TimeUnit.SECONDS)
+                    }
+                }.apply {
+                    isDaemon = true
+                    start()
+                }
+            val completedWhileLockHeld =
+                try {
+                    withContext(Dispatchers.IO) { assertTrue(lockHeld.await(5, TimeUnit.SECONDS)) }
+                    releaseRoster.complete(Unit)
+                    withContext(Dispatchers.Default) { withTimeoutOrNull(2_000) { read.await() } } != null
+                } finally {
+                    releaseLock.countDown()
+                    withContext(Dispatchers.IO) { maintenance.join(5_000) }
+                }
+            read.await()
+            assertTrue("Roster publication waited for the subscription lock", completedWhileLockHeld)
+            assertEquals(GroupRosterLoadState.READY, controller.memberRosterState)
+            assertTrue(controller.canSendMessages)
+        }
+
+    /** Continually superseded reads settle with Retry rather than spinning or publishing stale members. */
+    @Test
+    fun repeatedMetadataChangesBoundColdRosterRetries() =
+        runTest {
+            var rosterReads = 0
+            lateinit var controller: ConversationController
+            controller =
+                conflictController(
+                    chatListItemFromProjection(chatListRow(pending = false), group = accepted()),
+                    roster = {
+                        rosterReads += 1
+                        controller.applyGroupStateForTest(accepted().copy(name = "Metadata $rosterReads"))
+                        memberRoster()
+                    },
+                    cold = true,
+                ) { error("unexpected canonical read") }
+            controller.retryMembers()
+            assertEquals(2, rosterReads)
+            assertEquals(GroupRosterLoadState.FAILED, controller.memberRosterState)
+            assertEquals("Metadata 2", controller.group.name)
+            assertFalse(controller.canSendMessages)
         }
 
     /** Unknown generation identity cannot establish a sticky acceptance proof. */
@@ -227,12 +470,15 @@ class InviteConfirmationReconciliationTest {
         assertFalse(controller.declineInvite())
         controller.retryInviteAcceptanceAuthority()
         assertFalse(controller.inviteAcceptanceResolutionPending)
+        assertEquals(GroupRosterLoadState.READY, controller.inviteAcceptanceResolutionState)
         assertEquals(canonical.pendingConfirmation, controller.group.pendingConfirmation)
     }
 
     /** Builds a conflict controller whose only native authority is the injected subscription. */
     private fun conflictController(
         item: ChatListItem,
+        roster: suspend () -> GroupRosterFfi = { memberRoster() },
+        cold: Boolean = false,
         open: suspend () -> ConversationGroupStateSubscriptionHandle,
     ): ConversationController {
         val app = appState()
@@ -245,11 +491,11 @@ class InviteConfirmationReconciliationTest {
             ConversationController(
                 appState = app,
                 initialGroup = item.group,
-                initialMemberSnapshot = memberSnapshot(),
+                initialMemberSnapshot = if (cold) null else memberSnapshot(),
                 initialChatListRow = item.projection,
                 initialInviteConfirmationUnresolved = item.inviteConfirmationUnresolved,
                 inviteAcceptor = { _, _ -> error("unexpected Join") },
-                groupRosterReader = { _, _ -> memberRoster() },
+                groupRosterReader = { _, _ -> roster() },
             ),
         )
     }

@@ -11,6 +11,7 @@ import dev.ipf.whitenoise.android.state.DisappearingMessageSweepWorker
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.applyApplicationLanguageTag
 import dev.ipf.whitenoise.android.state.persistedApplicationLanguageTag
+import dev.ipf.whitenoise.android.ui.CustomEmojiStore
 import dev.ipf.whitenoise.android.ui.createRecentEmojiRecentsOwner
 import dev.ipf.whitenoise.android.ui.navigation.MainShellProcessState
 import dev.ipf.whitenoise.android.updates.AppUpdateWorker
@@ -19,6 +20,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 
 internal class BackgroundWorkSchedulingGate {
@@ -59,6 +61,10 @@ open class WhiteNoiseApplication :
 
     val recentEmojiRecentsOwner by lazy {
         createRecentEmojiRecentsOwner()
+    }
+
+    internal val customEmojiStore by lazy {
+        CustomEmojiStore(File(filesDir, CustomEmojiStore.DIRECTORY))
     }
 
     private val mainShellProcessStateDelegate =

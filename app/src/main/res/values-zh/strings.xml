@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="poll_custom_time">自定义时间</string>
+    <string name="poll_custom_duration">时长</string>
+    <string name="poll_unit_seconds">秒</string>
+    <string name="poll_unit_minutes">分钟</string>
+    <string name="poll_unit_hours">小时</string>
+    <string name="poll_unit_days">天</string>
+    <string name="poll_custom_duration_error">请输入 1 秒至 30 天范围内的整数。</string>
+    <string name="poll_custom_preview">投票将在发布后 %1$s 结束。</string>
+    <string name="poll_cancel_custom_time">使用之前的截止时间</string>
     <string name="app_name">White Noise</string>
     <string name="poll_preview">投票</string>
     <string name="poll_unsupported">无法显示此投票</string>
@@ -1454,6 +1463,18 @@
     <string name="notification_channel_app_updates_global_description">White Noise 应用更新的 Android 提醒方式</string>
 
     <string name="chat_bubble_colors">聊天气泡颜色</string>
+    <string name="custom_emoji">自定义表情</string>
+    <string name="custom_emoji_detail">在此添加的图片会在消息和回应中变成 :短代码: 表情。它们只保存在此设备上，其他人看到的是短代码文本。</string>
+    <string name="custom_emoji_empty">还没有自定义表情。</string>
+    <string name="custom_emoji_name_title">为此表情命名</string>
+    <string name="custom_emoji_name_label">短代码</string>
+    <string name="custom_emoji_name_help">字母、数字和下划线。</string>
+    <string name="custom_emoji_replaces">将替换你现有的 %1$s。</string>
+    <string name="custom_emoji_remove_title">移除 %1$s？</string>
+    <string name="custom_emoji_remove_detail">图片会从此设备删除。消息中的短代码会保留为文本。</string>
+    <string name="custom_emoji_too_large">该图片超过 1 MB。</string>
+    <string name="custom_emoji_not_image">该文件不是 White Noise 可以显示的图片。</string>
+    <string name="custom_emoji_save_failed">无法保存该表情。</string>
     <string name="action_color">动作颜色</string>
     <string name="action_color_no_active_account">设置应用强调色前，请先选择一个活跃账户。</string>
     <string name="bubble_color_preview">预览</string>
@@ -2083,4 +2104,6 @@
     <string name="dictation_pause_other_audio_title">暂停其他音频</string>
     <string name="dictation_pause_other_audio_subtitle">听写期间暂停音乐和播客；录音结束后可继续播放。为安全起见，White Noise 的朗读和语音消息始终会暂停。</string>
     <string name="dictation_audio_focus_unavailable">无法暂停其他音频。请重试，或在听写设置中关闭“暂停其他音频”。</string>
+    <string name="checking_invitation">正在检查邀请…</string>
+    <string name="couldnt_check_invitation">无法检查邀请</string>
 </resources>

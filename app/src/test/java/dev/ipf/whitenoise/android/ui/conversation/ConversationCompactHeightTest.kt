@@ -8,8 +8,8 @@ import org.junit.Test
 
 /**
  * Compact-height decisions follow the measured post-inset viewport, never the
- * orientation label, and the compact composer ceiling guarantees a viable
- * composer without changing regular portrait geometry.
+ * orientation label, and the composer ceiling adds measured lines to a roomy
+ * viewport while preserving a viable compact-height fallback.
  */
 class ConversationCompactHeightTest {
     @Test
@@ -85,6 +85,35 @@ class ConversationCompactHeightTest {
     fun regularViewportsKeepTheHalfRemainderCeiling() {
         assertEquals(300.dp, resolveAutomaticComposerCeiling(600.dp))
         assertEquals(146.dp, resolveAutomaticComposerCeiling(292.dp))
+    }
+
+    /** Measured line spacing adds five visible lines when the viewport can spare them. */
+    @Test
+    fun regularViewportsGrowByFiveMeasuredLines() {
+        assertEquals(420.dp, resolveAutomaticComposerCeiling(600.dp, measuredEditorLineHeight = 24.dp))
+        assertEquals(470.dp, resolveAutomaticComposerCeiling(700.dp, measuredEditorLineHeight = 24.dp))
+        assertEquals(560.dp, resolveAutomaticComposerCeiling(800.dp, measuredEditorLineHeight = 32.dp))
+    }
+
+    /** At the same viewport height, each extra rendered line-height dp adds five dp before the reading cap. */
+    @Test
+    fun largerMeasuredLineHeightAddsFiveTimesTheDifference() {
+        val normal = resolveAutomaticComposerCeiling(800.dp, measuredEditorLineHeight = 20.dp)
+        val scaled = resolveAutomaticComposerCeiling(800.dp, measuredEditorLineHeight = 28.dp)
+
+        assertEquals(500.dp, normal)
+        assertEquals(540.dp, scaled)
+        assertEquals(40.dp, scaled - normal)
+    }
+
+    /** Small windows keep a reading area and ramp growth smoothly from compact mode. */
+    @Test
+    fun narrowAndImeViewportsLimitExtraLines() {
+        assertEquals(132.dp, resolveAutomaticComposerCeiling(264.dp, measuredEditorLineHeight = 24.dp))
+        assertEquals(135.dp, resolveAutomaticComposerCeiling(266.dp, measuredEditorLineHeight = 24.dp))
+        assertEquals(174.dp, resolveAutomaticComposerCeiling(292.dp, measuredEditorLineHeight = 24.dp))
+        assertEquals(280.dp, resolveAutomaticComposerCeiling(400.dp, measuredEditorLineHeight = 48.dp))
+        assertEquals(90.dp, resolveAutomaticComposerCeiling(90.dp, measuredEditorLineHeight = 24.dp))
     }
 
     @Test

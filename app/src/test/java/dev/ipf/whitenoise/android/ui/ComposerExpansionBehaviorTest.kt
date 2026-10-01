@@ -295,6 +295,7 @@ class ComposerExpansionBehaviorTest {
         assertExpandedSendInset(LayoutDirection.Rtl)
     }
 
+    /** A short draft keeps its natural control row despite the higher automatic ceiling. */
     @Test
     fun twoLinesKeepTheExistingCompactComposer() {
         render("First line\nSecond line")
@@ -652,6 +653,7 @@ class ComposerExpansionBehaviorTest {
         assertTrue("the unchanged draft must keep one composer height", abs(finalHeight - settledHeight) <= 1f)
     }
 
+    /** Removing most of a long draft restores the compact action layout without a manual resize. */
     @Test
     fun deletingAnAutomaticLongDraftBackToOneLineRestoresCompactControls() {
         val draft = longDraft()
@@ -664,9 +666,9 @@ class ComposerExpansionBehaviorTest {
         resizeHandle().assertDoesNotExist()
     }
 
-    /** Automatic growth stops near half of the available viewport. */
+    /** The longer automatic draft uses the new allowance without consuming the reading viewport. */
     @Test
-    fun automaticGrowthStopsNearHalfOfTheAvailableViewport() {
+    fun automaticGrowthAddsCapacityWhilePreservingTheReadingViewport() {
         render((1..40).joinToString("\n") { "Draft line $it" })
 
         val height =
@@ -674,10 +676,9 @@ class ComposerExpansionBehaviorTest {
                 .onNodeWithTag(TAG)
                 .fetchSemanticsNode()
                 .boundsInRoot.height
-        // This mdpi test renders inside a 720dp-tall Surface, so the automatic
-        // half-viewport ceiling is 360px; 300px proves the long draft grew.
-        assertTrue("a long draft should grow well beyond the compact composer", height >= 300f)
-        assertTrue("automatic growth should preserve roughly half the viewport", height <= 360f)
+        // The old half-viewport ceiling was below 360px in this fixture.
+        assertTrue("a long draft should use the additional automatic lines", height > 360f)
+        assertTrue("automatic growth should leave a reading area", height <= 720f * 0.7f)
     }
 
     /** Upward fling settles at the full screen endpoint. */
@@ -1255,16 +1256,20 @@ class ComposerExpansionBehaviorTest {
 
     private var statusBarInsetPx = 0
 
+    /** Finds the accessible control used to exercise explicit height changes. */
     private fun resizeHandle() = composeRule.onNodeWithContentDescription(app.getString(R.string.composer_resize))
 
+    /** Reads the outer composer height in root coordinates after layout settles. */
     private fun composerHeight() = composerBounds().height
 
+    /** Uses the outer semantics bounds so height assertions include the full bottom cluster. */
     private fun composerBounds(): Rect =
         composeRule
             .onNodeWithTag(TAG)
             .fetchSemanticsNode()
             .boundsInRoot
 
+    /** Captures outer, pill, and editor bounds in the same root coordinate space. */
     private fun composerGeometry() =
         ComposerGeometry(
             composer = composerBounds(),
@@ -1318,6 +1323,7 @@ class ComposerExpansionBehaviorTest {
         }
     }
 
+    /** Samples each animation frame and optionally checks that growth stays bottom anchored. */
     private fun sampleComposerHeights(
         frameCount: Int = 20,
         expectedBottom: Float? = null,
@@ -1337,6 +1343,7 @@ class ComposerExpansionBehaviorTest {
             }
         }
 
+    /** Allows a pixel of layout rounding while asserting the bottom edge stays fixed. */
     private fun assertComposerBottom(expectedBottom: Float) {
         val actualBottom = composerBounds().bottom
         assertTrue(
@@ -1345,6 +1352,7 @@ class ComposerExpansionBehaviorTest {
         )
     }
 
+    /** Restores automatic frame advancement even when a frame assertion fails. */
     private fun <T> withManualClock(block: () -> T): T {
         composeRule.mainClock.autoAdvance = false
         return try {
@@ -1354,6 +1362,7 @@ class ComposerExpansionBehaviorTest {
         }
     }
 
+    /** Rejects a reverse jump across sampled resize frames, allowing one pixel of rounding. */
     private fun assertMonotonic(
         heights: List<Float>,
         increasing: Boolean,
@@ -1367,6 +1376,7 @@ class ComposerExpansionBehaviorTest {
         }
     }
 
+    /** Checks focus, draft text, and selection together after a resize or send transition. */
     private fun assertEditorState(
         editor: androidx.compose.ui.test.SemanticsNodeInteraction,
         draft: String,

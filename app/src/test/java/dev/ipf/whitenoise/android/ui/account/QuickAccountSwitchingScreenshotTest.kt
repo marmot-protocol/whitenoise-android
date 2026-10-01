@@ -110,7 +110,7 @@ class QuickAccountSwitchingScreenshotTest {
                 WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (rtl) 2f else 1f) {
                     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
                         if (settings) {
-                            AppearanceScreen(app, {}, {}, {}, {})
+                            AppearanceScreen(app, {}, {}, {}, {}, {})
                         } else {
                             Column {
                                 ChatListTopBar(

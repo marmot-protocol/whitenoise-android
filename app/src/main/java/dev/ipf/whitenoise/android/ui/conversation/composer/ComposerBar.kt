@@ -64,6 +64,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -99,6 +100,18 @@ private val ComposerManualMinimumHeight = 144.dp
 
 /** How close to an endpoint a release still counts as landing on it rather than resting free. */
 private val ComposerSettleDeadband = 24.dp
+
+/** Measures the same body text line spacing used by the composer editor at the current font scale. */
+@Composable
+private fun rememberComposerEditorLineHeight(): Dp {
+    val density = LocalDensity.current
+    val style = MaterialTheme.typography.bodyLarge
+    val measurer = rememberTextMeasurer()
+    return remember(density, style, measurer) {
+        val layout = measurer.measure("M\nM", style = style)
+        with(density) { (layout.getLineTop(1) - layout.getLineTop(0)).toDp() }
+    }
+}
 
 /**
  * Whether the composer bottom cluster (reply preview, edit banner, mention
@@ -440,6 +453,7 @@ internal fun ComposerBar(
     val actionColors = accountActionColors(appState)
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
+    val editorLineHeight = rememberComposerEditorLineHeight()
     var composerEmojiPickerOpen by remember { mutableStateOf(false) }
     var composerEmojiPickerRequested by remember { mutableStateOf(false) }
     var composerEmojiSearchActive by remember { mutableStateOf(false) }
@@ -843,9 +857,11 @@ internal fun ComposerBar(
     // onAccepted, so the pre-edit composer is restored instead.
     var attachmentSendInFlight by remember(draftKey) { mutableStateOf(false) }
     val submitMessage: () -> Unit = {
+        // An IME can commit text and request Send before the next composition.
+        // Eligibility and submission must use the same live editor content.
+        val acceptanceToken = textState.acceptanceToken()
         if (hasPendingAttachments && editingMessageId == null) {
             if (!attachmentsPreparing && !attachmentSendInFlight && onSendAttachments != null) {
-                val acceptanceToken = textState.acceptanceToken()
                 attachmentSendInFlight = true
                 var dispatched = false
                 try {
@@ -861,9 +877,8 @@ internal fun ComposerBar(
                     if (!dispatched) attachmentSendInFlight = false
                 }
             }
-        } else if (text.isNotBlank()) {
+        } else if (acceptanceToken.text.isNotBlank()) {
             val sendingEdit = editingMessageId != null
-            val acceptanceToken = textState.acceptanceToken()
             onSend(acceptanceToken.text) {
                 if (!sendingEdit) {
                     // onAccepted can land after the user has started typing the
@@ -880,17 +895,20 @@ internal fun ComposerBar(
         }
     }
 
+    /** Updates the active text owner and publishes a draft only when this is not an edit. */
     fun applyComposerFieldValue(value: TextFieldValue) {
         textState.updateValue(value)
         if (editingMessageId == null) onDraftChange(value)
     }
 
+    /** Deletes the current selection or previous code point and repairs mention tokens before publishing. */
     fun deleteFromComposer() {
         val proposedValue = deleteComposerSelectionOrPreviousCodePoint(textFieldValue) ?: return
         val updatedValue = repairComposerMentionEdit(textFieldValue, proposedValue, mentionPickerEnabled)
         applyComposerFieldValue(updatedValue)
     }
 
+    /** Switches the bottom inset to the emoji pane while retaining its measured height for the composer cap. */
     fun openComposerEmojiPane() {
         attachmentSheetState.dismiss()
         if (composerKeyboardRestorePending) {
@@ -918,6 +936,7 @@ internal fun ComposerBar(
         keyboardController?.hide()
     }
 
+    /** Returns from the emoji pane to the IME without keeping the former pane in the height budget. */
     fun showKeyboardFromEmojiPane() {
         attachmentSheetState.dismiss()
         restoreKeyboardFromEmojiPane()
@@ -960,7 +979,11 @@ internal fun ComposerBar(
             boundedHeight - statusBarTop - topInteractionClearance - bottomInset - customInputPaneHeight
         val prototypeTopGap = if (composerRemainder - 18.dp >= CompactViableComposerHeight) 18.dp else 0.dp
         val maximumComposerHeight = (composerRemainder - prototypeTopGap).coerceAtLeast(44.dp)
-        val automaticComposerCeiling = resolveAutomaticComposerCeiling(maximumComposerHeight)
+        val automaticComposerCeiling =
+            resolveAutomaticComposerCeiling(
+                maximumComposerHeight,
+                measuredEditorLineHeight = editorLineHeight,
+            )
         val maximumComposerHeightPx = with(density) { maximumComposerHeight.toPx() }
         val minimumManualComposerHeightPx =
             with(density) {
@@ -1194,6 +1217,17 @@ internal fun ComposerBar(
                             composerEmojiPickerOpen = false
                             composerEmojiPickerRequested = false
                             attachmentSheetState.dismiss()
+                        },
+                    )
+                } else if (
+                    composerTextMatchesEditSession &&
+                    composerExpansion.mode == ComposerExpansionMode.Automatic
+                ) {
+                    EmojiShortcodeSuggestions(
+                        field = textFieldValue,
+                        onPick = { updated ->
+                            applyComposerFieldValue(updated)
+                            runCatching { composerFocus.requestFocus() }
                         },
                     )
                 }

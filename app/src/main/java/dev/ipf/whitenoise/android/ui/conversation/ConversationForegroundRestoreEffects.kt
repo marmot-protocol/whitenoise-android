@@ -26,6 +26,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
 import dev.ipf.whitenoise.android.state.isLoadingOlder
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
 
 // Liveness fallback only. Correctness waits for the IME target/inset settle signal,
@@ -188,6 +189,7 @@ internal fun ConversationForegroundRestoreEffects(
                 }
         },
         onResume = { restoreFocus, clearFocus ->
+            scope.launch { controller.retryInviteAcceptanceAuthority() }
             foregroundPreDrawSignals.tryReceive()
             val restoreToken = foregroundRestoreToken
             foregroundRestoreToken = null
