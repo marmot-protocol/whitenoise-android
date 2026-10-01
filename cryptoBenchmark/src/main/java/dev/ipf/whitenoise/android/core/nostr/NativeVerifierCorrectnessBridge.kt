@@ -1,7 +1,17 @@
 package dev.ipf.whitenoise.android.core.nostr
 
+import org.json.JSONObject
+
 /** Boolean entry points keep the separate test APK independent of obfuscated DTOs. */
 object NativeVerifierCorrectnessBridge {
+    fun verifiesFixtureJson(json: String): Boolean =
+        NostrEvent.fromJson(JSONObject(json))?.let(NostrEventVerifier::verifies) ?: false
+
+    fun verifiesFixtureWithRecomputedId(json: String): Boolean {
+        val event = NostrEvent.fromJson(JSONObject(json)) ?: return false
+        return NostrEventVerifier.verifies(event.copy(id = event.computedIdHex()))
+    }
+
     fun acceptsSignedTextEvent(): Boolean = NostrEventVerifier.verifies(TEXT_EVENT)
 
     fun rejectsOutOfRangeSignatureScalars(): Boolean =
@@ -10,8 +20,14 @@ object NativeVerifierCorrectnessBridge {
             TEXT_EVENT.copy(sig = TEXT_EVENT.sig.take(64) + CURVE_ORDER_HEX),
         ).all { !NostrEventVerifier.verifies(it) }
 
-    fun rejectsOffCurvePublicKey(): Boolean {
+    fun rejectsOutOfRangePublicKey(): Boolean {
         val changed = TEXT_EVENT.copy(pubkey = FIELD_PRIME_HEX)
+        return !NostrEventVerifier.verifies(changed.copy(id = changed.computedIdHex()))
+    }
+
+    fun rejectsInRangeOffCurvePublicKey(): Boolean {
+        // x=0 is below p, but x^3+7 has no square root in the secp256k1 field.
+        val changed = TEXT_EVENT.copy(pubkey = "0".repeat(64))
         return !NostrEventVerifier.verifies(changed.copy(id = changed.computedIdHex()))
     }
 

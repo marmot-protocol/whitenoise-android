@@ -8,12 +8,13 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class InstrumentedDispatchTest(unittest.TestCase):
-    def run_dispatch(self, *args):
+    def run_dispatch(self, *args, fail_app=False):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
             (root / "scripts").mkdir()
             gradle = root / "gradlew"
-            gradle.write_text('#!/bin/sh\nprintf "%s\\n" "$*"\n')
+            failure = 'case "$*" in *:app:connected*) exit 23;; esac\n' if fail_app else ''
+            gradle.write_text('#!/bin/sh\n' + failure + 'printf "%s\\n" "$*"\n')
             gradle.chmod(0o755)
             for name in ("run-review-demo-e2e.sh", "run-document-provider-matrix.sh"):
                 script = root / "scripts" / name
@@ -48,3 +49,10 @@ class InstrumentedDispatchTest(unittest.TestCase):
         with self.assertRaises(subprocess.CalledProcessError) as caught:
             self.run_dispatch("workflow_dispatch", "true", "true")
         self.assertIn("Select one", caught.exception.stderr)
+
+    def test_app_failure_cannot_be_hidden_by_passing_native_suite(self):
+        for event in ("push", "pull_request"):
+            with self.subTest(event=event):
+                with self.assertRaises(subprocess.CalledProcessError) as caught:
+                    self.run_dispatch(event, fail_app=True)
+                self.assertEqual(caught.exception.returncode, 23)

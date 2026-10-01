@@ -76,7 +76,7 @@ class ZapstoreAssetEventsTest {
     }
 
     @Test
-    fun releaseWithMutatedTagsFailsVerification() {
+    fun rejectingVerifierBlocksReleaseAssetReferences() {
         val releaseEvent =
             signedEvent(SIGNED_RELEASE_EVENT_JSON).copy(
                 tags =
@@ -93,6 +93,37 @@ class ZapstoreAssetEventsTest {
                 publisherPubkey = TEST_PUBLISHER_PUBKEY,
                 releaseDTag = "$APP_ID@$VERSION",
             ),
+        )
+    }
+
+    @Test
+    fun acceptingVerifierSelectsSingleReferencedAssetAndStillChecksCanonicalId() {
+        val event = assetEventWithComputedId(baseAssetTags())
+        val accepting = ZapstoreAssetEventPolicy { true }
+        fun select(candidate: NostrEvent): ZapstoreApkAsset? =
+            accepting.selectUniqueApkAsset(
+                events = listOf(candidate),
+                referencedIds = setOf(event.id),
+                appId = APP_ID,
+                version = VERSION,
+                platformId = PLATFORM_ID,
+                publisherPubkey = TEST_PUBLISHER_PUBKEY,
+            )
+        assertEquals(event.id, select(event)?.eventId)
+        assertNull(select(event.copy(content = "changed without recomputing the ID")))
+        assertNull(select(event.copy(pubkey = "b".repeat(64))))
+    }
+
+    @Test
+    fun acceptingVerifierExtractsNormalizedReleaseReferences() {
+        val event =
+            signedEvent(SIGNED_RELEASE_EVENT_JSON).copy(
+                tags = listOf(listOf("d", "$APP_ID@$VERSION"), listOf("e", ASSET_ID.uppercase())),
+            )
+        val accepting = ZapstoreAssetEventPolicy { true }
+        assertEquals(
+            setOf(ASSET_ID),
+            accepting.assetEventIdsFromReleaseEvent(event, APP_ID, TEST_PUBLISHER_PUBKEY, "$APP_ID@$VERSION"),
         )
     }
 
