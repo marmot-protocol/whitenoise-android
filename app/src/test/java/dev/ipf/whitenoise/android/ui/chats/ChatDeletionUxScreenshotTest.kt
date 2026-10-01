@@ -86,7 +86,12 @@ class ChatDeletionUxScreenshotTest {
     @Test
     @Config(sdk = [36], qualifiers = "ar-w360dp-h780dp-mdpi")
     fun localDeleteRtlLargeScreenshot() =
-        captureDialog("chat_delete_local_rtl_large", dark = false, leave = false, scale = 2f)
+        captureDialog(
+            "chat_delete_local_rtl_large",
+            dark = false,
+            leave = false,
+            scale = 2f,
+        )
 
     /** Records the actual shared confirmation surface. */
     private fun captureDialog(

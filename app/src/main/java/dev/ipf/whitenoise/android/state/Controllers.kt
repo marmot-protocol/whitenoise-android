@@ -4659,7 +4659,11 @@ class ChatsController private constructor(
     }
 
     /** Explicit single-chat departure; unconfirmed leave never admits local deletion. */
-    suspend fun leaveAndDeleteFromChatList(groupIdHex: String): Boolean = leaveGroup(groupIdHex, deleteAfterLeave = true)
+    suspend fun leaveAndDeleteFromChatList(groupIdHex: String): Boolean =
+        leaveGroup(
+            groupIdHex = groupIdHex,
+            deleteAfterLeave = true,
+        )
 
     /**
      * Local-only chat-list wipe: hide the row optimistically, run client cleanup
