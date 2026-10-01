@@ -136,6 +136,12 @@ jobs:
           python3 -m unittest scripts/test_check_screenshot_baseline_owners.py
           python3 scripts/check_screenshot_baseline_owners.py
 
+      - name: Test instrumented dispatch and required cases
+        if: matrix.phase == 'tooling'
+        run: |
+          python3 -m unittest scripts/test_run_android_instrumented_dispatch.py
+          python3 -m unittest scripts/test_check_instrumented_required_cases.py
+
       - name: Configure MarmotKit cache directory
         shell: bash
         run: printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$RUNNER_TEMP/marmotkit-cache" >> "$GITHUB_ENV"

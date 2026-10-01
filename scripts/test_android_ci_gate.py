@@ -189,6 +189,13 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('python3 -m unittest scripts/test_check_screenshot_baseline_owners.py', static)
         self.assertIn('python3 scripts/check_screenshot_baseline_owners.py\n', static)
 
+    def test_instrumented_dispatch_tooling_runs_without_an_emulator(self):
+        """The dispatcher and required-case parser tests run in the fast tooling phase."""
+        step = self.named_step(self.build_contracts, 'Test instrumented dispatch and required cases')
+        self.assertIn("        if: matrix.phase == 'tooling'\n", step)
+        self.assertIn('python3 -m unittest scripts/test_run_android_instrumented_dispatch.py', step)
+        self.assertIn('python3 -m unittest scripts/test_check_instrumented_required_cases.py', step)
+
     def test_job_caches(self):
         """Every workload retains its own task cache; forks remain read-only."""
         gradle_setup_steps = re.findall(
