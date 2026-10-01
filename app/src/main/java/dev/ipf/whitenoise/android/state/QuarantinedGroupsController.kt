@@ -4,6 +4,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -69,8 +71,9 @@ internal class QuarantinedGroupsController(
                     } else {
                         QuarantineRecoveryOutcome.StillQuarantined
                     }
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
+                } catch (_: CancellationException) {
+                    currentCoroutineContext().ensureActive()
+                    QuarantineRecoveryOutcome.Failed
                 } catch (_: Exception) {
                     QuarantineRecoveryOutcome.Failed
                 }
@@ -122,10 +125,9 @@ internal class QuarantinedGroupsController(
         try {
             val rows = access!!.load().sortedBy { it.groupId }
             if (current()) mutable.value = state.value.copy(rows = rows, loaded = true, loadFailed = false)
-        } catch (
-            cancelled: CancellationException,
-        ) {
-            throw cancelled
+        } catch (_: CancellationException) {
+            currentCoroutineContext().ensureActive()
+            if (current()) mutable.value = state.value.copy(loadFailed = true)
         } catch (
             _: Exception,
         ) {

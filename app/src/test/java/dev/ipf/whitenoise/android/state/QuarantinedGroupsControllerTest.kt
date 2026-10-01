@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppGroupHydrationQuarantineReasonFfi
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -43,6 +44,35 @@ class QuarantinedGroupsControllerTest {
             controller.refresh()
             assertTrue(controller.state.value.loadFailed)
             assertFalse(controller.state.value.loaded)
+            assertFalse(controller.state.value.busy)
+            controller.close()
+        }
+
+    @Test fun unexpectedNativeReadCancellationShowsLoadFailure() =
+        runTest {
+            val access = Access().apply { loadCancelled = true }
+            val controller = QuarantinedGroupsController(access, this)
+            controller.refresh()
+            assertTrue(controller.state.value.available)
+            assertTrue(controller.state.value.loadFailed)
+            assertFalse(controller.state.value.loaded)
+            assertFalse(controller.state.value.busy)
+            controller.close()
+        }
+
+    @Test fun unexpectedNativeRetryCancellationShowsFailureAndReloads() =
+        runTest {
+            val access =
+                Access().apply {
+                    rows = listOf(row("a"))
+                    retryCancelled = true
+                }
+            val controller = QuarantinedGroupsController(access, this)
+            controller.refresh()
+            controller.recover("a")
+            assertEquals(QuarantineRecoveryOutcome.Failed, controller.state.value.outcome)
+            assertEquals(listOf(row("a")), controller.state.value.rows)
+            assertEquals(2, access.loads)
             assertFalse(controller.state.value.busy)
             controller.close()
         }
@@ -182,7 +212,9 @@ class QuarantinedGroupsControllerTest {
         var rows = emptyList<QuarantinedGroupRow>()
         var loads = 0
         var loadFailure = false
+        var loadCancelled = false
         var retryFailure = false
+        var retryCancelled = false
         var recovered = true
         var loadGate: CompletableDeferred<Unit>? = null
         var retryGate: CompletableDeferred<Unit>? = null
@@ -193,6 +225,7 @@ class QuarantinedGroupsControllerTest {
         override suspend fun load(): List<QuarantinedGroupRow> {
             loads++
             loadGate?.await()
+            if (loadCancelled) throw CancellationException("private native cancellation")
             if (loadFailure) error("private native details")
             return rows
         }
@@ -200,6 +233,7 @@ class QuarantinedGroupsControllerTest {
         override suspend fun retry(groupId: String): Boolean {
             retries.add(groupId)
             retryGate?.await()
+            if (retryCancelled) throw CancellationException("private native cancellation")
             if (retryFailure) error("private native details")
             if (recovered) rows = rows.filterNot { it.groupId == groupId }
             return recovered
