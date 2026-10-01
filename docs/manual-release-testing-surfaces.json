@@ -9352,25 +9352,25 @@
       },
       {
         "surface": "PollMessageActionOwner",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollMessageActions.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollMessageActionOwner.kt",
         "anchor": "internal data class PollMessageActionOwner(",
         "test_ids": ["MSG-026"]
       },
       {
         "surface": "currentPollActionTarget",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollMessageActions.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollMessageActionOwner.kt",
         "anchor": "internal fun currentPollActionTarget(",
         "test_ids": ["MSG-026"]
       },
       {
         "surface": "pollMessageActionsEligible",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollMessageActions.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollMessageActionOwner.kt",
         "anchor": "internal fun pollMessageActionsEligible(",
         "test_ids": ["MSG-026"]
       },
       {
         "surface": "submitOwnedPollVote",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollMessageActions.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollMessageActionOwner.kt",
         "anchor": "internal suspend fun submitOwnedPollVote(",
         "test_ids": ["MSG-021", "MSG-026"]
       },

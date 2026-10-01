@@ -56,11 +56,18 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
     @Test fun pendingPollKeepsVotingLight() = render("pending_light", PollScreenshotConfiguration(pending = true))
 
     @Test fun closedPollReactionsAmoledRtlLarge() =
-        render("amoled_rtl_large", PollScreenshotConfiguration(dark = true, amoled = true, rtl = true, fontScale = 2f, closed = true))
+        render(
+            "amoled_rtl_large",
+            PollScreenshotConfiguration(dark = true, amoled = true, rtl = true, fontScale = 2f, closed = true),
+        )
 
     @Test fun pollActionMenuLight() = render("menu_light", PollScreenshotConfiguration(menu = true))
 
-    @Test fun pollReplyComposerAmoled() = render("reply_amoled", PollScreenshotConfiguration(dark = true, amoled = true, reply = true, closed = true))
+    @Test fun pollReplyComposerAmoled() =
+        render(
+            "reply_amoled",
+            PollScreenshotConfiguration(dark = true, amoled = true, reply = true, closed = true),
+        )
 
     @Test fun pollInfoLight() {
         val item = pollMessage(closed = true)
@@ -81,7 +88,9 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
                 )
             }
         }
-        composeRule.onNodeWithTag(MESSAGE_DETAILS_TAG).captureRoboImage("src/test/snapshots/poll_message_info_light.png")
+        composeRule
+            .onNodeWithTag(MESSAGE_DETAILS_TAG)
+            .captureRoboImage("src/test/snapshots/poll_message_info_light.png")
     }
 
     private fun render(
@@ -109,7 +118,8 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
                             if (configuration.reply) {
                                 ComposerBar(
                                     replyingTo = item.record,
-                                    replyingToDisplay = TimelineProjector.replyTargetPreview(checkNotNull(item.projected)),
+                                    replyingToDisplay =
+                                        TimelineProjector.replyTargetPreview(checkNotNull(item.projected)),
                                     messageTextCopy = MessageTextCopy.Default,
                                     onCancelReply = {},
                                     onSend = { _, _ -> },

@@ -1069,7 +1069,12 @@ internal fun MessageBubble(
         if (deleted || actionsReadOnly) return
         // Route via launchMutation: same survives-navigation rationale as delete/send.
         appState.launchMutation {
-            val target = if (isPollRecord) currentPollActionTarget(controller, pollOwner)?.record ?: return@launchMutation else record
+            val target =
+                if (isPollRecord) {
+                    currentPollActionTarget(controller, pollOwner)?.record ?: return@launchMutation
+                } else {
+                    record
+                }
             controller.toggleReaction(emoji, target)
         }
     }
@@ -2165,9 +2170,13 @@ internal fun MessageBubble(
                     } else {
                         null
                     }
-                val visiblePoll = item.projected?.poll.takeIf { isPollRecord && !deleted && !invalidated && !persistedFailure }
+                val visiblePoll =
+                    item.projected?.poll.takeIf { isPollRecord && !deleted && !invalidated && !persistedFailure }
                 if (visiblePoll != null) {
-                    Column(Modifier.fillMaxWidth().then(actionAnchorBoundsModifier), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Column(
+                        Modifier.fillMaxWidth().then(actionAnchorBoundsModifier),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
                         senderNameLabel(false)
                         replyPreviewCard(false)
                         PollMessageContent(item, controller, appState, canVote = !actionsReadOnly && !selectionMode)
@@ -2450,7 +2459,8 @@ internal fun MessageBubble(
                     canReply = !deleted && !actionsReadOnly,
                     canReact = !deleted && !actionsReadOnly,
                     canDelete = deleteCapability.canDeleteAtAll,
-                    canEdit = !actionsReadOnly && mine && record.kind == 9uL && record.messageIdHex.isNotBlank() && !deleted,
+                    canEdit =
+                        !actionsReadOnly && mine && record.kind == 9uL && record.messageIdHex.isNotBlank() && !deleted,
                     canForward = !deleted && !actionsReadOnly && forwardPayload != null,
                     forwardBlockedReason =
                         if (!isPollRecord && !deleted && !actionsReadOnly) {

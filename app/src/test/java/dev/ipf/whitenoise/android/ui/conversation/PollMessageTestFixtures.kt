@@ -49,7 +49,8 @@ open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
                                 SendAcceptDispositionFfi.PUBLISHED,
                                 SendMaintenanceDispositionFfi.READY,
                             )
-                        "replyToMessageWithClientToken" -> LocalSendAcceptanceFfi(args.orEmpty()[4] as String, "bb".repeat(32))
+                        "replyToMessageWithClientToken" ->
+                            LocalSendAcceptanceFfi(args.orEmpty()[4] as String, "bb".repeat(32))
                         "parseMarkdown" -> markdown(args.orEmpty().first() as String)
                         "messages" -> emptyList<dev.ipf.marmotkit.AppMessageRecordFfi>()
                         else -> null
@@ -91,7 +92,14 @@ open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
         status: MessageStatus = if (mine) MessageStatus.Sent else MessageStatus.Received,
     ): TimelineMessage {
         val source =
-            fileTimelineMessage(70, "", mine = mine, caption = "{\"private-envelope\":true}", attachments = emptyList(), status = status)
+            fileTimelineMessage(
+                70,
+                "",
+                mine = mine,
+                caption = "{\"private-envelope\":true}",
+                attachments = emptyList(),
+                status = status,
+            )
         return source.copy(
             record = source.record.copy(kind = 1068uL),
             projected =
@@ -100,7 +108,8 @@ open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
                     poll =
                         PollProjectionFfi(
                             question = "Lunch?",
-                            options = listOf(PollOptionResultFfi("a", "Soup", 0uL), PollOptionResultFfi("b", "Salad", 0uL)),
+                            options =
+                                listOf(PollOptionResultFfi("a", "Soup", 0uL), PollOptionResultFfi("b", "Salad", 0uL)),
                             pollType = PollTypeFfi.SINGLE_CHOICE,
                             participants = 0uL,
                             localSelection = emptyList(),

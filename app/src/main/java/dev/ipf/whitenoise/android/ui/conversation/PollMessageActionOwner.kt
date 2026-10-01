@@ -20,7 +20,9 @@ internal fun currentPollActionTarget(
     owner: PollMessageActionOwner,
     nowSeconds: ULong = (System.currentTimeMillis() / POLL_ACTION_MILLIS_PER_SECOND).toULong(),
 ): TimelineMessage? {
-    val mayAct = pollOwnerMayAct(controller, owner) && !MessageProjector.isDeleted(owner.messageId, controller.deletedMessageIds)
+    val mayAct =
+        pollOwnerMayAct(controller, owner) &&
+            !MessageProjector.isDeleted(owner.messageId, controller.deletedMessageIds)
     return if (mayAct) {
         val current =
             controller.timelineItemsById[owner.messageId]
@@ -39,7 +41,8 @@ private fun pollOwnerMayAct(
         controller.acceptsConversationActionOwner(owner.accountRef, owner.groupId) &&
         pollConversationMayAct(controller)
 
-private fun pollConversationMayAct(controller: ConversationController): Boolean = controller.canSendMessages && !controller.group.pendingConfirmation
+private fun pollConversationMayAct(controller: ConversationController): Boolean =
+    controller.canSendMessages && !controller.group.pendingConfirmation
 
 /** The poll's vote deadline deliberately has no part in message discussion eligibility. */
 internal fun pollMessageActionsEligible(
@@ -53,9 +56,13 @@ internal fun pollMessageActionsEligible(
             item.record.messageIdHex == owner.messageId &&
             item.record.groupIdHex == owner.groupId
     val livePoll = MessageProjector.isPollKind(item.record.kind) && projected.poll != null && !projected.deleted
-    val retained = projected.invalidationStatus == null && (item.record.retentionExpiresAt?.let { it > nowSeconds } ?: true)
+    val retained =
+        projected.invalidationStatus == null && (item.record.retentionExpiresAt?.let { it > nowSeconds } ?: true)
     // Native poll projections already carry a stable target while relay publication is pending.
-    val available = item.status == MessageStatus.Sent || item.status == MessageStatus.Received || item.status == MessageStatus.Pending
+    val available =
+        item.status == MessageStatus.Sent ||
+            item.status == MessageStatus.Received ||
+            item.status == MessageStatus.Pending
     return if (!matchesTarget || !livePoll || !retained) false else available
 }
 

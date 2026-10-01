@@ -16,7 +16,6 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_ACTION_REACTI
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleRowTestTag
 import dev.ipf.whitenoise.android.ui.conversation.reactions.REACTION_PILL_TEST_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
-import java.time.Duration
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -30,6 +29,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.time.Duration
 
 /** Poll discussion shares native reaction admission, rollback and event-scoped removal. */
 @RunWith(RobolectricTestRunner::class)
@@ -60,7 +60,10 @@ class PollMessageReactionsTest : PollMessageTestFixtures() {
                 listOf("personal", item.record.groupIdHex, item.record.messageIdHex, "👍"),
                 recordedCalls().first { it.first == "reactToMessage" }.second.take(4),
             )
-            assertEquals(listOf("personal", item.record.groupIdHex, "aa".repeat(32)), recordedCalls().first { it.first == "deleteMessage" }.second.take(3))
+            assertEquals(
+                listOf("personal", item.record.groupIdHex, "aa".repeat(32)),
+                recordedCalls().first { it.first == "deleteMessage" }.second.take(3),
+            )
             assertTrue(recordedCalls().none { it.first == "castPollVote" })
             assertEquals(emptyList<String>(), item.projected?.poll?.localSelection)
             assertEquals(0uL, item.projected?.poll?.participants)
@@ -97,7 +100,8 @@ class PollMessageReactionsTest : PollMessageTestFixtures() {
         advanceReactionQuietPeriod()
         composeRule.waitUntil {
             shadowOf(Looper.getMainLooper()).idle()
-            recordedCalls().any { it.first == "reactToMessage" } && pollController.reactions[item.record.messageIdHex].isNullOrEmpty()
+            recordedCalls().any { it.first == "reactToMessage" } &&
+                pollController.reactions[item.record.messageIdHex].isNullOrEmpty()
         }
         composeRule.runOnIdle { assertTrue(recordedCalls().none { it.first == "castPollVote" }) }
     }
@@ -109,7 +113,10 @@ class PollMessageReactionsTest : PollMessageTestFixtures() {
             composeRule.onNodeWithText("Reply").performClick()
             pollController.send("I prefer soup")
             val call = recordedCalls().first { it.first == "replyToMessageWithClientToken" }.second
-            assertEquals(listOf("personal", item.record.groupIdHex, item.record.messageIdHex, "I prefer soup"), call.take(4))
+            assertEquals(
+                listOf("personal", item.record.groupIdHex, item.record.messageIdHex, "I prefer soup"),
+                call.take(4),
+            )
             assertTrue(recordedCalls().none { it.first == "castPollVote" })
         }
 

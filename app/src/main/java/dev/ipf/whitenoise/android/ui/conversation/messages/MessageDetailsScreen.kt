@@ -118,7 +118,12 @@ internal fun MessageDetailsScreen(
     canDismissReports: Boolean = false,
     onDismissReport: (ContentReportFfi) -> Unit = {},
 ) {
-    val contentText = if (MessageProjector.isPollKind(record.kind)) stringResource(R.string.poll_preview) else record.plaintext
+    val contentText =
+        if (MessageProjector.isPollKind(record.kind)) {
+            stringResource(R.string.poll_preview)
+        } else {
+            record.plaintext
+        }
     Dialog(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),

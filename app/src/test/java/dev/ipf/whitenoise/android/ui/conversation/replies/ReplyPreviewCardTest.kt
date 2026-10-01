@@ -89,7 +89,8 @@ class ReplyPreviewCardTest {
                 groupIdHex = "group",
                 sender = "Alice",
                 plaintext = "{\"private-envelope\":true}",
-                contentTokens = MarkdownDocumentFfi(blocks = emptyList(), truncated = false, blankLinesBefore = byteArrayOf()),
+                contentTokens =
+                    MarkdownDocumentFfi(blocks = emptyList(), truncated = false, blankLinesBefore = byteArrayOf()),
                 kind = 1068uL,
                 tags = emptyList(),
                 sourceEpoch = null,

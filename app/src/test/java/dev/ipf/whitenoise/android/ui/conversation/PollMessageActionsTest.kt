@@ -107,7 +107,10 @@ class PollMessageActionsTest : PollMessageTestFixtures() {
         composeRule.waitUntil { synchronized(nativeCalls) { nativeCalls.any { it.first == "castPollVote" } } }
         composeRule.runOnIdle {
             val call = recordedCalls().first { it.first == "castPollVote" }.second
-            assertEquals(listOf("personal", item.record.groupIdHex, item.record.messageIdHex, listOf("a")), call.take(4))
+            assertEquals(
+                listOf("personal", item.record.groupIdHex, item.record.messageIdHex, listOf("a")),
+                call.take(4),
+            )
             assertEquals(null, pollController.replyingTo)
             assertEquals(false, menuOpen.value)
         }
@@ -128,7 +131,10 @@ class PollMessageActionsTest : PollMessageTestFixtures() {
         composeRule.onNodeWithText("Soup").performClick()
         composeRule.waitUntil { recordedCalls().any { it.first == "castPollVote" } }
         val call = recordedCalls().first { it.first == "castPollVote" }.second
-        assertEquals(listOf("personal", item.record.groupIdHex, item.record.messageIdHex, listOf("a")), call.take(4))
+        assertEquals(
+            listOf("personal", item.record.groupIdHex, item.record.messageIdHex, listOf("a")),
+            call.take(4),
+        )
         assertNull(pollController.replyingTo)
     }
 
@@ -152,7 +158,9 @@ class PollMessageActionsTest : PollMessageTestFixtures() {
         composeRule.onNodeWithTag(EMOJI_PICKER_TEST_TAG).assertExists()
         composeRule.runOnIdle { pollController.applyGroupStateForTest(pollController.group.copy(disbanded = true)) }
         composeRule.onNodeWithTag(EMOJI_PICKER_TEST_TAG).assertDoesNotExist()
-        composeRule.runOnIdle { assertTrue(recordedCalls().none { it.first == "reactToMessage" || it.first == "castPollVote" }) }
+        composeRule.runOnIdle {
+            assertTrue(recordedCalls().none { it.first == "reactToMessage" || it.first == "castPollVote" })
+        }
     }
 
     @Test fun replyCallbackRechecksTargetRemovedWhileMenuOpen() {
@@ -180,27 +188,26 @@ class PollMessageActionsTest : PollMessageTestFixtures() {
         closed: Boolean = false,
         pending: Boolean = false,
         failed: Boolean = false,
-    ) =
-        pollMessage(
-            closed,
-            mine = pending || failed,
-            status =
-                when {
-                    failed -> MessageStatus.Failed
-                    pending -> MessageStatus.Pending
-                    else -> MessageStatus.Received
-                },
-        ).also { item ->
-            retain(item)
-            composeRule.setContent {
-                WhiteNoiseTheme {
-                    Surface(Modifier.fillMaxWidth()) {
-                        LazyColumn {
-                            item { if (mounted.value) RealPollMessage(item, menuOpen.value) { menuOpen.value = it } }
-                            item { Spacer(Modifier.height(1_000.dp)) }
-                        }
+    ) = pollMessage(
+        closed,
+        mine = pending || failed,
+        status =
+            when {
+                failed -> MessageStatus.Failed
+                pending -> MessageStatus.Pending
+                else -> MessageStatus.Received
+            },
+    ).also { item ->
+        retain(item)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface(Modifier.fillMaxWidth()) {
+                    LazyColumn {
+                        item { if (mounted.value) RealPollMessage(item, menuOpen.value) { menuOpen.value = it } }
+                        item { Spacer(Modifier.height(1_000.dp)) }
                     }
                 }
             }
         }
+    }
 }
