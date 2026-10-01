@@ -54,6 +54,12 @@ class DictationDiagnosticStoreTest {
                     mapOf("path" to "retained_transcript"),
                 "event=completion_action reason=already_finishing" to
                     mapOf("reason" to "already_finishing"),
+                "event=completion_action action=SendOnFinish source=explicit accepted=true" to
+                    mapOf("action" to "SendOnFinish", "source" to "explicit", "accepted" to true),
+                "event=completion_action action=PasteIntoDraft source=automatic accepted=true" to
+                    mapOf("action" to "PasteIntoDraft", "source" to "automatic", "accepted" to true),
+                "event=failure_recovery failure=SendBlocked" to
+                    mapOf("failure" to "SendBlocked"),
                 "event=caller_audio_retry_exhausted attempts=3 action=retain" to
                     mapOf("attempts" to 3L, "action" to "retain"),
                 "event=caller_audio_silence_acknowledged action=advance" to

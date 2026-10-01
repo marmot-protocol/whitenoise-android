@@ -193,7 +193,7 @@
         <service
             android:name=".notifications.NotificationStreamForegroundService"
             android:exported="false"
-            android:foregroundServiceType="remoteMessaging|specialUse">
+            android:foregroundServiceType="remoteMessaging|specialUse|microphone">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="@string/background_connection_special_use_subtype" />
@@ -202,10 +202,6 @@
             android:name=".audio.tts.TtsPlaybackForegroundService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
-        <service
-            android:name=".audio.ConversationDictationForegroundService"
-            android:exported="false"
-            android:foregroundServiceType="microphone" />
         <service
             android:name=".notifications.MarmotFirebaseMessagingService"
             android:exported="false">

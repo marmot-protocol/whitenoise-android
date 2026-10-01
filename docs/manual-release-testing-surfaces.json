@@ -9650,18 +9650,36 @@
       {
         "surface": "Dictation completion command avoids queued foreground repost",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
-        "anchor": "override fun onStartCommand(",
+        "anchor": "fun onStartCommand(",
         "test_ids": [
           "DIC-002"
         ]
       },
       {
-        "surface": "Connection service orders restoration after queued dictation controls",
+        "surface": "Single foreground host releases dictation while preserving connection",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationStreamForegroundService.kt",
-        "anchor": "fun restoreIfForeground(context: Context)",
+        "anchor": "internal fun releaseDictation(",
         "test_ids": [
           "DIC-002"
         ]
+      },
+      {
+        "surface": "string:dictation_send_blocked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.dictation_send_blocked",
+        "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "string:dictation_retry_send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.dictation_retry_send",
+        "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "Explicit dictation choice overrides automatic completion before delivery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationCompletionIntent.kt",
+        "anchor": "fun choose(",
+        "test_ids": ["DIC-002"]
       },
       {
         "surface": "string:dictation_notification_text",

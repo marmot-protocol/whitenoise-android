@@ -206,6 +206,58 @@ class ConversationDictationPersistentControlTest {
             assertTrue(fixture.controller.state is ConversationDictationState.Idle)
         }
 
+    /** The visible retry for a blocked Send sends retained text instead of pasting or recording again. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun blockedSendOffersExplicitPasteAndRetrySend() =
+        runTest {
+            var accepted = false
+            val sent = mutableListOf<String>()
+            val fixture =
+                fixture(
+                    TextFieldValue("Draft", TextRange(5)),
+                    deliveryScope = this,
+                    send = { request ->
+                        if (accepted && request.beginDispatch()) {
+                            sent += request.payload
+                            true
+                        } else {
+                            false
+                        }
+                    },
+                )
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+            fixture.controller.send()
+            fixture.platform.listener.onResult("dictated")
+            runCurrent()
+            render(fixture)
+            assertEquals("Draft", fixture.draft.text)
+            composeRule.onNodeWithContentDescription("Paste").assertIsDisplayed()
+            composeRule.onNodeWithContentDescription("Retry Send").assertIsDisplayed()
+            composeRule.onNodeWithContentDescription("Dismiss").assertIsDisplayed()
+            accepted = true
+            composeRule.onNodeWithContentDescription("Retry Send").performClick()
+            runCurrent()
+            assertEquals(listOf("Draft dictated"), sent)
+            assertEquals("", fixture.draft.text)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        }
+
+    /** Recovery into a changed draft requires an actual Paste gesture. */
+    @Test
+    fun blockedSendExplicitPasteRecoversIntoChangedDraftWithoutSending() {
+        val fixture = fixture(TextFieldValue("Draft", TextRange(5)))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        fixture.controller.send()
+        fixture.edit(TextFieldValue("Updated", TextRange(7)))
+        fixture.platform.listener.onResult("dictated")
+        render(fixture)
+        assertEquals("Updated", fixture.draft.text)
+        composeRule.onNodeWithContentDescription("Paste").performClick()
+        assertEquals("Updated dictated", fixture.draft.text)
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+    }
+
     /** Verifies provider-readiness feedback and cancellation fit at large font in RTL. */
     @Test
     fun readinessFeedbackFitsTheRootBarAtLargeFontRtl() {
