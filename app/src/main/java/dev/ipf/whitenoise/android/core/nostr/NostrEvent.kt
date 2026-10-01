@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.core.nostr
 
 import org.json.JSONArray
 import org.json.JSONObject
+import java.security.MessageDigest
 import java.util.Locale
 
 internal data class NostrEvent(
@@ -54,6 +55,8 @@ internal data class NostrEvent(
         }
     }
 }
+
+internal fun sha256(bytes: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(bytes)
 
 internal fun String.hexToBytes(): ByteArray? {
     if (length % 2 != 0 || !isHex(length)) return null

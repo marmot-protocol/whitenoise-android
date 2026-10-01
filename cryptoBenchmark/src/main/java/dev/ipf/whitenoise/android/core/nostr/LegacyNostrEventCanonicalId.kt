@@ -1,7 +1,5 @@
 package dev.ipf.whitenoise.android.core.nostr
 
-import java.security.MessageDigest
-
 /** Benchmark-only copy of the former Kotlin canonicalization path. */
 internal fun NostrEvent.canonicalJson(): String =
     buildString {
@@ -31,8 +29,6 @@ internal fun NostrEvent.canonicalJson(): String =
     }
 
 internal fun NostrEvent.computedIdHex(): String = sha256(canonicalJson().toByteArray(Charsets.UTF_8)).toHex()
-
-internal fun sha256(bytes: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(bytes)
 
 private fun StringBuilder.appendNostrJsonString(value: String) {
     append('"')

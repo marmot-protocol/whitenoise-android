@@ -81,6 +81,7 @@ class ZapstoreAssetEventsTest {
     @Test
     fun acceptingVerifierSelectsSingleAssetAndChecksReferenceAndPublisher() {
         val event = assetEvent(baseAssetTags())
+
         fun select(candidate: NostrEvent): ZapstoreApkAsset? =
             ZapstoreAssetEvents.selectUniqueApkAsset(
                 events = listOf(candidate),
@@ -105,7 +106,11 @@ class ZapstoreAssetEventsTest {
         assertEquals(
             setOf(ASSET_ID),
             ZapstoreAssetEvents.assetEventIdsFromReleaseEvent(
-                event, APP_ID, TEST_PUBLISHER_PUBKEY, "$APP_ID@$VERSION", verifyEvent = { true },
+                event,
+                APP_ID,
+                TEST_PUBLISHER_PUBKEY,
+                "$APP_ID@$VERSION",
+                verifyEvent = { true },
             ),
         )
     }
