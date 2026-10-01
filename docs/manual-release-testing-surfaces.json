@@ -3,6 +3,12 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "Composer cursor updates during dictation Send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ComposerDraftExpansionBridge.kt",
+        "anchor": "fun setDraft(",
+        "test_ids": ["DIC-002"]
+      },
+      {
         "surface": "Offline speech disclosure title",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
         "anchor": "R.string.dictation_disclosure_offline_title",
@@ -1041,6 +1047,7 @@
           "CHL-002",
           "CHL-011",
           "CHL-016",
+          "CHL-019",
           "FIND-003"
         ]
       },
@@ -1054,6 +1061,7 @@
           "CHL-002",
           "CHL-011",
           "CHL-016",
+          "CHL-019",
           "FIND-003"
         ]
       },
@@ -1213,6 +1221,15 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ConnectivityBannerEffects.kt",
         "anchor": "fun ConnectivityEdgeRefreshEffects(",
         "test_ids": [
+          "INT-008"
+        ]
+      },
+      {
+        "surface": "rememberChatListPollingStopped",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ConnectivityBannerEffects.kt",
+        "anchor": "fun rememberChatListPollingStopped(",
+        "test_ids": [
+          "INT-007",
           "INT-008"
         ]
       },

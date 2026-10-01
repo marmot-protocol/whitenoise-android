@@ -23,13 +23,17 @@ internal class ComposerDraftExpansionBridge(
     private val onDraftPresentationRestored: () -> Unit,
     private val onCleanupFailure: (groupIdHex: String, cause: Throwable) -> Unit,
 ) {
-    /** Stores one user edit and advances the matching geometry's stale-send fence. */
+    /** Stores editor presentation and advances the stale-send fence only for changed text. */
     fun setDraft(
         accountRef: String,
         groupIdHex: String,
         value: TextFieldValue,
     ) {
+        val currentText = draftStore.getDraft(accountRef, groupIdHex)?.textFieldValue?.text
         draftStore.set(accountRef, groupIdHex, value)
+        // Caret and IME composition are Android presentation state. Submitting unchanged
+        // content would invalidate a dictation Send captured before this UI-only update.
+        if (currentText == value.text) return
         val generation = draftWriter.submit(accountRef, groupIdHex, value.text)
         expansionRetention.onDraftGenerationAdvanced(accountRef, groupIdHex, generation.value)
     }
