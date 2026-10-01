@@ -143,6 +143,7 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
             .onNodeWithTag(if (configuration.menu) MESSAGE_ACTION_MENU_TEST_TAG else "poll-discussion")
             .captureRoboImage("src/test/snapshots/poll_message_$name.png")
     }
+
     private fun assertPollLayout(configuration: PollScreenshotConfiguration) {
         if (configuration.menu) {
             val card =
@@ -168,7 +169,6 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
             assertEquals("Reactions must overlap the card's bottom edge", card.bottom - 21f, reaction.top, 1f)
         }
     }
-
 }
 
 private data class PollScreenshotConfiguration(
