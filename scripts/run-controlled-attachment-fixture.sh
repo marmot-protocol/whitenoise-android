@@ -4,6 +4,7 @@ set -euo pipefail
 # Only a disposable emulator may receive this generated-fixture measurement package.
 serial="${1:?Pass the exact emulator serial}"
 distribution="${2:-Play}"
+budget_profile="${3:-reference-api30-arm64}"
 case "$serial" in emulator-*) ;; *) echo 'Disposable emulator required' >&2; exit 2 ;; esac
 case "$distribution" in Play|Zapstore) ;; *) echo 'Invalid distribution' >&2; exit 2 ;; esac
 [[ "$(adb -s "$serial" shell getprop ro.kernel.qemu | tr -d '\r\n')" == 1 ]] || exit 2
@@ -20,4 +21,4 @@ adb -s "$serial" install -r "${test_apks[0]}"
 report_root="$(mktemp -d "${TMPDIR:-/tmp}/wn-attachment-fixture.XXXXXX")"
 mkdir -p app/build/reports/attachment-fixture
 python3 tools/attachment-fixture/device_runner.py --serial "$serial" --root "$report_root" \
-  --output "app/build/reports/attachment-fixture/received-${distribution}.json"
+  --output "app/build/reports/attachment-fixture/received-${distribution}.json" --budget-profile "$budget_profile"

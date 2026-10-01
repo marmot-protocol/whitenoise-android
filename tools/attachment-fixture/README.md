@@ -46,41 +46,10 @@ ledger evidence cannot become PASS. Optional `--private-debug` captures raw test
 output only in the private run root for local debugging; it is off in CI and is
 never copied into redacted reports.
 
-The probe publishes a genuine 1 KiB file from a native fixture identity to another
-native identity, waits for native received history, then uses Android's production
-resolver and host acquisition gate. Cold and ten retained consumers compare exact plaintext, asserting empty
-Android memory/disk caches before every retained read. After cold completion the
-control channel makes acquisition requests return 503 while still counting
-each attempt. One further read closes and reopens the native database under the
-same unavailable endpoint. This is native runtime reopen, not app process restart
-or whole-device offline qualification. The server must see exactly one complete acquisition body,
-equal to the actual uploaded ciphertext size. It also queries the genuine native
-sender's canonical local availability without acquiring it. That query alone
-does not qualify Android's send controller or outgoing restart/offline retention.
+Performance checks use explicit environment profiles: local API30 arm64 defaults to `reference-api30-arm64`; CI passes `ci-api34-x86_64` as the script's third argument. The runner verifies actual API/ABI and enforces every sample through `budget_checker.py` before transport qualification. Violations are included in the saved report and fail the command; no successful HTTP transfer can override them. To check only the performance fields of an existing report:
 
-Memory fields are **10 ms sampled absolute Java/native heap peaks**, with initial
-and final samples, rather than allocation deltas or guaranteed maxima. Cold and
-retained resolver elapsed times include the sampler lifecycle. The host baseline
-reports host Python/RSS memory separately; it cannot stand in for Android memory.
-Successful socket-write bytes exclude HTTP headers, TCP retransmits and total
-link traffic, and can include bytes buffered before a disconnect. Record each
-failed body, rather than guessing that buffered bytes reached the consumer.
+```bash
+python3 tools/attachment-fixture/budget_checker.py report.json --profile reference-api30-arm64
+```
 
-## Qualification boundaries
-
-The foundation requires passing host contracts and an actual small received-file
-baseline. Its CI jobs execute both distribution variants and archive aggregate
-reports; configuration alone does not establish passing hosted evidence.
-
-The dedicated MDK large-file sender, Android controller genuine-send retention,
-process restart/offline matrix, protected platform worker/service lifetime,
-external Open/Save/installer handoff, physical-device matrix and production
-endpoint capability probes remain separate qualification. Do not infer those
-outcomes from a generated row, a supplier count, a direct native download, a
-native runtime reopen or the host server's Range support.
-
-Promotion/retry changes stay gated on MDK #2134, outgoing retention on MDK #2135,
-and timeout-repair claims on Android #2936 or its qualified successor. Android
-#2973 is already in the implementation base. Shared progress changes still need
-Datawav's written ownership coordination. Danny's MDK #2106 remains untouched;
-agent-sender rows are deferred. No issue closure, merge or release is authorized.
+See the [baseline report](../../docs/performance-data/attachment-fixture-baseline-2026-10-01.md) for method, phase/memory ceilings, failures, host-only versus Android results and qualification boundaries. Original raw sessions are stored in the durable [evidence archive and checksum manifest](../../docs/performance-data/attachment-evidence-manifest-2026-10-01.md); `verify_evidence.py` anonymously verifies/extracts every original member. Seven-day CI artifacts are only a convenience for new runs. Reports exclude private database/blobs and optional instrumentation transcripts.

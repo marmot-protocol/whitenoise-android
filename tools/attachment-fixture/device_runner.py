@@ -8,6 +8,7 @@ import subprocess
 import threading
 import time
 
+from budget_checker import PROFILES, check_budget
 from fixture_relay import FixtureRelay
 from fixture_server import FixtureServer
 
@@ -20,12 +21,14 @@ def adb_command(adb, serial, *args):
     return subprocess.run([adb, "-s", serial, *args], check=True, capture_output=True, text=True, timeout=180).stdout
 
 
-def run(adb, serial, root, output, private_debug=False):
+def run(adb, serial, root, output, private_debug=False, budget_profile="reference-api30-arm64"):
     """Count genuine uploaded ciphertext and received bodies without resetting failed attempts."""
     if not serial.startswith("emulator-") or adb_command(adb, serial, "shell", "getprop", "ro.kernel.qemu").strip() != "1":
         raise ValueError("fixture runner requires a disposable emulator")
     if f"package:{APP}" not in adb_command(adb, serial, "shell", "pm", "list", "packages", APP).splitlines():
         raise ValueError("install the isolated measurement APK in place before running")
+    if budget_profile not in PROFILES:
+        raise ValueError("unknown attachment budget profile")
     server = FixtureServer(root)
     relay = FixtureRelay()
     forwards = []
@@ -60,6 +63,10 @@ def run(adb, serial, root, output, private_debug=False):
             if line.startswith(prefix):
                 report["metrics"].append(json.loads(line[len(prefix):]))
         report["instrumentation_passed"] = "OK (1 test)" in result and "FAILURES!!!" not in result
+        report["environment"] = {
+            "api": adb_command(adb, serial, "shell", "getprop", "ro.build.version.sdk").strip(),
+            "abi": adb_command(adb, serial, "shell", "getprop", "ro.product.cpu.abi").strip(),
+        }
     except (subprocess.SubprocessError, OSError, ValueError) as error:
         failure = error
         report["failure_class"] = type(error).__name__
@@ -74,11 +81,15 @@ def run(adb, serial, root, output, private_debug=False):
         report["http_upload_requests"] = sum(e["kind"] == "upload" for e in events)
         report["uploaded_ciphertext_bytes"] = sum(e["value"] for e in events if e["kind"] == "upload_bytes")
         report["successful_ciphertext_body_write_bytes"] = sum(e["value"] for e in events if e["kind"] == "body_bytes")
-        received = [m for m in report["metrics"] if m["phase"].startswith("received-")]
+        report["budget_check"] = check_budget(report["metrics"], budget_profile)
+        if report.get("environment") != PROFILES[budget_profile]:
+            report["budget_check"]["passed"] = False
+            report["budget_check"]["violations"].append("emulator API/ABI does not match budget profile")
+        received = [m for m in report["metrics"] if isinstance(m, dict) and str(m.get("phase", "")).startswith("received-")]
         requests = {e["seq"] for e in events if e["kind"] in ("get", "head")}
         completed = {e["request"] for e in events if e["kind"] == "complete"}
         report["qualified"] = (
-            report.get("instrumentation_passed", False) and len(received) == 12 and all(m["success"] for m in received)
+            report["budget_check"]["passed"] and report.get("instrumentation_passed", False) and len(received) == 12 and all(m.get("success") is True for m in received)
             and sum(e["kind"] == "acquisition_unavailable" for e in events) == 1
             and report["http_acquisition_requests"] == 1
             and report["http_upload_requests"] == 1 and requests <= completed
@@ -98,6 +109,7 @@ def run(adb, serial, root, output, private_debug=False):
             service.server_close()
         for thread in threads:
             thread.join(5)
+        report["qualified"] = report["qualified"] and failure is None and not report["reverse_cleanup_failed"]
         output.write_text(json.dumps(report, indent=2) + "\n")
     if failure is not None or not report["qualified"] or report["reverse_cleanup_failed"]:
         raise RuntimeError("controlled received probe failed; see redacted report, not a closure claim")
@@ -110,9 +122,10 @@ def main():
     parser.add_argument("--serial", required=True)
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--budget-profile", choices=PROFILES, default="reference-api30-arm64")
     parser.add_argument("--private-debug", action="store_true", help="Save raw test output in the private run root only")
     args = parser.parse_args()
-    run(args.adb, args.serial, args.root, args.output, args.private_debug)
+    run(args.adb, args.serial, args.root, args.output, args.private_debug, args.budget_profile)
 
 
 if __name__ == "__main__":
