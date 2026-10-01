@@ -29,6 +29,32 @@ inject immutable verifier decisions and do not claim cryptographic validation.
 
 ## Current MDK measurements
 
+The [2026-10-01 Pixel 6a samples](performance-data/bip340-mdk-2026-10-01-pixel6a.json)
+come from one guarded physical-device run of both minified release APKs on
+GrapheneOS Android 17 / arm64-v8a. All seven instrumentation tests passed:
+the warmed comparison plus six real-native correctness tests. Battery was 80%
+and thermal status was 0 before and after measurement.
+
+| Full-event verifier | Median | Operations per second |
+| --- | ---: | ---: |
+| Legacy Kotlin | 234.421 ms | 4.27 |
+| MDK 0.11.0 | 0.474 ms | 2,112 |
+
+The warmed MDK path was approximately 495 times faster for this signed fixture.
+The measurements include canonical event-ID validation and exclude first-call
+native loading. They do not measure card rendering or message latency.
+
+Both APKs were built from committed benchmark/build inputs at
+`3db293d4e3e6cbbc3d6671436ebdc3105bc821f2`. The report records all 24 build-input
+hashes, the pinned MarmotKit archive checksum, all 12 prepared artifact-file
+hashes, both APK hashes and all packaged native-library hashes. The four ABI
+copies of `libmarmot_uniffi.so` match the prepared pinned artifact byte for byte.
+The text-event fixture's canonical ID and signature were independently verified
+with libsecp256k1; its public test scalar is 1. The earlier parsing fixture had a
+stored ID inconsistent with its fields and was correctly rejected by MDK.
+
+## Historical September 30 MDK measurements
+
 The [2026-09-30 Pixel 6a samples](performance-data/bip340-mdk-2026-09-30-pixel6a.json)
 come from one guarded physical-device run of the minified release benchmark on
 GrapheneOS Android 17 / arm64-v8a. The instrumentation verdict was `OK (1 test)`.
