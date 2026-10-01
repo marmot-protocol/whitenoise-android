@@ -37,11 +37,13 @@ class AvatarImageLoaderTest {
                 Base64.getDecoder().decode(ONE_PIXEL_PNG_BASE64)
             }
             val network = (1..2).map { async { AvatarImageLoader.load("https://profiles.example/blocked-$it") } }
+            val key = "marmot-avatar:owner:offline@1"
+            val lifetime = AvatarImageLoader.currentCacheLifetime()
             try {
                 withTimeout(5_000) { bothStarted.await() }
                 assertNotNull(
                     withTimeout(5_000) {
-                        AvatarImageLoader.loadStored("marmot-avatar:owner:offline@1", AvatarImageLoader.currentCacheLifetime()) {
+                        AvatarImageLoader.loadStored(key, lifetime) {
                             Base64.getDecoder().decode(ONE_PIXEL_PNG_BASE64)
                         }
                     },
