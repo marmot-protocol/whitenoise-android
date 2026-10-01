@@ -11741,9 +11741,7 @@ class ConversationController(
         // call markReadUpTo again with the confirmed hex id once it echoes.
         if (!HEX_MESSAGE_ID.matches(trimmed)) return
         val account = conversationAccountRef ?: return
-        val consumeManualReminder =
-            !manualUnreadReminderConsumed &&
-                appState.hasManualUnreadReminder(account, group.groupIdHex, latestChatListRow)
+        val consumeManualReminder = shouldConsumeManualUnreadReminder(account)
         if (trimmed == lastSubmittedReadMessageId && !consumeManualReminder) return
         val previousRequestId = lastReadRequestId
         val requestId = ++nextReadRequestId
@@ -11787,6 +11785,10 @@ class ConversationController(
             if (BuildConfig.DEBUG) Log.w("DMConversation", "dismiss read notifications failed", it)
         }
     }
+
+    private fun shouldConsumeManualUnreadReminder(accountRef: String): Boolean =
+        !manualUnreadReminderConsumed &&
+            appState.hasManualUnreadReminder(accountRef, group.groupIdHex, latestChatListRow)
 
     private fun anchorReadExpiryUpTo(
         messageId: String,

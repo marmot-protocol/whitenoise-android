@@ -3378,9 +3378,11 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
         conversationRow: ChatListRowFfi?,
     ): Boolean {
-        if (!appInForeground || appLockScreenVisible) return false
-        if (activeConversationAccountRef != accountRef) return false
-        if (activeConversationGroupIdHex?.equals(groupIdHex, ignoreCase = true) != true) return false
+        val visible =
+            appInForeground && !appLockScreenVisible &&
+                activeConversationAccountRef == accountRef &&
+                activeConversationGroupIdHex?.equals(groupIdHex, ignoreCase = true) == true
+        if (!visible) return false
         return chatsController
             ?.takeIf { it.boundAccountRef == accountRef }
             ?.hasManualUnreadReminder(groupIdHex)

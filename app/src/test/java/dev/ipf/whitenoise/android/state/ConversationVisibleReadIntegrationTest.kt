@@ -13,6 +13,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.shadow.api.Shadow
+import org.robolectric.shadows.ShadowBiometricManager
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -344,10 +346,10 @@ class ConversationVisibleReadIntegrationTest {
                 controller.markReadUpTo(MESSAGE_ID)
                 assertEquals(1, fixture.markReadCalls.get())
                 fixture.appState.setAppInForeground(true, dismissRetainedVisibleConversation = false)
-                fixture.appState.appLockScreenVisible = true
+                showAppLock(fixture.appState)
                 controller.markReadUpTo(MESSAGE_ID)
                 assertEquals(1, fixture.markReadCalls.get())
-                fixture.appState.appLockScreenVisible = false
+                fixture.appState.markAppUnlockSucceeded(dismissRetainedVisibleConversation = false)
                 fixture.appState.setActiveConversationFromUi("other-account", reminder.groupIdHex)
                 controller.markReadUpTo(MESSAGE_ID)
                 assertEquals(1, fixture.markReadCalls.get())
@@ -385,6 +387,16 @@ class ConversationVisibleReadIntegrationTest {
                 closeFixture(fixture)
             }
         }
+
+    private fun showAppLock(state: WhiteNoiseAppState) {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        Shadow
+            .extract<ShadowBiometricManager>(
+                context.getSystemService(android.hardware.biometrics.BiometricManager::class.java),
+            ).setCanAuthenticate(true)
+        state.updateRequireAppUnlock(true)
+        assertTrue(state.appLockScreenVisible)
+    }
 
     private fun overlappingUnreadRow(newerId: String): ChatListRowFfi {
         val reminder = reminderRow()
