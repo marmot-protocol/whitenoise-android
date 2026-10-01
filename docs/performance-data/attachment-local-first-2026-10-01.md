@@ -2,6 +2,8 @@
 
 Refs #2779, #2785 and #2909. Coordinated behavior draft is stacked on
 [fixture foundation #2978](https://github.com/marmot-protocol/whitenoise-android/pull/2978).
+The PR targets master to run the required Android CI matrix. Foundation #2978
+must land first; its inherited commits remain visible until then.
 The production change is restricted to resolving canonical MDK bytes before Android
 acquisition admission. Join/retry/promotion, outgoing retention, progress and
 platform-lifecycle implementation remain excluded pending their prerequisites.
