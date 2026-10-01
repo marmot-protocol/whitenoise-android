@@ -1,11 +1,11 @@
 # Attachment evidence manifest — 2026-10-01
 
-[Gist archive](https://gist.github.com/mubarakcoded/04c9118c05de4308b149b76ce3fc9ebc) is durable, public, and has no CI expiry. The revision-pinned download is a base64-encoded ZIP; all JSON members retain their original bytes and formatting. Keep this archive for the lifetime of tracker #2779.
+[Gist archive](https://gist.github.com/mubarakcoded/04c9118c05de4308b149b76ce3fc9ebc) is durable, public, and has no CI expiry. The revision-pinned download is a base64-encoded ZIP; the prior 45 members retain their original bytes and formatting. New failed reports include explicit post-run annotations while preserving their measurements and unqualified outcomes. Keep this archive for the lifetime of tracker #2779.
 
-Download: <https://gist.githubusercontent.com/mubarakcoded/04c9118c05de4308b149b76ce3fc9ebc/raw/8a8b7cbb5e5e12a6626cd1d7df6a50d1622de38e/attachment-evidence-2026-10-01.zip.base64>
-ZIP SHA-256: `ea49d9c0b017005fe8fca7f8688e31ebd7d4f77e09208665927b2b751a00f2ff`
+Download: <https://gist.githubusercontent.com/mubarakcoded/04c9118c05de4308b149b76ce3fc9ebc/raw/0ad930df2773de461738fb37d92795059269c4ce/attachment-evidence-2026-10-01.zip.base64>
+ZIP SHA-256: `b01a678d98814a67f97429d8ce3ef054a6daaf427c4bcf118aa5ad658f7d1f5e`
 
-45 members; 219,107 original bytes; 58,308 ZIP bytes. Original 32 members remain byte-identical. The previous immutable revision also remains downloadable. Anonymous HTTP 200, ZIP digest and every member checksum were verified before repository copies were removed; the expanded Pixel archive was independently reviewed and verified anonymously before this manifest update. This trims current PR diffs; original commits remain in Git history. No private fixture database/blob or instrumentation transcript is included.
+75 members; 426,193 member bytes; 121,866 ZIP bytes. Original 45 members remain byte-identical. The previous immutable revision also remains downloadable. Anonymous HTTP 200, ZIP digest and every member checksum were verified before repository copies were removed; the expanded platform archive was independently reviewed, explicitly approved for public publication, and verified anonymously before this manifest update. This trims current PR diffs; original commits remain in Git history. No private fixture database/blob or instrumentation transcript is included.
 
 ```bash
 python3 tools/attachment-fixture/verify_evidence.py \
@@ -20,6 +20,8 @@ Session source is baseline/candidate; provenance/check records can cover both. F
 CI-reference: run 36886299126 / PR #2978 head `5792f140880f533491d76f4b8cb14f944fc31026`; CI-candidate: run 36887456880 / PR #2980 head `a16731672f3845996a8953c3661cd3407cc9ddd6`. These API34 x86_64 reports are supplemental environment calibration; CI merge checkout/APK digests are not recorded in them. They are not pooled with the API30 arm64 comparison, which has exact source/APK provenance. Host-only results are Python-to-Python and cannot qualify Android throughput.
 
 Pixel API37 evidence: twelve paired small-file sessions (three baseline/candidate per flavor), exact measured sources/APK digests and private-driver checksum in `pixel-2026-10-01/provenance.json`. API37 checks apply the original ceilings to metrics only; they do not assert an emulator environment profile. Device package snapshots changed during the window, so whole-device unchanged state or exclusive-device latency cannot be claimed. See the [physical report](attachment-pixel-2026-10-01.md).
+
+Pixel platform companion: two final qualified sessions, three excluded diagnostic attempts, one unqualified baseline negative control with teardown failure, setup failures and exact reusable overlays. See the [platform report](attachment-pixel-platform-2026-10-01.md). Private backups, signing keys, APKs and raw instrumentation transcripts remain excluded.
 
 | Original path inside ZIP | Evidence | Source | Flavor | Outcome | Bytes | SHA-256 |
 | --- | --- | --- | --- | --- | ---: | --- |
@@ -68,3 +70,33 @@ Pixel API37 evidence: twelve paired small-file sessions (three baseline/candidat
 | `pixel-2026-10-01/candidate-Zapstore-2.json` | Android physical | candidate | Zapstore | qualified-small-file | 5947 | `bd579eade621cbb2e8441322ed149541f47575dd9e5dd447a780b7cc6367329b` |
 | `pixel-2026-10-01/candidate-Zapstore-3.json` | Android physical | candidate | Zapstore | qualified-small-file | 5946 | `7059d6dff61bc6689bd5d3bcda178501465bc40bca25e6be14a42de9c4f8fb49` |
 | `pixel-2026-10-01/provenance.json` | provenance | mixed | both | metadata/concurrent-device | 3654 | `bac34eb43f93219fd480fe28d942a10dd670684d6fd7238b9ebd54fbe08c28b0` |
+| `pixel-platform-2026-10-01/apk-provenance.json` | provenance | mixed | both | metadata | 1861 | `d298e6146dcca3a56721c3e16243e076278fc5b419abfb9f63c944193099a1f1` |
+| `pixel-platform-2026-10-01/diagnostic-README.md` | diagnostic source | mixed | both | reusable-overlay | 3504 | `8dd073dd139b4d39f407cd8321d834f019eaa05301eeeb462d942e34e7a3f97b` |
+| `pixel-platform-2026-10-01/diagnostic-src/AndroidManifest.xml` | diagnostic source | mixed | both | reusable-overlay | 1510 | `803c4c893360c2cfc5c62bedc6287b6ff21abfa5068191b271be05d0be16262e` |
+| `pixel-platform-2026-10-01/diagnostic-src/LocalFirstDeviceChecks.kt` | diagnostic source | mixed | both | reusable-overlay | 12395 | `b85cb8d5ae43392ed2739d94fe9f023c9f7e5b5b5c253ee8512baa7afa6f0dea` |
+| `pixel-platform-2026-10-01/diagnostic-src/LocalFirstDeviceFixture.kt` | diagnostic source | mixed | both | reusable-overlay | 15403 | `c90d4bf4b0b8913ea500775a6a0d046f98496fdecebcc5471027c081b99f3d16` |
+| `pixel-platform-2026-10-01/failed-fixture-v1/apk-provenance.json` | diagnostic source | candidate | Play | unqualified-source-preserved | 1766 | `9dfbd97a5dddadeb68022ff0313474fe45f6042834e3d7f32c7c9ba71176af78` |
+| `pixel-platform-2026-10-01/failed-fixture-v1/diagnostic-src/LocalFirstDeviceChecks.kt` | diagnostic source | candidate | Play | unqualified-source-preserved | 12112 | `8878e6960b4bfc17d8562e61306da1da1bb26bb388a6d7c6cfa3d4afd019ca54` |
+| `pixel-platform-2026-10-01/failed-fixture-v1/diagnostic-src/LocalFirstDeviceFixture.kt` | diagnostic source | candidate | Play | unqualified-source-preserved | 15403 | `c90d4bf4b0b8913ea500775a6a0d046f98496fdecebcc5471027c081b99f3d16` |
+| `pixel-platform-2026-10-01/failed-fixture-v1/platform-companion.init.gradle` | diagnostic source | candidate | Play | unqualified-source-preserved | 341 | `03b5d2e50247ccef2afd59ca8c671a971efba1df2f7897cbd7add24eaec2cbbd` |
+| `pixel-platform-2026-10-01/failed-fixture-v1/platform_host_driver.py` | diagnostic source | candidate | Play | unqualified-source-preserved | 9387 | `6bd58e1d4e7993dc4bd4cd5e303ff679c8e624a183833dc6537c23ab224d5198` |
+| `pixel-platform-2026-10-01/failed-fixture-v2/apk-provenance.json` | diagnostic source | candidate | Play | unqualified-source-preserved | 1861 | `4d7b5238883ce8453f9e1d032898af811e4c7f87e72bf97afbd0a9e99f199f44` |
+| `pixel-platform-2026-10-01/failed-fixture-v2/diagnostic-src/AndroidManifest.xml` | diagnostic source | candidate | Play | unqualified-source-preserved | 1510 | `803c4c893360c2cfc5c62bedc6287b6ff21abfa5068191b271be05d0be16262e` |
+| `pixel-platform-2026-10-01/failed-fixture-v2/diagnostic-src/LocalFirstDeviceChecks.kt` | diagnostic source | candidate | Play | unqualified-source-preserved | 12166 | `db87979d2595a23377a873676b5c25f9a3f4bb09689c6e71e287d56ee9ff849f` |
+| `pixel-platform-2026-10-01/failed-fixture-v2/diagnostic-src/LocalFirstDeviceFixture.kt` | diagnostic source | candidate | Play | unqualified-source-preserved | 15403 | `c90d4bf4b0b8913ea500775a6a0d046f98496fdecebcc5471027c081b99f3d16` |
+| `pixel-platform-2026-10-01/failed-fixture-v2/platform-companion.init.gradle` | diagnostic source | candidate | Play | unqualified-source-preserved | 495 | `04bf0674e76d60ba99b9e22a56a0749bc05e15bb84e23787fad553cd5025d36f` |
+| `pixel-platform-2026-10-01/failed-fixture-v2/platform_host_driver.py` | diagnostic source | candidate | Play | unqualified-source-preserved | 9438 | `85a99d256a60281c165fc4002dbc3839f5dbc15392aa49d2dc0fe5a3bb3faa38` |
+| `pixel-platform-2026-10-01/failed-fixture-v3/apk-provenance.json` | diagnostic source | candidate | Play | unqualified-source-preserved | 1861 | `854dc4e3486b54030a169c23556dc3e525d735d0b3bfaece93263babb4f354a4` |
+| `pixel-platform-2026-10-01/failed-fixture-v3/platform_host_driver.py` | diagnostic source | candidate | Play | unqualified-source-preserved | 9438 | `85a99d256a60281c165fc4002dbc3839f5dbc15392aa49d2dc0fe5a3bb3faa38` |
+| `pixel-platform-2026-10-01/platform-companion.init.gradle` | diagnostic source | mixed | both | reusable-overlay | 495 | `04bf0674e76d60ba99b9e22a56a0749bc05e15bb84e23787fad553cd5025d36f` |
+| `pixel-platform-2026-10-01/platform_host_driver.py` | diagnostic source | mixed | both | reusable-overlay | 9470 | `2c790f1bfabda3510b2876fea1d2c65b3b54bdb5fd2b1bab534038cf2b20c9d0` |
+| `pixel-platform-2026-10-01/reports/baseline-Play-1.json` | Android physical | baseline | Play | negative-control/teardown-failed | 8816 | `79fb48508bd6b877535799ec7cd6c4d824f141dc2ab87c135680edbd9bfeabb8` |
+| `pixel-platform-2026-10-01/reports/candidate-Play-1.json` | Android physical | candidate | Play | unqualified/excluded | 9849 | `4daab3e2b35ffaacbf51ba9aee10e78385ec091cf8e9791b6d40c7f25c7b18cc` |
+| `pixel-platform-2026-10-01/reports/candidate-Play-2.json` | Android physical | candidate | Play | unqualified/excluded | 9948 | `4143f17ee7f0985e5407f80a3cb9173a28972cae1dbc56fa9770bf296be762f3` |
+| `pixel-platform-2026-10-01/reports/candidate-Play-3.json` | Android physical | candidate | Play | unqualified/excluded | 12846 | `290af19ebff1cdb3719a122cd2da6b29b00378c1e6e4f5d5b5dc91a19531d0c0` |
+| `pixel-platform-2026-10-01/reports/candidate-Play-4.json` | Android physical | candidate | Play | qualified-platform-companion | 12493 | `e0d3fa23094056cf2ed75b699803a2e58405e3e7df75b6e8ec1323966abe1caf` |
+| `pixel-platform-2026-10-01/reports/candidate-Zapstore-1.json` | Android physical | candidate | Zapstore | qualified-platform-companion | 12495 | `e81b41b5c7e9c3ce808507401ee2dd2926cc21f3905c2422b9fbd7506fe1cbc7` |
+| `pixel-platform-2026-10-01/reports/setup-failures.json` | failure | mixed | both | setup-failed | 613 | `9b53f6c5e6fe92e76de1f8d13a714eb02f1635214c7eee4d2c9e85f28762d114` |
+| `pixel-platform-2026-10-01/viewer/AndroidManifest.xml` | diagnostic source | mixed | both | reusable-overlay | 541 | `f76d9a709fc1ba4fb1cf37e20c4a0f1a366139e2c7c707994fab4b35458dfc1b` |
+| `pixel-platform-2026-10-01/viewer/src/FixtureStatusProvider.java` | diagnostic source | mixed | both | reusable-overlay | 1761 | `2339b5ae5d1a172a5e168e973dc644f3662553980daafdd53cf02ba9da8c1129` |
+| `pixel-platform-2026-10-01/viewer/src/FixtureViewerActivity.java` | diagnostic source | mixed | both | reusable-overlay | 1905 | `e294a139bfa5aec4dce74f441b0aa178704fa9218397bf957be880408aee69d1` |
