@@ -7,12 +7,13 @@
   "network": "loopback adb reverse; no bandwidth shaping; acquisition endpoint503 after cold read",
   "marmot_version": "schema=1\nsource=marmot-protocol/mdk\nmdk-sha=946e0547485c9a2c393c2048ec3a968fd50fb441\nmdk-short-sha=946e0547\nmdk-branch=master\nfeatures=otlp-export,product-analytics-export\nartifact-id=0.11.0\nartifact-tag=marmotkit-v0.11.0\nartifact-url=https://github.com/marmot-protocol/mdk/releases/download/marmotkit-v0.11.0/marmotkit-android-0.11.0.zip\nartifact-sha256=5ab8bf5f7723ed2c07d15a07c5691d05eb8a37354882020c0b69b952d6418923\narchive-root=marmotkit-android-0.11.0\nmanifest-schema=mdk-android-v1\nworkspace-version=0.11.0\nandroid-api=26\napi-type-count=334\napi-checksum-count=330\napi-helper-declaration-count=5\n",
   "sample_count_per_distribution": 3,
-  "note": "Native-runtime reopen, not app process restart. No physical-device changes. Other host builds were active; latency variability is retained.",
+  "note": "Native-runtime reopen, not app process restart. No physical-device changes. Other host builds were active; latency variability is retained. Subsequent probe line wrapping satisfies detekt without changing measured behavior; the recorded probe hash identifies the measured revision.",
   "probe_source_sha256": "d731338392e3a74bc5119399a24ca9163ce76bc87797ce9b2e77c941d79b317b",
   "play_app_sha256": "788a7263272d8904940696c4945185b0125f468dc5d2446d9457f596d81d51b6",
   "play_test_apk_sha256": "626fc61f0d9ea5ecf1489e8b53a1510e0caf234f64274727e9eda77d1a90af42",
   "zapstore_app_sha256": "a4721fbef8b1f72873ed51418dad9fea95aed9badc40abf5cf1d63cd53b9a78b",
   "zapstore_test_apk_sha256": "680ea29531aca24a26b369ed7664099d4fb51a212c16bfe7a2e613b933a36566",
   "fixture_server_sha256": "9196da7178da0aa039af717a424fe971895abc8e75e503f930550a685e9e5df0",
-  "device_runner_sha256": "be57b1a23963e50d8ad7c70a10c11a4971e26fde658cdddd7e49fe09c36cdcbb"
+  "device_runner_sha256": "be57b1a23963e50d8ad7c70a10c11a4971e26fde658cdddd7e49fe09c36cdcbb",
+  "measured_fixture_commit": "4510a677cf1932657fc318866a516dc1e5b46271"
 }

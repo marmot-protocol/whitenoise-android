@@ -85,7 +85,10 @@ internal object ControlledAttachmentProbe {
                         sender.label,
                         group,
                         MediaUploadRequestFfi(
-                            attachments = listOf(MediaUploadAttachmentRequestFfi("fixture.txt", "text/plain", bytes, null, null)),
+                            attachments =
+                                listOf(
+                                    MediaUploadAttachmentRequestFfi("fixture.txt", "text/plain", bytes, null, null),
+                                ),
                             caption = null,
                             send = true,
                             blossomServer = "http://127.0.0.1:$blobPort",
@@ -111,17 +114,21 @@ internal object ControlledAttachmentProbe {
                 fixtureState = state
                 report(JSONObject().put("phase", "fixture-stage").put("stage", "received-projected"))
                 measure("received-cold") {
-                    state.downloadAttachmentPlaintextSource(request, reference, persistInteractiveIntent = false).use {
-                        assertArrayEquals(bytes, it.toByteArray())
-                    }
+                    state
+                        .downloadAttachmentPlaintextSource(request, reference, persistInteractiveIntent = false)
+                        .use {
+                            assertArrayEquals(bytes, it.toByteArray())
+                        }
                 }
                 denyAcquisition(blobPort)
                 repeat(10) {
                     assertNoAndroidCache(state, request)
                     measure("received-retained") {
-                        state.downloadAttachmentPlaintextSource(request, reference, persistInteractiveIntent = false).use {
-                            assertArrayEquals(bytes, it.toByteArray())
-                        }
+                        state
+                            .downloadAttachmentPlaintextSource(request, reference, persistInteractiveIntent = false)
+                            .use {
+                                assertArrayEquals(bytes, it.toByteArray())
+                            }
                     }
                 }
                 val sentSource = projectedRequest(marmot, sender.label, group, reference)
@@ -171,9 +178,11 @@ internal object ControlledAttachmentProbe {
                 fixtureState = reopenedState
                 assertNoAndroidCache(reopenedState, request)
                 measure("received-native-reopen-unavailable-endpoint") {
-                    reopenedState.downloadAttachmentPlaintextSource(request, reference, persistInteractiveIntent = false).use {
-                        assertArrayEquals(bytes, it.toByteArray())
-                    }
+                    reopenedState
+                        .downloadAttachmentPlaintextSource(request, reference, persistInteractiveIntent = false)
+                        .use {
+                            assertArrayEquals(bytes, it.toByteArray())
+                        }
                 }
             }
         } finally {
@@ -191,7 +200,8 @@ internal object ControlledAttachmentProbe {
     /** Makes accidental downloads fail visibly while preserving the external attempt ledger. */
     private suspend fun denyAcquisition(port: Int) =
         withContext(Dispatchers.IO) {
-            val connection = URL("http://127.0.0.1:$port/__acquisition-unavailable").openConnection() as HttpURLConnection
+            val endpoint = URL("http://127.0.0.1:$port/__acquisition-unavailable")
+            val connection = endpoint.openConnection() as HttpURLConnection
             try {
                 connection.requestMethod = "POST"
                 connection.connectTimeout = 5_000
@@ -244,7 +254,14 @@ internal object ControlledAttachmentProbe {
                                 accepted?.reference?.ciphertextSha256 == reference.ciphertextSha256
                             }
                         if (entry != null) {
-                            request = AttachmentTransferRequest(account, group, entry.messageIdHex, 0, entry.sourceMessageIdHex)
+                            request =
+                                AttachmentTransferRequest(
+                                    account,
+                                    group,
+                                    entry.messageIdHex,
+                                    0,
+                                    entry.sourceMessageIdHex,
+                                )
                         }
                     } finally {
                         page.nextCursor?.close()
