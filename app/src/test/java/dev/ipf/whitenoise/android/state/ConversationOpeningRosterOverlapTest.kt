@@ -159,6 +159,29 @@ class ConversationOpeningRosterOverlapTest {
         )
     }
 
+    /** A newer read during backoff supersedes the pending chain instead of stacking a second one. */
+    @Test
+    fun aNewerReadDuringBackoffAbandonsTheOlderChain() =
+        runBlocking {
+            val rosterReads = AtomicInteger()
+            val controller =
+                notificationOpenedController { _, _ ->
+                    rosterReads.incrementAndGet()
+                    throw MarmotKitException.AccountWorkerBusy()
+                }
+
+            awaitConversationCondition { rosterReads.get() == 1 }
+            controller.retryMembers()
+            assertEquals(2, rosterReads.get())
+            idleMainClockFor(GROUP_ROSTER_READ_RETRY_DELAYS_MS.sum() * 2)
+            awaitAdvancingMainClock { controller.memberRosterState == GroupRosterLoadState.FAILED }
+            assertEquals(
+                "only the newest chain spends its bounded re-reads",
+                2 + GROUP_ROSTER_READ_RETRY_DELAYS_MS.size,
+                rosterReads.get(),
+            )
+        }
+
     /** Disposing the controller during backoff abandons the pending re-read. */
     @Test
     fun disposalDuringBackoffStopsAutomaticRetry() {

@@ -13014,6 +13014,8 @@ class ConversationController(
     /**
      * Re-reads a retryable failure with bounded backoff while the read is still owned, then
      * exposes manual Retry. An account switch, newer read, disposal or runtime change wins.
+     * A blocked transcript's backoff runs on [controllerScope], so it never holds the caller's
+     * mutation lock or stalls the group-state stream; other retries keep the old inline re-read.
      */
     private suspend fun handleMemberReadFailure(
         account: String,
@@ -13024,17 +13026,33 @@ class ConversationController(
     ) {
         val kind = classifyGroupRosterReadFailure(failure)
         if (kind == GroupRosterReadFailureKind.SUPERSEDED && !group.acceptsInviteResults()) return
+        val transcriptBlocked = !hasKnownTranscriptPresentation
         val retryDelay =
-            groupRosterReadRetryDelayMs(kind, attempt, transcriptBlocked = !hasKnownTranscriptPresentation)
+            groupRosterReadRetryDelayMs(kind, attempt, transcriptBlocked)
                 .takeUnless { failure.isUseAfterEviction() }
+        val backgroundBackoff = transcriptBlocked && kind != GroupRosterReadFailureKind.SUPERSEDED
         if (retryDelay != null) {
             logRosterRead("retry", kind, attempt)
-            if (retryDelay > 0L) delay(retryDelay)
-            if (ownsCurrentMemberRead(generation, runtimeGeneration)) {
-                refreshMembers(automaticRetryAttempt = attempt + 1)
+            if (backgroundBackoff) {
+                controllerScope.launch { retryMemberReadAfter(retryDelay, generation, runtimeGeneration, attempt) }
+            } else {
+                retryMemberReadAfter(retryDelay, generation, runtimeGeneration, attempt)
             }
         } else {
             settleMemberReadFailure(account, generation, runtimeGeneration, failure, attempt)
+        }
+    }
+
+    /** Waits [delayMs], then re-reads only if the failed read is still the current owned read. */
+    private suspend fun retryMemberReadAfter(
+        delayMs: Long,
+        generation: Long,
+        runtimeGeneration: Int,
+        attempt: Int,
+    ) {
+        if (delayMs > 0L) delay(delayMs)
+        if (ownsCurrentMemberRead(generation, runtimeGeneration)) {
+            refreshMembers(automaticRetryAttempt = attempt + 1)
         }
     }
 
