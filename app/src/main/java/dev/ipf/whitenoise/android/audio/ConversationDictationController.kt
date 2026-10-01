@@ -2153,20 +2153,35 @@ internal class ConversationDictationController internal constructor(
         sessionTimeoutHandle = null
         cancelPendingRestart()
         clearRecognitionGeneration(cancel = false)
+        val drainAlreadyExpired = finishRequested && failure == ConversationDictationFailure.TimedOut
         finishRequested = true
-        val platformOwnsClosure =
-            runCatching {
-                platform.finishCallerAudioCapture { finishPlaybackInterruption(sessionId) }
-            }.getOrDefault(false)
-        if (!platformOwnsClosure) finishPlaybackInterruption(sessionId)
-        state =
+        val failed =
             ConversationDictationState.Failed(
                 sessionId = sessionId,
                 target = target,
                 reason = failure,
                 retainedTranscript = accumulatedTranscript.trim().ifBlank { null },
             )
-        releaseDurableSessionLease()
+        state = failed
+        val token = notificationSessionToken
+        val onClosed: () -> Unit = {
+            finishPlaybackInterruption(sessionId)
+            if (state === failed && notificationSessionToken == token) {
+                sessionTimeoutHandle?.cancel()
+                sessionTimeoutHandle = null
+                releaseDurableSessionLease()
+            }
+        }
+        sessionTimeoutHandle =
+            diagnosticTimeout(
+                sessionId,
+                CALLER_AUDIO_FAILURE_CLOSE_TIMEOUT_MILLIS,
+                "caller_audio_failure_close",
+                isCurrent = { state === failed && notificationSessionToken == token },
+                callback = onClosed,
+            )
+        val platformOwnsClosure = runCatching { platform.finishCallerAudioCapture(onClosed) }.getOrDefault(false)
+        if (!platformOwnsClosure || drainAlreadyExpired) onClosed()
     }
 
     /** Keeps the logical session fenced while every captured chunk is recognized exactly once. */
@@ -3235,6 +3250,8 @@ internal class ConversationDictationController internal constructor(
         const val CALLER_AUDIO_PROBE_TIMEOUT_MILLIS = 6_000L
         const val MAX_SESSION_MILLIS = 65L * 60L * 1_000L
         const val CALLER_AUDIO_DRAIN_TIMEOUT_MILLIS = 90_000L
+        // Recorder tail reads are bounded at 750 ms; a stalled closure cannot retain foreground forever.
+        const val CALLER_AUDIO_FAILURE_CLOSE_TIMEOUT_MILLIS = 1_000L
         const val PROCESSING_TIMEOUT_MILLIS = 20_000L
         const val ORDINARY_SILENCE_MILLIS = 2_000L
         const val MAX_CONSECUTIVE_RAPID_EMPTY_GENERATIONS = 3

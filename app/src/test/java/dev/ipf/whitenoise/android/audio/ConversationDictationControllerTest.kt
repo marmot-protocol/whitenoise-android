@@ -2848,6 +2848,42 @@ class ConversationDictationControllerTest {
         }
     }
 
+    /** A recoverable live-capture failure keeps microphone access through the last recorder reads. */
+    @Test
+    fun retainedAudioFailureReleasesForegroundOnlyAfterRecorderClosure() {
+        var stops = 0
+        val fixture = fixture(draft = TextFieldValue(""), stopDurableSession = { stops += 1 })
+        fixture.platform.pendingCallerAudio = true
+        fixture.platform.deferCallerAudioFinish = true
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
+        assertTrue(fixture.controller.state is ConversationDictationState.Failed)
+        assertTrue(fixture.controller.hasDurableSession)
+        assertEquals(0, stops)
+        requireNotNull(fixture.platform.callerAudioFinishCallback).invoke()
+        assertFalse(fixture.controller.hasDurableSession)
+        assertEquals(1, stops)
+        assertTrue(fixture.platform.pendingCallerAudio)
+        requireNotNull(fixture.platform.callerAudioFinishCallback).invoke()
+        assertEquals(1, stops)
+    }
+
+    /** A broken recorder still has a bounded failure lease while its PCM stays recoverable. */
+    @Test
+    fun stalledFailureRecorderClosureCannotRetainForegroundIndefinitely() {
+        val fixture = fixture(draft = TextFieldValue(""))
+        fixture.platform.pendingCallerAudio = true
+        fixture.platform.deferCallerAudioFinish = true
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
+        fixture.scheduler.advanceBy(999L)
+        assertTrue(fixture.controller.hasDurableSession)
+        fixture.scheduler.advanceBy(1L)
+        assertFalse(fixture.controller.hasDurableSession)
+        assertTrue(fixture.platform.pendingCallerAudio)
+        assertTrue(fixture.controller.state is ConversationDictationState.Failed)
+    }
+
     /** Sealed-audio Retry reacquires foreground ownership and fences the previous lease's callbacks. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test

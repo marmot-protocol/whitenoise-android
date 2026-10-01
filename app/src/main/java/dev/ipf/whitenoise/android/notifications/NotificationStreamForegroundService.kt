@@ -47,10 +47,6 @@ private const val START_TRIGGER_CAPABILITY_FALLBACK = "capability_fallback"
 class NotificationStreamForegroundService : Service() {
     private var lastServiceStartId = 0
 
-    /** A rejected connection-only restore must reconcile the visible Keep connected preference. */
-    internal fun onConnectionRestoreRejected() {
-        (application as? WhiteNoiseApplication)?.initializedAppState()?.onBackgroundConnectionStartRejected()
-    }
     internal val foreground =
         ConversationForegroundRecord(
             service = this,
@@ -473,8 +469,10 @@ class NotificationStreamForegroundService : Service() {
             runCatching {
                 val appContext = context.applicationContext
                 val intent = buildIntent(appContext)
-                if (intent.action != ACTION_SYNC_NATIVE_PUSH_REGISTRATION) connectionStartEpoch.incrementAndGet()
                 ContextCompat.startForegroundService(appContext, intent)
+                if (intent.getStringExtra(EXTRA_START_TRIGGER) == START_TRIGGER_USER_TOGGLE) {
+                    connectionStartEpoch.incrementAndGet()
+                }
                 true
             }.getOrElse {
                 foregroundServiceDebug(it) { "start rejected" }
@@ -512,6 +510,11 @@ class NotificationStreamForegroundService : Service() {
             }.onFailure { foregroundServiceDebug(it) { "stop rejected" } }
         }
     }
+}
+
+/** Only a rejected user-owned connection restore reconciles the Keep connected preference. */
+internal fun NotificationStreamForegroundService.onConnectionRestoreRejected() {
+    (application as? WhiteNoiseApplication)?.initializedAppState()?.onBackgroundConnectionStartRejected()
 }
 
 /** Acknowledges only request generations owned by this supervised service instance. */

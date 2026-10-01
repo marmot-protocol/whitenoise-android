@@ -58,7 +58,10 @@ that exact fence, so even a concurrent same-text attachment mutation blocks it.
 The account, conversation, reply and captured text remain the original payload.
 
 A terminal transcription failure keeps sealed PCM and recognized text as recovery
-data, but releases the foreground lease and removes microphone controls. Retry
+data, but releases the foreground lease and removes microphone controls after
+the recorder acknowledges closure, including its bounded final tail reads. A
+one-second failure-closure watchdog releases a stalled recorder lease; an already
+expired transcription drain bound is not extended. Retry
 acquires a new lease before transcribing that PCM, without opening another
 recording. Lease generations fence old notification actions and promotion or
 destruction callbacks, including retries within the same logical session.

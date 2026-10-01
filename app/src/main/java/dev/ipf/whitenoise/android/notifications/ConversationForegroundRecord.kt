@@ -19,6 +19,7 @@ internal class ConversationForegroundRecord(
         private set
     private var foregroundPromoted = false
     private var publishedServiceType = 0
+    private var connectionUserOwned = false
 
     fun foregroundNotification(): Notification = dictation.notificationOrNull() ?: connectionNotification()
 
@@ -31,6 +32,7 @@ internal class ConversationForegroundRecord(
             type or if (dictation.hasForegroundLease) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0,
         )
         connectionServiceType = type
+        connectionUserOwned = connectionUserOwned || trigger == ForegroundStartTrigger.UserToggle
     }
 
     private fun publishForeground(
@@ -65,12 +67,14 @@ internal class ConversationForegroundRecord(
             try {
                 publishForeground(connectionNotification(), connectionServiceType)
             } catch (_: SecurityException) {
+                val reconcilePreference = connectionUserOwned
                 releaseConnection()
-                service.onConnectionRestoreRejected()
+                if (reconcilePreference) service.onConnectionRestoreRejected()
             } catch (error: RuntimeException) {
                 if (!error.isForegroundServiceStartRejection()) throw error
+                val reconcilePreference = connectionUserOwned
                 releaseConnection()
-                service.onConnectionRestoreRejected()
+                if (reconcilePreference) service.onConnectionRestoreRejected()
             }
         } else {
             removeForegroundAndStop(startId)
@@ -85,6 +89,7 @@ internal class ConversationForegroundRecord(
             return
         }
         connectionServiceType = 0
+        connectionUserOwned = false
         try {
             if (dictation.hasForegroundLease) {
                 dictation.refreshNotification()
@@ -107,6 +112,7 @@ internal class ConversationForegroundRecord(
 
     fun onDestroy() {
         connectionServiceType = 0
+        connectionUserOwned = false
         dictation.onDestroy()
         removeForegroundAndStop(serviceStartId())
     }

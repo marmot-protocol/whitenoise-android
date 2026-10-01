@@ -453,7 +453,14 @@ private fun dictationStatusLabel(
             stringResource(
                 if (captureInProgress) R.string.dictation_listening else R.string.dictation_processing,
             )
-        is ConversationDictationState.Failed -> dictationFailureLabel(state.cause ?: state.reason)
+        is ConversationDictationState.Failed -> {
+            val failureLabel = dictationFailureLabel(state.cause ?: state.reason)
+            if (state.reason == ConversationDictationFailure.SendBlocked && state.cause != null) {
+                "${stringResource(R.string.dictation_send_blocked)} · $failureLabel"
+            } else {
+                failureLabel
+            }
+        }
         is ConversationDictationState.Idle -> ""
     }
 

@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.audio
 import android.app.Application
 import android.app.Notification
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
@@ -10,6 +11,8 @@ import android.os.Handler
 import android.os.Looper
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.text.input.TextFieldValue
+import dev.ipf.whitenoise.android.MainActivity
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.BackgroundConnectionNotification
 import dev.ipf.whitenoise.android.notifications.BackgroundConnectionPreferences
 import dev.ipf.whitenoise.android.notifications.ForegroundStartTrigger
@@ -155,6 +158,65 @@ class ConversationDictationNotificationRestorationTest {
         assertTrue(shadowOf(service as Service).isForegroundStopped)
         assertCompletedPresentation(service.getSystemService(NotificationManager::class.java), false)
         lifecycle.destroy()
+    }
+
+    /** Automatic wakes cannot turn a queued user Stop into a continuing connection lease. */
+    @Test
+    fun automaticWakeDoesNotFenceQueuedConnectionStop() {
+        listOf(
+            ForegroundStartTrigger.PushWake,
+            ForegroundStartTrigger.SystemWake,
+            ForegroundStartTrigger.CapabilityFallback,
+        ).forEach { trigger ->
+            val harness = installHost()
+            val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
+            val service = lifecycle.get()
+            service.foreground.promoteConnection(ForegroundStartTrigger.UserToggle)
+            service.onStartCommand(startIntent(service, harness), 0, 1)
+            val context = RuntimeEnvironment.getApplication()
+            val worker = Thread { NotificationStreamForegroundService.stop(context) }
+            worker.start()
+            worker.join(5_000L)
+            assertFalse(worker.isAlive)
+            assertTrue(NotificationStreamForegroundService.start(context, trigger))
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(0, service.foreground.connectionServiceType)
+            assertTrue(harness.conversationDictation.hasDurableSession)
+            harness.conversationDictation.cancel()
+            assertCompletedPresentation(service.getSystemService(NotificationManager::class.java), false)
+            lifecycle.destroy()
+        }
+    }
+
+    /** The drawer describes sealed-audio work as transcription, through Starting and Listening. */
+    @Test
+    fun sealedAudioDrainNotificationNeverClaimsToBeListening() {
+        val harness = installHost()
+        val context = RuntimeEnvironment.getApplication()
+        harness.platform.pendingCallerAudio = true
+        harness.conversationDictation.send()
+        harness.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
+        harness.conversationDictation.retry()
+        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(500L))
+        assertTrue(harness.conversationDictation.state is ConversationDictationState.Starting)
+        listOf(false, true).forEach { ready ->
+            if (ready) harness.platform.listener.onReady()
+            assertFalse(harness.conversationDictation.captureInProgress)
+            val notification =
+                buildConversationDictationNotification(context, harness.conversationDictation) { _, _ ->
+                    PendingIntent.getActivity(
+                        context,
+                        1,
+                        Intent(context, MainActivity::class.java),
+                        PendingIntent.FLAG_IMMUTABLE,
+                    )
+                }
+            assertEquals(
+                context.getString(R.string.dictation_processing),
+                notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString(),
+            )
+        }
+        harness.conversationDictation.cancel()
     }
 
     /** Connection readiness is invalidated even when microphone ownership keeps the host alive. */
@@ -466,6 +528,9 @@ class ConversationDictationNotificationRestorationTest {
 
     private class FakePlatform : ConversationDictationPlatform {
         var sessionsCreated = 0
+        var pendingCallerAudio = false
+
+        override fun callerAudioHasPending(): Boolean = pendingCallerAudio
 
         lateinit var listener: ConversationDictationRecognitionListener
 

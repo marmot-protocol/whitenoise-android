@@ -313,10 +313,42 @@ class ConversationDictationPersistentControlTest {
         composeRule.onNodeWithContentDescription("Open the speech service").assertIsDisplayed()
     }
 
+    /** Recognition failure keeps the unsent outcome explicit and offers review through Paste. */
+    @Test
+    fun partialSendFailureNamesBothUnsentOutcomeAndCause() {
+        val fixture = fixture(TextFieldValue(""))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        val initial = fixture.controller.state
+        render(
+            fixture,
+            fontScale = 2f,
+            rtl = true,
+            displayedState =
+                ConversationDictationState.Failed(
+                    requireNotNull(initial.sessionId),
+                    requireNotNull(initial.target),
+                    ConversationDictationFailure.SendBlocked,
+                    "Recognized prefix",
+                    cause = ConversationDictationFailure.Network,
+                ),
+        )
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val status =
+            context.getString(R.string.dictation_send_blocked) + " · " +
+                context.getString(R.string.dictation_network_error)
+        composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, status),
+        )
+        composeRule.onNodeWithContentDescription("Paste").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Retry Send").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Dismiss").assertIsDisplayed()
+    }
+
     private fun render(
         fixture: Fixture,
         fontScale: Float = 1f,
         rtl: Boolean = false,
+        displayedState: ConversationDictationState? = null,
     ) {
         composeRule.setContent {
             val density = LocalDensity.current
@@ -327,7 +359,7 @@ class ConversationDictationPersistentControlTest {
                 WhiteNoiseTheme {
                     Box(Modifier.width(268.dp).testTag(ROOT_TAG)) {
                         ConversationDictationPersistentControl(
-                            state = fixture.controller.state,
+                            state = displayedState ?: fixture.controller.state,
                             controller = fixture.controller,
                         )
                     }
