@@ -1075,7 +1075,9 @@ internal fun MessageBubble(
                 } else {
                     record
                 }
-            controller.toggleReaction(emoji, target)
+            controller.toggleReaction(emoji, target) {
+                !isPollRecord || currentPollActionTarget(controller, pollOwner) != null
+            }
         }
     }
 

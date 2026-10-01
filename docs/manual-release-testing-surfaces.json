@@ -9377,6 +9377,12 @@
         "test_ids": ["MSG-027"]
       },
       {
+        "surface": "Delayed reaction target admission",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ReactionMutation.kt",
+        "anchor": "internal data class ReactionMutationTarget(",
+        "test_ids": ["MSG-027"]
+      },
+      {
         "surface": "currentPollActionTarget",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollMessageActionOwner.kt",
         "anchor": "internal fun currentPollActionTarget(",

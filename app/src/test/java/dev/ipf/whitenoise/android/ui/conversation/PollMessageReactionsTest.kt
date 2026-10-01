@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -16,8 +17,14 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_ACTION_REACTI
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleRowTestTag
 import dev.ipf.whitenoise.android.ui.conversation.reactions.REACTION_PILL_TEST_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -74,6 +81,10 @@ class PollMessageReactionsTest : PollMessageTestFixtures() {
         val item = render()
         openMenu(item.record.messageIdHex)
         composeRule.onNodeWithContentDescription("Open emoji picker").performClick()
+        // The real picker loads its catalog on IO; Compose idleness alone does not await that work.
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText("😀").fetchSemanticsNodes().size == 1
+        }
         composeRule.onNodeWithText("😀").performClick()
         advanceReactionQuietPeriod()
         composeRule.waitUntil { recordedCalls().any { it.first == "reactToMessage" } }
@@ -104,6 +115,83 @@ class PollMessageReactionsTest : PollMessageTestFixtures() {
                 pollController.reactions[item.record.messageIdHex].isNullOrEmpty()
         }
         composeRule.runOnIdle { assertTrue(recordedCalls().none { it.first == "castPollVote" }) }
+    }
+
+    @Test fun removedPollDuringQuietPeriodDiscardsQueuedReaction() {
+        val item = render()
+        openMenu(item.record.messageIdHex)
+        composeRule.onNodeWithTag("$MESSAGE_ACTION_REACTION_TEST_TAG:👍").performClick()
+        composeRule.runOnIdle {
+            assertTrue(pollController.reactions[item.record.messageIdHex].orEmpty().any { it.mine })
+            pollController.timelineItemsById.remove(item.record.messageIdHex)
+        }
+        assertQueuedReactionDiscarded(item.record.messageIdHex)
+    }
+
+    @Test fun expiredPollDuringQuietPeriodDiscardsQueuedReaction() {
+        val item = render()
+        openMenu(item.record.messageIdHex)
+        composeRule.onNodeWithTag("$MESSAGE_ACTION_REACTION_TEST_TAG:👍").performClick()
+        composeRule.runOnIdle {
+            assertTrue(pollController.reactions[item.record.messageIdHex].orEmpty().any { it.mine })
+            retain(item.copy(record = item.record.copy(retentionExpiresAt = 1uL)))
+        }
+        assertQueuedReactionDiscarded(item.record.messageIdHex)
+    }
+
+    @Test fun queuedRemovalRechecksAvailabilityBeforeDeletingReactionEvent() =
+        runTest {
+            val item = render()
+            pollController.toggleReaction("👍", item.record)
+            var available = true
+            var admissionChecks = 0
+            val removal =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    pollController.toggleReaction("👍", item.record) {
+                        admissionChecks++
+                        available
+                    }
+                }
+            available = false
+            removal.await()
+            assertEquals(1, admissionChecks)
+            assertEquals(1, recordedCalls().count { it.first == "reactToMessage" })
+            assertTrue(recordedCalls().none { it.first == "deleteMessage" || it.first == "unreactFromMessage" })
+        }
+
+    @Test fun pollRemovedDuringGroupLockWaitDoesNotReachNative() =
+        runTest {
+            val item = render()
+            val owner = PollMessageActionOwner("personal", item.record.groupIdHex, item.record.messageIdHex)
+            val release = CompletableDeferred<Unit>()
+            val lockHolder =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    pollState.withGroupCommitLock("personal", item.record.groupIdHex) { release.await() }
+                }
+            val reaction =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    pollController.toggleReaction("👍", item.record) {
+                        currentPollActionTarget(pollController, owner) != null
+                    }
+                }
+            advanceTimeBy(200L)
+            runCurrent()
+            assertTrue(pollController.reactions[item.record.messageIdHex].orEmpty().any { it.mine })
+            pollController.timelineItemsById.remove(item.record.messageIdHex)
+            release.complete(Unit)
+            lockHolder.join()
+            reaction.await()
+            assertTrue(pollController.reactions[item.record.messageIdHex].isNullOrEmpty())
+            assertTrue(recordedCalls().none { it.first == "reactToMessage" })
+        }
+
+    private fun assertQueuedReactionDiscarded(target: String) {
+        advanceReactionQuietPeriod()
+        composeRule.waitUntil {
+            shadowOf(Looper.getMainLooper()).idle()
+            pollController.reactions[target].isNullOrEmpty()
+        }
+        assertTrue(recordedCalls().none { it.first == "reactToMessage" || it.first == "unreactFromMessage" })
     }
 
     @Test fun pollReplyUsesExistingNativeComposerSendAndStableTarget() =
