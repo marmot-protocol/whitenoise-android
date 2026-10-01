@@ -48,6 +48,7 @@ class MarkdownLinkCopyTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Long-pressing an autolink copies its URL and never reaches the parent row's long-press actions. */
     @Test
     fun longPressingAutolinkCopiesItsUrlInsteadOfOpeningParentActions() {
         val url = "https://example.com/page"
@@ -58,6 +59,18 @@ class MarkdownLinkCopyTest {
         )
     }
 
+    /** Long-pressing a bare `www.` address copies the `https://` destination a tap would open. */
+    @Test
+    fun longPressingWwwAutolinkCopiesItsHttpsDestination() {
+        val typed = "www.example.network/page"
+
+        assertEquals(
+            LongPressResult(copiedUrl = "https://$typed", parentLongPresses = 0),
+            longPress(autolinkDocument(typed, MarkdownAutolinkKindFfi.WWW), visibleText = typed),
+        )
+    }
+
+    /** Long-pressing a labelled link copies its destination, not the visible label. */
     @Test
     fun longPressingExplicitLinkCopiesDestinationInsteadOfLabel() {
         val destination = "https://example.com/destination"
@@ -168,6 +181,7 @@ class MarkdownLinkCopyTest {
         composeRule.runOnIdle { assertEquals(url, copiedUrl) }
     }
 
+    /** Long-presses [visibleText] in a rendered [document] and reports what was copied and forwarded. */
     private fun longPress(
         document: MarkdownDocumentFfi,
         visibleText: String,
@@ -260,20 +274,25 @@ class MarkdownLinkCopyTest {
         return LongPressResult(copiedUrl, parentLongPresses)
     }
 
+    /** Resolves [resId] against the test application context. */
     private fun string(resId: Int): String {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         return context.getString(resId)
     }
 
-    private fun autolinkDocument(url: String) =
-        paragraphDocument(
-            MarkdownInlineFfi.Autolink(
-                url,
-                MarkdownAutolinkKindFfi.URI,
-                MarkdownLinkDestinationKindFfi.WEB,
-            ),
-        )
+    /** Wraps a single autolink of [kind] in a one-paragraph document. */
+    private fun autolinkDocument(
+        url: String,
+        kind: MarkdownAutolinkKindFfi = MarkdownAutolinkKindFfi.URI,
+    ) = paragraphDocument(
+        MarkdownInlineFfi.Autolink(
+            url,
+            kind,
+            MarkdownLinkDestinationKindFfi.WEB,
+        ),
+    )
 
+    /** Wraps a single [inline] in a one-paragraph document. */
     private fun paragraphDocument(inline: MarkdownInlineFfi) =
         MarkdownDocumentFfi(
             truncated = false,

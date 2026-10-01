@@ -23,6 +23,7 @@ internal enum class SettingsDetail {
     Support,
     SupportRelays,
     KeyPackages,
+    QuarantinedGroups,
     Notifications,
     DevicePrivacy,
     DiagnosticsImprovements,

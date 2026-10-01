@@ -12,6 +12,79 @@ import org.junit.Test
 import java.io.File
 
 class AttachmentPlaintextResolverTest {
+    /** Canonical retained bytes bypass acquisition even when both Android presentation caches miss. */
+    @Test
+    fun nativeLeaseBypassesAcquisitionAndRemainsCallerOwned() =
+        runBlocking {
+            val file = File.createTempFile("native-retained", ".lease").apply { writeBytes(byteArrayOf(3, 4)) }
+            val lease = AttachmentPlaintext.Lease(DiskByteCacheLease(file))
+            val events = mutableListOf<String>()
+            val source =
+                resolveAttachmentPlaintext(
+                    loadMemory = {
+                        events += "memory"
+                        null
+                    },
+                    loadDisk = { _, onAcquired ->
+                        events += "disk"
+                        null.also(onAcquired)
+                    },
+                    cacheMemory = { error("leases must not be copied into memory") },
+                    clearInteractiveIntent = { events += "clear" },
+                    loadMiss = { error("retained reads must not join or promote network work") },
+                    loadNative = {
+                        events += "native"
+                        lease
+                    },
+                )
+            assertSame(lease, source)
+            org.junit.Assert.assertEquals(listOf("memory", "disk", "native", "clear"), events)
+            assertTrue(file.exists())
+            source.close()
+            assertFalse(file.exists())
+        }
+
+    /** Failed local preparation propagates without silently turning a retained hit into a transfer. */
+    @Test
+    fun nativeMaterializationFailureNeverAcquiresOrClearsIntent() =
+        runBlocking {
+            val failure = java.io.IOException("local preparation failed")
+            val thrown =
+                runCatching {
+                    resolveAttachmentPlaintext(
+                        loadMemory = { null },
+                        loadDisk = { _, onAcquired -> null.also(onAcquired) },
+                        cacheMemory = {},
+                        clearInteractiveIntent = { error("failed local reads preserve intent") },
+                        loadMiss = { error("failed local reads must not download") },
+                        loadNative = { throw failure },
+                    )
+                }.exceptionOrNull()
+            assertSame(failure, thrown)
+        }
+
+    /** Post-load failure closes the native lease just as it closes an Android disk lease. */
+    @Test
+    fun nativeLeaseBookkeepingFailureDeletesPlaintext() =
+        runBlocking {
+            val file = File.createTempFile("native-retained", ".lease")
+            val lease = AttachmentPlaintext.Lease(DiskByteCacheLease(file))
+            val failure = CancellationException("caller detached")
+            val thrown =
+                runCatching {
+                    resolveAttachmentPlaintext(
+                        loadMemory = { null },
+                        loadDisk = { _, onAcquired -> null.also(onAcquired) },
+                        cacheMemory = {},
+                        clearInteractiveIntent = { throw failure },
+                        loadMiss = { error("native hit must not download") },
+                        loadNative = { lease },
+                    )
+                }.exceptionOrNull()
+            assertSame(failure, thrown)
+            assertFalse(file.exists())
+        }
+
     /** A failed native reopen must not erase the durable request that can retry it. */
     @Test
     fun failedNativeMaterializationPreservesInteractiveIntent() =

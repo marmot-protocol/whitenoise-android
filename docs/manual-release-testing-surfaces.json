@@ -3,6 +3,38 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "QuarantinedGroupsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "fun QuarantinedGroupsScreen(",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "QuarantinedGroupsContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "fun QuarantinedGroupsContent(",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Developer quarantined group navigation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "row(\"quarantined_groups\")",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group reason and recovery guidance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "fun quarantineGuidance(",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
         "surface": "Modifier.conversationScrollIndicator",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScrollIndicatorWindow.kt",
         "anchor": "fun Modifier.conversationScrollIndicator(",
@@ -579,6 +611,14 @@
         "anchor": "fun MarkdownBodyText(",
         "test_ids": [
           "RDR-001"
+        ]
+      },
+      {
+        "surface": "Bare www autolink destination",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "fun markdownAutolinkDestination(",
+        "test_ids": [
+          "MSG-029"
         ]
       },
       {
@@ -3896,6 +3936,12 @@
           "MSG-013",
           "MSG-015"
         ]
+      },
+      {
+        "surface": "Canonical retained attachment resolution before acquisition admission",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentPlaintextResolver.kt",
+        "anchor": "internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(",
+        "test_ids": ["MED-009", "MED-017", "MED-023"]
       },
       {
         "surface": "Persisted file open terminal download settlement",
@@ -24206,6 +24252,158 @@
       }
     ],
     "source_coverage": [
+      {
+        "surface": "Quarantined group recovery: R.string.quarantined_groups",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.quarantined_groups",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_count",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_empty",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_empty",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_explanation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_explanation",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_group",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_group_record",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_group_record",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_load_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_load_failed",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_loading",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_member_validation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_member_validation",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_missing_state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_missing_state",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_pending_commit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_pending_commit",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_recovered",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_recovered",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_refresh",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_refresh",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_retry",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_retry_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_retry_failed",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_still_quarantined",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_still_quarantined",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_stored_state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_stored_state",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_unavailable",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantined_groups",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantined_groups",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
       {
         "surface": "Continuous retained-window position and layout ownership",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScrollIndicatorWindow.kt",

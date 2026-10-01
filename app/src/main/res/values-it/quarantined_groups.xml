@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="quarantined_groups">Gruppi in quarantena</string>
+    <string name="quarantine_explanation">Non è stato possibile caricare questi gruppi in sicurezza. Il recupero ripete la convalida senza eliminare la cronologia, aggirare i controlli o rientrare nel gruppo.</string>
+    <string name="quarantine_unavailable">Nessun account attivo con accesso effettuato disponibile.</string>
+    <string name="quarantine_loading">Caricamento dei gruppi in quarantena…</string>
+    <string name="quarantine_load_failed">Impossibile caricare i gruppi in quarantena. Prova ad aggiornare.</string>
+    <string name="quarantine_count">In quarantena: %1$d</string>
+    <string name="quarantine_refresh">Aggiorna gruppi</string>
+    <string name="quarantine_empty">Nessun gruppo è in quarantena.</string>
+    <string name="quarantine_group">Gruppo %1$s</string>
+    <string name="quarantine_retry">Riprova recupero</string>
+    <string name="quarantine_stored_state">Impossibile caricare lo stato di cifratura salvato.</string>
+    <string name="quarantine_missing_state">Lo stato di cifratura salvato è assente.</string>
+    <string name="quarantine_member_validation">La convalida dei membri o dello stato di cifratura non è riuscita.</string>
+    <string name="quarantine_group_record">Impossibile caricare il record del gruppo.</string>
+    <string name="quarantine_pending_commit">Impossibile recuperare un aggiornamento del gruppo interrotto.</string>
+    <string name="quarantine_recovered">Recupero riuscito. Il gruppo può tornare nella lista delle chat.</string>
+    <string name="quarantine_still_quarantined">Il gruppo resta in quarantena. La cronologia non è stata eliminata.</string>
+    <string name="quarantine_retry_failed">Impossibile completare il recupero. Riprova più tardi.</string>
+</resources>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="quarantined_groups">Groupes en quarantaine</string>
+    <string name="quarantine_explanation">Ces groupes n’ont pas pu être chargés en toute sécurité. La récupération relance la validation sans supprimer l’historique, contourner les contrôles ni rejoindre à nouveau le groupe.</string>
+    <string name="quarantine_unavailable">Aucun compte actif connecté n’est disponible.</string>
+    <string name="quarantine_loading">Chargement des groupes en quarantaine…</string>
+    <string name="quarantine_load_failed">Impossible de charger les groupes en quarantaine. Essayez d’actualiser.</string>
+    <string name="quarantine_count">En quarantaine : %1$d</string>
+    <string name="quarantine_refresh">Actualiser les groupes</string>
+    <string name="quarantine_empty">Aucun groupe n’est en quarantaine.</string>
+    <string name="quarantine_group">Groupe %1$s</string>
+    <string name="quarantine_retry">Réessayer la récupération</string>
+    <string name="quarantine_stored_state">Impossible de charger l’état de chiffrement enregistré.</string>
+    <string name="quarantine_missing_state">L’état de chiffrement enregistré est manquant.</string>
+    <string name="quarantine_member_validation">La validation des membres ou de l’état de chiffrement a échoué.</string>
+    <string name="quarantine_group_record">Impossible de charger le dossier du groupe.</string>
+    <string name="quarantine_pending_commit">Impossible de récupérer une mise à jour du groupe interrompue.</string>
+    <string name="quarantine_recovered">Récupération réussie. Le groupe peut revenir dans la liste des discussions.</string>
+    <string name="quarantine_still_quarantined">Le groupe reste en quarantaine. Son historique n’a pas été supprimé.</string>
+    <string name="quarantine_retry_failed">La récupération n’a pas pu être terminée. Réessayez plus tard.</string>
+</resources>

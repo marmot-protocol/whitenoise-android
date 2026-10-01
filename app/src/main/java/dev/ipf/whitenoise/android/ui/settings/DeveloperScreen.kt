@@ -53,13 +53,14 @@ internal fun developerBuildFacts(staging: Boolean): DeveloperBuildFacts {
  * the debugging surfaces the switch reveals, and the build this app was made from. Telemetry and audit logs
  * stay in Privacy & Security — they are privacy controls, not developer tools.
  */
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongParameterList")
 @Composable
 internal fun DeveloperScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
     onOpenDiagnostics: () -> Unit,
     onOpenKeyPackages: () -> Unit,
+    onOpenQuarantinedGroups: () -> Unit,
     onOpenDemoChat: (ChatListItem) -> Unit = {},
 ) {
     val demo = appState.appReviewDemo
@@ -83,6 +84,12 @@ internal fun DeveloperScreen(
         }
     }
     var seedDialogOpen by remember { mutableStateOf(false) }
+    val quarantineSummary =
+        if (appState.developerMode) {
+            rememberQuarantinedGroupsSummary(appState)
+        } else {
+            null
+        }
     DeveloperContent(
         developerMode = appState.developerMode,
         streamingDebug = appState.streamingDebugMode,
@@ -92,6 +99,8 @@ internal fun DeveloperScreen(
         onBack = onBack,
         onOpenDiagnostics = onOpenDiagnostics,
         onOpenKeyPackages = onOpenKeyPackages,
+        onOpenQuarantinedGroups = onOpenQuarantinedGroups,
+        quarantineSummary = quarantineSummary,
         demoStatus = demo.status,
         demoAvailable = demo.canBegin,
         demoHasSavedSetup = demo.hasSavedSetup,
@@ -121,6 +130,8 @@ internal fun DeveloperContent(
     onBack: () -> Unit,
     onOpenDiagnostics: () -> Unit,
     onOpenKeyPackages: () -> Unit,
+    onOpenQuarantinedGroups: () -> Unit = {},
+    quarantineSummary: String? = null,
     demoStatus: ReviewDemoStatus = ReviewDemoStatus.Idle,
     demoAvailable: Boolean = false,
     demoHasSavedSetup: Boolean = false,
@@ -236,6 +247,19 @@ internal fun DeveloperContent(
                 }
             }
             if (developerMode) {
+                item {
+                    SettingsGroup {
+                        row("quarantined_groups") { context ->
+                            SettingsLink(
+                                context = context,
+                                title = stringResource(R.string.quarantined_groups),
+                                onClick = onOpenQuarantinedGroups,
+                                subtitle = quarantineSummary,
+                                modifier = Modifier.testTag("developer.quarantined_groups"),
+                            )
+                        }
+                    }
+                }
                 item { SettingsSection(stringResource(R.string.developer_debugging)) }
                 item {
                     SettingsGroup(modifier = Modifier.testTag("developer.debugging")) {

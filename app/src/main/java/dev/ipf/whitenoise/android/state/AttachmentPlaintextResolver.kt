@@ -89,6 +89,7 @@ internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
             clearInteractiveIntent = {
                 clearInteractiveAttachmentIntentAfterSuccess(request, priority, persistInteractiveIntent)
             },
+            loadNative = { openNativeAttachment(request) },
             loadMiss = {
                 diagnostics?.phase(
                     phase = PerformancePhase.ATTACHMENT_ACQUISITION_START,
@@ -256,7 +257,7 @@ internal suspend fun materializeAttachmentAcquisition(
 }
 
 /**
- * Chooses bounded in-memory or private-file attachment plaintext and transfers
+ * Chooses Android cache or canonical native plaintext before admitting acquisition, and transfers
  * lease ownership to the caller only after all post-load bookkeeping succeeds.
  * `loadDisk` must invoke its acquisition callback before crossing back from the
  * dispatcher where the source was acquired, so cancellation can close it.
@@ -271,6 +272,7 @@ internal suspend fun resolveAttachmentPlaintext(
     cacheMemory: suspend (ByteArray) -> Unit,
     clearInteractiveIntent: suspend () -> Unit,
     loadMiss: suspend () -> AttachmentPlaintext,
+    loadNative: suspend () -> AttachmentPlaintext? = { null },
 ): AttachmentPlaintext {
     val memory = loadMemory()
     val callerContext = currentCoroutineContext()
@@ -283,6 +285,7 @@ internal suspend fun resolveAttachmentPlaintext(
                     { callerContext.ensureActive() },
                     { pendingSource = it },
                 )
+                ?: loadNative()
         pendingSource = null
         source?.let { resolved ->
             if (resolved is AttachmentPlaintext.Bytes && memory == null) {

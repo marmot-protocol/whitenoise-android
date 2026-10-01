@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="quarantined_groups">Grupos en cuarentena</string>
+    <string name="quarantine_explanation">Estos grupos no se pudieron cargar de forma segura. La recuperación vuelve a validar sin borrar el historial, omitir comprobaciones ni volver a unirse al grupo.</string>
+    <string name="quarantine_unavailable">No hay una cuenta activa con sesión iniciada.</string>
+    <string name="quarantine_loading">Cargando grupos en cuarentena…</string>
+    <string name="quarantine_load_failed">No se pudieron cargar los grupos en cuarentena. Intenta actualizar.</string>
+    <string name="quarantine_count">En cuarentena: %1$d</string>
+    <string name="quarantine_refresh">Actualizar grupos</string>
+    <string name="quarantine_empty">No hay grupos en cuarentena.</string>
+    <string name="quarantine_group">Grupo %1$s</string>
+    <string name="quarantine_retry">Reintentar recuperación</string>
+    <string name="quarantine_stored_state">No se pudo cargar el estado de cifrado guardado.</string>
+    <string name="quarantine_missing_state">Falta el estado de cifrado guardado.</string>
+    <string name="quarantine_member_validation">Falló la validación de miembros o del estado de cifrado.</string>
+    <string name="quarantine_group_record">No se pudo cargar el registro del grupo.</string>
+    <string name="quarantine_pending_commit">No se pudo recuperar una actualización de grupo interrumpida.</string>
+    <string name="quarantine_recovered">Recuperación completada. El grupo puede volver a la lista de chats.</string>
+    <string name="quarantine_still_quarantined">El grupo sigue en cuarentena. No se ha borrado su historial.</string>
+    <string name="quarantine_retry_failed">No se pudo completar la recuperación. Inténtalo más tarde.</string>
+</resources>

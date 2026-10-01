@@ -54,6 +54,10 @@ import kotlin.random.Random
 /** Opt-in component timings using generated images and a separate disposable native store. */
 @RunWith(AndroidJUnit4::class)
 class MediaAttachmentLatencyProbe {
+    /** Opt-in controlled received-message probe; public endpoints are never used by this entry point. */
+    @Test
+    fun measureControlledReceivedAttachment() = runBlocking { ControlledAttachmentProbe.run() }
+
     /** Compares generated file preparation, upload, and verified cold downloads by payload size. */
     @Test
     fun measureSyntheticSizeMatrix() =

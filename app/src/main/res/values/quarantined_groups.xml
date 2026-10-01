@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="quarantined_groups">Quarantined groups</string>
+    <string name="quarantine_explanation">These groups could not be safely loaded. Recovery retries the shared engine’s validation without deleting history, bypassing checks, or rejoining a group.</string>
+    <string name="quarantine_unavailable">No active signed-in account is available.</string>
+    <string name="quarantine_loading">Loading quarantined groups…</string>
+    <string name="quarantine_load_failed">Could not load quarantined groups. Try refreshing.</string>
+    <string name="quarantine_count">Quarantined: %1$d</string>
+    <string name="quarantine_refresh">Refresh groups</string>
+    <string name="quarantine_empty">No groups are quarantined.</string>
+    <string name="quarantine_group">Group %1$s</string>
+    <string name="quarantine_retry">Retry recovery</string>
+    <string name="quarantine_stored_state">The stored encryption state could not be loaded.</string>
+    <string name="quarantine_missing_state">The stored encryption state is missing.</string>
+    <string name="quarantine_member_validation">Member or encryption-state validation did not pass.</string>
+    <string name="quarantine_group_record">The group record could not be loaded.</string>
+    <string name="quarantine_pending_commit">An interrupted group update could not be recovered.</string>
+    <string name="quarantine_recovered">Recovery succeeded. The group can return to the chat list.</string>
+    <string name="quarantine_still_quarantined">The group is still quarantined. Its history has not been deleted.</string>
+    <string name="quarantine_retry_failed">Recovery could not be completed. Try again later.</string>
+</resources>
