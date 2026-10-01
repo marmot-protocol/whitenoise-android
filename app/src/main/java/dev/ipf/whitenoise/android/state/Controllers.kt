@@ -11778,14 +11778,7 @@ class ConversationController(
         pendingReadRequestIds -= requestId
         val markReadFailure = markReadResult.exceptionOrNull()
         if (markReadFailure != null) {
-            if (lastReadRequestId == requestId) {
-                lastReadMessageId = confirmedReadMessageId()
-                manualUnreadReminderConsumed = false
-                // Earlier overlapping attempts may also have failed. A retry
-                // must reach MDK instead of restoring a failed dedupe key.
-                lastSubmittedReadMessageId = null
-                lastReadRequestId = pendingReadRequestIds.maxOrNull() ?: 0L
-            }
+            restoreFailedReadRequest(requestId)
             if (markReadFailure is CancellationException) throw markReadFailure
             if (BuildConfig.DEBUG) Log.w("DMConversation", "mark read failed", markReadFailure)
             return
@@ -11811,6 +11804,15 @@ class ConversationController(
         }.onFailure {
             if (BuildConfig.DEBUG) Log.w("DMConversation", "dismiss read notifications failed", it)
         }
+    }
+
+    /** Restores only the latest failed request; finished requests never regain ownership or suppress retries. */
+    private fun restoreFailedReadRequest(requestId: Long) {
+        if (lastReadRequestId != requestId) return
+        lastReadMessageId = confirmedReadMessageId()
+        manualUnreadReminderConsumed = false
+        lastSubmittedReadMessageId = null
+        lastReadRequestId = pendingReadRequestIds.maxOrNull() ?: 0L
     }
 
     /** Uses the native cursor, or a successful null-result cursor only while its original row remains current. */

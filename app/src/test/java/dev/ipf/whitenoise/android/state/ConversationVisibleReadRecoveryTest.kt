@@ -261,7 +261,10 @@ internal class ConversationVisibleReadRecoveryTest : ConversationVisibleReadTest
             val release = List(3) { CountDownLatch(1) }
             val calls = AtomicInteger()
             val row =
-                reminderRow().copy(lastReadMessageIdHex = ConversationTimelineTestIds.MESSAGE_A, lastReadTimelineAt = 1uL)
+                reminderRow().copy(
+                    lastReadMessageIdHex = ConversationTimelineTestIds.MESSAGE_A,
+                    lastReadTimelineAt = 1uL,
+                )
             val fixture =
                 fixture(row) {
                     val index = calls.getAndIncrement()
