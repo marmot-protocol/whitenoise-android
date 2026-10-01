@@ -1,9 +1,13 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
@@ -13,8 +17,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
 import androidx.compose.ui.test.swipeRight
-import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_PICKER_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleRowTestTag
@@ -96,7 +101,8 @@ class PollMessageActionsTest : PollMessageTestFixtures() {
 
     @Test fun verticalDragOfAnOptionDoesNotVoteOrReply() {
         render()
-        composeRule.onNodeWithText("Soup").performTouchInput { swipeUp() }
+        // The label's own height is smaller than touch slop. Drag into the real scroll owner.
+        composeRule.onNodeWithText("Soup").performTouchInput { swipe(center, center - Offset(0f, 80f)) }
         composeRule.runOnIdle {
             assertNull(pollController.replyingTo)
             assertTrue(recordedCalls().none { it.first == "castPollVote" })
@@ -151,7 +157,10 @@ class PollMessageActionsTest : PollMessageTestFixtures() {
             composeRule.setContent {
                 WhiteNoiseTheme {
                     Surface(Modifier.fillMaxWidth()) {
-                        if (mounted.value) RealPollMessage(item, menuOpen.value) { menuOpen.value = it }
+                        LazyColumn {
+                            item { if (mounted.value) RealPollMessage(item, menuOpen.value) { menuOpen.value = it } }
+                            item { Spacer(Modifier.height(1_000.dp)) }
+                        }
                     }
                 }
             }

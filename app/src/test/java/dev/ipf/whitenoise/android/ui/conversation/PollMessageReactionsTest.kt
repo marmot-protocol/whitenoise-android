@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import android.os.Looper
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.mutableStateOf
@@ -26,7 +27,9 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.time.Duration
 
 /** Poll discussion shares native reaction admission, rollback and event-scoped removal. */
 @RunWith(RobolectricTestRunner::class)
@@ -46,9 +49,11 @@ class PollMessageReactionsTest : PollMessageTestFixtures() {
         val item = render()
         openMenu(item.record.messageIdHex)
         composeRule.onNodeWithTag("$MESSAGE_ACTION_REACTION_TEST_TAG:👍").performClick()
+        advanceReactionQuietPeriod()
         composeRule.waitUntil { recordedCalls().any { it.first == "reactToMessage" } }
         composeRule.onNodeWithTag("$REACTION_PILL_TEST_TAG:0").performClick()
         composeRule.onNodeWithText("Tap to remove").performClick()
+        advanceReactionQuietPeriod()
         composeRule.waitUntil { recordedCalls().any { it.first == "deleteMessage" } }
         composeRule.runOnIdle {
             assertEquals(
@@ -67,6 +72,7 @@ class PollMessageReactionsTest : PollMessageTestFixtures() {
         openMenu(item.record.messageIdHex)
         composeRule.onNodeWithContentDescription("Open emoji picker").performClick()
         composeRule.onNodeWithText("😀").performClick()
+        advanceReactionQuietPeriod()
         composeRule.waitUntil { recordedCalls().any { it.first == "reactToMessage" } }
         assertEquals(
             listOf("personal", item.record.groupIdHex, item.record.messageIdHex, "😀"),
@@ -88,6 +94,7 @@ class PollMessageReactionsTest : PollMessageTestFixtures() {
         reactionFailure = IllegalStateException("rejected fixture reaction")
         openMenu(item.record.messageIdHex)
         composeRule.onNodeWithTag("$MESSAGE_ACTION_REACTION_TEST_TAG:👍").performClick()
+        advanceReactionQuietPeriod()
         composeRule.waitUntil { recordedCalls().any { it.first == "reactToMessage" } && pollController.reactions[item.record.messageIdHex].isNullOrEmpty() }
         composeRule.runOnIdle { assertTrue(recordedCalls().none { it.first == "castPollVote" }) }
     }
@@ -102,6 +109,11 @@ class PollMessageReactionsTest : PollMessageTestFixtures() {
             assertEquals(listOf("personal", item.record.groupIdHex, item.record.messageIdHex, "I prefer soup"), call.take(4))
             assertTrue(recordedCalls().none { it.first == "castPollVote" })
         }
+
+    /** App mutations use Android Main, whose delayed reaction admission needs its paused looper advanced. */
+    private fun advanceReactionQuietPeriod() {
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(200L))
+    }
 
     private fun openMenu(id: String) {
         composeRule
