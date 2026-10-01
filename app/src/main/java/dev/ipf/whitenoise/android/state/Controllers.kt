@@ -1886,7 +1886,7 @@ class ChatsController private constructor(
     initialLocalSnapshot: AccountSwitchLocalSnapshot?,
     private val initialConnectionAttemptClaim: () -> Boolean,
 ) {
-    private val liveSubscriptions = appState.chatListLiveSubscriptions()
+    internal val liveSubscriptions = appState.chatListLiveSubscriptions()
 
     /** Creates a standalone controller whose initial subscription validation stays silent. */
     constructor(appState: WhiteNoiseAppState) :
@@ -3733,6 +3733,33 @@ class ChatsController private constructor(
             selectedAvatarAsset = selectedAvatarAssetsByGroup[chatRowKey(row.groupIdHex)],
             selectedPreview = selectedPreviewsByGroup[chatRowKey(row.groupIdHex)],
             actions = selectedActionsByGroup[chatRowKey(row.groupIdHex)],
+            group = optimisticArchiveGroup(row.groupIdHex, groupRecordsById[row.groupIdHex]),
+            activeAccountIdHex = activeAccountIdHex,
+            members = memberCacheByGroup[row.groupIdHex],
+            presentationMembers = lastKnownPresentation(row.groupIdHex, activeAccountIdHex),
+            previewTokens = chatRowPreviewTokens(row, previewTokensByText),
+            resolvedMediaPreviewFallback = row.lastMessage?.messageIdHex?.let { mediaPreviewFallbackByMessageId[it] },
+            removed = row.groupIdHex in removedGroupIds,
+            activitySequence = activitySequenceByGroup[chatRowKey(row.groupIdHex)] ?: 0uL,
+        )
+    }
+
+    /**
+     * Projects a row MDK presented outside the retained window (#2618), with the presentation, preview,
+     * actions and avatar that row carries and whatever group, roster and preview caches this controller
+     * already holds for it. Retained rows must keep using [projectChatRow], which reads the live window.
+     */
+    internal fun projectPresentedRow(
+        presented: PresentedChatRowFfi,
+        activeAccountIdHex: String? = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex,
+    ): ChatListItem {
+        val row = optimisticArchiveRow(presented.row)
+        return chatListItemFromProjection(
+            row = row,
+            selectedPresentation = localGroupNames.reconciledPresentation(presented.row, presented.presentation),
+            selectedAvatarAsset = presented.avatarAsset,
+            selectedPreview = presented.preview,
+            actions = presented.actions,
             group = optimisticArchiveGroup(row.groupIdHex, groupRecordsById[row.groupIdHex]),
             activeAccountIdHex = activeAccountIdHex,
             members = memberCacheByGroup[row.groupIdHex],

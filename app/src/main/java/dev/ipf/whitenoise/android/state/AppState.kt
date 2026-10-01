@@ -3405,6 +3405,12 @@ class WhiteNoiseAppState private constructor(
      */
     fun forwardTargets(): List<ChatListItem> = chatsController?.forwardTargets().orEmpty()
 
+    /** Account-wide forward targets beyond the active controller's window (#2618); null when none is attached. */
+    internal suspend fun loadAccountWideForwardTargets(): List<ChatListItem>? {
+        val controller = chatsController ?: return null
+        return controller.loadAccountWideForwardTargets()
+    }
+
     internal val forwardTargetsLoading: Boolean
         get() = chatsController?.isLoading == true
 

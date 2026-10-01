@@ -4752,7 +4752,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
         "anchor": "fun ForwardMessagePickerContent(",
         "test_ids": [
-          "MSG-010"
+          "MSG-010",
+          "MSG-028"
         ]
       },
       {
@@ -4776,7 +4777,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
         "anchor": "fun ForwardTargetList(",
         "test_ids": [
-          "MSG-010"
+          "MSG-010",
+          "MSG-028"
         ]
       },
       {
@@ -9232,7 +9234,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt",
         "anchor": "fun ShareChatPickerTargetList(",
         "test_ids": [
-          "SYS-001"
+          "SYS-001",
+          "MSG-028"
         ]
       },
       {
