@@ -2,10 +2,10 @@
 
 [Gist archive](https://gist.github.com/mubarakcoded/04c9118c05de4308b149b76ce3fc9ebc) is durable, public, and has no CI expiry. The revision-pinned download is a base64-encoded ZIP; all JSON members retain their original bytes and formatting. Keep this archive for the lifetime of tracker #2779.
 
-Download: <https://gist.githubusercontent.com/mubarakcoded/04c9118c05de4308b149b76ce3fc9ebc/raw/51cca8c9d2c9d0666d10076d10e549cc2ce02d0e/attachment-evidence-2026-10-01.zip.base64>
-ZIP SHA-256: `8350e2096b409db0bf39593ed0b0c41d4b01541459e065c0924c4359285d1e18`
+Download: <https://gist.githubusercontent.com/mubarakcoded/04c9118c05de4308b149b76ce3fc9ebc/raw/8a8b7cbb5e5e12a6626cd1d7df6a50d1622de38e/attachment-evidence-2026-10-01.zip.base64>
+ZIP SHA-256: `ea49d9c0b017005fe8fca7f8688e31ebd7d4f77e09208665927b2b751a00f2ff`
 
-32 members; 144,122 original bytes; 37,011 ZIP bytes. Anonymous HTTP 200, ZIP digest and every member checksum were verified before repository copies were removed. This trims current PR diffs; original commits remain in Git history. No private fixture database/blob or instrumentation transcript is included.
+45 members; 219,107 original bytes; 58,308 ZIP bytes. Original 32 members remain byte-identical. The previous immutable revision also remains downloadable. Anonymous HTTP 200, ZIP digest and every member checksum were verified before repository copies were removed; the expanded Pixel archive was independently reviewed and verified anonymously before this manifest update. This trims current PR diffs; original commits remain in Git history. No private fixture database/blob or instrumentation transcript is included.
 
 ```bash
 python3 tools/attachment-fixture/verify_evidence.py \
@@ -18,6 +18,8 @@ The verifier uses no credentials, rejects incomplete membership/corruption, and 
 Session source is baseline/candidate; provenance/check records can cover both. Foundation baseline1–3 calibrates budgets; comparison baseline4–6 alternates with candidate1–3. Partial sessions are excluded from that comparison even where their transport assertions passed. `setup-failures.json` retains both insufficient-storage attempts; the negative control retains the baseline timeout. Initial HTTP1.0/receipt-lookup development failures and the stalled Gradle worker have narrative records in the baseline report, but no raw transcripts in this archive.
 
 CI-reference: run 36886299126 / PR #2978 head `5792f140880f533491d76f4b8cb14f944fc31026`; CI-candidate: run 36887456880 / PR #2980 head `a16731672f3845996a8953c3661cd3407cc9ddd6`. These API34 x86_64 reports are supplemental environment calibration; CI merge checkout/APK digests are not recorded in them. They are not pooled with the API30 arm64 comparison, which has exact source/APK provenance. Host-only results are Python-to-Python and cannot qualify Android throughput.
+
+Pixel API37 evidence: twelve paired small-file sessions (three baseline/candidate per flavor), exact measured sources/APK digests and private-driver checksum in `pixel-2026-10-01/provenance.json`. API37 checks apply the original ceilings to metrics only; they do not assert an emulator environment profile. Device package snapshots changed during the window, so whole-device unchanged state or exclusive-device latency cannot be claimed. See the [physical report](attachment-pixel-2026-10-01.md).
 
 | Original path inside ZIP | Evidence | Source | Flavor | Outcome | Bytes | SHA-256 |
 | --- | --- | --- | --- | --- | ---: | --- |
@@ -53,3 +55,16 @@ CI-reference: run 36886299126 / PR #2978 head `5792f140880f533491d76f4b8cb14f944
 | `docs/performance-data/attachment-local-first-2026-10-01/setup-partial/baseline-zapstore-universal.json` | Android | baseline | Zapstore | partial/excluded | 4949 | `20bf35e3614634b2039bc23c717d4f83a310e46241f33adf17f52eb0afc079f0` |
 | `docs/performance-data/attachment-local-first-2026-10-01/setup-partial/candidate-zapstore-arm64-old-emulator.json` | Android | candidate | Zapstore | partial/excluded | 4950 | `4031a132c2a6cdcb4d6b0e10dd9470ace3e89a6ae67ac9b7e6c8395cf7392db5` |
 | `docs/performance-data/attachment-local-first-2026-10-01/setup-partial/candidate-zapstore-universal.json` | Android | candidate | Zapstore | partial/excluded | 4952 | `6dd1eaa04fb06280ae9d66c0bcf8b6e9b6470d1af22952a25e279e4d910ba429` |
+| `pixel-2026-10-01/baseline-Play-1.json` | Android physical | baseline | Play | qualified-small-file | 5943 | `ea62ef5d7702511ab60ebc6a220787f8612e5af00d24ac468b5012e50c2440d7` |
+| `pixel-2026-10-01/baseline-Play-2.json` | Android physical | baseline | Play | qualified-small-file | 5941 | `688b467d15543b856f7a3e07f8d4ba5cc5c55921ba28179e74cbba24f41dcb58` |
+| `pixel-2026-10-01/baseline-Play-3.json` | Android physical | baseline | Play | qualified-small-file | 5944 | `b147610bd5c97c8a4fe45934cec1b0851409e5f2d86cd25eeba2b8f3bdd0c26b` |
+| `pixel-2026-10-01/baseline-Zapstore-1.json` | Android physical | baseline | Zapstore | qualified-small-file | 5947 | `a3db76c7f4d929a145e4548963161cdc092b36723dc9fc50483347c208727da9` |
+| `pixel-2026-10-01/baseline-Zapstore-2.json` | Android physical | baseline | Zapstore | qualified-small-file | 5946 | `8a2d0f27c8b59d9a667b6bea7e494b5d4867764ea36c1bfd986ef4d49f8aa807` |
+| `pixel-2026-10-01/baseline-Zapstore-3.json` | Android physical | baseline | Zapstore | qualified-small-file | 5947 | `d632690b02ddcb62c491bb45e4b680f87fe6b01ec0d8a2025532b772c1b87c9e` |
+| `pixel-2026-10-01/candidate-Play-1.json` | Android physical | candidate | Play | qualified-small-file | 5943 | `2fe815361729e61984a8ad28ffd74be85297aab5b04abeb53bb5d1f4fd5bf57a` |
+| `pixel-2026-10-01/candidate-Play-2.json` | Android physical | candidate | Play | qualified-small-file | 5940 | `bb4d5d403835b89fb487fa11e12cd1af59290f8b95733caccdd184a071b50188` |
+| `pixel-2026-10-01/candidate-Play-3.json` | Android physical | candidate | Play | qualified-small-file | 5942 | `252d4535cb5af9f0890b676f1fb0ffff4b786d39d17ad0134696f5ce5999d661` |
+| `pixel-2026-10-01/candidate-Zapstore-1.json` | Android physical | candidate | Zapstore | qualified-small-file | 5945 | `4077d33c65accf7261fdea62dc46115cfc6515d1985466c8c8bfd719f805ecfe` |
+| `pixel-2026-10-01/candidate-Zapstore-2.json` | Android physical | candidate | Zapstore | qualified-small-file | 5947 | `bd579eade621cbb2e8441322ed149541f47575dd9e5dd447a780b7cc6367329b` |
+| `pixel-2026-10-01/candidate-Zapstore-3.json` | Android physical | candidate | Zapstore | qualified-small-file | 5946 | `7059d6dff61bc6689bd5d3bcda178501465bc40bca25e6be14a42de9c4f8fb49` |
+| `pixel-2026-10-01/provenance.json` | provenance | mixed | both | metadata/concurrent-device | 3654 | `bac34eb43f93219fd480fe28d942a10dd670684d6fd7238b9ebd54fbe08c28b0` |

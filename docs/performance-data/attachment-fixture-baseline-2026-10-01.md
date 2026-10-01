@@ -39,6 +39,10 @@ Profiles `reference-api30-arm64` and `ci-api34-x86_64` use the original pre-cand
 
 All six reference sessions pass exact requests/bytes and the ceilings above. Genuine outgoing canonical availability is false in all six. Cold/reopen have only 3 observations per flavor, so no p95; retained has 30 correlated observations, nearest-rank p95. Memory is absolute heap sampled every 10 ms plus initial/final samples, not allocation deltas or guaranteed maxima. Latency includes sampler lifecycle. Socket-write bytes exclude HTTP/error headers, error JSON, TCP retransmissions and total link traffic.
 
+## Supplemental Pixel qualification
+
+[Paired Pixel report](attachment-pixel-2026-10-01.md): six physical baseline and six candidate sessions pass exact HTTP/bytes and the original performance ceilings on API37 arm64. The unchanged probe runs in the isolated measurement package; the checked-in runner remains emulator-only. This adds small received-file/native-runtime-reopen evidence only. The device was not exclusive; unrelated package metadata changed during the window, limiting latency comparison. Full process/offline/large-file/handoff/device qualification remains deferred.
+
 ## Host-only accounting baseline
 
 Twenty Python-to-Python loopback samples per size, with 50 ms header delay, produce exactly 20 requests and 20×payload bytes. This validates fixture accounting, not Android/native throughput. Archived host JSON retains raw timings, traced-Python and process-RSS peak measurements.
@@ -59,4 +63,4 @@ Both measured app/test variants built; all six actual emulator sessions passed. 
 
 Native outgoing retention remains unavailable: [MDK #2135](https://github.com/marmot-protocol/mdk/issues/2135), owned by `mubarakcoded`. Join/promotion stays held on [MDK #2134](https://github.com/marmot-protocol/mdk/issues/2134), also owned by `mubarakcoded`, until adopted atomic demand promotion preserves both retry budgets and tapped-file priority, including native storage assertions. Android #2936 timeout adoption remains a separate prerequisite; Datawav #2973 cancellation cleanup is already in the base. Shared progress/lifecycle/APK ownership requires Datawav coordination; Danny's MDK #2106 is untouched.
 
-App process restart, whole-device offline, real Android send-controller retention, large native incoming files, physical devices, protected workers, external Open/Save/installer handoff, production resume and native allocation redesign remain deferred. Native reopen and host Range support do not qualify them. No issue closure, merge or release claim.
+App process restart, whole-device offline, real Android send-controller retention, large native incoming files, the complete physical-device matrix, protected workers, external Open/Save/installer handoff, production resume and native allocation redesign remain deferred. Native reopen and host Range support do not qualify them. No issue closure, merge or release claim.
