@@ -36,7 +36,9 @@ class ConversationVisibleReadObserverTest {
         val fixture = fixture(row)
         runBlocking { fixture.bootstrap() }
         val state = fixture.appState
+        val subscription = installTimeline(state)
         val controller = controller(state, row)
+        awaitTimeline(controller, subscription)
         var observing by mutableStateOf(true)
         try {
             composeRule.runOnIdle {
@@ -60,6 +62,8 @@ class ConversationVisibleReadObserverTest {
             assertEquals(0, fixture.markReadCalls.get())
             activate(state, row.groupIdHex)
             awaitReads(fixture, controller, 1)
+            awaitAnchor(subscription)
+            assertEquals(listOf(ConversationTimelineTestIds.MESSAGE_B), subscription.anchorReports)
 
             composeRule.runOnIdle { state.clearActiveConversation() }
             composeRule.waitForIdle()
@@ -81,12 +85,44 @@ class ConversationVisibleReadObserverTest {
             assertEquals(2, fixture.markReadCalls.get())
             composeRule.runOnIdle { state.setAppInForeground(true, dismissRetainedVisibleConversation = false) }
             awaitReads(fixture, controller, 3)
+            assertEquals(listOf(ConversationTimelineTestIds.MESSAGE_B), subscription.anchorReports)
             assertEquals(Lifecycle.State.RESUMED, lifecycleOwner.lifecycle.currentState)
         } finally {
             composeRule.runOnIdle { observing = false }
             composeRule.waitForIdle()
             controller.onCleared()
             fixture.close()
+        }
+    }
+
+    private fun installTimeline(state: WhiteNoiseAppState): ScriptedConversationTimelineSubscription {
+        val subscription =
+            ScriptedConversationTimelineSubscription(
+                timelinePage(timelineRecord(ConversationTimelineTestIds.MESSAGE_B, timelineAt = 2uL)),
+            )
+        val scripted =
+            ScriptedConversationLiveSubscriptions(
+                timelineScripts = listOf(subscription),
+                group = conversationTimelineTestGroup(),
+            )
+        state.liveSubscriptionOverrides.conversation = scripted.subscriptions
+        return subscription
+    }
+
+    private fun awaitTimeline(
+        controller: ConversationController,
+        subscription: ScriptedConversationTimelineSubscription,
+    ) = runBlocking {
+        awaitConversationCondition {
+            controller.timelineSubscription === subscription &&
+                controller.retainsTimelineRecord(ConversationTimelineTestIds.MESSAGE_B)
+        }
+    }
+
+    private fun awaitAnchor(subscription: ScriptedConversationTimelineSubscription) {
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            shadowOf(Looper.getMainLooper()).idle()
+            subscription.anchorReports.isNotEmpty()
         }
     }
 
@@ -128,6 +164,8 @@ class ConversationVisibleReadObserverTest {
         initialMemberSnapshot = conversationTimelineMemberSnapshot(),
         initialChatListRow = row,
         accountRefOverride = ConversationTimelineTestIds.ACCOUNT_REF,
+        groupRosterReader = { _, _ -> conversationTimelineGroupRoster() },
+        startOnConstruction = true,
     )
 
     private fun awaitReads(

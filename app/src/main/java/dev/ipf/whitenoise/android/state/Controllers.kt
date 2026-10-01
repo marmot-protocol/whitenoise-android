@@ -7397,6 +7397,12 @@ class ConversationController(
         row: ChatListRowFfi,
     ) {
         if (!matchesConversation(accountRef, row.groupIdHex)) return
+        // A new native row supersedes a null-result acknowledgement, including
+        // a new reminder whose preceding manual=false echo was not observed.
+        if (successfulReadWithoutRow?.let { it.first !== row } == true) {
+            successfulReadWithoutRow = null
+            manualUnreadReminderConsumed = false
+        }
         if (!row.manuallyMarkedUnread || latestChatListRow?.manuallyMarkedUnread != true) {
             manualUnreadReminderConsumed = false
         }
@@ -11779,8 +11785,9 @@ class ConversationController(
             lastSuccessfulReadRequestId = requestId
             successfulReadWithoutRow = if (markReadResult.getOrNull() == null) latestChatListRow to trimmed else null
         }
-        if (lastReadRequestId == requestId && consumeManualReminder) {
-            manualUnreadReminderConsumed = true
+        if (lastReadRequestId == requestId) {
+            lastReadMessageId = confirmedReadMessageId()
+            if (consumeManualReminder) manualUnreadReminderConsumed = true
         }
         // A visit-level attention acknowledgement must not restart an
         // already-confirmed message's disappearing deadline after reopening.

@@ -10,6 +10,7 @@ import android.os.SystemClock
 import android.util.Log
 import androidx.annotation.StringRes
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -2536,12 +2537,14 @@ class WhiteNoiseAppState private constructor(
     // drift across the separate places that update them (issue #821).
     @Volatile
     private var suppression = NotificationSuppression()
-    internal val conversationReadVisibility = mutableStateOf(suppression)
+    private val conversationReadVisibilityState = mutableStateOf(suppression)
+    internal val conversationReadVisibility: State<NotificationSuppression>
+        get() = conversationReadVisibilityState
 
     private fun updateNotificationSuppression(next: NotificationSuppression) {
         if (next != suppression) notificationPostEpoch.advance()
         suppression = next
-        conversationReadVisibility.value = next
+        conversationReadVisibilityState.value = next
         dictationDiagnosticLifecycle.originVisibility({ conversationDictation }) {
             isConversationDictationOriginVisible(it.accountRef, it.groupIdHex)
         }
@@ -3373,16 +3376,7 @@ class WhiteNoiseAppState private constructor(
         return boundController != null
     }
 
-    /** Only the visible unlocked conversation may consume a newly selected reminder. */
-    internal fun hasManualUnreadReminder(
-        accountRef: String,
-        groupIdHex: String,
-        conversationRow: ChatListRowFfi?,
-    ): Boolean {
-        if (!isConversationReadVisible(accountRef, groupIdHex)) return false
-        val boundChats = chatsController?.takeIf { it.boundAccountRef == accountRef }
-        return boundChats?.hasManualUnreadReminder(groupIdHex) ?: (conversationRow?.manuallyMarkedUnread == true)
-    }
+    internal fun boundChats(account: String): ChatsController? = chatsController?.takeIf { it.boundAccountRef == account }
 
     internal fun rollbackOptimisticSentPreview(
         accountRef: String?,

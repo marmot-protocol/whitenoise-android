@@ -32,6 +32,7 @@ internal fun observeConversationVisibleReads(
     val currentResumed by rememberUpdatedState(resumed)
     val currentReadAnchor by rememberUpdatedState(readAnchor)
     LaunchedEffect(controller, lifecycleOwner) {
+        var lastReportedMessageId: String? = null
         snapshotFlow {
             val visible =
                 appState.isConversationReadVisible(controller.boundAccountRef.orEmpty(), controller.group.groupIdHex)
@@ -45,7 +46,10 @@ internal fun observeConversationVisibleReads(
             .collect { (messageId, _) ->
                 if (messageId.isNotBlank()) {
                     controller.markReadUpTo(messageId)
-                    controller.reportVisibleMessage(messageId)
+                    if (messageId != lastReportedMessageId) {
+                        controller.reportVisibleMessage(messageId)
+                        lastReportedMessageId = messageId
+                    }
                 }
             }
     }
