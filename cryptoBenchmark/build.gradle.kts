@@ -1,5 +1,4 @@
 import org.gradle.api.tasks.Sync
-import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -12,25 +11,9 @@ val stageVerifierSources = tasks.register<Sync>("stageVerifierSources") {
     into(verifierSources.map { it.dir("dev/ipf/whitenoise/android/core/nostr") })
 }
 
-// Reuse the immutable artifact prepared and checksum-verified by :app.
-val marmotKitLock =
-    Properties().apply {
-        rootProject.file("app/src/main/marmotkit/MARMOT_VERSION").inputStream().use { load(it) }
-    }
-val marmotKitCacheRoot =
-    providers
-        .gradleProperty("whitenoise.marmotkit.cacheDir")
-        .orNull
-        ?.let(rootProject::file)
-        ?: providers
-            .environmentVariable("WHITENOISE_MARMOTKIT_CACHE_DIR")
-            .orNull
-            ?.let(rootProject::file)
-        ?: gradle.gradleUserHomeDir.resolve("caches/whitenoise/marmotkit")
-val marmotKitPreparedDir =
-    marmotKitCacheRoot
-        .resolve(marmotKitLock.getProperty("artifact-sha256"))
-        .resolve(marmotKitLock.getProperty("archive-root"))
+// Reuse :app's artifact resolution and checksum-verified preparation task.
+evaluationDependsOn(":app")
+val marmotKitPreparedDir = project(":app").extra["marmotKitPreparedDir"] as File
 
 android {
     namespace = "dev.ipf.whitenoise.android.crypto.benchmark"
@@ -69,10 +52,6 @@ android {
 }
 
 tasks.named("preBuild").configure {
-    dependsOn(stageVerifierSources, ":app:prepareMarmotKitArtifact")
-}
-
-tasks.matching { it.name.startsWith("compile") }.configureEach {
     dependsOn(stageVerifierSources, ":app:prepareMarmotKitArtifact")
 }
 

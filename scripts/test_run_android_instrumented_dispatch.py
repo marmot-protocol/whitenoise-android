@@ -39,11 +39,12 @@ class InstrumentedDispatchTest(unittest.TestCase):
         self.assertIn("NostrEventVerifierInstrumentedTest", output)
         self.assertNotIn("Bip340PhysicalBenchmark", output)
 
-    def test_pull_request_runs_all_isolated_native_tests(self):
+    def test_pull_request_checks_native_correctness_without_timing_benchmark(self):
         output = self.run_dispatch("pull_request")
         self.assertIn("PullRequestDeviceSmoke", output)
         self.assertIn(":cryptoBenchmark:connectedReleaseAndroidTest", output)
-        self.assertNotIn("testInstrumentationRunnerArguments.class=", output)
+        self.assertIn("NostrEventVerifierInstrumentedTest", output)
+        self.assertNotIn("Bip340PhysicalBenchmark", output)
 
     def test_both_opt_in_suites_are_rejected(self):
         with self.assertRaises(subprocess.CalledProcessError) as caught:

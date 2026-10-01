@@ -30,17 +30,13 @@ private sealed class SizeTagValue {
     ) : SizeTagValue()
 }
 
-internal object ZapstoreAssetEvents : ZapstoreAssetEventPolicy()
-
-/** Immutable domain-test seam; production always delegates verification to MDK. */
-internal open class ZapstoreAssetEventPolicy(
-    private val verifyEvent: (NostrEvent) -> Boolean = NostrEventVerifier::verifies,
-) {
+internal object ZapstoreAssetEvents {
     fun assetEventIdsFromReleaseEvent(
         event: NostrEvent,
         appId: String,
         publisherPubkey: String,
         releaseDTag: String,
+        verifyEvent: (NostrEvent) -> Boolean = NostrEventVerifier::verifies,
     ): Set<String>? {
         if (event.kind != KIND_ZAPSTORE_RELEASE) return null
         if (event.pubkey != publisherPubkey) return null
@@ -63,12 +59,12 @@ internal open class ZapstoreAssetEventPolicy(
         version: String,
         platformId: String,
         publisherPubkey: String,
+        verifyEvent: (NostrEvent) -> Boolean = NostrEventVerifier::verifies,
     ): ZapstoreApkAsset? {
         if (event.kind != KIND_ZAPSTORE_ASSET) return null
         if (event.pubkey != publisherPubkey) return null
         if (!event.id.equals(referencedId, ignoreCase = true)) return null
         if (!verifyEvent(event)) return null
-        if (!event.computedIdHex().equals(referencedId, ignoreCase = true)) return null
         return parseApkAssetTags(
             event = event,
             appId = appId,
@@ -142,6 +138,7 @@ internal open class ZapstoreAssetEventPolicy(
         version: String,
         platformId: String,
         publisherPubkey: String,
+        verifyEvent: (NostrEvent) -> Boolean = NostrEventVerifier::verifies,
     ): ZapstoreApkAsset? {
         val matches =
             events
@@ -155,6 +152,7 @@ internal open class ZapstoreAssetEventPolicy(
                         version = version,
                         platformId = platformId,
                         publisherPubkey = publisherPubkey,
+                        verifyEvent = verifyEvent,
                     )
                 }.toList()
         return matches.singleOrNull()

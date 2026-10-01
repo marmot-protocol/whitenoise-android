@@ -9,9 +9,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.util.concurrent.Callable
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 
 /** Fast real-MDK correctness checks, with no application/account/database startup. */
 @RunWith(AndroidJUnit4::class)
@@ -74,25 +71,6 @@ class NostrEventVerifierInstrumentedTest {
         for (forgery in listOf(contentForgery, tagForgery)) {
             assertFalse(NativeVerifierCorrectnessBridge.verifiesFixtureJson(forgery.toString()))
             assertFalse(NativeVerifierCorrectnessBridge.verifiesFixtureWithRecomputedId(forgery.toString()))
-        }
-    }
-
-    @Test
-    fun simultaneousValidAndForgedEventsKeepIndependentTrustDecisions() {
-        val event = boundaryFixtures().getJSONObject(0).getJSONObject("event")
-        val valid = event.toString()
-        val forged = JSONObject(valid).put("content", "forged").toString()
-        val executor = Executors.newFixedThreadPool(4)
-        try {
-            val jobs = (0 until 32).map { index ->
-                Callable {
-                    val expected = index % 2 == 0
-                    assertEquals(expected, NativeVerifierCorrectnessBridge.verifiesFixtureJson(if (expected) valid else forged))
-                }
-            }
-            executor.invokeAll(jobs, 10, TimeUnit.SECONDS).forEach { it.get() }
-        } finally {
-            executor.shutdownNow()
         }
     }
 

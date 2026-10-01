@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.core.nostr
 
 import org.json.JSONArray
 import org.json.JSONObject
-import java.security.MessageDigest
 import java.util.Locale
 
 internal data class NostrEvent(
@@ -15,35 +14,6 @@ internal data class NostrEvent(
     val sig: String,
 ) {
     fun firstTagValue(name: String): String? = tags.firstOrNull { it.firstOrNull() == name }?.getOrNull(1)
-
-    fun canonicalJson(): String =
-        buildString {
-            append('[')
-            append('0')
-            append(',')
-            appendNostrJsonString(pubkey)
-            append(',')
-            append(createdAt)
-            append(',')
-            append(kind)
-            append(',')
-            append('[')
-            tags.forEachIndexed { index, tag ->
-                if (index > 0) append(',')
-                append('[')
-                tag.forEachIndexed { tagIndex, value ->
-                    if (tagIndex > 0) append(',')
-                    appendNostrJsonString(value)
-                }
-                append(']')
-            }
-            append(']')
-            append(',')
-            appendNostrJsonString(content)
-            append(']')
-        }
-
-    fun computedIdHex(): String = sha256(canonicalJson().toByteArray(Charsets.UTF_8)).toHex()
 
     /** Complete event object; MDK owns canonical ID and signature validation. */
     fun toJson(): String =
@@ -85,8 +55,6 @@ internal data class NostrEvent(
     }
 }
 
-internal fun sha256(bytes: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(bytes)
-
 internal fun String.hexToBytes(): ByteArray? {
     if (length % 2 != 0 || !isHex(length)) return null
     return ByteArray(length / 2) { index ->
@@ -95,30 +63,6 @@ internal fun String.hexToBytes(): ByteArray? {
 }
 
 internal fun ByteArray.toHex(): String = joinToString(separator = "") { "%02x".format(it.toInt() and 0xff) }
-
-private fun StringBuilder.appendNostrJsonString(value: String) {
-    append('"')
-    value.forEach { char ->
-        when (char) {
-            '"' -> append("\\\"")
-            '\\' -> append("\\\\")
-            '\b' -> append("\\b")
-            '\u000C' -> append("\\f")
-            '\n' -> append("\\n")
-            '\r' -> append("\\r")
-            '\t' -> append("\\t")
-            else -> {
-                if (char < ' ') {
-                    append("\\u")
-                    append(char.code.toString(16).padStart(4, '0'))
-                } else {
-                    append(char)
-                }
-            }
-        }
-    }
-    append('"')
-}
 
 private fun String.isHex(expectedLength: Int): Boolean = length == expectedLength && all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }
 

@@ -65,12 +65,12 @@ class ZapstoreReleaseClientTest {
     fun fetchLatestSelectsNewestVerifiedReleaseForTheRequestedApp() {
         // Verify caller policy and relay integration; real signatures run on Android.
         val verified = mutableListOf<String>()
-        val policy =
-            ZapstoreEventPolicy {
+        val verifyEvent: (NostrEvent) -> Boolean =
+            {
                 verified += it.firstTagValue("version").orEmpty()
                 it.sig != "0".repeat(128)
             }
-        val releaseClient = releaseClient(policy)
+        val releaseClient = releaseClient(verifyEvent)
         val relay =
             enqueueRelay { webSocket, request ->
                 val subscription = request.getString(1)
@@ -98,7 +98,7 @@ class ZapstoreReleaseClientTest {
         val calls = AtomicInteger()
         val releaseClient =
             releaseClient(
-                ZapstoreEventPolicy {
+                {
                     calls.incrementAndGet()
                     false
                 },
@@ -115,12 +115,12 @@ class ZapstoreReleaseClientTest {
         relay.awaitClosing()
     }
 
-    private fun releaseClient(policy: ZapstoreEventPolicy): ZapstoreReleaseClient =
+    private fun releaseClient(verifyEvent: (NostrEvent) -> Boolean): ZapstoreReleaseClient =
         ZapstoreReleaseClient(
             httpClient = webSocketFactory,
             relayUrl = server.url("/relay").toString().replaceFirst("http", "ws"),
             publisherPubkey = "c".repeat(64),
-            eventPolicy = policy,
+            verifyEvent = verifyEvent,
         )
 
     private fun releaseEventJson(version: String): JSONObject =

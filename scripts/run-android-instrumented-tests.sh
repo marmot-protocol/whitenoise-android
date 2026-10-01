@@ -31,17 +31,14 @@ if [[ "$event_name" == "pull_request" ]]; then
     -Pandroid.testInstrumentationRunnerArguments.annotation="$smoke_annotation" \
     -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
     --no-daemon --stacktrace
-
-  # Run both the fast correctness cases and the timed comparison on PRs.
-  exec ./gradlew :cryptoBenchmark:connectedReleaseAndroidTest --no-daemon --stacktrace
+else
+  ./gradlew :app:connectedDevZapstoreDebugAndroidTest \
+    -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
+    --no-daemon --stacktrace
 fi
 
-./gradlew :app:connectedDevZapstoreDebugAndroidTest \
-  -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
-  --no-daemon --stacktrace
-
-# Keep real native verification covered after merge without timing the legacy
-# implementation on every master run. Explicit opt-in suites returned above.
+# PRs and master run native correctness only. Timing is a manual physical-device
+# operation; explicit opt-in app suites returned above.
 exec ./gradlew :cryptoBenchmark:connectedReleaseAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=dev.ipf.whitenoise.android.core.nostr.NostrEventVerifierInstrumentedTest \
   --no-daemon --stacktrace

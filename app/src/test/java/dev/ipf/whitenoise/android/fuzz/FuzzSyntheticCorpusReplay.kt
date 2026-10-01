@@ -112,6 +112,12 @@ object FuzzSyntheticCorpusReplay {
                 .getOrNull()
                 ?.let { NostrEvent.fromJson(it) }
                 ?.let { parsed ->
+                    ZapstoreEvents.latestReleaseVersion(
+                        parsed,
+                        "org.parres.darkmatter",
+                        "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+                        verifyEvent = { true },
+                    )
                     ZapstoreEvents.releaseVersionForApp(parsed, "org.parres.darkmatter")
                 }
         }

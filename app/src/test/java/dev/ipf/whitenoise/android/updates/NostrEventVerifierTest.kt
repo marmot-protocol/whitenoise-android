@@ -15,43 +15,6 @@ class NostrEventVerifierTest {
     }
 
     @Test
-    fun canonicalEventIdUsesNostrSerializationOrder() {
-        val event =
-            NostrEvent(
-                id = "0".repeat(64),
-                pubkey = "1".repeat(64),
-                createdAt = 123L,
-                kind = 32267,
-                tags = listOf(listOf("d", "org.parres.darkmatter"), listOf("a", "30063:${"1".repeat(64)}:org.parres.darkmatter@2026.6.20")),
-                content = "",
-                sig = "0".repeat(128),
-            )
-        assertEquals(
-            "[0,\"${"1".repeat(64)}\",123,32267,[[\"d\",\"org.parres.darkmatter\"],[\"a\",\"30063:${"1".repeat(64)}:org.parres.darkmatter@2026.6.20\"]],\"\"]",
-            event.canonicalJson(),
-        )
-    }
-
-    @Test
-    fun canonicalEventJsonDoesNotEscapeForwardSlash() {
-        val event =
-            NostrEvent(
-                id = "0".repeat(64),
-                pubkey = "1".repeat(64),
-                createdAt = 123L,
-                kind = 30063,
-                tags = listOf(listOf("d", "org.parres.darkmatter@2026.6.20"), listOf("summary", "release </notes>")),
-                content = "body </content>",
-                sig = "0".repeat(128),
-            )
-
-        assertEquals(
-            "[0,\"${"1".repeat(64)}\",123,30063,[[\"d\",\"org.parres.darkmatter@2026.6.20\"],[\"summary\",\"release </notes>\"]],\"body </content>\"]",
-            event.canonicalJson(),
-        )
-    }
-
-    @Test
     fun completeEventSerializationPreservesEscapesUnicodeAndAllSignedFields() {
         val event =
             NostrEvent(

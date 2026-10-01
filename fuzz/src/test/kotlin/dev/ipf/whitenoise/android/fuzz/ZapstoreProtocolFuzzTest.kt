@@ -45,19 +45,6 @@ class ZapstoreProtocolFuzzTest {
         assertFixedWidthHex(parsed.pubkey, 64)
         assertFixedWidthHex(parsed.sig, 128)
 
-        val canonicalOnce = parsed.canonicalJson()
-        val canonicalTwice = parsed.canonicalJson()
-        FuzzAssertions.assertEquals("canonical JSON is not stable", canonicalOnce, canonicalTwice)
-
-        val reparsed = NostrEvent.fromJson(json)
-        if (reparsed != null) {
-            FuzzAssertions.assertEquals(
-                "reparsed canonical JSON differs",
-                canonicalOnce,
-                reparsed.canonicalJson(),
-            )
-        }
-
         FuzzAssertions.assertEquals("full-event JSON roundtrip differs", parsed, NostrEvent.fromJson(JSONObject(parsed.toJson())))
     }
 

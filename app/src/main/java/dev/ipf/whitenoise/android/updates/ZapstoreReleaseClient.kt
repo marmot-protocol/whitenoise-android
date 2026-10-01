@@ -18,7 +18,7 @@ class ZapstoreReleaseClient internal constructor(
     private val httpClient: WebSocket.Factory,
     private val relayUrl: String,
     private val publisherPubkey: String = ZAPSTORE_PUBLISHER_PUBKEY,
-    private val eventPolicy: ZapstoreEventPolicy = ZapstoreEvents,
+    private val verifyEvent: (NostrEvent) -> Boolean = NostrEventVerifier::verifies,
 ) {
     constructor() : this(defaultHttpClient(), ZAPSTORE_RELAY, ZAPSTORE_PUBLISHER_PUBKEY)
 
@@ -35,7 +35,7 @@ class ZapstoreReleaseClient internal constructor(
         val versions =
             fetchAppReleaseEvents(appId)
                 .asSequence()
-                .mapNotNull { event -> eventPolicy.latestReleaseVersion(event, appId, publisherPubkey) }
+                .mapNotNull { event -> ZapstoreEvents.latestReleaseVersion(event, appId, publisherPubkey, verifyEvent) }
                 .distinct()
                 .toList()
         val latestVersion = versions.maxWithOrNull { a, b -> CalVer.compare(a, b) } ?: return null
@@ -102,12 +102,7 @@ private fun Throwable.hasRelayTimeoutCause(): Boolean = causes().any { it is Nos
 
 private fun Throwable.causes(): Sequence<Throwable> = generateSequence(this) { it.cause }
 
-internal object ZapstoreEvents : ZapstoreEventPolicy()
-
-/** Immutable verification seam for domain tests; production uses stateless MDK. */
-internal open class ZapstoreEventPolicy(
-    private val verifyEvent: (NostrEvent) -> Boolean = NostrEventVerifier::verifies,
-) {
+internal object ZapstoreEvents {
     /**
      * Latest-release discovery: read the version from a kind-30063 release
      * event, trusting it only when signed by [publisherPubkey] and bound to
@@ -119,6 +114,7 @@ internal open class ZapstoreEventPolicy(
         event: NostrEvent,
         appId: String,
         publisherPubkey: String,
+        verifyEvent: (NostrEvent) -> Boolean = NostrEventVerifier::verifies,
     ): String? {
         if (event.kind != KIND_ZAPSTORE_RELEASE || event.pubkey != publisherPubkey || !verifyEvent(event)) return null
         return releaseVersionForApp(event, appId)
@@ -146,6 +142,7 @@ internal open class ZapstoreEventPolicy(
         appId: String,
         publisherPubkey: String,
         releaseDTag: String,
+        verifyEvent: (NostrEvent) -> Boolean = NostrEventVerifier::verifies,
     ): String? {
         val isRequestedRelease =
             event.kind == KIND_ZAPSTORE_RELEASE &&

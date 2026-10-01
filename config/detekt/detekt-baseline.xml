@@ -1733,9 +1733,9 @@
     <ID>ReturnCount:VoiceRecordingController.kt:VoiceRecordingController$private fun abortPendingRestart: Boolean</ID>
     <ID>ReturnCount:ZapstoreApkAssetResolver.kt:ZapstoreApkAssetResolver$suspend fun resolveApkAsset: ZapstoreApkAsset?</ID>
     <ID>ReturnCount:ZapstoreAppSelfUpdateFlow.kt:ZapstoreAppSelfUpdateFlow$override fun launchInstall: Boolean</ID>
-    <ID>ReturnCount:ZapstoreAssetEvents.kt:ZapstoreAssetEventPolicy$fun assetEventIdsFromReleaseEvent: Set&lt;String&gt;?</ID>
-    <ID>ReturnCount:ZapstoreAssetEvents.kt:ZapstoreAssetEventPolicy$fun parseVerifiedApkAsset: ZapstoreApkAsset?</ID>
-    <ID>ReturnCount:ZapstoreAssetEvents.kt:ZapstoreAssetEventPolicy$internal fun parseApkAssetTags: ZapstoreApkAsset?</ID>
+    <ID>ReturnCount:ZapstoreAssetEvents.kt:ZapstoreAssetEvents$fun assetEventIdsFromReleaseEvent: Set&lt;String&gt;?</ID>
+    <ID>ReturnCount:ZapstoreAssetEvents.kt:ZapstoreAssetEvents$fun parseVerifiedApkAsset: ZapstoreApkAsset?</ID>
+    <ID>ReturnCount:ZapstoreAssetEvents.kt:ZapstoreAssetEvents$internal fun parseApkAssetTags: ZapstoreApkAsset?</ID>
     <ID>ReturnCount:ZapstoreAssetEvents.kt:private fun NostrEvent.parseSizeTag: SizeTagValue</ID>
     <ID>ReturnCount:ZapstoreAssetEvents.kt:private fun String.isTrustedHttpsUrl: Boolean</ID>
     <ID>ReturnCount:ZapstoreReleaseClient.kt:ZapstoreReleaseClient.&lt;no name provided&gt;$override fun onMessage</ID>
