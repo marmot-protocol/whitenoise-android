@@ -3242,7 +3242,7 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** Cancels reconnect producers before stopping the passive notification receiver. */
-    private suspend fun stopNotificationListenerForAccountTeardown() {
+    internal suspend fun stopNotificationListenerForAccountTeardown() {
         notificationNetworkRecovery.cancelAndJoin()
         pushWakeCatchUpDrainJob.cancelAndJoin()
         notificationJob.cancelAndJoin()
@@ -10885,7 +10885,7 @@ class WhiteNoiseAppState private constructor(
             runNotificationListenerLoop(marmot())
         }
 
-    private suspend fun runNotificationListenerLoop(marmot: MarmotInterface) {
+    internal suspend fun runNotificationListenerLoop(marmot: MarmotInterface) {
         // Restart the subscription on any failure (or clean end-of-stream)
         // with exponential backoff, so a transient relay/binding error
         // doesn't permanently silence notifications. Backoff resets after
