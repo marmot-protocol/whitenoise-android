@@ -46,6 +46,11 @@ private const val START_TRIGGER_CAPABILITY_FALLBACK = "capability_fallback"
 /** One Android foreground record owns both connection work and dictation presentation. */
 class NotificationStreamForegroundService : Service() {
     private var lastServiceStartId = 0
+
+    /** A rejected connection-only restore must reconcile the visible Keep connected preference. */
+    internal fun onConnectionRestoreRejected() {
+        (application as? WhiteNoiseApplication)?.initializedAppState()?.onBackgroundConnectionStartRejected()
+    }
     internal val foreground =
         ConversationForegroundRecord(
             service = this,
@@ -467,8 +472,9 @@ class NotificationStreamForegroundService : Service() {
         ): Boolean =
             runCatching {
                 val appContext = context.applicationContext
-                connectionStartEpoch.incrementAndGet()
-                ContextCompat.startForegroundService(appContext, buildIntent(appContext))
+                val intent = buildIntent(appContext)
+                if (intent.action != ACTION_SYNC_NATIVE_PUSH_REGISTRATION) connectionStartEpoch.incrementAndGet()
+                ContextCompat.startForegroundService(appContext, intent)
                 true
             }.getOrElse {
                 foregroundServiceDebug(it) { "start rejected" }

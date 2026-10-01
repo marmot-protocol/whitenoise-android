@@ -132,6 +132,31 @@ class ConversationDictationNotificationRestorationTest {
         lifecycle.destroy()
     }
 
+    /** A push-registration sync nudge does not supersede an already queued connection Stop. */
+    @Test
+    fun nativePushSyncDoesNotFenceQueuedConnectionStop() {
+        val harness = installHost()
+        val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
+        val service = lifecycle.get()
+        service.foreground.promoteConnection(ForegroundStartTrigger.UserToggle)
+        service.onStartCommand(startIntent(service, harness), 0, 1)
+        val context = RuntimeEnvironment.getApplication()
+        val stopped = AtomicBoolean()
+        val worker = Thread { stopped.set(NotificationStreamForegroundService.stop(context)) }
+        worker.start()
+        worker.join(5_000L)
+        assertFalse(worker.isAlive)
+        assertTrue(stopped.get())
+        assertTrue(NotificationStreamForegroundService.syncNativePushRegistration(context))
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(0, service.foreground.connectionServiceType)
+        assertTrue(harness.conversationDictation.hasDurableSession)
+        harness.conversationDictation.cancel()
+        assertTrue(shadowOf(service as Service).isForegroundStopped)
+        assertCompletedPresentation(service.getSystemService(NotificationManager::class.java), false)
+        lifecycle.destroy()
+    }
+
     /** Connection readiness is invalidated even when microphone ownership keeps the host alive. */
     @Test
     @Config(application = Application::class)
@@ -311,25 +336,28 @@ class ConversationDictationNotificationRestorationTest {
         }
     }
 
-    /** A permission loss during refresh closes capture and preserves text instead of crashing the observer. */
+    /** Presentation changes never reassert foreground microphone permission from the background. */
     @Test
-    fun rejectedForegroundRefreshPreservesRecognizedText() {
+    fun presentationRefreshDoesNotRestartForegroundOwnership() {
         val harness = installHost()
         val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
         val service = lifecycle.get()
         service.onStartCommand(startIntent(service, harness), 0, 1)
-        harness.platform.listener.onReady()
-        Snapshot.sendApplyNotifications()
-        shadowOf(Looper.getMainLooper()).idle()
-        harness.platform.listener.onResult("preserved phrase")
         NotificationStreamForegroundService.foregroundPublisher = { _, _, _ ->
-            throw SecurityException("microphone revoked")
+            throw SecurityException("background microphone promotion must not recur")
         }
-        Snapshot.sendApplyNotifications()
-        shadowOf(Looper.getMainLooper()).idle()
-        assertEquals("preserved phrase", harness.draft.text)
+        repeat(3) {
+            harness.platform.listener.onReady()
+            harness.platform.listener.onEndOfSpeech()
+            harness.platform.listener.onResult("phrase")
+            Snapshot.sendApplyNotifications()
+            shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(500L))
+            assertTrue(harness.conversationDictation.hasDurableSession)
+            assertEquals("", harness.draft.text)
+        }
+        harness.conversationDictation.paste()
+        assertEquals("phrase phrase phrase", harness.draft.text)
         assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)
-        assertFalse(harness.conversationDictation.hasDurableSession)
         assertTrue(service.getSystemService(NotificationManager::class.java).activeNotifications.isEmpty())
         lifecycle.destroy()
     }

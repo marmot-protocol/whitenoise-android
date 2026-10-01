@@ -73,7 +73,7 @@ private fun openDictationAppIntent(context: Context): PendingIntent =
 private fun dictationNotificationStatus(controller: ConversationDictationController): Int =
     when {
         controller.deliveryInProgress -> R.string.message_status_pending
-        controller.state is ConversationDictationState.Starting -> R.string.dictation_starting
-        controller.state is ConversationDictationState.Processing -> R.string.dictation_processing
+        controller.state is ConversationDictationState.Starting && controller.captureInProgress -> R.string.dictation_starting
+        controller.state is ConversationDictationState.Processing || !controller.captureInProgress -> R.string.dictation_processing
         else -> R.string.dictation_notification_text
     }

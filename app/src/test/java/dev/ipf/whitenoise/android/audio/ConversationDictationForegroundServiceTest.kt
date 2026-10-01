@@ -470,6 +470,46 @@ class ConversationDictationForegroundServiceTest {
         serviceController.destroy()
     }
 
+    /** A terminal retained-audio failure removes microphone controls without discarding Retry data. */
+    @Test
+    fun retainedAudioFailureReleasesNotificationWithAndWithoutConnection() {
+        listOf(false, true).forEach { connected ->
+            listOf(
+                ConversationDictationForegroundService.ACTION_PASTE,
+                ConversationDictationForegroundService.ACTION_SEND,
+            ).forEach { action ->
+                val harness = installHost()
+                val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
+                val service = lifecycle.get()
+                service.onStartCommand(startIntent(service, harness), 0, 1)
+                if (connected) service.foreground.promoteConnection(ForegroundStartTrigger.UserToggle)
+                harness.platform.pendingCallerAudio = true
+                service.onStartCommand(actionCommand(service, harness, action), 0, 2)
+                harness.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
+
+                assertTrue(harness.conversationDictation.state is ConversationDictationState.Failed)
+                assertFalse(harness.conversationDictation.hasDurableSession)
+                assertNull(ConversationDictationForegroundService.activeNotificationOrNull())
+                assertFalse(service.foreground.dictation.hasForegroundLease)
+                val notifications = service.getSystemService(NotificationManager::class.java).activeNotifications
+                if (connected) {
+                    assertEquals(1, notifications.size)
+                    assertEquals(
+                        BackgroundConnectionNotification.CHANNEL_ID,
+                        notifications.single().notification.channelId,
+                    )
+                } else {
+                    assertTrue(notifications.isEmpty())
+                    assertTrue(shadowOf(service as Service).isForegroundStopped)
+                }
+                assertTrue(harness.platform.pendingCallerAudio)
+                lifecycle.destroy()
+                assertTrue(harness.platform.pendingCallerAudio)
+                harness.conversationDictation.dismissFailure()
+            }
+        }
+    }
+
     /** Verifies recents removal preserves explicit capture but service destruction fails it closed. */
     @Test
     fun recentsSwipeKeepsCaptureButServiceDestructionCancelsIt() {
@@ -656,6 +696,7 @@ class ConversationDictationForegroundServiceTest {
 
     private class FakePlatform : ConversationDictationPlatform {
         var sessionsCreated = 0
+        var pendingCallerAudio = false
 
         lateinit var listener: ConversationDictationRecognitionListener
 
@@ -664,6 +705,21 @@ class ConversationDictationForegroundServiceTest {
 
         /** Test sessions always expose an in-process recognizer. */
         override fun recognitionAvailable(): Boolean = true
+
+        override fun callerAudioHasPending(): Boolean = pendingCallerAudio
+
+        override fun finishCallerAudioCapture(onClosed: () -> Unit): Boolean {
+            if (!pendingCallerAudio) return false
+            onClosed()
+            return true
+        }
+
+        override fun discardCallerAudio(onClosed: () -> Unit): Boolean {
+            if (!pendingCallerAudio) return false
+            pendingCallerAudio = false
+            onClosed()
+            return true
+        }
 
         /** Captures the listener and returns a no-op provider generation. */
         @Suppress("MaxLineLength")

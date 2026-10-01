@@ -56,3 +56,16 @@ rollback succeeds. The draft adapter returns the generation accepted by that
 write, rather than sampling the latest generation afterward. Retry Send keeps
 that exact fence, so even a concurrent same-text attachment mutation blocks it.
 The account, conversation, reply and captured text remain the original payload.
+
+A terminal transcription failure keeps sealed PCM and recognized text as recovery
+data, but releases the foreground lease and removes microphone controls. Retry
+acquires a new lease before transcribing that PCM, without opening another
+recording. Lease generations fence old notification actions and promotion or
+destruction callbacks, including retries within the same logical session.
+A rejected retry promotion retains the recovery data and releases its pending
+lease rather than discarding the recording.
+
+Presentation changes use notification updates on the existing foreground record.
+Only acquisition or release of a service type calls startForeground again.
+Native-push registration sync does not supersede a queued connection Stop.
+Blocked Send also retains its recognition cause for truthful status and recovery.

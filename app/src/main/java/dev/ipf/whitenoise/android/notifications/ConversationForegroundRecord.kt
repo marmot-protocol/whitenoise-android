@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.notifications
 
 import android.app.Notification
+import android.app.NotificationManager
 import android.content.pm.ServiceInfo
 import dev.ipf.whitenoise.android.audio.ConversationDictationForegroundService
 import dev.ipf.whitenoise.android.audio.isForegroundServiceStartRejection
@@ -17,6 +18,7 @@ internal class ConversationForegroundRecord(
     var connectionServiceType = 0
         private set
     private var foregroundPromoted = false
+    private var publishedServiceType = 0
 
     fun foregroundNotification(): Notification = dictation.notificationOrNull() ?: connectionNotification()
 
@@ -35,8 +37,16 @@ internal class ConversationForegroundRecord(
         notification: Notification,
         type: Int,
     ) {
-        NotificationStreamForegroundService.foregroundPublisher(service, notification, type)
-        foregroundPromoted = true
+        if (!foregroundPromoted || publishedServiceType != type) {
+            NotificationStreamForegroundService.foregroundPublisher(service, notification, type)
+            publishedServiceType = type
+            foregroundPromoted = true
+        } else {
+            service.getSystemService(NotificationManager::class.java).notify(
+                BackgroundConnectionNotification.NOTIFICATION_ID,
+                notification,
+            )
+        }
     }
 
     fun promoteDictation(notification: Notification) {
@@ -56,9 +66,11 @@ internal class ConversationForegroundRecord(
                 publishForeground(connectionNotification(), connectionServiceType)
             } catch (_: SecurityException) {
                 releaseConnection()
+                service.onConnectionRestoreRejected()
             } catch (error: RuntimeException) {
                 if (!error.isForegroundServiceStartRejection()) throw error
                 releaseConnection()
+                service.onConnectionRestoreRejected()
             }
         } else {
             removeForegroundAndStop(startId)
@@ -68,6 +80,10 @@ internal class ConversationForegroundRecord(
     /** Releasing connection never interrupts a separately authorized microphone lease. */
     fun releaseConnection(expectedStartId: Int = connectionStartId()) {
         if (expectedStartId != connectionStartId() || !isCurrent()) return
+        if (connectionServiceType == 0) {
+            if (!dictation.hasForegroundLease) removeForegroundAndStop(serviceStartId())
+            return
+        }
         connectionServiceType = 0
         try {
             if (dictation.hasForegroundLease) {
@@ -84,6 +100,7 @@ internal class ConversationForegroundRecord(
         if (foregroundPromoted) {
             NotificationStreamForegroundService.foregroundRemover(service)
             foregroundPromoted = false
+            publishedServiceType = 0
         }
         service.stopSelfResult(startId)
     }

@@ -374,7 +374,7 @@ private fun ConversationDictationFailureAction(
     controller: ConversationDictationController,
 ) {
     val context = LocalContext.current
-    val recovery = dictationFailureRecovery(state.reason)
+    val recovery = dictationFailureRecovery(state.cause ?: state.reason)
     IconButton(
         onClick =
             when (recovery) {
@@ -453,7 +453,7 @@ private fun dictationStatusLabel(
             stringResource(
                 if (captureInProgress) R.string.dictation_listening else R.string.dictation_processing,
             )
-        is ConversationDictationState.Failed -> dictationFailureLabel(state.reason)
+        is ConversationDictationState.Failed -> dictationFailureLabel(state.cause ?: state.reason)
         is ConversationDictationState.Idle -> ""
     }
 
