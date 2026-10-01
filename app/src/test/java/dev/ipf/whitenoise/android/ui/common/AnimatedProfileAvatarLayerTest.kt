@@ -33,6 +33,7 @@ import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.twoFrameGif
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.junit.After
@@ -122,6 +123,48 @@ class AnimatedProfileAvatarLayerTest {
         assertEquals(2, decoded.size)
         assertFalse(first.running)
         assertTrue(decoded.last().running)
+    }
+
+    /** A new source in the same visible slot stops the old owner and starts exactly one new one. */
+    @Test
+    fun replacingTheSourceInPlaceRestartsTheAnimation() {
+        var source by mutableStateOf(twoFrameGif())
+        lifecycleOwner.moveTo(Lifecycle.State.RESUMED)
+        composeRule.setContent { Harness { Layer(animationsEnabled = true, source = source) } }
+        composeRule.waitForIdle()
+        val first = decoded.single()
+
+        source = twoFrameGif(width = 2, height = 2)
+        composeRule.waitForIdle()
+
+        assertEquals(2, decoded.size)
+        assertFalse(first.running)
+        assertNull(first.callback)
+        assertTrue(decoded.last().running)
+    }
+
+    /** A decode still in flight when motion is turned off is cancelled and never publishes a drawable. */
+    @Test
+    fun pendingDecodeIsCancelledWhenMotionTurnsOff() {
+        val release = CompletableDeferred<Unit>()
+        val started = CompletableDeferred<Unit>()
+        var enabled by mutableStateOf(true)
+        val slowDecode: suspend (ByteArray, Int) -> Drawable? = { _, _ ->
+            started.complete(Unit)
+            release.await()
+            FakeAnimation().also(decoded::add)
+        }
+        lifecycleOwner.moveTo(Lifecycle.State.RESUMED)
+        composeRule.setContent { Harness { Layer(animationsEnabled = enabled, decoder = slowDecode) } }
+        composeRule.waitUntil(DECODE_TIMEOUT_MS) { started.isCompleted }
+
+        enabled = false
+        composeRule.waitForIdle()
+        release.complete(Unit)
+        composeRule.waitForIdle()
+
+        assertTrue(decoded.isEmpty())
+        composeRule.onNodeWithTag(ANIMATED_PROFILE_AVATAR_TAG).assertDoesNotExist()
     }
 
     /** Leaving composition stops the animation and clears its callback. */
@@ -240,14 +283,18 @@ class AnimatedProfileAvatarLayerTest {
 
     /** The layer under test with the fake decoder. */
     @Composable
-    private fun Layer(animationsEnabled: Boolean) {
+    private fun Layer(
+        animationsEnabled: Boolean,
+        source: ByteArray = DEFAULT_SOURCE,
+        decoder: suspend (ByteArray, Int) -> Drawable? = decode,
+    ) {
         AnimatedProfileAvatarLayer(
-            source = twoFrameGif(),
+            source = source,
             maxEdgePx = 48,
             contentScale = ContentScale.Crop,
             modifier = Modifier.size(48.dp),
             animationsEnabled = animationsEnabled,
-            decode = decode,
+            decode = decoder,
         )
     }
 
@@ -297,6 +344,9 @@ class AnimatedProfileAvatarLayerTest {
 
     private companion object {
         const val DECODE_TIMEOUT_MS = 5_000L
+
+        /** One stable array, so recompositions never look like a source change. */
+        val DEFAULT_SOURCE = twoFrameGif()
     }
 
     /** A lifecycle the test moves by hand. */

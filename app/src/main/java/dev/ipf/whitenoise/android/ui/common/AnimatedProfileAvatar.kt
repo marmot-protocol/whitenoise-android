@@ -131,7 +131,9 @@ internal fun AnimatedProfileAvatarLayer(
     animationsEnabled: Boolean = rememberSystemAnimationsEnabled(),
     decode: suspend (ByteArray, Int) -> Drawable? = ::decodeAnimatedProfileAvatar,
 ) {
-    var visible by remember(source) { mutableStateOf(false) }
+    // Not keyed on the source: the visibility node only reports changes, so a reset here would leave a
+    // replacement picture in the same slot believing it is off-screen until the next scroll.
+    var visible by remember { mutableStateOf(false) }
     // Plain collection: a lifecycle-scoped collector would stop before it ever saw the background.
     val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateFlow
         .collectAsState()
