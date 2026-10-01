@@ -249,7 +249,8 @@ class AttachmentDownloadWorker : CoroutineWorker {
             // interactive intent cannot linger. Scheduler cancellation still
             // propagates and retains intent for the next run.
             if (!currentCoroutineContext().isActive) {
-                val reason = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) stopReason.toString() else "unavailable"
+                val reason =
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) stopReason.toString() else "unavailable"
                 Log.w(TAG, "attachment_work_stopped reason=$reason")
                 throw cancel
             }

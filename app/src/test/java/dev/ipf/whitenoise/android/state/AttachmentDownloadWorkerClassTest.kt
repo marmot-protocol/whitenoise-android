@@ -181,7 +181,8 @@ class AttachmentDownloadWorkerClassTest {
     fun cancelledFetchEndsTheWorkerAndClearsInteractiveIntent() =
         runTest {
             val request = testRequest()
-            val intents = AttachmentDownloadIntentStore(appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE))
+            val intents =
+                AttachmentDownloadIntentStore(appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE))
             for (interactive in listOf(false, true)) {
                 intents.setInteractive(request, interactive)
                 val worker =
@@ -199,7 +200,8 @@ class AttachmentDownloadWorkerClassTest {
     fun stoppedWorkerPropagatesCancellationAndRetainsInteractiveIntent() =
         runTest {
             val request = testRequest()
-            val intents = AttachmentDownloadIntentStore(appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE))
+            val intents =
+                AttachmentDownloadIntentStore(appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE))
             intents.setInteractive(request, true)
             val enteredDownload = CompletableDeferred<Unit>()
             val worker =
