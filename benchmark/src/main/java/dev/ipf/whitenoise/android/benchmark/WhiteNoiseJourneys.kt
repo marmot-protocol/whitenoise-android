@@ -199,15 +199,20 @@ internal class WhiteNoiseJourneys {
 
     /**
      * Selects one global notification-delivery radio from the chat list, for an idle energy
-     * baseline's unmeasured setup. Assumes the single-account benchmark fixture, where the chat
-     * list's avatar opens Settings directly rather than an account selector.
+     * baseline's unmeasured setup. The chat list's avatar opens Settings directly on a
+     * single-account fixture, or a "Switch Profile" account selector on a multi-account one; the
+     * latter has its own "Settings" row, so either path is handled.
      */
     fun setNotificationDeliveryMode(mode: BenchmarkDeliveryMode) {
-        clickVisibleTagUntilPresent(
-            triggerTag = CHATS_SWITCH_PROFILE_TAG,
-            destinationTag = SETTINGS_LIST_TAG,
-            timeoutMs = NETWORK_STATE_TIMEOUT_MS,
-        )
+        waitForVisibleTag(CHATS_SWITCH_PROFILE_TAG, NETWORK_STATE_TIMEOUT_MS).click()
+        device.waitForIdle()
+        if (findTag(SETTINGS_LIST_TAG) == null) {
+            clickTextUntilTagPresent(
+                text = SETTINGS_SHEET_ROW_TEXT,
+                destinationTag = SETTINGS_LIST_TAG,
+                timeoutMs = NETWORK_STATE_TIMEOUT_MS,
+            )
+        }
         clickTextUntilTagPresent(
             text = NOTIFICATIONS_ROW_TEXT,
             destinationTag = NOTIFICATION_DELIVERY_CHOICES_TAG,
@@ -826,6 +831,7 @@ internal class WhiteNoiseJourneys {
         const val CHATS_SWITCH_PROFILE_TAG = "chats.switchProfile"
         const val SETTINGS_LIST_TAG = "settings.list"
         const val NOTIFICATIONS_ROW_TEXT = "Notifications"
+        const val SETTINGS_SHEET_ROW_TEXT = "Settings"
         const val NOTIFICATION_DELIVERY_CHOICES_TAG = "notification-delivery.choices"
         const val CONVERSATION_SETTINGS_LOG_TAG = "ConversationSettings"
         val APP_DISPATCH_LOG_REGEX =
