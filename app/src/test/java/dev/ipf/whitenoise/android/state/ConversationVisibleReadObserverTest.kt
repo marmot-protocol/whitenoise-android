@@ -32,13 +32,7 @@ class ConversationVisibleReadObserverTest {
 
     @Test
     fun resumedSettledAnchorRetriesWhenConversationAndForegroundOwnershipReturn() {
-        val row =
-            notificationChatListRow().copy(
-                lastReadMessageIdHex = ConversationTimelineTestIds.MESSAGE_B,
-                manuallyMarkedUnread = true,
-                hasUnread = true,
-                unreadCount = 0uL,
-            )
+        val row = reminderRow()
         val fixture = fixture(row)
         runBlocking { fixture.bootstrap() }
         val state = fixture.appState
@@ -106,6 +100,14 @@ class ConversationVisibleReadObserverTest {
             Snapshot.sendApplyNotifications()
         }
     }
+
+    private fun reminderRow() =
+        notificationChatListRow().copy(
+            lastReadMessageIdHex = ConversationTimelineTestIds.MESSAGE_B,
+            manuallyMarkedUnread = true,
+            hasUnread = true,
+            unreadCount = 0uL,
+        )
 
     private fun fixture(row: ChatListRowFfi) =
         NotificationBootstrapTestFixture(
