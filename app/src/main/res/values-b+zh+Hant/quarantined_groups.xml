@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="quarantined_groups">隔離的群組</string>
+    <string name="quarantine_explanation">這些群組無法安全載入。復原會重新進行驗證，不會刪除歷史紀錄、略過檢查或重新加入群組。</string>
+    <string name="quarantine_unavailable">沒有可用的已登入使用中帳號。</string>
+    <string name="quarantine_loading">正在載入隔離的群組…</string>
+    <string name="quarantine_load_failed">無法載入隔離的群組。請嘗試重新整理。</string>
+    <string name="quarantine_count">已隔離：%1$d</string>
+    <string name="quarantine_refresh">重新整理群組</string>
+    <string name="quarantine_empty">沒有被隔離的群組。</string>
+    <string name="quarantine_group">群組 %1$s</string>
+    <string name="quarantine_retry">重試復原</string>
+    <string name="quarantine_stored_state">無法載入儲存的加密狀態。</string>
+    <string name="quarantine_missing_state">儲存的加密狀態遺失。</string>
+    <string name="quarantine_member_validation">成員或加密狀態驗證未通過。</string>
+    <string name="quarantine_group_record">無法載入群組紀錄。</string>
+    <string name="quarantine_pending_commit">無法復原中斷的群組更新。</string>
+    <string name="quarantine_recovered">復原成功。群組可以重新出現在聊天清單中。</string>
+    <string name="quarantine_still_quarantined">群組仍處於隔離狀態。其歷史紀錄未被刪除。</string>
+    <string name="quarantine_retry_failed">無法完成復原。請稍後重試。</string>
+</resources>

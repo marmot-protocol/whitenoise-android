@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="quarantined_groups">Karantinadaki gruplar</string>
+    <string name="quarantine_explanation">Bu gruplar güvenli biçimde yüklenemedi. Kurtarma, geçmişi silmeden, denetimleri atlamadan veya gruba yeniden katılmadan doğrulamayı tekrarlar.</string>
+    <string name="quarantine_unavailable">Oturum açmış etkin bir hesap yok.</string>
+    <string name="quarantine_loading">Karantinadaki gruplar yükleniyor…</string>
+    <string name="quarantine_load_failed">Karantinadaki gruplar yüklenemedi. Yenilemeyi deneyin.</string>
+    <string name="quarantine_count">Karantinada: %1$d</string>
+    <string name="quarantine_refresh">Grupları yenile</string>
+    <string name="quarantine_empty">Karantinada grup yok.</string>
+    <string name="quarantine_group">Grup %1$s</string>
+    <string name="quarantine_retry">Kurtarmayı yeniden dene</string>
+    <string name="quarantine_stored_state">Kayıtlı şifreleme durumu yüklenemedi.</string>
+    <string name="quarantine_missing_state">Kayıtlı şifreleme durumu eksik.</string>
+    <string name="quarantine_member_validation">Üye veya şifreleme durumu doğrulaması başarısız oldu.</string>
+    <string name="quarantine_group_record">Grup kaydı yüklenemedi.</string>
+    <string name="quarantine_pending_commit">Kesintiye uğrayan grup güncellemesi kurtarılamadı.</string>
+    <string name="quarantine_recovered">Kurtarma başarılı. Grup sohbet listesine geri dönebilir.</string>
+    <string name="quarantine_still_quarantined">Grup hâlâ karantinada. Geçmişi silinmedi.</string>
+    <string name="quarantine_retry_failed">Kurtarma tamamlanamadı. Daha sonra tekrar deneyin.</string>
+</resources>
