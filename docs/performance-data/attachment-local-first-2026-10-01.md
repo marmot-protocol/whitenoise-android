@@ -48,6 +48,8 @@ Cold/reopen n=3 per source/flavor: no p95. Retained n=30 with within-session cor
 
 The whole-device-unchanged post-run check failed because unrelated package snapshots changed during the window; our install records identify only isolated measurement APKs. Concurrent activity limits latency comparison. This does not qualify physical app-process restart/offline, real-download saturation, large files or external handoff, and does not demonstrate newly saved bandwidth or cold throughput.
 
+The [isolated Pixel platform companion](attachment-pixel-platform-2026-10-01.md) subsequently qualifies generated retained content reaching the production external Open and Downloads Save helpers while three host permits stay occupied, with zero acquisition after endpoint denial. One final session per flavor passes; failed diagnostic attempts and the baseline teardown failure remain explicit. Full bubble/picker manual flows and real native backlog are still unqualified.
+
 ## Validation and landing boundaries
 
 The measured candidate passed 69 focused tests in each distribution (resolver/native chunks/leases/cache races/saturated host/Open/APK/cancellation), using 2 GiB workers. The negative control failed as expected; no baseline fix. Both measured APK/test variants built and 12 paired emulator sessions passed. Manual guide validator and 33 tests passed; MED-009/MED-017 companion acceptance remains unchecked. Reviewed-head hosted fixture jobs passed both distributions. Follow-up rebase/gate evidence belongs to the PR; new-head CI, substantive review and meaningful 80% CodeRabbit docstring confirmation remain required. Rate-limited SUCCESS is not review evidence. Visual changes: none.
