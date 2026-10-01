@@ -3302,11 +3302,11 @@ internal fun ConversationScreen(
     val currentReadHostResumed by rememberUpdatedState(readHostResumed)
     LaunchedEffect(listState, controller) {
         snapshotFlow {
+            val readBlockedByHost = !currentReadHostResumed || appState.appLockScreenVisible
             if (
                 !initialTimelineAnchored ||
                 listState.isScrollInProgress ||
-                !currentReadHostResumed ||
-                appState.appLockScreenVisible
+                readBlockedByHost
             ) {
                 null
             } else {
