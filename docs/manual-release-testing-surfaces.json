@@ -3898,6 +3898,12 @@
         ]
       },
       {
+        "surface": "Canonical retained attachment resolution before acquisition admission",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentPlaintextResolver.kt",
+        "anchor": "internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(",
+        "test_ids": ["MED-009", "MED-017"]
+      },
+      {
         "surface": "Persisted file open terminal download settlement",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaFileAccess.kt",
         "anchor": "internal suspend fun <T> materializePersistedAttachmentOpen(",
