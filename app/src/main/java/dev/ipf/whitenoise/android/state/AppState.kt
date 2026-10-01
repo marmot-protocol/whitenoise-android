@@ -2538,6 +2538,7 @@ class WhiteNoiseAppState private constructor(
     @Volatile
     private var suppression = NotificationSuppression()
     private val conversationReadVisibilityState = mutableStateOf(suppression)
+
     /** Read-only Compose view of notification suppression's foreground and conversation ownership. */
     internal val conversationReadVisibility: State<NotificationSuppression>
         get() = conversationReadVisibilityState
