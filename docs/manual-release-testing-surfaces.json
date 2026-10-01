@@ -962,7 +962,8 @@
         "anchor": "fun ProfileSwitcherSheet(",
         "test_ids": [
           "NAV-004",
-          "NAV-006"
+          "NAV-006",
+          "CHL-022"
         ]
       },
       {
@@ -1360,7 +1361,8 @@
         "test_ids": [
           "CHL-001",
           "SEC-012",
-          "CHL-018"
+          "CHL-018",
+          "CHL-021"
         ]
       },
       {
@@ -2047,7 +2049,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Badges.kt",
         "anchor": "fun UnreadCountBadge(",
         "test_ids": [
-          "AXY-001"
+          "AXY-001",
+          "CHL-022"
         ]
       },
       {
@@ -2651,8 +2654,15 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationJumpToNewestButton.kt",
         "anchor": "fun ConversationJumpToNewestButton(",
         "test_ids": [
-          "CON-001"
+          "CON-001",
+          "CHL-022"
         ]
+      },
+      {
+        "surface": "Jump to newest accessibility text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationJumpToNewestButton.kt",
+        "anchor": "R.string.jump_to_newest",
+        "test_ids": ["CON-001", "CHL-022"]
       },
       {
         "surface": "ConversationMediaDraftContent",
@@ -4748,7 +4758,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
         "anchor": "fun ForwardMessagePickerContent(",
         "test_ids": [
-          "MSG-010"
+          "MSG-010",
+          "MSG-030"
         ]
       },
       {
@@ -4772,7 +4783,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
         "anchor": "fun ForwardTargetList(",
         "test_ids": [
-          "MSG-010"
+          "MSG-010",
+          "MSG-030"
         ]
       },
       {
@@ -9228,7 +9240,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt",
         "anchor": "fun ShareChatPickerTargetList(",
         "test_ids": [
-          "SYS-001"
+          "SYS-001",
+          "MSG-030"
         ]
       },
       {
