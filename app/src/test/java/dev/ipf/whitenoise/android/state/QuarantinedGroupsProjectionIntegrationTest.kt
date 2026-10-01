@@ -50,42 +50,8 @@ class QuarantinedGroupsProjectionIntegrationTest {
         val quarantined = AtomicBoolean(true)
         val window = RecoveryWindow()
         val groups = RecoveryGroups()
-        val native =
-            Proxy.newProxyInstance(MarmotInterface::class.java.classLoader, arrayOf(MarmotInterface::class.java)) { proxy, method, args ->
-                when (method.name) {
-                    "quarantinedGroups" -> {
-                        assertEquals(account, args!![0])
-                        if (quarantined.get()) {
-                            listOf(
-                                AppQuarantinedGroupFfi(groupId, AppGroupHydrationQuarantineReasonFfi.OPEN_MLS_LOAD_FAILED),
-                            )
-                        } else {
-                            emptyList()
-                        }
-                    }
-                    "retryHydrateQuarantinedGroup" -> {
-                        assertEquals(account, args!![0])
-                        assertEquals(groupId, args[1])
-                        if (recovered) {
-                            quarantined.set(false)
-                            window.deliverRecoveredGroup()
-                        }
-                        recovered
-                    }
-                    "toString" -> "QuarantineProjectionFake"
-                    "hashCode" -> System.identityHashCode(proxy)
-                    "equals" -> proxy === args?.firstOrNull()
-                    else -> error("unexpected native call")
-                }
-            } as MarmotInterface
-        val appState =
-            WhiteNoiseAppState(
-                context = ApplicationProvider.getApplicationContext<Context>(),
-                draftStore = DraftStore(ConversationTimelineTestDraftPersistence()),
-                accountIdHexResolver = { ConversationTimelineTestIds.ACCOUNT_ID },
-                accounts = listOf(AccountSummaryFfi(account, ConversationTimelineTestIds.ACCOUNT_ID, true, false, false, true)),
-                activeAccountRef = account,
-            )
+        val native = recoveryNative(account, groupId, quarantined, window, recovered)
+        val appState = projectionAppState(account)
         appState.liveSubscriptionOverrides.chatList =
             ChatListLiveSubscriptions(
                 openChatListWindow = { _, view -> if (view == ChatListViewFfi.CHATS) window else RecoveryWindow(view) },
@@ -108,7 +74,12 @@ class QuarantinedGroupsProjectionIntegrationTest {
                 memberSnapshotLoader = { _, _ -> emptyList() },
             )
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-        val access = NativeQuarantinedGroupsAccess(account, AppMarmotRuntime("private", native), { appState.activeAccountRef == account })
+        val access =
+            NativeQuarantinedGroupsAccess(
+                account,
+                AppMarmotRuntime("private", native),
+                { appState.activeAccountRef == account },
+            )
         val recovery = QuarantinedGroupsController(access, scope)
         scope.launch { chats.bind(account) }
         try {
@@ -118,29 +89,86 @@ class QuarantinedGroupsProjectionIntegrationTest {
             awaitQuarantineProjection { recovery.state.value.loaded }
             recovery.recover(groupId)
             awaitQuarantineProjection { !recovery.state.value.busy && recovery.state.value.outcome != null }
-            if (recovered) {
-                awaitQuarantineProjection { chats.items.size == 1 }
-                assertEquals(groupId, chats.items.single().id)
-                assertTrue(
-                    recovery.state.value.rows
-                        .isEmpty(),
-                )
-                assertEquals(QuarantineRecoveryOutcome.Recovered, recovery.state.value.outcome)
-            } else {
-                assertTrue(chats.items.isEmpty())
-                assertEquals(
-                    listOf(groupId),
-                    recovery.state.value.rows
-                        .map { it.groupId },
-                )
-                assertEquals(QuarantineRecoveryOutcome.StillQuarantined, recovery.state.value.outcome)
-            }
+            assertRecoveryProjection(recovered, groupId, chats, recovery)
         } finally {
             recovery.close()
             chats.onCleared()
             window.close()
             groups.close()
             scope.cancel()
+        }
+    }
+
+    private fun recoveryNative(
+        account: String,
+        groupId: String,
+        quarantined: AtomicBoolean,
+        window: RecoveryWindow,
+        recovered: Boolean,
+    ): MarmotInterface =
+        Proxy.newProxyInstance(
+            MarmotInterface::class.java.classLoader,
+            arrayOf(MarmotInterface::class.java),
+        ) { proxy, method, args ->
+            when (method.name) {
+                "quarantinedGroups" -> {
+                    assertEquals(account, args!![0])
+                    if (quarantined.get()) {
+                        listOf(
+                            AppQuarantinedGroupFfi(groupId, AppGroupHydrationQuarantineReasonFfi.OPEN_MLS_LOAD_FAILED),
+                        )
+                    } else {
+                        emptyList()
+                    }
+                }
+                "retryHydrateQuarantinedGroup" -> {
+                    assertEquals(account, args!![0])
+                    assertEquals(groupId, args[1])
+                    if (recovered) {
+                        quarantined.set(false)
+                        window.deliverRecoveredGroup()
+                    }
+                    recovered
+                }
+                "toString" -> "QuarantineProjectionFake"
+                "hashCode" -> System.identityHashCode(proxy)
+                "equals" -> proxy === args?.firstOrNull()
+                else -> error("unexpected native call")
+            }
+        } as MarmotInterface
+
+    private fun projectionAppState(account: String) =
+        WhiteNoiseAppState(
+            context = ApplicationProvider.getApplicationContext<Context>(),
+            draftStore = DraftStore(ConversationTimelineTestDraftPersistence()),
+            accountIdHexResolver = { ConversationTimelineTestIds.ACCOUNT_ID },
+            accounts =
+                listOf(AccountSummaryFfi(account, ConversationTimelineTestIds.ACCOUNT_ID, true, false, false, true)),
+            activeAccountRef = account,
+        )
+
+    private fun assertRecoveryProjection(
+        recovered: Boolean,
+        groupId: String,
+        chats: ChatsController,
+        recovery: QuarantinedGroupsController,
+    ) {
+        if (recovered) {
+            awaitQuarantineProjection { chats.items.size == 1 }
+            assertEquals(groupId, chats.items.single().id)
+            assertTrue(
+                recovery.state.value.rows
+                    .isEmpty(),
+            )
+            assertEquals(QuarantineRecoveryOutcome.Recovered, recovery.state.value.outcome)
+        } else {
+            assertTrue(chats.items.isEmpty())
+            assertEquals(
+                listOf(groupId),
+                recovery.state.value.rows
+                    .map { it.groupId },
+            )
+            assertEquals(QuarantineRecoveryOutcome.StillQuarantined, recovery.state.value.outcome)
         }
     }
 }

@@ -126,6 +126,8 @@ class QuarantinedGroupsControllerTest {
             access.loadGate!!.complete(Unit)
             runCurrent()
             assertFalse(controller.state.value.loaded)
+            assertFalse(controller.state.value.available)
+            assertFalse(controller.state.value.busy)
             assertTrue(
                 controller.state.value.rows
                     .isEmpty(),
@@ -136,6 +138,28 @@ class QuarantinedGroupsControllerTest {
             controller.recover("private")
             assertEquals(1, access.loads)
             assertTrue(access.retries.isEmpty())
+        }
+
+    @Test fun lostOwnerEndsRetryProgressWithoutPublishingItsOutcome() =
+        runTest {
+            val access = Access().apply { rows = listOf(row("private")) }
+            val controller = QuarantinedGroupsController(access, this)
+            controller.refresh()
+            access.retryGate = CompletableDeferred()
+            controller.recover("private")
+            assertTrue(controller.state.value.busy)
+            access.current = false
+            access.retryGate!!.complete(Unit)
+            runCurrent()
+            assertFalse(controller.state.value.available)
+            assertFalse(controller.state.value.busy)
+            assertTrue(
+                controller.state.value.rows
+                    .isEmpty(),
+            )
+            assertEquals(null, controller.state.value.outcome)
+            assertEquals(1, access.loads)
+            controller.close()
         }
 
     @Test fun repeatedRefreshDuringLoadAddsOnlyOneRead() =

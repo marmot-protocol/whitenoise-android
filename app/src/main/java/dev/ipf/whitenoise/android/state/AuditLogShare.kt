@@ -16,6 +16,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 private const val AUDIT_LOG_SHARE_DIRECTORY = "audit_logs"
+private const val MAX_DICTATION_EXPORT_ENTRY_BYTES = 256 * 1024
 private val unsafeAuditFileName = Regex("[^A-Za-z0-9._-]")
 
 /**
@@ -51,8 +52,9 @@ internal fun prepareAuditLogArchive(
     cacheDir: File,
     allowedSourceRoot: File,
     sourcePaths: List<String>,
+    supplementalEntries: Map<String, ByteArray> = emptyMap(),
 ): File {
-    require(sourcePaths.isNotEmpty()) { "At least one audit log is required" }
+    require(sourcePaths.isNotEmpty() || supplementalEntries.isNotEmpty()) { "At least one audit log is required" }
     val shareRoot = File(cacheDir, AUDIT_LOG_SHARE_DIRECTORY)
     check(shareRoot.mkdirs() || shareRoot.isDirectory) { "Unable to prepare audit log export" }
     pruneAuditLogShareSessions(shareRoot, RETAINED_AUDIT_EXPORT_SESSIONS - 1)
@@ -60,7 +62,7 @@ internal fun prepareAuditLogArchive(
     check(shareDirectory.mkdir()) { "Unable to prepare audit log export" }
 
     val allowedLexicalRoot = allowedSourceRoot.toPath().toAbsolutePath().normalize()
-    val allowedRealRoot = allowedLexicalRoot.toRealPath()
+    val allowedRealRoot = if (sourcePaths.isEmpty()) allowedLexicalRoot else allowedLexicalRoot.toRealPath()
     val archive = File(shareDirectory, AUDIT_LOG_ARCHIVE_NAME)
     try {
         val usedNames = mutableSetOf<String>()
@@ -74,6 +76,13 @@ internal fun prepareAuditLogArchive(
                     ) ?: throw IOException("An audit log could not be included")
                 zip.putNextEntry(ZipEntry(uniqueAuditFileName(safeAuditEntryName(source.name), usedNames)))
                 source.inputStream().buffered().use { it.copyTo(zip) }
+                zip.closeEntry()
+            }
+            supplementalEntries.forEach { (name, bytes) ->
+                require(name in setOf("dictation-current.jsonl", "dictation-previous.jsonl", "dictation-manifest.json"))
+                require(bytes.size <= MAX_DICTATION_EXPORT_ENTRY_BYTES)
+                zip.putNextEntry(ZipEntry(uniqueAuditFileName(name, usedNames)))
+                zip.write(bytes)
                 zip.closeEntry()
             }
         }

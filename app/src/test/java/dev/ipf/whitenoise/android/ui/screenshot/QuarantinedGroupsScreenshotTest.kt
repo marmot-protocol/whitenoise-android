@@ -32,12 +32,20 @@ class QuarantinedGroupsScreenshotTest {
 
     @Test fun loadedLight() = capture("quarantine_loaded_light", inventory())
 
-    @Test fun recoveringDark() = capture("quarantine_recovering_dark", inventory().copy(recoveringGroup = GROUP), dark = true)
+    @Test fun recoveringDark() =
+        capture("quarantine_recovering_dark", inventory().copy(recoveringGroup = GROUP), dark = true)
 
     @Test fun loadedEmpty() = capture("quarantine_empty_light", QuarantinedGroupsUiState(loaded = true))
 
     @Test fun recoveryAndReloadFailure() =
-        capture("quarantine_recovered_reload_error", QuarantinedGroupsUiState(loaded = true, loadFailed = true, outcome = QuarantineRecoveryOutcome.Recovered))
+        capture(
+            "quarantine_recovered_reload_error",
+            QuarantinedGroupsUiState(
+                loaded = true,
+                loadFailed = true,
+                outcome = QuarantineRecoveryOutcome.Recovered,
+            ),
+        )
 
     @Test
     @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h780dp-mdpi")

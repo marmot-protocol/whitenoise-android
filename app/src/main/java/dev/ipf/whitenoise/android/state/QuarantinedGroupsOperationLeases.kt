@@ -34,14 +34,6 @@ internal object QuarantinedGroupsOperationLeases {
         private val closed = AtomicBoolean()
         val mutex get() = node.mutex
 
-        /** An admitted call retains its coordination through screen disposal. */
-        fun retain(): Lease =
-            synchronized(nodes) {
-                check(!closed.get())
-                node.references++
-                Lease(node)
-            }
-
         override fun close() =
             synchronized(nodes) {
                 if (closed.compareAndSet(false, true)) {

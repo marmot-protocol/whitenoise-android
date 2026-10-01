@@ -49,7 +49,13 @@ class QuarantinedGroupsOwnershipTest {
             assertTrue(old.isCancelled)
             assertTrue(calls.isEmpty())
             access.close()
-            val another = NativeQuarantinedGroupsAccess("a", runtime, { currentRuntime === runtime }, StandardTestDispatcher(testScheduler))
+            val another =
+                NativeQuarantinedGroupsAccess(
+                    "a",
+                    runtime,
+                    { currentRuntime === runtime },
+                    StandardTestDispatcher(testScheduler),
+                )
             val queued = launch { another.retry("group") }
             currentRuntime = runtime.copy()
             runCurrent()
@@ -110,7 +116,7 @@ class QuarantinedGroupsOwnershipTest {
     @Test fun retiredUnadmittedAccessNeverCallsNativeAndLeasesAreReleasedAfterAllUsers() {
         val runtime = Any()
         val lease = QuarantinedGroupsOperationLeases.acquire(runtime, "a")
-        val admitted = lease.retain()
+        val admitted = QuarantinedGroupsOperationLeases.acquire(runtime, "a")
         val mutex = admitted.mutex
         lease.close()
         val next = QuarantinedGroupsOperationLeases.acquire(runtime, "a")

@@ -71,7 +71,6 @@ internal class NativeQuarantinedGroupsAccess(
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : QuarantinedGroupsAccess {
     private val closed = AtomicBoolean()
-    private val lease = QuarantinedGroupsOperationLeases.acquire(runtime, account)
 
     override fun isCurrent(): Boolean = !closed.get() && owns()
 
@@ -95,7 +94,7 @@ internal class NativeQuarantinedGroupsAccess(
     ): T {
         currentCoroutineContext().ensureActive()
         requireCurrent()
-        val operation = lease.retain()
+        val operation = QuarantinedGroupsOperationLeases.acquire(runtime, account)
         try {
             val result =
                 withContext(dispatcher) {
@@ -120,6 +119,6 @@ internal class NativeQuarantinedGroupsAccess(
     }
 
     override fun close() {
-        if (closed.compareAndSet(false, true)) lease.close()
+        closed.set(true)
     }
 }

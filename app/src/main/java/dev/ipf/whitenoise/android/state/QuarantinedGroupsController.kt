@@ -39,7 +39,10 @@ internal class QuarantinedGroupsController(
 
     /** Repeated refreshes coalesce into one additional read after the admitted operation. */
     fun refresh() {
-        if (!current()) return
+        if (!current()) {
+            finishPresentation()
+            return
+        }
         if (running) {
             refreshRequested = true
             return
@@ -48,13 +51,20 @@ internal class QuarantinedGroupsController(
     }
 
     fun recover(groupId: String) {
-        if (!current() || running || !state.value.loaded) return
-        if (state.value.rows.none { it.groupId == groupId }) return
+        if (!current()) {
+            finishPresentation()
+            return
+        }
+        if (running || !state.value.loaded || state.value.rows.none { it.groupId == groupId }) return
         start {
             mutable.value = state.value.copy(recoveringGroup = groupId, outcome = null)
             val outcome =
                 try {
-                    if (access!!.retry(groupId)) QuarantineRecoveryOutcome.Recovered else QuarantineRecoveryOutcome.StillQuarantined
+                    if (access!!.retry(groupId)) {
+                        QuarantineRecoveryOutcome.Recovered
+                    } else {
+                        QuarantineRecoveryOutcome.StillQuarantined
+                    }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (_: Exception) {
@@ -86,8 +96,19 @@ internal class QuarantinedGroupsController(
                     }
                 } finally {
                     running = false
-                    if (current()) mutable.value = state.value.copy(loading = false, recoveringGroup = null)
+                    finishPresentation()
                 }
+            }
+    }
+
+    /** Losing an owner retires only this controller's transient presentation. */
+    private fun finishPresentation() {
+        if (closed) return
+        mutable.value =
+            if (access?.isCurrent() == true) {
+                state.value.copy(loading = false, recoveringGroup = null)
+            } else {
+                QuarantinedGroupsUiState(available = false)
             }
     }
 

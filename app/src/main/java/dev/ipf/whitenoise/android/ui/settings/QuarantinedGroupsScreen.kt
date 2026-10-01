@@ -138,7 +138,8 @@ internal fun QuarantinedGroupsContent(
 }
 
 private fun LazyListScope.quarantineCallouts(state: QuarantinedGroupsUiState) {
-    if (state.loaded && state.rows.isEmpty() && !state.loadFailed && !state.loading) {
+    val loadedWithoutError = state.loaded && !state.loadFailed
+    if (loadedWithoutError && state.rows.isEmpty() && !state.loading) {
         item { SettingsCallout(stringResource(R.string.quarantine_empty), Modifier.testTag("quarantine.empty")) }
     }
     if (state.loadFailed) {

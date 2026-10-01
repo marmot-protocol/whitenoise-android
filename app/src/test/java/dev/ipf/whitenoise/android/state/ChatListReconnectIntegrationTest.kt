@@ -233,14 +233,114 @@ class ChatListReconnectIntegrationTest {
             subscriptions.second.commandRows = listOf(pinned, group)
             subscriptions.first.close()
             awaitChatListCondition { entered.isCompleted }
-            bindScope.launch { controller.returnChatListToTop() }
+            val command = bindScope.launch { controller.returnChatListToTop() }
             awaitChatListCondition {
-                controller.chatRows.map { it.groupIdHex }.toSet() == setOf(pinned.groupIdHex, group.groupIdHex)
+                command.isCompleted &&
+                    controller.chatRows.map { it.groupIdHex }.toSet() == setOf(pinned.groupIdHex, group.groupIdHex)
             }
             release.complete(Unit)
             awaitChatListCondition { subscriptions.second.nextUpdateStarted.isCompleted }
             shadowOf(Looper.getMainLooper()).idle()
             assertEquals(setOf(pinned.groupIdHex, group.groupIdHex), controller.chatRows.map { it.groupIdHex }.toSet())
+        } finally {
+            release.complete(Unit)
+            controller.onCleared()
+            subscriptions.closeAll()
+            bindScope.cancel()
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+    }
+
+    /** Cancelling a suspended replacement callback retires its read without cancelling the controller's retry. */
+    @Test
+    fun closeDuringSuspendingValidationKeepsTheBindAliveForRetry() {
+        val pinned = notificationChatListRow().copy(groupIdHex = "aa".repeat(32), pinned = true)
+        val group = notificationChatListRow().copy(groupIdHex = "bb".repeat(32))
+        val subscriptions = DroppedChatSubscriptions(pinned, group)
+        val entered = CompletableDeferred<Unit>()
+        val cancelled = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        subscriptions.suspendBeforeKeyedLookup = {
+            entered.complete(Unit)
+            try {
+                release.await()
+            } finally {
+                cancelled.complete(Unit)
+            }
+        }
+        val controller =
+            testChatsController(chatListTestAppState(testRecoveryDiagnostics(), subscriptions.liveSubscriptions))
+        val bindScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        val bind = bindScope.launch { controller.bind(ConversationTimelineTestIds.ACCOUNT_REF) }
+        try {
+            awaitChatListCondition { subscriptions.first.nextUpdateStarted.isCompleted && controller.items.size == 2 }
+            subscriptions.first.emitRows(listOf(group))
+            awaitChatListCondition { entered.isCompleted }
+            requireNotNull(controller.chatListWindows).close()
+            awaitChatListCondition { cancelled.isCompleted && subscriptions.first.closed }
+            assertTrue(bind.isActive)
+            assertEquals(setOf(pinned.groupIdHex, group.groupIdHex), controller.items.map { it.id }.toSet())
+            controller.retryLoad()
+            awaitChatListCondition { subscriptions.second.nextUpdateStarted.isCompleted }
+            assertTrue(bind.isActive)
+            assertEquals(2, subscriptions.activeOpenCount.get())
+            assertEquals(setOf(pinned.groupIdHex, group.groupIdHex), controller.items.map { it.id }.toSet())
+        } finally {
+            release.complete(Unit)
+            controller.onCleared()
+            subscriptions.closeAll()
+            bindScope.cancel()
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+    }
+
+    /** A captured old-account command can finish after teardown without changing the replacement list. */
+    @Test
+    fun retiredAccountCommandCannotOverwriteReplacementAccountRows() {
+        val oldRow = notificationChatListRow().copy(groupIdHex = "aa".repeat(32))
+        val replacementRow = notificationChatListRow().copy(groupIdHex = "bb".repeat(32))
+        val freshRow = notificationChatListRow().copy(groupIdHex = "cc".repeat(32))
+        val subscriptions = DroppedChatSubscriptions(oldRow, replacementRow, secondRows = listOf(replacementRow))
+        val controller =
+            testChatsController(chatListTestAppState(testRecoveryDiagnostics(), subscriptions.liveSubscriptions))
+        val bindScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        subscriptions.first.beforeCommand = {
+            entered.complete(Unit)
+            release.await()
+        }
+        subscriptions.first.commandRows = listOf(oldRow)
+        bindScope.launch { controller.bind(ConversationTimelineTestIds.ACCOUNT_REF) }
+        try {
+            awaitChatListCondition { subscriptions.first.nextUpdateStarted.isCompleted && controller.items.size == 2 }
+            val oldCommand = bindScope.launch { controller.reportVisibleChat(oldRow.groupIdHex) }
+            awaitChatListCondition { entered.isCompleted }
+            val teardown =
+                bindScope.launch {
+                    controller.closeLiveSubscriptionsForAccountTeardown(ConversationTimelineTestIds.ACCOUNT_REF)
+                }
+            awaitChatListCondition { teardown.isCompleted }
+            assertFalse(subscriptions.first.closed)
+            assertTrue(oldCommand.isActive)
+
+            bindScope.launch { controller.bind("replacement-account") }
+            awaitChatListCondition {
+                subscriptions.second.nextUpdateStarted.isCompleted &&
+                    controller.items.map { it.id } == listOf(replacementRow.groupIdHex)
+            }
+            release.complete(Unit)
+            awaitChatListCondition { oldCommand.isCompleted && subscriptions.first.closed }
+            assertFalse(oldCommand.isCancelled)
+            assertEquals("replacement-account", controller.boundAccountRef)
+            assertEquals(listOf(replacementRow.groupIdHex), controller.items.map { it.id })
+
+            subscriptions.second.commandRows = listOf(replacementRow, freshRow)
+            bindScope.launch { controller.returnChatListToTop() }
+            awaitChatListCondition { controller.items.size == 2 }
+            assertEquals(setOf(replacementRow.groupIdHex, freshRow.groupIdHex), controller.items.map { it.id }.toSet())
+            subscriptions.second.emitRows(listOf(replacementRow))
+            awaitChatListCondition { controller.items.map { it.id } == listOf(replacementRow.groupIdHex) }
         } finally {
             release.complete(Unit)
             controller.onCleared()
@@ -605,6 +705,7 @@ private class ScriptedChatListSubscription(
     private var sequence = 0uL
     private var current = windowSnapshot(initialRows, sequence, view)
     var commandRows: List<ChatListRowFfi>? = null
+    var beforeCommand: suspend () -> Unit = {}
     val nextUpdateStarted = CompletableDeferred<Unit>()
 
     @Volatile var closed = false
@@ -623,18 +724,25 @@ private class ScriptedChatListSubscription(
         sequence: ULong,
         direction: ChatListPageDirectionFfi,
         count: UInt,
-    ): ChatListWindowSnapshotFfi = current
+    ): ChatListWindowSnapshotFfi = command(sequence)
 
     /** Anchor reports echo the installed replacement. */
     override suspend fun setVisibleAnchor(
         sequence: ULong,
         groupIdHex: String,
-    ): ChatListWindowSnapshotFfi = current
+    ): ChatListWindowSnapshotFfi = command(sequence)
 
     /** Return-to-top echoes the installed replacement. */
-    override suspend fun returnToTop(sequence: ULong): ChatListWindowSnapshotFfi {
+    override suspend fun returnToTop(sequence: ULong): ChatListWindowSnapshotFfi = command(sequence)
+
+    private suspend fun command(sequence: ULong): ChatListWindowSnapshotFfi {
+        check(!closed) { "destroyed window before command" }
+        beforeCommand()
+        check(!closed) { "destroyed window during command" }
         val rows = commandRows ?: return current
-        return windowSnapshot(rows, sequence + 1uL, view)
+        current = windowSnapshot(rows, sequence + 1uL, view)
+        this.sequence = current.sequence
+        return current
     }
 
     /** Delivers one authoritative update without blocking the test thread. */
