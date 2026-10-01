@@ -30,7 +30,12 @@ private sealed class SizeTagValue {
     ) : SizeTagValue()
 }
 
-internal object ZapstoreAssetEvents {
+internal object ZapstoreAssetEvents : ZapstoreAssetEventPolicy()
+
+/** Immutable domain-test seam; production always delegates verification to MDK. */
+internal open class ZapstoreAssetEventPolicy(
+    private val verifyEvent: (NostrEvent) -> Boolean = NostrEventVerifier::verifies,
+) {
     fun assetEventIdsFromReleaseEvent(
         event: NostrEvent,
         appId: String,
@@ -40,7 +45,7 @@ internal object ZapstoreAssetEvents {
         if (event.kind != KIND_ZAPSTORE_RELEASE) return null
         if (event.pubkey != publisherPubkey) return null
         if (event.firstTagValue("d") != releaseDTag) return null
-        if (!NostrEventVerifier.verifies(event)) return null
+        if (!verifyEvent(event)) return null
         if (ZapstoreAddress.versionFromReleaseDTag(releaseDTag, appId) == null) return null
         val ids =
             event.tags
@@ -62,7 +67,7 @@ internal object ZapstoreAssetEvents {
         if (event.kind != KIND_ZAPSTORE_ASSET) return null
         if (event.pubkey != publisherPubkey) return null
         if (!event.id.equals(referencedId, ignoreCase = true)) return null
-        if (!NostrEventVerifier.verifies(event)) return null
+        if (!verifyEvent(event)) return null
         if (!event.computedIdHex().equals(referencedId, ignoreCase = true)) return null
         return parseApkAssetTags(
             event = event,

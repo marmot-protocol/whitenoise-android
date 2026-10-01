@@ -12,6 +12,9 @@ class InstrumentedDispatchTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
             (root / "scripts").mkdir()
+            gradle = root / "gradlew"
+            gradle.write_text('#!/bin/sh\nprintf "%s\\n" "$*"\n')
+            gradle.chmod(0o755)
             for name in ("run-review-demo-e2e.sh", "run-document-provider-matrix.sh"):
                 script = root / "scripts" / name
                 script.write_text(f"#!/bin/sh\nprintf '{name}'\n")
@@ -27,6 +30,19 @@ class InstrumentedDispatchTest(unittest.TestCase):
 
     def test_document_provider_dispatch_remains_available(self):
         self.assertEqual(self.run_dispatch("workflow_dispatch", "false", "true"), "run-document-provider-matrix.sh")
+
+    def test_master_push_checks_native_correctness_without_timing_benchmark(self):
+        output = self.run_dispatch("push")
+        self.assertIn(":app:connectedDevZapstoreDebugAndroidTest", output)
+        self.assertIn(":cryptoBenchmark:connectedReleaseAndroidTest", output)
+        self.assertIn("NostrEventVerifierInstrumentedTest", output)
+        self.assertNotIn("Bip340PhysicalBenchmark", output)
+
+    def test_pull_request_runs_all_isolated_native_tests(self):
+        output = self.run_dispatch("pull_request")
+        self.assertIn("PullRequestDeviceSmoke", output)
+        self.assertIn(":cryptoBenchmark:connectedReleaseAndroidTest", output)
+        self.assertNotIn("testInstrumentationRunnerArguments.class=", output)
 
     def test_both_opt_in_suites_are_rejected(self):
         with self.assertRaises(subprocess.CalledProcessError) as caught:

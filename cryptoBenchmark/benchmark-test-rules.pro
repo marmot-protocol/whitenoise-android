@@ -3,6 +3,7 @@
 -keep class androidx.tracing.** { *; }
 -keep class org.junit.** { *; }
 -keep class dev.ipf.whitenoise.android.core.nostr.Bip340PhysicalBenchmark { *; }
+-keep class dev.ipf.whitenoise.android.core.nostr.NostrEventVerifierInstrumentedTest { *; }
 -keep class kotlin.** { *; }
 
 # AndroidX Test references source-retention Error Prone annotations only.

@@ -32,11 +32,16 @@ if [[ "$event_name" == "pull_request" ]]; then
     -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
     --no-daemon --stacktrace
 
-  exec ./gradlew :cryptoBenchmark:connectedReleaseAndroidTest \
-    -Pandroid.testInstrumentationRunnerArguments.class=dev.ipf.whitenoise.android.core.nostr.Bip340PhysicalBenchmark \
-    --no-daemon --stacktrace
+  # Run both the fast correctness cases and the timed comparison on PRs.
+  exec ./gradlew :cryptoBenchmark:connectedReleaseAndroidTest --no-daemon --stacktrace
 fi
 
-exec ./gradlew :app:connectedDevZapstoreDebugAndroidTest \
+./gradlew :app:connectedDevZapstoreDebugAndroidTest \
   -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
+  --no-daemon --stacktrace
+
+# Keep real native verification covered after merge without timing the legacy
+# implementation on every master run. Explicit opt-in suites returned above.
+exec ./gradlew :cryptoBenchmark:connectedReleaseAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=dev.ipf.whitenoise.android.core.nostr.NostrEventVerifierInstrumentedTest \
   --no-daemon --stacktrace

@@ -8,11 +8,15 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ZapstoreAssetEventsTest {
+    // Domain policies inject decisions; real cryptography is covered by the native APK.
+    private val policy = ZapstoreAssetEventPolicy { false }
+
     @Test
     fun releaseWithoutAssetReferencesReturnsNull() {
         val releaseEvent = signedEvent(SIGNED_RELEASE_EVENT_JSON)
+        val policy = ZapstoreAssetEventPolicy { true }
         assertNull(
-            ZapstoreAssetEvents.assetEventIdsFromReleaseEvent(
+            policy.assetEventIdsFromReleaseEvent(
                 event = releaseEvent,
                 appId = APP_ID,
                 publisherPubkey = TEST_PUBLISHER_PUBKEY,
@@ -23,28 +27,14 @@ class ZapstoreAssetEventsTest {
 
     @Test
     fun selectUniqueApkAssetRejectsAmbiguousMatches() {
-        val asset =
-            NostrEvent(
-                id = ASSET_ID,
-                pubkey = TEST_PUBLISHER_PUBKEY,
-                createdAt = 1L,
-                kind = 3063,
-                tags =
-                    listOf(
-                        listOf("i", APP_ID),
-                        listOf("version", VERSION),
-                        listOf("x", SHA256),
-                        listOf("m", AndroidAbi.APK_MIME),
-                        listOf("f", PLATFORM_ID),
-                        listOf("url", "https://cdn.example.com/app.apk"),
-                    ),
-                content = "",
-                sig = "0".repeat(128),
-            )
+        val asset = assetEventWithComputedId(baseAssetTags())
+        val changed = asset.copy(createdAt = 2L)
+        val second = changed.copy(id = changed.computedIdHex())
+        val policy = ZapstoreAssetEventPolicy { true }
         assertNull(
-            ZapstoreAssetEvents.selectUniqueApkAsset(
-                events = listOf(asset, asset.copy(id = "b".repeat(64))),
-                referencedIds = setOf(ASSET_ID, "b".repeat(64)),
+            policy.selectUniqueApkAsset(
+                events = listOf(asset, second),
+                referencedIds = setOf(asset.id, second.id),
                 appId = APP_ID,
                 version = VERSION,
                 platformId = PLATFORM_ID,
@@ -74,7 +64,7 @@ class ZapstoreAssetEventsTest {
                 sig = "0".repeat(128),
             )
         assertNull(
-            ZapstoreAssetEvents.selectUniqueApkAsset(
+            policy.selectUniqueApkAsset(
                 events = listOf(asset),
                 referencedIds = setOf(ASSET_ID),
                 appId = APP_ID,
@@ -97,7 +87,7 @@ class ZapstoreAssetEventsTest {
                         ),
             )
         assertNull(
-            ZapstoreAssetEvents.assetEventIdsFromReleaseEvent(
+            policy.assetEventIdsFromReleaseEvent(
                 event = releaseEvent,
                 appId = APP_ID,
                 publisherPubkey = TEST_PUBLISHER_PUBKEY,
@@ -110,7 +100,7 @@ class ZapstoreAssetEventsTest {
     fun parseApkAssetTagsAcceptsAbsentSizeTag() {
         val event = assetEventWithComputedId(baseAssetTags())
         val asset =
-            ZapstoreAssetEvents.parseApkAssetTags(
+            policy.parseApkAssetTags(
                 event = event,
                 appId = APP_ID,
                 version = VERSION,
@@ -124,7 +114,7 @@ class ZapstoreAssetEventsTest {
     fun parseApkAssetTagsAcceptsPositiveDecimalSizeTag() {
         val event = assetEventWithComputedId(baseAssetTags() + listOf(listOf("size", "12345")))
         val asset =
-            ZapstoreAssetEvents.parseApkAssetTags(
+            policy.parseApkAssetTags(
                 event = event,
                 appId = APP_ID,
                 version = VERSION,
@@ -149,7 +139,7 @@ class ZapstoreAssetEventsTest {
             )
 
         assertNull(
-            ZapstoreAssetEvents.parseApkAssetTags(
+            policy.parseApkAssetTags(
                 event = malformed,
                 appId = APP_ID,
                 version = VERSION,
@@ -157,7 +147,7 @@ class ZapstoreAssetEventsTest {
             ),
         )
         assertNull(
-            ZapstoreAssetEvents.parseApkAssetTags(
+            policy.parseApkAssetTags(
                 event = zero,
                 appId = APP_ID,
                 version = VERSION,
@@ -165,7 +155,7 @@ class ZapstoreAssetEventsTest {
             ),
         )
         assertNull(
-            ZapstoreAssetEvents.parseApkAssetTags(
+            policy.parseApkAssetTags(
                 event = negative,
                 appId = APP_ID,
                 version = VERSION,
@@ -173,7 +163,7 @@ class ZapstoreAssetEventsTest {
             ),
         )
         assertNull(
-            ZapstoreAssetEvents.parseApkAssetTags(
+            policy.parseApkAssetTags(
                 event = duplicate,
                 appId = APP_ID,
                 version = VERSION,
@@ -222,7 +212,7 @@ class ZapstoreAssetEventsTest {
             )
 
         assertNull(
-            ZapstoreAssetEvents.parseApkAssetTags(
+            policy.parseApkAssetTags(
                 event = duplicateAppId,
                 appId = APP_ID,
                 version = VERSION,
@@ -230,7 +220,7 @@ class ZapstoreAssetEventsTest {
             ),
         )
         assertNull(
-            ZapstoreAssetEvents.parseApkAssetTags(
+            policy.parseApkAssetTags(
                 event = duplicateVersion,
                 appId = APP_ID,
                 version = VERSION,
@@ -238,7 +228,7 @@ class ZapstoreAssetEventsTest {
             ),
         )
         assertNull(
-            ZapstoreAssetEvents.parseApkAssetTags(
+            policy.parseApkAssetTags(
                 event = duplicateHash,
                 appId = APP_ID,
                 version = VERSION,
@@ -246,7 +236,7 @@ class ZapstoreAssetEventsTest {
             ),
         )
         assertNull(
-            ZapstoreAssetEvents.parseApkAssetTags(
+            policy.parseApkAssetTags(
                 event = duplicateMime,
                 appId = APP_ID,
                 version = VERSION,
@@ -259,7 +249,7 @@ class ZapstoreAssetEventsTest {
     fun parseApkAssetTagsReturnsFullyBoundAsset() {
         val event = assetEventWithComputedId(baseAssetTags() + listOf(listOf("size", "4096")))
         val asset =
-            ZapstoreAssetEvents.parseApkAssetTags(
+            policy.parseApkAssetTags(
                 event = event,
                 appId = APP_ID,
                 version = VERSION,
