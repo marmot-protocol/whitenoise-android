@@ -27,7 +27,7 @@ JVM fuzzing covers the parser and serialization roundtrip; cryptographic rejecti
 runs in this isolated Android APK using the real native library. Domain unit tests
 inject immutable verifier decisions and do not claim cryptographic validation.
 
-## Current MDK measurements
+## Recorded MDK adoption measurements
 
 The [2026-10-01 Pixel 6a samples](performance-data/bip340-mdk-2026-10-01-pixel6a.json)
 come from one guarded physical-device run of both minified release APKs on

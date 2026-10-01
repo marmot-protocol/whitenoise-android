@@ -45,28 +45,12 @@ class ZapstoreAssetEventsTest {
 
     @Test
     fun selectUniqueApkAssetRejectsUnverifiedEvents() {
-        val asset =
-            NostrEvent(
-                id = ASSET_ID,
-                pubkey = TEST_PUBLISHER_PUBKEY,
-                createdAt = 1L,
-                kind = 3063,
-                tags =
-                    listOf(
-                        listOf("i", APP_ID),
-                        listOf("version", VERSION),
-                        listOf("x", SHA256),
-                        listOf("m", AndroidAbi.APK_MIME),
-                        listOf("f", PLATFORM_ID),
-                        listOf("url", "https://cdn.example.com/app.apk"),
-                    ),
-                content = "",
-                sig = "0".repeat(128),
-            )
+        // All ID/tag/publisher checks pass, so only the rejecting verifier blocks this asset.
+        val asset = assetEventWithComputedId(baseAssetTags())
         assertNull(
             policy.selectUniqueApkAsset(
                 events = listOf(asset),
-                referencedIds = setOf(ASSET_ID),
+                referencedIds = setOf(asset.id),
                 appId = APP_ID,
                 version = VERSION,
                 platformId = PLATFORM_ID,
