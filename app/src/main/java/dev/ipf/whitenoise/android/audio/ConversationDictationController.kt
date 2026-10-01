@@ -567,6 +567,7 @@ internal class ConversationDictationController internal constructor(
     private var promotionReadyReceived = false
     private var promotionTimeoutHandle: ConversationDictationTimeoutHandle? = null
     private var recoveryTimeoutHandle: ConversationDictationTimeoutHandle? = null
+    private var recoveryDeadlineElapsedMillis: Long? = null
     private var pendingForegroundRecoverySessionId: Long? = null
     var foregroundMicrophoneRequired by mutableStateOf(true)
         private set
@@ -737,6 +738,7 @@ internal class ConversationDictationController internal constructor(
         replyToMessageIdHex: String?,
         mode: ConversationDictationMode,
     ): Boolean {
+        expireRetainedRecoveryIfDue()
         conversationDictationDiagnostic("event=request_start mode=${mode.name}")
         if (!targetAvailable(accountRef, groupIdHex)) {
             conversationDictationDiagnostic("event=request_start accepted=false reason=target_unavailable")
@@ -913,6 +915,7 @@ internal class ConversationDictationController internal constructor(
 
     /** Stops recognition and pastes the result into the immutable origin draft. */
     fun paste() {
+        if (expireRetainedRecoveryIfDue()) return
         val failed = state as? ConversationDictationState.Failed
         if (failed?.reason == ConversationDictationFailure.SendBlocked && !failed.retainedTranscript.isNullOrBlank()) {
             completionIntent.reset()
@@ -934,6 +937,7 @@ internal class ConversationDictationController internal constructor(
         deliveryMode: ConversationDictationDeliveryMode?,
         automatic: Boolean = false,
     ) {
+        if (expireRetainedRecoveryIfDue()) return
         val current = state
         val action = deliveryMode?.name ?: "Done"
         val source = if (automatic) "automatic" else "explicit"
@@ -1198,6 +1202,7 @@ internal class ConversationDictationController internal constructor(
 
     /** Recreates a failed session against the origin's current authoritative draft. */
     fun retry() {
+        if (expireRetainedRecoveryIfDue()) return
         val failed = state as? ConversationDictationState.Failed
         if (failed == null) {
             conversationDictationDiagnostic("event=retry accepted=false reason=not_failed")
@@ -1213,6 +1218,7 @@ internal class ConversationDictationController internal constructor(
         }
         recoveryTimeoutHandle?.cancel()
         recoveryTimeoutHandle = null
+        recoveryDeadlineElapsedMillis = null
         pendingForegroundRecoverySessionId = null
         notificationActionGeneration += 1L
         if (finishRequested && runCatching(platform::callerAudioHasPending).getOrDefault(false)) {
@@ -1337,6 +1343,7 @@ internal class ConversationDictationController internal constructor(
     /** Retries any deferred narrowing only after a real foreground return. */
     fun onAppForegrounded() {
         pendingForegroundRecoverySessionId = null
+        if (expireRetainedRecoveryIfDue()) return
         if (durableSession) {
             foregroundRefreshRevision += 1L
         } else {
@@ -1347,6 +1354,7 @@ internal class ConversationDictationController internal constructor(
 
     /** A foreground return cannot substitute for native recorder closure or disarm its watchdog. */
     private fun reattachForegroundRecoveryAfterClosure() {
+        if (expireRetainedRecoveryIfDue()) return
         val failed = state as? ConversationDictationState.Failed ?: return
         if (failed.retainedTranscript.isNullOrBlank() && !runCatching(platform::callerAudioHasPending).getOrDefault(false)) {
             pendingForegroundRecoverySessionId = null
@@ -2784,14 +2792,27 @@ internal class ConversationDictationController internal constructor(
     private fun protectRetainedRecovery(failed: ConversationDictationState.Failed) {
         recoveryTimeoutHandle?.cancel()
         recoveryTimeoutHandle = null
+        recoveryDeadlineElapsedMillis = null
         if (failed.retainedTranscript.isNullOrBlank() && !runCatching(platform::callerAudioHasPending).getOrDefault(false)) return
+        recoveryDeadlineElapsedMillis = elapsedRealtime() + RETAINED_RECOVERY_TIMEOUT_MILLIS
         recoveryTimeoutHandle =
             scheduleTimeout(RETAINED_RECOVERY_TIMEOUT_MILLIS) {
-                if (state === failed) {
-                    cancelSession()
-                    onRecoveryExpired()
-                }
+                if (state === failed) expireRetainedRecoveryIfDue()
             }
+    }
+
+    /** Elapsed time includes deep sleep, unlike Handler delivery; expire before accessing recovery. */
+    private fun expireRetainedRecoveryIfDue(): Boolean {
+        val deadline = recoveryDeadlineElapsedMillis ?: return false
+        if (state !is ConversationDictationState.Failed || elapsedRealtime() < deadline) return false
+        // Native disposal can synchronously acknowledge closure. Clear the deadline before that
+        // callback reenters recovery, so expiry cannot recursively dispose or show another notice.
+        recoveryDeadlineElapsedMillis = null
+        recoveryTimeoutHandle?.cancel()
+        recoveryTimeoutHandle = null
+        cancelSession()
+        onRecoveryExpired()
+        return true
     }
 
     /** Delivery, explicit dismissal and expiry end the logical foreground lease. */
@@ -3324,6 +3345,7 @@ internal class ConversationDictationController internal constructor(
     private fun resetTranscriptSession() {
         recoveryTimeoutHandle?.cancel()
         recoveryTimeoutHandle = null
+        recoveryDeadlineElapsedMillis = null
         accumulatedTranscript = ""
         pendingCompletedTranscript = ""
         finishRequested = false

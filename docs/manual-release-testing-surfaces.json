@@ -9833,6 +9833,18 @@
         ]
       },
       {
+        "surface": "string:notification_channel_dictation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+        "anchor": "R.string.notification_channel_dictation",
+        "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "string:paste",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "R.string.paste",
+        "test_ids": ["DIC-002"]
+      },
+      {
         "surface": "string:dictation_recovery_title",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
         "anchor": "R.string.dictation_recovery_title",

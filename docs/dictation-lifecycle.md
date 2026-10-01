@@ -65,7 +65,11 @@ under non-microphone `specialUse` protection for up to 30 minutes, showing only
 “Dictation needs attention” and Open app. Recovery never leaves recording
 Cancel/Paste/Send controls behind. Explicit dismissal, successful delivery,
 Paste recovery or expiry ends that lease and wipes remaining PCM. Expiry leaves
-one ordinary dismissible notice. Retry transcribes the sealed recording without
+one ordinary dismissible notice. The recovery deadline uses elapsed time, including
+deep sleep. Timer delivery, foreground return, native closure and recovery actions
+check that deadline before reattaching or accessing retained data. Cleanup runs
+when a callback executes; no wake lock or exact-alarm permission is added.
+Retry transcribes the sealed recording without
 opening a new microphone. If Android destroyed the service, a foreground return
 can reattach recovery; a rejected reattach preserves the existing failure/data. Every native closure acknowledgment uses the same logical-session fence. Returning before closure defers recovery reattachment and leaves the watchdog armed; leaving the foreground cancels that deferred request.
 

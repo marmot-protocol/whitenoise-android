@@ -2919,6 +2919,135 @@ class ConversationDictationControllerTest {
         assertEquals(1, expired)
     }
 
+    /** A sleeping device cannot reattach expired PCM before its delayed timer is dispatched. */
+    @Test
+    fun foregroundReturnExpiresRecoveryAfterSleepWithoutReattaching() {
+        var starts = 0
+        var expired = 0
+        val fixture =
+            fixture(draft = TextFieldValue(""), onRecoveryExpired = { expired++ }, startDurableSession = { _, ready ->
+                starts++
+                ready()
+                true
+            })
+        fixture.platform.pendingCallerAudio = true
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.tracksCallerAudioDisposal = true
+        fixture.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
+        val delayedExpiry = fixture.scheduler.latestCallback()
+        fixture.controller.onDurableServiceDestroyed(requireNotNull(fixture.controller.notificationSessionToken))
+        fixture.scheduler.sleepWithoutDispatch(30 * 60 * 1_000L)
+        fixture.controller.onAppForegrounded()
+        delayedExpiry()
+        fixture.controller.onAppForegrounded()
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        assertFalse(fixture.platform.pendingCallerAudio)
+        assertFalse(fixture.controller.hasDurableSession)
+        assertEquals(1, fixture.platform.discardedCallerAudio)
+        assertEquals(1, starts)
+        assertEquals(1, expired)
+        assertEquals(0, fixture.writes)
+    }
+
+    /** A direct Retry also enforces elapsed expiry when the app-resume callback was withheld. */
+    @Test
+    fun retryCannotTranscribeExpiredPcmAfterSleep() {
+        var expired = 0
+        val fixture = fixture(draft = TextFieldValue(""), onRecoveryExpired = { expired++ })
+        fixture.platform.pendingCallerAudio = true
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.tracksCallerAudioDisposal = true
+        fixture.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
+        val sessions = fixture.platform.sessions.size
+        fixture.scheduler.sleepWithoutDispatch(35 * 60 * 1_000L)
+        fixture.controller.retry()
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        assertFalse(fixture.platform.pendingCallerAudio)
+        assertEquals(sessions, fixture.platform.sessions.size)
+        assertEquals(1, expired)
+        assertEquals(0, fixture.writes)
+    }
+
+    /** Neither transcript recovery action may dispatch or paste after an undispatched sleep deadline. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun expiredSendFailureCannotRetryOrPasteItsTranscript() =
+        runTest {
+            for (paste in listOf(false, true)) {
+                var sends = 0
+                var expired = 0
+                val fixture =
+                    fixture(
+                        draft = TextFieldValue(""),
+                        targetValidationScope = this,
+                        onRecoveryExpired = { expired++ },
+                        sendTranscriptIfOriginUnchanged = {
+                            sends++
+                            false
+                        },
+                    )
+                fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+                fixture.controller.send()
+                fixture.platform.listener.onResult("retained body")
+                advanceUntilIdle()
+                val failed = fixture.controller.state as ConversationDictationState.Failed
+                assertEquals(ConversationDictationFailure.SendBlocked, failed.reason)
+                assertEquals("retained body", failed.retainedTranscript)
+                assertEquals(1, sends)
+                fixture.scheduler.sleepWithoutDispatch(30 * 60 * 1_000L)
+                if (paste) fixture.controller.paste() else fixture.controller.retry()
+                advanceUntilIdle()
+                assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+                assertEquals(1, sends)
+                assertEquals(1, expired)
+                assertEquals(0, fixture.writes)
+            }
+        }
+
+    /** Expiring an old request permits a fresh capture and fences even a queued old timer callback. */
+    @Test
+    fun freshStartAfterSleepCannotBeExpiredByOldRecoveryCallback() {
+        var expired = 0
+        val fixture = fixture(draft = TextFieldValue(""), onRecoveryExpired = { expired++ })
+        fixture.platform.pendingCallerAudio = true
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.tracksCallerAudioDisposal = true
+        fixture.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
+        val delayedExpiry = fixture.scheduler.latestCallback()
+        fixture.scheduler.sleepWithoutDispatch(30 * 60 * 1_000L)
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        val replacement = fixture.controller.state
+        assertTrue(replacement is ConversationDictationState.Starting)
+        delayedExpiry()
+        assertTrue(fixture.controller.state === replacement)
+        assertTrue(fixture.controller.hasDurableSession)
+        assertEquals(1, expired)
+    }
+
+    /** Recovery remains usable just before the elapsed deadline, including after deep sleep. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun pasteBeforeElapsedDeadlineCompletesAndFencesOldExpiry() =
+        runTest {
+            var expired = 0
+            val fixture = fixture(draft = TextFieldValue(""), targetValidationScope = this, onRecoveryExpired = { expired++ })
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.controller.send()
+            fixture.platform.listener.onResult("retained body")
+            advanceUntilIdle()
+            assertTrue(fixture.controller.state is ConversationDictationState.Failed)
+            val delayedExpiry = fixture.scheduler.latestCallback()
+            fixture.scheduler.sleepWithoutDispatch(30 * 60 * 1_000L - 1L)
+            fixture.controller.paste()
+            advanceUntilIdle()
+            fixture.scheduler.sleepWithoutDispatch(1L)
+            delayedExpiry()
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+            assertEquals("retained body", fixture.drafts.getValue(key()).text)
+            assertEquals(0, expired)
+            assertEquals(1, fixture.writes)
+        }
+
     /** A failed reattach or recents swipe preserves existing failure text and its expiry. */
     @Test
     fun lostRecoveryRecordCanReattachWithoutOpeningCaptureOrErasingFailure() {
@@ -5945,6 +6074,14 @@ class ConversationDictationControllerTest {
         private var currentTimeMillis = 100L
 
         fun now(): Long = currentTimeMillis
+
+        /** Deep sleep advances elapsed time while Handler callbacks remain undispatched. */
+        fun sleepWithoutDispatch(delayMillis: Long) {
+            currentTimeMillis += delayMillis
+        }
+
+        /** Captures a queued callback so tests can invoke it even after cancellation. */
+        fun latestCallback(): () -> Unit = tasks.last { !it.cancelled && !it.ran }.callback
 
         fun schedule(
             delayMillis: Long,
