@@ -4,7 +4,13 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.Looper
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -71,6 +77,7 @@ import dev.ipf.whitenoise.android.state.retainedAvatarBytesReader
 import dev.ipf.whitenoise.android.ui.chats.ChatRow
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
+import dev.ipf.whitenoise.android.ui.common.PreparedVisibleGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.conversationGroupAvatarAsset
 import dev.ipf.whitenoise.android.ui.common.rememberConversationGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberDurableAvatar
@@ -548,6 +555,55 @@ class GroupAvatarLocalAssetScreenshotTest {
         composeRule.runOnIdle { AvatarImageLoader.clearStoredAvatars() }
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Edited draft").assertExists()
+    }
+
+    @Test
+    fun sameAccountRuntimeReplacementPreservesEditableSurfaceState() {
+        val fixture = AvatarLocalFixture { emptyList() }
+        composeRule.setContent {
+            PreparedGroupAvatarContent(fixture.state, emptyList()) {
+                var draft by rememberSaveable { mutableStateOf("Original") }
+                Button(onClick = { draft = "Edited draft" }) { Text(draft) }
+            }
+        }
+        composeRule.onNodeWithText("Original").performClick()
+        composeRule.runOnIdle {
+            WhiteNoiseAppState::class.java
+                .getDeclaredMethod("applyDestructiveWipeRuntimeState", DestructiveAccountWipeRuntimeState::class.java)
+                .apply { isAccessible = true }
+                .invoke(
+                    fixture.state,
+                    DestructiveAccountWipeRuntimeState(ACCOUNT_REF, null, null, fixture.state.runtimeGeneration + 1),
+                )
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Edited draft").assertExists()
+    }
+
+    @Test
+    fun scrollingWithinTheSameAvatarWindowDoesNotRecomposeListContent() {
+        val fixture = AvatarLocalFixture { emptyList() }
+        val listState = LazyListState()
+        val rows = (0 until 30).map { "group-$it" }
+        val compositions = AtomicInteger()
+        composeRule.setContent {
+            PreparedVisibleGroupAvatarContent(fixture.state, rows, listState, { it }, { null }) {
+                SideEffect { compositions.incrementAndGet() }
+                LazyColumn(Modifier.height(200.dp).fillMaxWidth(), state = listState) {
+                    items(rows, key = { it }) { row ->
+                        Box(Modifier.height(100.dp)) { Text(row) }
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        val initial = compositions.get()
+        for (offset in 1..5) {
+            composeRule.runOnIdle { runBlocking { listState.scrollToItem(0, offset) } }
+            composeRule.waitForIdle()
+            assertEquals(offset, listState.firstVisibleItemScrollOffset)
+            assertEquals(initial, compositions.get())
+        }
     }
 
     /** A same-account runtime generation replacement cannot reuse private pixels from the old runtime. */

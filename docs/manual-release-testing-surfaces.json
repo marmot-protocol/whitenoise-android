@@ -3,6 +3,12 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "PreparedVisibleGroupAvatarContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/PreparedGroupAvatarContent.kt",
+        "anchor": "fun <T> PreparedVisibleGroupAvatarContent(",
+        "test_ids": ["CHL-017"]
+      },
+      {
         "surface": "Stored avatar export failure",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AvatarViewer.kt",
         "anchor": "Stored avatar is no longer available",
@@ -13,6 +19,12 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/PreparedGroupAvatarContent.kt",
         "anchor": "fun PreparedGroupAvatarContent(",
         "test_ids": ["CHL-017"]
+      },
+      {
+        "surface": "Composer cursor updates during dictation Send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ComposerDraftExpansionBridge.kt",
+        "anchor": "fun setDraft(",
+        "test_ids": ["DIC-002"]
       },
       {
         "surface": "Offline speech disclosure title",
@@ -1227,6 +1239,15 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ConnectivityBannerEffects.kt",
         "anchor": "fun ConnectivityEdgeRefreshEffects(",
         "test_ids": [
+          "INT-008"
+        ]
+      },
+      {
+        "surface": "rememberChatListPollingStopped",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ConnectivityBannerEffects.kt",
+        "anchor": "fun rememberChatListPollingStopped(",
+        "test_ids": [
+          "INT-007",
           "INT-008"
         ]
       },

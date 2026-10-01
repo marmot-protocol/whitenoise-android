@@ -1,10 +1,14 @@
 package dev.ipf.whitenoise.android.ui.common
 
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.produceState
-import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.ImageBitmap
 import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
@@ -14,7 +18,29 @@ import dev.ipf.whitenoise.android.state.durableAvatar
 import dev.ipf.whitenoise.android.state.isRenderable
 import kotlinx.coroutines.withTimeoutOrNull
 
-internal val LocalPreparedGroupAvatarPixels = staticCompositionLocalOf<PreparedGroupAvatarPixels?> { null }
+internal val LocalPreparedGroupAvatarPixels = compositionLocalOf<PreparedGroupAvatarPixels?> { null }
+
+/** Scroll offsets are observed in this scope; unchanged row windows do not invalidate list content. */
+@Composable
+@Suppress("FunctionNaming")
+internal fun <T> PreparedVisibleGroupAvatarContent(
+    appState: WhiteNoiseAppState,
+    rows: List<T>,
+    listState: LazyListState,
+    rowKey: (T) -> String,
+    assetForRow: (T) -> AvatarAssetFfi?,
+    accountRef: String? = appState.activeAccountRef,
+    surfaceIdentity: Any? = null,
+    content: @Composable () -> Unit,
+) {
+    val assets by remember(rows, listState, rowKey, assetForRow) {
+        derivedStateOf {
+            visibleGroupAvatarWindow(rows, listState.layoutInfo.visibleItemsInfo.map { it.key }, rowKey)
+                .mapNotNull(assetForRow)
+        }
+    }
+    PreparedGroupAvatarContent(appState, assets, accountRef, surfaceIdentity, content)
+}
 
 /**
  * Primes validated local assets without withholding navigation or editable screen state. Local
@@ -40,11 +66,11 @@ internal fun PreparedGroupAvatarContent(
             .take(VISIBLE_GROUP_AVATAR_LIMIT)
             .toList()
     val preparation = rememberAvatarPixelPreparation(appState, selected, accountRef, lifetime, surfaceIdentity)
-    // The provider updates image bindings; never key the screen subtree on a cache lifetime.
-    key(appState, appState.runtimeGeneration, accountRef, surfaceIdentity) {
+    // Runtime and cache changes fence pixels; they must not recreate same-account editable state.
+    key(appState, accountRef, surfaceIdentity) {
         CompositionLocalProvider(
             LocalPreparedGroupAvatarPixels provides
-                PreparedGroupAvatarPixels(accountRef, lifetime, preparation.images),
+                PreparedGroupAvatarPixels(accountRef, appState.runtimeGeneration, lifetime, preparation.images),
             content = content,
         )
     }

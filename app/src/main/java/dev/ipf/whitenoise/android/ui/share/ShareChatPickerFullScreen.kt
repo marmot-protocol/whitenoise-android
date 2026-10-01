@@ -67,12 +67,11 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
 import dev.ipf.whitenoise.android.ui.chats.newchat.SectionHeader
 import dev.ipf.whitenoise.android.ui.chats.newchat.SelectionIndicator
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
-import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
+import dev.ipf.whitenoise.android.ui.common.PreparedVisibleGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
-import dev.ipf.whitenoise.android.ui.common.visibleGroupAvatarWindow
 import dev.ipf.whitenoise.android.ui.conversation.messages.forwardTargetAvatarAccount
 import dev.ipf.whitenoise.android.ui.conversation.messages.forwardTargetMembersPreview
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
@@ -352,13 +351,13 @@ private fun ShareChatPickerTargetList(
     modifier: Modifier,
     listState: androidx.compose.foundation.lazy.LazyListState,
 ) {
-    PreparedGroupAvatarContent(
+    PreparedVisibleGroupAvatarContent(
         pickerState.appState,
-        visibleGroupAvatarWindow(
-            filteredTargets,
-            listState.layoutInfo.visibleItemsInfo.map { it.key },
-        ) { it.item.group.groupIdHex }.mapNotNull { it.item.selectedAvatarAsset },
-        pickerState.selectedAccountRef,
+        filteredTargets,
+        listState,
+        { it.item.group.groupIdHex },
+        { it.item.selectedAvatarAsset },
+        accountRef = pickerState.selectedAccountRef,
     ) {
         LazyColumn(
             modifier = modifier.fillMaxWidth(),
