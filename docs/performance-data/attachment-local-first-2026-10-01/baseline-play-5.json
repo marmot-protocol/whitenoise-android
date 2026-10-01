@@ -1,0 +1,207 @@
+{
+  "schema": 1,
+  "scope": "android-host-resolver-packaged-native",
+  "metrics": [
+    {
+      "phase": "fixture-stage",
+      "stage": "upload-published"
+    },
+    {
+      "phase": "fixture-stage",
+      "stage": "received-projected"
+    },
+    {
+      "phase": "received-cold",
+      "success": true,
+      "payload_bytes": 1024,
+      "elapsed_ms": 283.417959,
+      "java_peak_bytes": 8583584,
+      "native_peak_bytes": 61584448
+    },
+    {
+      "phase": "received-retained",
+      "success": true,
+      "payload_bytes": 1024,
+      "elapsed_ms": 11.094916,
+      "java_peak_bytes": 8766000,
+      "native_peak_bytes": 61639600
+    },
+    {
+      "phase": "received-retained",
+      "success": true,
+      "payload_bytes": 1024,
+      "elapsed_ms": 9.1325,
+      "java_peak_bytes": 8930960,
+      "native_peak_bytes": 61662224
+    },
+    {
+      "phase": "received-retained",
+      "success": true,
+      "payload_bytes": 1024,
+      "elapsed_ms": 6.48575,
+      "java_peak_bytes": 9079936,
+      "native_peak_bytes": 61686848
+    },
+    {
+      "phase": "received-retained",
+      "success": true,
+      "payload_bytes": 1024,
+      "elapsed_ms": 5.709875,
+      "java_peak_bytes": 9193368,
+      "native_peak_bytes": 61700400
+    },
+    {
+      "phase": "received-retained",
+      "success": true,
+      "payload_bytes": 1024,
+      "elapsed_ms": 4.309917,
+      "java_peak_bytes": 9260424,
+      "native_peak_bytes": 61718816
+    },
+    {
+      "phase": "received-retained",
+      "success": true,
+      "payload_bytes": 1024,
+      "elapsed_ms": 4.355042,
+      "java_peak_bytes": 9425784,
+      "native_peak_bytes": 61737536
+    },
+    {
+      "phase": "received-retained",
+      "success": true,
+      "payload_bytes": 1024,
+      "elapsed_ms": 4.401291,
+      "java_peak_bytes": 9525608,
+      "native_peak_bytes": 66354704
+    },
+    {
+      "phase": "received-retained",
+      "success": true,
+      "payload_bytes": 1024,
+      "elapsed_ms": 3.886042,
+      "java_peak_bytes": 9625432,
+      "native_peak_bytes": 61774784
+    },
+    {
+      "phase": "received-retained",
+      "success": true,
+      "payload_bytes": 1024,
+      "elapsed_ms": 4.673042,
+      "java_peak_bytes": 9758024,
+      "native_peak_bytes": 61797568
+    },
+    {
+      "phase": "received-retained",
+      "success": true,
+      "payload_bytes": 1024,
+      "elapsed_ms": 3.928292,
+      "java_peak_bytes": 9857848,
+      "native_peak_bytes": 61813712
+    },
+    {
+      "phase": "genuine-native-send-retention",
+      "available": false,
+      "android_send_controller_qualified": false,
+      "restart_offline_qualified": false
+    },
+    {
+      "phase": "received-native-reopen-unavailable-endpoint",
+      "success": true,
+      "payload_bytes": 1024,
+      "elapsed_ms": 7.317458,
+      "java_peak_bytes": 12152456,
+      "native_peak_bytes": 104813872
+    }
+  ],
+  "qualified": true,
+  "instrumentation_passed": true,
+  "ledger": [
+    {
+      "seq": 1,
+      "request": null,
+      "fixture": "upload-ad29121e59880153",
+      "kind": "upload",
+      "value": 1040,
+      "at_ns": 1790868843801521000
+    },
+    {
+      "seq": 2,
+      "request": 1,
+      "fixture": "upload-ad29121e59880153",
+      "kind": "upload_bytes",
+      "value": 1040,
+      "at_ns": 1790868843803122000
+    },
+    {
+      "seq": 3,
+      "request": 1,
+      "fixture": "upload-ad29121e59880153",
+      "kind": "upload_complete",
+      "value": 0,
+      "at_ns": 1790868843805551000
+    },
+    {
+      "seq": 4,
+      "request": null,
+      "fixture": "upload-ad29121e59880153",
+      "kind": "get",
+      "value": 0,
+      "at_ns": 1790868845229759000
+    },
+    {
+      "seq": 5,
+      "request": 4,
+      "fixture": "upload-ad29121e59880153",
+      "kind": "range_offset",
+      "value": 0,
+      "at_ns": 1790868845230988000
+    },
+    {
+      "seq": 6,
+      "request": 4,
+      "fixture": "upload-ad29121e59880153",
+      "kind": "status",
+      "value": 200,
+      "at_ns": 1790868845232393000
+    },
+    {
+      "seq": 7,
+      "request": 4,
+      "fixture": "upload-ad29121e59880153",
+      "kind": "body_bytes",
+      "value": 1040,
+      "at_ns": 1790868845233206000
+    },
+    {
+      "seq": 8,
+      "request": 4,
+      "fixture": "upload-ad29121e59880153",
+      "kind": "complete",
+      "value": 0,
+      "at_ns": 1790868845233790000
+    },
+    {
+      "seq": 9,
+      "request": null,
+      "fixture": "control",
+      "kind": "acquisition_unavailable",
+      "value": 0,
+      "at_ns": 1790868845497487000
+    }
+  ],
+  "http_acquisition_requests": 1,
+  "http_get_requests": 1,
+  "http_head_requests": 0,
+  "http_upload_requests": 1,
+  "uploaded_ciphertext_bytes": 1040,
+  "successful_ciphertext_body_write_bytes": 1040,
+  "deferred": [
+    "platform-worker-lifetime",
+    "external-handoff",
+    "process-restart-offline",
+    "android-controller-genuine-send",
+    "mdk-large-received-sender",
+    "physical-device"
+  ],
+  "reverse_cleanup_failed": false
+}
