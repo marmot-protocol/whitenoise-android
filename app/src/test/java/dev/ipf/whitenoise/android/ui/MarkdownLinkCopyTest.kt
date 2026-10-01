@@ -48,6 +48,7 @@ class MarkdownLinkCopyTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Long-pressing an autolink copies its URL and never reaches the parent row's long-press actions. */
     @Test
     fun longPressingAutolinkCopiesItsUrlInsteadOfOpeningParentActions() {
         val url = "https://example.com/page"
@@ -69,6 +70,7 @@ class MarkdownLinkCopyTest {
         )
     }
 
+    /** Long-pressing a labelled link copies its destination, not the visible label. */
     @Test
     fun longPressingExplicitLinkCopiesDestinationInsteadOfLabel() {
         val destination = "https://example.com/destination"
@@ -179,6 +181,7 @@ class MarkdownLinkCopyTest {
         composeRule.runOnIdle { assertEquals(url, copiedUrl) }
     }
 
+    /** Long-presses [visibleText] in a rendered [document] and reports what was copied and forwarded. */
     private fun longPress(
         document: MarkdownDocumentFfi,
         visibleText: String,
@@ -271,6 +274,7 @@ class MarkdownLinkCopyTest {
         return LongPressResult(copiedUrl, parentLongPresses)
     }
 
+    /** Resolves [resId] against the test application context. */
     private fun string(resId: Int): String {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         return context.getString(resId)
@@ -288,6 +292,7 @@ class MarkdownLinkCopyTest {
         ),
     )
 
+    /** Wraps a single [inline] in a one-paragraph document. */
     private fun paragraphDocument(inline: MarkdownInlineFfi) =
         MarkdownDocumentFfi(
             truncated = false,

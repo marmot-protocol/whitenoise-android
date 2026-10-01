@@ -372,12 +372,14 @@ class MarkdownInlineTextTest {
         assertEquals("mailto:user@example.com", (link.item as LinkAnnotation.Url).url)
     }
 
-    /** A bare `www.` autolink keeps its typed text but opens the synthesized `https://` destination. */
+    /** A bare `www.` autolink keeps its typed text but opens `https://`, keeping ports and ASCII-encoding IDN hosts. */
     @Test
     fun wwwAutolinkOpensThroughHttps() {
         listOf(
             "www.example.network/path?q=1#top" to "https://www.example.network/path?q=1#top",
             "www.example.chat" to "https://www.example.chat",
+            "www.example.com:8443/x" to "https://www.example.com:8443/x",
+            "www.bücher.example" to "https://www.xn--bcher-kva.example",
         ).forEach { (typed, destination) ->
             val annotated = build(listOf(wwwAutolink(typed)))
             assertEquals(typed, annotated.text)
@@ -406,10 +408,15 @@ class MarkdownInlineTextTest {
         assertEquals(23, link.end)
     }
 
-    /** `https://` synthesis never makes a malformed or non-`www.` WWW autolink tappable. */
+    /** `https://` synthesis never makes a malformed, userinfo-spoofed or non-`www.` WWW autolink tappable. */
     @Test
     fun wwwSynthesisCannotOpenMalformedOrNonWwwText() {
-        listOf("javascript:alert(1)", "www.exa mple.com", "example.network").forEach { typed ->
+        listOf(
+            "javascript:alert(1)",
+            "www.exa mple.com",
+            "example.network",
+            "www.example.com@evil.example",
+        ).forEach { typed ->
             val annotated = build(listOf(wwwAutolink(typed)))
             assertEquals(typed, annotated.text)
             assertTrue(typed, annotated.getLinkAnnotations(0, annotated.length).isEmpty())
@@ -437,6 +444,7 @@ class MarkdownInlineTextTest {
             MarkdownLinkDestinationKindFfi.WEB,
         )
 
+    /** Only http, https and mailto open, case-insensitively — every other scheme stays inert. */
     @Test
     fun schemeAllowlistAdmitsExactlyTheExternalSchemes() {
         // Allowed, case-insensitively.
