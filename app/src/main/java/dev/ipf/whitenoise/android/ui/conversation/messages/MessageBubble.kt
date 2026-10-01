@@ -2445,7 +2445,7 @@ internal fun MessageBubble(
                     canEdit = !actionsReadOnly && mine && record.kind == 9uL && record.messageIdHex.isNotBlank() && !deleted,
                     canForward = !deleted && !actionsReadOnly && forwardPayload != null,
                     forwardBlockedReason =
-                        if (!deleted && !actionsReadOnly) {
+                        if (!isPollRecord && !deleted && !actionsReadOnly) {
                             (forwardEligibility as? ForwardEligibility.Blocked)?.reason
                         } else {
                             null

@@ -22,6 +22,7 @@ import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_PICKER_TEST_TAG
+import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_DETAILS_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleRowTestTag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -85,6 +86,19 @@ class PollMessageActionsTest : PollMessageTestFixtures() {
             assertEquals(item.record.messageIdHex, pollController.replyingTo?.messageIdHex)
             assertTrue(recordedCalls().none { it.first == "castPollVote" })
         }
+    }
+
+    @Test fun pollDetailsAndUnsupportedActionsNeverShowTheEnvelope() {
+        val item = render(closed = true)
+        composeRule
+            .onNodeWithTag(messageBubbleRowTestTag(item.record.messageIdHex))
+            .performSemanticsAction(SemanticsActions.OnLongClick) { it() }
+        composeRule.onNodeWithText("Forward").assertDoesNotExist()
+        composeRule.onNodeWithText("Speak aloud").assertDoesNotExist()
+        composeRule.onNodeWithText("Info").performClick()
+        composeRule.onNodeWithTag(MESSAGE_DETAILS_TAG).assertExists()
+        composeRule.onNodeWithText("private-envelope", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("Poll").assertExists()
     }
 
     @Test fun optionTapUsesNativePollTargetAndDoesNotReply() {
@@ -170,11 +184,12 @@ class PollMessageActionsTest : PollMessageTestFixtures() {
         pollMessage(
             closed,
             mine = pending || failed,
-            status = when {
-                failed -> MessageStatus.Failed
-                pending -> MessageStatus.Pending
-                else -> MessageStatus.Received
-            },
+            status =
+                when {
+                    failed -> MessageStatus.Failed
+                    pending -> MessageStatus.Pending
+                    else -> MessageStatus.Received
+                },
         ).also { item ->
             retain(item)
             composeRule.setContent {

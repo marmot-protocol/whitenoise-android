@@ -16,6 +16,7 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_ACTION_REACTI
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleRowTestTag
 import dev.ipf.whitenoise.android.ui.conversation.reactions.REACTION_PILL_TEST_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import java.time.Duration
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -29,7 +30,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
-import java.time.Duration
 
 /** Poll discussion shares native reaction admission, rollback and event-scoped removal. */
 @RunWith(RobolectricTestRunner::class)

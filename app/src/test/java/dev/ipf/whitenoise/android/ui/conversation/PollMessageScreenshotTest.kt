@@ -19,6 +19,8 @@ import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_ACTION_MENU_TEST_TAG
+import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_DETAILS_TAG
+import dev.ipf.whitenoise.android.ui.conversation.messages.MessageDetailsScreen
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -58,6 +60,28 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
     @Test fun pollActionMenuLight() = render("menu_light", PollScreenshotConfiguration(menu = true))
 
     @Test fun pollReplyComposerAmoled() = render("reply_amoled", PollScreenshotConfiguration(dark = true, amoled = true, reply = true, closed = true))
+
+    @Test fun pollInfoLight() {
+        val item = pollMessage(closed = true)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                MessageDetailsScreen(
+                    record = item.record,
+                    status = item.status,
+                    mine = false,
+                    senderDisplayName = "Alice",
+                    senderNpub = "npub-${item.record.sender}",
+                    senderAvatarUrl = null,
+                    reactions = emptyList(),
+                    recipients = emptyList(),
+                    attachmentLabels = emptyList(),
+                    onDismissRequest = {},
+                    onCopy = {},
+                )
+            }
+        }
+        composeRule.onNodeWithTag(MESSAGE_DETAILS_TAG).captureRoboImage("src/test/snapshots/poll_message_info_light.png")
+    }
 
     private fun render(
         name: String,

@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.TimelineReplyPreviewFfi
+import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableSource
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.TimelineProjector
@@ -90,6 +91,8 @@ class PollMessageEligibilityTest : PollMessageTestFixtures() {
     @Test fun pollReplyCopyNeverExposesEnvelope() {
         val item = pollMessage()
         assertTrue(MessageProjector.displayBody(item.record, MessageTextCopy.Default) == "Poll")
+        assertNull(MessageProjector.copyableText(item.record))
+        assertNull(resolveTtsSpeakableSource(item.record, editedText = null))
     }
 
     @Test fun composerAndReceivedQuoteUseLocalizedPollCopy() {

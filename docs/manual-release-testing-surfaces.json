@@ -4976,7 +4976,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
         "anchor": "fun MessageDetailsContentCard(",
         "test_ids": [
-          "MSG-001"
+          "MSG-001",
+          "MSG-026"
         ]
       },
       {
@@ -4984,7 +4985,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
         "anchor": "fun MessageDetailsScreen(",
         "test_ids": [
-          "MSG-001"
+          "MSG-001",
+          "MSG-026"
         ]
       },
       {
