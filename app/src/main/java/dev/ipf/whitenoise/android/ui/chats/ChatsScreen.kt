@@ -1421,7 +1421,10 @@ internal fun ChatsScreen(
                             },
                             onDelete = { pendingBulkDelete = listOf(item) },
                             onLeaveAndDelete =
-                                if (!item.isDm() && !item.group.leaveRequestPending && item.projection?.leaveRequestPending != true) {
+                                if (!item.isDm() &&
+                                    !item.group.leaveRequestPending &&
+                                    item.projection?.leaveRequestPending != true
+                                ) {
                                     { pendingLeaveAndDelete = item }
                                 } else {
                                     null

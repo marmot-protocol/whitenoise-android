@@ -606,7 +606,10 @@ class ComposerExpansionDestructiveLifecycleTest {
             try {
                 assertFalse(controller.leaveAndDeleteFromChatList(GROUP_ID))
                 assertEquals(listOf("leave"), fixture.calls.order)
-                assertEquals(retained, fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+                assertEquals(
+                    retained,
+                    fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID),
+                )
             } finally {
                 controller.onCleared()
             }
@@ -804,7 +807,9 @@ class ComposerExpansionDestructiveLifecycleTest {
                 "chatList" -> {
                     calls.chatList.incrementAndGet()
                     if (localGroupPresent) {
-                        listOf(groupRow().copy(selfMembership = if (left) SelfMembershipFfi.LEFT else SelfMembershipFfi.MEMBER))
+                        listOf(
+                            groupRow().copy(selfMembership = if (left) SelfMembershipFfi.LEFT else SelfMembershipFfi.MEMBER),
+                        )
                     } else {
                         emptyList<ChatListRowFfi>()
                     }

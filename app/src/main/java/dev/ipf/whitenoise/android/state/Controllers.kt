@@ -4615,7 +4615,9 @@ class ChatsController private constructor(
                 removeChatRow(groupIdHex)
                 finishRemovedChatRowClientState(groupIdHex)
             }
-            appState.presentTransient(if (deleteAfterLeave) R.string.toast_chat_deleted_local else R.string.toast_left_chat)
+            appState.presentTransient(
+                if (deleteAfterLeave) R.string.toast_chat_deleted_local else R.string.toast_left_chat,
+            )
             true
         }
     }
@@ -4638,7 +4640,8 @@ class ChatsController private constructor(
     }
 
     /** Explicit single-chat departure; unconfirmed leave never admits local deletion. */
-    suspend fun leaveAndDeleteFromChatList(groupIdHex: String): Boolean = leaveGroup(groupIdHex, deleteAfterLeave = true)
+    suspend fun leaveAndDeleteFromChatList(groupIdHex: String): Boolean =
+        leaveGroup(groupIdHex, deleteAfterLeave = true)
 
     /**
      * Local-only chat-list wipe: hide the row optimistically, run client cleanup
