@@ -132,8 +132,7 @@ internal fun ChatListSelectionControls(
             modifier =
                 Modifier
                     .heightIn(min = 40.dp)
-                    .testTag("chats.selectAllAction")
-                    .semantics { contentDescription = selectAllLabel },
+                    .testTag("chats.selectAllAction"),
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
         ) {
             Text(selectAllLabel, style = MaterialTheme.typography.labelMedium, maxLines = 1)

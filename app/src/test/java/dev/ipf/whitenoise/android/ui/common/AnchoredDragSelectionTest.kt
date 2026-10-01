@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
@@ -69,9 +70,9 @@ class AnchoredDragSelectionTest {
         assertEquals(12f, dragSelectionAutoScrollDelta(100f, 0f, 100f, 20f, 12f))
     }
 
-    /** Real reversed list offsets must resolve the physical row above and below an anchor. */
+    /** Native reversed offsets resolve rows at both padded viewport edges after a resize. */
     @Test
-    fun reverseLazyListEndpointFollowsPhysicalRowsAfterViewportShrinks() {
+    fun reverseLazyListEndpointFollowsPaddedPhysicalRowsAfterViewportShrinks() {
         val ids = listOf("newest", "middle", "oldest")
         val listState = LazyListState()
         val height = mutableStateOf(300.dp)
@@ -81,6 +82,7 @@ class AnchoredDragSelectionTest {
             LazyColumn(
                 state = listState,
                 reverseLayout = true,
+                contentPadding = PaddingValues(top = 24.dp, bottom = 32.dp),
                 modifier =
                     Modifier
                         .size(width = 240.dp, height = height.value)
@@ -99,23 +101,33 @@ class AnchoredDragSelectionTest {
 
         fun assertPhysicalEndpoints() {
             composeRule.runOnIdle {
-                val top = checkNotNull(viewportBounds).top
+                val viewport = checkNotNull(viewportBounds)
                 val layout = listState.layoutInfo
+                assertTrue(layout.beforeContentPadding > 0)
                 val visible =
                     layout.visibleItemsInfo.map {
                         DragSelectionVisibleItem(it.key as String, it.offset.toFloat(), (it.offset + it.size).toFloat())
                     }
-                ids.forEach { id ->
-                    assertEquals(
-                        id,
-                        reverseLazyListDragSelectionEndpoint(
-                            visibleItems = visible,
-                            pointerWindowY = checkNotNull(rowBounds[id]).center.y,
-                            viewportWindowTop = top,
-                            viewportHeight = layout.viewportSize.height,
-                        ),
-                    )
+                var sampledRows = 0
+                visible.forEach { item ->
+                    val bounds = checkNotNull(rowBounds[item.key])
+                    val visibleTop = maxOf(bounds.top, viewport.top)
+                    val visibleBottom = minOf(bounds.bottom, viewport.bottom)
+                    if (visibleBottom - visibleTop <= 4f) return@forEach
+                    sampledRows++
+                    listOf(visibleTop + 2f, visibleBottom - 2f).forEach { pointerY ->
+                        assertEquals(
+                            item.key,
+                            reverseLazyListDragSelectionEndpoint(
+                                visibleItems = visible,
+                                pointerWindowY = pointerY,
+                                viewportWindowTop = viewport.top,
+                                viewportHeight = layout.viewportSize.height - layout.beforeContentPadding,
+                            ),
+                        )
+                    }
                 }
+                assertTrue(sampledRows >= 2)
             }
         }
 
