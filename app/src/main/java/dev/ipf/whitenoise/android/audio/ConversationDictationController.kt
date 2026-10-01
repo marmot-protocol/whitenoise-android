@@ -646,7 +646,10 @@ internal class ConversationDictationController internal constructor(
     private val hasPendingCompletion: Boolean
         get() =
             inActiveRecognitionState &&
-                (activeRecognitionGenerationId != null || state is ConversationDictationState.Starting || finishRequested)
+                (
+                    activeRecognitionGenerationId != null ||
+                        state is ConversationDictationState.Starting || finishRequested
+                )
 
     /** One logical capture owns one absolute budget across fresh recognition and service identities. */
     private fun captureDeadlineReached(): Boolean {
@@ -908,9 +911,11 @@ internal class ConversationDictationController internal constructor(
         val action = deliveryMode?.name ?: "Done"
         val source = if (automatic) "automatic" else "explicit"
         if (!inActiveRecognitionState ||
-            !completionIntent.choose(deliveryMode ?: ConversationDictationDeliveryMode.PasteIntoDraft, automatic)
+            !completionIntent.choose(deliveryMode, automatic)
         ) {
-            conversationDictationDiagnostic("event=completion_action action=$action source=$source accepted=false reason=state")
+            conversationDictationDiagnostic(
+                "event=completion_action action=$action source=$source accepted=false reason=state",
+            )
             return
         }
         conversationDictationDiagnostic("event=completion_action action=$action source=$source accepted=true")
@@ -922,7 +927,11 @@ internal class ConversationDictationController internal constructor(
             ) {
                 // Paste is a local draft action; a pending Send membership probe must
                 // not delay it or later turn an accepted Paste into a validation failure.
-                validateAndDeliverTranscript(requireNotNull(current.sessionId), requireNotNull(current.target), pendingCompletedTranscript)
+                validateAndDeliverTranscript(
+                    requireNotNull(current.sessionId),
+                    requireNotNull(current.target),
+                    pendingCompletedTranscript,
+                )
             }
             return
         }
@@ -2472,7 +2481,13 @@ internal class ConversationDictationController internal constructor(
         if (transcript.isBlank()) {
             fail(sessionId, target, ConversationDictationFailure.NoSpeech, cancelSession = true)
         } else if (requestedDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {
-            fail(sessionId, target, ConversationDictationFailure.SendBlocked, cancelSession = true, retainedTranscript = transcript)
+            fail(
+                sessionId,
+                target,
+                ConversationDictationFailure.SendBlocked,
+                cancelSession = true,
+                retainedTranscript = transcript,
+            )
         } else {
             clearRecognitionSession(cancel = true)
             appendTranscriptAtEndOrFail(sessionId, target, transcript)

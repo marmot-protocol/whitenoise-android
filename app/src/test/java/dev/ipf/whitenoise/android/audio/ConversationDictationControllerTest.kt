@@ -158,7 +158,10 @@ class ConversationDictationControllerTest {
             runCurrent()
             val token = requireNotNull(active.controller.notificationSessionToken)
             active.controller.onDurableServiceDestroyed(token)
-            assertEquals(ConversationDictationFailure.SendBlocked, (active.controller.state as ConversationDictationState.Failed).reason)
+            assertEquals(
+                ConversationDictationFailure.SendBlocked,
+                (active.controller.state as ConversationDictationState.Failed).reason,
+            )
             active.controller.retry()
             runCurrent()
             assertEquals(2, checks)
@@ -3602,8 +3605,10 @@ class ConversationDictationControllerTest {
 
         platform.pendingCallerAudio = false
         platform.listener.onResult("second")
-        assertEquals("first second", fixture.drafts.getValue(key()).text)
-        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        assertEquals("", fixture.drafts.getValue(key()).text)
+        val failed = fixture.controller.state as ConversationDictationState.Failed
+        assertEquals(ConversationDictationFailure.SendBlocked, failed.reason)
+        assertEquals("first second", failed.retainedTranscript)
         assertEquals(null, fixture.controller.processingDeliveryMode)
     }
 
@@ -3630,9 +3635,19 @@ class ConversationDictationControllerTest {
         fixture.controller.send()
         fixture.controller.paste()
         fixture.platform.listener.onResult("second")
-        // No delivery scope exists: preserve the chosen Send result automatically in the latest draft.
+        // No delivery scope exists: preserve the chosen Send without performing the later rejected Paste.
+        val failed = fixture.controller.state as ConversationDictationState.Failed
+        assertEquals(ConversationDictationFailure.SendBlocked, failed.reason)
+        assertEquals("second", failed.retainedTranscript)
+        assertEquals("first", fixture.drafts.getValue(key()).text)
+        fixture.controller.dismissFailure()
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.scheduler.runDelay(500L)
+        fixture.controller.paste()
+        fixture.controller.send()
+        fixture.platform.listener.onResult("third")
         assertTrue(fixture.controller.state is ConversationDictationState.Idle)
-        assertEquals("first second", fixture.drafts.getValue(key()).text)
+        assertEquals("first third", fixture.drafts.getValue(key()).text)
         assertEquals(0, sendCalls)
     }
 

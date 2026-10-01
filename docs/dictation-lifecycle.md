@@ -4,7 +4,8 @@ Android owns capture, editor presentation and foreground-service lifecycle;
 MDK continues to own draft persistence, target validation and message dispatch.
 
 `NotificationStreamForegroundService` is the sole Android foreground service
-for connection work and app-owned dictation. Its dictation delegate renders
+for connection work and app-owned dictation. `ConversationForegroundRecord` owns its independent leases and ordered posts.
+Its dictation delegate renders
 only the controller's current, opaque session token. Connection and microphone
 work hold independent leases; releasing one keeps the other alive. The host
 publishes the union of their actual foreground-service types. Boot/sticky
@@ -29,7 +30,8 @@ and selects the configured default. Until delivery commits, the first explicit
 Paste or Send overrides that default; another explicit gesture cannot change
 it. The controller remains the owner of capture/drain barriers, generation
 fences and cancellation. The foreground card and in-app controls read that
-same state.
+same state; `ConversationDictationNotification` renders the drawer controls
+without owning lifecycle or recognition.
 
 Paste writes the transcript to the draft. Send follows the existing immutable
 origin payload, reply, account, target and semantic draft-generation fences.

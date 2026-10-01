@@ -17,7 +17,7 @@ internal class ConversationDictationCompletionIntent {
 
     /** The first explicit gesture overrides the automatic default until delivery starts. */
     fun choose(
-        delivery: ConversationDictationDeliveryMode,
+        delivery: ConversationDictationDeliveryMode?,
         automatic: Boolean = false,
     ): Boolean {
         if (!canChooseExplicit || (automatic && phase != Phase.Open)) return false

@@ -11,10 +11,8 @@ import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
-import android.widget.RemoteViews
 import androidx.compose.runtime.snapshotFlow
 import androidx.core.content.ContextCompat
-import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
@@ -84,7 +82,7 @@ internal class ConversationDictationForegroundService(
         )
         if (controller == null || !controller.hasDurableSession) {
             removeForegroundNotification()
-            service.releaseDictation(startId)
+            service.foreground.releaseDictation(startId)
         } else {
             val sessionToken = intent?.getStringExtra(EXTRA_SESSION_TOKEN)
             if (sessionToken == null || sessionToken != controller.notificationSessionToken) {
@@ -92,7 +90,7 @@ internal class ConversationDictationForegroundService(
                 // Never stop a service that currently authorizes a different live session.
                 val owner = promotedController
                 if (owner?.hasDurableSession != true || owner.notificationSessionToken != promotedSessionToken) {
-                    service.releaseDictation(startId)
+                    service.foreground.releaseDictation(startId)
                 }
                 return Service.START_NOT_STICKY
             }
@@ -105,7 +103,7 @@ internal class ConversationDictationForegroundService(
             // or open the microphone. Android posts foreground notifications asynchronously.
             if (!controller.hasDurableSession || controller.notificationSessionToken != sessionToken) {
                 removeForegroundNotification()
-                service.releaseDictation(startId)
+                service.foreground.releaseDictation(startId)
                 return Service.START_NOT_STICKY
             }
             ensureChannel(this)
@@ -115,7 +113,7 @@ internal class ConversationDictationForegroundService(
                 // Promotion may synchronously cancel or replace the controller in tests or platform hooks.
                 if (!controller.hasDurableSession || controller.notificationSessionToken != sessionToken) {
                     removeForegroundNotification()
-                    service.releaseDictation(startId)
+                    service.foreground.releaseDictation(startId)
                     return Service.START_NOT_STICKY
                 }
                 promotedController = controller
@@ -126,7 +124,7 @@ internal class ConversationDictationForegroundService(
                     observeNotification(controller, sessionToken)
                 } else {
                     removeForegroundNotification()
-                    service.releaseDictation(startId)
+                    service.foreground.releaseDictation(startId)
                 }
             }
         }
@@ -166,7 +164,7 @@ internal class ConversationDictationForegroundService(
         startId: Int,
     ) {
         controller.onDurableServiceStartFailed(sessionToken)
-        service.releaseDictation(startId)
+        service.foreground.releaseDictation(startId)
     }
 
     /** Fails capture closed when Android removes the service that authorized background microphone use. */
@@ -185,45 +183,12 @@ internal class ConversationDictationForegroundService(
         promotedController = null
         promotedSessionToken = null
         if (activeService === this) activeService = null
-        service.releaseDictation()
+        service.foreground.releaseDictation()
     }
 
-    /** Builds a public but metadata-free notification with the only actions valid off-screen. */
+    /** Builds presentation separately from lifecycle and recognition ownership. */
     private fun buildNotification(controller: ConversationDictationController): Notification =
-        Notification
-            .Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_stat_whitenoise)
-            .setContentTitle(getString(R.string.dictation_notification_title))
-            .setContentText(getString(dictationNotificationStatus(controller)))
-            // An indeterminate progress bar made the notification look stuck during
-            // normal recognizer restarts; the status text already names the phase.
-            .setContentIntent(openAppIntent())
-            .setVisibility(Notification.VISIBILITY_PUBLIC)
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .setShowWhen(false)
-            .setStyle(Notification.DecoratedCustomViewStyle())
-            .setCustomContentView(compactControls(controller))
-            .build()
-
-    /** Keeps safe actions on the compact surface even when Android chooses not to expand a notification. */
-    private fun compactControls(controller: ConversationDictationController): RemoteViews {
-        val token = requireNotNull(controller.notificationSessionToken)
-        return RemoteViews(packageName, R.layout.notification_dictation_compact).apply {
-            val cancelEnabled = !controller.deliveryInProgress
-            val completionEnabled = controller.completionActionsEnabled
-            setBoolean(R.id.dictation_notification_cancel, "setEnabled", cancelEnabled)
-            setBoolean(R.id.dictation_notification_paste, "setEnabled", completionEnabled)
-            setBoolean(R.id.dictation_notification_send, "setEnabled", completionEnabled)
-            if (cancelEnabled) {
-                setOnClickPendingIntent(R.id.dictation_notification_cancel, actionIntent(ACTION_CANCEL, token))
-            }
-            if (completionEnabled) {
-                setOnClickPendingIntent(R.id.dictation_notification_paste, actionIntent(ACTION_PASTE, token))
-                setOnClickPendingIntent(R.id.dictation_notification_send, actionIntent(ACTION_SEND, token))
-            }
-        }
-    }
+        buildConversationDictationNotification(this, controller, ::actionIntent)
 
     /** Keeps system controls truthful when capture becomes finalization or an irrevocable dispatch. */
     private fun observeNotification(
@@ -252,7 +217,7 @@ internal class ConversationDictationForegroundService(
         sessionToken: String,
     ) {
         try {
-            service.updateDictationNotification(buildNotification(controller))
+            service.foreground.updateDictationNotification(buildNotification(controller))
         } catch (_: SecurityException) {
             controller.onDurableServiceDestroyed(sessionToken)
             removeForegroundNotification()
@@ -286,17 +251,6 @@ internal class ConversationDictationForegroundService(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-    /** Reopens the existing White Noise task without exposing the dictation target in intent extras. */
-    private fun openAppIntent(): PendingIntent =
-        PendingIntent.getActivity(
-            this,
-            0,
-            Intent()
-                .setClass(this, MainActivity::class.java)
-                .setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-
     companion object {
         internal const val CHANNEL_ID = "composer_dictation"
 
@@ -327,17 +281,19 @@ internal class ConversationDictationForegroundService(
 
         /** Test seam for resolving the process-owned controller. */
         internal var hostResolver: (Service) -> ConversationDictationServiceHost? = { service ->
-            (service.application as? WhiteNoiseApplication)?.appState?.let { appState ->
-                object : ConversationDictationServiceHost {
-                    override val conversationDictation: ConversationDictationController
-                        get() = appState.conversationDictation
+            (service.application as? WhiteNoiseApplication)
+                ?.initializedAppState()
+                ?.initializedConversationDictation()
+                ?.let { controller ->
+                    object : ConversationDictationServiceHost {
+                        override val conversationDictation = controller
+                    }
                 }
-            }
         }
 
         /** Test seam for simulating platform rejection of foreground promotion. */
         internal var foregroundPromoter: (NotificationStreamForegroundService, Notification) -> Unit =
-            { service, notification -> service.promoteDictation(notification) }
+            { service, notification -> service.foreground.promoteDictation(notification) }
 
         /** Starts the microphone service while the initiating composer is visible. */
         fun start(
@@ -390,15 +346,6 @@ internal class ConversationDictationForegroundService(
         }
     }
 }
-
-/** Describes actual readiness/finalization, never a model download or invented percentage. */
-private fun dictationNotificationStatus(controller: ConversationDictationController): Int =
-    when {
-        controller.deliveryInProgress -> R.string.message_status_pending
-        controller.state is ConversationDictationState.Starting -> R.string.dictation_starting
-        controller.state is ConversationDictationState.Processing -> R.string.dictation_processing
-        else -> R.string.dictation_notification_text
-    }
 
 /** Recognizes API 31+'s explicit foreground-start rejection without resolving that class on older Android. */
 internal fun Throwable.isForegroundServiceStartRejection(): Boolean =

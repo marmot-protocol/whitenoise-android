@@ -134,12 +134,6 @@ internal object DictationDiagnosticSchema {
     private val booleans =
         setOf(
             "accepted",
-            "automatic",
-            "explicit",
-            "SendBlocked",
-            "PasteIntoDraft",
-            "SendOnFinish",
-            "Done",
             "durable",
             "visible",
             "foreground",
@@ -191,6 +185,12 @@ internal object DictationDiagnosticSchema {
         )
     private val allowedCategoryValues =
         setOf(
+            "automatic",
+            "explicit",
+            "SendBlocked",
+            "PasteIntoDraft",
+            "SendOnFinish",
+            "Done",
             "Idle",
             "ProviderSelectionRequired",
             "DisclosureRequired",

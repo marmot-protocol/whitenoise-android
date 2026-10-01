@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dictation_send_blocked">Nicht gesendet</string>
+    <string name="dictation_retry_send">Erneut senden</string>
+</resources>

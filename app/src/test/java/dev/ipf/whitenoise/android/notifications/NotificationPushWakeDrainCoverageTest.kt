@@ -179,12 +179,20 @@ class NotificationPushWakeDrainCoverageTest {
     fun rejectedForegroundServicePushWakeStopsBeforeRecordingOffMain() {
         val onStart = serviceFunctionBody("onStartCommand")
         val recordAfterStop = serviceFunctionBody("recordPendingPushWakeCatchUpAfterStop")
+        val releaseConnection =
+            File(serviceSource().parentFile, "ConversationForegroundRecord.kt")
+                .readText()
+                .kotlinFunctionBody("releaseConnection")
 
         assertTrue(
-            "onStartCommand must stop synchronously before scheduling the durable catch-up marker",
-            "stopSelf(startId)" in onStart &&
+            "onStartCommand must release connection synchronously before scheduling durable catch-up",
+            "foreground.releaseConnection(startId)" in onStart &&
                 "recordPendingPushWakeCatchUpAfterStop()" in onStart &&
                 "recordPendingPushWakeCatchUp(applicationContext)" !in onStart,
+        )
+        assertTrue(
+            "the shared record must settle remaining foreground work before the connection-release callback",
+            releaseConnection.indexOf("removeForegroundAndStop") < releaseConnection.indexOf("onConnectionReleased"),
         )
         assertTrue(
             "rejected push-wake starts must schedule their persisted marker off-main on an owned scope",

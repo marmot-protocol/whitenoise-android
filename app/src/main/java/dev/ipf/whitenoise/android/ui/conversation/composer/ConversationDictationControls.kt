@@ -153,7 +153,9 @@ internal fun ConversationDictationCompactActions(
             if (state.hasActiveRecognitionActions) {
                 ConversationDictationActiveActions(controller, actionColors)
             } else {
-                if (state is ConversationDictationState.Failed && state.reason == ConversationDictationFailure.SendBlocked) {
+                if (state is ConversationDictationState.Failed &&
+                    state.reason == ConversationDictationFailure.SendBlocked
+                ) {
                     IconButton(onClick = controller::paste, modifier = Modifier.size(48.dp)) {
                         Icon(Icons.Default.ContentPaste, contentDescription = stringResource(R.string.paste))
                     }
@@ -216,7 +218,8 @@ private fun ConversationDictationState.compactActionsWidth(captureInProgress: Bo
         is ConversationDictationState.Listening,
         is ConversationDictationState.Processing,
         -> if (captureInProgress) DICTATION_ACTIVE_ACTIONS_WIDTH else DICTATION_PROCESSING_ACTIONS_WIDTH
-        is ConversationDictationState.Failed -> if (reason == ConversationDictationFailure.SendBlocked) 144.dp else 96.dp
+        is ConversationDictationState.Failed ->
+            if (reason == ConversationDictationFailure.SendBlocked) 144.dp else 96.dp
         else -> 96.dp
     }
 
@@ -259,7 +262,11 @@ private fun ConversationDictationActiveActions(
         }
     }
     if (controller.processingDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {
-        IconButton(onClick = controller::send, enabled = controller.completionActionsEnabled, modifier = Modifier.size(48.dp)) {
+        IconButton(
+            onClick = controller::send,
+            enabled = controller.completionActionsEnabled,
+            modifier = Modifier.size(48.dp),
+        ) {
             CircularProgressIndicator(
                 modifier =
                     Modifier
@@ -391,7 +398,11 @@ private fun ConversationDictationFailureAction(
                         ConversationDictationRecovery.AppSettings -> R.string.open_app_settings
                         ConversationDictationRecovery.SpeechProviderSetup -> R.string.dictation_open_speech_service
                         ConversationDictationRecovery.Retry ->
-                            if (state.reason == ConversationDictationFailure.SendBlocked) R.string.dictation_retry_send else R.string.retry
+                            if (state.reason == ConversationDictationFailure.SendBlocked) {
+                                R.string.dictation_retry_send
+                            } else {
+                                R.string.retry
+                            }
                     },
                 ),
         )

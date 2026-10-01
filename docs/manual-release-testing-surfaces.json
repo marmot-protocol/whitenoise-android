@@ -9657,8 +9657,8 @@
       },
       {
         "surface": "Single foreground host releases dictation while preserving connection",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationStreamForegroundService.kt",
-        "anchor": "internal fun releaseDictation(",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationForegroundRecord.kt",
+        "anchor": "fun releaseDictation(",
         "test_ids": [
           "DIC-002"
         ]
@@ -9683,7 +9683,7 @@
       },
       {
         "surface": "string:dictation_notification_text",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
         "anchor": "R.string.dictation_notification_text",
         "test_ids": [
           "DIC-001",
@@ -9692,7 +9692,7 @@
       },
       {
         "surface": "string:dictation_processing",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
         "anchor": "R.string.dictation_processing",
         "test_ids": [
           "DIC-001",
@@ -9701,7 +9701,7 @@
       },
       {
         "surface": "string:dictation_starting",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
         "anchor": "R.string.dictation_starting",
         "test_ids": [
           "DIC-001",
@@ -9710,7 +9710,7 @@
       },
       {
         "surface": "string:message_status_pending",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
         "anchor": "R.string.message_status_pending",
         "test_ids": [
           "DIC-001",

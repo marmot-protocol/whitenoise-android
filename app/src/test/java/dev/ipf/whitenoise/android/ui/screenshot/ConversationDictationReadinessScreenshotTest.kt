@@ -101,6 +101,45 @@ class ConversationDictationReadinessScreenshotTest {
     }
 
     @Test
+    fun blockedSendPreservesTranscriptAndOffersRetry() {
+        captureBlockedSend("dictation_send_blocked_light.png", darkTheme = false, fontScale = 1f, rtl = false)
+    }
+
+    @Test
+    fun blockedSendLargeFontRtlDark() {
+        captureBlockedSend(
+            "dictation_send_blocked_large_font_rtl_dark.png",
+            darkTheme = true,
+            fontScale = 2f,
+            rtl = true,
+        )
+    }
+
+    private fun captureBlockedSend(
+        name: String,
+        darkTheme: Boolean,
+        fontScale: Float,
+        rtl: Boolean,
+    ) {
+        val fixture = fixture(appOwned = true)
+        val initial = fixture.controller.state as ConversationDictationState.Starting
+        capture(
+            fixture,
+            name,
+            darkTheme = darkTheme,
+            fontScale = fontScale,
+            rtl = rtl,
+            state =
+                ConversationDictationState.Failed(
+                    initial.sessionId,
+                    initial.target,
+                    ConversationDictationFailure.SendBlocked,
+                    "Dictated test phrase",
+                ),
+        )
+    }
+
+    @Test
     fun unavailableServiceLargeFontRtl() {
         val fixture = fixture(appOwned = true)
         fixture.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)

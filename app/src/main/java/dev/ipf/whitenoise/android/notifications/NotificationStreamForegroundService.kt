@@ -20,7 +20,6 @@ import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import dev.ipf.whitenoise.android.audio.ConversationDictationForegroundService
-import dev.ipf.whitenoise.android.audio.isForegroundServiceStartRejection
 import dev.ipf.whitenoise.android.state.RecoveryTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import kotlinx.coroutines.CoroutineScope
@@ -46,91 +45,25 @@ private const val START_TRIGGER_CAPABILITY_FALLBACK = "capability_fallback"
 
 /** One Android foreground record owns both connection work and dictation presentation. */
 class NotificationStreamForegroundService : Service() {
-    private val dictation = ConversationDictationForegroundService(this)
-    private var connectionServiceType = 0
     private var lastServiceStartId = 0
-    private var foregroundPromoted = false
-
-    override fun onCreate() {
-        super.onCreate()
-        activeHost = this
-    }
-
-    internal fun actionIntent(
-        action: String,
-        token: String,
-    ): PendingIntent = dictation.actionIntent(action, token)
-
-    internal fun foregroundNotification(): Notification = dictation.notificationOrNull() ?: BackgroundConnectionNotification.build(this)
-
-    internal fun promoteConnection(trigger: ForegroundStartTrigger) {
-        val type = foregroundServiceTypeForTrigger(trigger)
-        publishForeground(
-            foregroundNotification(),
-            type or if (dictation.hasForegroundLease) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0,
+    internal val foreground =
+        ConversationForegroundRecord(
+            service = this,
+            isCurrent = { activeHost === this },
+            serviceStartId = { lastServiceStartId },
+            connectionStartId = { latestStartId },
+            onConnectionReleased = {
+                bootstrapJob?.cancel()
+                bootstrapJob = null
+                pendingUserOwnedStart = false
+                (application as? WhiteNoiseApplication)
+                    ?.initializedAppState()
+                    ?.releasePushWakeServiceOwner(pushWakeServiceOwner)
+                recordPendingPushWakeCatchUpAfterStop()
+            },
         )
-        connectionServiceType = type
-    }
-
-    private fun publishForeground(
-        notification: Notification,
-        type: Int,
-    ) {
-        foregroundPublisher(this, notification, type)
-        foregroundPromoted = true
-    }
-
-    internal fun promoteDictation(notification: Notification) {
-        publishForeground(
-            notification,
-            connectionServiceType or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE,
-        )
-    }
-
-    internal fun updateDictationNotification(notification: Notification) {
-        if (activeHost === this && dictation.hasForegroundLease) promoteDictation(notification)
-    }
-
-    @Suppress("TooGenericExceptionCaught") // Android's foreground-start rejection is a RuntimeException on API 31+.
-    internal fun releaseDictation(startId: Int = lastServiceStartId) {
-        if (dictation.hasForegroundLease || activeHost !== this) return
-        if (connectionServiceType != 0) {
-            try {
-                publishForeground(BackgroundConnectionNotification.build(this), connectionServiceType)
-            } catch (_: SecurityException) {
-                releaseConnection()
-            } catch (error: RuntimeException) {
-                if (!error.isForegroundServiceStartRejection()) throw error
-                releaseConnection()
-            }
-        } else {
-            removeForegroundAndStop(startId)
-        }
-    }
-
-    /** Releasing connection never interrupts the separately owned microphone lease. */
-    internal fun releaseConnection(expectedStartId: Int = latestStartId) {
-        if (expectedStartId != latestStartId || activeHost !== this) return
-        connectionServiceType = 0
-        bootstrapJob?.cancel()
-        bootstrapJob = null
-        pendingUserOwnedStart = false
-        (application as? WhiteNoiseApplication)?.initializedAppState()?.releasePushWakeServiceOwner(pushWakeServiceOwner)
-        recordPendingPushWakeCatchUpAfterStop()
-        if (dictation.hasForegroundLease) {
-            dictation.refreshNotification()
-        } else {
-            removeForegroundAndStop(lastServiceStartId)
-        }
-    }
-
-    private fun removeForegroundAndStop(startId: Int) {
-        if (foregroundPromoted) {
-            foregroundRemover(this)
-            foregroundPromoted = false
-        }
-        stopSelfResult(startId)
-    }
+    private val dictation: ConversationDictationForegroundService
+        get() = foreground.dictation
 
     private val pushWakeServiceOwner = Any()
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -152,10 +85,11 @@ class NotificationStreamForegroundService : Service() {
         flags: Int,
         startId: Int,
     ): Int {
+        activeHost = this
         lastServiceStartId = startId
         if (ConversationDictationForegroundService.isCommand(intent)) {
             dictation.onStartCommand(intent, startId)
-            return if (connectionServiceType == 0) START_NOT_STICKY else START_STICKY
+            return if (foreground.connectionServiceType == 0) START_NOT_STICKY else START_STICKY
         }
         val trigger = foregroundStartTrigger(intent)
         val capabilityFallbackGeneration = capabilityFallbackGeneration(intent)
@@ -178,7 +112,7 @@ class NotificationStreamForegroundService : Service() {
         // high-priority wake) will retry. See #164.
         val startedForeground =
             runCatching {
-                promoteConnection(trigger)
+                foreground.promoteConnection(trigger)
             }.onFailure {
                 foregroundServiceDebug(it) { "startForeground rejected" }
             }.isSuccess
@@ -211,10 +145,10 @@ class NotificationStreamForegroundService : Service() {
                     (application as? WhiteNoiseApplication)?.appState?.onBackgroundConnectionStartRejected()
                 }
                 if (recordPendingPushWakeCatchUp) {
-                    releaseConnection(startId)
+                    foreground.releaseConnection(startId)
                     recordPendingPushWakeCatchUpAfterStop()
                 } else {
-                    releaseConnection(startId)
+                    foreground.releaseConnection(startId)
                 }
                 return START_NOT_STICKY
             }
@@ -223,7 +157,7 @@ class NotificationStreamForegroundService : Service() {
                 // request. The durable pending flag was recorded before the
                 // start intent was queued, so stop without flipping the user's
                 // background-connection preference or showing the #164 toast.
-                releaseConnection(startId)
+                foreground.releaseConnection(startId)
                 return START_NOT_STICKY
             }
             ForegroundStartDecision.BootstrapAndKeep -> {
@@ -265,7 +199,7 @@ class NotificationStreamForegroundService : Service() {
             )
         val cancelledUserToggle = initialTrigger == ForegroundStartTrigger.UserToggle && !keepConnectedAtStart
         if ((stickyRestartShouldStop || cancelledUserToggle) && latestStartId == bootstrapStartId) {
-            releaseConnection(bootstrapStartId)
+            foreground.releaseConnection(bootstrapStartId)
             return
         }
         val stopWhenFinished = initialOneShotRequested || stickyRestartShouldStop
@@ -298,7 +232,7 @@ class NotificationStreamForegroundService : Service() {
         recordPendingPushWakeCatchUpAfterStop()
         if (action == NotificationRuntimeBootstrapAction.Finish) {
             if (shouldStopAfterOneShotForegroundStart(stopWhenFinished, appState.backgroundConnectionEnabled)) {
-                releaseConnection(terminalStartId)
+                foreground.releaseConnection(terminalStartId)
             }
         }
     }
@@ -325,7 +259,9 @@ class NotificationStreamForegroundService : Service() {
             )
         if (attemptedPushWakeGeneration != null && outcome is NotificationRuntimeSupervisionOutcome.Exhausted) {
             recordPendingPushWakeCatchUpAfterStop()
-            if (!appState.backgroundConnectionEnabled && !pendingUserOwnedStart) releaseConnection(latestStartId)
+            if (!appState.backgroundConnectionEnabled && !pendingUserOwnedStart) {
+                foreground.releaseConnection(latestStartId)
+            }
             return NotificationRuntimeBootstrapAction.Finish
         }
         completedPushWakeGeneration = decision.completedPushWakeGeneration
@@ -354,7 +290,7 @@ class NotificationStreamForegroundService : Service() {
                     appState.onBackgroundConnectionRuntimeExhausted()
                 }
                 if (decision.action == NotificationRuntimeBootstrapAction.StopAfterExhaustion) {
-                    releaseConnection(attemptedStartId)
+                    foreground.releaseConnection(attemptedStartId)
                 }
             }
         }
@@ -436,9 +372,7 @@ class NotificationStreamForegroundService : Service() {
 
     override fun onDestroy() {
         if (activeHost === this) {
-            connectionServiceType = 0
-            dictation.onDestroy()
-            removeForegroundAndStop(lastServiceStartId)
+            foreground.onDestroy()
             activeHost = null
         } else {
             dictation.onDestroy()
@@ -556,12 +490,15 @@ class NotificationStreamForegroundService : Service() {
                 false
             }
 
-        private fun stopConnectionOnMain(context: Context, expectedEpoch: Long) {
+        private fun stopConnectionOnMain(
+            context: Context,
+            expectedEpoch: Long,
+        ) {
             if (connectionStartEpoch.get() != expectedEpoch) return
             runCatching {
                 val owner = activeHost
                 if (owner != null) {
-                    owner.releaseConnection()
+                    owner.foreground.releaseConnection()
                 } else if (!pendingDictationOwner(context)) {
                     context.stopService(Intent(context, NotificationStreamForegroundService::class.java))
                 }
