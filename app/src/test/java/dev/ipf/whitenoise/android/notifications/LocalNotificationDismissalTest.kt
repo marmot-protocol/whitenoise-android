@@ -149,7 +149,10 @@ class LocalNotificationDismissalTest {
 
         assertTrue(
             runBlocking {
-                LocalNotificationPresenter(context, groupReconciliation = {}).dismissConversationMessages(account, group)
+                LocalNotificationPresenter(context, groupReconciliation = {}).dismissConversationMessages(
+                    account,
+                    group,
+                )
             },
         )
 

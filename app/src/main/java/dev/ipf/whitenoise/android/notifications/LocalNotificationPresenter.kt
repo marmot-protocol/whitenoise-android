@@ -658,20 +658,27 @@ class LocalNotificationPresenter(
                             withContext(Dispatchers.Default) {
                                 synchronized(UserEventNotificationGroup.mutationLock) {
                                     val platform = context.getSystemService(NotificationManager::class.java)
-                                    val active = platform?.let {
-                                        activeNotification(
-                                            it,
-                                            notificationContent.notificationTag,
-                                            notificationContent.notificationId,
+                                    val active =
+                                        platform?.let {
+                                            activeNotification(
+                                                it,
+                                                notificationContent.notificationTag,
+                                                notificationContent.notificationId,
+                                            )
+                                        }
+                                    val messageId =
+                                        active?.notification?.extras?.getString(
+                                            LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX,
                                         )
-                                    }
-                                    val messageId = active?.notification?.extras?.getString(
-                                        LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX,
-                                    )
                                     replacementHasChanged =
-                                        replaceCurrentMessage && active != null && messageId != update.messageIdHex
-                                    active?.takeIf { messageId == update.messageIdHex }
-                                        ?.notification?.extras?.getString(EXTRA_GENERATION)
+                                        replaceCurrentMessage &&
+                                        active != null &&
+                                        messageId != update.messageIdHex
+                                    active
+                                        ?.takeIf { messageId == update.messageIdHex }
+                                        ?.notification
+                                        ?.extras
+                                        ?.getString(EXTRA_GENERATION)
                                         ?.takeIf(String::isNotBlank)
                                         ?.also { rewriteLease = NotificationCardGenerations.register(it) }
                                 }
@@ -957,11 +964,12 @@ class LocalNotificationPresenter(
                                         )
                                     }
                                     val notification =
-                                        builder.silencedIfSuperseded(
-                                            heldAlert,
-                                            replaceCurrentMessage,
-                                            notificationContent.notificationId,
-                                        ).build()
+                                        builder
+                                            .silencedIfSuperseded(
+                                                heldAlert,
+                                                replaceCurrentMessage,
+                                                notificationContent.notificationId,
+                                            ).build()
                                     ConversationCardPostSynchronizer.awaitTestBarrier(
                                         ConversationCardOp.SHOW_NOTIFY,
                                         ConversationCardBarrier.BEFORE_WRITE,
@@ -983,7 +991,8 @@ class LocalNotificationPresenter(
                                             writeObserver,
                                             mustBeLive = rewriteGeneration != null,
                                             finalPostAllowed = {
-                                                isPostStillAllowed() && showGenerationAllowsPost() &&
+                                                isPostStillAllowed() &&
+                                                    showGenerationAllowsPost() &&
                                                     rewriteLease?.dismissed?.get() != true
                                             },
                                         )
@@ -1023,11 +1032,12 @@ class LocalNotificationPresenter(
                                                 ),
                                             )
                                             val cleanNotification =
-                                                builder.silencedIfSuperseded(
-                                                    heldAlert,
-                                                    replaceCurrentMessage,
-                                                    notificationContent.notificationId,
-                                                ).build()
+                                                builder
+                                                    .silencedIfSuperseded(
+                                                        heldAlert,
+                                                        replaceCurrentMessage,
+                                                        notificationContent.notificationId,
+                                                    ).build()
                                             val retryResult =
                                                 postNotificationSafely(
                                                     notificationManager,
@@ -1037,7 +1047,8 @@ class LocalNotificationPresenter(
                                                     writeObserver,
                                                     mustBeLive = rewriteGeneration != null,
                                                     finalPostAllowed = {
-                                                        isPostStillAllowed() && showGenerationAllowsPost() &&
+                                                        isPostStillAllowed() &&
+                                                            showGenerationAllowsPost() &&
                                                             rewriteLease?.dismissed?.get() != true
                                                     },
                                                 )
@@ -1086,11 +1097,12 @@ class LocalNotificationPresenter(
                                     val presentationTimestampMs = nowMillis()
                                     stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
                                     val notification =
-                                        builder.silencedIfSuperseded(
-                                            heldAlert,
-                                            replaceCurrentMessage,
-                                            notificationContent.notificationId,
-                                        ).build()
+                                        builder
+                                            .silencedIfSuperseded(
+                                                heldAlert,
+                                                replaceCurrentMessage,
+                                                notificationContent.notificationId,
+                                            ).build()
                                     ConversationCardPostSynchronizer.awaitTestBarrier(
                                         ConversationCardOp.SHOW_NOTIFY,
                                         ConversationCardBarrier.BEFORE_WRITE,
@@ -1112,7 +1124,8 @@ class LocalNotificationPresenter(
                                             writeObserver,
                                             mustBeLive = rewriteGeneration != null,
                                             finalPostAllowed = {
-                                                isPostStillAllowed() && showGenerationAllowsPost() &&
+                                                isPostStillAllowed() &&
+                                                    showGenerationAllowsPost() &&
                                                     rewriteLease?.dismissed?.get() != true
                                             },
                                         )
@@ -1805,12 +1818,12 @@ class LocalNotificationPresenter(
                         .setOnlyAlertOnce(true)
                         .build()
                 if (postNotificationSafely(
-                    NotificationManagerCompat.from(context),
-                    notificationTag,
-                    notificationId,
-                    resolved,
-                    mustBeLive = true,
-                ) !=
+                        NotificationManagerCompat.from(context),
+                        notificationTag,
+                        notificationId,
+                        resolved,
+                        mustBeLive = true,
+                    ) !=
                     NotificationCardWriteResult.WRITTEN
                 ) {
                     return@runCatching false
@@ -1862,12 +1875,12 @@ class LocalNotificationPresenter(
                         .setOnlyAlertOnce(true)
                         .build()
                 if (postNotificationSafely(
-                    NotificationManagerCompat.from(context),
-                    notificationTag,
-                    notificationId,
-                    resolved,
-                    mustBeLive = true,
-                ) !=
+                        NotificationManagerCompat.from(context),
+                        notificationTag,
+                        notificationId,
+                        resolved,
+                        mustBeLive = true,
+                    ) !=
                     NotificationCardWriteResult.WRITTEN
                 ) {
                     return@runCatching false

@@ -441,11 +441,12 @@ class LocalNotificationGroupSummaryTest {
             settle()
             fixture.coordinator.close()
             manager.cancel("account-a|group-a", LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID)
-            val restored = NotificationGroupReconciler(
-                context,
-                CoroutineScope(backgroundScope.coroutineContext),
-                fixture.pacer,
-            )
+            val restored =
+                NotificationGroupReconciler(
+                    context,
+                    CoroutineScope(backgroundScope.coroutineContext),
+                    fixture.pacer,
+                )
             restored.request()
             settle()
             assertTrue(manager.activeNotifications.isEmpty())
@@ -542,14 +543,15 @@ class LocalNotificationGroupSummaryTest {
             val fixture = GroupFixture(context, backgroundScope)
             val original = fixture.send("account-a", "group-a", "original")
             val staleTray = manager.activeNotifications
-            val presenter = LocalNotificationPresenter(
-                context,
-                shortcutPublisher = {},
-                postPacer = fixture.pacer,
-                groupReconciliation = fixture.coordinator::request,
-                avatarBitmapResolver = { null },
-                activeNotificationsProvider = { staleTray },
-            )
+            val presenter =
+                LocalNotificationPresenter(
+                    context,
+                    shortcutPublisher = {},
+                    postPacer = fixture.pacer,
+                    groupReconciliation = fixture.coordinator::request,
+                    avatarBitmapResolver = { null },
+                    activeNotificationsProvider = { staleTray },
+                )
             ConversationCardPostSynchronizer.testHook =
                 object : ConversationCardTestHook {
                     override fun onBarrier(
@@ -587,24 +589,26 @@ class LocalNotificationGroupSummaryTest {
             fixture.coordinator.close()
             var hideChildren = false
             var summaryCancels = 0
-            val coordinator = NotificationGroupReconciler(
-                context,
-                backgroundScope,
-                fixture.pacer,
-                read = { platform ->
-                    platform.activeNotifications.filter {
-                        !hideChildren || UserEventNotificationGroup.child(it) == null
-                    }.toTypedArray()
-                },
-                cancel = { compat, tag, id ->
-                    summaryCancels++
-                    // Android's summary cancellation cascades to queued as well as posted children.
-                    manager.activeNotifications.filter { UserEventNotificationGroup.child(it) != null }.forEach {
-                        compat.cancel(it.tag, it.id)
-                    }
-                    compat.cancel(tag, id)
-                },
-            )
+            val coordinator =
+                NotificationGroupReconciler(
+                    context,
+                    backgroundScope,
+                    fixture.pacer,
+                    read = { platform ->
+                        platform.activeNotifications
+                            .filter {
+                                !hideChildren || UserEventNotificationGroup.child(it) == null
+                            }.toTypedArray()
+                    },
+                    cancel = { compat, tag, id ->
+                        summaryCancels++
+                        // Android's summary cancellation cascades to queued as well as posted children.
+                        manager.activeNotifications.filter { UserEventNotificationGroup.child(it) != null }.forEach {
+                            compat.cancel(it.tag, it.id)
+                        }
+                        compat.cancel(tag, id)
+                    },
+                )
             try {
                 manager.cancel("account-a|group-a", LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID)
                 coordinator.request()
@@ -667,8 +671,10 @@ class LocalNotificationGroupSummaryTest {
             fixture.send("account-b", "group-b", "later")
             context.sendBroadcast(intent)
             pumpingMainLooper {
-                awaitWorkerCondition("the delete broadcast must remove its displayed generation") {
-                    manager.activeNotifications.none { it.tag == "account-a|group-a" }
+                kotlinx.coroutines.withTimeout(10_000L) {
+                    while (manager.activeNotifications.any { it.tag == "account-a|group-a" }) {
+                        kotlinx.coroutines.delay(5L)
+                    }
                 }
             }
             assertTrue(manager.activeNotifications.any { it.tag == "account-b|group-b" })

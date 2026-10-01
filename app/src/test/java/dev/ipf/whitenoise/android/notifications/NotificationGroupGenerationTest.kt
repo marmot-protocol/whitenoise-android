@@ -29,25 +29,28 @@ class NotificationGroupGenerationTest {
             val sameKey = CompletableDeferred<ConversationCardShowToken>()
             val unseen = CompletableDeferred<ConversationCardShowToken>()
             val release = CompletableDeferred<Unit>()
-            val old = holdShow(
-                "account|group",
-                ConversationCardScope("account", "group"),
-                shown,
-                release,
-            )
+            val old =
+                holdShow(
+                    "account|group",
+                    ConversationCardScope("account", "group"),
+                    shown,
+                    release,
+                )
             val oldToken = withTimeout(5_000) { shown.await() }
-            val sameKeyPost = holdShow(
-                "account|group",
-                ConversationCardScope("account", "group"),
-                sameKey,
-                release,
-            )
-            val unseenPost = holdShow(
-                "other-account|unseen",
-                ConversationCardScope("other-account", "unseen"),
-                unseen,
-                release,
-            )
+            val sameKeyPost =
+                holdShow(
+                    "account|group",
+                    ConversationCardScope("account", "group"),
+                    sameKey,
+                    release,
+                )
+            val unseenPost =
+                holdShow(
+                    "other-account|unseen",
+                    ConversationCardScope("other-account", "unseen"),
+                    unseen,
+                    release,
+                )
             try {
                 val sameKeyToken = withTimeout(5_000) { sameKey.await() }
                 val unseenToken = withTimeout(5_000) { unseen.await() }

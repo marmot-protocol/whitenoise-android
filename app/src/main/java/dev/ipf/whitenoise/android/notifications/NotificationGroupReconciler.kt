@@ -82,9 +82,10 @@ internal class NotificationGroupReconciler(
                 // Delivery already succeeded or failed independently. Summary failures never replay a child.
             }
             emptyRechecks++
-            val settling = synchronized(UserEventNotificationGroup.mutationLock) {
-                NotificationGroupWriteVisibility.remainingMillis(context)
-            }
+            val settling =
+                synchronized(UserEventNotificationGroup.mutationLock) {
+                    NotificationGroupWriteVisibility.remainingMillis(context)
+                }
             delay(maxOf(SETTLE_DELAY_MS, settling))
         }
     }
@@ -162,59 +163,60 @@ internal class NotificationGroupReconciler(
         snapshot: Array<StatusBarNotification>,
     ): Boolean {
         var changed = false
-        snapshot.filter {
-            UserEventNotificationGroup.isChildCandidate(it) && UserEventNotificationGroup.child(it) == null
-        }.forEach { candidate ->
-            pacer.awaitSlot()
-            ConversationCardPostSynchronizer.withLock(
-                candidate.tag.orEmpty(),
-                candidate.id,
-                ConversationCardOp.REFRESH_CONTACT_NAME,
-            ) {
-                synchronized(UserEventNotificationGroup.mutationLock) {
-                    val live =
-                        read(manager).firstOrNull { it.tag == candidate.tag && it.id == candidate.id }
-                            ?: return@synchronized
-                    if (
-                        !UserEventNotificationGroup.isChildCandidate(live) ||
-                        UserEventNotificationGroup.child(live) != null
-                    ) {
-                        return@synchronized
+        snapshot
+            .filter {
+                UserEventNotificationGroup.isChildCandidate(it) && UserEventNotificationGroup.child(it) == null
+            }.forEach { candidate ->
+                pacer.awaitSlot()
+                ConversationCardPostSynchronizer.withLock(
+                    candidate.tag.orEmpty(),
+                    candidate.id,
+                    ConversationCardOp.REFRESH_CONTACT_NAME,
+                ) {
+                    synchronized(UserEventNotificationGroup.mutationLock) {
+                        val live =
+                            read(manager).firstOrNull { it.tag == candidate.tag && it.id == candidate.id }
+                                ?: return@synchronized
+                        if (
+                            !UserEventNotificationGroup.isChildCandidate(live) ||
+                            UserEventNotificationGroup.child(live) != null
+                        ) {
+                            return@synchronized
+                        }
+                        val generation =
+                            live.notification.extras.getString(EXTRA_GENERATION) ?: UUID.randomUUID().toString()
+                        val builder =
+                            NotificationCompat
+                                .Builder(context, live.notification)
+                                .addExtras(
+                                    android.os.Bundle().apply {
+                                        putLong(
+                                            EXTRA_LEGACY_POST_TIME,
+                                            UserEventNotificationGroup.dismissalTime(live),
+                                        )
+                                    },
+                                )
+                        val adopted =
+                            UserEventNotificationGroup
+                                .decorateChild(
+                                    context,
+                                    builder,
+                                    NotificationGroupChild(requireNotNull(live.tag), live.id, generation),
+                                    silent = true,
+                                ).setOnlyAlertOnce(true)
+                                .setSilent(true)
+                                .build()
+                        post(compat, requireNotNull(live.tag), live.id, adopted)
+                        NotificationGroupWriteVisibility.childWritten(context)
+                        ConversationCardPostedRegistry.markPosted(
+                            requireNotNull(live.tag),
+                            live.id,
+                            UserEventNotificationGroup.dismissalTime(live),
+                        )
+                        changed = true
                     }
-                    val generation =
-                        live.notification.extras.getString(EXTRA_GENERATION) ?: UUID.randomUUID().toString()
-                    val builder =
-                        NotificationCompat
-                            .Builder(context, live.notification)
-                            .addExtras(
-                                android.os.Bundle().apply {
-                                    putLong(
-                                        EXTRA_LEGACY_POST_TIME,
-                                        UserEventNotificationGroup.dismissalTime(live),
-                                    )
-                                },
-                            )
-                    val adopted =
-                        UserEventNotificationGroup
-                            .decorateChild(
-                                context,
-                                builder,
-                                NotificationGroupChild(requireNotNull(live.tag), live.id, generation),
-                                silent = true,
-                            ).setOnlyAlertOnce(true)
-                            .setSilent(true)
-                            .build()
-                    post(compat, requireNotNull(live.tag), live.id, adopted)
-                    NotificationGroupWriteVisibility.childWritten(context)
-                    ConversationCardPostedRegistry.markPosted(
-                        requireNotNull(live.tag),
-                        live.id,
-                        UserEventNotificationGroup.dismissalTime(live),
-                    )
-                    changed = true
                 }
             }
-        }
         return changed
     }
 

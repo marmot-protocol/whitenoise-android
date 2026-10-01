@@ -17,8 +17,7 @@ internal object NotificationGroupWriteVisibility {
 
     /** Empty OS snapshots cannot authorize a cascading summary cancel during this window. */
     fun remainingMillis(context: Context): Long {
-        if (application !== context.applicationContext) return 0L
-        val writtenAt = lastChildWrite ?: return 0L
+        val writtenAt = lastChildWrite?.takeIf { application === context.applicationContext } ?: return 0L
         return (SETTLE_WINDOW_MS - (SystemClock.elapsedRealtime() - writtenAt)).coerceAtLeast(0L)
     }
 }

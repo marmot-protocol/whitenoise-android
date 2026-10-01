@@ -118,8 +118,7 @@ internal object UserEventNotificationGroup {
             .setContentTitle(context.getString(R.string.app_name))
             .setContentText(
                 context.resources.getQuantityString(R.plurals.notification_group_count, children.size, children.size),
-            )
-            .setGroup(KEY)
+            ).setGroup(KEY)
             .setGroupSummary(true)
             .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             .setSilent(true)

@@ -105,13 +105,14 @@ class NotificationScopeSettingsScreenshotTest {
         NotificationChannelSpec.entries
             .filter { it != NotificationChannelSpec.USER_EVENT_SUMMARY }
             .forEach { expected ->
-            opened = null
-            composeRule.onNodeWithTag("global-notification-category-${expected.id}").performClick()
-            composeRule.runOnIdle { assertEquals(expected, opened) }
-        }
-        composeRule.onNodeWithTag(
-            "global-notification-category-${NotificationChannelSpec.USER_EVENT_SUMMARY.id}",
-        ).assertDoesNotExist()
+                opened = null
+                composeRule.onNodeWithTag("global-notification-category-${expected.id}").performClick()
+                composeRule.runOnIdle { assertEquals(expected, opened) }
+            }
+        composeRule
+            .onNodeWithTag(
+                "global-notification-category-${NotificationChannelSpec.USER_EVENT_SUMMARY.id}",
+            ).assertDoesNotExist()
     }
 
     @Test

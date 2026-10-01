@@ -50,5 +50,8 @@ internal object NotificationCardGenerations {
     }
 
     fun isDismissed(generationId: String?): Boolean =
-        synchronized(lock) { active[generationId]?.dismissed?.get() == true }
+        synchronized(lock) {
+            val generation = active[generationId]
+            generation?.dismissed?.get() == true
+        }
 }
