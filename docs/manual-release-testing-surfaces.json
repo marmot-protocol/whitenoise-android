@@ -2659,6 +2659,12 @@
         ]
       },
       {
+        "surface": "Jump to newest accessibility text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationJumpToNewestButton.kt",
+        "anchor": "R.string.jump_to_newest",
+        "test_ids": ["CON-001", "CHL-022"]
+      },
+      {
         "surface": "ConversationMediaDraftContent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaDraft.kt",
         "anchor": "fun ConversationMediaDraftContent(",
