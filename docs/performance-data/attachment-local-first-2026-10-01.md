@@ -1,6 +1,6 @@
 # Canonical local-before-network comparison — 2026-10-01
 
-Refs #2779/#2785/#2909. Behavior draft #2980 depends on [foundation #2978](https://github.com/marmot-protocol/whitenoise-android/pull/2978), which must land first. Both target master for the required CI matrix. See the [baseline report](attachment-fixture-baseline-2026-10-01.md) for common fixture method, predeclared ceilings, host-only evidence and deferred native/device outcomes, and the single [archive manifest](attachment-evidence-manifest-2026-10-01.md) for original raw sessions, checks and failures.
+Refs #2779/#2785/#2909. Behavior draft #2980 is rebased onto merged [foundation #2978](https://github.com/marmot-protocol/whitenoise-android/pull/2978), master commit `2a31171ade44dd19a0b0475a48615a0f0fee6c5b`, and targets master for the required CI matrix. See the [baseline report](attachment-fixture-baseline-2026-10-01.md) for common fixture method, predeclared ceilings, host-only evidence and deferred native/device outcomes, and the single [archive manifest](attachment-evidence-manifest-2026-10-01.md) for original raw sessions, checks and failures.
 
 ## Behavior and comparison method
 
@@ -54,4 +54,4 @@ The measured candidate passed 69 focused tests in each distribution (resolver/na
 
 Production code, fixtures and existing regression tests are unchanged by this report compaction. Genuine outgoing retention stays blocked on [MDK #2135](https://github.com/marmot-protocol/mdk/issues/2135); join/promotion stays held on [MDK #2134](https://github.com/marmot-protocol/mdk/issues/2134) until adopted retry budgets and tapped-file priority are preserved together. Both prerequisites are now owned by `mubarakcoded`. Android #2936 remains open; Datawav #2973 is already included. Datawav ownership is preserved and Danny's MDK #2106 is untouched.
 
-Full lifecycle/offline/device/Open/Save/installer/large native-file qualification, genuine outgoing controller retention, protected-worker behavior, shared progress and production resume remain deferred as described in the baseline. Keep drafts until all required landing gates pass. No issue closure, merge or release; full attachment reliability work remains unfinished.
+Full lifecycle/offline/device/Open/Save/installer/large native-file qualification, genuine outgoing controller retention, protected-worker behavior, shared progress and production resume remain deferred as described in the baseline. Keep the behavior PR draft until all required landing gates pass. This report does not authorize issue closure, behavior merge or release; full attachment reliability work remains unfinished.
