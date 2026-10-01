@@ -138,6 +138,12 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
                 }
             }
         }
+        assertPollLayout(configuration)
+        composeRule
+            .onNodeWithTag(if (configuration.menu) MESSAGE_ACTION_MENU_TEST_TAG else "poll-discussion")
+            .captureRoboImage("src/test/snapshots/poll_message_$name.png")
+    }
+    private fun assertPollLayout(configuration: PollScreenshotConfiguration) {
         if (configuration.menu) {
             val card =
                 composeRule
@@ -161,10 +167,8 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
             val reaction = composeRule.onNodeWithTag("$REACTION_PILL_TEST_TAG:0").fetchSemanticsNode().boundsInRoot
             assertEquals("Reactions must overlap the card's bottom edge", card.bottom - 21f, reaction.top, 1f)
         }
-        composeRule
-            .onNodeWithTag(if (configuration.menu) MESSAGE_ACTION_MENU_TEST_TAG else "poll-discussion")
-            .captureRoboImage("src/test/snapshots/poll_message_$name.png")
     }
+
 }
 
 private data class PollScreenshotConfiguration(
