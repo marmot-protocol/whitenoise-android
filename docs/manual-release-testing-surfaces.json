@@ -1219,6 +1219,15 @@
         ]
       },
       {
+        "surface": "rememberChatListPollingStopped",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ConnectivityBannerEffects.kt",
+        "anchor": "fun rememberChatListPollingStopped(",
+        "test_ids": [
+          "INT-007",
+          "INT-008"
+        ]
+      },
+      {
         "surface": "RelayConnectivityPollingEffect",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ConnectivityBannerEffects.kt",
         "anchor": "fun RelayConnectivityPollingEffect(",
