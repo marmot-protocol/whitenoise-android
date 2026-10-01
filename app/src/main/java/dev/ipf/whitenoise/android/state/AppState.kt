@@ -3372,14 +3372,20 @@ class WhiteNoiseAppState private constructor(
         return boundController != null
     }
 
-    /** Read-request dedupe must honor a newly selected native manual reminder. */
+    /** Only the visible unlocked conversation may consume a newly selected reminder. */
     internal fun hasManualUnreadReminder(
         accountRef: String,
         groupIdHex: String,
-    ): Boolean =
-        chatsController
+        conversationRow: ChatListRowFfi?,
+    ): Boolean {
+        if (!appInForeground || appLockScreenVisible) return false
+        if (activeConversationAccountRef != accountRef) return false
+        if (activeConversationGroupIdHex?.equals(groupIdHex, ignoreCase = true) != true) return false
+        return chatsController
             ?.takeIf { it.boundAccountRef == accountRef }
-            ?.hasManualUnreadReminder(groupIdHex) == true
+            ?.hasManualUnreadReminder(groupIdHex)
+            ?: (conversationRow?.manuallyMarkedUnread == true)
+    }
 
     internal fun rollbackOptimisticSentPreview(
         accountRef: String?,

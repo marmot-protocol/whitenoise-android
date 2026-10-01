@@ -3848,11 +3848,11 @@ class ChatsController private constructor(
     }
 
     /** Read-request dedupe reads the native flag without constructing a display item. */
-    internal fun hasManualUnreadReminder(groupIdHex: String): Boolean {
+    internal fun hasManualUnreadReminder(groupIdHex: String): Boolean? {
         val row =
             chatRowsByGroup[chatRowKey(groupIdHex)]
                 ?: chatRows.firstOrNull { it.groupIdHex.equals(groupIdHex, ignoreCase = true) }
-        return row?.manuallyMarkedUnread == true
+        return row?.manuallyMarkedUnread
     }
 
     fun chatItemForGroup(groupIdHex: String): ChatListItem? {
@@ -6416,6 +6416,7 @@ class ConversationController(
     // first settled visible message must reach MDK even when the watermark
     // stays unchanged: MDK also clears manual unread attention on that read.
     private var lastSubmittedReadMessageId: String? = null
+    private var manualUnreadReminderConsumed = false
     private var nextReadRequestId = 0L
     private var lastReadRequestId = 0L
 
@@ -7394,6 +7395,9 @@ class ConversationController(
         row: ChatListRowFfi,
     ) {
         if (!matchesConversation(accountRef, row.groupIdHex)) return
+        if (!row.manuallyMarkedUnread || latestChatListRow?.manuallyMarkedUnread != true) {
+            manualUnreadReminderConsumed = false
+        }
         latestChatListRow = row
     }
 
@@ -11737,13 +11741,10 @@ class ConversationController(
         // call markReadUpTo again with the confirmed hex id once it echoes.
         if (!HEX_MESSAGE_ID.matches(trimmed)) return
         val account = conversationAccountRef ?: return
-        if (
-            trimmed == lastSubmittedReadMessageId &&
-            !appState.hasManualUnreadReminder(account, group.groupIdHex)
-        ) {
-            return
-        }
-        val previous = lastReadMessageId
+        val consumeManualReminder =
+            !manualUnreadReminderConsumed &&
+                appState.hasManualUnreadReminder(account, group.groupIdHex, latestChatListRow)
+        if (trimmed == lastSubmittedReadMessageId && !consumeManualReminder) return
         val previousRequestId = lastReadRequestId
         val requestId = ++nextReadRequestId
         lastReadRequestId = requestId
@@ -11756,7 +11757,8 @@ class ConversationController(
         val markReadFailure = markReadResult.exceptionOrNull()
         if (markReadFailure != null) {
             if (lastReadRequestId == requestId) {
-                lastReadMessageId = previous
+                lastReadMessageId = latestChatListRow?.lastReadMessageIdHex?.takeIf { it.isNotBlank() }
+                manualUnreadReminderConsumed = false
                 // Earlier overlapping attempts may also have failed. A retry
                 // must reach MDK instead of restoring a failed dedupe key.
                 lastSubmittedReadMessageId = null
@@ -11773,6 +11775,9 @@ class ConversationController(
                     persistedLastReadTimelineAt = persistedLastReadTimelineAt,
                     applyChatListRow = { appState.applyChatListRowFromMarkRead(account, it) },
                 )
+        }
+        if (lastReadRequestId == requestId && consumeManualReminder) {
+            manualUnreadReminderConsumed = true
         }
         val anchoredAtSeconds = (clockMillis() / 1_000L).toULong()
         anchorReadExpiryUpTo(trimmed, anchoredAtSeconds)

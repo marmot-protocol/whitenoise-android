@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger
 @Config(sdk = [36], qualifiers = "en")
 class ConversationVisibleReadIntegrationTest {
     private val mountedChats = mutableListOf<ChatsController>()
+    private val mountedConversations = mutableListOf<ConversationController>()
 
     @Test
     fun firstVisibleReadClearsManualAttentionAtSavedWatermarkBeforeReturningToList() =
@@ -38,6 +39,10 @@ class ConversationVisibleReadIntegrationTest {
                 controller.markReadUpTo(MESSAGE_ID)
                 controller.markReadUpTo(MESSAGE_ID)
                 assertEquals(1, fixture.markReadCalls.get())
+                assertEquals(
+                    listOf(Triple(ConversationTimelineTestIds.ACCOUNT_REF, reminder.groupIdHex, MESSAGE_ID)),
+                    fixture.markReadRequests,
+                )
 
                 chats.setChatListVisible(true)
                 val returned = chats.items.single().projection!!
@@ -146,8 +151,10 @@ class ConversationVisibleReadIntegrationTest {
                 assertFalse(second.isCompleted)
                 releaseSecond.countDown()
                 second.await()
+                assertEquals(ConversationTimelineTestIds.MESSAGE_A, controller.lastReadMessageId)
                 controller.markReadUpTo(MESSAGE_ID)
                 assertEquals(3, fixture.markReadCalls.get())
+                assertEquals(listOf(MESSAGE_ID, newerId, MESSAGE_ID), fixture.markReadRequests.map { it.third })
             } finally {
                 releaseFirst.countDown()
                 releaseSecond.countDown()
@@ -313,6 +320,72 @@ class ConversationVisibleReadIntegrationTest {
             }
         }
 
+    @Test
+    fun hiddenRetainedControllerCannotConsumeNewManualReminder() =
+        runBlocking {
+            val reminder = reminderRow()
+            val read = reminder.copy(manuallyMarkedUnread = false, hasUnread = false)
+            val fixture = fixture(reminder) { read }
+            try {
+                fixture.bootstrap()
+                val chats = attachChats(fixture.appState, reminder)
+                val controller = controller(fixture.appState, reminder)
+                controller.markReadUpTo(MESSAGE_ID)
+                fixture.appState.clearActiveConversation()
+                chats.applyChatListRow(reminder)
+                controller.markReadUpTo(MESSAGE_ID)
+                assertEquals(1, fixture.markReadCalls.get())
+                assertTrue(chats.chatItemForGroup(reminder.groupIdHex)!!.projection!!.manuallyMarkedUnread)
+                fixture.appState.setActiveConversationFromUi(
+                    ConversationTimelineTestIds.ACCOUNT_REF,
+                    reminder.groupIdHex,
+                )
+                fixture.appState.setAppInForeground(false)
+                controller.markReadUpTo(MESSAGE_ID)
+                assertEquals(1, fixture.markReadCalls.get())
+                fixture.appState.setAppInForeground(true, dismissRetainedVisibleConversation = false)
+                fixture.appState.appLockScreenVisible = true
+                controller.markReadUpTo(MESSAGE_ID)
+                assertEquals(1, fixture.markReadCalls.get())
+                fixture.appState.appLockScreenVisible = false
+                fixture.appState.setActiveConversationFromUi("other-account", reminder.groupIdHex)
+                controller.markReadUpTo(MESSAGE_ID)
+                assertEquals(1, fixture.markReadCalls.get())
+                fixture.appState.setActiveConversationFromUi(
+                    ConversationTimelineTestIds.ACCOUNT_REF,
+                    reminder.groupIdHex,
+                )
+                controller.markReadUpTo(MESSAGE_ID)
+                assertEquals(2, fixture.markReadCalls.get())
+            } finally {
+                closeFixture(fixture)
+            }
+        }
+
+    @Test
+    fun nativeReminderWithoutBoundChatListIsConsumedOnceEvenWhenReadReturnsNull() =
+        runBlocking {
+            val reminder = reminderRow()
+            val read = reminder.copy(manuallyMarkedUnread = false, hasUnread = false)
+            val fixture = fixture(reminder) { null }
+            try {
+                fixture.bootstrap()
+                val controller = controller(fixture.appState, read)
+                controller.markReadUpTo(MESSAGE_ID)
+                controller.applyAuthoritativeChatListRow(ConversationTimelineTestIds.ACCOUNT_REF, reminder)
+                controller.markReadUpTo(MESSAGE_ID)
+                controller.markReadUpTo(MESSAGE_ID)
+                assertEquals(2, fixture.markReadCalls.get())
+                controller.applyAuthoritativeChatListRow(ConversationTimelineTestIds.ACCOUNT_REF, read)
+                controller.applyAuthoritativeChatListRow(ConversationTimelineTestIds.ACCOUNT_REF, reminder)
+                controller.markReadUpTo(MESSAGE_ID)
+                assertEquals(3, fixture.markReadCalls.get())
+                assertTrue(fixture.markReadRequests.all { it.third == MESSAGE_ID })
+            } finally {
+                closeFixture(fixture)
+            }
+        }
+
     private fun overlappingUnreadRow(newerId: String): ChatListRowFfi {
         val reminder = reminderRow()
         return reminder.copy(
@@ -338,7 +411,7 @@ class ConversationVisibleReadIntegrationTest {
     private fun fixture(
         row: ChatListRowFfi,
         onManualUnread: ((Boolean) -> ChatListRowFfi?)? = null,
-        onRead: () -> ChatListRowFfi,
+        onRead: () -> ChatListRowFfi?,
     ) = NotificationBootstrapTestFixture(
         context = ApplicationProvider.getApplicationContext(),
         accounts =
@@ -369,7 +442,12 @@ class ConversationVisibleReadIntegrationTest {
         initialChatListRow = row,
         initialTimelinePreview = row.lastMessage,
         accountRefOverride = ConversationTimelineTestIds.ACCOUNT_REF,
-    )
+    ).also { controller ->
+        mountedConversations += controller
+        state.attachConversationController(controller)
+        state.setAppInForeground(true, dismissRetainedVisibleConversation = false)
+        state.setActiveConversationFromUi(ConversationTimelineTestIds.ACCOUNT_REF, row.groupIdHex)
+    }
 
     private fun attachChats(
         state: WhiteNoiseAppState,
@@ -388,7 +466,10 @@ class ConversationVisibleReadIntegrationTest {
         }
 
     private fun closeFixture(fixture: NotificationBootstrapTestFixture) {
+        fixture.appState.clearActiveConversation()
         fixture.appState.attachChatsController(null)
+        mountedConversations.forEach(fixture.appState::detachConversationController)
+        mountedConversations.clear()
         mountedChats.forEach(ChatsController::onCleared)
         mountedChats.clear()
         fixture.close()
