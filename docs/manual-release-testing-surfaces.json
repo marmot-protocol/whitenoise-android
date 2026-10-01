@@ -5154,7 +5154,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageFullScreen.kt",
         "anchor": "fun MessageFullScreenView(",
         "test_ids": [
-          "MSG-013"
+          "MSG-013",
+          "MSG-026"
         ]
       },
       {
