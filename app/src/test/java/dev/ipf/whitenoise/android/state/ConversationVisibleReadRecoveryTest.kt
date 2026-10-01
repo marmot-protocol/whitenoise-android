@@ -253,6 +253,48 @@ internal class ConversationVisibleReadRecoveryTest : ConversationVisibleReadTest
             }
         }
 
+    /** Verifies two later failures restore ownership to the remaining read, not an already-finished request. */
+    @Test
+    fun threeOverlappingReadsRestoreRemainingSuccessfulCursorWithoutResubmitting() =
+        runBlocking {
+            val started = List(3) { CompletableDeferred<Unit>() }
+            val release = List(3) { CountDownLatch(1) }
+            val calls = AtomicInteger()
+            val row =
+                reminderRow().copy(lastReadMessageIdHex = ConversationTimelineTestIds.MESSAGE_A, lastReadTimelineAt = 1uL)
+            val fixture =
+                fixture(row) {
+                    val index = calls.getAndIncrement()
+                    started[index].complete(Unit)
+                    check(release[index].await(15, TimeUnit.SECONDS))
+                    if (index != 0) error("later read rejected")
+                    row.copy(lastReadMessageIdHex = MESSAGE_ID, lastReadTimelineAt = 2uL, manuallyMarkedUnread = false)
+                }
+            try {
+                fixture.bootstrap()
+                val controller = controller(fixture.appState, row)
+                val first = async { controller.markReadUpTo(MESSAGE_ID) }
+                started[0].await()
+                val middle = async { controller.markReadUpTo("cc".repeat(32)) }
+                started[1].await()
+                val latest = async { controller.markReadUpTo("dd".repeat(32)) }
+                started[2].await()
+                release[1].countDown()
+                middle.await()
+                release[2].countDown()
+                latest.await()
+                release[0].countDown()
+                first.await()
+                assertEquals(MESSAGE_ID, controller.lastReadMessageId)
+                assertFalse(controller.latestChatListRow!!.manuallyMarkedUnread)
+                controller.markReadUpTo(MESSAGE_ID)
+                assertEquals(3, fixture.markReadCalls.get())
+            } finally {
+                release.forEach(CountDownLatch::countDown)
+                closeFixture(fixture)
+            }
+        }
+
     /** Verifies an older success arriving after a newer failure still restores the confirmed display cursor. */
     @Test
     fun olderSuccessfulReadAfterNewerFailureRestoresItsConfirmedDisplayWatermark() =

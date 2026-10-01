@@ -31,11 +31,8 @@ class ConversationVisibleReadObserverTest {
     @get:Rule val composeRule = createComposeRule()
 
     /**
-
      * Exercises the production observer: ownership reentry retries three reads while reporting one unchanged
-
      * anchor.
-
      */
     @Test
     fun resumedSettledAnchorRetriesWhenConversationAndForegroundOwnershipReturn() {

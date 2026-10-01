@@ -6419,6 +6419,7 @@ class ConversationController(
     private var manualUnreadReminderConsumed = false
     private var nextReadRequestId = 0L
     private var lastReadRequestId = 0L
+    private val pendingReadRequestIds = mutableSetOf<Long>()
     private var lastSuccessfulReadRequestId = 0L
     private var successfulReadWithoutRow: Pair<ChatListRowFfi?, String>? = null
 
@@ -11754,7 +11755,7 @@ class ConversationController(
 
     /**
      * Submits the visit's visible cursor to MDK, including a saved cursor with pending manual attention.
-     * Successful rows fold monotonically even when requests overlap; only the latest request restores display state.
+     * Successful rows fold monotonically; after failures, only the latest remaining request restores display state.
      * A latest failure clears request dedupe for retry, and cancellation is rethrown. A null success acknowledges
      * this row instance until a new native row arrives. Already-confirmed reads do not restart retention deadlines.
      */
@@ -11765,15 +11766,16 @@ class ConversationController(
         val consumeManualReminder = shouldConsumeManualUnreadReminder(account)
         if (trimmed == lastSubmittedReadMessageId && !consumeManualReminder) return
         val readWasAlreadyConfirmed = trimmed == latestChatListRow?.lastReadMessageIdHex
-        val previousRequestId = lastReadRequestId
         val requestId = ++nextReadRequestId
         lastReadRequestId = requestId
+        pendingReadRequestIds += requestId
         lastReadMessageId = trimmed
         lastSubmittedReadMessageId = trimmed
         val markReadResult =
             runCatching {
                 appState.marmotIo { markTimelineMessageRead(account, group.groupIdHex, trimmed) }
             }
+        pendingReadRequestIds -= requestId
         val markReadFailure = markReadResult.exceptionOrNull()
         if (markReadFailure != null) {
             if (lastReadRequestId == requestId) {
@@ -11782,7 +11784,7 @@ class ConversationController(
                 // Earlier overlapping attempts may also have failed. A retry
                 // must reach MDK instead of restoring a failed dedupe key.
                 lastSubmittedReadMessageId = null
-                lastReadRequestId = previousRequestId
+                lastReadRequestId = pendingReadRequestIds.maxOrNull() ?: 0L
             }
             if (markReadFailure is CancellationException) throw markReadFailure
             if (BuildConfig.DEBUG) Log.w("DMConversation", "mark read failed", markReadFailure)
@@ -11795,6 +11797,7 @@ class ConversationController(
         }
         if (lastReadRequestId == requestId) {
             lastReadMessageId = confirmedReadMessageId()
+            lastSubmittedReadMessageId = trimmed
             if (consumeManualReminder) manualUnreadReminderConsumed = true
         }
         // A visit-level attention acknowledgement must not restart an
