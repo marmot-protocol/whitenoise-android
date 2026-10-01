@@ -90,6 +90,7 @@ import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.HostSafety
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.MarmotClient
+import dev.ipf.whitenoise.android.core.MarmotClientRootGate
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
@@ -4494,13 +4495,15 @@ class WhiteNoiseAppState private constructor(
                     construct = {
                         startupPerformance.stage(PerformancePhase.CLIENT_CONSTRUCTION) {
                             withContext(Dispatchers.IO) {
-                                marmotRuntimeFactory(appContext).also { runtime ->
-                                    // Publish before start so lifecycle consumers
-                                    // and later listener retries can resolve Marmot.
-                                    publishMarmotRuntime(runtime)
-                                    diagnostics.bind(runtime.marmot)
-                                    AvatarImageLoader.attachProfileImageFetcher { url, maxBytes ->
-                                        runtime.marmot.downloadProfileImage(url, maxBytes)
+                                MarmotClientRootGate.withLease {
+                                    marmotRuntimeFactory(appContext).also { runtime ->
+                                        // Publish before start so lifecycle consumers
+                                        // and later listener retries can resolve Marmot.
+                                        publishMarmotRuntime(runtime)
+                                        diagnostics.bind(runtime.marmot)
+                                        AvatarImageLoader.attachProfileImageFetcher { url, maxBytes ->
+                                            runtime.marmot.downloadProfileImage(url, maxBytes)
+                                        }
                                     }
                                 }
                             }
@@ -8033,26 +8036,21 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Reuses the live native client for a retention preflight when one already exists. */
+    internal fun retentionSweepRuntimeOrNull(): MarmotInterface? = marmotRuntime?.marmot
+
     /**
-     * Background disappearing-message sweep across every signed-in account
-     * (#745). The in-conversation sweep ([ConversationController.start]) only
-     * runs while a chat is open; this is the closed-conversation counterpart,
-     * driven on a coarse cadence by [DisappearingMessageSweepWorker] so a
-     * message that expires while its conversation is closed is still pruned,
-     * its decrypted L2 media still secure-deleted, and a stale tray card still
-     * cleared — without waiting for the user to reopen the chat.
+     * Sweeps closed conversations across signed-in accounts (#745) on the coarse worker cadence.
+     * Expired messages, decrypted L2 media, and stale tray cards are removed without reopening a
+     * conversation; [ConversationController.start] handles the open-conversation path.
      *
-     * The sweep core is engine-owned: one `sweepExpiredRetention` call per
-     * account covers every retention-enabled group with the same clock-skew,
-     * unread-anchor, and scan-cap deferrals Android used to gate app-side,
-     * run atomically with the prune on the account's serialized command
-     * worker. Android keeps only what it owns per pruned group: tray-card
-     * dismissal (#333) and decrypted media-cache eviction (#334).
+     * One engine-owned `sweepExpiredRetention` call per account atomically applies clock-skew,
+     * unread-anchor, and scan-cap deferrals on its serialized command worker. Android handles
+     * tray-card dismissal (#333) and decrypted media-cache eviction (#334) per pruned group.
      *
-     * Best-effort and per-account isolated: a failure on one account is
-     * logged (cancellation re-thrown) and the sweep moves on, so one bad
-     * account can't starve the rest. Bootstraps the runtime first so the
-     * worker can run after a process death with no UI attached.
+     * Failures are isolated per account and logged; cancellation propagates. The worker checks
+     * MDK's account inventory before starting the notification runtime, and eligible accounts
+     * can still bootstrap after process death without a UI.
      */
     suspend fun sweepExpiredDisappearingMessages() {
         ensureNotificationRuntimeStarted()

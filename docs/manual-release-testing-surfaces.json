@@ -25047,6 +25047,14 @@
         ]
       },
       {
+        "surface": "Hourly disappearing-message worker skips native startup for an empty signed-in inventory",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/DisappearingMessageSweepWorker.kt",
+        "anchor": "override suspend fun doWork()",
+        "test_ids": [
+          "GRP-017"
+        ]
+      },
+      {
         "surface": "A message past its disappearing deadline stays out of every search surface",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/MessageBodySearchSupport.kt",
         "anchor": "internal fun isRetentionExpiredForSearch(",
