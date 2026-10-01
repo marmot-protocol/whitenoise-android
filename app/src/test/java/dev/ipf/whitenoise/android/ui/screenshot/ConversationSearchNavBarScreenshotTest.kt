@@ -6,6 +6,10 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
@@ -33,11 +37,14 @@ import org.robolectric.annotation.GraphicsMode
 class ConversationSearchNavBarScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
 
-    /** Loading shows no partial count and disables both arrows. */
+    /** Loading shows no partial count, disables both arrows and is announced politely. */
     @Test
     fun loadingLight() {
         val steps = render(ConversationSearchScanStatus.LOADING, matchCount = 2, dark = false, largeRtl = false)
         composeRule.onNodeWithTag(STATUS_TAG).assertTextEquals("Searching all messages…")
+        composeRule
+            .onNodeWithTag(STATUS_TAG)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
         composeRule.onNodeWithContentDescription("Previous match").assertIsNotEnabled()
         composeRule.onNodeWithContentDescription("Next match").assertIsNotEnabled()
         capture("conversation_search_nav_loading_light")

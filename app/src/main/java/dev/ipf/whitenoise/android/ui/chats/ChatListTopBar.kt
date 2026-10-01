@@ -38,7 +38,9 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -415,7 +417,12 @@ internal fun ConversationSearchNavBar(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.weight(1f).testTag("conversation.search.status"),
+                // Polite live region: TalkBack announces when loading turns into a final count or failure.
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .testTag("conversation.search.status")
+                        .semantics { liveRegion = LiveRegionMode.Polite },
             )
             if (status == ConversationSearchScanStatus.FAILED) {
                 IconButton(onClick = onRetryScan) {
