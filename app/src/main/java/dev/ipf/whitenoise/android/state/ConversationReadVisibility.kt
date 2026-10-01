@@ -4,8 +4,12 @@ package dev.ipf.whitenoise.android.state
 internal fun WhiteNoiseAppState.isConversationReadVisible(
     accountRef: String,
     groupIdHex: String,
-): Boolean =
-    appInForeground &&
+): Boolean {
+    // Observe the same platform transitions used by notification suppression
+    // so a settled screen retries when navigation/foreground ownership changes.
+    val visibility = conversationReadVisibility.value
+    return visibility.inForeground &&
         !appLockScreenVisible &&
-        activeConversationAccountRef == accountRef &&
-        activeConversationGroupIdHex?.equals(groupIdHex, ignoreCase = true) == true
+        visibility.activeConversationAccountRef == accountRef &&
+        visibility.activeConversationGroupIdHex?.equals(groupIdHex, ignoreCase = true) == true
+}

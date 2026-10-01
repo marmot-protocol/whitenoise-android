@@ -477,8 +477,8 @@ class ConversationVisibleReadIntegrationTest {
                 fixture.bootstrap()
                 val controller = controller(fixture.appState, reminder, clockMillis = { nowMillis })
                 val record =
-                    timelineRecord(MESSAGE_ID, timelineAt = 40uL).copy(
-                        direction = "sent",
+                    timelineRecord(MESSAGE_ID, timelineAt = 2uL).copy(
+                        direction = "received",
                         retentionSeconds = 60uL,
                         retentionExpiresAt = 100uL,
                     )
@@ -494,6 +494,50 @@ class ConversationVisibleReadIntegrationTest {
                 nowMillis = 105_000L
                 controller.applyTimelinePage(page, replaceWindow = true, updatePagination = true)
                 assertTrue("the native deadline must still hide the message", timelineMessageIds(controller).isEmpty())
+
+                // Control: the same native record must actually support local
+                // anchoring for a first read, while its native echo is pending.
+                nowMillis = 90_000L
+                val firstRead =
+                    reminder.copy(lastReadMessageIdHex = ConversationTimelineTestIds.MESSAGE_A, lastReadTimelineAt = 1uL)
+                val fresh = controller(fixture.appState, firstRead, clockMillis = { nowMillis })
+                fresh.applyTimelinePage(page, replaceWindow = true, updatePagination = true)
+                nowMillis = 95_000L
+                fresh.markReadUpTo(MESSAGE_ID)
+                nowMillis = 105_000L
+                fresh.applyTimelinePage(page, replaceWindow = true, updatePagination = true)
+                assertEquals("a genuinely new read still anchors retention", listOf(MESSAGE_ID), timelineMessageIds(fresh))
+            } finally {
+                closeFixture(fixture)
+            }
+        }
+
+    @Test
+    fun failedReadPreservesEarlierSuccessfulAcknowledgementWhenNativeReturnedNoRow() =
+        runBlocking {
+            val newerId = "cc".repeat(32)
+            val row = overlappingUnreadRow(newerId)
+            val calls = AtomicInteger()
+            val fixture = fixture(row) {
+                if (calls.incrementAndGet() in listOf(2, 4)) error("later read failed")
+                null
+            }
+            try {
+                fixture.bootstrap()
+                val controller = controller(fixture.appState, row)
+                controller.markReadUpTo(MESSAGE_ID)
+                controller.markReadUpTo(newerId)
+                assertEquals(MESSAGE_ID, controller.lastReadMessageId)
+                controller.markReadUpTo(newerId)
+                assertEquals(newerId, controller.lastReadMessageId)
+                assertEquals(listOf(MESSAGE_ID, newerId, newerId), fixture.markReadRequests.map { it.third })
+
+                // A later native row replaces the null-result fallback.
+                val confirmedId = "dd".repeat(32)
+                val confirmed = row.copy(lastReadMessageIdHex = confirmedId, lastReadTimelineAt = 4uL)
+                controller.applyAuthoritativeChatListRow(ConversationTimelineTestIds.ACCOUNT_REF, confirmed)
+                controller.markReadUpTo("ee".repeat(32))
+                assertEquals(confirmedId, controller.lastReadMessageId)
             } finally {
                 closeFixture(fixture)
             }

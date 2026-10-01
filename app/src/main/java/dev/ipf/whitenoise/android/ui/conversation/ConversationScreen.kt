@@ -89,7 +89,6 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.Lifecycle
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.core.AgentOperationProjector
@@ -148,7 +147,6 @@ import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.reconcileConversationUnreadJump
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
-import dev.ipf.whitenoise.android.state.reportVisibleMessage
 import dev.ipf.whitenoise.android.state.returnToLatestWindow
 import dev.ipf.whitenoise.android.state.setUserBlocked
 import dev.ipf.whitenoise.android.state.transcriptPresentationNeedsRetry
@@ -3293,35 +3291,8 @@ internal fun ConversationScreen(
     // (`readAnchorMessageId`) so the FFI only sees IDs that strictly advance
     // the pointer — scroll-up cannot regress the count. Settle-gated
     // (`!isScrollInProgress`) avoids per-frame FFI hops while scrolling.
-    val readHostResumed =
-        resumeLifecycleOwner
-            ?.lifecycle
-            ?.currentStateFlow
-            ?.collectAsState()
-            ?.value == Lifecycle.State.RESUMED
-    val currentReadHostResumed by rememberUpdatedState(readHostResumed)
-    LaunchedEffect(listState, controller) {
-        snapshotFlow {
-            val readBlockedByHost = !currentReadHostResumed || appState.appLockScreenVisible
-            if (
-                !initialTimelineAnchored ||
-                listState.isScrollInProgress ||
-                readBlockedByHost
-            ) {
-                null
-            } else {
-                readAnchorMessageId?.let { messageId ->
-                    messageId to controller.latestChatListRow?.manuallyMarkedUnread
-                }
-            }
-        }.distinctUntilChanged()
-            .filterNotNull()
-            .collect { (messageId, _) ->
-                if (messageId.isNotBlank()) {
-                    controller.markReadUpTo(messageId)
-                    controller.reportVisibleMessage(messageId)
-                }
-            }
+    ObserveConversationVisibleReads(appState, controller, resumeLifecycleOwner) {
+        readAnchorMessageId.takeIf { initialTimelineAnchored && !listState.isScrollInProgress }
     }
 
     // Own prepared files above the details early return so staged media

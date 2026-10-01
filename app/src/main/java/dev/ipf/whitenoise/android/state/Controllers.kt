@@ -6419,6 +6419,8 @@ class ConversationController(
     private var manualUnreadReminderConsumed = false
     private var nextReadRequestId = 0L
     private var lastReadRequestId = 0L
+    private var lastSuccessfulReadRequestId = 0L
+    private var successfulReadWithoutRow: Pair<ChatListRowFfi?, String>? = null
 
     // Persisted read watermark from the chat-list projection / mark-read FFI.
     // Drives read-anchored disappearing-message deferral (#797).
@@ -11761,7 +11763,7 @@ class ConversationController(
         val markReadFailure = markReadResult.exceptionOrNull()
         if (markReadFailure != null) {
             if (lastReadRequestId == requestId) {
-                lastReadMessageId = latestChatListRow?.lastReadMessageIdHex?.takeIf { it.isNotBlank() }
+                lastReadMessageId = confirmedReadMessageId()
                 manualUnreadReminderConsumed = false
                 // Earlier overlapping attempts may also have failed. A retry
                 // must reach MDK instead of restoring a failed dedupe key.
@@ -11773,13 +11775,18 @@ class ConversationController(
             return
         }
         markReadResult.getOrNull()?.let { row -> foldVisibleReadRow(account, row) }
+        if (requestId > lastSuccessfulReadRequestId) {
+            lastSuccessfulReadRequestId = requestId
+            successfulReadWithoutRow = if (markReadResult.getOrNull() == null) latestChatListRow to trimmed else null
+        }
         if (lastReadRequestId == requestId && consumeManualReminder) {
             manualUnreadReminderConsumed = true
         }
         // A visit-level attention acknowledgement must not restart an
         // already-confirmed message's disappearing deadline after reopening.
         if (!readWasAlreadyConfirmed) {
-            anchorReadExpiryUpTo(trimmed, (clockMillis() / 1_000L).toULong())
+            val anchoredAtSeconds = (clockMillis() / 1_000L).toULong()
+            anchorReadExpiryUpTo(trimmed, anchoredAtSeconds)
         }
         runCatchingCancellable {
             appState.dismissConversationNotifications(account, group.groupIdHex)
@@ -11787,6 +11794,12 @@ class ConversationController(
             if (BuildConfig.DEBUG) Log.w("DMConversation", "dismiss read notifications failed", it)
         }
     }
+
+    // A successful null-returning command still acknowledges its visible ID.
+    // Any subsequent authoritative row supersedes this transient fallback.
+    private fun confirmedReadMessageId(): String? =
+        successfulReadWithoutRow?.takeIf { it.first === latestChatListRow }?.second
+            ?: latestChatListRow?.lastReadMessageIdHex?.takeIf { it.isNotBlank() }
 
     private fun foldVisibleReadRow(
         accountRef: String,

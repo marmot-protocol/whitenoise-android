@@ -2537,10 +2537,12 @@ class WhiteNoiseAppState private constructor(
     // drift across the separate places that update them (issue #821).
     @Volatile
     private var suppression = NotificationSuppression()
+    internal val conversationReadVisibility = mutableStateOf(suppression)
 
     private fun updateNotificationSuppression(next: NotificationSuppression) {
         if (next != suppression) notificationPostEpoch.advance()
         suppression = next
+        conversationReadVisibility.value = next
         dictationDiagnosticLifecycle.originVisibility({ conversationDictation }) {
             isConversationDictationOriginVisible(it.accountRef, it.groupIdHex)
         }

@@ -3,6 +3,14 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "ObserveConversationVisibleReads",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationVisibleReads.kt",
+        "anchor": "internal fun ObserveConversationVisibleReads(",
+        "test_ids": [
+          "CHL-008"
+        ]
+      },
+      {
         "surface": "Modifier.conversationScrollIndicator",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScrollIndicatorWindow.kt",
         "anchor": "fun Modifier.conversationScrollIndicator(",
@@ -24159,7 +24167,7 @@
       {
         "surface": "Settled visible-read retry on resume and manual-reminder changes",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
-        "anchor": "val readHostResumed =",
+        "anchor": "ObserveConversationVisibleReads(",
         "test_ids": [
           "CHL-008"
         ]
