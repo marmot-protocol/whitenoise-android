@@ -6731,13 +6731,7 @@ class WhiteNoiseAppState private constructor(
             false
         }
 
-    /**
-     * Archives current audit files and a flushed performance-session snapshot for a confirmed export.
-     *
-     * The engine paths, file names and archive entries are never logged or included in failures.
-     * Returns null when there is nothing to export or the archive could not be prepared in full;
-     * a partial archive is never returned, so the caller cannot present one as a complete export.
-     */
+    /** Archives audit, dictation, and performance data; empty or partial exports return null. */
     @Suppress("ReturnCount") // Each engine/cache failure is a distinct fail-closed export outcome.
     suspend fun prepareAuditLogArchiveForExport(): java.io.File? {
         val sourcePaths =
@@ -6757,13 +6751,7 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /**
-     * Delete every local audit and stored performance log file. Each delete is best-effort; the
-     * runtime hot-swaps any live recorder so logging keeps running on a
-     * fresh file when audit logging is currently on. Returns true if at
-     * least one file was successfully removed (or rotated).
-     * Distinct native, cache, and performance-file outcomes keep partial failures visible.
-     */
+    /** Clears audit, dictation, and performance files while surfacing native deletion failures. */
     @Suppress("CyclomaticComplexMethod", "ReturnCount")
     suspend fun deleteAuditLogs(): Boolean {
         var engineFailure: Throwable? = null
