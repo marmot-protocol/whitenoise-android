@@ -1,11 +1,13 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
@@ -94,6 +96,23 @@ class ConversationUnreadBadgeComposeTest {
             }
         }
         if (expected != null) composeRule.onNodeWithText(expected).assertExists()
+    }
+
+    /** The jump control announces its action plus the actual unread count, even where the badge shows `999+`. */
+    @Test
+    fun jumpControlAnnouncesTheActualUnreadCountBeyondTheVisualCap() {
+        var count by mutableIntStateOf(1030)
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                ConversationJumpToNewestButton(unreadIncomingCount = count, onClick = {})
+            }
+        }
+        composeRule.onNodeWithText("999+").assertExists()
+        composeRule.onNodeWithContentDescription("Jump to newest, 1030 unread messages").assertExists()
+        composeRule.runOnIdle { count = 1 }
+        composeRule.onNodeWithContentDescription("Jump to newest, 1 unread message").assertExists()
+        composeRule.runOnIdle { count = 0 }
+        composeRule.onNodeWithContentDescription("Jump to newest").assertExists()
     }
 
     /** Three backward pages, the second evicting the anchor itself, leave the number where it was on every frame. */
