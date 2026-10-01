@@ -2180,4 +2180,5 @@
     <string name="dictation_audio_focus_unavailable">Andere Audioinhalte konnten nicht pausiert werden. Versuche es erneut oder deaktiviere diese Option in den Diktiereinstellungen.</string>
     <string name="checking_invitation">Einladung wird geprüft…</string>
     <string name="couldnt_check_invitation">Einladung konnte nicht geprüft werden</string>
+    <string name="toast_leave_not_confirmed_history_kept">Verlassen nicht bestätigt. Verlauf behalten.</string>
 </resources>

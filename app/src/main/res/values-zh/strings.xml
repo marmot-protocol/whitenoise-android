@@ -2131,4 +2131,5 @@
     <string name="dictation_audio_focus_unavailable">无法暂停其他音频。请重试，或在听写设置中关闭“暂停其他音频”。</string>
     <string name="checking_invitation">正在检查邀请…</string>
     <string name="couldnt_check_invitation">无法检查邀请</string>
+    <string name="toast_leave_not_confirmed_history_kept">尚未确认退出。历史记录已保留。</string>
 </resources>

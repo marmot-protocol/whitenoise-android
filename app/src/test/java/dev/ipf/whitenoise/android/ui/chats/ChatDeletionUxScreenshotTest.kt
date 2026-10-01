@@ -88,7 +88,12 @@ class ChatDeletionUxScreenshotTest {
     fun localDeleteRtlLargeScreenshot() = captureDialog("chat_delete_local_rtl_large", dark = false, leave = false, scale = 2f)
 
     /** Records the actual shared confirmation surface. */
-    private fun captureDialog(name: String, dark: Boolean, leave: Boolean, scale: Float = 1f) {
+    private fun captureDialog(
+        name: String,
+        dark: Boolean,
+        leave: Boolean,
+        scale: Float = 1f,
+    ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = dark, fontScale = scale) {
                 if (leave) ChatLeaveAndDeleteConfirmationDialog({}, {}) else ChatDeleteConfirmationDialog(1, {}, {})
@@ -99,13 +104,42 @@ class ChatDeletionUxScreenshotTest {
 
     /** Supplies the native advisory capability rather than synthesizing permission. */
     @Composable
-    private fun menu(canLeave: Boolean, onLocal: () -> Unit, onLeave: () -> Unit) {
+    private fun menu(
+        canLeave: Boolean,
+        onLocal: () -> Unit,
+        onLeave: () -> Unit,
+    ) {
         ChatContextMenu(
-            hasUnread = false, canMarkUnread = true, archived = false, muted = false, pinned = false,
-            showPinToggle = false, showMovePinnedUp = false, showMovePinnedDown = false,
-            onMarkRead = {}, onMarkUnread = {}, onAddToFolder = {}, onArchiveToggle = {}, onMuteToggle = {},
-            onPinToggle = {}, onMovePinned = {}, onSelect = {}, onDelete = onLocal, onDismiss = {},
-            actions = ChatListRowActionsFfi(false, false, false, false, false, false, false, false, canLeave, true),
+            hasUnread = false,
+            canMarkUnread = true,
+            archived = false,
+            muted = false,
+            pinned = false,
+            showPinToggle = false,
+            showMovePinnedUp = false,
+            showMovePinnedDown = false,
+            onMarkRead = {},
+            onMarkUnread = {},
+            onAddToFolder = {},
+            onArchiveToggle = {},
+            onMuteToggle = {},
+            onPinToggle = {},
+            onMovePinned = {},
+            onSelect = {},
+            onDelete = onLocal,
+            onDismiss = {},
+            actions = ChatListRowActionsFfi(
+                canMarkRead = false,
+                canMarkUnread = false,
+                canPin = false,
+                canUnpin = false,
+                canMute = false,
+                canUnmute = false,
+                canArchive = false,
+                canRestore = false,
+                canStartLeave = canLeave,
+                canDeleteLocal = true,
+            ),
             onLeaveAndDelete = onLeave,
         )
     }

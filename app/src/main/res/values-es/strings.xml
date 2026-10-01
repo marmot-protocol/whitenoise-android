@@ -2163,4 +2163,5 @@
     <string name="dictation_audio_focus_unavailable">No se pudo pausar otro audio. Inténtalo de nuevo o desactiva esta opción en los ajustes de dictado.</string>
     <string name="checking_invitation">Comprobando invitación…</string>
     <string name="couldnt_check_invitation">No se pudo comprobar la invitación</string>
+    <string name="toast_leave_not_confirmed_history_kept">Salida no confirmada. Se conserva el historial.</string>
 </resources>

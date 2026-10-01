@@ -2161,4 +2161,5 @@
     <string name="dictation_audio_focus_unavailable">Diğer sesler duraklatılamadı. Tekrar deneyin veya Dikte ayarlarında bu seçeneği kapatın.</string>
     <string name="checking_invitation">Davet kontrol ediliyor…</string>
     <string name="couldnt_check_invitation">Davet kontrol edilemedi</string>
+    <string name="toast_leave_not_confirmed_history_kept">Ayrılma doğrulanmadı. Geçmiş korundu.</string>
 </resources>

@@ -2163,4 +2163,5 @@
     <string name="dictation_audio_focus_unavailable">Não foi possível pausar outro áudio. Tenta novamente ou desativa esta opção nas definições de ditado.</string>
     <string name="checking_invitation">A verificar o convite…</string>
     <string name="couldnt_check_invitation">Não foi possível verificar o convite</string>
+    <string name="toast_leave_not_confirmed_history_kept">Saída não confirmada. Histórico mantido.</string>
 </resources>

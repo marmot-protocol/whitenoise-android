@@ -2319,4 +2319,5 @@
     <string name="donate_open_failed">Couldn’t open the donation page. Try again or return to Settings.</string>
     <string name="checking_invitation">Checking invitation…</string>
     <string name="couldnt_check_invitation">Couldn’t check invitation</string>
+    <string name="toast_leave_not_confirmed_history_kept">Leave not confirmed. History kept.</string>
 </resources>

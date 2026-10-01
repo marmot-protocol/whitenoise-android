@@ -2163,4 +2163,5 @@
     <string name="dictation_audio_focus_unavailable">Impossibile mettere in pausa gli altri audio. Riprova oppure disattiva questa opzione nelle impostazioni della dettatura.</string>
     <string name="checking_invitation">Verifica dell’invito…</string>
     <string name="couldnt_check_invitation">Impossibile verificare l’invito</string>
+    <string name="toast_leave_not_confirmed_history_kept">Uscita non confermata. Cronologia conservata.</string>
 </resources>

@@ -2231,4 +2231,5 @@
     <string name="dictation_audio_focus_unavailable">Не удалось приостановить другое аудио. Повторите попытку или отключите этот параметр в настройках диктовки.</string>
     <string name="checking_invitation">Проверка приглашения…</string>
     <string name="couldnt_check_invitation">Не удалось проверить приглашение</string>
+    <string name="toast_leave_not_confirmed_history_kept">Выход не подтверждён. История сохранена.</string>
 </resources>
