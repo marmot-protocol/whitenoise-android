@@ -39,11 +39,8 @@ private fun pollOwnerMayAct(
 ): Boolean =
     owner.accountRef != null &&
         controller.acceptsConversationActionOwner(owner.accountRef, owner.groupId) &&
-        pollConversationMayAct(controller)
-
-private fun pollConversationMayAct(controller: ConversationController): Boolean {
-    return controller.canSendMessages && !controller.group.pendingConfirmation
-}
+        controller.canSendMessages &&
+        !controller.group.pendingConfirmation
 
 /** The poll's vote deadline deliberately has no part in message discussion eligibility. */
 internal fun pollMessageActionsEligible(

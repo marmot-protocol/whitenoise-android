@@ -55,17 +55,19 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
 
     @Test fun pendingPollKeepsVotingLight() = render("pending_light", PollScreenshotConfiguration(pending = true))
 
-    @Test fun closedPollReactionsAmoledRtlLarge() = render(
-        "amoled_rtl_large",
-        PollScreenshotConfiguration(dark = true, amoled = true, rtl = true, fontScale = 2f, closed = true),
-    )
+    @Test fun closedPollReactionsAmoledRtlLarge() =
+        render(
+            "amoled_rtl_large",
+            PollScreenshotConfiguration(dark = true, amoled = true, rtl = true, fontScale = 2f, closed = true),
+        )
 
     @Test fun pollActionMenuLight() = render("menu_light", PollScreenshotConfiguration(menu = true))
 
-    @Test fun pollReplyComposerAmoled() = render(
-        "reply_amoled",
-        PollScreenshotConfiguration(dark = true, amoled = true, reply = true, closed = true),
-    )
+    @Test fun pollReplyComposerAmoled() =
+        render(
+            "reply_amoled",
+            PollScreenshotConfiguration(dark = true, amoled = true, reply = true, closed = true),
+        )
 
     @Test fun pollInfoLight() {
         val item = pollMessage(closed = true)
