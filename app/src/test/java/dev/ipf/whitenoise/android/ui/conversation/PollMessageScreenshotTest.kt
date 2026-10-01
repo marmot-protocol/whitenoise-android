@@ -52,9 +52,9 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
         pollController.onCleared()
     }
 
-    @Test fun pollReactionsLight() = render("light")
+    @Test fun pollReactionsLight() = render("light", PollScreenshotConfiguration(sent = true))
 
-    @Test fun pollReactionsDark() = render("dark", PollScreenshotConfiguration(dark = true))
+    @Test fun pollReactionsDark() = render("dark", PollScreenshotConfiguration(dark = true, sent = true))
 
     @Test fun pendingPollKeepsVotingLight() = render("pending_light", PollScreenshotConfiguration(pending = true))
 
@@ -103,8 +103,13 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
         val item =
             pollMessage(
                 closed = configuration.closed,
-                mine = configuration.pending,
-                status = if (configuration.pending) MessageStatus.Pending else MessageStatus.Received,
+                mine = configuration.pending || configuration.sent,
+                status =
+                    when {
+                        configuration.pending -> MessageStatus.Pending
+                        configuration.sent -> MessageStatus.Sent
+                        else -> MessageStatus.Received
+                    },
             )
         retain(item)
         runTest { pollController.toggleReaction("👍", item.record) }
@@ -133,10 +138,23 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
                 }
             }
         }
-        if (!configuration.menu) {
+        if (configuration.menu) {
+            val card =
+                composeRule
+                    .onNodeWithTag("poll-preview-card", useUnmergedTree = true)
+                    .fetchSemanticsNode().boundsInRoot
+            val footer =
+                composeRule
+                    .onNodeWithTag("poll-preview-footer", useUnmergedTree = true)
+                    .fetchSemanticsNode().boundsInRoot
+            assertTrue("Preview footer must remain inside the card", footer.bottom <= card.bottom - 8f)
+            assertEquals("Preview footer must follow trailing alignment", 12f, card.right - footer.right, 1f)
+        } else {
             val card = composeRule.onNodeWithTag("poll-message-card").fetchSemanticsNode().boundsInRoot
-            val footer = composeRule.onNodeWithTag("poll-message-footer", useUnmergedTree = true)
-                .fetchSemanticsNode().boundsInRoot
+            val footer =
+                composeRule
+                    .onNodeWithTag("poll-message-footer", useUnmergedTree = true)
+                    .fetchSemanticsNode().boundsInRoot
             assertTrue("Footer must remain inside the rounded card", footer.bottom <= card.bottom - 8f)
             val trailingInset = if (configuration.rtl) footer.left - card.left else card.right - footer.right
             assertEquals("Footer must follow the ordinary trailing alignment", 12f, trailingInset, 1f)
@@ -158,4 +176,5 @@ private data class PollScreenshotConfiguration(
     val reply: Boolean = false,
     val closed: Boolean = false,
     val pending: Boolean = false,
+    val sent: Boolean = false,
 )

@@ -7,6 +7,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -2174,6 +2175,17 @@ internal fun MessageBubble(
                     }
                 val visiblePoll =
                     item.projected?.poll.takeIf { isPollRecord && !deleted && !invalidated && !persistedFailure }
+                val pollTimestampColor =
+                    if (visiblePoll != null) {
+                        messageBubbleFooterColor(
+                            mine = mine,
+                            persistedFailure = false,
+                            bubbleBackgroundColor = MaterialTheme.colorScheme.surfaceVariant,
+                            bubbleContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        timestampColor
+                    }
                 if (visiblePoll != null) {
                     Column(
                         Modifier.fillMaxWidth().then(actionAnchorBoundsModifier),
@@ -2190,13 +2202,13 @@ internal fun MessageBubble(
                             footer = {
                                 MessageInlineFooter(
                                     timeText = rememberedMessageBubbleTime(record.recordedAt),
-                                    color = timestampColor,
+                                    color = pollTimestampColor,
                                     showStatus = showOutgoingStatus,
                                     status = item.status,
                                     editedLabel = footerLabel,
                                     onEditedClick = null,
                                     modifier = Modifier.testTag("poll-message-footer"),
-                                    statusContainerColor = bubbleBackgroundColor,
+                                    statusContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                                 )
                             },
                         )
@@ -2606,18 +2618,29 @@ internal fun MessageBubble(
                         val previewFooter: @Composable () -> Unit = {
                             MessageInlineFooter(
                                 timeText = rememberedMessageBubbleTime(record.recordedAt),
-                                color = timestampColor,
+                                color = if (visiblePoll != null) pollTimestampColor else timestampColor,
                                 showStatus = showOutgoingStatus && !fileFooterInCard && remoteGiphyMedia == null,
                                 status = item.status,
                                 editedLabel = footerLabel.takeIf { remoteGiphyMedia == null },
                                 onEditedClick = null,
                                 showTime = !fileFooterInCard && remoteGiphyMedia == null,
-                                statusContainerColor = colorFromArgb(bubblePresentation.backgroundArgb),
+                                modifier =
+                                    if (visiblePoll != null) Modifier.testTag("poll-preview-footer") else Modifier,
+                                statusContainerColor =
+                                    if (visiblePoll != null) {
+                                        MaterialTheme.colorScheme.surfaceVariant
+                                    } else {
+                                        colorFromArgb(bubblePresentation.backgroundArgb)
+                                    },
                             )
                         }
                         val mediaPreview: (@Composable () -> Unit)? =
                             if (visiblePoll != null) {
-                                { PollCard(visiblePoll, canVote = false, onVote = {}, footer = previewFooter) }
+                                {
+                                    Box(Modifier.testTag("poll-preview-card")) {
+                                        PollCard(visiblePoll, canVote = false, onVote = {}, footer = previewFooter)
+                                    }
+                                }
                             } else if (hasMedia) {
                                 {
                                     FocusedRenderedMessagePreview(
@@ -2665,11 +2688,10 @@ internal fun MessageBubble(
                                     )
                                 }
                                 mediaPreview?.invoke()
-                                if (
-                                    visiblePoll == null && !footerOnVisualMedia &&
-                                    !footerOnPendingVisual && remoteGiphyMedia == null
-                                ) {
-                                    previewFooter()
+                                if (visiblePoll == null) {
+                                    if (!footerOnVisualMedia && !footerOnPendingVisual && remoteGiphyMedia == null) {
+                                        previewFooter()
+                                    }
                                 }
                             }
                         } else {
