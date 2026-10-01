@@ -82,6 +82,8 @@ internal fun MessageFullScreenView(
 ) {
     val selectionKey = remember(body, bodyMarkdownDocument) { Any() }
     val selection = rememberReaderTextSelectionController(selectionKey, selectionController)
+    // Save with the owning message, outside the dialog’s separate saveable registry.
+    val scrollState = rememberScrollState()
     Dialog(
         onDismissRequest = onDismiss,
         properties =
@@ -194,8 +196,6 @@ internal fun MessageFullScreenView(
             bottomBar = bottomBar,
         ) { padding ->
             AdaptiveContent(Modifier.fillMaxSize().padding(padding)) {
-                // Keep the native saveable reading position independent of the selection session.
-                val scrollState = rememberScrollState()
                 MessageFullScreenBody(
                     body = body,
                     markdownDocument = bodyMarkdownDocument,
