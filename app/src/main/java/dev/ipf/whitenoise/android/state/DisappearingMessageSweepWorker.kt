@@ -59,11 +59,13 @@ class DisappearingMessageSweepWorker : CoroutineWorker {
     private val sweepOverride: PerformDisappearingMessageSweep?
     private val accountOverride: HasRetentionSweepAccount?
 
+    /** WorkManager entry point using the authoritative MDK preflight and app-owned sweep. */
     constructor(
         appContext: Context,
         params: WorkerParameters,
     ) : this(appContext, params, null, null)
 
+    /** Test seam for account reads and sweep execution without opening the native root. */
     internal constructor(
         appContext: Context,
         params: WorkerParameters,
@@ -74,6 +76,7 @@ class DisappearingMessageSweepWorker : CoroutineWorker {
         this.accountOverride = accountOverride
     }
 
+    /** Skips ineligible inventories, retries uncertain reads or sweep failures, and preserves cancellation. */
     override suspend fun doWork(): Result {
         val app = applicationContext as? WhiteNoiseApplication ?: return Result.success()
         return runCatching {

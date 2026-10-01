@@ -31,6 +31,7 @@ class DisappearingMessageSweepWorkerTest {
     private lateinit var application: WhiteNoiseApplication
     private lateinit var appContext: Context
 
+    /** Installs a test WorkManager without constructing the app's native runtime. */
     @Before
     fun setUp() {
         application = ApplicationProvider.getApplicationContext()
@@ -38,6 +39,7 @@ class DisappearingMessageSweepWorkerTest {
         WorkManagerTestInitHelper.initializeTestWorkManager(application)
     }
 
+    /** A completed eligible sweep settles the WorkManager attempt successfully. */
     @Test
     fun doWorkSucceedsWhenSweepCompletes() =
         runTest {
@@ -46,6 +48,7 @@ class DisappearingMessageSweepWorkerTest {
             assertEquals(Result.success(), worker.doWork())
         }
 
+    /** An empty cold inventory never creates AppState or calls the sweep. */
     @Test
     fun emptyColdProcessSkipsRuntimeAndSweep() =
         runTest {
@@ -62,6 +65,7 @@ class DisappearingMessageSweepWorkerTest {
             assertNull(application.initializedAppState())
         }
 
+    /** Signed-out and non-signing identities cannot admit background retention work. */
     @Test
     fun signedOutAndNonSigningAccountsSkipSweep() =
         runTest {
@@ -83,23 +87,30 @@ class DisappearingMessageSweepWorkerTest {
             assertEquals(0, sweepCalls)
         }
 
+    /** An eligible inventory in a cold process admits the sweep only after the account read. */
     @Test
-    fun eligibleAccountRunsSweepAfterPreflight() =
+    fun eligibleColdProcessRunsSweepAfterAuthoritativePreflight() =
         runTest {
             val calls = mutableListOf<String>()
             val worker =
                 buildWorkerWithSweepOverride(
-                    sweepOverride = { calls += "sweep" },
+                    sweepOverride = {
+                        assertEquals(listOf("inventory"), calls)
+                        calls += "sweep"
+                    },
                     accountOverride = {
-                        calls += "read"
+                        assertNull(application.initializedAppState())
+                        calls += "inventory"
                         needsRetentionSweep(listOf(account(localSigning = false, externalSigning = true)))
                     },
                 )
 
+            assertNull(application.initializedAppState())
             assertEquals(Result.success(), worker.doWork())
-            assertEquals(listOf("read", "sweep"), calls)
+            assertEquals(listOf("inventory", "sweep"), calls)
         }
 
+    /** An unknown inventory retries rather than treating account eligibility as false. */
     @Test
     fun uncertainEligibilityRetriesWithoutStartingSweep() =
         runTest {
@@ -114,6 +125,7 @@ class DisappearingMessageSweepWorkerTest {
             assertEquals(0, sweepCalls)
         }
 
+    /** A sweep failure asks WorkManager for its ordinary backoff retry. */
     @Test
     fun doWorkRetriesTransientSweepFailures() =
         runTest {
@@ -127,6 +139,7 @@ class DisappearingMessageSweepWorkerTest {
             assertEquals(Result.retry(), worker.doWork())
         }
 
+    /** Cancellation remains visible to WorkManager instead of becoming a retry result. */
     @Test
     fun doWorkRethrowsCancellation() =
         runTest {
@@ -145,6 +158,7 @@ class DisappearingMessageSweepWorkerTest {
             }
         }
 
+    /** A context outside the app's runtime domain has no retention work to run. */
     @Test
     fun doWorkSucceedsWhenApplicationIsNotWhiteNoiseApplication() =
         runTest {
@@ -157,6 +171,7 @@ class DisappearingMessageSweepWorkerTest {
             assertEquals(Result.success(), worker.doWork())
         }
 
+    /** Builds native-shaped inventory rows with independently controlled signing and sign-out flags. */
     private fun account(
         label: String = "alice",
         localSigning: Boolean = true,
@@ -172,6 +187,7 @@ class DisappearingMessageSweepWorkerTest {
             running = !signedOut,
         )
 
+    /** Injects account and sweep seams while preserving the worker's real WorkManager entry point. */
     private fun buildWorkerWithSweepOverride(
         sweepOverride: SweepOverride,
         accountOverride: AccountOverride = { true },
@@ -181,11 +197,13 @@ class DisappearingMessageSweepWorkerTest {
             .setWorkerFactory(sweepWorkerFactory(sweepOverride, accountOverride))
             .build()
 
+    /** Restricts test overrides to this worker so other WorkManager workers keep their factory. */
     private fun sweepWorkerFactory(
         sweepOverride: SweepOverride,
         accountOverride: AccountOverride,
     ): WorkerFactory =
         object : WorkerFactory() {
+            /** Builds only the requested sweep worker with its injected preflight and sweep seams. */
             override fun createWorker(
                 appContext: Context,
                 workerClassName: String,
@@ -199,6 +217,7 @@ class DisappearingMessageSweepWorkerTest {
     private class NonWhiteNoiseApplicationContext(
         base: Context,
     ) : ContextWrapper(base) {
+        /** Exposes a foreign application context to exercise the worker's guarded cast. */
         override fun getApplicationContext(): Context = this
     }
 }
