@@ -7,12 +7,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -21,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -41,38 +40,34 @@ import dev.ipf.marmotkit.PollProjectionFfi
 import dev.ipf.marmotkit.PollTypeFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.castPollVote
-import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
-import dev.ipf.whitenoise.android.ui.common.Avatar
 import kotlinx.coroutines.delay
 import java.text.DateFormat
 import java.util.Date
 
-private const val POLL_ROW_MAX_WIDTH_FRACTION = 0.95f
 private const val POLL_MILLIS_PER_SECOND = 1_000L
 
-/** Shows MDK's poll projection and submits replacement selections through its native vote API. */
+/** Poll content inside the ordinary message action/gesture surface; voting has its own deadline. */
 @Composable
-@Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
-internal fun PollTimelineRow(
+@Suppress("FunctionNaming")
+internal fun PollMessageContent(
     item: TimelineMessage,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
-    selectionMode: Boolean,
+    canVote: Boolean,
+    modifier: Modifier = Modifier,
 ) {
-    val poll = item.projected?.poll
-    if (poll == null) {
-        Text(stringResource(R.string.poll_preview), Modifier.padding(16.dp))
-        return
-    }
-    var deadlineReached by remember(poll.endsAt) {
+    val poll = item.projected?.poll ?: return
+    val owner =
+        remember(controller, item.record.messageIdHex) {
+            PollMessageActionOwner(controller.boundAccountRef, controller.group.groupIdHex, item.record.messageIdHex)
+        }
+    var deadlineReached by remember(owner, poll.endsAt) {
         mutableStateOf(pollDeadlineReached(poll.endsAt, System.currentTimeMillis()))
     }
-    LaunchedEffect(poll.endsAt) {
+    LaunchedEffect(owner, poll.endsAt) {
         val deadline =
             poll.endsAt
                 ?.toLong()
@@ -82,43 +77,19 @@ internal fun PollTimelineRow(
         if (remaining > 0L) delay(remaining)
         deadlineReached = true
     }
-    val open = poll.open && !deadlineReached
-    val mine = controller.isMessageMine(item.record)
-    val showSender = GroupProjector.shouldShowTranscriptSenderAvatar(controller.usesDirectTranscriptChrome, mine)
-    Box(
-        Modifier.fillMaxWidth().padding(vertical = 2.dp),
-        contentAlignment = if (mine) Alignment.CenterEnd else Alignment.CenterStart,
-    ) {
-        Row(Modifier.fillMaxWidth(POLL_ROW_MAX_WIDTH_FRACTION), verticalAlignment = Alignment.Bottom) {
-            if (showSender) {
-                PollSenderAvatar(item.record.sender, appState)
-                Spacer(Modifier.width(8.dp))
-            }
-            Column(Modifier.weight(1f)) {
-                if (showSender) {
-                    Text(
-                        appState.displayName(item.record.sender),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                PollVotingCard(
-                    poll = poll,
-                    voteKey = controller.boundAccountRef to item.record.messageIdHex,
-                    canVote = open && controller.canSendMessages && !selectionMode,
-                    open = open,
-                    submitVote = { replacement, onCompleted ->
-                        appState.launchMutation {
-                            var outcome: SendAcceptDispositionFfi? = null
-                            try {
-                                outcome = controller.castPollVote(item.record.messageIdHex, replacement)
-                            } finally {
-                                onCompleted(outcome)
-                            }
-                        }
-                    },
-                )
-            }
+    Box(modifier.fillMaxWidth()) {
+        key(owner) {
+            PollVotingCard(
+                poll = poll,
+                voteKey = owner.accountRef to owner.messageId,
+                canVote = canVote && !deadlineReached,
+                open = poll.open && !deadlineReached,
+                submitVote = { replacement, onCompleted ->
+                    appState.launchMutation {
+                        submitOwnedPollVote(controller, owner, replacement, onCompleted)
+                    }
+                },
+            )
         }
     }
 }
@@ -162,25 +133,6 @@ internal fun PollVotingCard(
             }
         },
     )
-}
-
-/** Uses the same tappable group sender avatar as nearby transcript rows. */
-@Composable
-@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
-private fun PollSenderAvatar(
-    sender: String,
-    appState: WhiteNoiseAppState,
-) {
-    Box(
-        Modifier.clip(CircleShape).clickable { appState.presentProfile(appState.npub(sender)) },
-    ) {
-        Avatar(
-            title = appState.displayName(sender),
-            seed = sender,
-            size = 32.dp,
-            pictureUrl = appState.avatarUrl(sender),
-        )
-    }
 }
 
 internal enum class PollVoteStatus { IDLE, SUBMITTING, UNCONFIRMED, FAILED }

@@ -7366,6 +7366,12 @@ class ConversationController(
         groupIdHex: String,
     ): Boolean = conversationAccountRef == accountRef && group.groupIdHex == groupIdHex
 
+    /** Rejects UI callbacks after their conversation or account lifecycle has ended. */
+    internal fun acceptsConversationActionOwner(
+        accountRef: String?,
+        groupIdHex: String,
+    ): Boolean = !controllerCleared && !isAccountTeardownRequested() && matchesConversation(accountRef, groupIdHex)
+
     /** Applies the chat-list subscription's current row to this mounted conversation. */
     internal fun applyAuthoritativeChatListRow(
         accountRef: String?,
