@@ -525,10 +525,11 @@ class ConversationVisibleReadIntegrationTest {
             val newerId = "cc".repeat(32)
             val row = overlappingUnreadRow(newerId)
             val calls = AtomicInteger()
-            val fixture = fixture(row) {
-                if (calls.incrementAndGet() in listOf(2, 4)) error("later read failed")
-                null
-            }
+            val fixture =
+                fixture(row) {
+                    if (calls.incrementAndGet() in listOf(2, 4)) error("later read failed")
+                    null
+                }
             try {
                 fixture.bootstrap()
                 val controller = controller(fixture.appState, row)
