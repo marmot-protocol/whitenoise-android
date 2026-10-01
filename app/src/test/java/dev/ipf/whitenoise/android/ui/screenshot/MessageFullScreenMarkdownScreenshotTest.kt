@@ -4,8 +4,10 @@ import androidx.compose.foundation.text.contextmenu.provider.LocalTextContextMen
 import androidx.compose.foundation.text.contextmenu.provider.TextContextMenuDataProvider
 import androidx.compose.foundation.text.contextmenu.provider.TextContextMenuProvider
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -24,6 +26,7 @@ import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
 import dev.ipf.marmotkit.MarkdownListItemFfi
 import dev.ipf.marmotkit.MarkdownListKindFfi
 import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_FULL_SCREEN_BODY_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_FULL_SCREEN_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageFullScreenView
 import dev.ipf.whitenoise.android.ui.conversation.messages.ReaderTextSelectionController
@@ -47,6 +50,77 @@ class MessageFullScreenMarkdownScreenshotTest {
 
     private lateinit var selectionController: ReaderTextSelectionController
     private val selectionToolbar = SelectionScreenshotToolbarProvider()
+
+    @Test fun scrollingReaderTopLight() = captureScrollingReader(ReaderSnapshot("reader_scroll_top_light", 0f))
+
+    @Test fun scrollingReaderMiddleDark() {
+        captureScrollingReader(
+            ReaderSnapshot("reader_scroll_middle_dark", 0.5f, dark = true),
+        )
+    }
+
+    @Test fun scrollingReaderEndAmoled() {
+        captureScrollingReader(
+            ReaderSnapshot("reader_scroll_end_amoled", 1f, dark = true, amoled = true),
+        )
+    }
+
+    @Test fun scrollingReaderMiddleLargeRtl() =
+        captureScrollingReader(
+            ReaderSnapshot("reader_scroll_middle_large_rtl", 0.5f, rtl = true, scale = 2f),
+        )
+
+    @Test fun fittingReaderHasNoPositionThumb() {
+        render(false, 1f, LayoutDirection.Ltr, reader = ReaderContent("A short fitting message.", null))
+        composeRule
+            .onNodeWithTag(MESSAGE_FULL_SCREEN_TAG)
+            .captureRoboImage("src/test/snapshots/reader_scroll_fitting.png")
+    }
+
+    /** Holds a real native drag while capturing; screenshots cannot force decorative visibility. */
+    private data class ReaderSnapshot(
+        val name: String,
+        val fraction: Float,
+        val dark: Boolean = false,
+        val amoled: Boolean = false,
+        val rtl: Boolean = false,
+        val scale: Float = 1f,
+    )
+
+    private data class ReaderContent(
+        val body: String,
+        val document: MarkdownDocumentFfi?,
+        val amoled: Boolean = false,
+        val fontScale: Float = 1f,
+    )
+
+    private fun captureScrollingReader(snapshot: ReaderSnapshot) {
+        val text = (1..100).joinToString("\n") { "Reading line $it: a long message keeps its place." }
+        render(
+            snapshot.dark,
+            snapshot.scale,
+            if (snapshot.rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            reader = ReaderContent(text, null, snapshot.amoled, snapshot.scale),
+        )
+        val body = composeRule.onNodeWithTag(MESSAGE_FULL_SCREEN_BODY_TAG)
+        val range = body.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
+        val target = range.maxValue() * snapshot.fraction
+        composeRule.mainClock.autoAdvance = false
+        try {
+            body.performTouchInput {
+                down(center)
+                moveBy(Offset(0f, if (snapshot.fraction == 0f) 80f else -40f))
+                if (snapshot.fraction > 0f) moveBy(Offset(0f, -target))
+            }
+            composeRule.mainClock.advanceTimeBy(32)
+            composeRule
+                .onNodeWithTag(MESSAGE_FULL_SCREEN_TAG)
+                .captureRoboImage("src/test/snapshots/${snapshot.name}.png")
+        } finally {
+            body.performTouchInput { up() }
+            composeRule.mainClock.autoAdvance = true
+        }
+    }
 
     /** Captures structured reader content at the default light-theme density. */
     @Test
@@ -103,6 +177,7 @@ class MessageFullScreenMarkdownScreenshotTest {
         fontScale: Float,
         layoutDirection: LayoutDirection,
         callbacks: MutableList<String>? = null,
+        reader: ReaderContent = ReaderContent(RAW_MARKDOWN, richDocument()),
     ) {
         composeRule.setContent {
             val density = LocalDensity.current
@@ -111,15 +186,16 @@ class MessageFullScreenMarkdownScreenshotTest {
                 LocalLayoutDirection provides layoutDirection,
                 LocalTextContextMenuToolbarProvider provides selectionToolbar,
             ) {
-                WhiteNoiseTheme(darkTheme = darkTheme) {
-                    val controller = rememberReaderTextSelectionController(RAW_MARKDOWN)
+                // Dialogs restore the window density; scale the inherited typography for the new reader fixture.
+                WhiteNoiseTheme(darkTheme = darkTheme, amoled = reader.amoled, fontScale = reader.fontScale) {
+                    val controller = rememberReaderTextSelectionController(reader.body)
                     selectionController = controller
                     MessageFullScreenView(
                         senderDisplayName = "Wise Bee",
                         senderSeed = "wise-bee",
                         senderAvatarUrl = null,
-                        body = RAW_MARKDOWN,
-                        bodyMarkdownDocument = richDocument(),
+                        body = reader.body,
+                        bodyMarkdownDocument = reader.document,
                         mentionDisplayName = null,
                         isGroupMember = null,
                         onNostrProfileTap = null,
