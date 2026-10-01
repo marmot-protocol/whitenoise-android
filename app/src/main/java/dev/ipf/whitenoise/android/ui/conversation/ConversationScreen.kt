@@ -3306,7 +3306,9 @@ internal fun ConversationScreen(
             ) {
                 null
             } else {
-                readAnchorMessageId to controller.latestChatListRow?.manuallyMarkedUnread
+                readAnchorMessageId?.let { messageId ->
+                    messageId to controller.latestChatListRow?.manuallyMarkedUnread
+                }
             }
         }.distinctUntilChanged()
             .filterNotNull()
