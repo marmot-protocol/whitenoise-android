@@ -485,6 +485,24 @@
         "test_ids": ["CHL-010"]
       },
       {
+        "surface": "Portuguese local deletion keeps the user in the conversation",
+        "source": "app/src/main/res/values-pt/strings.xml",
+        "anchor": "<string name=\"delete_local_does_not_leave\">",
+        "test_ids": ["CHL-010"]
+      },
+      {
+        "surface": "Turkish local deletion keeps the user in the conversation",
+        "source": "app/src/main/res/values-tr/strings.xml",
+        "anchor": "<string name=\"delete_local_does_not_leave\">",
+        "test_ids": ["CHL-010"]
+      },
+      {
+        "surface": "Turkish bulk local deletion keeps the user in the conversations",
+        "source": "app/src/main/res/values-tr/strings.xml",
+        "anchor": "<plurals name=\"chat_list_bulk_delete_confirm\">",
+        "test_ids": ["CHL-010"]
+      },
+      {
         "surface": "R.string.delete_from_device",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatActionSheet.kt",
         "anchor": "R.string.delete_from_device",

@@ -170,8 +170,8 @@
     </plurals>
     <string name="message_selection_action_delete">Seçili mesajları sil</string>
     <plurals name="chat_list_bulk_delete_confirm">
-        <item quantity="one">%1$d sohbet silinsin mi? Bu işlem sohbetten ayrılmaz.</item>
-        <item quantity="other">%1$d sohbet silinsin mi? Bu işlem sohbetlerden ayrılmaz.</item>
+        <item quantity="one">%1$d sohbet silinsin mi? Bu işlem sohbetten ayrılmanıza neden olmaz.</item>
+        <item quantity="other">%1$d sohbet silinsin mi? Bu işlem sohbetlerden ayrılmanıza neden olmaz.</item>
     </plurals>
     <plurals name="toast_chat_list_chats_archived">
         <item quantity="one">%1$d sohbet arşivlendi</item>
@@ -2162,5 +2162,5 @@
     <string name="checking_invitation">Davet kontrol ediliyor…</string>
     <string name="couldnt_check_invitation">Davet kontrol edilemedi</string>
     <string name="toast_leave_not_confirmed_history_kept">Ayrılma doğrulanmadı. Geçmiş korundu.</string>
-    <string name="delete_local_does_not_leave">Bu işlem sohbetten ayrılmaz.</string>
+    <string name="delete_local_does_not_leave">Bu işlem sohbetten ayrılmanıza neden olmaz.</string>
 </resources>

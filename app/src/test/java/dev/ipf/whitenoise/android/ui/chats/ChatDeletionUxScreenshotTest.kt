@@ -79,6 +79,16 @@ class ChatDeletionUxScreenshotTest {
     /** Local-only confirmation is explicit in the default theme. */
     @Test fun localDeleteLightScreenshot() = captureDialog("chat_delete_local_light", dark = false, leave = false)
 
+    /** The Portuguese assurance stays readable with an explicit user subject. */
+    @Test
+    @Config(sdk = [36], qualifiers = "pt-w360dp-h780dp-mdpi")
+    fun localDeletePortugueseScreenshot() = captureDialog("chat_delete_local_pt", dark = false, leave = false)
+
+    /** The longer Turkish assurance fits without obscuring the confirmation. */
+    @Test
+    @Config(sdk = [36], qualifiers = "tr-w360dp-h780dp-mdpi")
+    fun localDeleteTurkishScreenshot() = captureDialog("chat_delete_local_tr", dark = false, leave = false)
+
     /** Departure is visually separate in dark mode. */
     @Test fun leaveAndDeleteDarkScreenshot() = captureDialog("chat_leave_delete_dark", dark = true, leave = true)
 
