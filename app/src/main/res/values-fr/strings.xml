@@ -539,6 +539,7 @@
     <string name="performance_logs">Journaux de performances</string>
     <string name="performance_logs_description">Collecte temporairement des mesures respectueuses de la confidentialité sur cet appareil. S’arrête après 30 minutes ou au redémarrage de l’application.</string>
     <string name="performance_logs_active">Actif · %1$d min restantes</string>
+    <string name="performance_logs_export_included">Cette session sera incluse dans la prochaine exportation des journaux de diagnostic enregistrés.</string>
     <string name="performance_logs_inactive">Inactif</string>
     <string name="copy_performance_logs">Copier les journaux de performances</string>
     <string name="copy_performance_logs_detail">Copie les événements limités et respectueux de la confidentialité de la session actuelle ou la plus récente.</string>

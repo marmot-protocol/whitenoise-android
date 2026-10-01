@@ -525,6 +525,7 @@
     <string name="performance_logs">性能日志</string>
     <string name="performance_logs_description">在此设备上临时收集保护隐私的计时事件。30 分钟后或应用重启时停止。</string>
     <string name="performance_logs_active">已启用 · 剩余 %1$d 分钟</string>
+    <string name="performance_logs_export_included">此会话将包含在下次导出的已存储诊断日志中。</string>
     <string name="performance_logs_inactive">未启用</string>
     <string name="copy_performance_logs">复制性能日志</string>
     <string name="copy_performance_logs_detail">复制当前或最近一次会话中数量受限且保护隐私的事件。</string>

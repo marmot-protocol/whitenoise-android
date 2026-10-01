@@ -6731,13 +6731,7 @@ class WhiteNoiseAppState private constructor(
             false
         }
 
-    /**
-     * Archives the current audit files into the app cache for a user-confirmed export.
-     *
-     * The engine paths, file names and archive entries are never logged or included in failures.
-     * Returns null when there is nothing to export or the archive could not be prepared in full;
-     * a partial archive is never returned, so the caller cannot present one as a complete export.
-     */
+    /** Archives audit, dictation, and performance data; empty or partial exports return null. */
     @Suppress("ReturnCount") // Each engine/cache failure is a distinct fail-closed export outcome.
     suspend fun prepareAuditLogArchiveForExport(): java.io.File? {
         val sourcePaths =
@@ -6757,12 +6751,8 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /**
-     * Delete every local audit log file. Each delete is best-effort; the
-     * runtime hot-swaps any live recorder so logging keeps running on a
-     * fresh file when audit logging is currently on. Returns true if at
-     * least one file was successfully removed (or rotated).
-     */
+    /** Clears audit, dictation, and performance files while surfacing native deletion failures. */
+    @Suppress("CyclomaticComplexMethod", "ReturnCount")
     suspend fun deleteAuditLogs(): Boolean {
         var engineFailure: Throwable? = null
         var cacheFailure: Throwable? = null
@@ -6804,14 +6794,15 @@ class WhiteNoiseAppState private constructor(
             presentFailure(R.string.toast_couldnt_delete_audit_logs, "AUDIT_LOG_DELETE", it)
             return false
         }
-        if (anyDeleted) {
+        val deleted = anyDeleted || (preparedDeleted && engineFailure == null)
+        if (deleted) {
             presentTransient(R.string.toast_audit_logs_deleted)
         } else {
             engineFailure?.let {
                 presentFailure(R.string.toast_couldnt_delete_audit_logs, "AUDIT_LOG_DELETE", it)
             } ?: present(R.string.toast_couldnt_delete_audit_logs)
         }
-        return anyDeleted
+        return deleted
     }
 
     fun updateThemeMode(mode: AppThemeMode) {

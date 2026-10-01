@@ -539,6 +539,7 @@
     <string name="performance_logs">Leistungsprotokolle</string>
     <string name="performance_logs_description">Erfasst vorübergehend datenschutzfreundliche Zeitmessungen auf diesem Gerät. Endet nach 30 Minuten oder beim Neustart der App.</string>
     <string name="performance_logs_active">Aktiv · noch %1$d Min.</string>
+    <string name="performance_logs_export_included">Diese Sitzung wird in den nächsten Export gespeicherter Diagnoseprotokolle aufgenommen.</string>
     <string name="performance_logs_inactive">Inaktiv</string>
     <string name="copy_performance_logs">Leistungsprotokolle kopieren</string>
     <string name="copy_performance_logs_detail">Kopiert die begrenzten, datenschutzfreundlichen Ereignisse der aktuellen oder letzten Sitzung.</string>
