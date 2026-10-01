@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.AvatarAcquisitionStateFfi
 import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.marmotkit.AvatarAvailabilityFfi
+import dev.ipf.marmotkit.AvatarBytesFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -15,6 +16,35 @@ import org.junit.Test
  * drawing and that a refreshed avatar can never render from the previous bytes.
  */
 class AvatarAssetsTest {
+    /** An exact ready/stale local payload belongs to its selected reference and immutable revision. */
+    @Test
+    fun durablePayloadMatchesOnlyTheSelectedReferenceAndRevision() {
+        val selected = asset(AvatarAvailabilityFfi.READY)
+        val bytes = payload()
+        assertTrue(bytes.matchesAvatarAsset(selected))
+        assertTrue(bytes.copy(availability = AvatarAvailabilityFfi.STALE).matchesAvatarAsset(selected))
+        assertFalse(bytes.copy(reference = "unrelated").matchesAvatarAsset(selected))
+        assertFalse(bytes.copy(contentRevision = 2uL).matchesAvatarAsset(selected))
+        assertFalse(bytes.copy(deferred = true).matchesAvatarAsset(selected))
+        assertFalse(bytes.copy(availability = AvatarAvailabilityFfi.INVALIDATED).matchesAvatarAsset(selected))
+        assertFalse(bytes.copy(availability = AvatarAvailabilityFfi.MISSING).matchesAvatarAsset(selected))
+        assertFalse(bytes.copy(bytes = byteArrayOf()).matchesAvatarAsset(selected))
+    }
+
+    /** Synthetic engine payload; Android checks presentation ownership, not protocol validity. */
+    private fun payload() =
+        AvatarBytesFfi(
+            reference = "ref-1",
+            availability = AvatarAvailabilityFfi.READY,
+            contentRevision = 1uL,
+            byteCount = 3uL,
+            deferred = false,
+            bytes = byteArrayOf(1, 2, 3),
+            mediaType = "image/png",
+            width = 1u,
+            height = 1u,
+        )
+
     /** A ready asset draws, and a stale one keeps drawing while the engine refreshes it. */
     @Test
     fun readyAndStaleAssetsAreRenderable() {

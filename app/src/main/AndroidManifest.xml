@@ -222,6 +222,9 @@
             </intent-filter>
         </receiver>
         <receiver
+            android:name=".notifications.NotificationGroupDismissReceiver"
+            android:exported="false" />
+        <receiver
             android:name=".notifications.NotificationActionReceiver"
             android:exported="false" />
 

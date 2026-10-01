@@ -2,7 +2,10 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
 import androidx.compose.material3.Surface
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -13,6 +16,7 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ChatFolderPreferences
+import dev.ipf.whitenoise.android.state.ChatFolderRule
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -135,6 +139,64 @@ class ChatFolderEditScreenTest {
                 it.id == ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID
             }
         assertTrue(folderStillExists)
+    }
+
+    @Test
+    fun attentionCategoriesSaveAndGroupDirectChoicesAreExclusive() {
+        val appState = appState()
+        appState.chatFolderPreferences.foldersFor(ACCOUNT_REF)
+        renderEditor(appState, onClose = {})
+
+        fun toggle(label: Int) {
+            val text = app.getString(label)
+            composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasText(text))
+            composeRule.onNodeWithText(text).performClick()
+        }
+        toggle(R.string.chat_folder_unread_mentions_only)
+        toggle(R.string.chat_folder_pinned_only)
+        toggle(R.string.chat_folder_groups_only)
+        toggle(R.string.chat_folder_direct_chats_only)
+        composeRule.onNodeWithText(app.getString(R.string.chat_folder_groups_only)).assertIsOff()
+        composeRule.onNodeWithText(app.getString(R.string.chat_folder_direct_chats_only)).assertIsOn()
+        toggle(R.string.chat_folder_groups_only)
+        composeRule.onNodeWithText(app.getString(R.string.chat_folder_direct_chats_only)).assertIsOff()
+        composeRule.onNodeWithText(app.getString(R.string.save)).performClick()
+        val reloaded = ChatFolderPreferences(app)
+        assertEquals(
+            ChatFolderRule(
+                unreadOnly = true,
+                includeMuted = true,
+                unreadMentionsOnly = true,
+                pinnedOnly = true,
+                groupsOnly = true,
+            ),
+            reloaded.folderRule(ACCOUNT_REF, ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID),
+        )
+    }
+
+    @Test
+    fun newCategoryChangesAreDiscardableAndDoNotPersistBeforeSave() {
+        val appState = appState()
+        appState.chatFolderPreferences.foldersFor(ACCOUNT_REF)
+        var closed = false
+        renderEditor(appState, onClose = { closed = true })
+        val label = app.getString(R.string.chat_folder_unread_mentions_only)
+        composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasText(label))
+        composeRule.onNodeWithText(label).performClick()
+        val original =
+            appState.chatFolderPreferences.folderRule(
+                ACCOUNT_REF,
+                ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID,
+            )
+        assertEquals(false, original?.unreadMentionsOnly)
+        composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
+        composeRule.onNodeWithText(app.getString(R.string.folder_keep_editing)).performClick()
+        composeRule.onNodeWithText(label).assertIsOn()
+        composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
+        composeRule.onNodeWithText(app.getString(R.string.folder_discard)).performClick()
+        assertTrue(closed)
+        val reloaded = ChatFolderPreferences(app).folderRule(ACCOUNT_REF, ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID)
+        assertEquals(false, reloaded?.unreadMentionsOnly)
     }
 
     private fun renderEditor(

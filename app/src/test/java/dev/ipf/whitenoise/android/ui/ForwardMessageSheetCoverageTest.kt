@@ -76,7 +76,7 @@ class ForwardMessageSheetCoverageTest {
         assertTrue("dataSource.isLoading" in content)
         assertTrue("dataSource.error" in content)
         assertTrue("dataSource.memberSnapshotsRevision" in content)
-        assertTrue("remember(dataSource.targets, originGroupIdHex)" in content)
+        assertTrue("remember(dataSource.targets, dataSource.targetsRevision, originGroupIdHex)" in content)
         assertTrue("ErrorContent(" in targetList && "InlineErrorBanner(" in targetList)
         assertTrue("onRetry = retryLoad" in targetList)
         assertTrue("Modifier.semantics { this.selected = selected }" in targetRow)

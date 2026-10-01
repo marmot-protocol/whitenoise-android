@@ -226,6 +226,7 @@ SEMANTIC_OWNER_IDS = {
         "intent:text/plain": {"SYS-004"},
         "intent:video/*": {"SYS-004"},
         "android-direct-share:conversation-shortcuts": {"SYS-011"},
+        "Generation-specific notification group dismissal": {"NTF-026"},
     },
 }
 

@@ -65,7 +65,6 @@ import dev.ipf.whitenoise.android.core.ConversationTranscriptTimelineReader
 import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import dev.ipf.whitenoise.android.core.EMPTY_MARKDOWN_DOCUMENT
 import dev.ipf.whitenoise.android.core.EditState
-import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.IndexedAttachment
 import dev.ipf.whitenoise.android.core.LeaveAction
@@ -82,7 +81,6 @@ import dev.ipf.whitenoise.android.core.StreamDebugEventFormatter
 import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.core.TimelineReplyDisplay
 import dev.ipf.whitenoise.android.core.aggregateEdits
-import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
 import dev.ipf.whitenoise.android.core.replyBodyWithTypedMediaFallback
 import dev.ipf.whitenoise.android.core.replyMediaKindFromMime
 import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
@@ -3738,6 +3736,17 @@ class ChatsController private constructor(
         )
     }
 
+    /** Keeps source picture identity separate from MDK-selected display URL/hash rewrites. */
+    internal fun currentGroupAvatarItem(groupIdHex: String): ChatListItem? {
+        val row =
+            chatRowsByGroup[chatRowKey(groupIdHex)]
+                ?: chatRows.firstOrNull { it.groupIdHex.equals(groupIdHex, ignoreCase = true) }
+                ?: return null
+        val item = projectChatRow(row)
+        val sourceGroup = chatListDisplayGroup(row, groupRecordsById[row.groupIdHex] ?: emptyGroupRecord(row))
+        return item.copy(group = sourceGroup)
+    }
+
     private fun optimisticArchiveRow(row: ChatListRowFfi): ChatListRowFfi =
         optimisticArchiveByGroup[chatRowKey(row.groupIdHex)]
             ?.let { intent -> row.copy(archived = intent.archived) }
@@ -4903,38 +4912,18 @@ class ChatsController private constructor(
         val conversationAvatar =
             ProfileSanitizer.protocolImageUrl(item.group.avatarUrl)
                 ?: ProfileSanitizer.protocolImageUrl(item.projection?.avatarUrl)
-        AvatarImageLoader.preWarm(conversationAvatar)
-        GroupProjector
-            .avatarAccount(item.group, item.presentationOtherMemberAccount, item.presentationMemberCount)
-            ?.let(appState::preWarmProfileAvatar)
+        if (item.selectedAvatarAsset == null) {
+            AvatarImageLoader.preWarm(conversationAvatar)
+            GroupProjector
+                .avatarAccount(item.group, item.presentationOtherMemberAccount, item.presentationMemberCount)
+                ?.let(appState::preWarmProfileAvatar)
+        }
         item.latest?.sender?.let(appState::preWarmProfileAvatar)
     }
 
-    @Suppress("ReturnCount") // Mirrors [GroupAvatar] URL-over-encrypted precedence with early exits.
     private fun firstFrameAvatarSeed(item: ChatListItem): ChatListAvatarSeed? {
-        val legacyUrl = ProfileSanitizer.protocolImageUrl(item.group.avatarUrl)
-        if (legacyUrl != null) {
-            return AvatarImageLoader.peek(legacyUrl)?.let { image ->
-                ChatListAvatarSeed(ChatListAvatarSource.LEGACY_URL, legacyUrl, image)
-            }
-        }
-
-        val encryptedCacheKey = encryptedGroupAvatarCacheKey(accountRef, item.group)
-        if (encryptedCacheKey != null) {
-            GroupAvatarImageLoader.peek(encryptedCacheKey)?.let { image ->
-                return ChatListAvatarSeed(ChatListAvatarSource.ENCRYPTED_GROUP, encryptedCacheKey, image)
-            }
-        }
-
-        val fallbackUrl =
-            GroupProjector
-                .avatarAccount(item.group, item.presentationOtherMemberAccount, item.presentationMemberCount)
-                ?.let { appState.avatarUrl(it) }
-        return fallbackUrl?.let { url ->
-            AvatarImageLoader.peek(url)?.let { image ->
-                ChatListAvatarSeed(ChatListAvatarSource.FALLBACK_URL, url, image)
-            }
-        }
+        val owner = accountRef
+        return firstFrameGroupAvatarSeed(item, owner, appState::avatarUrl)
     }
 
     /**
@@ -5023,6 +5012,7 @@ class ChatsController private constructor(
     }
 
     private fun resetBackingState() {
+        selectedAvatarAssetsByGroup = emptyMap()
         replaceChatRows(emptyList())
         selectedPresentationsByGroup = emptyMap()
         selectedPreviewsByGroup = emptyMap()

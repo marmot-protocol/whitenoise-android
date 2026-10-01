@@ -75,6 +75,11 @@ object NotificationChannels {
                 NotificationChannelSpec.AGENT_ACTIVITY,
                 NotificationChannelSpec.APP_UPDATES,
                 -> Unit
+
+                NotificationChannelSpec.USER_EVENT_SUMMARY -> {
+                    setSound(null, null)
+                    enableVibration(false)
+                }
             }
         }
 
@@ -93,6 +98,7 @@ object NotificationChannels {
             NotificationChannelSpec.GROUP_MEMBERSHIP -> R.string.notification_channel_group_membership
             NotificationChannelSpec.AGENT_ACTIVITY -> R.string.notification_channel_agent_activity
             NotificationChannelSpec.APP_UPDATES -> R.string.notification_channel_app_updates
+            NotificationChannelSpec.USER_EVENT_SUMMARY -> R.string.notification_channel_summary
         }
 
     private fun NotificationChannelSpec.globalNameRes(): Int =
@@ -105,6 +111,7 @@ object NotificationChannels {
             NotificationChannelSpec.GROUP_MEMBERSHIP -> R.string.notification_channel_group_membership_default
             NotificationChannelSpec.AGENT_ACTIVITY -> R.string.notification_channel_agent_activity_default
             NotificationChannelSpec.APP_UPDATES -> R.string.notification_channel_app_updates_global
+            NotificationChannelSpec.USER_EVENT_SUMMARY -> R.string.notification_channel_summary
         }
 
     private fun NotificationChannelSpec.globalDescriptionRes(): Int =
@@ -118,6 +125,7 @@ object NotificationChannels {
                 R.string.notification_channel_group_membership_default_description
             NotificationChannelSpec.AGENT_ACTIVITY -> R.string.notification_channel_agent_activity_default_description
             NotificationChannelSpec.APP_UPDATES -> R.string.notification_channel_app_updates_global_description
+            NotificationChannelSpec.USER_EVENT_SUMMARY -> R.string.notification_channel_summary_description
         }
 
     private fun ChannelImportance.toAndroidImportance(): Int =

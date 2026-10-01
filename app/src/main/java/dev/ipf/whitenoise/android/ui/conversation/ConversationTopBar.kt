@@ -45,9 +45,11 @@ import dev.ipf.whitenoise.android.state.ChatListAvatarSeed
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.adoptableSelectedAvatarAsset
+import dev.ipf.whitenoise.android.state.currentGroupAvatarItem
 import dev.ipf.whitenoise.android.ui.chats.ConversationSearchTopBar
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
+import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
@@ -111,6 +113,37 @@ internal fun ConversationTopBar(
     val presentedAvatarAccount = if (freezeRoutePresentation) routeAvatarAccount else liveAvatarAccount
     val presentedMembersLoaded = if (freezeRoutePresentation) routeMembersLoaded else liveMembersLoaded
     val presentedMemberCount = if (freezeRoutePresentation) routeMemberCount else liveMemberCount
+    val liveRow =
+        appState
+            .currentGroupAvatarItem(controller.boundAccountRef, presentedGroup.groupIdHex)
+    val currentRow =
+        liveRow
+            ?.takeIf {
+                it.group.avatarUrl == presentedGroup.avatarUrl &&
+                    it.group.imageHashHex == presentedGroup.imageHashHex
+            }
+    val selectedAsset =
+        if (freezeRoutePresentation || controller.window.header == null) {
+            currentRow?.selectedAvatarAsset
+        } else {
+            controller.window.header?.let { header ->
+                adoptableSelectedAvatarAsset(
+                    header.avatarAsset,
+                    header.selected.avatarSource,
+                    presentedGroup,
+                    presentedMemberCount,
+                    header.selected.avatar,
+                )
+            }
+        }
+    val hasExplicitSelection = controller.window.header != null || liveRow?.selectedAvatarAsset != null
+    val explicitSelectionMissing = hasExplicitSelection && selectedAsset == null
+    val avatarGroup =
+        if (explicitSelectionMissing) {
+            presentedGroup.copy(avatarUrl = null, imageHashHex = null)
+        } else {
+            presentedGroup
+        }
     Column {
         if (selectionMode) {
             MessageSelectionBar(
@@ -127,151 +160,152 @@ internal fun ConversationTopBar(
                 focusRequester = searchFocusRequester,
             )
         } else {
-            TopAppBar(
-                modifier = Modifier.testTag(CONVERSATION_TOP_BAR_TAG),
-                expandedHeight =
-                    if (compactHeight) {
-                        compactTopBarHeightFor(LocalDensity.current.fontScale)
-                    } else {
-                        TopAppBarDefaults.TopAppBarExpandedHeight
-                    },
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 48.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable(role = Role.Button, onClick = onOpenDetails)
-                                .performanceTestTag(
-                                    PerformanceTestTags.OPEN_GROUP_DETAILS,
-                                    enabled = performanceSelectorsEnabled,
-                                ).semantics(mergeDescendants = true) {
-                                    contentDescription = openDetailsDescription
-                                },
-                    ) {
-                        Box(Modifier.testTag("conversation.header.avatar")) {
-                            GroupAvatar(
-                                appState = appState,
-                                group = presentedGroup,
-                                title = presentedTitle,
-                                seed = presentedAvatarAccount ?: presentedGroup.groupIdHex,
-                                size = if (compactHeight) 28.dp else 40.dp,
-                                fallbackPictureUrl = presentedAvatarAccount?.let(appState::avatarUrl),
-                                firstFrameAvatar = firstFrameAvatar,
-                                // The prepared header names the avatar MarmotKit stores for this
-                                // conversation; a frozen route presentation keeps the row's picture instead.
-                                durableAvatar =
-                                    controller.window.header
-                                        ?.let { header ->
-                                            adoptableSelectedAvatarAsset(
-                                                asset = header.avatarAsset,
-                                                avatarSource = header.selected.avatarSource,
-                                                group = presentedGroup,
-                                                memberCount = presentedMemberCount,
-                                            )
-                                        }?.takeUnless { freezeRoutePresentation },
-                            )
-                        }
-                        Column(verticalArrangement = Arrangement.spacedBy(CONVERSATION_TITLE_LINE_SPACING_DP.dp)) {
-                            Text(
-                                presentedTitle,
-                                style = MaterialTheme.typography.titleMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            val membersSubtitle =
-                                if (
-                                    shouldShowConversationMembersSubtitle(
-                                        membersLoaded = presentedMembersLoaded,
-                                        openedAsDmHint = openedAsDmHint,
-                                        groupName = presentedGroup.name,
-                                        memberCount = presentedMemberCount,
-                                    )
-                                ) {
-                                    conversationMemberCountLabel(
-                                        count = presentedMemberCount,
-                                        justYou = stringResource(R.string.just_you),
-                                        oneMember = stringResource(R.string.one_member),
-                                        membersFormat = stringResource(R.string.members_count),
-                                    )
-                                } else {
-                                    null
-                                }
-                            val disappearingSecs = presentedGroup.disappearingMessageSecs.toLong()
-                            val showTimer = disappearingSecs > 0L
-                            if (membersSubtitle != null || showTimer) {
-                                val labelStyle = MaterialTheme.typography.labelSmall
-                                val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                val subtitleRow: @Composable () -> Unit = {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+            PreparedGroupAvatarContent(
+                appState,
+                listOfNotNull(selectedAsset),
+                controller.boundAccountRef,
+                surfaceIdentity = controller,
+            ) {
+                TopAppBar(
+                    modifier = Modifier.testTag(CONVERSATION_TOP_BAR_TAG),
+                    expandedHeight =
+                        if (compactHeight) {
+                            compactTopBarHeightFor(LocalDensity.current.fontScale)
+                        } else {
+                            TopAppBarDefaults.TopAppBarExpandedHeight
+                        },
+                    title = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 48.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable(role = Role.Button, onClick = onOpenDetails)
+                                    .performanceTestTag(
+                                        PerformanceTestTags.OPEN_GROUP_DETAILS,
+                                        enabled = performanceSelectorsEnabled,
+                                    ).semantics(mergeDescendants = true) {
+                                        contentDescription = openDetailsDescription
+                                    },
+                        ) {
+                            Box(Modifier.testTag("conversation.header.avatar")) {
+                                GroupAvatar(
+                                    appState = appState,
+                                    group = avatarGroup,
+                                    title = presentedTitle,
+                                    seed = presentedAvatarAccount ?: presentedGroup.groupIdHex,
+                                    size = if (compactHeight) 28.dp else 40.dp,
+                                    fallbackPictureUrl =
+                                        presentedAvatarAccount
+                                            ?.takeUnless { explicitSelectionMissing }
+                                            ?.let(appState::avatarUrl),
+                                    firstFrameAvatar = firstFrameAvatar,
+                                    accountRef = controller.boundAccountRef,
+                                    durableAvatar = selectedAsset,
+                                )
+                            }
+                            Column(verticalArrangement = Arrangement.spacedBy(CONVERSATION_TITLE_LINE_SPACING_DP.dp)) {
+                                Text(
+                                    presentedTitle,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                val membersSubtitle =
+                                    if (
+                                        shouldShowConversationMembersSubtitle(
+                                            membersLoaded = presentedMembersLoaded,
+                                            openedAsDmHint = openedAsDmHint,
+                                            groupName = presentedGroup.name,
+                                            memberCount = presentedMemberCount,
+                                        )
                                     ) {
-                                        if (membersSubtitle != null) {
-                                            Text(membersSubtitle, style = labelStyle, color = labelColor)
-                                        }
-                                        if (showTimer) {
+                                        conversationMemberCountLabel(
+                                            count = presentedMemberCount,
+                                            justYou = stringResource(R.string.just_you),
+                                            oneMember = stringResource(R.string.one_member),
+                                            membersFormat = stringResource(R.string.members_count),
+                                        )
+                                    } else {
+                                        null
+                                    }
+                                val disappearingSecs = presentedGroup.disappearingMessageSecs.toLong()
+                                val showTimer = disappearingSecs > 0L
+                                if (membersSubtitle != null || showTimer) {
+                                    val labelStyle = MaterialTheme.typography.labelSmall
+                                    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    val subtitleRow: @Composable () -> Unit = {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        ) {
                                             if (membersSubtitle != null) {
-                                                Text("·", style = labelStyle, color = labelColor)
+                                                Text(membersSubtitle, style = labelStyle, color = labelColor)
                                             }
-                                            Icon(
-                                                painterResource(R.drawable.ic_timer),
-                                                contentDescription = null,
-                                                modifier = Modifier.size(12.dp).testTag("conversation.header.timer"),
-                                                tint = labelColor,
-                                            )
-                                            Text(
-                                                disappearingMessagesLabel(disappearingSecs),
-                                                style = labelStyle,
-                                                color = labelColor,
-                                            )
+                                            if (showTimer) {
+                                                if (membersSubtitle != null) {
+                                                    Text("·", style = labelStyle, color = labelColor)
+                                                }
+                                                Icon(
+                                                    painterResource(R.drawable.ic_timer),
+                                                    contentDescription = null,
+                                                    modifier =
+                                                        Modifier.size(12.dp).testTag("conversation.header.timer"),
+                                                    tint = labelColor,
+                                                )
+                                                Text(
+                                                    disappearingMessagesLabel(disappearingSecs),
+                                                    style = labelStyle,
+                                                    color = labelColor,
+                                                )
+                                            }
                                         }
                                     }
-                                }
-                                if (showTimer) {
-                                    val timerTooltipState = rememberTooltipState(isPersistent = true)
-                                    val timerTooltipText = stringResource(R.string.disappearing_tooltip_text)
-                                    val showTooltipOnce =
-                                        remember(controller.group.groupIdHex) {
-                                            !appState.disappearingTooltipShown
+                                    if (showTimer) {
+                                        val timerTooltipState = rememberTooltipState(isPersistent = true)
+                                        val timerTooltipText = stringResource(R.string.disappearing_tooltip_text)
+                                        val showTooltipOnce =
+                                            remember(controller.group.groupIdHex) {
+                                                !appState.disappearingTooltipShown
+                                            }
+                                        if (showTooltipOnce) {
+                                            LaunchedEffect(controller.group.groupIdHex) {
+                                                appState.markDisappearingTooltipShown()
+                                                timerTooltipState.show()
+                                            }
                                         }
-                                    if (showTooltipOnce) {
-                                        LaunchedEffect(controller.group.groupIdHex) {
-                                            appState.markDisappearingTooltipShown()
-                                            timerTooltipState.show()
-                                        }
+                                        TooltipBox(
+                                            positionProvider = TooltipDefaults.rememberRichTooltipPositionProvider(),
+                                            tooltip = { RichTooltip { Text(timerTooltipText) } },
+                                            state = timerTooltipState,
+                                            content = subtitleRow,
+                                        )
+                                    } else {
+                                        subtitleRow()
                                     }
-                                    TooltipBox(
-                                        positionProvider = TooltipDefaults.rememberRichTooltipPositionProvider(),
-                                        tooltip = { RichTooltip { Text(timerTooltipText) } },
-                                        state = timerTooltipState,
-                                        content = subtitleRow,
-                                    )
-                                } else {
-                                    subtitleRow()
                                 }
                             }
                         }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            painterResource(R.drawable.ic_arrow_back),
-                            contentDescription = stringResource(R.string.back),
-                        )
-                    }
-                },
-                scrollBehavior = LocalWhiteNoiseHeaderScroll.current,
-                colors =
-                    TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    ),
-            )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                painterResource(R.drawable.ic_arrow_back),
+                                contentDescription = stringResource(R.string.back),
+                            )
+                        }
+                    },
+                    scrollBehavior = LocalWhiteNoiseHeaderScroll.current,
+                    colors =
+                        TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        ),
+                )
+            }
         }
         TtsTransportBar(
             appState = appState,

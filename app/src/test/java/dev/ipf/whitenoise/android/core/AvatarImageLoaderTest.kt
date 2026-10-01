@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.core
 
 import android.graphics.Bitmap
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -25,6 +26,130 @@ import java.util.concurrent.atomic.AtomicInteger
 
 @RunWith(RobolectricTestRunner::class)
 class AvatarImageLoaderTest {
+    @Test
+    fun cacheGuardSurvivesDiscardedComposeSnapshot() {
+        val before = AvatarImageLoader.currentCacheLifetime()
+        val snapshot = Snapshot.takeMutableSnapshot()
+        try {
+            snapshot.enter { AvatarImageLoader.clearStoredAvatars() }
+        } finally {
+            snapshot.dispose()
+        }
+        assertNotEquals(before, AvatarImageLoader.currentCacheLifetime())
+    }
+
+    @Test
+    fun storedAvatarReadDoesNotWaitForTwoBlockedNetworkRequests() =
+        runBlocking {
+            val started = AtomicInteger()
+            val bothStarted = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            AvatarImageLoader.attachProfileImageFetcher { _, _ ->
+                if (started.incrementAndGet() == 2) bothStarted.complete(Unit)
+                release.await()
+                Base64.getDecoder().decode(ONE_PIXEL_PNG_BASE64)
+            }
+            val network = (1..2).map { async { AvatarImageLoader.load("https://profiles.example/blocked-$it") } }
+            val key = "marmot-avatar:owner:offline@1"
+            val lifetime = AvatarImageLoader.currentCacheLifetime()
+            try {
+                withTimeout(5_000) { bothStarted.await() }
+                assertNotNull(
+                    withTimeout(5_000) {
+                        AvatarImageLoader.loadStored(key, lifetime) {
+                            Base64.getDecoder().decode(ONE_PIXEL_PNG_BASE64)
+                        }
+                    },
+                )
+            } finally {
+                release.complete(Unit)
+                network.awaitAll()
+            }
+        }
+
+    /** Concurrent surfaces share one off-main local read/decode without entering the network adapter. */
+    @Test
+    fun storedAvatarReadsAreCoalescedAndDecodedOffMain() =
+        runBlocking {
+            val key = "marmot-avatar:owner:reference@1"
+            val lifetime = AvatarImageLoader.currentCacheLifetime()
+            val reads = AtomicInteger()
+            val started = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val read: suspend () -> ByteArray? = {
+                check(android.os.Looper.myLooper() != android.os.Looper.getMainLooper())
+                reads.incrementAndGet()
+                started.complete(Unit)
+                release.await()
+                Base64.getDecoder().decode(ONE_PIXEL_PNG_BASE64)
+            }
+            val first = async { AvatarImageLoader.loadStored(key, lifetime, read) }
+            try {
+                withTimeout(5_000) { started.await() }
+                val second =
+                    async(start = CoroutineStart.UNDISPATCHED) { AvatarImageLoader.loadStored(key, lifetime, read) }
+                release.complete(Unit)
+                val image = withTimeout(5_000) { first.await() }
+                assertNotNull(image)
+                assertSame(image, withTimeout(5_000) { second.await() })
+                assertSame(image, AvatarImageLoader.loadStored(key, lifetime) { error("cache hit must not read") })
+                assertEquals(1, reads.get())
+            } finally {
+                release.complete(Unit)
+            }
+        }
+
+    /** Clearing an owner retires a pending local read and rejects even a later same-key cache hit. */
+    @Test
+    fun storedAvatarCannotCrossAnAccountClearAndReturnToTheSameOwner() =
+        runBlocking {
+            val key = "marmot-avatar:owner:reference@1"
+            val lifetime = AvatarImageLoader.currentCacheLifetime()
+            val started = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val old =
+                async {
+                    AvatarImageLoader.loadStored(key, lifetime) {
+                        started.complete(Unit)
+                        release.await()
+                        Base64.getDecoder().decode(ONE_PIXEL_PNG_BASE64)
+                    }
+                }
+            try {
+                withTimeout(5_000) { started.await() }
+                val publicImage = solidImage(2, 2)
+                AvatarImageLoader.putCached("https://public.example/avatar.png", publicImage)
+                AvatarImageLoader.clearStoredAvatars()
+                AvatarImageLoader.clearStoredAvatars()
+                assertSame(publicImage, AvatarImageLoader.peek("https://public.example/avatar.png"))
+                assertNull(withTimeout(5_000) { old.await() })
+                val current = solidImage(2, 2)
+                AvatarImageLoader.putCached(key, current)
+                assertNull(AvatarImageLoader.loadStored(key, lifetime) { error("retired read") })
+                release.complete(Unit)
+                // Same textual identity after A-to-B-to-A still belongs to the new lifetime.
+                assertSame(
+                    current,
+                    AvatarImageLoader.loadStored(key, AvatarImageLoader.currentCacheLifetime()) { error("cache hit") },
+                )
+            } finally {
+                // A failed assertion must not leak a detached read's permit into subsequent tests.
+                release.complete(Unit)
+            }
+        }
+
+    /** A transient local miss is not a network failure and cannot impose the URL failure cooldown. */
+    @Test
+    fun storedAvatarMissCanRecoverImmediatelyFromTheValidatedStore() =
+        runBlocking {
+            val key = "marmot-avatar:owner:reference@1"
+            val lifetime = AvatarImageLoader.currentCacheLifetime()
+            assertNull(AvatarImageLoader.loadStored(key, lifetime) { null })
+            assertNotNull(
+                AvatarImageLoader.loadStored(key, lifetime) { Base64.getDecoder().decode(ONE_PIXEL_PNG_BASE64) },
+            )
+        }
+
     /** A pre-recovery socket failure cannot recreate the old minute-long cooldown afterward. */
     @Test
     fun lateFailureCannotPoisonRecoveredRequest() =

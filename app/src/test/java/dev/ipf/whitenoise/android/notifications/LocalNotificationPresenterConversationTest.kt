@@ -75,6 +75,7 @@ class LocalNotificationPresenterConversationTest {
         presenter =
             LocalNotificationPresenter(
                 context = context,
+                groupReconciliation = {},
                 shortcutPublisher = { shortcut ->
                     publishedShortcut = shortcut
                     publishedShortcutCount += 1
@@ -283,6 +284,7 @@ class LocalNotificationPresenterConversationTest {
         val twoStagePresenter =
             LocalNotificationPresenter(
                 context = context,
+                groupReconciliation = {},
                 shortcutPublisher = { shortcut ->
                     publishedShortcut = shortcut
                     shortcutPublishCount += 1
@@ -365,6 +367,7 @@ class LocalNotificationPresenterConversationTest {
         val cachedPresenter =
             LocalNotificationPresenter(
                 context = context,
+                groupReconciliation = {},
                 shortcutPublisher = { shortcut -> publishedShortcut = shortcut },
                 notificationPoster = { notificationManager, tag, id, notification ->
                     assertNotNull("First group card must already carry its image", notification.getLargeIcon())
@@ -430,6 +433,7 @@ class LocalNotificationPresenterConversationTest {
         val presenterWithCarriedAvatars =
             LocalNotificationPresenter(
                 context = context,
+                groupReconciliation = {},
                 shortcutPublisher = { shortcut -> publishedShortcut = shortcut },
                 notificationPoster = { notificationManager, tag, id, notification ->
                     posts += notification
@@ -477,6 +481,7 @@ class LocalNotificationPresenterConversationTest {
         val twoStagePresenter =
             LocalNotificationPresenter(
                 context = context,
+                groupReconciliation = {},
                 shortcutPublisher = { },
                 notificationPoster = { notificationManager, tag, id, notification ->
                     posts += notification
@@ -531,6 +536,7 @@ class LocalNotificationPresenterConversationTest {
         val twoStagePresenter =
             LocalNotificationPresenter(
                 context = context,
+                groupReconciliation = {},
                 shortcutPublisher = { },
                 notificationPoster = { notificationManager, tag, id, notification ->
                     posts += notification
@@ -716,7 +722,7 @@ class LocalNotificationPresenterConversationTest {
             "group-a",
             ConversationVibrationPattern.LONG,
         )
-        val restartedPresenter = LocalNotificationPresenter(context)
+        val restartedPresenter = LocalNotificationPresenter(context, groupReconciliation = {})
 
         runBlocking {
             restartedPresenter.show(
@@ -1153,6 +1159,7 @@ class LocalNotificationPresenterConversationTest {
         val clockPresenter =
             LocalNotificationPresenter(
                 context = context,
+                groupReconciliation = {},
                 shortcutPublisher = { shortcut ->
                     publishedShortcut = shortcut
                     ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
@@ -1243,6 +1250,7 @@ class LocalNotificationPresenterConversationTest {
         val recoveringPresenter =
             LocalNotificationPresenter(
                 context = context,
+                groupReconciliation = {},
                 notificationPoster = { notificationManager, tag, id, notification ->
                     postAttempts += 1
                     if (postAttempts == 1) throw RuntimeException("simulated Binder rejection")
@@ -1276,6 +1284,7 @@ class LocalNotificationPresenterConversationTest {
         val failingPresenter =
             LocalNotificationPresenter(
                 context = context,
+                groupReconciliation = {},
                 notificationPoster = { _, _, _, _ ->
                     postAttempts += 1
                     throw RuntimeException("simulated Binder rejection")

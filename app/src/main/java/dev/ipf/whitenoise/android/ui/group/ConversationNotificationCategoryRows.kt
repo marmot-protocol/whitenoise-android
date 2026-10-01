@@ -112,5 +112,6 @@ private fun notificationChannelTitle(parent: NotificationChannelSpec): String =
             NotificationChannelSpec.GROUP_MEMBERSHIP -> R.string.notification_channel_group_membership
             NotificationChannelSpec.AGENT_ACTIVITY -> R.string.notification_channel_agent_activity
             NotificationChannelSpec.APP_UPDATES -> R.string.notification_channel_app_updates
+            NotificationChannelSpec.USER_EVENT_SUMMARY -> R.string.notification_channel_summary
         },
     )
