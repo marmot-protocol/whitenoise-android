@@ -27,7 +27,13 @@ class QuarantinedGroupsOwnershipTest {
                         emptyList<Any>()
                     },
                 )
-            val access = NativeQuarantinedGroupsAccess("account", runtime, { current }, StandardTestDispatcher(testScheduler))
+            val access =
+                NativeQuarantinedGroupsAccess(
+                    "account",
+                    runtime,
+                    { current },
+                    StandardTestDispatcher(testScheduler),
+                )
             val queued = launch { access.retry("group") }
             current = false
             runCurrent()
@@ -59,7 +65,13 @@ class QuarantinedGroupsOwnershipTest {
                         }
                     },
                 )
-            val access = NativeQuarantinedGroupsAccess("account", runtime, { true }, StandardTestDispatcher(testScheduler))
+            val access =
+                NativeQuarantinedGroupsAccess(
+                    "account",
+                    runtime,
+                    { true },
+                    StandardTestDispatcher(testScheduler),
+                )
             val job = launch { access.retry("group") }
             runCurrent()
             job.cancel()

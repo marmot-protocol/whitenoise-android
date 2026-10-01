@@ -20,25 +20,27 @@ internal interface QuarantinedGroupsAccess {
     suspend fun retry(groupId: String): Boolean
 }
 
+/** Eligibility is snapshot-backed and is rechecked before every native admission. */
+internal fun WhiteNoiseAppState.quarantineAccountEligible(account: String? = activeAccountRef): Boolean =
+    !signOutInProgress &&
+        !wipeInProgress &&
+        accounts.any { it.label == account && it.isSignedInSigningAccount() }
+
 /** Captures the account and native runtime; MDK owns recovery and concurrent native calls. */
 internal fun WhiteNoiseAppState.quarantinedGroupsAccess(): QuarantinedGroupsAccess? {
     val account = activeAccountRef ?: return null
-    val runtime = captureHostPerformanceRuntimeOwner()?.runtime ?: return null
+    val runtime = captureHostPerformanceRuntimeOwner()?.runtime
     val generation = runtimeGeneration
-    if (!developerMode ||
-        signOutInProgress ||
-        wipeInProgress ||
-        accounts.none { it.label == account && it.isSignedInSigningAccount() }
-    ) {
-        return null
+    return if (runtime == null || !developerMode || !quarantineAccountEligible(account)) {
+        null
+    } else {
+        NativeQuarantinedGroupsAccess(account, runtime, {
+            activeAccountRef == account &&
+                runtimeGeneration == generation &&
+                developerMode &&
+                quarantineAccountEligible(account)
+        })
     }
-    return NativeQuarantinedGroupsAccess(account, runtime, {
-        activeAccountRef == account &&
-            runtimeGeneration == generation &&
-            developerMode &&
-            !signOutInProgress &&
-            !wipeInProgress
-    })
 }
 
 internal class NativeQuarantinedGroupsAccess(

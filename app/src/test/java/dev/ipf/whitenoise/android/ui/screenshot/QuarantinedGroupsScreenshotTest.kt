@@ -61,7 +61,10 @@ class QuarantinedGroupsScreenshotTest {
             rows =
                 listOf(
                     QuarantinedGroupRow(GROUP, AppGroupHydrationQuarantineReasonFfi.OPEN_MLS_LOAD_FAILED),
-                    QuarantinedGroupRow("b".repeat(64), AppGroupHydrationQuarantineReasonFfi.PENDING_COMMIT_RECOVERY_FAILED),
+                    QuarantinedGroupRow(
+                        "b".repeat(64),
+                        AppGroupHydrationQuarantineReasonFfi.PENDING_COMMIT_RECOVERY_FAILED,
+                    ),
                 ),
         )
 

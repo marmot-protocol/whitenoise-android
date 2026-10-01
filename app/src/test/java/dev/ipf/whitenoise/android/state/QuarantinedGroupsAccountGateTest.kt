@@ -45,6 +45,9 @@ class QuarantinedGroupsAccountGateTest {
             val fresh = state.quarantinedGroupsAccess()!!
             assertTrue(fresh.isCurrent())
             assertTrue(fresh.load().isEmpty())
+            state.updateDeveloperMode(false)
+            assertFalse(fresh.isCurrent())
+            assertNull(state.quarantinedGroupsAccess())
         }
 
     private fun state(

@@ -27,14 +27,18 @@ import dev.ipf.whitenoise.android.state.QuarantineRecoveryOutcome
 import dev.ipf.whitenoise.android.state.QuarantinedGroupsController
 import dev.ipf.whitenoise.android.state.QuarantinedGroupsUiState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.quarantineAccountEligible
 import dev.ipf.whitenoise.android.state.quarantinedGroupsAccess
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 /** Observable account and runtime generation changes replace the screen's controller. */
 @Composable
 internal fun rememberQuarantinedGroupsController(appState: WhiteNoiseAppState): QuarantinedGroupsController {
     val scope = rememberCoroutineScope()
+    val eligible = appState.quarantineAccountEligible()
     val controller =
-        remember(appState.activeAccountRef, appState.runtimeGeneration, appState.developerMode) {
+        remember(appState.activeAccountRef, appState.runtimeGeneration, appState.developerMode, eligible) {
             QuarantinedGroupsController(appState.quarantinedGroupsAccess(), scope)
         }
     DisposableEffect(controller) { onDispose { controller.close() } }
@@ -45,7 +49,8 @@ internal fun rememberQuarantinedGroupsController(appState: WhiteNoiseAppState): 
 /** The Developer Tools subtitle performs one native read per observable owner. */
 @Composable
 internal fun rememberQuarantinedGroupsSummary(appState: WhiteNoiseAppState): String {
-    val state by key(appState.activeAccountRef, appState.runtimeGeneration) {
+    val eligible = appState.quarantineAccountEligible()
+    val state by key(appState.activeAccountRef, appState.runtimeGeneration, eligible) {
         produceState(QuarantinedGroupsUiState(loading = true)) {
             val access = appState.quarantinedGroupsAccess()
             value =
@@ -59,8 +64,10 @@ internal fun rememberQuarantinedGroupsSummary(appState: WhiteNoiseAppState): Str
                         } else {
                             QuarantinedGroupsUiState(available = false)
                         }
-                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                        throw cancelled
+                    } catch (_: kotlinx.coroutines.CancellationException) {
+                        currentCoroutineContext().ensureActive()
+                        val current = access.isCurrent()
+                        QuarantinedGroupsUiState(available = current, loadFailed = current)
                     } catch (_: Exception) {
                         QuarantinedGroupsUiState(loadFailed = true)
                     }
