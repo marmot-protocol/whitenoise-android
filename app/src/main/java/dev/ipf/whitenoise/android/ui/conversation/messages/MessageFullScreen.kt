@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -42,6 +43,7 @@ import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
+import dev.ipf.whitenoise.android.ui.common.readerScrollIndicator
 
 internal const val MESSAGE_FULL_SCREEN_TAG = "message-full-screen"
 internal const val MESSAGE_FULL_SCREEN_BODY_TAG = "message-full-screen-body"
@@ -193,16 +195,24 @@ internal fun MessageFullScreenView(
             bottomBar = bottomBar,
         ) { padding ->
             AdaptiveContent(Modifier.fillMaxSize().padding(padding)) {
-                MessageFullScreenBody(
-                    body = body,
-                    markdownDocument = bodyMarkdownDocument,
-                    mentionDisplayName = mentionDisplayName,
-                    isGroupMember = isGroupMember,
-                    onNostrProfileTap = onNostrProfileTap,
-                    onCopyMarkdownLink = onCopyMarkdownLink,
-                    selectionController = selection,
-                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-                )
+                key(selectionKey) {
+                    val scrollState = rememberScrollState()
+                    MessageFullScreenBody(
+                        body = body,
+                        markdownDocument = bodyMarkdownDocument,
+                        mentionDisplayName = mentionDisplayName,
+                        isGroupMember = isGroupMember,
+                        onNostrProfileTap = onNostrProfileTap,
+                        onCopyMarkdownLink = onCopyMarkdownLink,
+                        selectionController = selection,
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .readerScrollIndicator(scrollState, selectionKey, enabled = !selection.active)
+                                .verticalScroll(scrollState)
+                                .padding(16.dp),
+                    )
+                }
             }
         }
     }

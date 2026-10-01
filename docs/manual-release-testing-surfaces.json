@@ -3,6 +3,26 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "Modifier.conversationScrollIndicator",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScrollIndicatorWindow.kt",
+        "anchor": "fun Modifier.conversationScrollIndicator(",
+        "test_ids": [
+          "CON-025",
+          "CON-003",
+          "CON-013",
+          "CON-014"
+        ]
+      },
+      {
+        "surface": "Modifier.readerScrollIndicator",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ReadingScrollPosition.kt",
+        "anchor": "fun Modifier.readerScrollIndicator(",
+        "test_ids": [
+          "MSG-026",
+          "MSG-002"
+        ]
+      },
+      {
         "surface": "PreparedVisibleGroupAvatarContent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/PreparedGroupAvatarContent.kt",
         "anchor": "fun <T> PreparedVisibleGroupAvatarContent(",
@@ -24025,6 +24045,31 @@
       }
     ],
     "source_coverage": [
+      {
+        "surface": "Continuous retained-window position and layout ownership",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScrollIndicatorWindow.kt",
+        "anchor": "fun conversationScrollPosition(",
+        "test_ids": [
+          "CON-025"
+        ]
+      },
+      {
+        "surface": "Measured expanded reader range",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ReadingScrollPosition.kt",
+        "anchor": "fun readerScrollPosition(",
+        "test_ids": [
+          "MSG-026"
+        ]
+      },
+      {
+        "surface": "Passive reading indicator geometry and visibility motion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ReadingScrollPosition.kt",
+        "anchor": "fun DrawScope.drawReadingScrollIndicator(",
+        "test_ids": [
+          "CON-025",
+          "MSG-026"
+        ]
+      },
       {
         "surface": "Retained dictation diagnostic metadata",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/DictationDiagnosticStore.kt",
