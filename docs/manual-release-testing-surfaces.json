@@ -27689,7 +27689,7 @@
         ]
       },
       {
-        "surface": "MarmotKit SDK pin: backed-up in-place upgrade across the 0.11.0 recovery migrations, responsive startup comparison recovery, sign-in, replicated attachment download, and all Android-applicable performance-registry compatibility",
+        "surface": "MarmotKit SDK pin: backed-up in-place upgrade across the 0.11.0 recovery migrations, responsive startup comparison recovery, non-blocking catch-up after chat creation, sign-in, replicated attachment download, and all Android-applicable performance-registry compatibility",
         "source": "app/src/main/marmotkit/MARMOT_VERSION",
         "anchor": "mdk-sha=",
         "test_ids": [
@@ -27707,7 +27707,9 @@
           "SET-021",
           "MSG-017",
           "MED-019",
-          "MED-020"
+          "MED-020",
+          "NCH-001",
+          "NCH-002"
         ]
       },
       {
