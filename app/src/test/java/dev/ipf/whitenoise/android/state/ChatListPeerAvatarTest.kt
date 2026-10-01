@@ -16,8 +16,10 @@ import dev.ipf.marmotkit.PresentationTextFfi
 import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -84,6 +86,21 @@ class ChatListPeerAvatarTest {
         assertSame(peerAsset, item.selectedAvatarAsset)
     }
 
+    /** Only a direct chat's adopted peer picture counts as a person's picture that may animate. */
+    @Test
+    fun onlyAnAdoptedPeerAssetIsAPersonPicture() {
+        val direct = item("", PresentationSourceFfi.PEER_PROFILE, selectedAvatarAsset = peerAsset)
+        val namedWithPeer = item("Design review", PresentationSourceFfi.PEER_PROFILE, selectedAvatarAsset = peerAsset)
+        val groupImage = item("Design review", PresentationSourceFfi.GROUP, selectedAvatarAsset = peerAsset)
+        val directWithoutAsset = item("", PresentationSourceFfi.PEER_PROFILE)
+
+        assertTrue(direct.selectedAvatarIsPersonPicture)
+        assertFalse(namedWithPeer.selectedAvatarIsPersonPicture)
+        assertFalse(groupImage.selectedAvatarIsPersonPicture)
+        assertFalse(directWithoutAsset.selectedAvatarIsPersonPicture)
+    }
+
+    /** A projected row for a two-member conversation with the given name and avatar source. */
     private fun item(
         groupName: String,
         avatarSource: PresentationSourceFfi,

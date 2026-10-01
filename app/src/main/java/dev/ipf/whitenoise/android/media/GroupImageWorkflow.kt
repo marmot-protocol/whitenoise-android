@@ -125,23 +125,33 @@ internal object GroupImageDraftProcessor {
     private const val READ_TIMEOUT_MS = 10_000
     private const val ACCEPT_HEADER = "image/avif,image/webp,image/apng,image/png,image/jpeg,image/gif,*/*;q=0.8"
 
+    /** Fetches [rawUrl] within the bounded, SSRF-hardened policy and prepares it as a JPEG draft. */
     suspend fun fromRemoteUrl(rawUrl: String): ImageUploadDraft =
         withContext(Dispatchers.IO) {
-            val url = sanitizeHttpsAvatarUrl(rawUrl) ?: throw ImageUploadPreparationException.InvalidUrl
-            val source =
-                SafeHttpsGet.get(
-                    url = url,
-                    maxBodyBytes = REMOTE_PROFILE_IMAGE_MAX_BYTES,
-                    connectTimeoutMillis = CONNECT_TIMEOUT_MS,
-                    readTimeoutMillis = READ_TIMEOUT_MS,
-                    requestHeaders =
-                        mapOf(
-                            "Accept" to ACCEPT_HEADER,
-                            "Cache-Control" to "no-store",
-                        ),
-                ) ?: throw ImageUploadPreparationException.DownloadFailed
+            val (url, source) = fetchRemoteImage(rawUrl)
             fromBytes(source, url)
         }
+
+    /**
+     * The sanitized URL and at most [REMOTE_PROFILE_IMAGE_MAX_BYTES] of its body, shared by the group path
+     * and the profile path so both keep one fetch policy. Call off the main thread.
+     */
+    internal fun fetchRemoteImage(rawUrl: String): Pair<String, ByteArray> {
+        val url = sanitizeHttpsAvatarUrl(rawUrl) ?: throw ImageUploadPreparationException.InvalidUrl
+        val source =
+            SafeHttpsGet.get(
+                url = url,
+                maxBodyBytes = REMOTE_PROFILE_IMAGE_MAX_BYTES,
+                connectTimeoutMillis = CONNECT_TIMEOUT_MS,
+                readTimeoutMillis = READ_TIMEOUT_MS,
+                requestHeaders =
+                    mapOf(
+                        "Accept" to ACCEPT_HEADER,
+                        "Cache-Control" to "no-store",
+                    ),
+            ) ?: throw ImageUploadPreparationException.DownloadFailed
+        return url to source
+    }
 
     suspend fun fromContentUri(
         contentResolver: ContentResolver,

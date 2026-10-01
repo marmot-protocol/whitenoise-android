@@ -118,6 +118,7 @@ internal fun FlowSearchField(
  * [isFollowed] adds the followed-person avatar badge and exports the localized `You follow`
  * state once from the row. [selectionState] remains separate so multi-select pickers can expose
  * selected and followed at the same time without making the badge look like a selection control.
+ * [avatarAnimationKey] lets a stored person picture in [avatarImage] animate under the profile policy.
  */
 @Composable
 @Suppress("FunctionNaming", "LongMethod")
@@ -127,6 +128,7 @@ internal fun ContactRow(
     avatarSeed: String,
     avatarUrl: String?,
     avatarImage: ImageBitmap? = null,
+    avatarAnimationKey: String? = null,
     isFollowed: Boolean = false,
     selectionState: Boolean? = null,
     modifier: Modifier = Modifier,
@@ -178,6 +180,7 @@ internal fun ContactRow(
                 size = 48.dp,
                 pictureUrl = avatarUrl?.takeIf { avatarImage == null },
                 picture = avatarImage,
+                animationKey = avatarAnimationKey,
             )
             if (isFollowed) {
                 FollowedPersonBadge(modifier = Modifier.align(Alignment.BottomEnd))

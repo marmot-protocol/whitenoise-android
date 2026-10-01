@@ -22,8 +22,13 @@ import dev.ipf.whitenoise.android.state.cacheKey
 import dev.ipf.whitenoise.android.state.currentGroupAvatarItem
 import dev.ipf.whitenoise.android.state.isRenderable
 import dev.ipf.whitenoise.android.state.retainedAvatarBytesReader
+import dev.ipf.whitenoise.android.state.selectedAvatarIsPersonPicture
 
-/** All group surfaces consume the selected MDK asset; legacy acquisition is only a compatibility path. */
+/**
+ * All group surfaces consume the selected MDK asset; legacy acquisition is only a compatibility path.
+ * [durableAvatarIsPersonPicture] marks a selected asset that is a member's profile picture, which alone
+ * may animate under the shared profile-avatar policy.
+ */
 @Composable
 @Suppress("LongParameterList")
 internal fun rememberGroupAvatarPresentation(
@@ -33,6 +38,7 @@ internal fun rememberGroupAvatarPresentation(
     accountRef: String? = appState.activeAccountRef,
     fallbackPictureUrl: String? = null,
     firstFrameAvatar: ChatListAvatarSeed? = null,
+    durableAvatarIsPersonPicture: Boolean = false,
 ): GroupAvatarPresentation {
     val ownedSeed = firstFrameAvatar?.takeIf { it.matchesAvatarPresentationOwner(accountRef) }
     val durableImage = rememberDurableAvatar(appState, durableAvatar, accountRef)
@@ -40,7 +46,11 @@ internal fun rememberGroupAvatarPresentation(
         val durableKey = accountRef?.let { durableAvatar.takeIf { it.isRenderable() }?.cacheKey(it) }
         val seededImage = ownedSeed?.durableImageFor(durableKey)
         // Missing/invalidated assets must not revive a legacy bitmap or launch a second acquisition.
-        return GroupAvatarPresentation(durableImage ?: seededImage, null)
+        return GroupAvatarPresentation(
+            image = durableImage ?: seededImage,
+            pictureUrl = null,
+            animationKey = durableKey.takeIf { durableAvatarIsPersonPicture },
+        )
     }
     val legacyUrl = ProfileSanitizer.protocolImageUrl(group.avatarUrl)
     val encryptedKey = encryptedGroupAvatarCacheKey(accountRef, group)
@@ -98,6 +108,7 @@ internal fun rememberChatListGroupAvatar(
         accountRef = accountRef,
         fallbackPictureUrl = fallbackPictureUrl,
         firstFrameAvatar = item.firstFrameAvatar,
+        durableAvatarIsPersonPicture = item.selectedAvatarIsPersonPicture,
     )
 
 /** Details, editing and full-picture presentation share the conversation's account and current asset. */
@@ -205,6 +216,8 @@ internal fun GroupAvatar(
     // keeps its picture offline and costs no request. Null falls back to the URL path unchanged.
     durableAvatar: AvatarAssetFfi? = null,
     accountRef: String? = appState.activeAccountRef,
+    // True only when [durableAvatar] is a member's profile picture (a DM peer), never a group image.
+    durableAvatarIsPersonPicture: Boolean = false,
 ) {
     val presentation =
         rememberGroupAvatarPresentation(
@@ -214,6 +227,7 @@ internal fun GroupAvatar(
             accountRef,
             fallbackPictureUrl,
             firstFrameAvatar,
+            durableAvatarIsPersonPicture,
         )
     Avatar(
         title = title,
@@ -221,5 +235,6 @@ internal fun GroupAvatar(
         size = size,
         pictureUrl = presentation.pictureUrl?.takeIf { presentation.image == null },
         picture = presentation.image,
+        animationKey = presentation.animationKey,
     )
 }
