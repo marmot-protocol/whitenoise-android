@@ -76,7 +76,10 @@ private fun ChatListAvatarSeed.matchesAvatarPresentationOwner(accountRef: String
 }
 
 /** A selected native identity may only reuse the exact durable presentation seed. */
-private fun ChatListAvatarSeed.durableImageFor(assetKey: String?): ImageBitmap? = image.takeIf { source == ChatListAvatarSource.DURABLE && key == assetKey }
+private fun ChatListAvatarSeed.durableImageFor(assetKey: String?): ImageBitmap? {
+    val selected = source == ChatListAvatarSource.DURABLE && key == assetKey
+    return image.takeIf { selected }
+}
 
 /** The row's selected asset already includes MDK's group/peer selection and membership checks. */
 @Composable

@@ -25,6 +25,33 @@ import java.util.concurrent.atomic.AtomicInteger
 
 @RunWith(RobolectricTestRunner::class)
 class AvatarImageLoaderTest {
+    @Test
+    fun storedAvatarReadDoesNotWaitForTwoBlockedNetworkRequests() =
+        runBlocking {
+            val started = AtomicInteger()
+            val bothStarted = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            AvatarImageLoader.attachProfileImageFetcher { _, _ ->
+                if (started.incrementAndGet() == 2) bothStarted.complete(Unit)
+                release.await()
+                Base64.getDecoder().decode(ONE_PIXEL_PNG_BASE64)
+            }
+            val network = (1..2).map { async { AvatarImageLoader.load("https://profiles.example/blocked-$it") } }
+            try {
+                withTimeout(5_000) { bothStarted.await() }
+                assertNotNull(
+                    withTimeout(5_000) {
+                        AvatarImageLoader.loadStored("marmot-avatar:owner:offline@1", AvatarImageLoader.currentCacheLifetime()) {
+                            Base64.getDecoder().decode(ONE_PIXEL_PNG_BASE64)
+                        }
+                    },
+                )
+            } finally {
+                release.complete(Unit)
+                network.awaitAll()
+            }
+        }
+
     /** Concurrent surfaces share one off-main local read/decode without entering the network adapter. */
     @Test
     fun storedAvatarReadsAreCoalescedAndDecodedOffMain() =

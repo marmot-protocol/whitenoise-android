@@ -5,14 +5,18 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.Looper
 import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.ImageBitmap
@@ -307,9 +311,9 @@ class GroupAvatarLocalAssetScreenshotTest {
         assertEquals(0, fixture.legacyDownloads.get())
     }
 
-    /** Evicted decoded pixels are read once off-main before publishing populated UI, with no network. */
+    /** Cold local decoding never withholds navigation; warm-cache first frames remain synchronous. */
     @Test
-    fun evictedSelectionIsLocallyPreparedBeforeFirstPopulatedFrame() {
+    fun evictedSelectionKeepsNavigationAvailableWhileDecoding() {
         val started = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
         val fixture =
@@ -321,6 +325,7 @@ class GroupAvatarLocalAssetScreenshotTest {
             }
         val selected = asset()
         val firstFrames = mutableListOf<ImageBitmap?>()
+        var backCalls = 0
         try {
             composeRule.setContent {
                 WhiteNoiseTheme {
@@ -328,14 +333,17 @@ class GroupAvatarLocalAssetScreenshotTest {
                         val image = rememberDurableAvatar(fixture.state, selected)
                         SideEffect { firstFrames += image }
                         Text("populated", Modifier.testTag("populated"))
+                        Button(onClick = { backCalls += 1 }) { Text("Back while decoding") }
                     }
                 }
             }
             awaitLocal { started.isCompleted }
-            composeRule.onNodeWithTag("populated").assertDoesNotExist()
+            composeRule.onNodeWithTag("populated").assertExists()
+            composeRule.onNodeWithText("Back while decoding").performClick()
+            assertEquals(1, backCalls)
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/group_avatar_cold_decode_navigation_light.png")
             composeRule.runOnIdle { release.complete(Unit) }
-            awaitLocal { firstFrames.isNotEmpty() }
-            firstFrames.forEach { assertNotNull(it) }
+            awaitLocal { firstFrames.lastOrNull() != null }
             assertEquals(1, fixture.reads.get())
             assertEquals(0, fixture.requests.get())
             assertEquals(0, fixture.legacyDownloads.get())
@@ -499,7 +507,6 @@ class GroupAvatarLocalAssetScreenshotTest {
                 emptyList()
             }
         val selected = asset()
-        val epoch = mutableStateOf(0)
         var observed: ImageBitmap? = null
         val cached =
             checkNotNull(
@@ -513,19 +520,34 @@ class GroupAvatarLocalAssetScreenshotTest {
             composeRule.setContent {
                 val image = rememberDurableAvatar(fixture.state, selected)
                 SideEffect { observed = image }
-                Text("epoch ${epoch.value}")
+                Text("retained composition")
             }
             composeRule.waitForIdle()
             assertSame(cached, observed)
             composeRule.runOnIdle {
                 fixture.state.clearCrossAccountCachesForTest()
-                epoch.value += 1
             }
             composeRule.waitForIdle()
             assertNull(observed)
         } finally {
             release.complete(Unit)
         }
+    }
+
+    @Test
+    fun cacheInvalidationPreservesEditableSurfaceState() {
+        val fixture = AvatarLocalFixture { emptyList() }
+        composeRule.setContent {
+            PreparedGroupAvatarContent(fixture.state, emptyList()) {
+                var draft by rememberSaveable { mutableStateOf("Original") }
+                Button(onClick = { draft = "Edited draft" }) { Text(draft) }
+            }
+        }
+        composeRule.onNodeWithText("Original").performClick()
+        composeRule.onNodeWithText("Edited draft").assertExists()
+        composeRule.runOnIdle { AvatarImageLoader.clearStoredAvatars() }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Edited draft").assertExists()
     }
 
     /** A same-account runtime generation replacement cannot reuse private pixels from the old runtime. */

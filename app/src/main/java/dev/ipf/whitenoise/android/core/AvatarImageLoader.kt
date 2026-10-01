@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.core
 
 import android.graphics.BitmapFactory
 import android.util.LruCache
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -55,6 +56,9 @@ object AvatarImageLoader {
     // their results so a logout/account-switch can't be re-polluted by an
     // in-flight request that was already on the network.
     private val cacheLifetime = StalenessGuard()
+
+    // Observable presentation token; the guard remains authoritative for async publication.
+    private val observedCacheLifetime = mutableLongStateOf(cacheLifetime.capture())
     private val requestLifetime = StalenessGuard()
 
     /**
@@ -330,7 +334,7 @@ object AvatarImageLoader {
     /** Wipes cached avatars and invalidates every queued or in-flight fetch. */
     fun clear() {
         synchronized(lock) {
-            cacheLifetime.advance()
+            observedCacheLifetime.longValue = cacheLifetime.advance()
             cache.evictAll()
             retireRequestsLocked()
         }
@@ -339,7 +343,7 @@ object AvatarImageLoader {
     /** Retires account-private stored pixels/reads while preserving already decoded public URL images. */
     internal fun clearStoredAvatars() {
         synchronized(lock) {
-            cacheLifetime.advance()
+            observedCacheLifetime.longValue = cacheLifetime.advance()
             cache.evictStoredAvatars()
             retireRequestsLocked()
         }
@@ -401,7 +405,7 @@ object AvatarImageLoader {
     internal fun cachedImage(key: String): ImageBitmap? = cached(key.trim())
 
     /** The cache lifetime a durable read must capture before it suspends; [clear] makes it stale. */
-    internal fun currentCacheLifetime(): Long = cacheLifetime.capture()
+    internal fun currentCacheLifetime(): Long = observedCacheLifetime.longValue
 
     /** Shares local reads and off-main decodes through the existing bounded, generation-fenced loader. */
     internal suspend fun loadStored(
@@ -413,7 +417,7 @@ object AvatarImageLoader {
             request = avatarRequest(key),
             expectedGeneration = null,
             expectedCacheLifetime = lifetime,
-            fetchLane = AvatarFetchLane.REGULAR,
+            fetchLane = AvatarFetchLane.STORED,
             fetchImage = { request ->
                 readBytes()
                     ?.let { decode(it, request.variant, request.maxDimension)?.asImageBitmap() }
@@ -621,6 +625,7 @@ private sealed interface AvatarImageFetchResult {
 internal enum class AvatarFetchLane {
     REGULAR,
     NOTIFICATION,
+    STORED,
     PREWARM_ADMITTED,
 }
 
@@ -641,6 +646,9 @@ internal class AvatarFetchGate(
     private val regular = Semaphore(regularPermits)
     private val notification = Semaphore(notificationPermits)
 
+    // Local decoding has its own bounded capacity; offline socket waits cannot starve it.
+    private val stored = Semaphore(2)
+
     suspend fun <T> withPermit(
         lane: AvatarFetchLane,
         block: suspend () -> T,
@@ -648,6 +656,7 @@ internal class AvatarFetchGate(
         when (lane) {
             AvatarFetchLane.REGULAR -> regular.withPermit(block)
             AvatarFetchLane.NOTIFICATION -> notification.withPermit(block)
+            AvatarFetchLane.STORED -> stored.withPermit(block)
             AvatarFetchLane.PREWARM_ADMITTED -> block()
         }
 

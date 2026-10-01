@@ -3941,7 +3941,10 @@ class ChatsController private constructor(
     }
 
     /** Reads the current source row even while the chat-list UI is intentionally frozen. */
-    internal fun currentGroupAvatarItem(groupIdHex: String): ChatListItem? = chatRows.firstOrNull { it.groupIdHex == groupIdHex }?.let { projectChatRow(it) }
+    internal fun currentGroupAvatarItem(groupIdHex: String): ChatListItem? {
+        val row = chatRows.firstOrNull { it.groupIdHex == groupIdHex } ?: return null
+        return projectChatRow(row)
+    }
 
     private fun optimisticArchiveRow(row: ChatListRowFfi): ChatListRowFfi =
         optimisticArchiveByGroup[chatRowKey(row.groupIdHex)]
@@ -5117,7 +5120,10 @@ class ChatsController private constructor(
         item.latest?.sender?.let(appState::preWarmProfileAvatar)
     }
 
-    private fun firstFrameAvatarSeed(item: ChatListItem): ChatListAvatarSeed? = firstFrameGroupAvatarSeed(item, accountRef, appState::avatarUrl)
+    private fun firstFrameAvatarSeed(item: ChatListItem): ChatListAvatarSeed? {
+        val owner = accountRef
+        return firstFrameGroupAvatarSeed(item, owner, appState::avatarUrl)
+    }
 
     /**
      * Called by the shell when a conversation is foregrounded (`false`) or the
