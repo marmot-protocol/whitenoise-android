@@ -58,6 +58,8 @@ val marmotKitCacheRoot =
             ?.let(rootProject::file)
         ?: gradle.gradleUserHomeDir.resolve("caches/whitenoise/marmotkit")
 val marmotKitPreparedDir = marmotKitCacheRoot.resolve(marmotKitArtifactSha).resolve(marmotKitArchiveRoot)
+// The isolated native tests consume the same checksum-verified artifact location.
+extra["marmotKitPreparedDir"] = marmotKitPreparedDir
 val marmotKitArtifactOverride =
     providers
         .gradleProperty("whitenoise.marmotkit.artifactFile")

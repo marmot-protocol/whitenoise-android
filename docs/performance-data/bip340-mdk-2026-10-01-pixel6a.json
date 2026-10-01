@@ -1,0 +1,169 @@
+{
+  "schema": 2,
+  "implementation": "MDK 0.11.0 stateless full-event verifier",
+  "buildFingerprint": "google/bluejay/bluejay:17/CP3A.260905.009/2026092501:user/release-keys",
+  "abi": "arm64-v8a",
+  "warmupOperations": 10,
+  "operationsPerSample": 8,
+  "sampleCount": 20,
+  "before": {
+    "batteryPercent": 80,
+    "thermalStatus": 0
+  },
+  "after": {
+    "batteryPercent": 80,
+    "thermalStatus": 0
+  },
+  "results": [
+    {
+      "name": "legacyFullEvent",
+      "timeNs": [
+        234756927,
+        234284291,
+        234286590,
+        234471115,
+        234283589,
+        234430598,
+        233878128,
+        234403254,
+        235141993,
+        234479360,
+        235374135,
+        234410837,
+        234252767,
+        235417719,
+        234440796,
+        234796417,
+        233221547,
+        234408879,
+        234116363,
+        234613937
+      ],
+      "medianNs": 234420717,
+      "operationsPerSecond": 4.265834576386864
+    },
+    {
+      "name": "replacementFullEvent",
+      "timeNs": [
+        490285,
+        461593,
+        486958,
+        479522,
+        486867,
+        483057,
+        472742,
+        509730,
+        476471,
+        464803,
+        474390,
+        468897,
+        481079,
+        472732,
+        462377,
+        456237,
+        468805,
+        485188,
+        453806,
+        459335
+      ],
+      "medianNs": 473566,
+      "operationsPerSecond": 2111.638082125828
+    }
+  ],
+  "instrumentationVerdict": "OK (7 tests)",
+  "sourceRevision": "3db293d4e3e6cbbc3d6671436ebdc3105bc821f2",
+  "provenance": {
+    "sourceRevision": "3db293d4e3e6cbbc3d6671436ebdc3105bc821f2",
+    "worktreeRevision": "3db293d4e3e6cbbc3d6671436ebdc3105bc821f2",
+    "sourceMode": "Committed benchmark and build inputs; every input is byte-identical in the recorded clean PR revision.",
+    "buildInputHashes": {
+      "app/build.gradle.kts": "d8034b4424436bde675cea4fee384ed29f64928e07e347512179be79910cdc33",
+      "app/src/main/java/dev/ipf/whitenoise/android/core/nostr/NostrEvent.kt": "d38aaad0ca960cad7f7103bf0e73980b94cb780ab5cf964ee54caecd25a510c4",
+      "app/src/main/java/dev/ipf/whitenoise/android/core/nostr/NostrEventVerifier.kt": "8e435867ceb74014181ce0e2398fcdec2f1a177642bde3d9f2d8420f2d5a30bc",
+      "app/src/main/marmotkit/MARMOT_VERSION": "e94cde28f96e5daed5f52ef08a3980560a4815b1e7095baa40f22511452c17d4",
+      "build.gradle.kts": "acbef0521ced4c6df0b7a49ee02680a82b3d9950bdbdf7aba2bbb277b3c85825",
+      "cryptoBenchmark/benchmark-rules.pro": "159a4c476850831eba8f7fc428ed548b29af84724aa6b34ab7fb40202973f24a",
+      "cryptoBenchmark/benchmark-test-rules.pro": "947b7eca91b9609ce6d0b7639b02e9c18a60d9c52df4b4275acf163a957d8b47",
+      "cryptoBenchmark/build.gradle.kts": "26022c5f8cef7c0412286a74a5894045d34c20d7258ab1894b402fbd92f3ddbc",
+      "cryptoBenchmark/src/androidTest/java/dev/ipf/whitenoise/android/core/nostr/Bip340PhysicalBenchmark.kt": "4fe0b83e96b37103806d2b60a9b458cc4b022f16e1e40a175d09f370b7b15958",
+      "cryptoBenchmark/src/androidTest/java/dev/ipf/whitenoise/android/core/nostr/NostrEventVerifierInstrumentedTest.kt": "7babd29f7055dead5f07b6451d66944925c324b11495c845aa4b98898ed9780d",
+      "cryptoBenchmark/src/main/AndroidManifest.xml": "8e53283d9dcf354bd53bd7fab15184e66ab47c208143a57a8fc0bed325d02779",
+      "cryptoBenchmark/src/main/java/dev/ipf/whitenoise/android/core/nostr/Bip340ComparisonBridge.kt": "7f36326aa2e9fa7121675f0aa510796b82e978edc25648c0bf7b677228fbc9c6",
+      "cryptoBenchmark/src/main/java/dev/ipf/whitenoise/android/core/nostr/LegacyBip340BenchmarkVerifier.kt": "ed5235bce89ee5949535cb63e5942a41ccff13c3201a6a0e89ce6cb7cdf2e684",
+      "cryptoBenchmark/src/main/java/dev/ipf/whitenoise/android/core/nostr/NativeVerifierCorrectnessBridge.kt": "82c0f8590cdf82deff87ece8b6ddf002a23f3ee75e1e8eba60444dd68f6f33eb",
+      "gradle.properties": "a6246ee8a0bd7d5f4b1e26a2db84e3ccfbd001d3fc83ed3a155ac31c5b09601b",
+      "gradle/gradle-daemon-jvm.properties": "231649d2f8e8dc24310f18c921e3ae33fd2715b7f48a7ddcaf27a85003e0729a",
+      "gradle/libs.versions.toml": "6bb95874773351107e865447714c05059f4d03d658fee397edc6d904d3af3236",
+      "gradle/wrapper/gradle-wrapper.jar": "7a9ce74cff467ca1bf60a4fcd9f05185acceda4d0f382434d393e17864262c5d",
+      "gradle/wrapper/gradle-wrapper.properties": "176c063ca4780936476becc80f987ec9a7fdbfd2f58f7e32c1d3fb5fd4cb95b3",
+      "gradlew": "a5a5c199ba02189ae8c46a334223371a20599d9c298ef65e7540ede4a3f72d59",
+      "scripts/prepare-marmotkit-artifact.ps1": "6168324504c6aaa6d792de127dd31831f9c1f12ff949f2b14c210fd8b1a7b965",
+      "scripts/prepare-marmotkit-artifact.sh": "10eb499cd0736e24a13c09ec3a3ed477d3244a31cb235d71e96e105f2b9b966d",
+      "scripts/prepare_marmotkit_artifact.py": "9c41bbece82dac5510152ab5b4293422a0867764edff94553f8ab731581ccd5c",
+      "settings.gradle.kts": "a33b3efbc91978f1f137befff63f3ecf35e88fa77c79c139cfbb4cbbd3ad5b6d"
+    },
+    "marmotKitArtifactSha256": "5ab8bf5f7723ed2c07d15a07c5691d05eb8a37354882020c0b69b952d6418923",
+    "marmotKitExtractedHashes": {
+      ".prepared.json": "0d6fb7e144acbaa064c6af4fe29e5d639ef5cfe00060b5748151b68f3c77523b",
+      "android-elf.json": "b128ac6a0f08de2e362f504760af39f7c060e79e534bf5f3792702e4976a9690",
+      "jniLibs/arm64-v8a/libmarmot_uniffi.so": "077ad94f76dd0efd2bac59cb0cd094b58bbd695e0a18ce55e449139067ab192b",
+      "jniLibs/armeabi-v7a/libmarmot_uniffi.so": "b97a9910e5dafbba4e93c128edd35d5ccf01a33522696eb2d25121d7b7dcc0e5",
+      "jniLibs/x86/libmarmot_uniffi.so": "af270de69a7945c59f6c04de93e5b13118df39a1bd4fdc088e1d3223237569a3",
+      "jniLibs/x86_64/libmarmot_uniffi.so": "bdcac1c80172d0fd2ca694985446d2a5359c0655dd580915e31407143a703acb",
+      "kotlin/dev/ipf/marmotkit/MarmotAndroid.kt": "afd46c5f95d76b09b56d41b4e73c317d092be28b1497978023b2dc17412b7955",
+      "kotlin/dev/ipf/marmotkit/marmot_uniffi.kt": "6f167ee2494c4444ed4a00f0e83f008b050ead7200701870eae33e11c3aeb0ef",
+      "kotlin/io/crates/keyring/Keyring.kt": "368398f1f9eb36bd0c23b5a17f53579a72ac77950eee70a144e2579e5fd39dd5",
+      "manifest.json": "6ed68096e12ea376528f97756841c5178321420d41d7874c8c9b05475b54a891",
+      "marmotkit-api-signature.txt": "d6b33144c550a7717b505769a8b3a743d15dba8e34d21bcbc6a52705492fab16",
+      "prepared-files.sha256": "b84edcf710a540b21d2ac6dca6a5741a21d2d525940a406a96127d47f493421f"
+    },
+    "apkHashes": {
+      "cryptoBenchmark/build/outputs/apk/release/cryptoBenchmark-release.apk": "0c828157f16c6bd549d2fd5cfd3c3d0006bbaa959a82e9d3ef33cb514bfa51b4",
+      "cryptoBenchmark/build/outputs/apk/androidTest/release/cryptoBenchmark-release-androidTest.apk": "51fcd03af33bf73849a5d8dc98becda98a134a2a65bd26a6712fa2c1bc7fc377"
+    },
+    "packagedNativeHashes": {
+      "lib/arm64-v8a/libjnidispatch.so": "abc26e994517bcaa3309acdb0a27373864086c7569c89d3087b8626fada9ef06",
+      "lib/arm64-v8a/libmarmot_uniffi.so": "077ad94f76dd0efd2bac59cb0cd094b58bbd695e0a18ce55e449139067ab192b",
+      "lib/armeabi-v7a/libjnidispatch.so": "9652282ef31834281229370a354d56c1522fe36e93625169df99b3e346f76092",
+      "lib/armeabi-v7a/libmarmot_uniffi.so": "b97a9910e5dafbba4e93c128edd35d5ccf01a33522696eb2d25121d7b7dcc0e5",
+      "lib/armeabi/libjnidispatch.so": "101daa2222382f3727800c0c49731346c5c4f81f1ecf1fde85ebcea64b151901",
+      "lib/mips/libjnidispatch.so": "eb549d34eb17b394f4ba74c21c51f41340d8b049aa90cc9feaef734695890402",
+      "lib/mips64/libjnidispatch.so": "93f5b0bec919b95160db0bf35c5ed6904d4d48f282501f0ff4a85f6511f3e44d",
+      "lib/x86/libjnidispatch.so": "d10fcc75029621a88fa6020807e7ba82ff434a01ead396cf0e36c50e6c393118",
+      "lib/x86/libmarmot_uniffi.so": "af270de69a7945c59f6c04de93e5b13118df39a1bd4fdc088e1d3223237569a3",
+      "lib/x86_64/libjnidispatch.so": "3809247e9b804a05ed8377b87d545cf5b5e97f960f75e725bc8497b40260e417",
+      "lib/x86_64/libmarmot_uniffi.so": "bdcac1c80172d0fd2ca694985446d2a5359c0655dd580915e31407143a703acb"
+    },
+    "packagedMarmotMatchesPrepared": {
+      "lib/arm64-v8a/libmarmot_uniffi.so": true,
+      "lib/armeabi-v7a/libmarmot_uniffi.so": true,
+      "lib/x86/libmarmot_uniffi.so": true,
+      "lib/x86_64/libmarmot_uniffi.so": true
+    }
+  },
+  "instrumentationOutputSha256": "e0b5787497b5f6e964a027e10ace3fef05a2b1c7943e924319ed440b0aec1928",
+  "fixtureVerification": {
+    "generator": "coincurve/libsecp256k1",
+    "version": "21.0.0",
+    "previousFixtureSignatureMatchesCanonicalId": false,
+    "newFixtureSignatureValid": true,
+    "previousSignatureMatchesStoredId": true,
+    "previousFixtureCanonicalIdMatches": false,
+    "canonicalPreimage": "[0,\"79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\",1707409439,1,[[\"-\"]],\"hello members of the secret group\"]",
+    "event": {
+      "pubkey": "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "created_at": 1707409439,
+      "kind": 1,
+      "tags": [
+        [
+          "-"
+        ]
+      ],
+      "content": "hello members of the secret group",
+      "id": "f017727ad7c6b4c872639506b75ad7c8f85e0896f71610fb491625e1c0b8b2e6",
+      "sig": "05a6cc87a4e03cd93efd843d45ec927b13dedcaf653518c0dc7e929f2cd3588587ea4402009afaa9d4dfff5c7e74a8e15aee9cd71c2aaadf04ff3e7e690a3e9d"
+    }
+  },
+  "sourceMode": "Committed benchmark and build inputs; every input is byte-identical in the recorded clean PR revision.",
+  "date": "2026-10-01"
+}
