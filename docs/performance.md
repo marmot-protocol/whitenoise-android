@@ -335,6 +335,57 @@ Compare repeated runs on the same device, build, fixture, brightness, battery,
 network, and thermal state. Do not compare absolute values across devices, and
 do not set a fleet-wide threshold until representative baselines exist.
 
+### Idle background-delivery baselines and push-burst power
+
+`BackgroundIdleBenchmark` ([#2786](https://github.com/marmot-protocol/whitenoise-android/issues/2786))
+measures the three remaining delivery postures the recovery benchmark above does
+not cover, plus a representative push burst. Unlike the recovery journey, these
+methods run no UI interaction inside the measured block; each is a fixed sleep
+window while the app sits backgrounded, so only `idleMetrics()` applies (no
+frame timing).
+
+The product has no third "delivery entirely disabled" mode — it always resolves
+to push or local/keep-connected (see `NativePushDelivery.resolvedNotificationDeliveryMode`).
+`idleWithDeliveryDisabledPower` approximates the floor a user who disabled
+notifications would see: push mode selected (so the always-on local stream is
+off) with the OS notification permission revoked for the run, restored
+afterward regardless of outcome.
+
+```bash
+ANDROID_SERIAL=<device-serial> \
+  BENCHMARK_CLASS_FILTER="dev.ipf.whitenoise.android.benchmark.BackgroundIdleBenchmark#idleWithDeliveryDisabledPower" \
+  scripts/run-performance-benchmarks.sh
+```
+
+Swap the method name for `idleWithNativePushPower` or `idleWithKeepConnectedPower`
+to capture the other two postures. All three default to a 60-second idle window
+per iteration across 3 iterations; override it for a quick smoke run before
+committing to the full-length guarded pass, since a multi-minute `measureBlock`
+is new territory for this harness:
+
+```bash
+IDLE_WINDOW_MS=10000 \
+  BENCHMARK_CLASS_FILTER="dev.ipf.whitenoise.android.benchmark.BackgroundIdleBenchmark#idleWithKeepConnectedPower" \
+  scripts/run-performance-benchmarks.sh
+```
+
+`pushBurstPower` observes the receive-side push-wake/catch-up cost of several
+messages arriving together, which is a different thing from
+`SecondaryAccountNotificationNavigationMacrobenchmark`'s UI-reaction-time
+measurement against notifications already sitting in the tray — the burst must
+arrive *during* the measured window here, not before it. It runs a single
+iteration; watch `adb logcat -s BackgroundIdleBenchmark` for the "send the push
+burst now" line, then send roughly five messages in quick succession from a
+second account before the (also `IDLE_WINDOW_MS`-overridable) window closes:
+
+```bash
+BENCHMARK_CLASS_FILTER="dev.ipf.whitenoise.android.benchmark.BackgroundIdleBenchmark#pushBurstPower" \
+  scripts/run-performance-benchmarks.sh
+```
+
+Same caveat as the recovery baseline: system-wide energy, same-device
+comparison only, no fleet-wide threshold until representative baselines exist.
+
 To measure group creation separately, use the state-preserving runner with an
 explicit mutation argument. This creates ten persistent MLS groups:
 
