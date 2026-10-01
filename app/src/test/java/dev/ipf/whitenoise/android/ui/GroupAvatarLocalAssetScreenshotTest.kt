@@ -52,14 +52,24 @@ import dev.ipf.marmotkit.AvatarAcquisitionStateFfi
 import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.marmotkit.AvatarAvailabilityFfi
 import dev.ipf.marmotkit.AvatarBytesFfi
+import dev.ipf.marmotkit.ConversationAnchorKindFfi
+import dev.ipf.marmotkit.ConversationAnchorOutcomeFfi
+import dev.ipf.marmotkit.ConversationCapabilitiesFfi
+import dev.ipf.marmotkit.ConversationHeaderFfi
+import dev.ipf.marmotkit.ConversationOpenReadStateFfi
+import dev.ipf.marmotkit.ConversationParticipationFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
+import dev.ipf.marmotkit.ConversationWindowRevisionFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
+import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.marmotkit.MessageDraftRevisionFfi
 import dev.ipf.marmotkit.PresentationResolutionFfi
 import dev.ipf.marmotkit.PresentationSourceFfi
 import dev.ipf.marmotkit.PresentationTextFfi
 import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.marmotkit.SelectedAvatarFfi
+import dev.ipf.marmotkit.SelectedMessageDraftFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
@@ -69,6 +79,7 @@ import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.ConversationWindowFrame
 import dev.ipf.whitenoise.android.state.DestructiveAccountWipeRuntimeState
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -705,6 +716,76 @@ class GroupAvatarLocalAssetScreenshotTest {
         }
         composeRule.waitForIdle()
     }
+}
+
+/** Header selection comes from the native frame, even before the Android roster hydrates. */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [36])
+class ConversationHeaderAvatarSelectionTest {
+    @Before
+    @After
+    fun clearLoader() = AvatarImageLoader.clear()
+
+    @Test
+    fun loadedPeerHeaderUsesNativeMemberCountBeforeRosterHydration() {
+        val fixture = AvatarLocalFixture { emptyList() }
+        val production = productionSurfaceFixture(fixture, false, group().copy(name = "", avatarUrl = null))
+        assertEquals(0, production.controller.presentedMemberCount)
+        production.controller.window.install(avatarHeaderFrame(selectedPicture(PresentationSourceFfi.PEER_PROFILE)))
+        assertEquals(asset(), conversationGroupAvatarAsset(fixture.state, production.controller))
+    }
+
+    @Test
+    fun loadedGroupHeaderRejectsChangedSourceIdentity() {
+        val fixture = AvatarLocalFixture { emptyList() }
+        val production = productionSurfaceFixture(fixture, false)
+        production.controller.window.install(avatarHeaderFrame(selectedPicture(PresentationSourceFfi.GROUP)))
+        assertNull(conversationGroupAvatarAsset(fixture.state, production.controller))
+    }
+}
+
+private fun avatarHeaderFrame(selected: ConversationPresentationFfi) =
+    ConversationWindowFrame(
+        revision = ConversationWindowRevisionFfi("avatar-generation", 1uL),
+        header =
+            ConversationHeaderFfi(
+                selected = selected,
+                memberCount = 2uL,
+                archived = false,
+                epoch = 1uL,
+                lifecycle = GroupLifecycleStateFfi.STABLE,
+                disbanding = false,
+                unrecoverable = false,
+                avatarAsset = asset(),
+                capabilities =
+                    ConversationCapabilitiesFfi(
+                        participation = ConversationParticipationFfi.ACTIVE,
+                        isSelfAdmin = false,
+                        isLastAdmin = false,
+                        canSend = true,
+                        canInvite = false,
+                        canEditGroup = false,
+                        canLeave = true,
+                        requiresSelfDemoteBeforeLeave = false,
+                        canEnableDisbanding = false,
+                        canDisband = false,
+                    ),
+            ),
+        identities = emptyMap(),
+        readState = ConversationOpenReadStateFfi(true, null, null, false, 0uL, 0uL, null),
+        draft = SelectedMessageDraftFfi(avatarDraftRevisionStub(), null),
+        anchor = ConversationAnchorOutcomeFfi(ConversationAnchorKindFfi.LATEST, 0u),
+        references = emptyMap(),
+    )
+
+/** The native handle is never invoked; this follows the existing conversation-window JVM fixture. */
+private fun avatarDraftRevisionStub(): MessageDraftRevisionFfi {
+    val unsafeClass = Class.forName("sun.misc.Unsafe")
+    val unsafe = unsafeClass.getDeclaredField("theUnsafe").apply { isAccessible = true }.get(null)
+    return unsafeClass
+        .getMethod("allocateInstance", Class::class.java)
+        .invoke(unsafe, MessageDraftRevisionFfi::class.java) as MessageDraftRevisionFfi
 }
 
 /** Original local-image export remains independent of rendered UI and never creates another download. */

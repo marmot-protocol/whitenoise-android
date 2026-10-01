@@ -49,7 +49,6 @@ import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.state.ScopedGroupImageMutation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
-import dev.ipf.whitenoise.android.state.retainedAvatarBytesReader
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.GroupNameEmojiField
 import dev.ipf.whitenoise.android.ui.common.IMAGE_DOCUMENT_MIME_TYPES
@@ -456,11 +455,7 @@ internal fun GroupEditScreen(
                 pictureUrl = groupAvatarUrl,
                 picture = encryptedGroupAvatar,
                 onDismiss = { avatarViewerOpen = false },
-                readLocalBytes =
-                    appState.retainedAvatarBytesReader(
-                        conversationGroupAvatarAsset(appState, controller),
-                        controller.boundAccountRef,
-                    ),
+                readLocalBytes = groupAvatar.readOriginalBytes,
                 editActionLabel = if (canEdit) stringResource(R.string.group_image_search_edit) else null,
                 onEditPicture =
                     if (canEdit) {

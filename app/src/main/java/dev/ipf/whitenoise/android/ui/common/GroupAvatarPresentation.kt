@@ -6,4 +6,5 @@ import androidx.compose.ui.graphics.ImageBitmap
 internal data class GroupAvatarPresentation(
     val image: ImageBitmap?,
     val pictureUrl: String?,
+    val readOriginalBytes: (suspend () -> ByteArray?)? = null,
 )

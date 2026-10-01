@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.core
 
 import android.graphics.Bitmap
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -25,6 +26,18 @@ import java.util.concurrent.atomic.AtomicInteger
 
 @RunWith(RobolectricTestRunner::class)
 class AvatarImageLoaderTest {
+    @Test
+    fun cacheGuardSurvivesDiscardedComposeSnapshot() {
+        val before = AvatarImageLoader.currentCacheLifetime()
+        val snapshot = Snapshot.takeMutableSnapshot()
+        try {
+            snapshot.enter { AvatarImageLoader.clearStoredAvatars() }
+        } finally {
+            snapshot.dispose()
+        }
+        assertNotEquals(before, AvatarImageLoader.currentCacheLifetime())
+    }
+
     @Test
     fun storedAvatarReadDoesNotWaitForTwoBlockedNetworkRequests() =
         runBlocking {

@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.common
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.Dp
 import dev.ipf.marmotkit.AppGroupRecordFfi
@@ -20,6 +21,7 @@ import dev.ipf.whitenoise.android.state.adoptableSelectedAvatarAsset
 import dev.ipf.whitenoise.android.state.cacheKey
 import dev.ipf.whitenoise.android.state.currentGroupAvatarItem
 import dev.ipf.whitenoise.android.state.isRenderable
+import dev.ipf.whitenoise.android.state.retainedAvatarBytesReader
 
 /** All group surfaces consume the selected MDK asset; legacy acquisition is only a compatibility path. */
 @Composable
@@ -104,8 +106,13 @@ internal fun rememberConversationGroupAvatar(
     appState: WhiteNoiseAppState,
     controller: ConversationController,
 ): GroupAvatarPresentation {
-    val asset = conversationGroupAvatarAsset(appState, controller)
     val item = appState.currentGroupAvatarItem(controller.boundAccountRef, controller.group.groupIdHex)
+    val asset = conversationGroupAvatarAsset(controller, item)
+    val lifetime = AvatarImageLoader.currentCacheLifetime()
+    val originalBytes =
+        remember(appState, controller, asset, controller.boundAccountRef, appState.runtimeGeneration, lifetime) {
+            appState.retainedAvatarBytesReader(asset, controller.boundAccountRef)
+        }
     if (asset == null && (controller.window.header != null || item?.selectedAvatarAsset != null)) {
         // An explicit placeholder, removal or identity mismatch must not resurrect older group bytes.
         return GroupAvatarPresentation(null, null)
@@ -122,13 +129,22 @@ internal fun rememberConversationGroupAvatar(
         controller.boundAccountRef,
         controller.avatarUrl,
         matchingItem?.firstFrameAvatar,
-    )
+    ).copy(readOriginalBytes = originalBytes)
 }
 
 /** Reads current MDK selection without initiating any acquisition or borrowing another account's row. */
 internal fun conversationGroupAvatarAsset(
     appState: WhiteNoiseAppState,
     controller: ConversationController,
+): AvatarAssetFfi? =
+    conversationGroupAvatarAsset(
+        controller,
+        appState.currentGroupAvatarItem(controller.boundAccountRef, controller.group.groupIdHex),
+    )
+
+private fun conversationGroupAvatarAsset(
+    controller: ConversationController,
+    currentItem: ChatListItem?,
 ): AvatarAssetFfi? {
     val header = controller.window.header
     if (header != null) {
@@ -140,8 +156,7 @@ internal fun conversationGroupAvatarAsset(
             header.selected.avatar,
         )
     }
-    return appState
-        .currentGroupAvatarItem(controller.boundAccountRef, controller.group.groupIdHex)
+    return currentItem
         ?.takeIf {
             it.group.avatarUrl == controller.group.avatarUrl &&
                 it.group.imageHashHex == controller.group.imageHashHex

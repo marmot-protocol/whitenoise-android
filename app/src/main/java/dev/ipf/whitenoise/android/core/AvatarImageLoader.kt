@@ -405,7 +405,11 @@ object AvatarImageLoader {
     internal fun cachedImage(key: String): ImageBitmap? = cached(key.trim())
 
     /** The cache lifetime a durable read must capture before it suspends; [clear] makes it stale. */
-    internal fun currentCacheLifetime(): Long = observedCacheLifetime.longValue
+    internal fun currentCacheLifetime(): Long {
+        // Subscribe Compose to invalidation, but discarded snapshots cannot rewind the async guard.
+        observedCacheLifetime.longValue
+        return synchronized(lock) { cacheLifetime.capture() }
+    }
 
     /** Shares local reads and off-main decodes through the existing bounded, generation-fenced loader. */
     internal suspend fun loadStored(
