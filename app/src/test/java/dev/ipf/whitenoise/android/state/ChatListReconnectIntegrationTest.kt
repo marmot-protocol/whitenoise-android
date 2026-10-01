@@ -233,9 +233,10 @@ class ChatListReconnectIntegrationTest {
             subscriptions.second.commandRows = listOf(pinned, group)
             subscriptions.first.close()
             awaitChatListCondition { entered.isCompleted }
-            bindScope.launch { controller.returnChatListToTop() }
+            val command = bindScope.launch { controller.returnChatListToTop() }
             awaitChatListCondition {
-                controller.chatRows.map { it.groupIdHex }.toSet() == setOf(pinned.groupIdHex, group.groupIdHex)
+                command.isCompleted &&
+                    controller.chatRows.map { it.groupIdHex }.toSet() == setOf(pinned.groupIdHex, group.groupIdHex)
             }
             release.complete(Unit)
             awaitChatListCondition { subscriptions.second.nextUpdateStarted.isCompleted }
