@@ -78,6 +78,29 @@ class ChatFolderEditScreenScreenshotTest {
             rules = true,
         )
 
+    /** Attention and type filters remain reachable in every supported theme. */
+    @Test
+    fun attentionFiltersLight() = capture("chat_folder_attention_light", dark = false, amoled = false, attention = true)
+
+    @Test
+    fun attentionFiltersDark() = capture("chat_folder_attention_dark", dark = true, amoled = false, attention = true)
+
+    @Test
+    fun attentionFiltersAmoled() = capture("chat_folder_attention_amoled", dark = true, amoled = true, attention = true)
+
+    /** 200% RTL text keeps the mention and pin switches on their own accessible rows. */
+    @Test
+    @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h1100dp-mdpi")
+    fun attentionFiltersRtlLarge() {
+        capture(
+            "chat_folder_attention_rtl_large",
+            dark = true,
+            amoled = false,
+            largeRtl = true,
+            attention = true,
+        )
+    }
+
     @Test
     fun folderDeleteActionLight() {
         capture("chat_folder_editor_delete_light", dark = false, amoled = false, deleteAction = true)
@@ -114,6 +137,7 @@ class ChatFolderEditScreenScreenshotTest {
         rules: Boolean = false,
         deleteAction: Boolean = false,
         showDeleteDialog: Boolean = false,
+        attention: Boolean = false,
     ) {
         val context = ApplicationProvider.getApplicationContext<Context>()
         composeRule.setContent {
@@ -124,6 +148,9 @@ class ChatFolderEditScreenScreenshotTest {
                     ChatFolderEditContent(
                         state =
                             previewState().copy(
+                                unreadMentionsOnly = attention,
+                                pinnedOnly = attention,
+                                groupsOnly = attention,
                                 canSave = !unavailable,
                                 canDelete = !unavailable,
                                 error = if (unavailable) context.getString(R.string.folder_unavailable) else null,
@@ -132,6 +159,9 @@ class ChatFolderEditScreenScreenshotTest {
                         onIncludeMutedChange = {},
                         onGroupsOnlyChange = {},
                         onArchivedOnlyChange = {},
+                        onUnreadMentionsOnlyChange = {},
+                        onDirectChatsOnlyChange = {},
+                        onPinnedOnlyChange = {},
                         onOpenManualChats = {},
                         onOpenPeople = {},
                         onOpenPreview = {},
@@ -144,6 +174,11 @@ class ChatFolderEditScreenScreenshotTest {
                     }
                 }
             }
+        }
+        if (attention) {
+            composeRule
+                .onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)
+                .performScrollToNode(hasText(context.getString(R.string.chat_folder_unread_mentions_only)))
         }
         if (rules) {
             composeRule

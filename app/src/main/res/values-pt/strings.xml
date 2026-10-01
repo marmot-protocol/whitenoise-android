@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="notification_channel_summary">Resumo de notificações</string>
+    <string name="notification_channel_summary_description">Resumo silencioso de mensagens e outros eventos</string>
+    <plurals name="notification_group_count">
+        <item quantity="one">%1$d notificação</item>
+        <item quantity="other">%1$d notificações</item>
+    </plurals>
     <string name="poll_custom_time">Tempo personalizado</string>
     <string name="poll_custom_duration">Duração</string>
     <string name="poll_unit_seconds">Segundos</string>
@@ -1223,6 +1229,9 @@
     <string name="chat_folder_description_label">Descrição</string>
     <string name="chat_folder_keyword_label">Palavra-chave</string>
     <string name="chat_folder_unread_only">Somente não lidas</string>
+    <string name="chat_folder_unread_mentions_only">Somente menções não lidas</string>
+    <string name="chat_folder_direct_chats_only">Somente conversas diretas</string>
+    <string name="chat_folder_pinned_only">Somente conversas fixadas</string>
     <string name="chat_folder_include_muted">Incluir conversas silenciadas</string>
     <string name="chat_folder_groups_only">Somente grupos</string>
     <string name="chat_folder_archived_only">Somente arquivadas</string>
@@ -1240,7 +1249,7 @@
     <string name="folder_manual_hint">Os chats que você adicionar aqui continuam incluídos, mesmo quando não correspondem às regras automáticas.</string>
     <string name="folder_rules">Regras automáticas</string>
     <string name="folder_keyword_hint">Corresponde ao título do chat ou à descrição do grupo. Chats com qualquer pessoa selecionada também correspondem.</string>
-    <string name="folder_rule_hint">Os chats correspondem quando atendem a qualquer regra selecionada de pessoa ou palavra-chave. As opções de categoria restringem essas correspondências. Um chat removido volta se ainda corresponder.</string>
+    <string name="folder_rule_hint">As conversas devem corresponder a qualquer regra selecionada de pessoa ou palavra-chave e a todas as categorias selecionadas. Sem pessoa ou palavra-chave, as categorias funcionam sozinhas. Uma conversa removida volta se ainda corresponder.</string>
     <string name="folder_preview">Pré-visualização</string>
     <string name="folder_discard_title">Descartar as alterações?</string>
     <string name="folder_discard_detail">As alterações da pasta não foram salvas.</string>

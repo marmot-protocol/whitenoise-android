@@ -291,9 +291,7 @@ class NotificationRouteTimelinePresentationScreenshotTest : NotificationRouteTim
 
             routeGate.releaseRoster.countDown()
             awaitCondition { mountedController.memberRosterState == GroupRosterLoadState.FAILED }
-            composeRule.waitUntil(timeoutMillis = ROUTE_TIMEOUT_MILLIS) {
-                routeGate.targetBroadBindStarted.count == 0L
-            }
+            awaitCondition { routeGate.targetBroadBindStarted.count == 0L }
 
             assertEquals(TARGET_ACCOUNT, mountedController.boundAccountRef)
             assertFalse(mountedController.membersVerified)
@@ -471,9 +469,7 @@ class NotificationRouteTimelinePresentationScreenshotTest : NotificationRouteTim
                         },
                     )
             }
-            composeRule.waitUntil(timeoutMillis = ROUTE_TIMEOUT_MILLIS) {
-                routeGate.targetBroadBindStarted.count == 0L
-            }
+            awaitCondition { routeGate.targetBroadBindStarted.count == 0L }
             verifyMountedRosterTransitions(mountedController, routeGate, amoledLargeRtl)
         } finally {
             TimeZone.setDefault(originalTimeZone)

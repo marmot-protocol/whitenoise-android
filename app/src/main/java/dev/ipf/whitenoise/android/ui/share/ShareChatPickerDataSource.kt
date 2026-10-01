@@ -20,6 +20,8 @@ internal data class ShareChatPickerDataSource(
     val isLoading: Boolean,
     val error: ErrorPresentation?,
     val memberSnapshotsRevision: Long,
+    // Observe projection publication even while the visible chat list is frozen.
+    val targetsRevision: Long,
     val retryLoad: () -> Unit,
 )
 
@@ -96,6 +98,7 @@ internal fun rememberShareChatPickerDataSource(
                 isLoading = false,
                 error = null,
                 memberSnapshotsRevision = 0L,
+                targetsRevision = 0L,
                 retryLoad = {},
             )
         accountController != null ->
@@ -105,6 +108,7 @@ internal fun rememberShareChatPickerDataSource(
                 isLoading = accountController.isLoading,
                 error = accountController.error,
                 memberSnapshotsRevision = accountController.memberSnapshotsRevision,
+                targetsRevision = accountController.forwardTargetsRevision,
                 retryLoad = accountController::retryLoad,
             )
         else ->
@@ -114,6 +118,7 @@ internal fun rememberShareChatPickerDataSource(
                 isLoading = appState.forwardTargetsLoading,
                 error = appState.forwardTargetsError,
                 memberSnapshotsRevision = appState.forwardTargetMembersRevision,
+                targetsRevision = appState.forwardTargetsRevision,
                 retryLoad = appState::retryForwardTargets,
             )
     }

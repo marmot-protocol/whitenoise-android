@@ -9,6 +9,9 @@ import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
+import dev.ipf.marmotkit.AvatarAcquisitionStateFfi
+import dev.ipf.marmotkit.AvatarAssetFfi
+import dev.ipf.marmotkit.AvatarAvailabilityFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListAvatarFfi
 import dev.ipf.marmotkit.ChatListRowFfi
@@ -39,6 +42,47 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [36])
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatListFirstFrameAvatarPublicationTest {
+    @Test
+    fun currentAvatarRowIgnoresGroupIdCasingWhileListIsFrozen() =
+        runTest {
+            val controller = bindController(group())
+            controller.setChatListVisible(false)
+            val mixedCaseId = "ab".repeat(32)
+            controller.applyChatListRow(chatRow(null, null).copy(groupIdHex = mixedCaseId))
+            controller.applyLocalGroupUpdate(group().copy(groupIdHex = mixedCaseId))
+            assertEquals(mixedCaseId, controller.currentGroupAvatarItem(mixedCaseId.uppercase())?.group?.groupIdHex)
+        }
+
+    /** A cold selected asset is authoritative; even warm legacy encrypted pixels cannot seed its row. */
+    @Test
+    fun coldSelectedAssetCannotFallThroughToALegacySeed() =
+        runTest {
+            val image = AvatarScreenshotFixtures.distinctAvatarBitmap(Color.RED)
+            GroupAvatarImageLoader.putCached(encryptedGroupAvatarCacheKey(ACCOUNT_REF, GROUP_ID, IMAGE_HASH), image)
+            val controller = bindController(group(imageHashHex = IMAGE_HASH))
+            val selected =
+                AvatarAssetFfi(
+                    "group-target",
+                    "stored-reference",
+                    AvatarAvailabilityFfi.READY,
+                    AvatarAcquisitionStateFfi.IDLE,
+                    1uL,
+                    1_024uL,
+                )
+            val item = controller.items.single().copy(selectedAvatarAsset = selected)
+            val method =
+                ChatsController::class.java
+                    .getDeclaredMethod("firstFrameAvatarSeed", ChatListItem::class.java)
+                    .apply { isAccessible = true }
+            assertNull(method.invoke(controller, item))
+            AvatarImageLoader.putCached(checkNotNull(selected.cacheKey(ACCOUNT_REF)), image)
+            val seed = method.invoke(controller, item) as ChatListAvatarSeed
+            assertEquals(ChatListAvatarSource.DURABLE, seed.source)
+            assertSame(image, seed.image)
+            assertEquals(ACCOUNT_REF, seed.accountRef)
+            assertEquals(AvatarImageLoader.currentCacheLifetime(), seed.cacheLifetime)
+        }
+
     @Before
     fun setUp() {
         AvatarImageLoader.clear()

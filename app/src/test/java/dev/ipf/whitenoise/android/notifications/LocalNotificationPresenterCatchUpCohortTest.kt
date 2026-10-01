@@ -46,6 +46,7 @@ class LocalNotificationPresenterCatchUpCohortTest {
         presenter =
             LocalNotificationPresenter(
                 context = context,
+                groupReconciliation = {},
                 nowMillis = { now },
                 alertBudget = budget,
                 notificationPoster = { notificationManager, tag, id, notification ->

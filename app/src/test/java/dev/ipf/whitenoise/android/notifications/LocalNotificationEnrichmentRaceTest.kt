@@ -35,7 +35,7 @@ class LocalNotificationEnrichmentRaceTest {
     fun setUp() {
         Shadows.shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
         manager.cancelAll()
-        LocalNotificationPresenter(context).ensureChannels()
+        LocalNotificationPresenter(context, groupReconciliation = {}).ensureChannels()
     }
 
     /** Releases the shared synchronizer hook and removes fixture notifications. */
@@ -60,6 +60,7 @@ class LocalNotificationEnrichmentRaceTest {
         val presenter =
             LocalNotificationPresenter(
                 context = context,
+                groupReconciliation = {},
                 notificationPoster = { _, tag, id, notification ->
                     if (postCount.incrementAndGet() == 2) {
                         enrichmentReadyToWrite.countDown()

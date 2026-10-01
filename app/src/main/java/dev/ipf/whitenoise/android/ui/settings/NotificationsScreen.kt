@@ -280,7 +280,7 @@ internal fun NativePushCapability.subtitleResource(): Int =
 @Composable
 internal fun GlobalNotificationCategories(onOpenChannel: (NotificationChannelSpec) -> Unit) {
     SettingsGroup {
-        NotificationChannelSpec.entries.forEach { channel ->
+        NotificationChannelSpec.entries.filter { it != NotificationChannelSpec.USER_EVENT_SUMMARY }.forEach { channel ->
             row(channel.id) { context ->
                 SettingsLink(
                     context = context,
@@ -306,6 +306,7 @@ private fun notificationChannelTitle(channel: NotificationChannelSpec): String =
             NotificationChannelSpec.GROUP_MEMBERSHIP -> R.string.notification_channel_group_membership
             NotificationChannelSpec.AGENT_ACTIVITY -> R.string.notification_channel_agent_activity
             NotificationChannelSpec.APP_UPDATES -> R.string.notification_channel_app_updates
+            NotificationChannelSpec.USER_EVENT_SUMMARY -> R.string.notification_channel_summary
         },
     )
 

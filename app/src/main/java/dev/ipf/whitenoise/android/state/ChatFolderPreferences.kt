@@ -39,6 +39,9 @@ data class ChatFolderRule(
     val keyword: String? = null,
     val groupsOnly: Boolean = false,
     val archivedOnly: Boolean = false,
+    val unreadMentionsOnly: Boolean = false,
+    val directChatsOnly: Boolean = false,
+    val pinnedOnly: Boolean = false,
 )
 
 /** One account's folder state: ordered folders, manual memberships, rules. */
@@ -441,6 +444,9 @@ class ChatFolderPreferences(
                 keyword = json.optString(RULE_KEYWORD).takeIf { it.isNotBlank() },
                 groupsOnly = json.optBoolean(RULE_GROUPS_ONLY, false),
                 archivedOnly = json.optBoolean(RULE_ARCHIVED_ONLY, false),
+                unreadMentionsOnly = json.optBoolean(RULE_UNREAD_MENTIONS_ONLY, false),
+                directChatsOnly = json.optBoolean(RULE_DIRECT_CHATS_ONLY, false),
+                pinnedOnly = json.optBoolean(RULE_PINNED_ONLY, false),
             )
         }.getOrNull()
     }
@@ -453,6 +459,9 @@ class ChatFolderPreferences(
                 .put(RULE_INCLUDE_MUTED, rule.includeMuted)
                 .put(RULE_GROUPS_ONLY, rule.groupsOnly)
                 .put(RULE_ARCHIVED_ONLY, rule.archivedOnly)
+                .put(RULE_UNREAD_MENTIONS_ONLY, rule.unreadMentionsOnly)
+                .put(RULE_DIRECT_CHATS_ONLY, rule.directChatsOnly)
+                .put(RULE_PINNED_ONLY, rule.pinnedOnly)
         rule.keyword?.takeIf { it.isNotBlank() }?.let { json.put(RULE_KEYWORD, it.trim()) }
         return json
     }
@@ -539,6 +548,9 @@ class ChatFolderPreferences(
         private const val RULE_KEYWORD = "keyword"
         private const val RULE_GROUPS_ONLY = "groupsOnly"
         private const val RULE_ARCHIVED_ONLY = "archivedOnly"
+        private const val RULE_UNREAD_MENTIONS_ONLY = "unreadMentionsOnly"
+        private const val RULE_DIRECT_CHATS_ONLY = "directChatsOnly"
+        private const val RULE_PINNED_ONLY = "pinnedOnly"
 
         // Bumped when defaults became first-class folders carrying real rules,
         // so the rule backfill for older accounts runs exactly once.

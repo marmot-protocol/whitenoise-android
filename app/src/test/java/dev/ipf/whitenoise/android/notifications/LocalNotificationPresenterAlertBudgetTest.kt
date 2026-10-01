@@ -43,6 +43,7 @@ class LocalNotificationPresenterAlertBudgetTest {
         presenter =
             LocalNotificationPresenter(
                 context = context,
+                groupReconciliation = {},
                 nowMillis = { now },
                 alertBudget = NotificationAlertBudget(catchUpWindow),
                 notificationPoster = { notificationManager, tag, id, notification ->
