@@ -24645,9 +24645,15 @@
         ]
       },
       {
-        "surface": "User-initiated attachment job restart keeps cancellation and completion ownership",
+        "surface": "User-initiated attachment job restart and terminal notification cleanup",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadJobRuns.kt",
         "anchor": "internal class AttachmentDownloadJobRuns(",
+        "test_ids": ["MED-022"]
+      },
+      {
+        "surface": "Cancelled shared attachment fetch finishes its active worker and notification",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt",
+        "anchor": "attachment_fetch_cancelled",
         "test_ids": ["MED-022"]
       },
       {

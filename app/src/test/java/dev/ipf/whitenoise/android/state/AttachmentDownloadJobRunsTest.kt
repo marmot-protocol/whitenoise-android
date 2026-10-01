@@ -1,11 +1,15 @@
 package dev.ipf.whitenoise.android.state
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -14,6 +18,42 @@ import org.junit.Test
 /** Exercises real coroutine cancellation overlapping a same-ID Android job restart. */
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class AttachmentDownloadJobRunsTest {
+    @Test
+    fun cancelledFetchFinishesItsStillActiveAndroidJob() =
+        runTest {
+            val runs = AttachmentDownloadJobRuns(backgroundScope)
+            var finishes = 0
+            val run =
+                runs.start(
+                    jobId = 1,
+                    download = { CompletableDeferred<Unit>().apply { cancel() }.await() },
+                    onFinished = { finishes += 1 },
+                )
+
+            runCurrent()
+
+            assertTrue(run.isCompleted)
+            assertFalse(run.isCancelled)
+            assertEquals("the active Android job must end so its notification is removed", 1, finishes)
+            assertFalse(runs.stop(1))
+        }
+
+    @Test
+    fun fetchTimeoutFinishesItsStillActiveAndroidJob() =
+        runTest {
+            val runs = AttachmentDownloadJobRuns(backgroundScope)
+            var finishes = 0
+            val run = runs.start(1, download = { withTimeout(10) { delay(20) } }, onFinished = { finishes += 1 })
+            runCurrent()
+            advanceTimeBy(10)
+            runCurrent()
+
+            assertTrue(run.isCompleted)
+            assertFalse(run.isCancelled)
+            assertEquals(1, finishes)
+            assertFalse(runs.stop(1))
+        }
+
     @Test
     fun stoppedRunUnwindingCannotUnregisterItsReplacement() =
         runTest {
@@ -53,7 +93,12 @@ class AttachmentDownloadJobRunsTest {
             val old =
                 runs.start(
                     1,
-                    download = { withContext(NonCancellable) { releaseOldRun.await() } },
+                    download = {
+                        withContext(NonCancellable) {
+                            releaseOldRun.await()
+                            throw CancellationException("replaced fetch retired")
+                        }
+                    },
                     onFinished = { finishes += "old" },
                 )
             runCurrent()
