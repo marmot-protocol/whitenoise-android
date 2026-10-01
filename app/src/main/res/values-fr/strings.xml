@@ -562,11 +562,11 @@
     <string name="notification_scope_custom_chat">Personnalisé pour cette discussion</string>
     <string name="notification_custom_for_chat_control">Personnaliser %1$s pour cette discussion</string>
     <string name="open_notification_category_settings">Ouvrir les réglages Android de %1$s</string>
-    <string name="notification_notify_restore">Votre choix « Notifier pour » est conservé pendant la mise en sourdine et rétabli à sa fin.</string>
-    <string name="notification_mute_detail">Suspendre les notifications sans modifier votre choix « Notifier pour ».</string>
+    <string name="notification_notify_restore">Les mentions directes peuvent encore vous notifier pendant la mise en sourdine. Votre choix « Notifier pour » reprend ensuite.</string>
+    <string name="notification_mute_detail">Mettre les messages ordinaires en sourdine. Les mentions directes peuvent encore vous notifier.</string>
     <string name="notification_scope_switch_detail">Désactivez pour revenir au réglage global par défaut.</string>
     <string name="notification_chat_categories_detail">Les notifications de messages utilisent les réglages de cette discussion. Les autres catégories peuvent suivre les réglages globaux ou des réglages propres à cette discussion.</string>
-    <string name="notify_nothing_while_muted">Rien pendant la mise en sourdine.</string>
+    <string name="notify_nothing_while_muted">Seules les mentions directes peuvent notifier pendant la mise en sourdine.</string>
     <string name="notification_categories_loading">Chargement des catégories de notifications…</string>
     <string name="toast_notification_scope_update_failed">Impossible de mettre à jour ce réglage de notification</string>
     <string name="toast_notification_settings_unavailable">Impossible d’ouvrir les réglages de notifications</string>
@@ -1452,7 +1452,7 @@
     <string name="notify_all_messages">Tous les messages</string>
     <string name="notify_only_mentions">Mentions uniquement</string>
     <string name="notify_nothing">Rien</string>
-    <string name="notify_muted_until">En sourdine jusqu\'à %1$s</string>
+    <string name="notify_muted_until">En sourdine jusqu’à %1$s ; les mentions directes peuvent notifier.</string>
     <string name="vibration_pattern">Schéma de vibration</string>
     <string name="vibration_pattern_description">Choisissez un schéma pour les nouveaux messages de cette discussion. L’aperçu est joué une fois.</string>
     <string name="vibration_pattern_system_default">Valeur par défaut du système</string>
