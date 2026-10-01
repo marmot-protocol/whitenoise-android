@@ -56,6 +56,7 @@ class NotificationStreamForegroundService : Service() {
                 bootstrapJob?.cancel()
                 bootstrapJob = null
                 pendingUserOwnedStart = false
+                application.notifyCapabilityFallbackUnavailable(capabilityFallbackRequests.onRuntimeUnavailable())
                 (application as? WhiteNoiseApplication)
                     ?.initializedAppState()
                     ?.releasePushWakeServiceOwner(pushWakeServiceOwner)
@@ -69,7 +70,7 @@ class NotificationStreamForegroundService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val runtimeSupervisor = NotificationRuntimeSupervisor()
     private val pushRuntimeSupervisor = NotificationRuntimeSupervisor(NotificationRuntimeRetryPolicy(maxAttempts = 1))
-    private val capabilityFallbackRequests = CapabilityFallbackServiceRequests()
+    internal val capabilityFallbackRequests = CapabilityFallbackServiceRequests()
     private var bootstrapJob: Job? = null
     private var pendingNativePushRegistrationSync = false
 

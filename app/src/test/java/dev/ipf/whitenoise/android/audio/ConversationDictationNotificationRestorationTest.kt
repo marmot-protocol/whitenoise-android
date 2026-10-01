@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.audio
 
+import android.app.Application
 import android.app.Notification
 import android.app.NotificationManager
 import android.app.Service
@@ -10,6 +11,7 @@ import android.os.Looper
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.text.input.TextFieldValue
 import dev.ipf.whitenoise.android.notifications.BackgroundConnectionNotification
+import dev.ipf.whitenoise.android.notifications.BackgroundConnectionPreferences
 import dev.ipf.whitenoise.android.notifications.ForegroundStartTrigger
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
 import kotlinx.coroutines.CoroutineScope
@@ -128,6 +130,56 @@ class ConversationDictationNotificationRestorationTest {
         assertFalse(shadowOf(service as Service).isForegroundStopped)
         assertCompletedPresentation(service.getSystemService(NotificationManager::class.java), true)
         lifecycle.destroy()
+    }
+
+    /** Connection readiness is invalidated even when microphone ownership keeps the host alive. */
+    @Test
+    @Config(application = Application::class)
+    fun releasingConnectionInvalidatesFallbackReadinessWhileDictationContinues() {
+        val harness = installHost()
+        val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
+        val service = lifecycle.get()
+        service.onStartCommand(startIntent(service, harness), 0, 1)
+        service.foreground.promoteConnection(ForegroundStartTrigger.CapabilityFallback)
+        val requests = service.capabilityFallbackRequests
+        requests.register(7L)
+        assertEquals(setOf(7L), requests.onRuntimeStarted())
+        service.foreground.releaseConnection()
+        assertTrue(harness.conversationDictation.hasDurableSession)
+        assertFalse(shadowOf(service as Service).isForegroundStopped)
+        assertTrue(requests.register(8L).isEmpty())
+        assertEquals(setOf(8L), requests.onRuntimeUnavailable())
+        harness.conversationDictation.cancel()
+        lifecycle.destroy()
+    }
+
+    /** A queued user start cannot resurrect connection after the preference was switched off. */
+    @Test
+    @Config(application = Application::class)
+    fun cancelledUserToggleReleasesOnlyConnectionWithoutBootstrapping() {
+        val harness = installHost()
+        val context = RuntimeEnvironment.getApplication()
+        val prior = BackgroundConnectionPreferences.isEnabled(context)
+        val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
+        val service = lifecycle.get()
+        try {
+            service.onStartCommand(startIntent(service, harness), 0, 1)
+            BackgroundConnectionPreferences.setEnabled(context, false)
+            assertTrue(NotificationStreamForegroundService.start(context, ForegroundStartTrigger.UserToggle))
+            service.onStartCommand(shadowOf(context).nextStartedService, 0, 2)
+            val deadline = System.nanoTime() + 2_000_000_000L
+            while (service.foreground.connectionServiceType != 0 && System.nanoTime() < deadline) {
+                Thread.sleep(10L)
+                shadowOf(Looper.getMainLooper()).idle()
+            }
+            assertEquals(0, service.foreground.connectionServiceType)
+            assertTrue(harness.conversationDictation.hasDurableSession)
+            assertFalse(shadowOf(service as Service).isForegroundStopped)
+            harness.conversationDictation.cancel()
+        } finally {
+            lifecycle.destroy()
+            BackgroundConnectionPreferences.setEnabled(context, prior)
+        }
     }
 
     /** Actual host promotions share one Android service record and one ordered removal queue. */

@@ -892,6 +892,7 @@ internal class ConversationDictationController internal constructor(
         if (failed?.reason == ConversationDictationFailure.SendBlocked && !failed.retainedTranscript.isNullOrBlank()) {
             completionIntent.reset()
             completionIntent.choose(ConversationDictationDeliveryMode.PasteIntoDraft)
+            finishRequested = true
             state = ConversationDictationState.Processing(failed.sessionId, failed.target)
             validateAndDeliverTranscript(failed.sessionId, failed.target, failed.retainedTranscript)
         } else {
@@ -1209,6 +1210,7 @@ internal class ConversationDictationController internal constructor(
                     ConversationDictationDeliveryMode.PasteIntoDraft
                 }
             completionIntent.choose(retryMode)
+            finishRequested = true
             state = ConversationDictationState.Processing(failed.sessionId, failed.target)
             validateAndDeliverTranscript(failed.sessionId, failed.target, transcript)
             return

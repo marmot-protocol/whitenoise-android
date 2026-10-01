@@ -4057,6 +4057,47 @@ class ConversationDictationControllerTest {
             assertEquals(1, sends)
         }
 
+    /** Retained-text retry validates a Send without pretending to capture new audio. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun retainedSendRetryShowsProcessingWhileValidationIsPending() =
+        runTest {
+            val validation = CompletableDeferred<ConversationDictationTargetValidation>()
+            var validationCalls = 0
+            var sendCalls = 0
+            val fixture =
+                fixture(
+                    draft = TextFieldValue("Draft", TextRange(5)),
+                    targetValidationScope = this,
+                    targetValidator = { _, _ ->
+                        if (++validationCalls == 1) {
+                            ConversationDictationTargetValidation.Available
+                        } else {
+                            validation.await()
+                        }
+                    },
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        ++sendCalls > 1 && request.beginDispatch()
+                    },
+                )
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.controller.send()
+            fixture.platform.listener.onResult("dictated")
+            runCurrent()
+            assertTrue(fixture.controller.state is ConversationDictationState.Failed)
+            fixture.controller.retry()
+            runCurrent()
+            assertTrue(fixture.controller.state is ConversationDictationState.Processing)
+            assertFalse(fixture.controller.captureInProgress)
+            assertEquals(ConversationDictationDeliveryMode.SendOnFinish, fixture.controller.processingDeliveryMode)
+            assertFalse(fixture.controller.completionActionsEnabled)
+            assertEquals(1, sendCalls)
+            validation.complete(ConversationDictationTargetValidation.Available)
+            advanceUntilIdle()
+            assertEquals(2, sendCalls)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        }
+
     /** Semantic draft mutations after Send cannot publish or be converted into Paste. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
