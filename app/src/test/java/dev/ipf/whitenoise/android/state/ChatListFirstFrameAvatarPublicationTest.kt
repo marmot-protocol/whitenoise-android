@@ -42,6 +42,17 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [36])
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatListFirstFrameAvatarPublicationTest {
+    @Test
+    fun currentAvatarRowIgnoresGroupIdCasingWhileListIsFrozen() =
+        runTest {
+            val controller = bindController(group())
+            controller.setChatListVisible(false)
+            val mixedCaseId = "ab".repeat(32)
+            controller.applyChatListRow(chatRow(null, null).copy(groupIdHex = mixedCaseId))
+            controller.applyLocalGroupUpdate(group().copy(groupIdHex = mixedCaseId))
+            assertEquals(mixedCaseId, controller.currentGroupAvatarItem(mixedCaseId.uppercase())?.group?.groupIdHex)
+        }
+
     /** A cold selected asset is authoritative; even warm legacy encrypted pixels cannot seed its row. */
     @Test
     fun coldSelectedAssetCannotFallThroughToALegacySeed() =

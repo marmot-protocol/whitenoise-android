@@ -3738,7 +3738,10 @@ class ChatsController private constructor(
 
     /** Reads the current source row even while the chat-list UI is intentionally frozen. */
     internal fun currentGroupAvatarItem(groupIdHex: String): ChatListItem? {
-        val row = chatRows.firstOrNull { it.groupIdHex == groupIdHex } ?: return null
+        val row =
+            chatRowsByGroup[chatRowKey(groupIdHex)]
+                ?: chatRows.firstOrNull { it.groupIdHex.equals(groupIdHex, ignoreCase = true) }
+                ?: return null
         return projectChatRow(row)
     }
 

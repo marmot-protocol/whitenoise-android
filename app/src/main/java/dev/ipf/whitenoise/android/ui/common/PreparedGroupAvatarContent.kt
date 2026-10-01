@@ -91,4 +91,16 @@ private data class AvatarPixelPreparation(
 )
 
 internal const val VISIBLE_GROUP_AVATAR_LIMIT = 16
+
+/** Lazy headers and banners do not count as rows when choosing the bounded avatar window. */
+internal fun <T> visibleGroupAvatarWindow(
+    rows: List<T>,
+    visibleKeys: Collection<Any>,
+    rowKey: (T) -> String,
+): List<T> {
+    val keys = visibleKeys.toHashSet()
+    val firstRow = rows.indexOfFirst { rowKey(it) in keys }.coerceAtLeast(0)
+    return rows.subList(firstRow, minOf(rows.size, firstRow + VISIBLE_GROUP_AVATAR_LIMIT))
+}
+
 private const val LOCAL_GROUP_AVATAR_PREPARATION_BUDGET_MILLIS = 1_000L

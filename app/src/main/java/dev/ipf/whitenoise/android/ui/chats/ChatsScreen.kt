@@ -110,13 +110,13 @@ import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarContentInset
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
-import dev.ipf.whitenoise.android.ui.common.VISIBLE_GROUP_AVATAR_LIMIT
 import dev.ipf.whitenoise.android.ui.common.anchoredDragSelection
 import dev.ipf.whitenoise.android.ui.common.dragSelectionAutoScrollDelta
 import dev.ipf.whitenoise.android.ui.common.dragSelectionEndpoint
 import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
+import dev.ipf.whitenoise.android.ui.common.visibleGroupAvatarWindow
 import dev.ipf.whitenoise.android.ui.conversation.TtsTransportBar
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.settings.ChatFoldersScreen
@@ -1720,10 +1720,11 @@ internal fun ChatsScreen(
                     else ->
                         PreparedGroupAvatarContent(
                             appState,
-                            visibleItems
-                                .drop(chatListState.firstVisibleItemIndex)
-                                .take(VISIBLE_GROUP_AVATAR_LIMIT)
-                                .mapNotNull { it.selectedAvatarAsset },
+                            visibleGroupAvatarWindow(
+                                visibleItems,
+                                chatListState.layoutInfo.visibleItemsInfo.map { it.key },
+                                ::visibleRowId,
+                            ).mapNotNull { it.selectedAvatarAsset },
                             controller.boundAccountRef,
                             surfaceIdentity = controller,
                         ) {

@@ -69,10 +69,10 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.SelectionIndicator
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
-import dev.ipf.whitenoise.android.ui.common.VISIBLE_GROUP_AVATAR_LIMIT
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.common.visibleGroupAvatarWindow
 import dev.ipf.whitenoise.android.ui.conversation.messages.forwardTargetAvatarAccount
 import dev.ipf.whitenoise.android.ui.conversation.messages.forwardTargetMembersPreview
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
@@ -354,9 +354,10 @@ private fun ShareChatPickerTargetList(
 ) {
     PreparedGroupAvatarContent(
         pickerState.appState,
-        filteredTargets.drop(listState.firstVisibleItemIndex).take(VISIBLE_GROUP_AVATAR_LIMIT).mapNotNull {
-            it.item.selectedAvatarAsset
-        },
+        visibleGroupAvatarWindow(
+            filteredTargets,
+            listState.layoutInfo.visibleItemsInfo.map { it.key },
+        ) { it.item.group.groupIdHex }.mapNotNull { it.item.selectedAvatarAsset },
         pickerState.selectedAccountRef,
     ) {
         LazyColumn(
