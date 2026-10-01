@@ -28438,6 +28438,14 @@
           "GRP-011",
           "GRP-014"
         ]
+      },
+      {
+        "surface": "Opt-in avatar cache counters for decoded chat-list avatars",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/AvatarCacheDiagnostics.kt",
+        "anchor": "internal object AvatarCacheDiagnostics",
+        "test_ids": [
+          "CHL-017"
+        ]
       }
     ],
     "notification_content_contracts": [
