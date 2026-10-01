@@ -6,6 +6,7 @@ import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.FileProviderStrategyCacheRule
 import dev.ipf.whitenoise.android.audio.DictationDiagnostics
+import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -35,7 +36,8 @@ class AuditLogShareTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         DictationDiagnostics.attach(context)
         try {
-            DictationDiagnostics.clear()
+            PerformanceDiagnostics.stop()
+            clearAuditAndDictationLogShares(context.cacheDir)
             assertNull(prepareAuditAndDictationLogArchive(context, emptyList()))
             val performance = "schema=2 op=app_start phase=accepted\n".toByteArray()
             val performanceOnly = requireNotNull(prepareAuditAndDictationLogArchive(context, emptyList(), performance))
@@ -57,7 +59,8 @@ class AuditLogShareTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         DictationDiagnostics.attach(context)
         try {
-            DictationDiagnostics.clear()
+            PerformanceDiagnostics.stop()
+            clearAuditAndDictationLogShares(context.cacheDir)
             val directory = File(context.noBackupFilesDir, "dictation-diagnostics")
             File(directory, "dictation-current.jsonl").writeText("PRIVATE_PARTIAL")
             val archive = requireNotNull(prepareAuditAndDictationLogArchive(context, emptyList()))
