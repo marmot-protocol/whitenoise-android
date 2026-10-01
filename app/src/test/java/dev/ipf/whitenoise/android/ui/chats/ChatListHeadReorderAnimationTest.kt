@@ -243,12 +243,16 @@ class ChatListHeadReorderAnimationTest {
     @Test
     fun variableHeightMiddlePromotionStillMovesEachRowMonotonically() {
         val original = listOf("A", "B", "C", "D", "E", "F")
+        val promotedOrder = listOf("E", "A", "B", "C", "D", "F")
         val heights = mapOf("A" to 48.dp, "B" to 64.dp, "C" to 52.dp, "D" to 76.dp, "E" to 60.dp, "F" to 48.dp)
+        val listStateHolder = arrayOfNulls<LazyListState>(1)
         var ids by mutableStateOf(original)
         composeRule.setContent {
+            val listState = rememberLazyListState()
+            listStateHolder[0] = listState
             ChatListHeadReorderMotionHarness(
                 itemIds = ids,
-                listState = rememberLazyListState(),
+                listState = listState,
                 rowHeight = rowHeight,
                 rowHeights = heights,
             )
@@ -256,7 +260,7 @@ class ChatListHeadReorderAnimationTest {
         composeRule.waitForIdle()
         val previousTops = original.associateWith(::rowTop).toMutableMap()
         composeRule.mainClock.autoAdvance = false
-        composeRule.runOnUiThread { ids = listOf("E", "A", "B", "C", "D", "F") }
+        composeRule.runOnUiThread { ids = promotedOrder }
         composeRule.runOnIdle { }
         repeat(60) { frame ->
             composeRule.mainClock.advanceTimeByFrame()
@@ -270,7 +274,12 @@ class ChatListHeadReorderAnimationTest {
                 previousTops[id] = top
             }
         }
-        assertEquals(0f, rowTop("E"), 0.5f)
+        var expectedTop = 0f
+        promotedOrder.forEach { id ->
+            assertEquals("final top for $id", expectedTop, rowTop(id), 0.5f)
+            expectedTop += composeRule.density.run { heights.getValue(id).toPx() }
+        }
+        assertListFlushAtTop(checkNotNull(listStateHolder[0]), promotedOrder)
     }
 
     @Test

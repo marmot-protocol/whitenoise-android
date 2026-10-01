@@ -81,15 +81,33 @@
         "test_ids": ["MED-014"]
       },
       {
+        "surface": "Received contact compact Add label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
+        "anchor": "R.string.contact_add_short",
+        "test_ids": ["MED-014"]
+      },
+      {
         "surface": "Received contact Save VCF action",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
         "anchor": "R.string.contact_save_vcf",
         "test_ids": ["MED-014"]
       },
       {
+        "surface": "Received contact compact Save label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
+        "anchor": "R.string.contact_save_short",
+        "test_ids": ["MED-014"]
+      },
+      {
         "surface": "Received contact View action",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
         "anchor": "R.string.contact_view",
+        "test_ids": ["MED-014"]
+      },
+      {
+        "surface": "Received contact compact View label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
+        "anchor": "R.string.contact_view_short",
         "test_ids": ["MED-014"]
       },
       {

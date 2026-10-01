@@ -1231,7 +1231,9 @@ internal fun ConversationScreen(
                 },
                 pointerWindowY = pointerWindowY,
                 viewportWindowTop = transcriptWindowTop,
-                viewportHeight = listState.layoutInfo.viewportSize.height,
+                // A reversed list's item offsets start above its bottom content padding.
+                viewportHeight =
+                    listState.layoutInfo.viewportSize.height - listState.layoutInfo.beforeContentPadding,
             ) ?: return false
         if (endpointId == anchorId && selectedMessages.isEmpty()) return false
         val nextTimelineIds =
