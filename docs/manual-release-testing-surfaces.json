@@ -3,9 +3,9 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "ObserveConversationVisibleReads",
+        "surface": "observeConversationVisibleReads",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationVisibleReads.kt",
-        "anchor": "internal fun ObserveConversationVisibleReads(",
+        "anchor": "internal fun observeConversationVisibleReads(",
         "test_ids": [
           "CHL-008"
         ]
@@ -24167,7 +24167,7 @@
       {
         "surface": "Settled visible-read retry on resume and manual-reminder changes",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
-        "anchor": "ObserveConversationVisibleReads(",
+        "anchor": "observeConversationVisibleReads(",
         "test_ids": [
           "CHL-008"
         ]

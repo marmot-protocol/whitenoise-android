@@ -1,8 +1,11 @@
 package dev.ipf.whitenoise.android.state
 
+import android.os.Looper
+import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -10,13 +13,15 @@ import androidx.lifecycle.LifecycleRegistry
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.ChatListRowFfi
-import dev.ipf.whitenoise.android.ui.conversation.ObserveConversationVisibleReads
+import dev.ipf.whitenoise.android.ui.conversation.observeConversationVisibleReads
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /** Drives the exact production Compose read observer without manual mark-read calls. */
@@ -45,9 +50,11 @@ class ConversationVisibleReadObserverTest {
                 state.clearActiveConversation()
             }
             val lifecycleOwner = ReadLifecycleOwner()
+            assertEquals(Lifecycle.State.RESUMED, lifecycleOwner.lifecycle.currentStateFlow.value)
             composeRule.setContent {
+                Text("Read observer")
                 if (observing) {
-                    ObserveConversationVisibleReads(state, controller, lifecycleOwner) {
+                    observeConversationVisibleReads(state, controller, lifecycleOwner) {
                         ConversationTimelineTestIds.MESSAGE_B
                     }
                 }
@@ -62,7 +69,10 @@ class ConversationVisibleReadObserverTest {
 
             composeRule.runOnIdle { state.clearActiveConversation() }
             composeRule.waitForIdle()
-            composeRule.runOnIdle { controller.applyAuthoritativeChatListRow(ConversationTimelineTestIds.ACCOUNT_REF, row) }
+            composeRule.runOnIdle {
+                controller.applyAuthoritativeChatListRow(ConversationTimelineTestIds.ACCOUNT_REF, row)
+                Snapshot.sendApplyNotifications()
+            }
             composeRule.waitForIdle()
             assertEquals(1, fixture.markReadCalls.get())
             activate(state, row.groupIdHex)
@@ -71,6 +81,7 @@ class ConversationVisibleReadObserverTest {
             composeRule.runOnIdle {
                 state.setAppInForeground(false)
                 controller.applyAuthoritativeChatListRow(ConversationTimelineTestIds.ACCOUNT_REF, row)
+                Snapshot.sendApplyNotifications()
             }
             composeRule.waitForIdle()
             assertEquals(2, fixture.markReadCalls.get())
@@ -89,7 +100,11 @@ class ConversationVisibleReadObserverTest {
         state: WhiteNoiseAppState,
         groupIdHex: String,
     ) {
-        composeRule.runOnIdle { state.setActiveConversationFromUi(ConversationTimelineTestIds.ACCOUNT_REF, groupIdHex) }
+        composeRule.runOnIdle {
+            state.setActiveConversationFromUi(ConversationTimelineTestIds.ACCOUNT_REF, groupIdHex)
+            assertTrue(state.isConversationReadVisible(ConversationTimelineTestIds.ACCOUNT_REF, groupIdHex))
+            Snapshot.sendApplyNotifications()
+        }
     }
 
     private fun fixture(row: ChatListRowFfi) =
@@ -119,6 +134,10 @@ class ConversationVisibleReadObserverTest {
         count: Int,
     ) {
         composeRule.waitUntil(timeoutMillis = 5_000) {
+            // The native bootstrap fixture posts platform work to Robolectric's
+            // paused Android looper, separate from Compose's test clock.
+            shadowOf(Looper.getMainLooper()).idle()
+            Snapshot.sendApplyNotifications()
             fixture.markReadCalls.get() >= count && controller.latestChatListRow?.manuallyMarkedUnread == false
         }
         composeRule.waitForIdle()

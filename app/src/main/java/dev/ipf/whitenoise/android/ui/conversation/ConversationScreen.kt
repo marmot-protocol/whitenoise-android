@@ -3291,7 +3291,7 @@ internal fun ConversationScreen(
     // (`readAnchorMessageId`) so the FFI only sees IDs that strictly advance
     // the pointer — scroll-up cannot regress the count. Settle-gated
     // (`!isScrollInProgress`) avoids per-frame FFI hops while scrolling.
-    ObserveConversationVisibleReads(appState, controller, resumeLifecycleOwner) {
+    observeConversationVisibleReads(appState, controller, resumeLifecycleOwner) {
         readAnchorMessageId.takeIf { initialTimelineAnchored && !listState.isScrollInProgress }
     }
 

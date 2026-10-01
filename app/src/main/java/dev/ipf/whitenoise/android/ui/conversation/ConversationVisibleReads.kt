@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.filterNotNull
 
 /** Retries a settled read when its retained screen becomes the visible Android host again. */
 @Composable
-internal fun ObserveConversationVisibleReads(
+internal fun observeConversationVisibleReads(
     appState: WhiteNoiseAppState,
     controller: ConversationController,
     lifecycleOwner: LifecycleOwner?,

@@ -499,14 +499,21 @@ class ConversationVisibleReadIntegrationTest {
                 // anchoring for a first read, while its native echo is pending.
                 nowMillis = 90_000L
                 val firstRead =
-                    reminder.copy(lastReadMessageIdHex = ConversationTimelineTestIds.MESSAGE_A, lastReadTimelineAt = 1uL)
+                    reminder.copy(
+                        lastReadMessageIdHex = ConversationTimelineTestIds.MESSAGE_A,
+                        lastReadTimelineAt = 1uL,
+                    )
                 val fresh = controller(fixture.appState, firstRead, clockMillis = { nowMillis })
                 fresh.applyTimelinePage(page, replaceWindow = true, updatePagination = true)
                 nowMillis = 95_000L
                 fresh.markReadUpTo(MESSAGE_ID)
                 nowMillis = 105_000L
                 fresh.applyTimelinePage(page, replaceWindow = true, updatePagination = true)
-                assertEquals("a genuinely new read still anchors retention", listOf(MESSAGE_ID), timelineMessageIds(fresh))
+                assertEquals(
+                    "a genuinely new read still anchors retention",
+                    listOf(MESSAGE_ID),
+                    timelineMessageIds(fresh),
+                )
             } finally {
                 closeFixture(fixture)
             }
