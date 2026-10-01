@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.AppGroupHydrationQuarantineReasonFfi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -133,7 +134,6 @@ class QuarantinedGroupsControllerTest {
                     .isEmpty(),
             )
             controller.close()
-            assertTrue(access.closed)
             controller.refresh()
             controller.recover("private")
             assertEquals(1, access.loads)
@@ -175,11 +175,10 @@ class QuarantinedGroupsControllerTest {
             controller.close()
         }
 
-    private fun row(id: String) = QuarantinedGroupRow(id, QuarantinedGroupReason.StoredState)
+    private fun row(id: String) = QuarantinedGroupRow(id, AppGroupHydrationQuarantineReasonFfi.OPEN_MLS_LOAD_FAILED)
 
     private class Access : QuarantinedGroupsAccess {
         var current = true
-        var closed = false
         var rows = emptyList<QuarantinedGroupRow>()
         var loads = 0
         var loadFailure = false
@@ -189,7 +188,7 @@ class QuarantinedGroupsControllerTest {
         var retryGate: CompletableDeferred<Unit>? = null
         val retries = mutableListOf<String>()
 
-        override fun isCurrent() = current && !closed
+        override fun isCurrent() = current
 
         override suspend fun load(): List<QuarantinedGroupRow> {
             loads++
@@ -204,10 +203,6 @@ class QuarantinedGroupsControllerTest {
             if (retryFailure) error("private native details")
             if (recovered) rows = rows.filterNot { it.groupId == groupId }
             return recovered
-        }
-
-        override fun close() {
-            closed = true
         }
     }
 }

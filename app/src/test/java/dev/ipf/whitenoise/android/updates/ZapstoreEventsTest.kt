@@ -1,20 +1,32 @@
 package dev.ipf.whitenoise.android.updates
 
 import dev.ipf.whitenoise.android.core.nostr.NostrEvent
-import dev.ipf.whitenoise.android.core.nostr.NostrEventVerifier
 import dev.ipf.whitenoise.android.fuzz.FuzzSyntheticCorpusReplay
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ZapstoreEventsTest {
     @Test
     fun replaysSyntheticFuzzCorpus() {
         FuzzSyntheticCorpusReplay.replaySuite(FuzzSyntheticCorpusReplay.Suite.ZapstoreEvents)
+    }
+
+    @Test
+    fun otherwiseValidReleaseCannotPassWhenVerifierRejectsIt() {
+        val event = signedEvent(SIGNED_RELEASE_EVENT_JSON)
+        assertNull(ZapstoreEvents.latestReleaseVersion(event, APP_ID, TEST_PUBLISHER_PUBKEY, verifyEvent = { false }))
+        assertNull(
+            ZapstoreEvents.versionFromReleaseEvent(
+                event,
+                APP_ID,
+                TEST_PUBLISHER_PUBKEY,
+                "$APP_ID@$VERSION",
+                verifyEvent = { false },
+            ),
+        )
     }
 
     // --- Latest-release discovery (signature-gated). Reads the version straight
@@ -24,41 +36,53 @@ class ZapstoreEventsTest {
     @Test
     fun latestReleaseVersionReadsSignedReleaseBoundByDTag() {
         val releaseEvent = signedEvent(SIGNED_RELEASE_EVENT_JSON)
-        assertTrue(NostrEventVerifier.verifies(releaseEvent))
-        assertEquals(VERSION, ZapstoreEvents.latestReleaseVersion(releaseEvent, APP_ID, TEST_PUBLISHER_PUBKEY))
+        assertEquals(
+            VERSION,
+            ZapstoreEvents.latestReleaseVersion(releaseEvent, APP_ID, TEST_PUBLISHER_PUBKEY, verifyEvent = { true }),
+        )
     }
 
     @Test
-    fun latestReleaseVersionRejectsWrongAuthorWrongAppOrInvalidSignature() {
+    fun latestReleaseVersionRejectsWrongAuthorOrWrongApp() {
         val releaseEvent = signedEvent(SIGNED_RELEASE_EVENT_JSON)
 
-        assertNull(ZapstoreEvents.latestReleaseVersion(releaseEvent, APP_ID, "0".repeat(64)))
+        assertNull(ZapstoreEvents.latestReleaseVersion(releaseEvent, APP_ID, "0".repeat(64), verifyEvent = { true }))
         // A release for another app under the same publisher must not be read as
         // this app's latest — this is the Dark Matter / White Noise boundary.
-        assertNull(ZapstoreEvents.latestReleaseVersion(releaseEvent, "org.parres.whitenoise", TEST_PUBLISHER_PUBKEY))
-
-        val mutatedSignature = releaseEvent.copy(sig = "0".repeat(128))
-        assertFalse(NostrEventVerifier.verifies(mutatedSignature))
-        assertNull(ZapstoreEvents.latestReleaseVersion(mutatedSignature, APP_ID, TEST_PUBLISHER_PUBKEY))
+        assertNull(
+            ZapstoreEvents.latestReleaseVersion(
+                releaseEvent,
+                "org.parres.whitenoise",
+                TEST_PUBLISHER_PUBKEY,
+                verifyEvent = { true },
+            ),
+        )
     }
 
     // --- Exact-d-tag validation used by the download/asset-resolution path. ---
 
     @Test
-    fun versionFromReleaseEventMatchesExactDTagAndRejectsMismatchOrBadSignature() {
+    fun versionFromReleaseEventMatchesExactDTagAndRejectsMismatch() {
         val releaseEvent = signedEvent(SIGNED_RELEASE_EVENT_JSON)
 
         assertEquals(
             VERSION,
-            ZapstoreEvents.versionFromReleaseEvent(releaseEvent, APP_ID, TEST_PUBLISHER_PUBKEY, "$APP_ID@$VERSION"),
+            ZapstoreEvents.versionFromReleaseEvent(
+                releaseEvent,
+                APP_ID,
+                TEST_PUBLISHER_PUBKEY,
+                "$APP_ID@$VERSION",
+                verifyEvent = { true },
+            ),
         )
         assertNull(
-            ZapstoreEvents.versionFromReleaseEvent(releaseEvent, APP_ID, TEST_PUBLISHER_PUBKEY, "$APP_ID@2026.6.21"),
-        )
-
-        val mutatedSignature = releaseEvent.copy(sig = "0".repeat(128))
-        assertNull(
-            ZapstoreEvents.versionFromReleaseEvent(mutatedSignature, APP_ID, TEST_PUBLISHER_PUBKEY, "$APP_ID@$VERSION"),
+            ZapstoreEvents.versionFromReleaseEvent(
+                releaseEvent,
+                APP_ID,
+                TEST_PUBLISHER_PUBKEY,
+                "$APP_ID@2026.6.21",
+                verifyEvent = { true },
+            ),
         )
     }
 

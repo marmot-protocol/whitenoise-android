@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -222,6 +225,23 @@ class FocusedMessageOverlayDragTest {
         assertTrue("the drag after a tap must move the stack, rested at " + resting, stackTop() < resting)
     }
 
+    /** The initiating hold cannot drag the lifted preview; a fresh post-release gesture can. */
+    @Test
+    fun liftedPreviewDragsOnlyAfterInitiatingHoldEnds() {
+        var holdActive by mutableStateOf(true)
+        render(anchorTop = 600, anchorBottom = 680, initiatingHoldActive = { holdActive })
+        val resting = stackTop()
+
+        composeRule.onNodeWithTag(PREVIEW_TAG).performTouchInput { swipeUp() }
+        composeRule.waitForIdle()
+        assertEquals(resting, stackTop(), 0.5f)
+
+        composeRule.runOnIdle { holdActive = false }
+        composeRule.onNodeWithTag(PREVIEW_TAG).performTouchInput { swipeUp() }
+        composeRule.waitForIdle()
+        assertTrue(stackTop() < resting)
+    }
+
     /**
      * The lifted message opens on the bubble it came from, so nothing appears to jump.
      *
@@ -293,10 +313,12 @@ class FocusedMessageOverlayDragTest {
         anchorBottom: Int,
         onDismiss: () -> Unit = {},
         actionCount: Int = REALISTIC_ACTIONS,
+        initiatingHoldActive: () -> Boolean = { false },
     ) {
         composeRule.setContent {
             WhiteNoiseTheme {
                 FocusedMessageActions(
+                    initiatingHoldActive = initiatingHoldActive(),
                     sourceBounds = IntRect(0, anchorTop, 360, anchorBottom),
                     touchY = anchorTop.toFloat(),
                     mine = true,

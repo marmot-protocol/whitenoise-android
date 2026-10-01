@@ -23,7 +23,11 @@ internal data class QuarantinedGroupsUiState(
     val busy: Boolean get() = loading || recoveringGroup != null
 }
 
-/** One screen's transient presentation. Native projections remain authoritative. */
+/**
+ * One screen's transient presentation, called only on the Main dispatcher.
+ * Native recovery may finish after disposal or owner loss; suppressing that outcome here
+ * does not undo recovery. The active account's normal chat projection remains authoritative.
+ */
 internal class QuarantinedGroupsController(
     private val access: QuarantinedGroupsAccess?,
     private val scope: CoroutineScope,
@@ -134,6 +138,5 @@ internal class QuarantinedGroupsController(
     override fun close() {
         closed = true
         job?.cancel()
-        access?.close()
     }
 }

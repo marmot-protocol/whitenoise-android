@@ -593,8 +593,6 @@
     <ID>MagicNumber:AudioWaveformExtractor.kt:AudioWaveformExtractor$1_000_000L</ID>
     <ID>MagicNumber:AudioWaveformExtractor.kt:AudioWaveformExtractor$2_147_483_648.0</ID>
     <ID>MagicNumber:AudioWaveformExtractor.kt:AudioWaveformExtractor$32768f</ID>
-    <ID>MagicNumber:BIP340.kt:BIP340$32</ID>
-    <ID>MagicNumber:BIP340.kt:BIP340$64</ID>
     <ID>MagicNumber:Badges.kt:99uL</ID>
     <ID>MagicNumber:BubbleColors.kt:0.04045</ID>
     <ID>MagicNumber:BubbleColors.kt:0.05</ID>
@@ -1499,9 +1497,6 @@
     <ID>ReturnCount:AudioFocusOwner.kt:AudioFocusOwner$private fun acquireLocked: AcquisitionResult</ID>
     <ID>ReturnCount:AudioWaveformExtractor.kt:AudioWaveformExtractor$internal fun &lt;FormatT&gt; decodeBlocking: FloatArray?</ID>
     <ID>ReturnCount:AvatarImageLoader.kt:AvatarImageLoader$private fun decode: android.graphics.Bitmap?</ID>
-    <ID>ReturnCount:BIP340.kt:BIP340$fun verify: Boolean</ID>
-    <ID>ReturnCount:BIP340.kt:BIP340$private fun add: Point?</ID>
-    <ID>ReturnCount:BIP340.kt:BIP340$private fun liftX: Point?</ID>
     <ID>ReturnCount:BubbleColors.kt:BubbleColorPreferences$internal fun chatKey: String?</ID>
     <ID>ReturnCount:BubbleColors.kt:internal fun contrastRatio: Double</ID>
     <ID>ReturnCount:ChatListHeadSnap.kt:internal fun canDecideConversationReturnHeadSnap: Boolean</ID>
@@ -1743,8 +1738,6 @@
     <ID>ReturnCount:ZapstoreAssetEvents.kt:ZapstoreAssetEvents$internal fun parseApkAssetTags: ZapstoreApkAsset?</ID>
     <ID>ReturnCount:ZapstoreAssetEvents.kt:private fun NostrEvent.parseSizeTag: SizeTagValue</ID>
     <ID>ReturnCount:ZapstoreAssetEvents.kt:private fun String.isTrustedHttpsUrl: Boolean</ID>
-    <ID>ReturnCount:ZapstoreReleaseClient.kt:ZapstoreEvents$fun latestReleaseVersion: String?</ID>
-    <ID>ReturnCount:ZapstoreReleaseClient.kt:ZapstoreEvents$fun versionFromReleaseEvent: String?</ID>
     <ID>ReturnCount:ZapstoreReleaseClient.kt:ZapstoreReleaseClient.&lt;no name provided&gt;$override fun onMessage</ID>
     <ID>SwallowedException:AppLockPreferences.kt:AppLockPreferences$error: GeneralSecurityException</ID>
     <ID>SwallowedException:AppLockPreferences.kt:AppLockPreferences$error: IOException</ID>

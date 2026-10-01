@@ -179,11 +179,14 @@ class ChatListHeadReorderAnimationTest {
         val originalOrder = listOf("A", "B", "C", "D", "E", "F")
         val promotedOrder = listOf("E", "A", "B", "C", "D", "F")
         var itemIds by mutableStateOf(originalOrder)
+        val listStateHolder = arrayOf<LazyListState?>(null)
 
         composeRule.setContent {
+            val listState = rememberLazyListState()
+            listStateHolder[0] = listState
             ChatListHeadReorderMotionHarness(
                 itemIds = itemIds,
-                listState = rememberLazyListState(),
+                listState = listState,
                 rowHeight = rowHeight,
             )
         }
@@ -229,10 +232,54 @@ class ChatListHeadReorderAnimationTest {
         promotedOrder.forEachIndexed { index, id ->
             assertEquals("final top for $id", rowHeightPx * index, rowTop(id), 0.5f)
         }
+        assertListFlushAtTop(checkNotNull(listStateHolder[0]), promotedOrder)
         assertTrue(
             "a four-slot promotion should use the bounded long-distance budget",
             sawMotionBeyondAdjacentBudget,
         )
+    }
+
+    /** Unequal real-row heights expose placement and viewport correction fighting during a middle promotion. */
+    @Test
+    fun variableHeightMiddlePromotionStillMovesEachRowMonotonically() {
+        val original = listOf("A", "B", "C", "D", "E", "F")
+        val promotedOrder = listOf("E", "A", "B", "C", "D", "F")
+        val heights = mapOf("A" to 48.dp, "B" to 64.dp, "C" to 52.dp, "D" to 76.dp, "E" to 60.dp, "F" to 48.dp)
+        val listStateHolder = arrayOfNulls<LazyListState>(1)
+        var ids by mutableStateOf(original)
+        composeRule.setContent {
+            val listState = rememberLazyListState()
+            listStateHolder[0] = listState
+            ChatListHeadReorderMotionHarness(
+                itemIds = ids,
+                listState = listState,
+                rowHeight = rowHeight,
+                rowHeights = heights,
+            )
+        }
+        composeRule.waitForIdle()
+        val previousTops = original.associateWith(::rowTop).toMutableMap()
+        composeRule.mainClock.autoAdvance = false
+        composeRule.runOnUiThread { ids = promotedOrder }
+        composeRule.runOnIdle { }
+        repeat(60) { frame ->
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.runOnIdle { }
+            val promotedTop = rowTop("E")
+            assertTrue("E reversed at frame $frame", promotedTop <= previousTops.getValue("E") + 0.5f)
+            previousTops["E"] = promotedTop
+            listOf("A", "B", "C", "D").forEach { id ->
+                val top = rowTop(id)
+                assertTrue("$id reversed at frame $frame", top + 0.5f >= previousTops.getValue(id))
+                previousTops[id] = top
+            }
+        }
+        var expectedTop = 0f
+        promotedOrder.forEach { id ->
+            assertEquals("final top for $id", expectedTop, rowTop(id), 0.5f)
+            expectedTop += composeRule.density.run { heights.getValue(id).toPx() }
+        }
+        assertListFlushAtTop(checkNotNull(listStateHolder[0]), promotedOrder)
     }
 
     @Test
@@ -642,6 +689,18 @@ class ChatListHeadReorderAnimationTest {
         composeRule.runOnIdle { assertEquals(listOf("A"), openedIds) }
     }
 
+    /** The final keyed order and scroll coordinate must agree on a flush viewport. */
+    private fun assertListFlushAtTop(
+        listState: LazyListState,
+        expectedOrder: List<String>,
+    ) {
+        composeRule.runOnIdle {
+            assertEquals(expectedOrder, listState.layoutInfo.visibleItemsInfo.map { it.key })
+            assertEquals(0, listState.firstVisibleItemIndex)
+            assertEquals(0, listState.firstVisibleItemScrollOffset)
+        }
+    }
+
     private fun rowTop(id: String): Float =
         composeRule
             .onNodeWithTag(chatListHeadReorderRowTag(id))
@@ -675,6 +734,7 @@ internal fun ChatListHeadReorderMotionHarness(
     itemIds: List<String>,
     listState: LazyListState,
     rowHeight: Dp,
+    rowHeights: Map<String, Dp> = emptyMap(),
     datasetKey: ChatListDatasetKey = ChatListDatasetKey(false, null, ""),
     contentRevision: Int = 0,
     pinnedCount: Int? = null,
@@ -760,7 +820,7 @@ internal fun ChatListHeadReorderMotionHarness(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .height(rowHeight)
+                                .height(rowHeights[id] ?: rowHeight)
                                 .clickable(enabled = interactionsEnabled) { onOpen(id) }
                                 .testTag(chatListHeadReorderRowTag(id)),
                     ) {

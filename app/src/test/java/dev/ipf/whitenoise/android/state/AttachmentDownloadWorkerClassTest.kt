@@ -14,8 +14,12 @@ import androidx.work.testing.WorkManagerTestInitHelper
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.currentTime
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -174,12 +178,48 @@ class AttachmentDownloadWorkerClassTest {
         }
 
     @Test
-    fun interruptedDownloadPropagatesCancellationWithoutClaimingSuccess() =
+    fun cancelledFetchEndsTheWorkerAndClearsInteractiveIntent() =
         runTest {
-            val cancellation = CancellationException("synthetic cancellation")
-            val worker = buildWorkerWithDownloadOverride(downloadOverride = { _, _, _ -> throw cancellation })
-            val result = runCatching { worker.doWork() }
-            assertTrue(result.exceptionOrNull() === cancellation)
+            val request = testRequest()
+            val intents =
+                AttachmentDownloadIntentStore(appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE))
+            for (interactive in listOf(false, true)) {
+                intents.setInteractive(request, interactive)
+                val worker =
+                    buildWorkerWithDownloadOverride(
+                        downloadOverride = { _, _, _ -> CompletableDeferred<Boolean>().apply { cancel() }.await() },
+                    )
+
+                assertEquals(Result.failure(), worker.doWork())
+                assertFalse(intents.isInteractive(request))
+                assertFalse(intents.isAutomaticSuppressed(request))
+            }
+        }
+
+    @Test
+    fun stoppedWorkerPropagatesCancellationAndRetainsInteractiveIntent() =
+        runTest {
+            val request = testRequest()
+            val intents =
+                AttachmentDownloadIntentStore(appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE))
+            intents.setInteractive(request, true)
+            val enteredDownload = CompletableDeferred<Unit>()
+            val worker =
+                buildWorkerWithDownloadOverride(
+                    downloadOverride = { _, _, _ ->
+                        enteredDownload.complete(Unit)
+                        awaitCancellation()
+                    },
+                )
+            val run = async { worker.doWork() }
+            runCurrent()
+            enteredDownload.await()
+            run.cancel()
+            runCurrent()
+
+            assertTrue(run.isCancelled)
+            assertTrue(runCatching { run.await() }.exceptionOrNull() is CancellationException)
+            assertTrue(intents.isInteractive(request))
         }
 
     @Test

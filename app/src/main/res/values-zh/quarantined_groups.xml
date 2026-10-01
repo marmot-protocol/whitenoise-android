@@ -15,7 +15,6 @@
     <string name="quarantine_member_validation">成员或加密状态验证未通过。</string>
     <string name="quarantine_group_record">无法加载群组记录。</string>
     <string name="quarantine_pending_commit">无法恢复中断的群组更新。</string>
-    <string name="quarantine_unknown">无法安全加载该群组。</string>
     <string name="quarantine_recovered">恢复成功。群组可以重新出现在聊天列表中。</string>
     <string name="quarantine_still_quarantined">群组仍处于隔离状态。其历史记录未被删除。</string>
     <string name="quarantine_retry_failed">无法完成恢复。请稍后重试。</string>

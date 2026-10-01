@@ -501,6 +501,29 @@ class AvatarImageLoaderTest {
         assertEquals(entryBytes, cache.byteSize(ProfileImageVariant.BANNER))
     }
 
+    /** An explicit profile clear is not mistaken for cache pressure, while LRU trimming still counts. */
+    @Test
+    fun profileCacheClearDoesNotCountAsCapacityEviction() {
+        val entry = solidImage(AVATAR_EDGE_PX, AVATAR_EDGE_PX)
+        val entryBytes = entry.asAndroidBitmap().byteCount
+        val cache = PartitionedProfileImageCache(avatarBytes = entryBytes * 2, bannerBytes = entryBytes)
+        val keys = (0..2).map { "https://profiles.example/eviction-$it.png" }
+
+        AvatarCacheDiagnostics.start()
+        try {
+            cache.put(keys[0], entry)
+            cache.put(keys[1], entry)
+            cache.evictAll()
+            assertEquals(0, AvatarCacheDiagnostics.snapshot().profile.evictions)
+            assertNull(cache.get(keys[0]))
+
+            keys.forEach { cache.put(it, entry) }
+            assertEquals(1, AvatarCacheDiagnostics.snapshot().profile.evictions)
+        } finally {
+            AvatarCacheDiagnostics.stop()
+        }
+    }
+
     /** A cache key resolves back to the variant it was built for, which is what picks its partition. */
     @Test
     fun cacheKeysResolveBackToTheirVariant() {

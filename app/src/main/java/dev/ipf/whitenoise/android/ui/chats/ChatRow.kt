@@ -53,6 +53,7 @@ import dev.ipf.marmotkit.ChatListAttachmentKindFfi
 import dev.ipf.marmotkit.SelectedChatPreviewFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GroupProjector
+import dev.ipf.whitenoise.android.core.GroupSystemPreviewNames
 import dev.ipf.whitenoise.android.core.MessageBodyMatch
 import dev.ipf.whitenoise.android.core.SnippetHighlight
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
@@ -402,6 +403,9 @@ internal fun ChatRow(
                                 item.projectedPreviewText(
                                     copy = messageTextCopy,
                                     empty = stringResource(R.string.no_messages_yet),
+                                    // Names the affected member and refreshes when their profile loads (#1581).
+                                    groupSystemNames =
+                                        GroupSystemPreviewNames(activeAccountIdHex, appState::chatMemberTitle),
                                 )
                         },
                     )

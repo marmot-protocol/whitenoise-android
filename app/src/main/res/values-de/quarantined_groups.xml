@@ -15,7 +15,6 @@
     <string name="quarantine_member_validation">Die Prüfung von Mitgliedern oder Verschlüsselungszustand ist fehlgeschlagen.</string>
     <string name="quarantine_group_record">Der Gruppendatensatz konnte nicht geladen werden.</string>
     <string name="quarantine_pending_commit">Eine unterbrochene Gruppenaktualisierung konnte nicht wiederhergestellt werden.</string>
-    <string name="quarantine_unknown">Die Gruppe konnte nicht sicher geladen werden.</string>
     <string name="quarantine_recovered">Wiederherstellung erfolgreich. Die Gruppe kann wieder in der Chatliste erscheinen.</string>
     <string name="quarantine_still_quarantined">Die Gruppe bleibt in Quarantäne. Der Verlauf wurde nicht gelöscht.</string>
     <string name="quarantine_retry_failed">Die Wiederherstellung konnte nicht abgeschlossen werden. Später erneut versuchen.</string>

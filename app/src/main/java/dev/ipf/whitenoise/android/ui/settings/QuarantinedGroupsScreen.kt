@@ -10,6 +10,8 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -18,46 +20,54 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import dev.ipf.marmotkit.AppGroupHydrationQuarantineReasonFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.QuarantineRecoveryOutcome
-import dev.ipf.whitenoise.android.state.QuarantinedGroupReason
 import dev.ipf.whitenoise.android.state.QuarantinedGroupsController
 import dev.ipf.whitenoise.android.state.QuarantinedGroupsUiState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.isSignedInSigningAccount
 import dev.ipf.whitenoise.android.state.quarantinedGroupsAccess
 
-/** Account, switch epoch and runtime identity key the screen's transient controller. */
+/** Observable account and runtime generation changes replace the screen's controller. */
 @Composable
 internal fun rememberQuarantinedGroupsController(appState: WhiteNoiseAppState): QuarantinedGroupsController {
     val scope = rememberCoroutineScope()
-    val runtime = appState.captureHostPerformanceRuntimeOwner()
-    val signedIn = appState.accounts.any { it.label == appState.activeAccountRef && it.isSignedInSigningAccount() }
     val controller =
-        remember(
-            appState,
-            signedIn,
-            appState.activeAccountRef,
-            appState.captureAccountSwitchEpoch(),
-            runtime?.let { QuarantineRuntimeKey(it.runtime) },
-            runtime?.generation,
-            appState.developerMode,
-            appState.signOutInProgress,
-            appState.wipeInProgress,
-        ) { QuarantinedGroupsController(appState.quarantinedGroupsAccess(), scope) }
+        remember(appState.activeAccountRef, appState.runtimeGeneration, appState.developerMode) {
+            QuarantinedGroupsController(appState.quarantinedGroupsAccess(), scope)
+        }
     DisposableEffect(controller) { onDispose { controller.close() } }
     LaunchedEffect(controller) { controller.refresh() }
     return controller
 }
 
-/** Compose keys must preserve runtime identity even when its fields and generation match. */
-private class QuarantineRuntimeKey(
-    private val runtime: Any,
-) {
-    override fun equals(other: Any?): Boolean = other is QuarantineRuntimeKey && runtime === other.runtime
-
-    override fun hashCode(): Int = System.identityHashCode(runtime)
+/** The Developer Tools subtitle performs one native read per observable owner. */
+@Composable
+internal fun rememberQuarantinedGroupsSummary(appState: WhiteNoiseAppState): String {
+    val state by key(appState.activeAccountRef, appState.runtimeGeneration) {
+        produceState(QuarantinedGroupsUiState(loading = true)) {
+            val access = appState.quarantinedGroupsAccess()
+            value =
+                if (access == null) {
+                    QuarantinedGroupsUiState(available = false)
+                } else {
+                    try {
+                        val rows = access.load()
+                        if (access.isCurrent()) {
+                            QuarantinedGroupsUiState(loaded = true, rows = rows)
+                        } else {
+                            QuarantinedGroupsUiState(available = false)
+                        }
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        QuarantinedGroupsUiState(loadFailed = true)
+                    }
+                }
+        }
+    }
+    return quarantinedGroupsSummary(state)
 }
 
 @Suppress("FunctionNaming")
@@ -81,14 +91,13 @@ internal fun quarantinedGroupsSummary(state: QuarantinedGroupsUiState): String =
         else -> stringResource(R.string.quarantine_loading)
     }
 
-internal fun quarantineGuidance(reason: QuarantinedGroupReason): Int =
+internal fun quarantineGuidance(reason: AppGroupHydrationQuarantineReasonFfi): Int =
     when (reason) {
-        QuarantinedGroupReason.StoredState -> R.string.quarantine_stored_state
-        QuarantinedGroupReason.MissingState -> R.string.quarantine_missing_state
-        QuarantinedGroupReason.MemberValidation -> R.string.quarantine_member_validation
-        QuarantinedGroupReason.GroupRecord -> R.string.quarantine_group_record
-        QuarantinedGroupReason.PendingCommit -> R.string.quarantine_pending_commit
-        QuarantinedGroupReason.Unknown -> R.string.quarantine_unknown
+        AppGroupHydrationQuarantineReasonFfi.OPEN_MLS_LOAD_FAILED -> R.string.quarantine_stored_state
+        AppGroupHydrationQuarantineReasonFfi.OPEN_MLS_GROUP_MISSING -> R.string.quarantine_missing_state
+        AppGroupHydrationQuarantineReasonFfi.MEMBER_VALIDATION_FAILED -> R.string.quarantine_member_validation
+        AppGroupHydrationQuarantineReasonFfi.GROUP_RECORD_LOAD_FAILED -> R.string.quarantine_group_record
+        AppGroupHydrationQuarantineReasonFfi.PENDING_COMMIT_RECOVERY_FAILED -> R.string.quarantine_pending_commit
     }
 
 internal fun quarantineOutcome(outcome: QuarantineRecoveryOutcome): Int =

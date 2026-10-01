@@ -23,13 +23,13 @@ class QuarantinedGroupsAccountGateTest {
         state.updateDeveloperMode(false)
         assertNull(state.quarantinedGroupsAccess())
         state.updateDeveloperMode(true)
-        state.quarantinedGroupsAccess().also { assertNotNull(it) }!!.close()
+        assertNotNull(state.quarantinedGroupsAccess())
         assertNull(state(signedOut = true).also { it.updateDeveloperMode(true) }.quarantinedGroupsAccess())
         assertNull(state(signing = false).also { it.updateDeveloperMode(true) }.quarantinedGroupsAccess())
         assertNull(state(runtime = false).also { it.updateDeveloperMode(true) }.quarantinedGroupsAccess())
     }
 
-    @Test fun teardownAndSameAccountRuntimeReplacementRetireCapturedAccess() =
+    @Test fun teardownRetiresCapturedAccess() =
         runTest {
             val state = state().also { it.updateDeveloperMode(true) }
             val old = state.quarantinedGroupsAccess()!!
@@ -42,18 +42,9 @@ class QuarantinedGroupsAccountGateTest {
             assertNull(state.quarantinedGroupsAccess())
             state.wipeInProgress = false
             assertTrue(old.isCurrent())
-            // Replace an otherwise equal runtime at the same generation without a production test hook.
-            val runtimeField =
-                WhiteNoiseAppState::class.java.getDeclaredField("marmotRuntime").apply { isAccessible = true }
-            val previous = runtimeField.get(state) as AppMarmotRuntime
-            runtimeField.set(state, previous.copy())
-            assertFalse(old.isCurrent())
-            old.close()
             val fresh = state.quarantinedGroupsAccess()!!
             assertTrue(fresh.isCurrent())
             assertTrue(fresh.load().isEmpty())
-            fresh.close()
-            assertFalse(fresh.isCurrent())
         }
 
     private fun state(

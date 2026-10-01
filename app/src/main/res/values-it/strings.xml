@@ -539,6 +539,7 @@
     <string name="performance_logs">Log delle prestazioni</string>
     <string name="performance_logs_description">Raccoglie temporaneamente su questo dispositivo eventi di temporizzazione rispettosi della privacy. Si interrompe dopo 30 minuti o al riavvio dell’app.</string>
     <string name="performance_logs_active">Attivo · %1$d min rimanenti</string>
+    <string name="performance_logs_export_included">Questa sessione sarà inclusa nella prossima esportazione dei registri diagnostici salvati.</string>
     <string name="performance_logs_inactive">Inattivo</string>
     <string name="copy_performance_logs">Copia log delle prestazioni</string>
     <string name="copy_performance_logs_detail">Copia gli eventi limitati e rispettosi della privacy della sessione corrente o più recente.</string>
@@ -1031,6 +1032,15 @@
     <string name="share_user_view">Vedi profilo</string>
     <string name="attach_options">Aggiungi allegato</string>
     <string name="media_preview_position_badge">Posizione di invio %1$d</string>
+    <string name="contact_view">Visualizza contatto</string>
+    <string name="contact_add">Aggiungi ai contatti</string>
+    <string name="contact_save_vcf">Salva VCF</string>
+    <string name="contact_view_short">Vedi</string>
+    <string name="contact_add_short">Aggiungi</string>
+    <string name="contact_save_short">Salva</string>
+    <string name="contact_invalid_vcard">Questo file di contatto non è valido o è troppo grande</string>
+    <string name="contact_action_failed">Impossibile completare l’azione</string>
+    <string name="contact_vcf_saved">VCF salvato</string>
     <string name="share_contact_title">Condividi contatto</string>
     <string name="share_location_title">Condividi posizione</string>
     <string name="location_use_current">Usa posizione attuale</string>
@@ -1263,6 +1273,10 @@
     <string name="clear_search">Cancella ricerca</string>
     <string name="chat_list_action_add_to_folder">Aggiungi a una cartella</string>
     <string name="chat_folder_included_by_rule">Incluso dalle regole di questa cartella</string>
+    <plurals name="chat_pill_unread_messages_count">
+        <item quantity="one">%1$s messaggio non letto</item>
+        <item quantity="other">%1$s messaggi non letti</item>
+    </plurals>
     <plurals name="chat_folder_chat_count">
         <item quantity="one">%1$d chat</item>
         <item quantity="other">%1$d chat</item>

@@ -57,7 +57,7 @@ class MessageDraftDictationWriteTest {
                             writer.generation(account, group).value,
                         )
                     },
-                    writeDraft = bridge::setDraftIfCurrent,
+                    writeDraft = bridge::writeDraftIfCurrent,
                     disclosureAccepted = { true },
                     markDisclosureAccepted = {},
                     scheduleTimeout = { _, _ -> ConversationDictationTimeoutHandle {} },
@@ -290,8 +290,8 @@ class MessageDraftDictationWriteTest {
                     content = value.text,
                 )?.let {
                     cache[account to group] = value
-                    true
-                } ?: false
+                    it.value
+                }
         },
         disclosureAccepted = { true },
         markDisclosureAccepted = {},

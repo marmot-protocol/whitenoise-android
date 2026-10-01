@@ -5,7 +5,6 @@ import com.code_intelligence.jazzer.junit.DictionaryEntries
 import com.code_intelligence.jazzer.junit.DictionaryFile
 import com.code_intelligence.jazzer.junit.FuzzTest
 import dev.ipf.whitenoise.android.core.nostr.NostrEvent
-import dev.ipf.whitenoise.android.core.nostr.NostrEventVerifier
 import dev.ipf.whitenoise.android.core.nostr.NostrRelayFrames
 import org.json.JSONArray
 import org.json.JSONObject
@@ -46,22 +45,7 @@ class ZapstoreProtocolFuzzTest {
         assertFixedWidthHex(parsed.pubkey, 64)
         assertFixedWidthHex(parsed.sig, 128)
 
-        val canonicalOnce = parsed.canonicalJson()
-        val canonicalTwice = parsed.canonicalJson()
-        FuzzAssertions.assertEquals("canonical JSON is not stable", canonicalOnce, canonicalTwice)
-
-        val reparsed = NostrEvent.fromJson(json)
-        if (reparsed != null) {
-            FuzzAssertions.assertEquals(
-                "reparsed canonical JSON differs",
-                canonicalOnce,
-                reparsed.canonicalJson(),
-            )
-        }
-
-        if (NostrEventVerifier.verifies(parsed)) {
-            assertMutationsBreakVerification(parsed)
-        }
+        FuzzAssertions.assertEquals("full-event JSON roundtrip differs", parsed, NostrEvent.fromJson(JSONObject(parsed.toJson())))
     }
 
     private fun fuzzRelayEnvelopeFrames(data: FuzzedDataProvider) {
@@ -260,49 +244,5 @@ class ZapstoreProtocolFuzzTest {
     ) {
         FuzzAssertions.assertEquals("hex field length mismatch", length, value.length)
         FuzzAssertions.assertTrue("hex field contains non-hex characters", value.all { it in '0'..'9' || it in 'a'..'f' })
-    }
-
-    private fun assertMutationsBreakVerification(event: NostrEvent) {
-        FuzzAssertions.assertFalse(
-            "pubkey mutation must break verification",
-            NostrEventVerifier.verifies(event.copy(pubkey = flipHexChar(event.pubkey))),
-        )
-        FuzzAssertions.assertFalse(
-            "created_at mutation must break verification",
-            NostrEventVerifier.verifies(event.copy(createdAt = event.createdAt + 1)),
-        )
-        FuzzAssertions.assertFalse(
-            "kind mutation must break verification",
-            NostrEventVerifier.verifies(event.copy(kind = event.kind + 1)),
-        )
-        FuzzAssertions.assertFalse(
-            "tags mutation must break verification",
-            NostrEventVerifier.verifies(
-                event.copy(tags = event.tags + listOf(listOf("fuzz", "mutated"))),
-            ),
-        )
-        FuzzAssertions.assertFalse(
-            "content mutation must break verification",
-            NostrEventVerifier.verifies(event.copy(content = event.content + "x")),
-        )
-        FuzzAssertions.assertFalse(
-            "signature mutation must break verification",
-            NostrEventVerifier.verifies(event.copy(sig = flipHexChar(event.sig, atEnd = true))),
-        )
-    }
-
-    private fun flipHexChar(
-        hex: String,
-        atEnd: Boolean = false,
-    ): String {
-        val index = if (atEnd) hex.lastIndex else 0
-        val flipped =
-            when (hex[index].lowercaseChar()) {
-                '0' -> '1'
-                'a' -> 'b'
-                'f' -> 'e'
-                else -> '0'
-            }
-        return hex.substring(0, index) + flipped + hex.substring(index + 1)
     }
 }

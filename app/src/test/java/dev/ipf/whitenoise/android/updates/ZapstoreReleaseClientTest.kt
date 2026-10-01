@@ -18,6 +18,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -59,6 +60,77 @@ class ZapstoreReleaseClientTest {
     fun replaysSyntheticFuzzCorpus() {
         FuzzSyntheticCorpusReplay.replaySuite(FuzzSyntheticCorpusReplay.Suite.ZapstoreReleaseClient)
     }
+
+    @Test
+    fun fetchLatestSelectsNewestVerifiedReleaseForTheRequestedApp() {
+        // Verify caller policy and relay integration; real signatures run on Android.
+        val verified = mutableListOf<String>()
+        val verifyEvent: (NostrEvent) -> Boolean =
+            {
+                verified += it.firstTagValue("version").orEmpty()
+                it.sig != "0".repeat(128)
+            }
+        val releaseClient = releaseClient(verifyEvent)
+        val relay =
+            enqueueRelay { webSocket, request ->
+                val subscription = request.getString(1)
+                webSocket.send(eventMessage(subscription, releaseEventJson("2026.5.1")))
+                webSocket.send(eventMessage(subscription, releaseEventJson("2026.5.3")))
+                webSocket.send(eventMessage(subscription, releaseEventJson("2026.5.9").put("sig", "0".repeat(128))))
+                val otherAppTags = JSONArray().put(JSONArray().put("i").put("other.app"))
+                val wrongApp = releaseEventJson("2026.5.8").put("tags", otherAppTags)
+                webSocket.send(eventMessage(subscription, wrongApp))
+                webSocket.send(eventMessage(subscription, releaseEventJson("2026.5.7").put("pubkey", "b".repeat(64))))
+                webSocket.send(JSONArray().put("EOSE").put(subscription).toString())
+            }
+
+        val result = runBlocking { releaseClient.fetchLatest("example.app", "2026.5.1") }
+
+        assertEquals("2026.5.3", result?.version)
+        assertEquals(1, result?.releasesBehind)
+        assertTrue(verified.contains("2026.5.9"))
+        assertTrue(!verified.contains("2026.5.7"))
+        relay.awaitClosing()
+    }
+
+    @Test
+    fun fetchLatestCannotAcceptOtherwiseValidReleaseWhenVerifierRejectsIt() {
+        val calls = AtomicInteger()
+        val releaseClient =
+            releaseClient(
+                {
+                    calls.incrementAndGet()
+                    false
+                },
+            )
+        val relay =
+            enqueueRelay { webSocket, request ->
+                val subscription = request.getString(1)
+                webSocket.send(eventMessage(subscription, releaseEventJson("2026.5.3")))
+                webSocket.send(JSONArray().put("EOSE").put(subscription).toString())
+            }
+
+        assertNull(runBlocking { releaseClient.fetchLatest("example.app") })
+        assertEquals(1, calls.get())
+        relay.awaitClosing()
+    }
+
+    private fun releaseClient(verifyEvent: (NostrEvent) -> Boolean): ZapstoreReleaseClient =
+        ZapstoreReleaseClient(
+            httpClient = webSocketFactory,
+            relayUrl = server.url("/relay").toString().replaceFirst("http", "ws"),
+            publisherPubkey = "c".repeat(64),
+            verifyEvent = verifyEvent,
+        )
+
+    private fun releaseEventJson(version: String): JSONObject =
+        eventJson(version.replace(".", "").padStart(64, '0'))
+            .put(
+                "tags",
+                JSONArray()
+                    .put(JSONArray().put("i").put("example.app"))
+                    .put(JSONArray().put("version").put(version)),
+            )
 
     @Test
     fun fetchEventsKeepsOnlyEventsForItsSubscription() {

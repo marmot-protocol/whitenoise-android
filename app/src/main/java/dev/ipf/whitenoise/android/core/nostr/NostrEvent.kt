@@ -16,34 +16,17 @@ internal data class NostrEvent(
 ) {
     fun firstTagValue(name: String): String? = tags.firstOrNull { it.firstOrNull() == name }?.getOrNull(1)
 
-    fun canonicalJson(): String =
-        buildString {
-            append('[')
-            append('0')
-            append(',')
-            appendNostrJsonString(pubkey)
-            append(',')
-            append(createdAt)
-            append(',')
-            append(kind)
-            append(',')
-            append('[')
-            tags.forEachIndexed { index, tag ->
-                if (index > 0) append(',')
-                append('[')
-                tag.forEachIndexed { tagIndex, value ->
-                    if (tagIndex > 0) append(',')
-                    appendNostrJsonString(value)
-                }
-                append(']')
-            }
-            append(']')
-            append(',')
-            appendNostrJsonString(content)
-            append(']')
-        }
-
-    fun computedIdHex(): String = sha256(canonicalJson().toByteArray(Charsets.UTF_8)).toHex()
+    /** Complete event object; MDK owns canonical ID and signature validation. */
+    fun toJson(): String =
+        JSONObject()
+            .put("id", id)
+            .put("pubkey", pubkey)
+            .put("created_at", createdAt)
+            .put("kind", kind)
+            .put("tags", JSONArray(tags.map { JSONArray(it) }))
+            .put("content", content)
+            .put("sig", sig)
+            .toString()
 
     companion object {
         fun fromJson(json: JSONObject): NostrEvent? {
@@ -73,18 +56,6 @@ internal data class NostrEvent(
     }
 }
 
-internal object NostrEventVerifier {
-    fun verifies(event: NostrEvent): Boolean {
-        val message = event.computedIdHex()
-        if (!message.equals(event.id, ignoreCase = true)) return false
-        return BIP340.verify(
-            publicKeyHex = event.pubkey,
-            messageHex = message,
-            signatureHex = event.sig,
-        )
-    }
-}
-
 internal fun sha256(bytes: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(bytes)
 
 internal fun String.hexToBytes(): ByteArray? {
@@ -95,30 +66,6 @@ internal fun String.hexToBytes(): ByteArray? {
 }
 
 internal fun ByteArray.toHex(): String = joinToString(separator = "") { "%02x".format(it.toInt() and 0xff) }
-
-private fun StringBuilder.appendNostrJsonString(value: String) {
-    append('"')
-    value.forEach { char ->
-        when (char) {
-            '"' -> append("\\\"")
-            '\\' -> append("\\\\")
-            '\b' -> append("\\b")
-            '\u000C' -> append("\\f")
-            '\n' -> append("\\n")
-            '\r' -> append("\\r")
-            '\t' -> append("\\t")
-            else -> {
-                if (char < ' ') {
-                    append("\\u")
-                    append(char.code.toString(16).padStart(4, '0'))
-                } else {
-                    append(char)
-                }
-            }
-        }
-    }
-    append('"')
-}
 
 private fun String.isHex(expectedLength: Int): Boolean = length == expectedLength && all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }
 

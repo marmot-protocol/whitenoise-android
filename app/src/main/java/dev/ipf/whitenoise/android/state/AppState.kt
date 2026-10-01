@@ -65,7 +65,6 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
 import dev.ipf.whitenoise.android.audio.DictationDiagnosticLifecycle
 import dev.ipf.whitenoise.android.audio.DictationDiagnostics
 import dev.ipf.whitenoise.android.audio.MicrophoneCaptureCoordinator
-import dev.ipf.whitenoise.android.audio.discoverConversationDictationProviders
 import dev.ipf.whitenoise.android.audio.tts.AndroidTtsSpeechEngine
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineHandle
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineResolver
@@ -90,6 +89,7 @@ import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.HostSafety
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.MarmotClient
+import dev.ipf.whitenoise.android.core.MarmotClientRootGate
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
@@ -119,6 +119,7 @@ import dev.ipf.whitenoise.android.notifications.ConversationNotificationChannels
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationRouting
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPattern
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPreferences
+import dev.ipf.whitenoise.android.notifications.ForegroundStartTrigger
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
 import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.NotificationBatteryPolicy
@@ -1221,67 +1222,66 @@ class WhiteNoiseAppState private constructor(
     internal val conversationDictationPreferences = ConversationDictationPreferences(appContext)
     internal val microphoneCaptureCoordinator = MicrophoneCaptureCoordinator()
     private val dictationMicrophoneOwner = Any()
-    internal val conversationDictation: ConversationDictationController by lazy {
-        ConversationDictationController(
-            context = appContext,
-            readDraft = ::conversationDictationDraftSnapshot,
-            writeDraft = ::setConversationDictationDraftIfCurrent,
-            // Chat rows are a refreshable projection, not proof that the immutable origin was removed.
-            targetAvailable = { accountRef, _ ->
-                accounts.any { it.label == accountRef && it.signedOut != true }
-            },
-            targetReplyAvailable = { account, group, reply ->
-                conversationDictationReplyTargetResolution(account, group, reply).available
-            },
-            targetValidator = { account, group ->
-                val cached =
-                    synchronized(conversationControllerLock) {
-                        newestMatchingController(conversationControllers) { it.matchesConversation(account, group) }
+    internal val conversationDictation: ConversationDictationController
+        get() = conversationDictationOwner.value
+
+    /** Connection lifecycle checks must not create a speech controller in an idle process. */
+    internal fun initializedConversationDictation(): ConversationDictationController? =
+        if (conversationDictationOwner.isInitialized()) conversationDictationOwner.value else null
+
+    private val conversationDictationOwner =
+        lazy {
+            ConversationDictationController(
+                context = appContext,
+                readDraft = ::conversationDictationDraftSnapshot,
+                writeDraft = ::setConversationDictationDraftIfCurrent,
+                // Chat rows are a refreshable projection, not proof that the immutable origin was removed.
+                targetAvailable = { accountRef, _ ->
+                    accounts.any { it.label == accountRef && it.signedOut != true }
+                },
+                targetReplyAvailable = { account, group, reply ->
+                    conversationDictationReplyTargetResolution(account, group, reply).available
+                },
+                targetValidator = { account, group ->
+                    val cached =
+                        synchronized(conversationControllerLock) {
+                            newestMatchingController(conversationControllers) { it.matchesConversation(account, group) }
+                        }
+                    when {
+                        accounts.none { it.label == account && it.signedOut != true } ->
+                            TargetValidation.DefinitelyRemoved
+                        cached?.membersVerified == true && cached.isSelfMember -> TargetValidation.Available
+                        cached?.membersVerified == true -> TargetValidation.DefinitelyRemoved
+                        else ->
+                            runCatchingCancellable {
+                                marmotIo {
+                                    val member =
+                                        groupDetails(account, group).group.selfMembership ==
+                                            SelfMembershipFfi.MEMBER
+                                    if (member) TargetValidation.Available else TargetValidation.DefinitelyRemoved
+                                }
+                            }.getOrDefault(TargetValidation.Indeterminate)
                     }
-                when {
-                    accounts.none { it.label == account && it.signedOut != true } ->
-                        TargetValidation.DefinitelyRemoved
-                    cached?.membersVerified == true && cached.isSelfMember -> TargetValidation.Available
-                    cached?.membersVerified == true -> TargetValidation.DefinitelyRemoved
-                    else ->
-                        runCatchingCancellable {
-                            marmotIo {
-                                val member =
-                                    groupDetails(account, group).group.selfMembership ==
-                                        SelfMembershipFfi.MEMBER
-                                if (member) TargetValidation.Available else TargetValidation.DefinitelyRemoved
-                            }
-                        }.getOrDefault(TargetValidation.Indeterminate)
-                }
-            },
-            targetValidationScope = mutationsScope,
-            onBeforeRecognition = conversationDictationMediaHandoff::beforeRecognition,
-            onAfterAudioCapture = conversationDictationMediaHandoff::afterAudioCapture,
-            tryAcquireMicrophone = { microphoneCaptureCoordinator.tryAcquire(dictationMicrophoneOwner) },
-            releaseMicrophone = { microphoneCaptureCoordinator.release(dictationMicrophoneOwner) },
-            finishAfterSilenceMillis = {
-                conversationDictationPreferences.current().finishAfterSilenceMillis
-            },
-            pauseOtherAudio = { conversationDictationPreferences.current().pauseOtherAudio },
-            silenceDeliveryMode = {
-                conversationDictationPreferences.current().silenceDeliveryMode
-            },
-            sendTranscriptIfOriginUnchanged = ::sendDictationTranscriptIfOriginUnchanged,
-        )
-    }
+                },
+                targetValidationScope = mutationsScope,
+                onBeforeRecognition = conversationDictationMediaHandoff::beforeRecognition,
+                onAfterAudioCapture = conversationDictationMediaHandoff::afterAudioCapture,
+                tryAcquireMicrophone = { microphoneCaptureCoordinator.tryAcquire(dictationMicrophoneOwner) },
+                releaseMicrophone = { microphoneCaptureCoordinator.release(dictationMicrophoneOwner) },
+                finishAfterSilenceMillis = {
+                    conversationDictationPreferences.current().finishAfterSilenceMillis
+                },
+                pauseOtherAudio = { conversationDictationPreferences.current().pauseOtherAudio },
+                silenceDeliveryMode = {
+                    conversationDictationPreferences.current().silenceDeliveryMode
+                },
+                sendTranscriptIfOriginUnchanged = ::sendDictationTranscriptIfOriginUnchanged,
+            )
+        }
 
     /** Settings discovery is lifecycle-local; protocol data never enters this platform snapshot. */
-    internal suspend fun discoverDictationProviders(): List<ConversationDictationProvider> {
-        val providers =
-            withContext(Dispatchers.IO) {
-                discoverConversationDictationProviders(appContext)
-            }
-        val saved = conversationDictationPreferences.current().providerSelection
-        if (saved != null && providers.flatMap { it.choices }.none(saved::sameInstallation)) {
-            conversationDictationPreferences.setProviderSelection(null)
-        }
-        return providers
-    }
+    internal suspend fun discoverDictationProviders(): List<ConversationDictationProvider> =
+        discoverDictationProvidersForSettings(appContext, conversationDictationPreferences)
 
     private val legacyDraftMigrationSource by lazy { LegacyDraftMigrationSource(appContext) }
     internal val editorSourceStore: EditorSourceStore = EditorSourceStore.create(appContext)
@@ -2641,7 +2641,7 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
         expectedRevision: Long,
         value: TextFieldValue,
-    ): Boolean = composerDraftExpansionBridge.setDraftIfCurrent(accountRef, groupIdHex, expectedRevision, value)
+    ): Long? = composerDraftExpansionBridge.writeDraftIfCurrent(accountRef, groupIdHex, expectedRevision, value)
 
     /** Dictation conditionally empties only its unchanged origin; failed or unknown sends restore that exact text. */
     internal suspend fun sendDictationTranscriptIfOriginUnchanged(request: ConversationDictationSendRequest): Boolean {
@@ -4496,13 +4496,15 @@ class WhiteNoiseAppState private constructor(
                     construct = {
                         startupPerformance.stage(PerformancePhase.CLIENT_CONSTRUCTION) {
                             withContext(Dispatchers.IO) {
-                                marmotRuntimeFactory(appContext).also { runtime ->
-                                    // Publish before start so lifecycle consumers
-                                    // and later listener retries can resolve Marmot.
-                                    publishMarmotRuntime(runtime)
-                                    diagnostics.bind(runtime.marmot)
-                                    AvatarImageLoader.attachProfileImageFetcher { url, maxBytes ->
-                                        runtime.marmot.downloadProfileImage(url, maxBytes)
+                                MarmotClientRootGate.withLease {
+                                    marmotRuntimeFactory(appContext).also { runtime ->
+                                        // Publish before start so lifecycle consumers
+                                        // and later listener retries can resolve Marmot.
+                                        publishMarmotRuntime(runtime)
+                                        diagnostics.bind(runtime.marmot)
+                                        AvatarImageLoader.attachProfileImageFetcher { url, maxBytes ->
+                                            runtime.marmot.downloadProfileImage(url, maxBytes)
+                                        }
                                     }
                                 }
                             }
@@ -6733,13 +6735,7 @@ class WhiteNoiseAppState private constructor(
             false
         }
 
-    /**
-     * Archives the current audit files into the app cache for a user-confirmed export.
-     *
-     * The engine paths, file names and archive entries are never logged or included in failures.
-     * Returns null when there is nothing to export or the archive could not be prepared in full;
-     * a partial archive is never returned, so the caller cannot present one as a complete export.
-     */
+    /** Archives audit, dictation, and performance data; empty or partial exports return null. */
     @Suppress("ReturnCount") // Each engine/cache failure is a distinct fail-closed export outcome.
     suspend fun prepareAuditLogArchiveForExport(): java.io.File? {
         val sourcePaths =
@@ -6759,12 +6755,8 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /**
-     * Delete every local audit log file. Each delete is best-effort; the
-     * runtime hot-swaps any live recorder so logging keeps running on a
-     * fresh file when audit logging is currently on. Returns true if at
-     * least one file was successfully removed (or rotated).
-     */
+    /** Clears audit, dictation, and performance files while surfacing native deletion failures. */
+    @Suppress("CyclomaticComplexMethod", "ReturnCount")
     suspend fun deleteAuditLogs(): Boolean {
         var engineFailure: Throwable? = null
         var cacheFailure: Throwable? = null
@@ -6806,14 +6798,15 @@ class WhiteNoiseAppState private constructor(
             presentFailure(R.string.toast_couldnt_delete_audit_logs, "AUDIT_LOG_DELETE", it)
             return false
         }
-        if (anyDeleted) {
+        val deleted = anyDeleted || (preparedDeleted && engineFailure == null)
+        if (deleted) {
             presentTransient(R.string.toast_audit_logs_deleted)
         } else {
             engineFailure?.let {
                 presentFailure(R.string.toast_couldnt_delete_audit_logs, "AUDIT_LOG_DELETE", it)
             } ?: present(R.string.toast_couldnt_delete_audit_logs)
         }
-        return anyDeleted
+        return deleted
     }
 
     fun updateThemeMode(mode: AppThemeMode) {
@@ -8044,26 +8037,21 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Reuses the live native client for a retention preflight when one already exists. */
+    internal fun retentionSweepRuntimeOrNull(): MarmotInterface? = marmotRuntime?.marmot
+
     /**
-     * Background disappearing-message sweep across every signed-in account
-     * (#745). The in-conversation sweep ([ConversationController.start]) only
-     * runs while a chat is open; this is the closed-conversation counterpart,
-     * driven on a coarse cadence by [DisappearingMessageSweepWorker] so a
-     * message that expires while its conversation is closed is still pruned,
-     * its decrypted L2 media still secure-deleted, and a stale tray card still
-     * cleared — without waiting for the user to reopen the chat.
+     * Sweeps closed conversations across signed-in accounts (#745) on the coarse worker cadence.
+     * Expired messages, decrypted L2 media, and stale tray cards are removed without reopening a
+     * conversation; [ConversationController.start] handles the open-conversation path.
      *
-     * The sweep core is engine-owned: one `sweepExpiredRetention` call per
-     * account covers every retention-enabled group with the same clock-skew,
-     * unread-anchor, and scan-cap deferrals Android used to gate app-side,
-     * run atomically with the prune on the account's serialized command
-     * worker. Android keeps only what it owns per pruned group: tray-card
-     * dismissal (#333) and decrypted media-cache eviction (#334).
+     * One engine-owned `sweepExpiredRetention` call per account atomically applies clock-skew,
+     * unread-anchor, and scan-cap deferrals on its serialized command worker. Android handles
+     * tray-card dismissal (#333) and decrypted media-cache eviction (#334) per pruned group.
      *
-     * Best-effort and per-account isolated: a failure on one account is
-     * logged (cancellation re-thrown) and the sweep moves on, so one bad
-     * account can't starve the rest. Bootstraps the runtime first so the
-     * worker can run after a process death with no UI attached.
+     * Failures are isolated per account and logged; cancellation propagates. The worker checks
+     * MDK's account inventory before starting the notification runtime, and eligible accounts
+     * can still bootstrap after process death without a UI.
      */
     suspend fun sweepExpiredDisappearingMessages() {
         ensureNotificationRuntimeStarted()
@@ -11243,7 +11231,11 @@ class WhiteNoiseAppState private constructor(
     }
 
     private fun startBackgroundConnectionService(): Boolean {
-        val started = NotificationStreamForegroundService.start(appContext)
+        val started =
+            NotificationStreamForegroundService.start(
+                appContext,
+                ForegroundStartTrigger.UserToggle,
+            )
         appStateDebug { "background connection service start=$started" }
         return started
     }

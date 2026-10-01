@@ -514,7 +514,8 @@ private fun SettingsDetailRoute(
                 appState = appState,
                 onBack = { onDetailChange(null) },
                 onOpenDiagnostics = onOpenDiagnostics,
-                onOpenRecovery = { onDetailChange(it) },
+                onOpenKeyPackages = { onDetailChange(SettingsDetail.KeyPackages) },
+                onOpenQuarantinedGroups = { onDetailChange(SettingsDetail.QuarantinedGroups) },
                 onOpenDemoChat = onOpenSupportChat,
             )
     }

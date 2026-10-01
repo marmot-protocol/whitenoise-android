@@ -192,7 +192,13 @@ class DeveloperScreenTest {
         appState.updateStreamingDebugMode(true)
         composeRule.setContent {
             WhiteNoiseTheme {
-                DeveloperScreen(appState, onBack = {}, onOpenDiagnostics = {}, onOpenRecovery = {})
+                DeveloperScreen(
+                    appState,
+                    onBack = {},
+                    onOpenDiagnostics = {},
+                    onOpenKeyPackages = {},
+                    onOpenQuarantinedGroups = {},
+                )
             }
         }
         composeRule.onNodeWithTag("developer.mode.switch").assertIsOn().performClick()

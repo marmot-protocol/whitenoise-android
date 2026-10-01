@@ -15,7 +15,6 @@
     <string name="quarantine_member_validation">Üye veya şifreleme durumu doğrulaması başarısız oldu.</string>
     <string name="quarantine_group_record">Grup kaydı yüklenemedi.</string>
     <string name="quarantine_pending_commit">Kesintiye uğrayan grup güncellemesi kurtarılamadı.</string>
-    <string name="quarantine_unknown">Grup güvenli biçimde yüklenemedi.</string>
     <string name="quarantine_recovered">Kurtarma başarılı. Grup sohbet listesine geri dönebilir.</string>
     <string name="quarantine_still_quarantined">Grup hâlâ karantinada. Geçmişi silinmedi.</string>
     <string name="quarantine_retry_failed">Kurtarma tamamlanamadı. Daha sonra tekrar deneyin.</string>

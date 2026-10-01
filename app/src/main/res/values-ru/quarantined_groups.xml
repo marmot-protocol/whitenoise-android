@@ -15,7 +15,6 @@
     <string name="quarantine_member_validation">Проверка участников или состояния шифрования не пройдена.</string>
     <string name="quarantine_group_record">Не удалось загрузить запись группы.</string>
     <string name="quarantine_pending_commit">Не удалось восстановить прерванное обновление группы.</string>
-    <string name="quarantine_unknown">Группу не удалось безопасно загрузить.</string>
     <string name="quarantine_recovered">Восстановление успешно. Группа может вернуться в список чатов.</string>
     <string name="quarantine_still_quarantined">Группа остаётся в карантине. Её история не удалена.</string>
     <string name="quarantine_retry_failed">Не удалось завершить восстановление. Попробуйте позже.</string>

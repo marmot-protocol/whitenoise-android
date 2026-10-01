@@ -15,7 +15,6 @@
     <string name="quarantine_member_validation">La convalida dei membri o dello stato di cifratura non è riuscita.</string>
     <string name="quarantine_group_record">Impossibile caricare il record del gruppo.</string>
     <string name="quarantine_pending_commit">Impossibile recuperare un aggiornamento del gruppo interrotto.</string>
-    <string name="quarantine_unknown">Impossibile caricare il gruppo in sicurezza.</string>
     <string name="quarantine_recovered">Recupero riuscito. Il gruppo può tornare nella lista delle chat.</string>
     <string name="quarantine_still_quarantined">Il gruppo resta in quarantena. La cronologia non è stata eliminata.</string>
     <string name="quarantine_retry_failed">Impossibile completare il recupero. Riprova più tardi.</string>

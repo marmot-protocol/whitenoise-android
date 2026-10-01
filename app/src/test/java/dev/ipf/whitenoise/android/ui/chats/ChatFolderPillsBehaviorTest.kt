@@ -96,7 +96,7 @@ class ChatFolderPillsBehaviorTest {
         composeRule
             .onNodeWithTag(chatListFilterChipTag("folder-0"))
             .performSemanticsAction(SemanticsActions.OnLongClick)
-        composeRule.onNodeWithTag("chats.folders").performScrollToIndex(2)
+        composeRule.onNodeWithTag("chats.folders").performScrollToIndex(1)
         composeRule.onNodeWithTag("chats.manageFolders").performClick()
         assertEquals(listOf("current:folder-0"), edits)
         assertEquals(1, managed)

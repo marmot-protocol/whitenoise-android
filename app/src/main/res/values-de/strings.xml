@@ -539,6 +539,7 @@
     <string name="performance_logs">Leistungsprotokolle</string>
     <string name="performance_logs_description">Erfasst vorübergehend datenschutzfreundliche Zeitmessungen auf diesem Gerät. Endet nach 30 Minuten oder beim Neustart der App.</string>
     <string name="performance_logs_active">Aktiv · noch %1$d Min.</string>
+    <string name="performance_logs_export_included">Diese Sitzung wird in den nächsten Export gespeicherter Diagnoseprotokolle aufgenommen.</string>
     <string name="performance_logs_inactive">Inaktiv</string>
     <string name="copy_performance_logs">Leistungsprotokolle kopieren</string>
     <string name="copy_performance_logs_detail">Kopiert die begrenzten, datenschutzfreundlichen Ereignisse der aktuellen oder letzten Sitzung.</string>
@@ -1031,6 +1032,15 @@
     <string name="share_user_view">Profil ansehen</string>
     <string name="attach_options">Anhang hinzufügen</string>
     <string name="media_preview_position_badge">Sendeposition %1$d</string>
+    <string name="contact_view">Kontakt ansehen</string>
+    <string name="contact_add">Zu Kontakten hinzufügen</string>
+    <string name="contact_save_vcf">VCF speichern</string>
+    <string name="contact_view_short">Ansehen</string>
+    <string name="contact_add_short">Hinzuf.</string>
+    <string name="contact_save_short">Sichern</string>
+    <string name="contact_invalid_vcard">Diese Kontaktdatei ist ungültig oder zu groß</string>
+    <string name="contact_action_failed">Kontaktaktion fehlgeschlagen</string>
+    <string name="contact_vcf_saved">VCF gespeichert</string>
     <string name="share_contact_title">Kontakt teilen</string>
     <string name="share_location_title">Standort teilen</string>
     <string name="location_use_current">Aktuellen Standort verwenden</string>
@@ -1261,6 +1271,10 @@
     <string name="clear_search">Suche löschen</string>
     <string name="chat_list_action_add_to_folder">Zu Ordner hinzufügen</string>
     <string name="chat_folder_included_by_rule">Durch die Regeln dieses Ordners enthalten</string>
+    <plurals name="chat_pill_unread_messages_count">
+        <item quantity="one">%1$s ungelesene Nachricht</item>
+        <item quantity="other">%1$s ungelesene Nachrichten</item>
+    </plurals>
     <plurals name="chat_folder_chat_count">
         <item quantity="one">%1$d Chat</item>
         <item quantity="other">%1$d Chats</item>
@@ -1823,7 +1837,7 @@
     <string name="dictation_result_paste_description">Text vor dem Senden prüfen oder bearbeiten</string>
     <string name="dictation_result_send">Nachricht senden</string>
     <string name="dictation_result_send_description">Sendet nur, wenn Chat und Entwurf unverändert sind</string>
-    <string name="dictation_send_safety_note">Ändert sich der Chat oder der Entwurf vor dem Senden, bleibt der Text in deinem Entwurf, damit du ihn prüfen kannst.</string>
+    <string name="dictation_send_safety_note">Ändert sich der Chat oder Entwurf vor dem Senden, bleibt das Diktat ungesendet. Versuche das Senden erneut oder wähle Einfügen, um es zu prüfen.</string>
     <string name="dictation_microphone_muted">Mikrofonzugriff ist deaktiviert</string>
     <string name="dictation_microphone_muted_help">Aktiviere den Mikrofonzugriff in den Android-Datenschutzeinstellungen oder den Schnelleinstellungen und versuche das Diktieren erneut.</string>
     <!-- Imported-account preflight (#2519). -->

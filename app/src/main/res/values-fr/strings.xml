@@ -539,6 +539,7 @@
     <string name="performance_logs">Journaux de performances</string>
     <string name="performance_logs_description">Collecte temporairement des mesures respectueuses de la confidentialité sur cet appareil. S’arrête après 30 minutes ou au redémarrage de l’application.</string>
     <string name="performance_logs_active">Actif · %1$d min restantes</string>
+    <string name="performance_logs_export_included">Cette session sera incluse dans la prochaine exportation des journaux de diagnostic enregistrés.</string>
     <string name="performance_logs_inactive">Inactif</string>
     <string name="copy_performance_logs">Copier les journaux de performances</string>
     <string name="copy_performance_logs_detail">Copie les événements limités et respectueux de la confidentialité de la session actuelle ou la plus récente.</string>
@@ -1031,6 +1032,15 @@
     <string name="share_user_view">Voir le profil</string>
     <string name="attach_options">Ajouter une pièce jointe</string>
     <string name="media_preview_position_badge">Position d\'envoi %1$d</string>
+    <string name="contact_view">Voir le contact</string>
+    <string name="contact_add">Ajouter aux contacts</string>
+    <string name="contact_save_vcf">Enregistrer le VCF</string>
+    <string name="contact_view_short">Voir</string>
+    <string name="contact_add_short">Ajouter</string>
+    <string name="contact_save_short">Enreg.</string>
+    <string name="contact_invalid_vcard">Ce fichier de contact est invalide ou trop volumineux</string>
+    <string name="contact_action_failed">Impossible de terminer cette action</string>
+    <string name="contact_vcf_saved">VCF enregistré</string>
     <string name="share_contact_title">Partager le contact</string>
     <string name="share_location_title">Partager la position</string>
     <string name="location_use_current">Utiliser la position actuelle</string>
@@ -1263,6 +1273,10 @@
     <string name="clear_search">Effacer la recherche</string>
     <string name="chat_list_action_add_to_folder">Ajouter à un dossier</string>
     <string name="chat_folder_included_by_rule">Inclus par les règles de ce dossier</string>
+    <plurals name="chat_pill_unread_messages_count">
+        <item quantity="one">%1$s message non lu</item>
+        <item quantity="other">%1$s messages non lus</item>
+    </plurals>
     <plurals name="chat_folder_chat_count">
         <item quantity="one">%1$d discussion</item>
         <item quantity="other">%1$d discussions</item>

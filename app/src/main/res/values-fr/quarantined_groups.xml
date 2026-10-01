@@ -15,7 +15,6 @@
     <string name="quarantine_member_validation">La validation des membres ou de l’état de chiffrement a échoué.</string>
     <string name="quarantine_group_record">Impossible de charger le dossier du groupe.</string>
     <string name="quarantine_pending_commit">Impossible de récupérer une mise à jour du groupe interrompue.</string>
-    <string name="quarantine_unknown">Le groupe n’a pas pu être chargé en toute sécurité.</string>
     <string name="quarantine_recovered">Récupération réussie. Le groupe peut revenir dans la liste des discussions.</string>
     <string name="quarantine_still_quarantined">Le groupe reste en quarantaine. Son historique n’a pas été supprimé.</string>
     <string name="quarantine_retry_failed">La récupération n’a pas pu être terminée. Réessayez plus tard.</string>

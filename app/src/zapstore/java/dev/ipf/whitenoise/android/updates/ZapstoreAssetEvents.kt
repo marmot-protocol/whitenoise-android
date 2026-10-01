@@ -36,11 +36,12 @@ internal object ZapstoreAssetEvents {
         appId: String,
         publisherPubkey: String,
         releaseDTag: String,
+        verifyEvent: (NostrEvent) -> Boolean = NostrEventVerifier::verifies,
     ): Set<String>? {
         if (event.kind != KIND_ZAPSTORE_RELEASE) return null
         if (event.pubkey != publisherPubkey) return null
         if (event.firstTagValue("d") != releaseDTag) return null
-        if (!NostrEventVerifier.verifies(event)) return null
+        if (!verifyEvent(event)) return null
         if (ZapstoreAddress.versionFromReleaseDTag(releaseDTag, appId) == null) return null
         val ids =
             event.tags
@@ -58,12 +59,12 @@ internal object ZapstoreAssetEvents {
         version: String,
         platformId: String,
         publisherPubkey: String,
+        verifyEvent: (NostrEvent) -> Boolean = NostrEventVerifier::verifies,
     ): ZapstoreApkAsset? {
         if (event.kind != KIND_ZAPSTORE_ASSET) return null
         if (event.pubkey != publisherPubkey) return null
         if (!event.id.equals(referencedId, ignoreCase = true)) return null
-        if (!NostrEventVerifier.verifies(event)) return null
-        if (!event.computedIdHex().equals(referencedId, ignoreCase = true)) return null
+        if (!verifyEvent(event)) return null
         return parseApkAssetTags(
             event = event,
             appId = appId,
@@ -137,6 +138,7 @@ internal object ZapstoreAssetEvents {
         version: String,
         platformId: String,
         publisherPubkey: String,
+        verifyEvent: (NostrEvent) -> Boolean = NostrEventVerifier::verifies,
     ): ZapstoreApkAsset? {
         val matches =
             events
@@ -150,6 +152,7 @@ internal object ZapstoreAssetEvents {
                         version = version,
                         platformId = platformId,
                         publisherPubkey = publisherPubkey,
+                        verifyEvent = verifyEvent,
                     )
                 }.toList()
         return matches.singleOrNull()

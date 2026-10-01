@@ -5,6 +5,17 @@ import dev.ipf.marmotkit.GroupSystemEventFfi
 import dev.ipf.marmotkit.GroupSystemEventProvenanceFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 
+/**
+ * How a chat-list preview names the member a system row affected: [selfAccountIdHex] is the reader, so
+ * their own change takes the localized "You" form, and [subjectName] resolves anyone else's local label
+ * (nickname, cached profile name or a shortened npub). It is only ever asked about an authenticated
+ * subject id, never about a name or id claimed by a member-authored payload.
+ */
+class GroupSystemPreviewNames(
+    val selfAccountIdHex: String?,
+    val subjectName: (accountIdHex: String) -> String?,
+)
+
 data class GroupRenameDiffNames(
     val oldName: String,
     val newName: String,
@@ -415,8 +426,10 @@ object GroupSystemEvents {
     ): Boolean = accountIdHex != null && candidateHex != null && candidateHex.equals(accountIdHex, ignoreCase = true)
 
     /**
-     * Name-free summary for chat-list previews and notifications, where no
-     * profile resolution is available: the localized passive form.
+     * Passive summary for chat-list previews and notifications. Without [names] it is name-free, as
+     * notifications need. With [names], an authenticated membership or admin row names its affected
+     * subject — never the actor, so "Alice removed Bob" previews as "Bob was removed" — and uses the
+     * self form when that subject is the reader (#1581). Member-authored rows stay neutral either way.
      */
     fun previewText(
         plaintext: String,
@@ -424,9 +437,20 @@ object GroupSystemEvents {
         // MarmotKit 0.10.1 projects the chat-list preview's system event with its provenance; when
         // present it is preferred over parsing the row's plaintext, exactly as timeline rows do.
         structured: GroupSystemEventFfi? = null,
+        names: GroupSystemPreviewNames? = null,
     ): String {
         val event = resolveAuthenticatedStateProjection(plaintext, structured) ?: return copy.fallback
-        return summary(event, actorName = null, subjectName = null, copy = copy)
+        val subject = event.subject?.takeIf { names != null && it.isNotBlank() }
+        return summary(
+            event = event,
+            actorName = null,
+            subjectName =
+                subject?.let {
+                    preferredName(requireNotNull(names).subjectName(it), event.subjectDisplayName)
+                },
+            subjectIsSelf = isSelf(names?.selfAccountIdHex, subject),
+            copy = copy,
+        )
     }
 
     /** Name-free summary that preserves authenticated state projections. */

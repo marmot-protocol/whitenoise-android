@@ -8,11 +8,11 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.marmotkit.AppGroupHydrationQuarantineReasonFfi
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestDraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.QuarantineRecoveryOutcome
-import dev.ipf.whitenoise.android.state.QuarantinedGroupReason
 import dev.ipf.whitenoise.android.state.QuarantinedGroupRow
 import dev.ipf.whitenoise.android.state.QuarantinedGroupsUiState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -88,7 +88,7 @@ class QuarantinedGroupsScreenTest {
         content(
             QuarantinedGroupsUiState(
                 loaded = true,
-                rows = listOf(QuarantinedGroupRow(id, QuarantinedGroupReason.Unknown)),
+                rows = listOf(QuarantinedGroupRow(id, AppGroupHydrationQuarantineReasonFfi.GROUP_RECORD_LOAD_FAILED)),
             ),
             recover = actions::add,
         )
@@ -99,7 +99,7 @@ class QuarantinedGroupsScreenTest {
     }
 
     @Test fun activeRecoveryDisablesBothRefreshAndAnotherRetry() {
-        val row = QuarantinedGroupRow("a".repeat(64), QuarantinedGroupReason.StoredState)
+        val row = QuarantinedGroupRow("a".repeat(64), AppGroupHydrationQuarantineReasonFfi.OPEN_MLS_LOAD_FAILED)
         content(QuarantinedGroupsUiState(loaded = true, rows = listOf(row), recoveringGroup = row.groupId))
         compose.onNodeWithTag("quarantine.refresh").assertIsNotEnabled()
         compose.onNodeWithTag("quarantine.recover").assertIsNotEnabled()

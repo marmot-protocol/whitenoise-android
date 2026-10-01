@@ -1,8 +1,10 @@
 package dev.ipf.whitenoise.android.diagnostics
 
+import android.content.Context
 import android.os.SystemClock
 import android.util.Log
 import dev.ipf.whitenoise.android.BuildConfig
+import java.io.File
 import java.util.concurrent.atomic.AtomicLong
 
 private const val ROUTINE_SPAN_THRESHOLD_MS = 5L
@@ -268,6 +270,7 @@ internal class PerformanceDiagnosticEmitter(
     mdkRevision: String,
     private val nowMs: () -> Long,
     sink: (String) -> Unit,
+    private val onSessionStart: () -> Unit = {},
 ) {
     private val appRevision = sanitizePerformanceRevision(appRevision)
     private val mdkRevision = sanitizePerformanceRevision(mdkRevision)
@@ -295,6 +298,7 @@ internal class PerformanceDiagnosticEmitter(
             lastTrace = null
             droppedSummaryEmitted = false
             output.clear()
+            onSessionStart()
         }
         return statusAt(now)
     }
@@ -523,15 +527,21 @@ internal class PerformanceDiagnosticEmitter(
     }
 }
 
-/** Process-local facade. It has no disk, preference, or network sink. */
+/** Process-local session control with a private bounded file sink beside logcat. */
 internal object PerformanceDiagnostics {
+    @Volatile
+    private var fileStore: PerformanceDiagnosticFileStore? = null
     private val emitter =
         PerformanceDiagnosticEmitter(
             available = BuildConfig.ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS,
             appRevision = BuildConfig.APP_SHORT_SHA,
             mdkRevision = BuildConfig.MDK_SHORT_SHA,
             nowMs = SystemClock::elapsedRealtime,
-            sink = { line -> Log.i(LOG_TAG, line) },
+            sink = { line ->
+                Log.i(LOG_TAG, line)
+                fileStore?.append(line)
+            },
+            onSessionStart = { fileStore?.reset() },
         )
 
     init {
@@ -539,6 +549,18 @@ internal object PerformanceDiagnostics {
         // used by the state-preserving performance runner. Ordinary debug,
         // preview, and staging builds remain inactive until the UI toggle.
         if (BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS) emitter.start()
+    }
+
+    /** Binds the process-local emitter to a private diagnostics file during application startup. */
+    @Synchronized
+    fun bind(context: Context) {
+        if (fileStore != null) return
+        val store = PerformanceDiagnosticFileStore(File(context.filesDir, "diagnostics"))
+        fileStore = store
+        if (emitter.status().active) {
+            store.reset()
+            emitter.output.snapshot().forEach(store::append)
+        }
     }
 
     /** Enables one time-bounded, process-local diagnostic session when supported by the build. */
@@ -552,6 +574,17 @@ internal object PerformanceDiagnostics {
 
     /** Supplies bounded sanitized evidence to the explicit in-app support copy action. */
     fun exportLines(): List<String> = emitter.output.snapshot()
+
+    /** Returns a flushed file snapshot, including an active session, for the manual ZIP export. */
+    fun storedLogForExport(): ByteArray? = fileStore?.readForExport()
+
+    /** Removes the stored performance session when the user clears diagnostic logs. */
+    fun clearStoredLog(): Boolean =
+        synchronized(emitter) {
+            val removed = fileStore?.delete() ?: false
+            emitter.output.clear()
+            removed
+        }
 
     /** Indicates whether a local diagnostic session currently accepts events. */
     fun isActive(): Boolean = status().active

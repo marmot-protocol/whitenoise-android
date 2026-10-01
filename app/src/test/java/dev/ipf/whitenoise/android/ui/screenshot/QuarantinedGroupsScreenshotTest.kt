@@ -11,8 +11,8 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.marmotkit.AppGroupHydrationQuarantineReasonFfi
 import dev.ipf.whitenoise.android.state.QuarantineRecoveryOutcome
-import dev.ipf.whitenoise.android.state.QuarantinedGroupReason
 import dev.ipf.whitenoise.android.state.QuarantinedGroupRow
 import dev.ipf.whitenoise.android.state.QuarantinedGroupsUiState
 import dev.ipf.whitenoise.android.ui.settings.QuarantinedGroupsContent
@@ -60,8 +60,8 @@ class QuarantinedGroupsScreenshotTest {
             loaded = true,
             rows =
                 listOf(
-                    QuarantinedGroupRow(GROUP, QuarantinedGroupReason.StoredState),
-                    QuarantinedGroupRow("b".repeat(64), QuarantinedGroupReason.PendingCommit),
+                    QuarantinedGroupRow(GROUP, AppGroupHydrationQuarantineReasonFfi.OPEN_MLS_LOAD_FAILED),
+                    QuarantinedGroupRow("b".repeat(64), AppGroupHydrationQuarantineReasonFfi.PENDING_COMMIT_RECOVERY_FAILED),
                 ),
         )
 

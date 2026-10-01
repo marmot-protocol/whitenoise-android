@@ -10,7 +10,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,7 +30,6 @@ import dev.ipf.whitenoise.android.state.ReviewDemoStatus
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
-import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.PillShape
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.launch
@@ -55,23 +53,40 @@ internal fun developerBuildFacts(staging: Boolean): DeveloperBuildFacts {
  * the debugging surfaces the switch reveals, and the build this app was made from. Telemetry and audit logs
  * stay in Privacy & Security — they are privacy controls, not developer tools.
  */
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongParameterList")
 @Composable
 internal fun DeveloperScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
     onOpenDiagnostics: () -> Unit,
-    onOpenRecovery: (SettingsDetail) -> Unit,
+    onOpenKeyPackages: () -> Unit,
+    onOpenQuarantinedGroups: () -> Unit,
     onOpenDemoChat: (ChatListItem) -> Unit = {},
 ) {
     val demo = appState.appReviewDemo
-    val openDemo = rememberDemoChatOpener(appState, onOpenDemoChat)
+    val scope = rememberCoroutineScope()
+    val openDemo: (String, String) -> Unit = { account, group ->
+        scope.launch {
+            val previous = appState.activeAccountRef
+            val generation = appState.runtimeGeneration
+            val activated =
+                previous == account ||
+                    appState.setActiveAccount(account, shouldActivate = {
+                        appState.runtimeGeneration == generation && appState.activeAccountRef == previous
+                    })
+            if (activated && appState.activeAccountRef == account) {
+                runCatchingCancellable { appState.preloadNotificationChatListItem(account, group) }
+                    .onSuccess(onOpenDemoChat)
+                    .onFailure { demo.reportOpenFailure() }
+            } else {
+                demo.reportOpenFailure()
+            }
+        }
+    }
     var seedDialogOpen by remember { mutableStateOf(false) }
     val quarantineSummary =
         if (appState.developerMode) {
-            val controller = rememberQuarantinedGroupsController(appState)
-            val state by controller.state.collectAsState()
-            quarantinedGroupsSummary(state)
+            rememberQuarantinedGroupsSummary(appState)
         } else {
             null
         }
@@ -83,8 +98,8 @@ internal fun DeveloperScreen(
         onStreamingDebugChange = { appState.updateStreamingDebugMode(it) },
         onBack = onBack,
         onOpenDiagnostics = onOpenDiagnostics,
-        onOpenKeyPackages = { onOpenRecovery(SettingsDetail.KeyPackages) },
-        onOpenQuarantinedGroups = { onOpenRecovery(SettingsDetail.QuarantinedGroups) },
+        onOpenKeyPackages = onOpenKeyPackages,
+        onOpenQuarantinedGroups = onOpenQuarantinedGroups,
         quarantineSummary = quarantineSummary,
         demoStatus = demo.status,
         demoAvailable = demo.canBegin,
@@ -402,33 +417,6 @@ private fun DeveloperStagingBadge() {
                 style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
             )
-        }
-    }
-}
-
-@Composable
-private fun rememberDemoChatOpener(
-    appState: WhiteNoiseAppState,
-    onOpenDemoChat: (ChatListItem) -> Unit,
-): (String, String) -> Unit {
-    val demo = appState.appReviewDemo
-    val scope = rememberCoroutineScope()
-    return { account, group ->
-        scope.launch {
-            val previous = appState.activeAccountRef
-            val generation = appState.runtimeGeneration
-            val activated =
-                previous == account ||
-                    appState.setActiveAccount(account, shouldActivate = {
-                        appState.runtimeGeneration == generation && appState.activeAccountRef == previous
-                    })
-            if (activated && appState.activeAccountRef == account) {
-                runCatchingCancellable { appState.preloadNotificationChatListItem(account, group) }
-                    .onSuccess(onOpenDemoChat)
-                    .onFailure { demo.reportOpenFailure() }
-            } else {
-                demo.reportOpenFailure()
-            }
         }
     }
 }
