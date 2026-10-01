@@ -3294,7 +3294,11 @@ internal fun ConversationScreen(
     // the pointer — scroll-up cannot regress the count. Settle-gated
     // (`!isScrollInProgress`) avoids per-frame FFI hops while scrolling.
     val readHostResumed =
-        resumeLifecycleOwner?.lifecycle?.currentStateFlow?.collectAsState()?.value == Lifecycle.State.RESUMED
+        resumeLifecycleOwner
+            ?.lifecycle
+            ?.currentStateFlow
+            ?.collectAsState()
+            ?.value == Lifecycle.State.RESUMED
     val currentReadHostResumed by rememberUpdatedState(readHostResumed)
     LaunchedEffect(listState, controller) {
         snapshotFlow {

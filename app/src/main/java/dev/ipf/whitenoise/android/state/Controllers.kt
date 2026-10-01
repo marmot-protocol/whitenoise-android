@@ -11748,6 +11748,7 @@ class ConversationController(
     ) {
         val consumeManualReminder = shouldConsumeManualUnreadReminder(account)
         if (trimmed == lastSubmittedReadMessageId && !consumeManualReminder) return
+        val readWasAlreadyConfirmed = trimmed == latestChatListRow?.lastReadMessageIdHex
         val previousRequestId = lastReadRequestId
         val requestId = ++nextReadRequestId
         lastReadRequestId = requestId
@@ -11775,8 +11776,11 @@ class ConversationController(
         if (lastReadRequestId == requestId && consumeManualReminder) {
             manualUnreadReminderConsumed = true
         }
-        val anchoredAtSeconds = (clockMillis() / 1_000L).toULong()
-        anchorReadExpiryUpTo(trimmed, anchoredAtSeconds)
+        // A visit-level attention acknowledgement must not restart an
+        // already-confirmed message's disappearing deadline after reopening.
+        if (!readWasAlreadyConfirmed) {
+            anchorReadExpiryUpTo(trimmed, (clockMillis() / 1_000L).toULong())
+        }
         runCatchingCancellable {
             appState.dismissConversationNotifications(account, group.groupIdHex)
         }.onFailure {

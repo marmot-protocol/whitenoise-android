@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.TimelinePageFfi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
@@ -466,6 +467,38 @@ class ConversationVisibleReadIntegrationTest {
             }
         }
 
+    @Test
+    fun reopeningAtSavedReadWatermarkDoesNotExtendNativeDisappearingDeadline() =
+        runBlocking {
+            var nowMillis = 90_000L
+            val reminder = reminderRow()
+            val fixture = fixture(reminder) { reminder.copy(manuallyMarkedUnread = false, hasUnread = false) }
+            try {
+                fixture.bootstrap()
+                val controller = controller(fixture.appState, reminder, clockMillis = { nowMillis })
+                val record =
+                    timelineRecord(MESSAGE_ID, timelineAt = 40uL).copy(
+                        direction = "sent",
+                        retentionSeconds = 60uL,
+                        retentionExpiresAt = 100uL,
+                    )
+                val page = TimelinePageFfi(messages = listOf(record), hasMoreBefore = false, hasMoreAfter = false)
+                controller.applyTimelinePage(page, replaceWindow = true, updatePagination = true)
+                assertEquals(listOf(MESSAGE_ID), timelineMessageIds(controller))
+
+                nowMillis = 95_000L
+                controller.markReadUpTo(MESSAGE_ID)
+                assertEquals(1, fixture.markReadCalls.get())
+                assertFalse(controller.latestChatListRow!!.manuallyMarkedUnread)
+
+                nowMillis = 105_000L
+                controller.applyTimelinePage(page, replaceWindow = true, updatePagination = true)
+                assertTrue("the native deadline must still hide the message", timelineMessageIds(controller).isEmpty())
+            } finally {
+                closeFixture(fixture)
+            }
+        }
+
     private fun activateConversation(
         state: WhiteNoiseAppState,
         row: ChatListRowFfi,
@@ -532,6 +565,7 @@ class ConversationVisibleReadIntegrationTest {
     private fun controller(
         state: WhiteNoiseAppState,
         row: ChatListRowFfi,
+        clockMillis: () -> Long = System::currentTimeMillis,
     ) = ConversationController(
         appState = state,
         initialGroup = conversationTimelineTestGroup(),
@@ -539,6 +573,7 @@ class ConversationVisibleReadIntegrationTest {
         initialChatListRow = row,
         initialTimelinePreview = row.lastMessage,
         accountRefOverride = ConversationTimelineTestIds.ACCOUNT_REF,
+        clockMillis = clockMillis,
     ).also { controller ->
         mountedConversations += controller
         state.attachConversationController(controller)
