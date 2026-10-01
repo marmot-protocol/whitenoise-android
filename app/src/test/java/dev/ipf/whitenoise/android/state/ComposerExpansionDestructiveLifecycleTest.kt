@@ -784,13 +784,7 @@ class ComposerExpansionDestructiveLifecycleTest {
                 "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
                 "selectedMessageDraft" -> SelectedMessageDraftFfi(emptyDraftRevision, null)
                 "localSendStatus" -> null
-                "sendTextWithClientToken" -> {
-                    val summary = countedSendResult(calls, sendResult)
-                    LocalSendAcceptanceFfi(
-                        clientToken = arguments!![3] as String,
-                        messageIdHex = summary.messageIds.single(),
-                    )
-                }
+                "sendTextWithClientToken" -> acceptedTextSend(arguments, countedSendResult(calls, sendResult))
                 "sendText" -> countedSendResult(calls, sendResult)
                 "groupMembers" -> if (soleMember) members().take(1) else members()
                 "listMedia" -> emptyList<Any>()
@@ -834,6 +828,15 @@ class ComposerExpansionDestructiveLifecycleTest {
             }
         } as MarmotInterface
     }
+
+    private fun acceptedTextSend(
+        arguments: Array<out Any?>?,
+        summary: SendSummaryFfi,
+    ): LocalSendAcceptanceFfi =
+        LocalSendAcceptanceFfi(
+            clientToken = arguments!![3] as String,
+            messageIdHex = summary.messageIds.single(),
+        )
 
     private fun countedSendResult(
         calls: LifecycleCalls,
