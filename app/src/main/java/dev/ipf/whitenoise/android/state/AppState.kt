@@ -6732,7 +6732,7 @@ class WhiteNoiseAppState private constructor(
         }
 
     /**
-     * Archives the current audit files into the app cache for a user-confirmed export.
+     * Archives current audit files and a flushed performance-session snapshot for a confirmed export.
      *
      * The engine paths, file names and archive entries are never logged or included in failures.
      * Returns null when there is nothing to export or the archive could not be prepared in full;
@@ -6758,11 +6758,13 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Delete every local audit log file. Each delete is best-effort; the
+     * Delete every local audit and stored performance log file. Each delete is best-effort; the
      * runtime hot-swaps any live recorder so logging keeps running on a
      * fresh file when audit logging is currently on. Returns true if at
      * least one file was successfully removed (or rotated).
+     * Distinct native, cache, and performance-file outcomes keep partial failures visible.
      */
+    @Suppress("CyclomaticComplexMethod", "ReturnCount")
     suspend fun deleteAuditLogs(): Boolean {
         var engineFailure: Throwable? = null
         var cacheFailure: Throwable? = null
@@ -6804,14 +6806,15 @@ class WhiteNoiseAppState private constructor(
             presentFailure(R.string.toast_couldnt_delete_audit_logs, "AUDIT_LOG_DELETE", it)
             return false
         }
-        if (anyDeleted) {
+        val deleted = anyDeleted || (preparedDeleted && engineFailure == null)
+        if (deleted) {
             presentTransient(R.string.toast_audit_logs_deleted)
         } else {
             engineFailure?.let {
                 presentFailure(R.string.toast_couldnt_delete_audit_logs, "AUDIT_LOG_DELETE", it)
             } ?: present(R.string.toast_couldnt_delete_audit_logs)
         }
-        return anyDeleted
+        return deleted
     }
 
     fun updateThemeMode(mode: AppThemeMode) {

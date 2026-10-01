@@ -575,6 +575,7 @@
     <string name="performance_logs">Журналы производительности</string>
     <string name="performance_logs_description">Временно собирает на этом устройстве события измерения времени без личных данных. Отключается через 30 минут или при перезапуске приложения.</string>
     <string name="performance_logs_active">Активно · осталось %1$d мин</string>
+    <string name="performance_logs_export_included">Этот сеанс будет включён в следующий экспорт сохранённых диагностических журналов.</string>
     <string name="performance_logs_inactive">Неактивно</string>
     <string name="copy_performance_logs">Копировать журналы производительности</string>
     <string name="copy_performance_logs_detail">Копирует ограниченный набор событий без личных данных из текущего или последнего сеанса.</string>

@@ -107,6 +107,25 @@ class AuditLogShareTest {
         assertEquals(mapOf("audit.jsonl" to "one", "audit-b.jsonl" to "two"), archive.entries())
     }
 
+    /** A flushed WNPerf snapshot shares the same explicit archive, even without native audit files. */
+    @Test
+    fun prepareAuditLogArchiveIncludesPerformanceSessionWithAndWithoutAuditFiles() {
+        val audit = temporaryFolder.newFile("audit.jsonl").apply { writeText("audit") }
+        val cache = temporaryFolder.newFolder("performance-cache")
+        val performance = "schema=2 op=app_start phase=accepted\n".toByteArray()
+
+        val combined =
+            prepareAuditLogArchive(cache, temporaryFolder.root, listOf(audit.absolutePath), performance)
+        assertEquals(
+            mapOf("performance-session.log" to performance.decodeToString(), "audit.jsonl" to "audit"),
+            combined.entries(),
+        )
+
+        val onlyPerformance =
+            prepareAuditLogArchive(cache, temporaryFolder.root, emptyList(), performance)
+        assertEquals(mapOf("performance-session.log" to performance.decodeToString()), onlyPerformance.entries())
+    }
+
     /** An allowed root reached through a filesystem alias is still the same confined root. */
     @Test
     fun prepareAuditLogArchiveAcceptsTheConfiguredRootThroughItsFilesystemAlias() {

@@ -20408,6 +20408,15 @@
         ]
       },
       {
+        "surface": "string:performance_logs_export_included",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.performance_logs_export_included",
+        "test_ids": [
+          "SET-021",
+          "SEC-009"
+        ]
+      },
+      {
         "surface": "string:performance_logs_description",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.performance_logs_description",

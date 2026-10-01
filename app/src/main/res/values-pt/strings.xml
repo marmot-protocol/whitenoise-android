@@ -539,6 +539,7 @@
     <string name="performance_logs">Registos de desempenho</string>
     <string name="performance_logs_description">Recolhe temporariamente eventos de temporização que preservam a privacidade neste dispositivo. Para após 30 minutos ou ao reiniciar a aplicação.</string>
     <string name="performance_logs_active">Ativo · faltam %1$d min</string>
+    <string name="performance_logs_export_included">Esta sessão será incluída na próxima exportação dos registos de diagnóstico armazenados.</string>
     <string name="performance_logs_inactive">Inativo</string>
     <string name="copy_performance_logs">Copiar registos de desempenho</string>
     <string name="copy_performance_logs_detail">Copia os eventos limitados e privados da sessão atual ou mais recente.</string>

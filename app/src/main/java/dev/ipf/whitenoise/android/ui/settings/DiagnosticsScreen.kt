@@ -591,6 +591,7 @@ private fun PerformanceDiagnosticsGroup(
         }
     }
     SettingsExplainer(stringResource(R.string.performance_logs_description))
+    if (status.active) SettingsExplainer(stringResource(R.string.performance_logs_export_included))
 }
 
 @Composable

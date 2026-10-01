@@ -539,6 +539,7 @@
     <string name="performance_logs">Registros de rendimiento</string>
     <string name="performance_logs_description">Recopila temporalmente eventos de tiempo que respetan la privacidad en este dispositivo. Se detiene tras 30 minutos o al reiniciar la app.</string>
     <string name="performance_logs_active">Activo · quedan %1$d min</string>
+    <string name="performance_logs_export_included">Esta sesión se incluirá en la próxima exportación de registros de diagnóstico almacenados.</string>
     <string name="performance_logs_inactive">Inactivo</string>
     <string name="copy_performance_logs">Copiar registros de rendimiento</string>
     <string name="copy_performance_logs_detail">Copia los eventos limitados y respetuosos con la privacidad de la sesión actual o más reciente.</string>
