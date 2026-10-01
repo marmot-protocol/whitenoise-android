@@ -126,10 +126,14 @@
     <string name="chat_row_action_delete_group">删除群组</string>
     <string name="chat_row_action_delete_chat">删除对话</string>
     <string name="delete_chat_dialog_title">删除对话？</string>
-    <string name="delete_chat_dialog_message">从此设备移除此对话？如果你仍是成员，将先退出对话。</string>
+    <string name="delete_chat_dialog_message">从此设备删除此对话？</string>
     <string name="delete_group_dialog_title">删除群组？</string>
-    <string name="delete_group_dialog_message">从此设备移除此群组？如果你仍是成员，将先退出群组。</string>
+    <string name="delete_group_dialog_message">从此设备删除此群组？</string>
     <string name="delete_group_confirm">删除</string>
+    <string name="delete_from_device">从此设备删除</string>
+    <string name="leave_and_delete">退出并删除</string>
+    <string name="leave_and_delete_message">退出此群组并从此设备删除聊天记录？</string>
+    <string name="toast_left_chat_delete_failed">已退出群组，但本地删除失败。</string>
     <string name="group_reset_action">重置并等待新邀请</string>
     <string name="group_reset_dialog_title">在此设备上重置此群组？</string>
     <string name="group_reset_dialog_message">White Noise 仅会在此设备上清除该群组的历史记录和加密状态，不会向群组发送任何内容。只有当管理员在此次重置后发送新的邀请时，你才会重新加入。</string>
@@ -160,7 +164,7 @@
     </plurals>
     <string name="message_selection_action_delete">删除所选消息</string>
     <plurals name="chat_list_bulk_delete_confirm">
-        <item quantity="other">从此设备删除 %1$d 个聊天？</item>
+        <item quantity="other">删除 %1$d 个对话？此操作不会退出对话。</item>
     </plurals>
     <plurals name="toast_chat_list_chats_archived">
         <item quantity="other">已归档 %1$d 个聊天</item>

@@ -138,10 +138,14 @@
     <string name="chat_row_action_delete_group">Удалить группу</string>
     <string name="chat_row_action_delete_chat">Удалить чат</string>
     <string name="delete_chat_dialog_title">Удалить чат?</string>
-    <string name="delete_chat_dialog_message">Удалить этот чат с этого устройства? Если вы ещё участник, сначала вы покинете чат.</string>
+    <string name="delete_chat_dialog_message">Удалить этот чат с этого устройства?</string>
     <string name="delete_group_dialog_title">Удалить группу?</string>
-    <string name="delete_group_dialog_message">Удалить эту группу с этого устройства? Если вы ещё участник, сначала вы покинете группу.</string>
+    <string name="delete_group_dialog_message">Удалить эту группу с этого устройства?</string>
     <string name="delete_group_confirm">Удалить</string>
+    <string name="delete_from_device">Удалить с этого устройства</string>
+    <string name="leave_and_delete">Выйти и удалить</string>
+    <string name="leave_and_delete_message">Выйти из группы и удалить её историю с этого устройства?</string>
+    <string name="toast_left_chat_delete_failed">Вы вышли из группы. Не удалось удалить локальную историю.</string>
     <string name="group_reset_action">Сбросить и ждать новое приглашение</string>
     <string name="group_reset_dialog_title">Сбросить эту группу на этом устройстве?</string>
     <string name="group_reset_dialog_message">White Noise удалит историю и состояние шифрования этой группы только на этом устройстве. В группу ничего не отправляется. Вы вернётесь в неё только после нового приглашения, созданного администратором после сброса.</string>
@@ -178,10 +182,10 @@
     </plurals>
     <string name="message_selection_action_delete">Удалить выбранные сообщения</string>
     <plurals name="chat_list_bulk_delete_confirm">
-        <item quantity="one">Удалить %1$d чат с этого устройства?</item>
-        <item quantity="few">Удалить %1$d чата с этого устройства?</item>
-        <item quantity="many">Удалить %1$d чатов с этого устройства?</item>
-        <item quantity="other">Удалить %1$d чата с этого устройства?</item>
+        <item quantity="one">Удалить %1$d чат? Это не выход из чата.</item>
+        <item quantity="few">Удалить %1$d чата? Это не выход из чатов.</item>
+        <item quantity="many">Удалить %1$d чатов? Это не выход из чатов.</item>
+        <item quantity="other">Удалить %1$d чата? Это не выход из чатов.</item>
     </plurals>
     <plurals name="toast_chat_list_chats_archived">
         <item quantity="one">%1$d чат архивирован</item>

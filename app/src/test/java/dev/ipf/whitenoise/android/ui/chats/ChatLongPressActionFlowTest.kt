@@ -353,7 +353,7 @@ class ChatLongPressActionFlowTest {
             }
         }
 
-        composeRule.onNodeWithText(string(R.string.delete)).performClick()
+        composeRule.onNodeWithText(string(R.string.delete_from_device)).performClick()
 
         composeRule.onNodeWithText(string(R.string.chat_list_action_add_to_folder)).assertDoesNotExist()
         composeRule

@@ -445,6 +445,22 @@
         ]
       },
       {
+        "surface": "explicit single-group leave and delete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "suspend fun leaveAndDeleteFromChatList(",
+        "test_ids": [
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "ChatLeaveAndDeleteConfirmationDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatActionSheet.kt",
+        "anchor": "fun ChatLeaveAndDeleteConfirmationDialog(",
+        "test_ids": [
+          "CHL-012"
+        ]
+      },
+      {
         "surface": "toast couldnt delete chat",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "R.string.toast_couldnt_delete_chat",

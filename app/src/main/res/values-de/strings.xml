@@ -130,10 +130,14 @@
     <string name="chat_row_action_delete_group">Gruppe löschen</string>
     <string name="chat_row_action_delete_chat">Chat löschen</string>
     <string name="delete_chat_dialog_title">Chat löschen?</string>
-    <string name="delete_chat_dialog_message">Diesen Chat von diesem Gerät entfernen? Wenn du noch Mitglied bist, verlässt du zuerst den Chat.</string>
+    <string name="delete_chat_dialog_message">Diesen Chat auf diesem Gerät löschen?</string>
     <string name="delete_group_dialog_title">Gruppe löschen?</string>
-    <string name="delete_group_dialog_message">Diese Gruppe von diesem Gerät entfernen? Wenn du noch Mitglied bist, verlässt du zuerst die Gruppe.</string>
+    <string name="delete_group_dialog_message">Diese Gruppe auf diesem Gerät löschen?</string>
     <string name="delete_group_confirm">Löschen</string>
+    <string name="delete_from_device">Auf diesem Gerät löschen</string>
+    <string name="leave_and_delete">Verlassen und löschen</string>
+    <string name="leave_and_delete_message">Diese Gruppe verlassen und ihren Verlauf auf diesem Gerät löschen?</string>
+    <string name="toast_left_chat_delete_failed">Gruppe verlassen. Lokales Löschen fehlgeschlagen.</string>
     <string name="group_reset_action">Zurücksetzen und auf neue Einladung warten</string>
     <string name="group_reset_dialog_title">Diese Gruppe auf diesem Gerät zurücksetzen?</string>
     <string name="group_reset_dialog_message">White Noise löscht den Verlauf und den Verschlüsselungszustand dieser Gruppe nur auf diesem Gerät. An die Gruppe wird nichts gesendet. Du trittst erst wieder bei, wenn ein Admin nach diesem Zurücksetzen eine neue Einladung sendet.</string>
@@ -166,8 +170,8 @@
     </plurals>
     <string name="message_selection_action_delete">Ausgewählte Nachrichten löschen</string>
     <plurals name="chat_list_bulk_delete_confirm">
-        <item quantity="one">%1$d Chat von diesem Gerät löschen?</item>
-        <item quantity="other">%1$d Chats von diesem Gerät löschen?</item>
+        <item quantity="one">%1$d Chat löschen? Dadurch verlässt du ihn nicht.</item>
+        <item quantity="other">%1$d Chats löschen? Dadurch verlässt du sie nicht.</item>
     </plurals>
     <plurals name="toast_chat_list_chats_archived">
         <item quantity="one">%1$d Chat archiviert</item>

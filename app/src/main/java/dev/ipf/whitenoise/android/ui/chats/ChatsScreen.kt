@@ -217,6 +217,12 @@ internal fun ChatsScreen(
         if (appState.signOutInProgress || appState.wipeInProgress) folderManagerOpen = false
     }
     val selectedChatIds = remember { mutableStateSetOf<String>() }
+    var pendingLeaveAndDelete by remember(appState.activeAccountRef, appState.runtimeGeneration) {
+        mutableStateOf<ChatListItem?>(null)
+    }
+    var leavingAndDeleting by remember(appState.activeAccountRef, appState.runtimeGeneration) {
+        mutableStateOf<String?>(null)
+    }
     val selectionMode = selectedChatIds.isNotEmpty()
     val searchOpen = globalSearchState.isOpen
     val searchQuery = globalSearchState.query
@@ -1412,6 +1418,12 @@ internal fun ChatsScreen(
                                 selectedChatIds.addAll(enterChatListSelection(visibleRowId(item)))
                             },
                             onDelete = { pendingBulkDelete = listOf(item) },
+                            onLeaveAndDelete =
+                                if (!item.isDm()) {
+                                    { pendingLeaveAndDelete = item }
+                                } else {
+                                    null
+                                },
                             onDismiss = {
                                 if (actionMenuOwner.isCurrent(menuToken) && actionSheetChatId == rowId) {
                                     actionSheetChatId = null
@@ -1423,7 +1435,8 @@ internal fun ChatsScreen(
                             modifier = Modifier.testTag("chat.menu.$rowId"),
                             canRunAction = {
                                 val ownsMenu = actionSheetChatId == rowId && rowId in visibleChatIds
-                                ownsMenu && actionMenuOwner.isCurrent(menuToken) && menuActionsCurrent()
+                                ownsMenu && leavingAndDeleting != item.group.groupIdHex &&
+                                    actionMenuOwner.isCurrent(menuToken) && menuActionsCurrent()
                             },
                             actions = item.actions,
                         )
@@ -1892,6 +1905,29 @@ internal fun ChatsScreen(
                 clearSelection()
             },
             onDismiss = { folderHandoff.pickerChatIds = null },
+        )
+    }
+
+    pendingLeaveAndDelete?.let { item ->
+        val originAccount = appState.activeAccountRef
+        val originRuntime = appState.runtimeGeneration
+        ChatLeaveAndDeleteConfirmationDialog(
+            onConfirm = {
+                pendingLeaveAndDelete = null
+                val groupId = item.group.groupIdHex
+                leavingAndDeleting = groupId
+                appState.launchMutation {
+                    try {
+                        if (appState.activeAccountRef != originAccount || appState.runtimeGeneration != originRuntime) {
+                            return@launchMutation
+                        }
+                        controller.leaveAndDeleteFromChatList(groupId)
+                    } finally {
+                        if (leavingAndDeleting == groupId) leavingAndDeleting = null
+                    }
+                }
+            },
+            onDismiss = { pendingLeaveAndDelete = null },
         )
     }
 

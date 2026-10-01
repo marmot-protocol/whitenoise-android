@@ -43,6 +43,7 @@ internal fun ChatContextMenu(
     modifier: Modifier = Modifier,
     canRunAction: () -> Boolean = { true },
     actions: ChatListRowActionsFfi? = null,
+    onLeaveAndDelete: (() -> Unit)? = null,
 ) {
     val items =
         buildList {
@@ -87,7 +88,14 @@ internal fun ChatContextMenu(
                 )
             }
             if (actions?.canDeleteLocal != false) {
-                add(chatMenuItem(R.string.delete, R.drawable.ic_delete, "Delete", destructive = true) { onDelete() })
+                add(chatMenuItem(R.string.delete_from_device, R.drawable.ic_delete, "Delete", destructive = true) { onDelete() })
+            }
+            if (onLeaveAndDelete != null && actions?.canStartLeave == true && actions.canDeleteLocal) {
+                add(
+                    chatMenuItem(R.string.leave_and_delete, R.drawable.ic_delete, "LeaveAndDelete", destructive = true) {
+                        onLeaveAndDelete()
+                    },
+                )
             }
             add(
                 chatMenuItem(R.string.chat_list_action_add_to_folder, R.drawable.ic_folder, "Folder") {
@@ -146,9 +154,25 @@ internal fun ChatDeleteConfirmationDialog(
     onDismiss: () -> Unit,
 ) {
     ConfirmDialog(
-        title = stringResource(R.string.delete_group_confirm),
+        title = stringResource(R.string.delete_from_device),
         message = pluralStringResource(R.plurals.chat_list_bulk_delete_confirm, count, count),
         confirmLabel = stringResource(R.string.delete_group_confirm),
+        destructive = true,
+        onConfirm = onConfirm,
+        onDismiss = onDismiss,
+    )
+}
+
+/** Departure is a separate, explicit choice from device-local history deletion. */
+@Composable
+internal fun ChatLeaveAndDeleteConfirmationDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ConfirmDialog(
+        title = stringResource(R.string.leave_and_delete),
+        message = stringResource(R.string.leave_and_delete_message),
+        confirmLabel = stringResource(R.string.leave_and_delete),
         destructive = true,
         onConfirm = onConfirm,
         onDismiss = onDismiss,
