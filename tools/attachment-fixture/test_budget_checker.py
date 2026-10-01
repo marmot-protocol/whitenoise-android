@@ -67,14 +67,22 @@ class BudgetContractTest(unittest.TestCase):
             self.assertEqual(1, result.returncode)
             self.assertFalse(json.loads(result.stdout)["passed"])
 
-    def test_runner_preserves_over_budget_failure_with_complete_real_http(self):
-        """Mock only adb/sample output; real upload, GET and durable completion counters all pass."""
+    def run_real_http(self, data, missing_event=None):
+        """Keep real transport intact while independently controlling metrics or a missing ledger event."""
         owned = {}
         original_server = device_runner.FixtureServer
+        original_wait = device_runner.wait_for_ledger_completion
 
         def server(root):
             """Expose the actual loopback server to the simulated instrumentation client."""
             owned["server"] = original_server(root)
+            event = owned["server"].ledger.event
+
+            def record(request, token, kind, value=0):
+                """Model a terminal ledger write that never arrives without changing transferred bytes."""
+                return 0 if kind == missing_event else event(request, token, kind, value)
+
+            owned["server"].ledger.event = record
             return owned["server"]
 
         def adb(_, serial, *args):
@@ -96,13 +104,13 @@ class BudgetContractTest(unittest.TestCase):
                 client.getresponse().read()
             finally:
                 client.close()
-            data = copy.deepcopy(samples())
-            data[1]["elapsed_ms"] += 1
             return "\n".join("INSTRUMENTATION_STATUS: controlled_attachment_json=" + json.dumps(m)
                              for m in data) + "\nOK (1 test)"
 
         with tempfile.TemporaryDirectory() as directory, patch.object(device_runner, "FixtureServer", side_effect=server), \
-                patch.object(device_runner, "adb_command", side_effect=adb):
+                patch.object(device_runner, "adb_command", side_effect=adb), \
+                patch.object(device_runner, "wait_for_ledger_completion",
+                             side_effect=lambda ledger, start: original_wait(ledger, start, timeout=0.1)):
             output = Path(directory) / "report.json"
             with self.assertRaises(RuntimeError):
                 device_runner.run("adb", "emulator-5554", Path(directory) / "server", output)
@@ -110,9 +118,26 @@ class BudgetContractTest(unittest.TestCase):
             self.assertTrue(report["instrumentation_passed"])
             self.assertEqual(1, report["http_acquisition_requests"])
             self.assertEqual(1040, report["successful_ciphertext_body_write_bytes"])
-            self.assertFalse(report["budget_check"]["passed"])
             self.assertFalse(report["qualified"])
             self.assertFalse(report["reverse_cleanup_failed"])
+            return report
+
+    def test_runner_preserves_over_budget_failure_with_complete_real_http(self):
+        """Real upload, GET and durable completion cannot conceal an over-budget local read."""
+        data = copy.deepcopy(samples())
+        data[1]["elapsed_ms"] += 1
+        report = self.run_real_http(data)
+        self.assertTrue(report["ledger_finalized"])
+        self.assertFalse(report["budget_check"]["passed"])
+
+    def test_runner_preserves_timeout_report_when_a_terminal_event_is_missing(self):
+        """Passing instrumentation, budgets and exact bytes still fail without either terminal event."""
+        for event in ("complete", "upload_complete"):
+            with self.subTest(missing=event):
+                report = self.run_real_http(samples(), missing_event=event)
+                self.assertTrue(report["budget_check"]["passed"])
+                self.assertFalse(report["ledger_finalized"])
+                self.assertNotIn(event, {e["kind"] for e in report["ledger"]})
 
 
 if __name__ == "__main__":
