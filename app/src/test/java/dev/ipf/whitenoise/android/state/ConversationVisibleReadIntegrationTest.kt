@@ -109,17 +109,7 @@ class ConversationVisibleReadIntegrationTest {
             val releaseSecond = CountDownLatch(1)
             val calls = AtomicInteger()
             val newerId = "cc".repeat(32)
-            val row =
-                reminderRow().let { reminder ->
-                    reminder.copy(
-                        lastMessage = reminder.lastMessage!!.copy(messageIdHex = newerId, timelineAt = 3uL),
-                        lastReadMessageIdHex = ConversationTimelineTestIds.MESSAGE_A,
-                        lastReadTimelineAt = 1uL,
-                        manuallyMarkedUnread = false,
-                        unreadCount = 2uL,
-                        firstUnreadMessageIdHex = MESSAGE_ID,
-                    )
-                }
+            val row = overlappingUnreadRow(newerId)
             val fixture =
                 fixture(row) {
                     when (calls.incrementAndGet()) {
@@ -248,7 +238,12 @@ class ConversationVisibleReadIntegrationTest {
     @Test
     fun explicitMarkReadClearsEmptyChatManualReminderWithoutInventingMessageId() =
         runBlocking {
-            val reminder = reminderRow().copy(lastMessage = null, lastReadMessageIdHex = null, lastReadTimelineAt = null)
+            val reminder =
+                reminderRow().copy(
+                    lastMessage = null,
+                    lastReadMessageIdHex = null,
+                    lastReadTimelineAt = null,
+                )
             val read = reminder.copy(manuallyMarkedUnread = false, hasUnread = false)
             val fixture = fixture(reminder, onManualUnread = { read }) { error("no message read is available") }
             try {
@@ -303,7 +298,10 @@ class ConversationVisibleReadIntegrationTest {
     fun explicitMarkReadWithoutTailOrManualReminderRemainsANoOp() =
         runBlocking {
             val row = reminderRow().copy(lastMessage = null, manuallyMarkedUnread = false, hasUnread = false)
-            val fixture = fixture(row, onManualUnread = { error("no reminder to clear") }) { error("no message to read") }
+            val fixture =
+                fixture(row, onManualUnread = { error("no reminder to clear") }) {
+                    error("no message to read")
+                }
             try {
                 fixture.bootstrap()
                 val chats = attachChats(fixture.appState, row)
@@ -314,6 +312,18 @@ class ConversationVisibleReadIntegrationTest {
                 closeFixture(fixture)
             }
         }
+
+    private fun overlappingUnreadRow(newerId: String): ChatListRowFfi {
+        val reminder = reminderRow()
+        return reminder.copy(
+            lastMessage = reminder.lastMessage!!.copy(messageIdHex = newerId, timelineAt = 3uL),
+            lastReadMessageIdHex = ConversationTimelineTestIds.MESSAGE_A,
+            lastReadTimelineAt = 1uL,
+            manuallyMarkedUnread = false,
+            unreadCount = 2uL,
+            firstUnreadMessageIdHex = MESSAGE_ID,
+        )
+    }
 
     private fun reminderRow() =
         notificationChatListRow().copy(
