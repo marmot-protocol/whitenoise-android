@@ -115,11 +115,11 @@ import dev.ipf.whitenoise.android.media.editor.MarmotMessageDraftGateway
 import dev.ipf.whitenoise.android.media.editor.MessageDraftMutationResult
 import dev.ipf.whitenoise.android.media.editor.MessageDraftRepository
 import dev.ipf.whitenoise.android.notifications.BackgroundConnectionPreferences
-import dev.ipf.whitenoise.android.notifications.ForegroundStartTrigger
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationChannels
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationRouting
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPattern
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPreferences
+import dev.ipf.whitenoise.android.notifications.ForegroundStartTrigger
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
 import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.NotificationBatteryPolicy
