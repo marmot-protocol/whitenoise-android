@@ -33,6 +33,7 @@ import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.twoFrameGif
+import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -270,6 +271,31 @@ class AnimatedProfileAvatarLayerTest {
         composeRule.onNodeWithTag(ANIMATED_PROFILE_AVATAR_TAG).assertDoesNotExist()
 
         animationKey = key
+
+        composeRule.waitUntil(DECODE_TIMEOUT_MS) {
+            composeRule.onAllNodesWithTag(ANIMATED_PROFILE_AVATAR_TAG).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    /** Share and forward pickers pass a DM's stored person-picture key through ContactRow. */
+    @Test
+    fun pickerRowAnimatesAStoredPersonPicture() {
+        val key = "marmot-avatar:owner:picker@1"
+        val firstFrame = ImageBitmap(4, 4)
+        AvatarImageLoader.putCachedAnimated(key, firstFrame, twoFrameGif())
+        lifecycleOwner.moveTo(Lifecycle.State.RESUMED)
+        composeRule.setContent {
+            Harness {
+                ContactRow(
+                    title = "Peer",
+                    subtitle = null,
+                    avatarSeed = "peer",
+                    avatarUrl = null,
+                    avatarImage = firstFrame,
+                    avatarAnimationKey = key,
+                )
+            }
+        }
 
         composeRule.waitUntil(DECODE_TIMEOUT_MS) {
             composeRule.onAllNodesWithTag(ANIMATED_PROFILE_AVATAR_TAG).fetchSemanticsNodes().isNotEmpty()
