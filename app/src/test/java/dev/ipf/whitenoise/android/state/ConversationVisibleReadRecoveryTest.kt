@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicInteger
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 internal class ConversationVisibleReadRecoveryTest : ConversationVisibleReadTestSupport() {
+    /** Verifies a retained controller cannot acknowledge attention after navigation, backgrounding or locking. */
     @Test
     fun hiddenRetainedControllerCannotConsumeNewManualReminder() =
         runBlocking {
@@ -60,6 +61,7 @@ internal class ConversationVisibleReadRecoveryTest : ConversationVisibleReadTest
             }
         }
 
+    /** Verifies a null native result is acknowledged once without requiring a mounted list. */
     @Test
     fun nativeReminderWithoutBoundChatListIsConsumedOnceEvenWhenReadReturnsNull() =
         runBlocking {
@@ -85,6 +87,7 @@ internal class ConversationVisibleReadRecoveryTest : ConversationVisibleReadTest
             }
         }
 
+    /** Verifies initial and retry attempts wait until the correct account and group regain visible ownership. */
     @Test
     fun firstAndRetriedReadsWaitForVisibleConversation() =
         runBlocking {
@@ -119,6 +122,7 @@ internal class ConversationVisibleReadRecoveryTest : ConversationVisibleReadTest
             }
         }
 
+    /** Verifies a failed latest attempt restores the confirmed cursor without a mounted list. */
     @Test
     fun failedReadWithoutBoundChatListRestoresMostRecentlyConfirmedWatermark() =
         runBlocking {
@@ -163,6 +167,7 @@ internal class ConversationVisibleReadRecoveryTest : ConversationVisibleReadTest
             }
         }
 
+    /** Verifies a visit-level acknowledgement preserves existing expiry while a genuinely new read anchors it. */
     @Test
     fun reopeningAtSavedReadWatermarkDoesNotExtendNativeDisappearingDeadline() =
         runBlocking {
@@ -215,6 +220,7 @@ internal class ConversationVisibleReadRecoveryTest : ConversationVisibleReadTest
             }
         }
 
+    /** Verifies a later failure preserves an earlier null-result acknowledgement until a native row supersedes it. */
     @Test
     fun failedReadPreservesEarlierSuccessfulAcknowledgementWhenNativeReturnedNoRow() =
         runBlocking {
@@ -247,6 +253,7 @@ internal class ConversationVisibleReadRecoveryTest : ConversationVisibleReadTest
             }
         }
 
+    /** Verifies an older success arriving after a newer failure still restores the confirmed display cursor. */
     @Test
     fun olderSuccessfulReadAfterNewerFailureRestoresItsConfirmedDisplayWatermark() =
         runBlocking {

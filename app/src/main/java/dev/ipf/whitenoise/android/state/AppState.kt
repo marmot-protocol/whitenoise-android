@@ -2538,9 +2538,11 @@ class WhiteNoiseAppState private constructor(
     @Volatile
     private var suppression = NotificationSuppression()
     private val conversationReadVisibilityState = mutableStateOf(suppression)
+    /** Read-only Compose view of notification suppression's foreground and conversation ownership. */
     internal val conversationReadVisibility: State<NotificationSuppression>
         get() = conversationReadVisibilityState
 
+    /** Publishes shared visibility to notifications, visible reads and dictation diagnostics. */
     private fun updateNotificationSuppression(next: NotificationSuppression) {
         if (next != suppression) notificationPostEpoch.advance()
         suppression = next
@@ -3376,6 +3378,7 @@ class WhiteNoiseAppState private constructor(
         return boundController != null
     }
 
+    /** Returns only the mounted list bound to this account. */
     internal fun boundChats(owner: String): ChatsController? = chatsController?.takeIf { it.boundAccountRef == owner }
 
     internal fun rollbackOptimisticSentPreview(

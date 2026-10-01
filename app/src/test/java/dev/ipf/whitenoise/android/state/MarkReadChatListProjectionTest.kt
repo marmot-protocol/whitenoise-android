@@ -21,6 +21,10 @@ import java.io.File
  * without relying on a posted OS notification.
  */
 class MarkReadChatListProjectionTest {
+    /**
+     * Checks the visible-read entry point reaches MDK and folds successful rows independently of notification mute
+     * state.
+     */
     @Test
     fun markReadUpTo_foldsReturnedChatListRowIntoChatsController() {
         val source = controllersSource().readText()
@@ -40,6 +44,7 @@ class MarkReadChatListProjectionTest {
         )
     }
 
+    /** Checks an unchanged display watermark cannot suppress folding an authoritative native read result. */
     @Test
     fun markReadUpTo_successPathDoesNotGateRowFoldOnLastReadMessageId() {
         val body = controllersSource().readText().kotlinFunctionBody("submitVisibleReadUpTo")

@@ -12,6 +12,7 @@ internal abstract class ConversationVisibleReadTestSupport {
     private val mountedChats = mutableListOf<ChatsController>()
     private val mountedConversations = mutableListOf<ConversationController>()
 
+    /** Transfers platform visibility to the fixture account and group without creating a read acknowledgement. */
     protected fun activateConversation(
         state: WhiteNoiseAppState,
         row: ChatListRowFfi,
@@ -19,6 +20,7 @@ internal abstract class ConversationVisibleReadTestSupport {
         state.setActiveConversationFromUi(ConversationTimelineTestIds.ACCOUNT_REF, row.groupIdHex)
     }
 
+    /** Enables a working biometric fixture and verifies the lock screen actually gates visible reads. */
     protected fun showAppLock(state: WhiteNoiseAppState) {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         Shadow
@@ -29,6 +31,7 @@ internal abstract class ConversationVisibleReadTestSupport {
         assertTrue(state.appLockScreenVisible)
     }
 
+    /** Builds a native row with two unread messages and an older persisted cursor for overlapping requests. */
     protected fun overlappingUnreadRow(newerId: String): ChatListRowFfi {
         val reminder = reminderRow()
         return reminder.copy(
@@ -41,6 +44,7 @@ internal abstract class ConversationVisibleReadTestSupport {
         )
     }
 
+    /** Builds manual attention at an already-read watermark with zero actual unread messages. */
     protected fun reminderRow() =
         notificationChatListRow().copy(
             unreadCount = 0uL,
@@ -51,6 +55,7 @@ internal abstract class ConversationVisibleReadTestSupport {
             lastReadTimelineAt = 2uL,
         )
 
+    /** Installs controllable native read and manual-flag responses without emitting a startup notification. */
     protected fun fixture(
         row: ChatListRowFfi,
         onManualUnread: ((Boolean) -> ChatListRowFfi?)? = null,
@@ -75,6 +80,7 @@ internal abstract class ConversationVisibleReadTestSupport {
         onSetChatManuallyUnread = onManualUnread,
     )
 
+    /** Mounts an account-bound conversation and grants foreground ownership; retains it for cleanup. */
     protected fun controller(
         state: WhiteNoiseAppState,
         row: ChatListRowFfi,
@@ -94,6 +100,7 @@ internal abstract class ConversationVisibleReadTestSupport {
         state.setActiveConversationFromUi(ConversationTimelineTestIds.ACCOUNT_REF, row.groupIdHex)
     }
 
+    /** Mounts a matching list from a native row through its normal hidden/visible handoff. */
     protected fun attachChats(
         state: WhiteNoiseAppState,
         row: ChatListRowFfi,
@@ -110,6 +117,7 @@ internal abstract class ConversationVisibleReadTestSupport {
             state.attachChatsController(chats)
         }
 
+    /** Removes visibility, detaches controllers and closes native fixture resources between regressions. */
     protected fun closeFixture(fixture: NotificationBootstrapTestFixture) {
         fixture.appState.clearActiveConversation()
         fixture.appState.attachChatsController(null)

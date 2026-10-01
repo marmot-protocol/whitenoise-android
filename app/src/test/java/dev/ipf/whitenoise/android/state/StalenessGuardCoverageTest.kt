@@ -64,6 +64,10 @@ class StalenessGuardCoverageTest {
 
     /** Pins every audited suspend-then-publish boundary to a guard or a reasoned exemption. */
     @Suppress("LongMethod") // Keep guarded paths beside their complete per-entry exemption audit.
+    /**
+     * Audits asynchronous publications for a latest-wins guard or a documented alternative such as monotonic read
+     * cursors.
+     */
     @Test
     fun awaitThenPublishPathsAreGuardedOrExplicitlyExempt() {
         val appState = productionSource("AppState.kt")

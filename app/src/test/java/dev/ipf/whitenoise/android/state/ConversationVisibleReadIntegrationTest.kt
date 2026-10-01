@@ -17,6 +17,7 @@ import java.util.concurrent.atomic.AtomicInteger
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 internal class ConversationVisibleReadIntegrationTest : ConversationVisibleReadTestSupport() {
+    /** Verifies reopen/read/Back clears manual attention even when the persisted cursor is unchanged. */
     @Test
     fun firstVisibleReadClearsManualAttentionAtSavedWatermarkBeforeReturningToList() =
         runBlocking {
@@ -62,6 +63,7 @@ internal class ConversationVisibleReadIntegrationTest : ConversationVisibleReadT
             }
         }
 
+    /** Verifies an older failed request cannot roll back a newer successful acknowledgement of the same cursor. */
     @Test
     fun olderSameMessageReadFailureCannotUndoNewerSuccessfulRead() =
         runBlocking {
@@ -99,6 +101,7 @@ internal class ConversationVisibleReadIntegrationTest : ConversationVisibleReadT
             }
         }
 
+    /** Verifies failed overlapping attempts leave the earlier visible cursor eligible for a native retry. */
     @Test
     fun overlappingReadFailuresCannotSuppressRetryOfEarlierMessage() =
         runBlocking {
@@ -156,6 +159,7 @@ internal class ConversationVisibleReadIntegrationTest : ConversationVisibleReadT
             }
         }
 
+    /** Verifies clearing manual attention leaves MDK's newer unread count and first-unread cursor intact. */
     @Test
     fun readingSavedWatermarkPreservesNewerUnreadMessages() =
         runBlocking {
@@ -188,6 +192,7 @@ internal class ConversationVisibleReadIntegrationTest : ConversationVisibleReadT
             }
         }
 
+    /** Verifies the first failed acknowledgement of a stored watermark can be retried during the same visit. */
     @Test
     fun failedFirstVisibleReadCanRetryTheSavedWatermark() =
         runBlocking {
@@ -213,6 +218,7 @@ internal class ConversationVisibleReadIntegrationTest : ConversationVisibleReadT
             }
         }
 
+    /** Rejects blank and optimistic IDs without fabricating a native read cursor. */
     @Test
     fun missingVisibleMessageDoesNotFabricateAReadRequest() =
         runBlocking {
@@ -236,6 +242,7 @@ internal class ConversationVisibleReadIntegrationTest : ConversationVisibleReadT
             }
         }
 
+    /** Verifies the explicit list action clears manual attention in an empty chat through MDK's flag command. */
     @Test
     fun explicitMarkReadClearsEmptyChatManualReminderWithoutInventingMessageId() =
         runBlocking {
@@ -269,6 +276,7 @@ internal class ConversationVisibleReadIntegrationTest : ConversationVisibleReadT
             }
         }
 
+    /** Verifies the flag-only list action preserves unread messages when the latest message is unavailable. */
     @Test
     fun clearingReminderWithoutKnownTailPreservesNativeUnreadCountAndWatermark() =
         runBlocking {
@@ -295,6 +303,7 @@ internal class ConversationVisibleReadIntegrationTest : ConversationVisibleReadT
             }
         }
 
+    /** Verifies an unknown tail without manual attention causes neither a read nor a flag mutation. */
     @Test
     fun explicitMarkReadWithoutTailOrManualReminderRemainsANoOp() =
         runBlocking {

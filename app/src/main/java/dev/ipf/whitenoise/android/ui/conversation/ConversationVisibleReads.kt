@@ -15,7 +15,11 @@ import dev.ipf.whitenoise.android.state.reportVisibleMessage
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 
-/** Retries a settled read when its retained screen becomes the visible Android host again. */
+/**
+ * Submits settled anchors only from a resumed, unlocked screen that owns the visible account and group.
+ * Visibility reentry and native manual-reminder changes retry reads without scrolling; hidden emissions reset dedupe.
+ * Reports each changed visible message ID once per observer, independently of manual-reminder transitions.
+ */
 @Composable
 internal fun observeConversationVisibleReads(
     appState: WhiteNoiseAppState,

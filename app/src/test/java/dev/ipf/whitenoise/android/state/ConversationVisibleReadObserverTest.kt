@@ -30,6 +30,13 @@ import org.robolectric.annotation.Config
 class ConversationVisibleReadObserverTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /**
+
+     * Exercises the production observer: ownership reentry retries three reads while reporting one unchanged
+
+     * anchor.
+
+     */
     @Test
     fun resumedSettledAnchorRetriesWhenConversationAndForegroundOwnershipReturn() {
         val row = reminderRow()
@@ -88,6 +95,7 @@ class ConversationVisibleReadObserverTest {
         }
     }
 
+    /** Mounts the production composable with a stable anchor and controllable presence in composition. */
     private fun installObserver(
         state: WhiteNoiseAppState,
         controller: ConversationController,
@@ -104,6 +112,7 @@ class ConversationVisibleReadObserverTest {
         }
     }
 
+    /** Supplies a real controller subscription path with one retained native timeline record. */
     private fun installTimeline(state: WhiteNoiseAppState): ScriptedConversationTimelineSubscription {
         val subscription =
             ScriptedConversationTimelineSubscription(
@@ -118,6 +127,7 @@ class ConversationVisibleReadObserverTest {
         return subscription
     }
 
+    /** Waits until the controller owns the scripted subscription and retains its visible record. */
     private fun awaitTimeline(
         controller: ConversationController,
         subscription: ScriptedConversationTimelineSubscription,
@@ -128,6 +138,7 @@ class ConversationVisibleReadObserverTest {
         }
     }
 
+    /** Pumps Android work until the production observer reports its first native visible anchor. */
     private fun awaitAnchor(subscription: ScriptedConversationTimelineSubscription) {
         composeRule.waitUntil(timeoutMillis = 5_000) {
             shadowOf(Looper.getMainLooper()).idle()
@@ -135,6 +146,7 @@ class ConversationVisibleReadObserverTest {
         }
     }
 
+    /** Transfers visible ownership on the Compose thread and publishes its snapshot transition. */
     private fun activate(
         state: WhiteNoiseAppState,
         groupIdHex: String,
@@ -146,6 +158,7 @@ class ConversationVisibleReadObserverTest {
         }
     }
 
+    /** Builds manual attention at the retained message without any actual unread messages. */
     private fun reminderRow() =
         notificationChatListRow().copy(
             lastReadMessageIdHex = ConversationTimelineTestIds.MESSAGE_B,
@@ -154,6 +167,7 @@ class ConversationVisibleReadObserverTest {
             unreadCount = 0uL,
         )
 
+    /** Provides a native read result that clears attention while preserving the saved cursor. */
     private fun fixture(row: ChatListRowFfi) =
         NotificationBootstrapTestFixture(
             context = ApplicationProvider.getApplicationContext(),
@@ -164,6 +178,7 @@ class ConversationVisibleReadObserverTest {
             onMarkTimelineMessageRead = { row.copy(manuallyMarkedUnread = false, hasUnread = false) },
         )
 
+    /** Starts a controller bound to the fixture account so the observer uses a real opened timeline. */
     private fun controller(
         state: WhiteNoiseAppState,
         row: ChatListRowFfi,
@@ -177,6 +192,7 @@ class ConversationVisibleReadObserverTest {
         startOnConstruction = true,
     )
 
+    /** Pumps Android and Compose until the expected native read count and cleared reminder are observed. */
     private fun awaitReads(
         fixture: NotificationBootstrapTestFixture,
         controller: ConversationController,
@@ -193,6 +209,7 @@ class ConversationVisibleReadObserverTest {
         assertEquals(count, fixture.markReadCalls.get())
     }
 
+    /** Builds the running local account used by both the native fixture and controller ownership checks. */
     private fun account() =
         AccountSummaryFfi(
             label = ConversationTimelineTestIds.ACCOUNT_REF,

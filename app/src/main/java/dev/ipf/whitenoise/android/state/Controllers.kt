@@ -7391,7 +7391,7 @@ class ConversationController(
         groupIdHex: String,
     ): Boolean = conversationAccountRef == accountRef && group.groupIdHex == groupIdHex
 
-    /** Applies the chat-list subscription's current row to this mounted conversation. */
+    /** Applies a matching native row and invalidates any null-result acknowledgement superseded by that row. */
     internal fun applyAuthoritativeChatListRow(
         accountRef: String?,
         row: ChatListRowFfi,
@@ -11740,6 +11740,8 @@ class ConversationController(
      *
      * Dedupes requests submitted by this controller so a quiet scroll
      * (settled on the same row) doesn't issue redundant FFI hops.
+     * Invalid/optimistic IDs and hidden, locked or differently owned conversations are ignored.
+     * A stored watermark alone does not dedupe the first visible read of a new visit.
      */
     suspend fun markReadUpTo(messageId: String) {
         // Optimistic UUIDs and missing anchors cannot reach native read commands.
@@ -11750,6 +11752,12 @@ class ConversationController(
         }
     }
 
+    /**
+     * Submits the visit's visible cursor to MDK, including a saved cursor with pending manual attention.
+     * Successful rows fold monotonically even when requests overlap; only the latest request restores display state.
+     * A latest failure clears request dedupe for retry, and cancellation is rethrown. A null success acknowledges
+     * this row instance until a new native row arrives. Already-confirmed reads do not restart retention deadlines.
+     */
     private suspend fun submitVisibleReadUpTo(
         account: String,
         trimmed: String,
@@ -11802,12 +11810,12 @@ class ConversationController(
         }
     }
 
-    // A successful null-returning command still acknowledges its visible ID.
-    // Any subsequent authoritative row supersedes this transient fallback.
+    /** Uses the native cursor, or a successful null-result cursor only while its original row remains current. */
     private fun confirmedReadMessageId(): String? =
         successfulReadWithoutRow?.takeIf { it.first === latestChatListRow }?.second
             ?: latestChatListRow?.lastReadMessageIdHex?.takeIf { it.isNotBlank() }
 
+    /** Folds MDK's read result into the matching list, or monotonically into this conversation if no list is bound. */
     private fun foldVisibleReadRow(
         accountRef: String,
         row: ChatListRowFfi,
@@ -11824,6 +11832,7 @@ class ConversationController(
             }
     }
 
+    /** Retries an unconsumed native manual reminder only while this account's conversation is visibly owned. */
     private fun shouldConsumeManualUnreadReminder(accountRef: String): Boolean =
         !manualUnreadReminderConsumed &&
             appState.hasManualUnreadReminder(accountRef, group.groupIdHex, latestChatListRow)
