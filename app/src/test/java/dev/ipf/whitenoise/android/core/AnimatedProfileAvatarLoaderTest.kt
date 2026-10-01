@@ -118,6 +118,25 @@ class AnimatedProfileAvatarLoaderTest {
             assertNull(AvatarImageLoader.peekAnimatedSource(url))
         }
 
+    /** A stored GIF keeps its account-private source; the stored clear drops it but keeps public URL sources. */
+    @Test
+    fun storedClearDropsStoredAnimationButKeepsPublicSources() =
+        runBlocking {
+            val storedKey = "marmot-avatar:owner:reference@1"
+            val publicUrl = "https://profiles.example/public"
+            AvatarImageLoader.attachProfileImageFetcher { _, _ -> twoFrameGif() }
+            assertNotNull(AvatarImageLoader.load(publicUrl))
+            assertNotNull(
+                AvatarImageLoader.loadStored(storedKey, AvatarImageLoader.currentCacheLifetime()) { twoFrameGif() },
+            )
+            assertNotNull(AvatarImageLoader.peekAnimatedSource(storedKey))
+
+            AvatarImageLoader.clearStoredAvatars()
+
+            assertNull(AvatarImageLoader.peekAnimatedSource(storedKey))
+            assertNotNull(AvatarImageLoader.peekAnimatedSource(publicUrl))
+        }
+
     /** Banners are out of scope: a GIF banner decodes statically and leaves no avatar source behind. */
     @Test
     fun bannerRequestsNeverKeepAnAnimatedSource() =

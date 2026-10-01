@@ -253,6 +253,29 @@ class AnimatedProfileAvatarLayerTest {
         composeRule.onNodeWithTag(ANIMATED_PROFILE_AVATAR_TAG).assertDoesNotExist()
     }
 
+    /** A stored picture animates only when its caller names it as a person's picture. */
+    @Test
+    fun storedPictureAnimatesOnlyWithAPersonPictureKey() {
+        val key = "marmot-avatar:owner:peer@1"
+        val firstFrame = ImageBitmap(4, 4)
+        AvatarImageLoader.putCachedAnimated(key, firstFrame, twoFrameGif())
+        lifecycleOwner.moveTo(Lifecycle.State.RESUMED)
+        var animationKey by mutableStateOf<String?>(null)
+        composeRule.setContent {
+            Harness {
+                Avatar(title = "Peer", seed = "peer", size = 40.dp, picture = firstFrame, animationKey = animationKey)
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(ANIMATED_PROFILE_AVATAR_TAG).assertDoesNotExist()
+
+        animationKey = key
+
+        composeRule.waitUntil(DECODE_TIMEOUT_MS) {
+            composeRule.onAllNodesWithTag(ANIMATED_PROFILE_AVATAR_TAG).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
     /** The gate needs all three conditions at once. */
     @Test
     fun gateRequiresMotionVisibilityAndForeground() {

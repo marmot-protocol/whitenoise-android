@@ -382,11 +382,15 @@ object AvatarImageLoader {
         }
     }
 
-    /** Retires account-private stored pixels/reads while preserving already decoded public URL images. */
+    /**
+     * Retires account-private stored pixels, animation bytes and reads while preserving already decoded
+     * public URL images and their animated sources.
+     */
     internal fun clearStoredAvatars() {
         synchronized(lock) {
             observedCacheLifetime.longValue = cacheLifetime.advance()
             cache.evictStoredAvatars()
+            animatedSources.keysSnapshot().filter(::isStoredAvatarKey).forEach(animatedSources::remove)
             retireRequestsLocked()
         }
     }
@@ -466,7 +470,11 @@ object AvatarImageLoader {
         return synchronized(lock) { cacheLifetime.capture() }
     }
 
-    /** Shares local reads and off-main decodes through the existing bounded, generation-fenced loader. */
+    /**
+     * Shares local reads and off-main decodes through the existing bounded, generation-fenced loader. A
+     * stored GIF keeps its bytes as an animated source under the same account-private key, so whether it
+     * may animate is decided by the surface that knows it is a person's picture.
+     */
     internal suspend fun loadStored(
         key: String,
         lifetime: Long,
@@ -479,9 +487,10 @@ object AvatarImageLoader {
             fetchLane = AvatarFetchLane.STORED,
             fetchImage = { request ->
                 AvatarCacheDiagnostics.fetch(AvatarCacheKind.PROFILE)
-                readBytes()
+                val bytes = readBytes()
+                bytes
                     ?.let { decode(it, request.variant, request.maxDimension)?.asImageBitmap() }
-                    ?.let(AvatarImageFetchResult::Success)
+                    ?.let { AvatarImageFetchResult.Success(it, profileAvatarAnimationSource(bytes)) }
                     ?: AvatarImageFetchResult.Unavailable
             },
         )
@@ -614,7 +623,7 @@ internal class PartitionedProfileImageCache(
         avatars
             .snapshot()
             .keys
-            .filter { it.startsWith("marmot-avatar:") }
+            .filter(::isStoredAvatarKey)
             .forEach(avatars::remove)
     }
 

@@ -26,6 +26,12 @@ internal fun isAnimatableProfileAvatar(bytes: ByteArray): Boolean {
     return width in 1..MAX_ANIMATED_PROFILE_AVATAR_EDGE && height in 1..MAX_ANIMATED_PROFILE_AVATAR_EDGE
 }
 
+/** Prefix of every account-private, MarmotKit-stored avatar cache key. */
+internal const val STORED_AVATAR_KEY_PREFIX = "marmot-avatar:"
+
+/** True for a key naming account-private stored bytes rather than a public profile URL. */
+internal fun isStoredAvatarKey(key: String): Boolean = key.startsWith(STORED_AVATAR_KEY_PREFIX)
+
 /** Encoded-byte ceiling for any animated profile picture, matching the avatar fetch bound. */
 private const val MAX_ANIMATED_PROFILE_AVATAR_BYTES = 2 * 1024 * 1024
 

@@ -39,7 +39,8 @@ private val AvatarPalette =
 
 /**
  * Shows identity-scoped cached pixels or initials, recovering missing URL images while visible. A URL
- * picture whose cached bytes are a GIF animates over its first frame under the shared profile policy.
+ * picture whose cached bytes are a GIF animates over its first frame under the shared profile policy; a
+ * supplied [picture] animates only when the caller names its stored person-picture [animationKey].
  */
 @Composable
 internal fun Avatar(
@@ -48,6 +49,7 @@ internal fun Avatar(
     size: androidx.compose.ui.unit.Dp,
     pictureUrl: String? = null,
     picture: ImageBitmap? = null,
+    animationKey: String? = null,
 ) {
     val color = AvatarPalette[avatarPaletteIndex(seed.hashCode(), AvatarPalette.size)]
     // Seed from the in-memory cache so re-entering a screen shows an
@@ -78,9 +80,10 @@ internal fun Avatar(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
             )
-            if (picture == null) {
+            val animatedKey = if (picture == null) pictureUrl else animationKey
+            if (animatedKey != null) {
                 val maxEdgePx = with(LocalDensity.current) { size.roundToPx() }
-                AnimatedProfileAvatarOverlay(pictureUrl, image, Modifier.fillMaxSize(), maxEdgePx)
+                AnimatedProfileAvatarOverlay(animatedKey, image, Modifier.fillMaxSize(), maxEdgePx)
             }
         } else {
             // Derive the font size from the avatar diameter so the single

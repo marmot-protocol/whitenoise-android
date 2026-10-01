@@ -2,15 +2,21 @@ package dev.ipf.whitenoise.android.ui.screenshot
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -26,10 +32,12 @@ import dev.ipf.marmotkit.AvatarAvailabilityFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.core.twoFrameGif
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.cacheKey
+import dev.ipf.whitenoise.android.ui.common.ANIMATED_PROFILE_AVATAR_TAG
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
@@ -92,6 +100,38 @@ class DurableAvatarScreenshotTest {
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/chat_row_durable_avatar_light.png")
     }
 
+    /** A stored GIF animates in a row only when the asset is a person's picture, never as a group image. */
+    @Test
+    fun storedGifAnimatesOnlyAsAPersonPicture() {
+        val appState = appState()
+        val asset = asset()
+        val key = requireNotNull(asset.cacheKey(ACCOUNT_REF))
+        val gif = twoFrameGif()
+        val firstFrame = BitmapFactory.decodeByteArray(gif, 0, gif.size).asImageBitmap()
+        AvatarImageLoader.putCachedAnimated(key, firstFrame, gif)
+        var personPicture by mutableStateOf(false)
+        composeRule.setContent {
+            GroupAvatar(
+                appState = appState,
+                group = group(),
+                title = GROUP_NAME,
+                seed = GROUP_ID,
+                size = 56.dp,
+                durableAvatar = asset,
+                durableAvatarIsPersonPicture = personPicture,
+            )
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(ANIMATED_PROFILE_AVATAR_TAG).assertDoesNotExist()
+
+        personPicture = true
+
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithTag(ANIMATED_PROFILE_AVATAR_TAG).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    /** A 64px solid PNG for the stored-bytes fixture. */
     private fun solidPng(): ByteArray {
         val bitmap = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888)
         bitmap.eraseColor(Color.rgb(0x1E, 0x88, 0xE5))
