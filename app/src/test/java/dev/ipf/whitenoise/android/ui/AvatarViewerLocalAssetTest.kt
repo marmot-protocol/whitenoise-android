@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -30,6 +31,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.ByteArrayOutputStream
@@ -73,7 +75,8 @@ class AvatarViewerLocalAssetTest {
     fun warmPublicPictureLoadsOriginalResolution() {
         val bytes = largePng()
         AvatarImageLoader.attachProfileImageFetcher { _, _ -> bytes }
-        val preview = checkNotNull(AvatarImageLoader.decodeAndCache(URL, bytes, AvatarImageLoader.currentCacheLifetime()))
+        val preview =
+            checkNotNull(AvatarImageLoader.decodeAndCache(URL, bytes, AvatarImageLoader.currentCacheLifetime()))
         assertEquals(512, preview.width)
         var observed: AvatarViewerImageState? = null
         composeRule.setContent {
@@ -87,7 +90,8 @@ class AvatarViewerLocalAssetTest {
     @Test
     fun retainedOriginalUpgradesWarmPixelsWithoutNetworkOrRepeatedReads() {
         val bytes = largePng()
-        val preview = checkNotNull(AvatarImageLoader.decodeAndCache("stored", bytes, AvatarImageLoader.currentCacheLifetime()))
+        val preview =
+            checkNotNull(AvatarImageLoader.decodeAndCache("stored", bytes, AvatarImageLoader.currentCacheLifetime()))
         val release = CompletableDeferred<Unit>()
         val reads = AtomicInteger()
         val requests = AtomicInteger()
@@ -125,7 +129,8 @@ class AvatarViewerLocalAssetTest {
     @Test
     fun replacedOwnerCannotRetainThePreviousFullResolutionPixels() {
         val bytes = largePng()
-        val preview = checkNotNull(AvatarImageLoader.decodeAndCache("stored", bytes, AvatarImageLoader.currentCacheLifetime()))
+        val preview =
+            checkNotNull(AvatarImageLoader.decodeAndCache("stored", bytes, AvatarImageLoader.currentCacheLifetime()))
         val picture = mutableStateOf<ImageBitmap?>(preview)
         val reader = mutableStateOf<suspend () -> ByteArray?>({ bytes })
         val replacementReads = AtomicInteger()
@@ -147,14 +152,18 @@ class AvatarViewerLocalAssetTest {
         try {
             composeRule.waitUntil(5_000) { observed == AvatarViewerImageState.Failed }
         } catch (error: Throwable) {
-            throw AssertionError("Owner replacement left ${observed?.javaClass?.simpleName}; reads=${replacementReads.get()}", error)
+            throw AssertionError(
+                "Owner replacement left ${observed?.javaClass?.simpleName}; reads=${replacementReads.get()}",
+                error,
+            )
         }
     }
 
     @Test
     fun retainedSaveRechecksTheReaderAfterItsInitialRead() {
         val bytes = largePng()
-        val preview = checkNotNull(AvatarImageLoader.decodeAndCache("stored", bytes, AvatarImageLoader.currentCacheLifetime()))
+        val preview =
+            checkNotNull(AvatarImageLoader.decodeAndCache("stored", bytes, AvatarImageLoader.currentCacheLifetime()))
         val ownerValid = AtomicBoolean(true)
         val reads = AtomicInteger()
         val reader: suspend () -> ByteArray? = {
@@ -170,9 +179,16 @@ class AvatarViewerLocalAssetTest {
         composeRule.waitForIdle()
         ownerValid.set(false)
         val context = ApplicationProvider.getApplicationContext<Context>()
+        val resolver = shadowOf(context.contentResolver)
+        val insertsBeforeSave = resolver.insertStatements.size
         composeRule.onNodeWithContentDescription(context.getString(R.string.actions)).performClick()
         composeRule.onNodeWithText(context.getString(R.string.media_save)).performClick()
         composeRule.waitUntil(5_000) { reads.get() == 2 }
+        val failureText = context.getString(R.string.media_save_failed)
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText(failureText).fetchSemanticsNodes().isNotEmpty()
+        }
+        assertEquals(insertsBeforeSave, resolver.insertStatements.size)
     }
 }
 

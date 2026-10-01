@@ -220,7 +220,11 @@ internal fun rememberAvatarViewerImageState(
                         if (readLocalBytes != null) {
                             readLocalBytes()
                         } else {
-                            val result = AvatarImageLoader.fetchBytes(checkNotNull(safePictureUrl), AVATAR_VIEWER_MAX_BYTES)
+                            val result =
+                                AvatarImageLoader.fetchBytes(
+                                    checkNotNull(safePictureUrl),
+                                    AVATAR_VIEWER_MAX_BYTES,
+                                )
                             (result as? AvatarByteFetchResult.Success)?.bytes
                         }
                     }.getOrNull()
