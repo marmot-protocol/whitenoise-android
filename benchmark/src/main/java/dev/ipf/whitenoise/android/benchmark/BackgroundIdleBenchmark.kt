@@ -18,6 +18,11 @@ import org.junit.runner.RunWith
  * [NetworkRecoveryBenchmark], which covers the repeated-reconnect scenario — together they cover
  * the five scenarios #2786's acceptance criteria call for.
  *
+ * Every measured window puts the screen to sleep first: a kept-awake, screen-on idle reads mostly
+ * display power, which swamps any delivery-mode-specific signal and reads nearly identical across
+ * postures regardless of what the app is doing. Real background battery drain happens with the
+ * screen off, so that is what these measure.
+ *
  * The product never resolves to a true third "nothing" delivery mode (see
  * `NativePushDelivery.resolvedNotificationDeliveryMode`), so [idleWithDeliveryDisabledPower]
  * approximates the floor a user who disabled notifications entirely would see: push mode selected
@@ -48,6 +53,7 @@ class BackgroundIdleBenchmark {
                     pressHome()
                 },
                 measureBlock = {
+                    device.sleep()
                     SystemClock.sleep(idleWindowMs())
                 },
             )
@@ -71,6 +77,7 @@ class BackgroundIdleBenchmark {
                 pressHome()
             },
             measureBlock = {
+                device.sleep()
                 SystemClock.sleep(idleWindowMs())
             },
         )
@@ -91,6 +98,7 @@ class BackgroundIdleBenchmark {
                 pressHome()
             },
             measureBlock = {
+                device.sleep()
                 SystemClock.sleep(idleWindowMs())
             },
         )
@@ -101,9 +109,10 @@ class BackgroundIdleBenchmark {
      *
      * Unlike `SecondaryAccountNotificationNavigationMacrobenchmark`, which measures UI reaction
      * time against notifications already sitting in the tray, this measures the receive-side
-     * push-wake/catch-up cost, so the burst must arrive *during* the measured window. Runs a
-     * single iteration; coordinate a burst of several messages from a second account, sent within
-     * the first few seconds after the logged "send now" line, before the window closes.
+     * push-wake/catch-up cost, so the burst must arrive *during* the measured window, screen
+     * asleep. Runs a single iteration; coordinate a burst of several messages from a second
+     * account, sent within the first few seconds after the logged "send now" line, before the
+     * window closes.
      */
     @Test
     fun pushBurstPower() {
@@ -118,6 +127,7 @@ class BackgroundIdleBenchmark {
                 pressHome()
             },
             measureBlock = {
+                device.sleep()
                 Log.i(BURST_LOG_TAG, "Send the push burst now; observing for ${burstWindowMs()}ms.")
                 SystemClock.sleep(burstWindowMs())
             },
@@ -145,7 +155,11 @@ class BackgroundIdleBenchmark {
     }
 
     private companion object {
-        const val IDLE_ITERATIONS = 3
+        // A genuinely slept screen re-engages a secure keyguard that `wm dismiss-keyguard`
+        // cannot clear, so a second iteration can't autonomously re-enter the app on a device
+        // with a real lock method. One iteration keeps this measurement honest without needing
+        // the operator to unlock between samples.
+        const val IDLE_ITERATIONS = 1
         const val BURST_ITERATIONS = 1
         const val IDLE_WINDOW_MS = 60_000L
         const val BURST_WINDOW_MS = 30_000L
