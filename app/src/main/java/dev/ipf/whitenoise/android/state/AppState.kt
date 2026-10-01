@@ -3376,9 +3376,7 @@ class WhiteNoiseAppState private constructor(
         return boundController != null
     }
 
-    internal fun boundChats(account: String): ChatsController? {
-        return chatsController?.takeIf { it.boundAccountRef == account }
-    }
+    internal fun boundChats(owner: String): ChatsController? = chatsController?.takeIf { it.boundAccountRef == owner }
 
     internal fun rollbackOptimisticSentPreview(
         accountRef: String?,
