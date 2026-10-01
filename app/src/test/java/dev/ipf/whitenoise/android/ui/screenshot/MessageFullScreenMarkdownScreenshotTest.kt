@@ -1,14 +1,17 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
+import android.graphics.Bitmap
 import androidx.compose.foundation.text.contextmenu.provider.LocalTextContextMenuToolbarProvider
 import androidx.compose.foundation.text.contextmenu.provider.TextContextMenuDataProvider
 import androidx.compose.foundation.text.contextmenu.provider.TextContextMenuProvider
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -30,18 +33,22 @@ import dev.ipf.marmotkit.MarkdownListKindFfi
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_FULL_SCREEN_BODY_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_FULL_SCREEN_TAG
+import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_FULL_SCREEN_VIEWPORT_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageFullScreenView
 import dev.ipf.whitenoise.android.ui.conversation.messages.ReaderTextSelectionController
 import dev.ipf.whitenoise.android.ui.conversation.messages.rememberReaderTextSelectionController
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.awaitCancellation
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import kotlin.math.roundToInt
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -65,6 +72,10 @@ class MessageFullScreenMarkdownScreenshotTest {
         captureScrollingReader(
             ReaderSnapshot("reader_scroll_end_amoled", 1f, dark = true, amoled = true),
         )
+    }
+
+    @Test fun scrollingReaderBottomEdgeDark() {
+        captureScrollingReader(ReaderSnapshot("reader_scroll_bottom_edge_dark", 1f, dark = true))
     }
 
     @Test fun scrollingReaderMiddleLargeRtl() =
@@ -108,6 +119,16 @@ class MessageFullScreenMarkdownScreenshotTest {
             reader = ReaderContent(text, null, snapshot.amoled),
         )
         val body = composeRule.onNodeWithTag(MESSAGE_FULL_SCREEN_BODY_TAG)
+        val viewport = composeRule.onNodeWithTag(MESSAGE_FULL_SCREEN_VIEWPORT_TAG).fetchSemanticsNode().boundsInRoot
+        val root = composeRule.onNodeWithTag(MESSAGE_FULL_SCREEN_TAG)
+        val chromeBefore = root.captureToImage().asAndroidBitmap()
+        val chromeHeight = (viewport.top - root.fetchSemanticsNode().boundsInRoot.top).roundToInt()
+        assertTrue("The reader must start below its header", chromeHeight > 0)
+        assertEquals(
+            "The native scroll surface must fill its bounded viewport",
+            viewport,
+            body.fetchSemanticsNode().boundsInRoot,
+        )
         val range = body.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
         val target = range.maxValue() * snapshot.fraction
         composeRule.mainClock.autoAdvance = false
@@ -118,6 +139,7 @@ class MessageFullScreenMarkdownScreenshotTest {
                 if (snapshot.fraction > 0f) moveBy(Offset(0f, -target))
             }
             composeRule.mainClock.advanceTimeBy(32)
+            assertReaderChromeUnchanged(chromeBefore, root.captureToImage().asAndroidBitmap(), chromeHeight)
             if (snapshot.actionMenu) {
                 // Use the native accessibility action while the primary drag pointer stays held.
                 composeRule
@@ -134,6 +156,20 @@ class MessageFullScreenMarkdownScreenshotTest {
             body.performTouchInput { up() }
             composeRule.mainClock.autoAdvance = true
         }
+    }
+
+    /** Checks the static header independently of the moving reader and its decorative thumb. */
+    private fun assertReaderChromeUnchanged(
+        before: Bitmap,
+        after: Bitmap,
+        height: Int,
+    ) {
+        assertEquals(before.width, after.width)
+        val expected = IntArray(before.width * height)
+        val actual = IntArray(expected.size)
+        before.getPixels(expected, 0, before.width, 0, 0, before.width, height)
+        after.getPixels(actual, 0, after.width, 0, 0, after.width, height)
+        assertArrayEquals("A held reader drag must not paint over its header", expected, actual)
     }
 
     /** Captures structured reader content at the default light-theme density. */

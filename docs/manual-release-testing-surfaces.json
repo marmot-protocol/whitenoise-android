@@ -28745,6 +28745,14 @@
         "test_ids": [
           "CHL-017"
         ]
+      },
+      {
+        "surface": "Bounded reader viewport during native edge drags",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageFullScreen.kt",
+        "anchor": "internal const val MESSAGE_FULL_SCREEN_VIEWPORT_TAG",
+        "test_ids": [
+          "MSG-026"
+        ]
       }
     ],
     "notification_content_contracts": [
