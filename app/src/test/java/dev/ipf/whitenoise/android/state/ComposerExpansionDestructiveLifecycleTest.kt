@@ -808,7 +808,9 @@ class ComposerExpansionDestructiveLifecycleTest {
                     calls.chatList.incrementAndGet()
                     if (localGroupPresent) {
                         listOf(
-                            groupRow().copy(selfMembership = if (left) SelfMembershipFfi.LEFT else SelfMembershipFfi.MEMBER),
+                            groupRow().copy(
+                                selfMembership = if (left) SelfMembershipFfi.LEFT else SelfMembershipFfi.MEMBER,
+                            ),
                         )
                     } else {
                         emptyList<ChatListRowFfi>()
