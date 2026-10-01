@@ -63,8 +63,9 @@ class ConversationScrollIndicatorScreenshotTest {
 
     @Test fun middleDark() = capture("conversation_scroll_middle_dark", 300f, Environment(dark = true))
 
-    @Test fun oldestAmoled() =
+    @Test fun oldestAmoled() {
         capture("conversation_scroll_oldest_amoled", 3000f, Environment(dark = true, amoled = true))
+    }
 
     @Test fun largeRtlAndRaisedComposer() =
         capture(
@@ -133,14 +134,15 @@ class ConversationScrollIndicatorScreenshotTest {
                                     viewport,
                                     ConversationScrollIndicatorWindow(keys, 0, keys.size + 1, "fixture"),
                                     true,
-                                )
-                                .testTag("reading-indicator-fixture"),
+                                ).testTag("reading-indicator-fixture"),
                         ) {
                             FixtureTimeline(viewport, keys, environment.chrome)
                             Surface(
                                 modifier =
-                                    Modifier.align(Alignment.BottomCenter)
-                                        .fillMaxWidth().height(environment.chrome.dp),
+                                    Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .fillMaxWidth()
+                                        .height(environment.chrome.dp),
                                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                                 shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
                             ) {
@@ -153,15 +155,20 @@ class ConversationScrollIndicatorScreenshotTest {
         }
         composeRule.waitForIdle()
     }
+
     @Composable
-    private fun FixtureMessage(key: Any, index: Int) {
+    private fun FixtureMessage(
+        key: Any,
+        index: Int,
+    ) {
         Surface(
             shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.surfaceContainer,
         ) {
             Text(
                 "$key\n" + "A long message keeps its reading position.\n".repeat(24),
-                Modifier.fillMaxWidth()
+                Modifier
+                    .fillMaxWidth()
                     .height(if (index == 1) 600.dp else 160.dp)
                     .padding(12.dp),
             )
@@ -169,28 +176,30 @@ class ConversationScrollIndicatorScreenshotTest {
     }
 
     @Composable
-    private fun FixtureTimeline(viewport: ConversationTimelineViewport, keys: List<Any>, chrome: Int) {
-    LazyColumn(
-        state = state,
-        reverseLayout = true,
-        verticalArrangement = CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT,
-        contentPadding = conversationTimelineContentPadding(0.dp, chrome.dp),
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .measureConversationTimelinePadding(
-                    viewport,
-                    CONVERSATION_TIMELINE_TAIL_GAP,
-                    chrome.dp,
-                )
-                .padding(horizontal = 12.dp)
-                .onGloballyPositioned(viewport::onPaintViewportMeasured),
+    private fun FixtureTimeline(
+        viewport: ConversationTimelineViewport,
+        keys: List<Any>,
+        chrome: Int,
     ) {
-        itemsIndexed(keys, key = { _, key -> key }) { index, key ->
-            FixtureMessage(key, index)
+        LazyColumn(
+            state = state,
+            reverseLayout = true,
+            verticalArrangement = CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT,
+            contentPadding = conversationTimelineContentPadding(0.dp, chrome.dp),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .measureConversationTimelinePadding(
+                        viewport,
+                        CONVERSATION_TIMELINE_TAIL_GAP,
+                        chrome.dp,
+                    ).padding(horizontal = 12.dp)
+                    .onGloballyPositioned(viewport::onPaintViewportMeasured),
+        ) {
+            itemsIndexed(keys, key = { _, key -> key }) { index, key ->
+                FixtureMessage(key, index)
+            }
+            item(key = "top-spacer") { Box(Modifier.height(4.dp)) }
         }
-        item(key = "top-spacer") { Box(Modifier.height(4.dp)) }
     }
-    }
-
 }

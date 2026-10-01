@@ -53,11 +53,17 @@ class MessageFullScreenMarkdownScreenshotTest {
 
     @Test fun scrollingReaderTopLight() = captureScrollingReader(ReaderSnapshot("reader_scroll_top_light", 0f))
 
-    @Test fun scrollingReaderMiddleDark() =
-        captureScrollingReader(ReaderSnapshot("reader_scroll_middle_dark", 0.5f, dark = true))
+    @Test fun scrollingReaderMiddleDark() {
+        captureScrollingReader(
+            ReaderSnapshot("reader_scroll_middle_dark", 0.5f, dark = true),
+        )
+    }
 
-    @Test fun scrollingReaderEndAmoled() =
-        captureScrollingReader(ReaderSnapshot("reader_scroll_end_amoled", 1f, dark = true, amoled = true))
+    @Test fun scrollingReaderEndAmoled() {
+        captureScrollingReader(
+            ReaderSnapshot("reader_scroll_end_amoled", 1f, dark = true, amoled = true),
+        )
+    }
 
     @Test fun scrollingReaderMiddleLargeRtl() =
         captureScrollingReader(
@@ -85,6 +91,7 @@ class MessageFullScreenMarkdownScreenshotTest {
         val body: String,
         val document: MarkdownDocumentFfi?,
         val amoled: Boolean = false,
+        val fontScale: Float = 1f,
     )
 
     private fun captureScrollingReader(snapshot: ReaderSnapshot) {
@@ -93,7 +100,7 @@ class MessageFullScreenMarkdownScreenshotTest {
             snapshot.dark,
             snapshot.scale,
             if (snapshot.rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
-            reader = ReaderContent(text, null, snapshot.amoled),
+            reader = ReaderContent(text, null, snapshot.amoled, snapshot.scale),
         )
         val body = composeRule.onNodeWithTag(MESSAGE_FULL_SCREEN_BODY_TAG)
         val range = body.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
@@ -107,8 +114,8 @@ class MessageFullScreenMarkdownScreenshotTest {
             }
             composeRule.mainClock.advanceTimeBy(32)
             composeRule
-            .onNodeWithTag(MESSAGE_FULL_SCREEN_TAG)
-            .captureRoboImage("src/test/snapshots/${snapshot.name}.png")
+                .onNodeWithTag(MESSAGE_FULL_SCREEN_TAG)
+                .captureRoboImage("src/test/snapshots/${snapshot.name}.png")
         } finally {
             body.performTouchInput { up() }
             composeRule.mainClock.autoAdvance = true
@@ -179,7 +186,8 @@ class MessageFullScreenMarkdownScreenshotTest {
                 LocalLayoutDirection provides layoutDirection,
                 LocalTextContextMenuToolbarProvider provides selectionToolbar,
             ) {
-                WhiteNoiseTheme(darkTheme = darkTheme, amoled = reader.amoled) {
+                // Dialogs restore the window density; scale the inherited typography for the new reader fixture.
+                WhiteNoiseTheme(darkTheme = darkTheme, amoled = reader.amoled, fontScale = reader.fontScale) {
                     val controller = rememberReaderTextSelectionController(reader.body)
                     selectionController = controller
                     MessageFullScreenView(
