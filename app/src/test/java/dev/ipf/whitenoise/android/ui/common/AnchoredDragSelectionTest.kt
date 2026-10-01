@@ -1,15 +1,20 @@
 package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -63,6 +68,73 @@ class AnchoredDragSelectionTest {
         assertEquals(-12f, dragSelectionAutoScrollDelta(0f, 0f, 100f, 20f, 12f))
         assertEquals(0f, dragSelectionAutoScrollDelta(50f, 0f, 100f, 20f, 12f))
         assertEquals(12f, dragSelectionAutoScrollDelta(100f, 0f, 100f, 20f, 12f))
+    }
+
+    /** Native reversed offsets resolve rows at both padded viewport edges after a resize. */
+    @Test
+    fun reverseLazyListEndpointFollowsPaddedPhysicalRowsAfterViewportShrinks() {
+        val ids = listOf("newest", "middle", "oldest")
+        val listState = LazyListState()
+        val height = mutableStateOf(300.dp)
+        val rowBounds = mutableMapOf<String, Rect>()
+        var viewportBounds: Rect? = null
+        composeRule.setContent {
+            LazyColumn(
+                state = listState,
+                reverseLayout = true,
+                contentPadding = PaddingValues(top = 24.dp, bottom = 32.dp),
+                modifier =
+                    Modifier
+                        .size(width = 240.dp, height = height.value)
+                        .onGloballyPositioned { viewportBounds = it.boundsInWindow() },
+            ) {
+                items(ids, key = { it }) { id ->
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(72.dp)
+                            .onGloballyPositioned { rowBounds[id] = it.boundsInWindow() },
+                    )
+                }
+            }
+        }
+
+        fun assertPhysicalEndpoints() {
+            composeRule.runOnIdle {
+                val viewport = checkNotNull(viewportBounds)
+                val layout = listState.layoutInfo
+                assertTrue(layout.beforeContentPadding > 0)
+                val visible =
+                    layout.visibleItemsInfo.map {
+                        DragSelectionVisibleItem(it.key as String, it.offset.toFloat(), (it.offset + it.size).toFloat())
+                    }
+                var sampledRows = 0
+                visible.forEach { item ->
+                    val bounds = checkNotNull(rowBounds[item.key])
+                    val visibleTop = maxOf(bounds.top, viewport.top)
+                    val visibleBottom = minOf(bounds.bottom, viewport.bottom)
+                    if (visibleBottom - visibleTop <= 4f) return@forEach
+                    sampledRows++
+                    listOf(visibleTop + 2f, visibleBottom - 2f).forEach { pointerY ->
+                        assertEquals(
+                            item.key,
+                            reverseLazyListDragSelectionEndpoint(
+                                visibleItems = visible,
+                                pointerWindowY = pointerY,
+                                viewportWindowTop = viewport.top,
+                                viewportHeight = layout.viewportSize.height - layout.beforeContentPadding,
+                            ),
+                        )
+                    }
+                }
+                assertTrue(sampledRows >= 2)
+            }
+        }
+
+        assertPhysicalEndpoints()
+        composeRule.runOnIdle { height.value = 250.dp }
+        composeRule.waitForIdle()
+        assertPhysicalEndpoints()
     }
 
     @Test

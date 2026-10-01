@@ -51,6 +51,22 @@ class ChatFolderPillsScreenshotTest {
     /** Renamed default. */
     @Test fun renamedDefault() = capture("folder_pills_renamed_default", selected = "unread")
 
+    /** Chats total is present with another folder selected. */
+    @Test fun chatsUnreadInFolder() = capture("folder_pills_chats_unread_folder", selected = "unread", unread = 12uL)
+
+    /** High totals cap visually in dark theme. */
+    @Test
+    fun chatsUnreadCappedDark() =
+        capture(
+            "folder_pills_chats_unread_amoled",
+            dark = true,
+            amoled = true,
+            unread = 100uL,
+        )
+
+    /** RTL large text retains the permanent total. */
+    @Test fun chatsUnreadLargeRtl() = capture("folder_pills_chats_unread_rtl", rtl = true, unread = 99uL)
+
     /** Density fixture for a high-density render. */
     @Test
     @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-xxhdpi")
@@ -67,6 +83,7 @@ class ChatFolderPillsScreenshotTest {
         scrolled: Boolean = false,
         empty: Boolean = false,
         selected: String? = null,
+        unread: ULong? = null,
     ) {
         val chips =
             listOf(
@@ -84,7 +101,16 @@ class ChatFolderPillsScreenshotTest {
                     LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
                 ) {
                     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-                        Column { ChatFolderPills(if (empty) emptyList() else chips, selected, {}, {}, {}) }
+                        Column {
+                            ChatFolderPills(
+                                if (empty) emptyList() else chips,
+                                selected,
+                                {},
+                                {},
+                                {},
+                                chatsUnreadCount = unread,
+                            )
+                        }
                     }
                 }
             }

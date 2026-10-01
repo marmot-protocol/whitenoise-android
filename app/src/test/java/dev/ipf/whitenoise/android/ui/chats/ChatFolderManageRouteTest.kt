@@ -76,7 +76,7 @@ class ChatFolderManageRouteTest {
                     )
                 }
             }
-            composeRule.onNodeWithTag("chats.folders").performScrollToIndex(2)
+            composeRule.onNodeWithTag("chats.folders").performScrollToIndex(1)
             composeRule.onNodeWithTag("chats.manageFolders").performClick()
             composeRule.onNodeWithTag(CHAT_FOLDERS_CONTENT_TAG).assertExists()
             composeRule.onNodeWithText("Pending diagnostics consent").assertDoesNotExist()

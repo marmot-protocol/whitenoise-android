@@ -75,6 +75,72 @@
         "test_ids": ["ONB-005", "FIND-005", "FIND-006"]
       },
       {
+        "surface": "Received contact Add action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
+        "anchor": "R.string.contact_add",
+        "test_ids": ["MED-014"]
+      },
+      {
+        "surface": "Received contact compact Add label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
+        "anchor": "R.string.contact_add_short",
+        "test_ids": ["MED-014"]
+      },
+      {
+        "surface": "Received contact Save VCF action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
+        "anchor": "R.string.contact_save_vcf",
+        "test_ids": ["MED-014"]
+      },
+      {
+        "surface": "Received contact compact Save label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
+        "anchor": "R.string.contact_save_short",
+        "test_ids": ["MED-014"]
+      },
+      {
+        "surface": "Received contact View action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
+        "anchor": "R.string.contact_view",
+        "test_ids": ["MED-014"]
+      },
+      {
+        "surface": "Received contact compact View label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
+        "anchor": "R.string.contact_view_short",
+        "test_ids": ["MED-014"]
+      },
+      {
+        "surface": "Received contact action failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ReceivedContactActions.kt",
+        "anchor": "R.string.contact_action_failed",
+        "test_ids": ["MED-014"]
+      },
+      {
+        "surface": "Received contact invalid VCF",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ReceivedContactActions.kt",
+        "anchor": "R.string.contact_invalid_vcard",
+        "test_ids": ["MED-014"]
+      },
+      {
+        "surface": "Received contact VCF saved",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ReceivedContactActions.kt",
+        "anchor": "R.string.contact_vcf_saved",
+        "test_ids": ["MED-014"]
+      },
+      {
+        "surface": "Received contact media load failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ReceivedContactActions.kt",
+        "anchor": "R.string.media_couldnt_load",
+        "test_ids": ["MED-014"]
+      },
+      {
+        "surface": "Received contact missing handler",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ReceivedContactActions.kt",
+        "anchor": "R.string.media_no_app_to_open",
+        "test_ids": ["MED-014"]
+      },
+      {
         "surface": "content",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiShortcodes.kt",
         "anchor": "fun content(): Map<String, InlineTextContent>",
@@ -1002,7 +1068,18 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
         "anchor": "fun ChatListSelectionControls(",
         "test_ids": [
-          "CHL-001"
+          "CHL-001",
+          "CHL-011",
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "DirectSelectionAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
+        "anchor": "fun DirectSelectionAction(",
+        "test_ids": [
+          "CHL-011",
+          "CHL-012"
         ]
       },
       {
@@ -5421,7 +5498,32 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
         "anchor": "fun ContactMessageBubble(",
         "test_ids": [
-          "CON-001"
+          "CON-001",
+          "MED-014"
+        ]
+      },
+      {
+        "surface": "ContactCardActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
+        "anchor": "fun ContactCardActions(",
+        "test_ids": [
+          "MED-014"
+        ]
+      },
+      {
+        "surface": "ContactCardAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
+        "anchor": "fun ContactCardAction(",
+        "test_ids": [
+          "MED-014"
+        ]
+      },
+      {
+        "surface": "ReceivedContactActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ReceivedContactActions.kt",
+        "anchor": "fun ReceivedContactActions(",
+        "test_ids": [
+          "MED-014"
         ]
       },
       {
@@ -25743,15 +25845,6 @@
         "anchor": "R.string.save",
         "test_ids": [
           "FLD-002"
-        ]
-      },
-      {
-        "surface": "R.string.actions",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
-        "anchor": "R.string.actions",
-        "test_ids": [
-          "CHL-011",
-          "CHL-012"
         ]
       },
       {

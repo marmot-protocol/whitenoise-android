@@ -1014,6 +1014,15 @@
     <string name="share_user_view">查看资料</string>
     <string name="attach_options">添加附件</string>
     <string name="media_preview_position_badge">发送顺序 %1$d</string>
+    <string name="contact_view">查看联系人</string>
+    <string name="contact_add">添加到联系人</string>
+    <string name="contact_save_vcf">保存 VCF</string>
+    <string name="contact_view_short">查看</string>
+    <string name="contact_add_short">添加</string>
+    <string name="contact_save_short">保存</string>
+    <string name="contact_invalid_vcard">联系人文件无效或过大</string>
+    <string name="contact_action_failed">无法完成联系人操作</string>
+    <string name="contact_vcf_saved">VCF 已保存</string>
     <string name="share_contact_title">分享联系人</string>
     <string name="share_location_title">分享位置</string>
     <string name="location_use_current">使用当前位置</string>
@@ -1242,6 +1251,9 @@
     <string name="clear_search">清除搜索</string>
     <string name="chat_list_action_add_to_folder">添加到文件夹</string>
     <string name="chat_folder_included_by_rule">由此文件夹的规则加入</string>
+    <plurals name="chat_pill_unread_messages_count">
+        <item quantity="other">%1$s 条未读消息</item>
+    </plurals>
     <plurals name="chat_folder_chat_count">
         <item quantity="other">%1$d 个聊天</item>
     </plurals>

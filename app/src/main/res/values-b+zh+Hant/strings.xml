@@ -1014,6 +1014,15 @@
     <string name="share_user_view">查看個人檔案</string>
     <string name="attach_options">新增附件</string>
     <string name="media_preview_position_badge">傳送順序 %1$d</string>
+    <string name="contact_view">查看聯絡人</string>
+    <string name="contact_add">加入聯絡人</string>
+    <string name="contact_save_vcf">儲存 VCF</string>
+    <string name="contact_view_short">查看</string>
+    <string name="contact_add_short">加入</string>
+    <string name="contact_save_short">儲存</string>
+    <string name="contact_invalid_vcard">聯絡人檔案無效或過大</string>
+    <string name="contact_action_failed">無法完成聯絡人操作</string>
+    <string name="contact_vcf_saved">VCF 已儲存</string>
     <string name="share_contact_title">分享聯絡人</string>
     <string name="share_location_title">分享位置</string>
     <string name="location_use_current">使用目前位置</string>
@@ -1242,6 +1251,9 @@
     <string name="clear_search">清除搜尋</string>
     <string name="chat_list_action_add_to_folder">加入資料夾</string>
     <string name="chat_folder_included_by_rule">由此資料夾的規則加入</string>
+    <plurals name="chat_pill_unread_messages_count">
+        <item quantity="other">%1$s 則未讀訊息</item>
+    </plurals>
     <plurals name="chat_folder_chat_count">
         <item quantity="other">%1$d 個聊天</item>
     </plurals>

@@ -81,6 +81,7 @@ import java.util.UUID
 @Suppress("FunctionNaming", "LongParameterList", "LongMethod", "CyclomaticComplexMethod")
 internal fun MessageActionMenu(
     expanded: Boolean,
+    initiatingHoldActive: Boolean = false,
     anchorBoundsInWindow: IntRect?,
     anchorWindowYPx: Float?,
     canReply: Boolean,
@@ -198,6 +199,7 @@ internal fun MessageActionMenu(
             )
         }
     FocusedMessageActions(
+        initiatingHoldActive = initiatingHoldActive,
         sourceBounds = anchorBoundsInWindow,
         touchY = anchorWindowYPx,
         mine = mine,
