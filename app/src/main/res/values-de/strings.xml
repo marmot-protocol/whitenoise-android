@@ -1035,6 +1035,9 @@
     <string name="contact_view">Kontakt ansehen</string>
     <string name="contact_add">Zu Kontakten hinzufügen</string>
     <string name="contact_save_vcf">VCF speichern</string>
+    <string name="contact_view_short">Ansehen</string>
+    <string name="contact_add_short">Hinzuf.</string>
+    <string name="contact_save_short">Sichern</string>
     <string name="contact_invalid_vcard">Diese Kontaktdatei ist ungültig oder zu groß</string>
     <string name="contact_action_failed">Kontaktaktion fehlgeschlagen</string>
     <string name="contact_vcf_saved">VCF gespeichert</string>

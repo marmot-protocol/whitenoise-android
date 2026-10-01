@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.chats
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -130,11 +131,12 @@ internal fun ChatListSelectionControls(
             enabled = actionsEnabled,
             modifier =
                 Modifier
-                    .heightIn(min = 48.dp)
+                    .heightIn(min = 40.dp)
                     .testTag("chats.selectAllAction")
                     .semantics { contentDescription = selectAllLabel },
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
         ) {
-            Text(selectAllLabel)
+            Text(selectAllLabel, style = MaterialTheme.typography.labelMedium, maxLines = 1)
         }
         DirectSelectionAction(
             label = archiveLabel,

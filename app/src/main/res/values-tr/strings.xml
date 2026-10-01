@@ -1035,6 +1035,9 @@
     <string name="contact_view">Kişiyi görüntüle</string>
     <string name="contact_add">Kişilere ekle</string>
     <string name="contact_save_vcf">VCF kaydet</string>
+    <string name="contact_view_short">Gör</string>
+    <string name="contact_add_short">Ekle</string>
+    <string name="contact_save_short">Kaydet</string>
     <string name="contact_invalid_vcard">Bu kişi dosyası geçersiz veya çok büyük</string>
     <string name="contact_action_failed">Kişi işlemi tamamlanamadı</string>
     <string name="contact_vcf_saved">VCF kaydedildi</string>

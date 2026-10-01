@@ -168,11 +168,11 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.anchoredDragSelection
 import dev.ipf.whitenoise.android.ui.common.dragSelectionAutoScrollDelta
-import dev.ipf.whitenoise.android.ui.common.dragSelectionEndpoint
 import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
 import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
+import dev.ipf.whitenoise.android.ui.common.reverseLazyListDragSelectionEndpoint
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
@@ -1216,7 +1216,7 @@ internal fun ConversationScreen(
     fun updateMessageDragSelection(pointerWindowY: Float): Boolean {
         val anchorId = dragAnchorTimelineId ?: return false
         val endpointId =
-            dragSelectionEndpoint(
+            reverseLazyListDragSelectionEndpoint(
                 timelineViewport.readingLayoutInfo().visibleItemsInfo.mapNotNull { visible ->
                     val id = visible.key as? String
                     id
@@ -1229,7 +1229,9 @@ internal fun ConversationScreen(
                             )
                         }
                 },
-                pointerY = pointerWindowY - transcriptWindowTop,
+                pointerWindowY = pointerWindowY,
+                viewportWindowTop = transcriptWindowTop,
+                viewportHeight = listState.layoutInfo.viewportSize.height,
             ) ?: return false
         if (endpointId == anchorId && selectedMessages.isEmpty()) return false
         val nextTimelineIds =

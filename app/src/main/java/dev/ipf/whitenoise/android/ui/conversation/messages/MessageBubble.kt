@@ -1444,79 +1444,8 @@ internal fun MessageBubble(
                 Modifier
                     .fillMaxWidth()
                     .testTag(messageBubbleRowTestTag(record.messageIdHex))
-                    .messageBubbleSelectionRow(
-                        selectionMode = selectionMode,
-                        selected = selected,
-                    ).twoFingerSwipeDown(
-                        // Batch selection and text selection own the row while
-                        // they are active, and a deleted message has nothing to
-                        // read. Everything else keeps the shortcut, including a
-                        // bubble that cannot itself be spoken: holding what is
-                        // already playing does not need this message to have
-                        // anything to say.
-                        enabled = !selectionMode && !textSelectionMode && !deleted,
-                        viewportLock = ttsQuickTransportViewportLock,
-                        onSwipe = ::quickTransportFromTwoFingerSwipe,
-                    ).then(
-                        // A deleted or selection-mode message has no actionable
-                        // reply gesture; taps are owned by the selection row. Keep
-                        // the originating row's detector mounted while its range
-                        // drag is active so recomposition cannot break ownership
-                        // of the pointer that is already down.
-                        if (replySwipeUnavailable || longPressBlockedBySelection) {
-                            Modifier
-                        } else {
-                            Modifier.pointerInput(record.messageIdHex, replySwipeDirection) {
-                                var gesture = ReplySwipeGesture()
-                                detectHorizontalDragGestures(
-                                    onDragStart = {
-                                        gesture = ReplySwipeGesture()
-                                    },
-                                    onHorizontalDrag = { change, dragAmount ->
-                                        val forward = dragAmount * replySwipeDirection
-                                        gesture =
-                                            gesture.dragBy(
-                                                deltaX = forward,
-                                                deltaY = change.position.y - change.previousPosition.y,
-                                            )
-                                        val raw = gesture.forwardReplySwipeDistance()
-                                        if (forward > 0f || raw > 0f) change.consume()
-                                        replySwipe.dragTo(raw)
-                                    },
-                                    onDragEnd = {
-                                        replySwipe.release { beginReply() }
-                                        gesture = ReplySwipeGesture()
-                                    },
-                                    onDragCancel = {
-                                        replySwipe.cancel()
-                                        gesture = ReplySwipeGesture()
-                                    },
-                                )
-                            }
-                        },
-                    ).then(
-                        Modifier.observeMessageTextDoubleTap(
-                            enabled = !deleted && !selectionMode && !textSelectionMode && canSpeakAloud,
-                            allowConsumedTapAt = { position ->
-                                rowCoordinates[0]
-                                    ?.localToWindow(position)
-                                    ?.let { press ->
-                                        markdownHasLinkAnnotationAt(markdownLinkLayouts.values, press)
-                                    } == true
-                            },
-                            onPointerDown = { position ->
-                                val pressInWindow = rowCoordinates[0]?.localToWindow(position)
-                                if (
-                                    pressInWindow != null &&
-                                    markdownHasLinkAnnotationAt(markdownLinkLayouts.values, pressInWindow)
-                                ) {
-                                    ttsLinkTapCoordinator.beginPointerActivation()
-                                }
-                            },
-                            onPointerFinished = ttsLinkTapCoordinator::endPointerActivation,
-                            onDoubleTap = messageTextDoubleTap,
-                        ),
-                    ).then(
+                    // Keep the active hold detector ahead of selection chrome that changes mid-drag.
+                    .then(
                         // Long-press lives in a raw pointerInput, not
                         // combinedClickable, so it WINS over inner media
                         // children (image/video/file/voice) that install their
@@ -1619,6 +1548,78 @@ internal fun MessageBubble(
                                 },
                             )
                         },
+                    ).messageBubbleSelectionRow(
+                        selectionMode = selectionMode,
+                        selected = selected,
+                    ).twoFingerSwipeDown(
+                        // Batch selection and text selection own the row while
+                        // they are active, and a deleted message has nothing to
+                        // read. Everything else keeps the shortcut, including a
+                        // bubble that cannot itself be spoken: holding what is
+                        // already playing does not need this message to have
+                        // anything to say.
+                        enabled = !selectionMode && !textSelectionMode && !deleted,
+                        viewportLock = ttsQuickTransportViewportLock,
+                        onSwipe = ::quickTransportFromTwoFingerSwipe,
+                    ).then(
+                        // A deleted or selection-mode message has no actionable
+                        // reply gesture; taps are owned by the selection row. Keep
+                        // the originating row's detector mounted while its range
+                        // drag is active so recomposition cannot break ownership
+                        // of the pointer that is already down.
+                        if (replySwipeUnavailable || longPressBlockedBySelection) {
+                            Modifier
+                        } else {
+                            Modifier.pointerInput(record.messageIdHex, replySwipeDirection) {
+                                var gesture = ReplySwipeGesture()
+                                detectHorizontalDragGestures(
+                                    onDragStart = {
+                                        gesture = ReplySwipeGesture()
+                                    },
+                                    onHorizontalDrag = { change, dragAmount ->
+                                        val forward = dragAmount * replySwipeDirection
+                                        gesture =
+                                            gesture.dragBy(
+                                                deltaX = forward,
+                                                deltaY = change.position.y - change.previousPosition.y,
+                                            )
+                                        val raw = gesture.forwardReplySwipeDistance()
+                                        if (forward > 0f || raw > 0f) change.consume()
+                                        replySwipe.dragTo(raw)
+                                    },
+                                    onDragEnd = {
+                                        replySwipe.release { beginReply() }
+                                        gesture = ReplySwipeGesture()
+                                    },
+                                    onDragCancel = {
+                                        replySwipe.cancel()
+                                        gesture = ReplySwipeGesture()
+                                    },
+                                )
+                            }
+                        },
+                    ).then(
+                        Modifier.observeMessageTextDoubleTap(
+                            enabled = !deleted && !selectionMode && !textSelectionMode && canSpeakAloud,
+                            allowConsumedTapAt = { position ->
+                                rowCoordinates[0]
+                                    ?.localToWindow(position)
+                                    ?.let { press ->
+                                        markdownHasLinkAnnotationAt(markdownLinkLayouts.values, press)
+                                    } == true
+                            },
+                            onPointerDown = { position ->
+                                val pressInWindow = rowCoordinates[0]?.localToWindow(position)
+                                if (
+                                    pressInWindow != null &&
+                                    markdownHasLinkAnnotationAt(markdownLinkLayouts.values, pressInWindow)
+                                ) {
+                                    ttsLinkTapCoordinator.beginPointerActivation()
+                                }
+                            },
+                            onPointerFinished = ttsLinkTapCoordinator::endPointerActivation,
+                            onDoubleTap = messageTextDoubleTap,
+                        ),
                     ).then(
                         // The raw pointerInput above only fires on a physical
                         // pointer long-press, so it leaves accessibility services

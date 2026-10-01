@@ -1081,6 +1081,9 @@
     <string name="contact_view">Просмотреть контакт</string>
     <string name="contact_add">Добавить в контакты</string>
     <string name="contact_save_vcf">Сохранить VCF</string>
+    <string name="contact_view_short">Открыть</string>
+    <string name="contact_add_short">Добавить</string>
+    <string name="contact_save_short">Сохранить</string>
     <string name="contact_invalid_vcard">Файл контакта недействителен или слишком большой</string>
     <string name="contact_action_failed">Не удалось выполнить действие</string>
     <string name="contact_vcf_saved">VCF сохранён</string>

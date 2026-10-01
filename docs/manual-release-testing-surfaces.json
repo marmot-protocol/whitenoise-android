@@ -5493,6 +5493,14 @@
         ]
       },
       {
+        "surface": "ContactCardAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
+        "anchor": "fun ContactCardAction(",
+        "test_ids": [
+          "MED-014"
+        ]
+      },
+      {
         "surface": "ReceivedContactActions",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ReceivedContactActions.kt",
         "anchor": "fun ReceivedContactActions(",

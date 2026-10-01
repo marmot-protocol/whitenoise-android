@@ -1017,6 +1017,9 @@
     <string name="contact_view">查看聯絡人</string>
     <string name="contact_add">加入聯絡人</string>
     <string name="contact_save_vcf">儲存 VCF</string>
+    <string name="contact_view_short">查看</string>
+    <string name="contact_add_short">加入</string>
+    <string name="contact_save_short">儲存</string>
     <string name="contact_invalid_vcard">聯絡人檔案無效或過大</string>
     <string name="contact_action_failed">無法完成聯絡人操作</string>
     <string name="contact_vcf_saved">VCF 已儲存</string>

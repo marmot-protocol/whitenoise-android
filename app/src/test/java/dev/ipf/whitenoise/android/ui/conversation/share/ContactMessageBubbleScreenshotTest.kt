@@ -41,7 +41,7 @@ class ContactMessageBubbleScreenshotTest {
     /** Recoverable error retains actions. */
     @Test fun failed() = capture("contact_card_failed", error = "Could not load")
 
-    /** Large RTL controls wrap without hiding Save VCF. */
+    /** Large RTL controls stay on one row with full accessible action names. */
     @Test
     @Config(sdk = [36], qualifiers = "ar-ldrtl-w320dp-h780dp-mdpi")
     fun largeRtl() = capture("contact_card_rtl_large", rtl = true, large = true)

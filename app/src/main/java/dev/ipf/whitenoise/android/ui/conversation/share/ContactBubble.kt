@@ -1,9 +1,13 @@
 package dev.ipf.whitenoise.android.ui.conversation.share
 
+import androidx.annotation.StringRes
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,6 +26,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -108,9 +114,35 @@ private fun ContactCardActions(
     if (error != null) {
         Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
     }
-    FlowRow {
-        TextButton(onClick = onView, enabled = !busy) { Text(stringResource(R.string.contact_view)) }
-        TextButton(onClick = onAdd, enabled = !busy) { Text(stringResource(R.string.contact_add)) }
-        TextButton(onClick = onSave, enabled = !busy) { Text(stringResource(R.string.contact_save_vcf)) }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        ContactCardAction(Modifier.weight(1f), R.string.contact_view_short, R.string.contact_view, !busy, onView)
+        ContactCardAction(Modifier.weight(1f), R.string.contact_add_short, R.string.contact_add, !busy, onAdd)
+        ContactCardAction(Modifier.weight(1f), R.string.contact_save_short, R.string.contact_save_vcf, !busy, onSave)
+    }
+}
+
+/** Compact visible labels keep all actions in one row; the full names remain available to accessibility. */
+@Composable
+@Suppress("FunctionNaming")
+private fun ContactCardAction(
+    modifier: Modifier,
+    @StringRes labelRes: Int,
+    @StringRes descriptionRes: Int,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val description = stringResource(descriptionRes)
+    TextButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.heightIn(min = 48.dp).semantics { contentDescription = description },
+        contentPadding = PaddingValues(horizontal = 0.dp),
+    ) {
+        Text(
+            stringResource(labelRes),
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }

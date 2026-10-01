@@ -1404,6 +1404,9 @@
     <string name="contact_view">View contact</string>
     <string name="contact_add">Add to contacts</string>
     <string name="contact_save_vcf">Save VCF</string>
+    <string name="contact_view_short">View</string>
+    <string name="contact_add_short">Add</string>
+    <string name="contact_save_short">Save</string>
     <string name="contact_invalid_vcard">This contact file is invalid or too large</string>
     <string name="contact_action_failed">Couldn\'t finish contact action</string>
     <string name="contact_vcf_saved">VCF saved</string>

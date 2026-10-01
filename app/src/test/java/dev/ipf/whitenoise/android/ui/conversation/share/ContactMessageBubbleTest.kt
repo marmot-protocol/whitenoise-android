@@ -3,10 +3,12 @@ package dev.ipf.whitenoise.android.ui.conversation.share
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -37,9 +39,21 @@ class ContactMessageBubbleTest {
             }
         }
         composeRule.onNodeWithText("Ada Example").assertIsDisplayed()
-        composeRule.onNodeWithText("View contact").performClick()
-        composeRule.onNodeWithText("Add to contacts").performClick()
-        composeRule.onNodeWithText("Save VCF").performClick()
+        val actionLabels = listOf("View contact", "Add to contacts", "Save VCF")
+        val actionCenters =
+            actionLabels.map { label ->
+                composeRule
+                    .onNodeWithContentDescription(label)
+                    .fetchSemanticsNode()
+                    .boundsInRoot.center.y
+            }
+        assertTrue("all three contact actions share one row", actionCenters.max() - actionCenters.min() < 1f)
+        composeRule.onNodeWithText("View").assertIsDisplayed()
+        composeRule.onNodeWithText("Add").assertIsDisplayed()
+        composeRule.onNodeWithText("Save").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("View contact").performClick()
+        composeRule.onNodeWithContentDescription("Add to contacts").performClick()
+        composeRule.onNodeWithContentDescription("Save VCF").performClick()
         assertEquals(1, views)
         assertEquals(1, adds)
         assertEquals(1, saves)
@@ -61,7 +75,7 @@ class ContactMessageBubbleTest {
         }
         composeRule.onNodeWithText("Ada Example").assertIsDisplayed()
         composeRule.onNodeWithText("Could not load").assertIsDisplayed()
-        composeRule.onNodeWithText("View contact").assertIsNotEnabled()
-        composeRule.onNodeWithText("Save VCF").assertIsNotEnabled()
+        composeRule.onNodeWithContentDescription("View contact").assertIsNotEnabled()
+        composeRule.onNodeWithContentDescription("Save VCF").assertIsNotEnabled()
     }
 }

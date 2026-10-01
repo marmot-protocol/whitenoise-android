@@ -5,11 +5,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -63,6 +67,62 @@ class AnchoredDragSelectionTest {
         assertEquals(-12f, dragSelectionAutoScrollDelta(0f, 0f, 100f, 20f, 12f))
         assertEquals(0f, dragSelectionAutoScrollDelta(50f, 0f, 100f, 20f, 12f))
         assertEquals(12f, dragSelectionAutoScrollDelta(100f, 0f, 100f, 20f, 12f))
+    }
+
+    /** Real reversed list offsets must resolve the physical row above and below an anchor. */
+    @Test
+    fun reverseLazyListEndpointFollowsPhysicalRowsAfterViewportShrinks() {
+        val ids = listOf("newest", "middle", "oldest")
+        val listState = LazyListState()
+        val height = mutableStateOf(300.dp)
+        val rowBounds = mutableMapOf<String, Rect>()
+        var viewportBounds: Rect? = null
+        composeRule.setContent {
+            LazyColumn(
+                state = listState,
+                reverseLayout = true,
+                modifier =
+                    Modifier
+                        .size(width = 240.dp, height = height.value)
+                        .onGloballyPositioned { viewportBounds = it.boundsInWindow() },
+            ) {
+                items(ids, key = { it }) { id ->
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(72.dp)
+                            .onGloballyPositioned { rowBounds[id] = it.boundsInWindow() },
+                    )
+                }
+            }
+        }
+
+        fun assertPhysicalEndpoints() {
+            composeRule.runOnIdle {
+                val top = checkNotNull(viewportBounds).top
+                val layout = listState.layoutInfo
+                val visible =
+                    layout.visibleItemsInfo.map {
+                        DragSelectionVisibleItem(it.key as String, it.offset.toFloat(), (it.offset + it.size).toFloat())
+                    }
+                ids.forEach { id ->
+                    assertEquals(
+                        id,
+                        reverseLazyListDragSelectionEndpoint(
+                            visibleItems = visible,
+                            pointerWindowY = checkNotNull(rowBounds[id]).center.y,
+                            viewportWindowTop = top,
+                            viewportHeight = layout.viewportSize.height,
+                        ),
+                    )
+                }
+            }
+        }
+
+        assertPhysicalEndpoints()
+        composeRule.runOnIdle { height.value = 250.dp }
+        composeRule.waitForIdle()
+        assertPhysicalEndpoints()
     }
 
     @Test
