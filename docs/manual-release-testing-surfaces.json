@@ -9531,6 +9531,22 @@
     ],
     "settings_controls": [
       {
+        "surface": "Summary channel excluded from global notification settings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_channel_summary",
+        "test_ids": [
+          "NTF-026"
+        ]
+      },
+      {
+        "surface": "Summary channel excluded from conversation notification settings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
+        "anchor": "R.string.notification_channel_summary",
+        "test_ids": [
+          "NTF-026"
+        ]
+      },
+      {
         "surface": "notification-first-post:giphy_media_preview",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
         "anchor": "R.string.giphy_media_preview",
@@ -23793,6 +23809,14 @@
     ],
     "android_entry_points": [
       {
+        "surface": "Generation-specific notification group dismissal",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": ".notifications.NotificationGroupDismissReceiver",
+        "test_ids": [
+          "NTF-026"
+        ]
+      },
+      {
         "surface": "intent:${deepLinkScheme}",
         "source": "app/src/main/AndroidManifest.xml",
         "anchor": "${deepLinkScheme}",
@@ -28234,6 +28258,70 @@
       }
     ],
     "notification_content_contracts": [
+      {
+        "surface": "Silent group summary channel name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationChannels.kt",
+        "anchor": "R.string.notification_channel_summary",
+        "test_ids": [
+          "NTF-026"
+        ]
+      },
+      {
+        "surface": "Silent group summary channel description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationChannels.kt",
+        "anchor": "R.string.notification_channel_summary_description",
+        "test_ids": [
+          "NTF-026"
+        ]
+      },
+      {
+        "surface": "Generic notification summary app title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/UserEventNotificationGroup.kt",
+        "anchor": "R.string.app_name",
+        "test_ids": [
+          "NTF-026"
+        ]
+      },
+      {
+        "surface": "Redacted group summary public content",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/UserEventNotificationGroup.kt",
+        "anchor": "R.string.notification_hidden_content",
+        "test_ids": [
+          "NTF-026"
+        ]
+      },
+      {
+        "surface": "Private generic notification group summary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/UserEventNotificationGroup.kt",
+        "anchor": "fun summary(",
+        "test_ids": [
+          "NTF-026"
+        ]
+      },
+      {
+        "surface": "Notification group generation cleanup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationGroupDismissal.kt",
+        "anchor": "suspend fun dismissNotificationGroupGenerations(",
+        "test_ids": [
+          "NTF-026"
+        ]
+      },
+      {
+        "surface": "OS notification group reconciliation and blocked channel/group recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationGroupReconciler.kt",
+        "anchor": "internal class NotificationGroupReconciler(",
+        "test_ids": [
+          "NTF-026"
+        ]
+      },
+      {
+        "surface": "Android summary channel and group blocking",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationSummaryChannel.kt",
+        "anchor": "internal fun isNotificationSummaryChannelBlocked(",
+        "test_ids": [
+          "NTF-026"
+        ]
+      },
       {
         "surface": "Generic attachment download notification title",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentUserInitiatedDownloadService.kt",

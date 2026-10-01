@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="notification_channel_summary">Resumo de notificações</string>
+    <string name="notification_channel_summary_description">Resumo silencioso de mensagens e outros eventos</string>
+    <plurals name="notification_group_count">
+        <item quantity="one">%1$d notificação</item>
+        <item quantity="other">%1$d notificações</item>
+    </plurals>
     <string name="poll_custom_time">Tempo personalizado</string>
     <string name="poll_custom_duration">Duração</string>
     <string name="poll_unit_seconds">Segundos</string>

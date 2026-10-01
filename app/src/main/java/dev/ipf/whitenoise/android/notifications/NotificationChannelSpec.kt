@@ -97,6 +97,16 @@ enum class NotificationChannelSpec(
         ConversationChannelPolicy.GLOBAL_ONLY,
         launcherBadgeByDefault = false,
     ),
+
+    /** Presentation-only summary. Child channels and their existing settings own every alert. */
+    USER_EVENT_SUMMARY(
+        "user_event_summary_v1",
+        // LOW can hide the group's only icon when Android hides silent status-bar icons.
+        // Explicit null sound/vibration, setSilent and GROUP_ALERT_CHILDREN suppress summary alerts.
+        ChannelImportance.DEFAULT,
+        ConversationChannelPolicy.GLOBAL_ONLY,
+        launcherBadgeByDefault = false,
+    ),
     ;
 
     companion object {

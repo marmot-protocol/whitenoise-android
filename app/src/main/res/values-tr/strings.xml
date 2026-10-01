@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="notification_channel_summary">Bildirim özeti</string>
+    <string name="notification_channel_summary_description">Mesajların ve diğer olayların sessiz özeti</string>
+    <plurals name="notification_group_count">
+        <item quantity="one">%1$d bildirim</item>
+        <item quantity="other">%1$d bildirim</item>
+    </plurals>
     <string name="poll_custom_time">Özel süre</string>
     <string name="poll_custom_duration">Süre</string>
     <string name="poll_unit_seconds">Saniye</string>

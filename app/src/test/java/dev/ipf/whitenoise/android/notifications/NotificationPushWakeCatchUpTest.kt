@@ -595,7 +595,14 @@ class NotificationPushWakeCatchUpTest {
             assertEquals(2, fetches)
             assertFalse(store.pushWakeCatchUpPending())
             withTimeout(5_000L) {
-                while (manager.activeNotifications.map { it.id }.toSet() != setOf(0, 1)) {
+                while (
+                    manager.activeNotifications
+                        .filterNot {
+                            it.tag == UserEventNotificationGroup.SUMMARY_TAG &&
+                                it.id == UserEventNotificationGroup.SUMMARY_ID
+                        }.map { it.id }
+                        .toSet() != setOf(0, 1)
+                ) {
                     shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
                     delay(1L)
                 }

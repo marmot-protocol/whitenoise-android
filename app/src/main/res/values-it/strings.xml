@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="notification_channel_summary">Riepilogo delle notifiche</string>
+    <string name="notification_channel_summary_description">Riepilogo silenzioso dei messaggi e degli altri eventi</string>
+    <plurals name="notification_group_count">
+        <item quantity="one">%1$d notifica</item>
+        <item quantity="other">%1$d notifiche</item>
+    </plurals>
     <string name="poll_custom_time">Durata personalizzata</string>
     <string name="poll_custom_duration">Durata</string>
     <string name="poll_unit_seconds">Secondi</string>
