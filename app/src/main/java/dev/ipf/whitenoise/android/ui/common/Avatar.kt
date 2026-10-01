@@ -37,7 +37,10 @@ private val AvatarPalette =
         Color(0xFF9A4055),
     )
 
-/** Shows identity-scoped cached pixels or initials, recovering missing URL images while visible. */
+/**
+ * Shows identity-scoped cached pixels or initials, recovering missing URL images while visible. A URL
+ * picture whose cached bytes are a GIF animates over its first frame under the shared profile policy.
+ */
 @Composable
 internal fun Avatar(
     title: String,
@@ -75,6 +78,10 @@ internal fun Avatar(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
             )
+            if (picture == null) {
+                val maxEdgePx = with(LocalDensity.current) { size.roundToPx() }
+                AnimatedProfileAvatarOverlay(pictureUrl, image, Modifier.fillMaxSize(), maxEdgePx)
+            }
         } else {
             // Derive the font size from the avatar diameter so the single
             // monogram glyph (the prototype rule) fills the circle without

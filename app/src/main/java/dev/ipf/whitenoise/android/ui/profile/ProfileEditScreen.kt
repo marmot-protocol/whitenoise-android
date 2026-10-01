@@ -75,6 +75,7 @@ import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.randomProfilePseudonym
+import dev.ipf.whitenoise.android.ui.common.AnimatedProfileAvatarOverlay
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.IdentityImageCropFlow
 import dev.ipf.whitenoise.android.ui.group.ImagePreviewPresentation
@@ -249,6 +250,7 @@ internal fun ProfileBannerControl(
     }
 }
 
+/** Own-profile banner and avatar header; a GIF avatar animates over its first frame under the shared policy. */
 @Composable
 @Suppress("FunctionNaming", "LongMethod")
 internal fun ProfileHeroHeader(
@@ -354,6 +356,11 @@ internal fun ProfileHeroHeader(
                                                 .size(108.dp)
                                                 .clip(CircleShape)
                                                 .alpha(avatarImageAlpha),
+                                    )
+                                    AnimatedProfileAvatarOverlay(
+                                        url = pictureUrl,
+                                        firstFrame = image,
+                                        modifier = Modifier.size(108.dp).clip(CircleShape).alpha(avatarImageAlpha),
                                     )
                                 }
                             }

@@ -1998,7 +1998,24 @@
         "anchor": "fun Avatar(",
         "test_ids": [
           "AXY-001",
-          "INT-011"
+          "INT-011",
+          "PRO-006"
+        ]
+      },
+      {
+        "surface": "AnimatedProfileAvatarOverlay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnimatedProfileAvatar.kt",
+        "anchor": "fun AnimatedProfileAvatarOverlay(",
+        "test_ids": [
+          "PRO-006"
+        ]
+      },
+      {
+        "surface": "AnimatedProfileAvatarLayer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnimatedProfileAvatar.kt",
+        "anchor": "fun AnimatedProfileAvatarLayer(",
+        "test_ids": [
+          "PRO-006"
         ]
       },
       {
@@ -6986,7 +7003,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AvatarViewer.kt",
         "anchor": "fun ZoomableAvatarImage(",
         "test_ids": [
-          "PRO-001"
+          "PRO-001",
+          "PRO-006"
         ]
       },
       {
@@ -7064,7 +7082,8 @@
         "anchor": "fun ProfileAvatar(",
         "test_ids": [
           "PRO-001",
-          "PRO-002"
+          "PRO-002",
+          "PRO-006"
         ]
       },
       {
@@ -7206,7 +7225,8 @@
         "anchor": "fun ProfileHeroHeader(",
         "test_ids": [
           "PRO-001",
-          "PRO-002"
+          "PRO-002",
+          "PRO-006"
         ]
       },
       {
