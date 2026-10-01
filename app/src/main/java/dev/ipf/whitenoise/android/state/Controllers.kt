@@ -3722,6 +3722,7 @@ class ChatsController private constructor(
         return appState.accounts.firstOrNull { it.label == ref }?.accountIdHex
     }
 
+    /** Projects one retained row with the live window's presentation, preview, actions and caches. */
     internal fun projectChatRow(
         authoritativeRow: ChatListRowFfi,
         activeAccountIdHex: String? = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex,

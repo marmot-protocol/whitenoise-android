@@ -132,6 +132,7 @@ class ConversationUnreadJumpScreenshotTest {
         }
     }
 
+    /** The first tap top-aligns an oversized unread row and only the second tap reaches the tail. */
     @Test
     @Suppress("LongMethod") // One vertical harness verifies both taps against the same real list state.
     fun oversizedVisibleUnreadTopAlignsBeforeSecondTapReachesTail() {

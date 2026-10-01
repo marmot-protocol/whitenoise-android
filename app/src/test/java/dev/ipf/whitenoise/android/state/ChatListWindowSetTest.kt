@@ -216,6 +216,7 @@ private class FakeWindow(
             awaitingNext = false
         }
 
+    /** Answers a page with one appended row, or with the same rows when [forwardPageAppends] is off. */
     override suspend fun page(
         sequence: ULong,
         direction: ChatListPageDirectionFfi,

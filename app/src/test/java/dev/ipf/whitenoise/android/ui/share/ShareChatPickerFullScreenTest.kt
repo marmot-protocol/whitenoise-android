@@ -609,6 +609,7 @@ class ShareChatPickerFullScreenTest {
             .assertIsDisplayed()
     }
 
+    /** Delivers a window-inset change with the IME occupying [bottomPx] from the bottom. */
     private fun dispatchImeBottom(bottomPx: Int) {
         composeRule.runOnUiThread {
             val insets =
@@ -622,6 +623,7 @@ class ShareChatPickerFullScreenTest {
         composeRule.waitForIdle()
     }
 
+    /** A 64-character hex identifier built from one repeated byte. */
     private fun hexId(byte: Int): String = byte.toString(16).padStart(2, '0').repeat(32)
 
     /** A presented group row outside the retained window whose prepared title is [title]. */

@@ -161,8 +161,10 @@ class ChatListWindowForwardPagingComposeTest {
     }
 }
 
+/** The merged retained rows as the lazy-list keys the screen would render. */
 private fun ChatListWindowSet.rowIds(): List<String> = rows.map { it.row.groupIdHex }
 
+/** Zero-padded row key for position [index] in the 500-row account. */
 private fun rowId(index: Int): String = "row-%03d".format(index)
 
 /**
@@ -211,11 +213,13 @@ private class ModelChatListWindow(
         return current
     }
 
+    /** The newest frame this window has produced. */
     override fun snapshot(): ChatListWindowSnapshotFfi = current
 
     /** No stream replacements arrive in this fixture; commands are the only source of new frames. */
     override suspend fun next(): ChatListWindowSnapshotFfi? = awaitCancellation()
 
+    /** Grows the limit by [count] up to the cap; at the cap a forward page consumes the rows before the anchor. */
     override suspend fun page(
         sequence: ULong,
         direction: ChatListPageDirectionFfi,
@@ -237,6 +241,7 @@ private class ModelChatListWindow(
         return commit()
     }
 
+    /** Anchors the window on a retained row, or on the true top when that row is the first row of the list. */
     override suspend fun setVisibleAnchor(
         sequence: ULong,
         groupIdHex: String,
@@ -249,6 +254,7 @@ private class ModelChatListWindow(
         return commit()
     }
 
+    /** Drops the anchor so the window is pinned to the top of the list again. */
     override suspend fun returnToTop(sequence: ULong): ChatListWindowSnapshotFfi {
         requireCurrent(sequence)
         anchor = null
@@ -256,6 +262,7 @@ private class ModelChatListWindow(
         return commit()
     }
 
+    /** Nothing native to release in this fixture. */
     override fun close() = Unit
 
     private companion object {

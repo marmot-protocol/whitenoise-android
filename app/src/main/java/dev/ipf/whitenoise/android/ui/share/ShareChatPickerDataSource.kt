@@ -70,6 +70,10 @@ internal fun rememberShareChatPickerSelectionState(
     )
 }
 
+/**
+ * The picker's target source for [selectedAccountRef]: the active account's controller, or a picker-owned
+ * controller bound to another account, each merged with the one account-wide read behind the open picker.
+ */
 @Composable
 internal fun rememberShareChatPickerDataSource(
     appState: WhiteNoiseAppState,

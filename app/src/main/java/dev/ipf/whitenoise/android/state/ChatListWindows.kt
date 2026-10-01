@@ -153,6 +153,7 @@ internal class ChatListWindowSet private constructor(
     /** Whether a no-progress forward page has parked [view]'s edge demand until fresh state arrives. */
     fun isForwardStalled(view: ChatListViewFfi): Boolean = synchronized(frameLock) { view in forwardStalled }
 
+    /** Parks [view]'s forward demand; the next installed replacement clears it. */
     private fun markForwardStalled(view: ChatListViewFfi) {
         synchronized(frameLock) { forwardStalled += view }
         chatsDebug { "chat window forward page made no progress view=$view, waiting for fresh state" }
@@ -223,6 +224,7 @@ internal class ChatListWindowSet private constructor(
             result?.takeIf { install(view, it) }
         }
 
+    /** Installs a newer same-generation replacement for [view] and bumps the frame revision; false for a duplicate. */
     private fun install(
         view: ChatListViewFfi,
         update: ChatListWindowSnapshotFfi,
