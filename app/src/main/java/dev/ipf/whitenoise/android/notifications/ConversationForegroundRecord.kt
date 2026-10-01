@@ -18,9 +18,9 @@ internal class ConversationForegroundRecord(
         private set
     private var foregroundPromoted = false
 
-    fun foregroundNotification(): Notification {
-        return dictation.notificationOrNull() ?: BackgroundConnectionNotification.build(service)
-    }
+    fun foregroundNotification(): Notification = dictation.notificationOrNull() ?: connectionNotification()
+
+    private fun connectionNotification(): Notification = BackgroundConnectionNotification.build(service)
 
     fun promoteConnection(trigger: ForegroundStartTrigger) {
         val type = foregroundServiceTypeForTrigger(trigger)
@@ -53,7 +53,7 @@ internal class ConversationForegroundRecord(
         if (dictation.hasForegroundLease || !isCurrent()) return
         if (connectionServiceType != 0) {
             try {
-                publishForeground(BackgroundConnectionNotification.build(service), connectionServiceType)
+                publishForeground(connectionNotification(), connectionServiceType)
             } catch (_: SecurityException) {
                 releaseConnection()
             } catch (error: RuntimeException) {

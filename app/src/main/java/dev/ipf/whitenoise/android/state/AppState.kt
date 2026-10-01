@@ -65,7 +65,6 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
 import dev.ipf.whitenoise.android.audio.DictationDiagnosticLifecycle
 import dev.ipf.whitenoise.android.audio.DictationDiagnostics
 import dev.ipf.whitenoise.android.audio.MicrophoneCaptureCoordinator
-import dev.ipf.whitenoise.android.audio.discoverConversationDictationProviders
 import dev.ipf.whitenoise.android.audio.tts.AndroidTtsSpeechEngine
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineHandle
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineResolver
@@ -1280,17 +1279,8 @@ class WhiteNoiseAppState private constructor(
         }
 
     /** Settings discovery is lifecycle-local; protocol data never enters this platform snapshot. */
-    internal suspend fun discoverDictationProviders(): List<ConversationDictationProvider> {
-        val providers =
-            withContext(Dispatchers.IO) {
-                discoverConversationDictationProviders(appContext)
-            }
-        val saved = conversationDictationPreferences.current().providerSelection
-        if (saved != null && providers.flatMap { it.choices }.none(saved::sameInstallation)) {
-            conversationDictationPreferences.setProviderSelection(null)
-        }
-        return providers
-    }
+    internal suspend fun discoverDictationProviders(): List<ConversationDictationProvider> =
+        discoverDictationProvidersForSettings(appContext, conversationDictationPreferences)
 
     private val legacyDraftMigrationSource by lazy { LegacyDraftMigrationSource(appContext) }
     internal val editorSourceStore: EditorSourceStore = EditorSourceStore.create(appContext)
@@ -2650,14 +2640,7 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
         expectedRevision: Long,
         value: TextFieldValue,
-    ): Long? {
-        return composerDraftExpansionBridge.setDraftIfCurrentWithRevision(
-            accountRef,
-            groupIdHex,
-            expectedRevision,
-            value,
-        )
-    }
+    ): Long? = composerDraftExpansionBridge.writeDraftIfCurrent(accountRef, groupIdHex, expectedRevision, value)
 
     /** Dictation conditionally empties only its unchanged origin; failed or unknown sends restore that exact text. */
     internal suspend fun sendDictationTranscriptIfOriginUnchanged(request: ConversationDictationSendRequest): Boolean {

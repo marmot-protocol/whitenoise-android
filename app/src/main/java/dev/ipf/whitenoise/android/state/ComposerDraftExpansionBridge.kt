@@ -44,10 +44,10 @@ internal class ComposerDraftExpansionBridge(
         groupIdHex: String,
         expectedRevision: Long,
         value: TextFieldValue,
-    ): Boolean = setDraftIfCurrentWithRevision(accountRef, groupIdHex, expectedRevision, value) != null
+    ): Boolean = writeDraftIfCurrent(accountRef, groupIdHex, expectedRevision, value) != null
 
     /** Returns this write's own generation, never a later sample owned by another producer. */
-    fun setDraftIfCurrentWithRevision(
+    fun writeDraftIfCurrent(
         accountRef: String,
         groupIdHex: String,
         expectedRevision: Long,
