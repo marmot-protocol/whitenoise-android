@@ -1930,11 +1930,9 @@ internal fun ChatsScreen(
                 if (!leavingAndDeleting.add(groupId)) return@ChatLeaveAndDeleteConfirmationDialog
                 appState.launchMutation {
                     try {
-                        if (appState.activeAccountRef != originAccount ||
-                            appState.runtimeGeneration != originRuntime ||
-                            appState.signOutInProgress ||
-                            appState.wipeInProgress
-                        ) {
+                        val originChanged =
+                            appState.activeAccountRef != originAccount || appState.runtimeGeneration != originRuntime
+                        if (originChanged || appState.signOutInProgress || appState.wipeInProgress) {
                             return@launchMutation
                         }
                         controller.leaveAndDeleteFromChatList(groupId)

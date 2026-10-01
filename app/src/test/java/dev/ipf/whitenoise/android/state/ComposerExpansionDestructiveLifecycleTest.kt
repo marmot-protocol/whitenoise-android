@@ -780,66 +780,43 @@ class ComposerExpansionDestructiveLifecycleTest {
             MarmotInterface::class.java.classLoader,
             arrayOf(MarmotInterface::class.java),
         ) { proxy, method, arguments ->
-            /** Completes one reflected suspend call with the requested native failure. */
-            fun suspendFailure(failure: Throwable): Any {
-                (arguments!!.last() as Continuation<Any?>).resumeWithException(failure)
-                return COROUTINE_SUSPENDED
-            }
-
             when (method.name.substringBefore('-')) {
                 "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
                 "selectedMessageDraft" -> SelectedMessageDraftFfi(emptyDraftRevision, null)
                 "localSendStatus" -> null
                 "sendTextWithClientToken" -> {
-                    calls.send.incrementAndGet()
-                    val summary = sendResult()
+                    val summary = countedSendResult(calls, sendResult)
                     LocalSendAcceptanceFfi(
                         clientToken = arguments!![3] as String,
                         messageIdHex = summary.messageIds.single(),
                     )
                 }
-                "sendText" -> {
-                    calls.send.incrementAndGet()
-                    sendResult()
-                }
+                "sendText" -> countedSendResult(calls, sendResult)
                 "groupMembers" -> if (soleMember) members().take(1) else members()
                 "listMedia" -> emptyList<Any>()
                 "chatList" -> {
                     calls.chatList.incrementAndGet()
-                    if (localGroupPresent) {
-                        listOf(
-                            groupRow().copy(
-                                selfMembership = if (left) SelfMembershipFfi.LEFT else SelfMembershipFfi.MEMBER,
-                            ),
-                        )
-                    } else {
-                        emptyList<ChatListRowFfi>()
-                    }
+                    lifecycleChatRows(localGroupPresent, left)
                 }
                 "leaveGroup" -> {
                     calls.order.add("leave")
                     calls.leave.incrementAndGet()
                     if (failLeave) {
-                        suspendFailure(IllegalStateException("leave rejected"))
+                        failNativeCall(arguments, IllegalStateException("leave rejected"))
                     } else {
                         left = leaveConfirmed
                         leaveResultHook()
-                        SendSummaryFfi(
-                            published = 1u,
-                            messageIds = listOf("leave-commit"),
-                            acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
-                            maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
-                        )
+                        successfulSendSummary().copy(messageIds = listOf("leave-commit"))
                     }
                 }
                 "deleteGroupLocal" -> {
                     calls.order.add("delete")
                     val attempt = calls.delete.incrementAndGet()
                     if (failDelete) {
-                        suspendFailure(IllegalStateException("delete rejected"))
+                        failNativeCall(arguments, IllegalStateException("delete rejected"))
                     } else if (attempt <= deleteTransportFailures) {
                         if (commitBeforeTransportFailure) localGroupPresent = false
-                        suspendFailure(MarmotKitException.TransportClosed())
+                        failNativeCall(arguments, MarmotKitException.TransportClosed())
                     } else {
                         localGroupPresent = false
                         true
@@ -857,6 +834,34 @@ class ComposerExpansionDestructiveLifecycleTest {
             }
         } as MarmotInterface
     }
+
+    private fun countedSendResult(
+        calls: LifecycleCalls,
+        sendResult: () -> SendSummaryFfi,
+    ): SendSummaryFfi {
+        calls.send.incrementAndGet()
+        return sendResult()
+    }
+
+    /** Completes one reflected suspend call with the requested native failure. */
+    @Suppress("UNCHECKED_CAST")
+    private fun failNativeCall(
+        arguments: Array<out Any?>?,
+        failure: Throwable,
+    ): Any {
+        (arguments!!.last() as Continuation<Any?>).resumeWithException(failure)
+        return COROUTINE_SUSPENDED
+    }
+
+    private fun lifecycleChatRows(
+        present: Boolean,
+        left: Boolean,
+    ): List<ChatListRowFfi> =
+        if (present) {
+            listOf(groupRow().copy(selfMembership = if (left) SelfMembershipFfi.LEFT else SelfMembershipFfi.MEMBER))
+        } else {
+            emptyList()
+        }
 
     /** Creates a signed-in local account matching the self member returned by the native fixture. */
     private fun account() =

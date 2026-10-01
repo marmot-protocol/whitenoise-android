@@ -72,7 +72,7 @@ class ChatListBulkDeleteCoverageTest {
         assertTrue("leavingAndDeleting.remove(groupId)" in departure)
         assertTrue("appState.activeAccountRef != originAccount" in departure)
         assertTrue("appState.runtimeGeneration != originRuntime" in departure)
-        assertTrue("appState.signOutInProgress || appState.wipeInProgress" in departure)
+        assertTrue("appState.signOutInProgress || appState.wipeInProgress" in departure.replace(Regex("\\s+"), " "))
         val localDelete = source.requiredSection("pendingBulkDelete?.let", "onDismiss = { pendingBulkDelete = null }")
         assertTrue("it.group.groupIdHex in leavingAndDeleting" in localDelete)
     }
