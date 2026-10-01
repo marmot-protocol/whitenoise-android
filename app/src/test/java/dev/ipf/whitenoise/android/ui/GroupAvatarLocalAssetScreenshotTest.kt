@@ -34,6 +34,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -51,9 +52,14 @@ import dev.ipf.marmotkit.AvatarAcquisitionStateFfi
 import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.marmotkit.AvatarAvailabilityFfi
 import dev.ipf.marmotkit.AvatarBytesFfi
+import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.marmotkit.PresentationResolutionFfi
+import dev.ipf.marmotkit.PresentationSourceFfi
+import dev.ipf.marmotkit.PresentationTextFfi
 import dev.ipf.marmotkit.ProductRecordResultFfi
+import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
@@ -71,7 +77,6 @@ import dev.ipf.whitenoise.android.state.ProfileGroupPickerLoadState
 import dev.ipf.whitenoise.android.state.ProfileGroupPickerState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.cacheKey
-import dev.ipf.whitenoise.android.state.currentGroupAvatarItem
 import dev.ipf.whitenoise.android.state.notificationChatListRow
 import dev.ipf.whitenoise.android.state.retainedAvatarBytesReader
 import dev.ipf.whitenoise.android.ui.chats.ChatRow
@@ -558,6 +563,47 @@ class GroupAvatarLocalAssetScreenshotTest {
     }
 
     @Test
+    fun peerDisplayPictureKeepsTheSelectedAssetBeforeHeaderHydration() {
+        val fixture = AvatarLocalFixture { emptyList() }
+        val source = group().copy(name = "", avatarUrl = null)
+        val selected = selectedPicture(PresentationSourceFfi.PEER_PROFILE)
+        val production = productionSurfaceFixture(fixture, false, source, selected)
+        assertEquals(SELECTED_PICTURE_URL, production.item.group.avatarUrl)
+        assertNull(production.controller.window.header)
+        assertEquals(asset(), conversationGroupAvatarAsset(fixture.state, production.controller))
+    }
+
+    @Test
+    fun displayPictureDoesNotEraseTheSourceGroupAvatarIdentity() {
+        val fixture = AvatarLocalFixture { emptyList() }
+        val source = group().copy(avatarUrl = SELECTED_PICTURE_URL, imageHashHex = "group-picture-hash")
+        val production = productionSurfaceFixture(fixture, false, source, selectedPicture(PresentationSourceFfi.GROUP))
+        assertNull(production.item.group.imageHashHex)
+        assertNull(production.controller.window.header)
+        assertEquals(asset(), conversationGroupAvatarAsset(fixture.state, production.controller))
+    }
+
+    @Test
+    fun recreatedAvatarOwnersPreserveSavedEditableSurfaceState() {
+        val restoration = StateRestorationTester(composeRule)
+        val owners = mutableListOf<WhiteNoiseAppState>()
+        restoration.setContent {
+            val fixture = remember { AvatarLocalFixture { emptyList() } }
+            val surfaceOwner = remember { Any() }
+            SideEffect { if (owners.lastOrNull() !== fixture.state) owners.add(fixture.state) }
+            PreparedGroupAvatarContent(fixture.state, emptyList(), surfaceIdentity = surfaceOwner) {
+                var draft by rememberSaveable { mutableStateOf("Original") }
+                Button(onClick = { draft = "Edited draft" }) { Text(draft) }
+            }
+        }
+        composeRule.onNodeWithText("Original").performClick()
+        restoration.emulateSavedInstanceStateRestore()
+        composeRule.waitForIdle()
+        assertEquals(2, owners.size)
+        composeRule.onNodeWithText("Edited draft").assertExists()
+    }
+
+    @Test
     fun sameAccountRuntimeReplacementPreservesEditableSurfaceState() {
         val fixture = AvatarLocalFixture { emptyList() }
         composeRule.setContent {
@@ -788,10 +834,12 @@ private data class ProductionSurfaceFixture(
 private fun productionSurfaceFixture(
     fixture: AvatarLocalFixture,
     encrypted: Boolean,
+    sourceGroup: AppGroupRecordFfi? = null,
+    selectedPresentation: ConversationPresentationFfi? = null,
 ): ProductionSurfaceFixture {
     val selected = asset()
     val record =
-        if (encrypted) {
+        sourceGroup ?: if (encrypted) {
             group().copy(imageHashHex = "encrypted-picture")
         } else {
             group().copy(avatarUrl = "https://old.example/picture.png")
@@ -803,15 +851,25 @@ private fun productionSurfaceFixture(
             memberSnapshotLoader = { _, _ -> emptyList() },
         )
     chats.applyChatListRow(
-        notificationChatListRow().copy(groupIdHex = GROUP_ID, groupName = record.name, avatarUrl = record.avatarUrl),
+        notificationChatListRow().copy(
+            groupIdHex = GROUP_ID,
+            groupName = record.name,
+            avatarUrl = record.avatarUrl.takeIf { sourceGroup == null },
+        ),
     )
     chats.applyLocalGroupUpdate(record)
     ChatsController::class.java
         .getDeclaredField("selectedAvatarAssetsByGroup")
         .apply { isAccessible = true }
         .set(chats, mapOf(GROUP_ID to selected))
+    if (selectedPresentation != null) {
+        ChatsController::class.java
+            .getDeclaredField("selectedPresentationsByGroup")
+            .apply { isAccessible = true }
+            .set(chats, mapOf(GROUP_ID to selectedPresentation))
+    }
     fixture.state.attachChatsController(chats)
-    val item = checkNotNull(fixture.state.currentGroupAvatarItem(ACCOUNT_REF, GROUP_ID))
+    val item = chats.projectChatRow(checkNotNull(chats.chatRows.firstOrNull()))
     val controller =
         ConversationController(
             fixture.state,
@@ -827,6 +885,18 @@ private fun productionSurfaceFixture(
     )
     return ProductionSurfaceFixture(chats, item, controller)
 }
+
+private fun selectedPicture(source: PresentationSourceFfi) =
+    ConversationPresentationFfi(
+        title = PresentationTextFfi.UnnamedGroup(2uL),
+        avatar = SelectedAvatarFfi.RemoteImage(SELECTED_PICTURE_URL, "selected-picture-key"),
+        titleSource = PresentationSourceFfi.GROUP,
+        avatarSource = source,
+        peerId = "peer",
+        resolution = PresentationResolutionFfi.CACHED,
+    )
+
+private const val SELECTED_PICTURE_URL = "https://example.invalid/selected-picture.png"
 
 /** Production entry points under test, with inert navigation and no backend worker started. */
 @Composable

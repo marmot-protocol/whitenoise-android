@@ -66,8 +66,8 @@ internal fun PreparedGroupAvatarContent(
             .take(VISIBLE_GROUP_AVATAR_LIMIT)
             .toList()
     val preparation = rememberAvatarPixelPreparation(appState, selected, accountRef, lifetime, surfaceIdentity)
-    // Runtime and cache changes fence pixels; they must not recreate same-account editable state.
-    key(appState, accountRef, surfaceIdentity) {
+    // Pixel owners may be recreated; the stable account key preserves restored editable screen state.
+    key(accountRef) {
         CompositionLocalProvider(
             LocalPreparedGroupAvatarPixels provides
                 PreparedGroupAvatarPixels(accountRef, appState.runtimeGeneration, lifetime, preparation.images),

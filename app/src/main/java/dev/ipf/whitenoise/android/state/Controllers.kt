@@ -3736,13 +3736,15 @@ class ChatsController private constructor(
         )
     }
 
-    /** Reads the current source row even while the chat-list UI is intentionally frozen. */
+    /** Keeps source picture identity separate from MDK-selected display URL/hash rewrites. */
     internal fun currentGroupAvatarItem(groupIdHex: String): ChatListItem? {
         val row =
             chatRowsByGroup[chatRowKey(groupIdHex)]
                 ?: chatRows.firstOrNull { it.groupIdHex.equals(groupIdHex, ignoreCase = true) }
                 ?: return null
-        return projectChatRow(row)
+        val item = projectChatRow(row)
+        val sourceGroup = chatListDisplayGroup(row, groupRecordsById[row.groupIdHex] ?: emptyGroupRecord(row))
+        return item.copy(group = sourceGroup)
     }
 
     private fun optimisticArchiveRow(row: ChatListRowFfi): ChatListRowFfi =
