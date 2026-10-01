@@ -6,11 +6,13 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.graphics.ImageBitmap
 import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.core.AvatarLoadRecovery
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.cacheKey
 import dev.ipf.whitenoise.android.state.durableAvatar
 import dev.ipf.whitenoise.android.state.isRenderable
 import dev.ipf.whitenoise.android.state.wantsAcquisition
+import kotlinx.coroutines.flow.first
 
 /**
  * The bytes MarmotKit already stores for [asset], decoded once and held in the shared avatar cache. The
@@ -41,8 +43,15 @@ internal fun rememberDurableAvatar(
             ownedAsset?.target,
             ownedAsset?.acquisition,
         ) {
-            if (value == null || ownedAsset?.wantsAcquisition() == true) {
-                appState.durableAvatar(ownedAsset, accountRef)?.let { value = it }
+            if (ownedAsset == null || (value != null && !ownedAsset.wantsAcquisition())) return@produceState
+            var completedRevision: Long? = null
+            AvatarLoadRecovery.revision.first { revision ->
+                if (completedRevision != revision) {
+                    appState.durableAvatar(ownedAsset, accountRef)?.let { value = it }
+                    // A recovery during the read remains available for the next attempt.
+                    completedRevision = revision
+                }
+                value != null
             }
         }.value
     }

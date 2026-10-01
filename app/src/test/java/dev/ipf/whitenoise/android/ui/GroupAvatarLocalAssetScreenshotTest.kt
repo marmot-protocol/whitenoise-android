@@ -73,6 +73,7 @@ import dev.ipf.marmotkit.SelectedMessageDraftFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.core.AvatarLoadRecovery
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
@@ -368,6 +369,38 @@ class GroupAvatarLocalAssetScreenshotTest {
             composeRule.runOnIdle { release.complete(Unit) }
             awaitLocal { firstFrames.lastOrNull() != null }
             assertEquals(1, fixture.reads.get())
+            assertEquals(0, fixture.requests.get())
+            assertEquals(0, fixture.legacyDownloads.get())
+        } finally {
+            release.complete(Unit)
+        }
+    }
+
+    /** A recovery event that retires a cold local read must let the unchanged visible slot retry. */
+    @Test
+    fun networkRecoveryRetriesTheVisibleColdStoredPicture() {
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val fixture =
+            AvatarLocalFixture {
+                started.complete(Unit)
+                release.await()
+                listOf(payload())
+            }
+        val selected = asset()
+        var observed: ImageBitmap? = null
+        try {
+            composeRule.setContent {
+                val image = rememberDurableAvatar(fixture.state, selected)
+                SideEffect { observed = image }
+                Text(if (image == null) "empty" else "loaded")
+            }
+            awaitLocal { started.isCompleted }
+            composeRule.runOnIdle { AvatarLoadRecovery.onNetworkRestored() }
+            composeRule.waitForIdle()
+            composeRule.runOnIdle { release.complete(Unit) }
+            awaitLocal { observed != null }
+            assertTrue(fixture.reads.get() >= 2)
             assertEquals(0, fixture.requests.get())
             assertEquals(0, fixture.legacyDownloads.get())
         } finally {
