@@ -4753,7 +4753,7 @@
         "anchor": "fun ForwardMessagePickerContent(",
         "test_ids": [
           "MSG-010",
-          "MSG-028"
+          "MSG-030"
         ]
       },
       {
@@ -4778,7 +4778,7 @@
         "anchor": "fun ForwardTargetList(",
         "test_ids": [
           "MSG-010",
-          "MSG-028"
+          "MSG-030"
         ]
       },
       {
@@ -9235,7 +9235,7 @@
         "anchor": "fun ShareChatPickerTargetList(",
         "test_ids": [
           "SYS-001",
-          "MSG-028"
+          "MSG-030"
         ]
       },
       {
