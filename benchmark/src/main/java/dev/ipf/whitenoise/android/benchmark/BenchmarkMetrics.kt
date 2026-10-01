@@ -286,6 +286,53 @@ internal fun recoveryMetrics(): List<Metric> =
         ),
     )
 
+/**
+ * Resource signals for a pure background window — idle, or waiting on a push burst: no UI
+ * interaction runs during the measured block, so frame timing is meaningless and is omitted.
+ * Shares the same energy, memory, and recovery/wake-lock trace sections as [recoveryMetrics] so
+ * idle, burst, and reconnect results are directly comparable.
+ */
+@OptIn(ExperimentalMetricApi::class)
+internal fun idleMetrics(): List<Metric> =
+    listOf(
+        MemoryUsageMetric(
+            mode = MemoryUsageMetric.Mode.Max,
+            subMetrics =
+                listOf(
+                    MemoryUsageMetric.SubMetric.HeapSize,
+                    MemoryUsageMetric.SubMetric.RssAnon,
+                ),
+        ),
+        PowerMetric(
+            type =
+                PowerMetric.Type.Energy(
+                    mapOf(
+                        PowerCategory.CPU to PowerCategoryDisplayLevel.TOTAL,
+                        PowerCategory.NETWORK to PowerCategoryDisplayLevel.TOTAL,
+                        PowerCategory.MEMORY to PowerCategoryDisplayLevel.TOTAL,
+                    ),
+                ),
+        ),
+        TraceSectionMetric(
+            sectionName = NETWORK_RECOVERY_ATTEMPT_TRACE,
+            mode = TraceSectionMetric.Mode.Count,
+            label = "networkRecoveryAttemptCount",
+            targetPackageOnly = true,
+        ),
+        TraceSectionMetric(
+            sectionName = NETWORK_RECOVERY_ATTEMPT_TRACE,
+            mode = TraceSectionMetric.Mode.Sum,
+            label = "networkRecoveryAttemptDurationMs",
+            targetPackageOnly = true,
+        ),
+        TraceSectionMetric(
+            sectionName = PUSH_WAKE_LOCK_TRACE,
+            mode = TraceSectionMetric.Mode.Sum,
+            label = "pushWakeLockDurationMs",
+            targetPackageOnly = true,
+        ),
+    )
+
 internal inline fun tracedJourney(
     sectionName: String,
     block: () -> Unit,

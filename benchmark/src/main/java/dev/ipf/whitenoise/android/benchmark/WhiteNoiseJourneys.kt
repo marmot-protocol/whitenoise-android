@@ -35,6 +35,14 @@ internal enum class BenchmarkUsefulSurface {
     Conversation,
 }
 
+/** The two notification-delivery radio choices on `NotificationsScreen`, mirrored for the benchmark module. */
+internal enum class BenchmarkDeliveryMode(
+    val testTag: String,
+) {
+    Fcm("notification-delivery.fcm"),
+    Local("notification-delivery.local"),
+}
+
 internal class WhiteNoiseJourneys {
     private val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
 
@@ -186,6 +194,26 @@ internal class WhiteNoiseJourneys {
             scrollToTrigger = true,
         )
         waitForVisibleTag(PerformanceTags.GROUP_MESSAGE_NOTIFICATION_SETTINGS, NETWORK_STATE_TIMEOUT_MS)
+        device.waitForIdle()
+    }
+
+    /**
+     * Selects one global notification-delivery radio from the chat list, for an idle energy
+     * baseline's unmeasured setup. Assumes the single-account benchmark fixture, where the chat
+     * list's avatar opens Settings directly rather than an account selector.
+     */
+    fun setNotificationDeliveryMode(mode: BenchmarkDeliveryMode) {
+        clickVisibleTagUntilPresent(
+            triggerTag = CHATS_SWITCH_PROFILE_TAG,
+            destinationTag = SETTINGS_LIST_TAG,
+            timeoutMs = NETWORK_STATE_TIMEOUT_MS,
+        )
+        clickTextUntilTagPresent(
+            text = NOTIFICATIONS_ROW_TEXT,
+            destinationTag = NOTIFICATION_DELIVERY_CHOICES_TAG,
+            timeoutMs = NETWORK_STATE_TIMEOUT_MS,
+        )
+        waitForVisibleTag(mode.testTag, NETWORK_STATE_TIMEOUT_MS).click()
         device.waitForIdle()
     }
 
@@ -795,6 +823,10 @@ internal class WhiteNoiseJourneys {
         const val CHAT_LIST_SCROLL_PASSES = 4
         const val CHAT_LIST_SCROLL_STEPS = 20
         const val ANDROID_SETTINGS_PACKAGE = "com.android.settings"
+        const val CHATS_SWITCH_PROFILE_TAG = "chats.switchProfile"
+        const val SETTINGS_LIST_TAG = "settings.list"
+        const val NOTIFICATIONS_ROW_TEXT = "Notifications"
+        const val NOTIFICATION_DELIVERY_CHOICES_TAG = "notification-delivery.choices"
         const val CONVERSATION_SETTINGS_LOG_TAG = "ConversationSettings"
         val APP_DISPATCH_LOG_REGEX =
             Regex("operation_id=(\\d+) stage=start_activity duration_ms=(\\d+) outcome=ok")
