@@ -94,6 +94,51 @@ class LocalNotificationGroupSummaryTest {
         }
 
     @Test
+    fun aBlockedSummaryChannelConsumesNoWriteSlotsAndRecoversAfterItIsUnblocked() =
+        runTest {
+            val fixture = GroupFixture(context, backgroundScope)
+            fixture.coordinator.close()
+            fixture.send("account-a", "group-a", "one")
+            val channel = requireNotNull(manager.getNotificationChannel(NotificationChannelSpec.USER_EVENT_SUMMARY.id))
+            channel.importance = NotificationManager.IMPORTANCE_NONE
+            manager.createNotificationChannel(channel)
+            assertEquals(NotificationManager.IMPORTANCE_NONE, manager.getNotificationChannel(channel.id).importance)
+            var sleeps = 0
+            var posts = 0
+            val pacer = NotificationPostPacer(burstCapacity = 1, nowMillis = { 0L }, sleep = { sleeps++ })
+            val coordinator =
+                NotificationGroupReconciler(
+                    context,
+                    backgroundScope,
+                    pacer,
+                    post = { compat, tag, id, card ->
+                        posts++
+                        compat.notify(tag, id, card)
+                    },
+                )
+            try {
+                repeat(3) {
+                    coordinator.request()
+                    settle()
+                }
+                assertEquals(0, posts)
+                assertEquals(0, sleeps)
+                assertEquals(0L, pacer.awaitSlot())
+                assertEquals(0, sleeps)
+                assertNull(fixture.summary())
+                assertTrue(manager.activeNotifications.any { it.tag == "account-a|group-a" })
+                channel.importance = NotificationManager.IMPORTANCE_DEFAULT
+                manager.createNotificationChannel(channel)
+                coordinator.request()
+                settle()
+                assertEquals(1, posts)
+                assertNotNull(fixture.summary())
+            } finally {
+                coordinator.close()
+            }
+        }
+
+    @Test
     fun removingOneAccountPreservesTheOtherAndRemovingTheLastChildRemovesTheSummary() =
         runTest {
             val fixture = GroupFixture(context, backgroundScope)

@@ -600,8 +600,7 @@ class NotificationPushWakeCatchUpTest {
                         .filterNot {
                             it.tag == UserEventNotificationGroup.SUMMARY_TAG &&
                                 it.id == UserEventNotificationGroup.SUMMARY_ID
-                        }
-                        .map { it.id }
+                        }.map { it.id }
                         .toSet() != setOf(0, 1)
                 ) {
                     shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))

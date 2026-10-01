@@ -28018,7 +28018,7 @@
         ]
       },
       {
-        "surface": "OS notification group reconciliation",
+        "surface": "OS notification group reconciliation and blocked summary recovery",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationGroupReconciler.kt",
         "anchor": "internal class NotificationGroupReconciler(",
         "test_ids": [
