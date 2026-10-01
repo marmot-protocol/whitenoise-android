@@ -4263,7 +4263,7 @@ class ConversationDictationControllerTest {
             fixture.controller.paste()
             assertEquals(1, sends)
             assertEquals("Draft", fixture.drafts.getValue(key()).text)
-            assertTrue(fixture.controller.hasDurableSession)
+            assertFalse(fixture.controller.hasDurableSession)
             assertFalse(fixture.controller.ownsMicrophone)
         }
 

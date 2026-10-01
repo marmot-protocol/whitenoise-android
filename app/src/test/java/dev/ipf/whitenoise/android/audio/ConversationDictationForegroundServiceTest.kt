@@ -5,16 +5,9 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
-import android.content.ComponentName
-import android.content.Context
-import android.content.ContextWrapper
 import android.content.Intent
-import android.widget.Button
-import android.widget.FrameLayout
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.text.input.TextFieldValue
-import dev.ipf.whitenoise.android.MainActivity
-import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import dev.ipf.whitenoise.android.notifications.BackgroundConnectionNotification
 import dev.ipf.whitenoise.android.notifications.ForegroundStartTrigger
@@ -22,7 +15,6 @@ import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundServ
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -381,7 +373,6 @@ internal class ConversationDictationForegroundServiceTest : ConversationDictatio
         assertTrue(recreated.conversationDictation.state is ConversationDictationState.Starting)
         serviceController.destroy()
     }
-
 }
 
 @RunWith(RobolectricTestRunner::class)
@@ -635,5 +626,4 @@ internal class ConversationDictationForegroundServiceStartTest : ConversationDic
                 .getStringExtra(ConversationDictationForegroundService.EXTRA_SESSION_TOKEN),
         )
     }
-
 }

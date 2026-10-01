@@ -1,9 +1,6 @@
 package dev.ipf.whitenoise.android.audio
 
-import android.app.ForegroundServiceStartNotAllowedException
 import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.Service
 import android.content.ComponentName
 import android.content.Context
@@ -11,35 +8,18 @@ import android.content.ContextWrapper
 import android.content.Intent
 import android.widget.Button
 import android.widget.FrameLayout
-import androidx.compose.runtime.snapshots.Snapshot
-import androidx.compose.ui.text.input.TextFieldValue
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.WhiteNoiseApplication
-import dev.ipf.whitenoise.android.notifications.BackgroundConnectionNotification
-import dev.ipf.whitenoise.android.notifications.ForegroundStartTrigger
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.runCurrent
-import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.Robolectric
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
-import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowLog
 
 /** Shared deterministic foreground seams; each case restores them after execution. */
 internal abstract class ConversationDictationForegroundTestCase {
-
     protected class RejectingForegroundStartContext(
         base: Context,
     ) : ContextWrapper(base) {
@@ -54,20 +34,11 @@ internal abstract class ConversationDictationForegroundTestCase {
         ConversationDictationForegroundService.foregroundPromoter = defaultForegroundPromoter
     }
 
-
-
-
     protected fun assertCorrelatedServiceTrace() {
         val trace = ShadowLog.getLogsForTag("WNDictation").mapNotNull { DictationDiagnosticSchema.fields(it.msg) }
         assertTrue(trace.any { it["event"] == "foreground_service_on_start" && it["callback_session"] == 1L })
         assertTrue(trace.any { it["event"] == "foreground_service_promoted" && it["callback_session"] == 1L })
     }
-
-
-
-
-
-
 
     protected fun assertExplicitNotificationDestinations(
         service: NotificationStreamForegroundService,
@@ -117,20 +88,6 @@ internal abstract class ConversationDictationForegroundTestCase {
                 requireNotNull(harness.conversationDictation.notificationSessionToken),
             ),
         ).savedIntent
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     /** Installs a fresh process-owner harness into the service resolver seam. */
     protected fun installHost(): DictationForegroundTestHost =

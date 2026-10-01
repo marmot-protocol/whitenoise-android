@@ -64,7 +64,7 @@ internal class ConversationDictationForegroundService(
         promotedController
             ?.takeIf {
                 foregroundPromoted && it.hasDurableSession && it.notificationSessionToken == promotedSessionToken
-            }?.let(::buildNotification)
+            }?.let { controller -> buildConversationDictationNotification(this, controller, ::actionIntent) }
 
     private val conversationDictationDiagnostic: (String) -> Unit = { event ->
         val session = promotedSessionToken?.substringAfterLast(':')?.toLongOrNull() ?: 0L
@@ -306,7 +306,9 @@ internal class ConversationDictationForegroundService(
                 val token = service.promotedSessionToken
                 controller
                     ?.takeIf { token != null && it.hasDurableSession && it.notificationSessionToken == token }
-                    ?.let(service::buildNotification)
+                    ?.let { controller ->
+                        buildConversationDictationNotification(service, controller, service::actionIntent)
+                    }
             }
 
         internal const val ACTION_CANCEL = "dev.ipf.whitenoise.android.dictation.CANCEL"

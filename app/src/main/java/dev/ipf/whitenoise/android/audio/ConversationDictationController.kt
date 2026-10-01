@@ -1369,7 +1369,8 @@ internal class ConversationDictationController internal constructor(
         if (expireRetainedRecoveryIfDue()) return
         val failed = state as? ConversationDictationState.Failed ?: return
         val hasRecoveryData =
-            !failed.retainedTranscript.isNullOrBlank() || runCatching(platform::callerAudioHasPending).getOrDefault(false)
+            !failed.retainedTranscript.isNullOrBlank() ||
+                runCatching(platform::callerAudioHasPending).getOrDefault(false)
         if (failed.reason == ConversationDictationFailure.DeliveryUnknown || !hasRecoveryData) {
             pendingForegroundRecoverySessionId = null
             return

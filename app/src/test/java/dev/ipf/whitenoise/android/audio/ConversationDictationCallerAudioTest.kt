@@ -84,7 +84,10 @@ class ConversationDictationCallerAudioTest {
             assertFalse(forced.get())
             assertFalse(owner.hasPending())
             returnRelease.countDown()
-            await { shadowOf(Looper.getMainLooper()).idle(); discarded.get() && forced.get() }
+            await {
+                shadowOf(Looper.getMainLooper()).idle()
+                discarded.get() && forced.get()
+            }
             assertEquals(1, releases.get())
             assertFalse(owner.forceClose {})
         } finally {
