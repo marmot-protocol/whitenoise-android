@@ -21,15 +21,30 @@ class NotificationGroupDismissReceiver : BroadcastReceiver() {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         scope.launch {
             try {
-                withTimeoutOrNull(BROADCAST_BUDGET_MS) {
-                    dismissNotificationGroupGenerations(context.applicationContext, children)
-                }
-            } catch (_: RuntimeException) {
-                // A failed platform operation must not crash an otherwise healthy notification process.
+                finishDismissal(context.applicationContext, children, pending::finish)
             } finally {
-                NotificationGroupReconciler.shared(context).request()
-                pending.finish()
                 scope.cancel()
+            }
+        }
+    }
+
+    /** Separate completion seam exercises success, platform failure and the broadcast deadline. */
+    internal suspend fun finishDismissal(
+        context: Context,
+        children: List<NotificationGroupChild>,
+        finish: () -> Unit,
+        dismiss: suspend () -> Unit = { dismissNotificationGroupGenerations(context, children) },
+        budgetMs: Long = BROADCAST_BUDGET_MS,
+    ) {
+        try {
+            withTimeoutOrNull(budgetMs) { dismiss() }
+        } catch (_: RuntimeException) {
+            // A platform failure cannot crash an otherwise healthy notification process.
+        } finally {
+            try {
+                NotificationGroupReconciler.shared(context).request()
+            } finally {
+                finish()
             }
         }
     }

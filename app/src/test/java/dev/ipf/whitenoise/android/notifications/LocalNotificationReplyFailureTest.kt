@@ -29,7 +29,7 @@ import org.robolectric.annotation.Config
 class LocalNotificationReplyFailureTest {
     private val context: Context = RuntimeEnvironment.getApplication()
     private val manager: NotificationManager = context.getSystemService(NotificationManager::class.java)
-    private val presenter = LocalNotificationPresenter(context)
+    private val presenter = LocalNotificationPresenter(context, groupReconciliation = {})
 
     @Before
     fun setUp() {

@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.core.app.NotificationCompat
 import dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup.EXTRA_GENERATION
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
@@ -28,40 +29,25 @@ class NotificationGroupGenerationTest {
             val sameKey = CompletableDeferred<ConversationCardShowToken>()
             val unseen = CompletableDeferred<ConversationCardShowToken>()
             val release = CompletableDeferred<Unit>()
-            val old =
-                async {
-                    ConversationCardPostSynchronizer.withRegisteredShow(
-                        "account|group",
-                        0,
-                        ConversationCardScope("account", "group"),
-                    ) {
-                        shown.complete(it)
-                        release.await()
-                    }
-                }
+            val old = holdShow(
+                "account|group",
+                ConversationCardScope("account", "group"),
+                shown,
+                release,
+            )
             val oldToken = withTimeout(5_000) { shown.await() }
-            val sameKeyPost =
-                async {
-                    ConversationCardPostSynchronizer.withRegisteredShow(
-                        "account|group",
-                        0,
-                        ConversationCardScope("account", "group"),
-                    ) {
-                        sameKey.complete(it)
-                        release.await()
-                    }
-                }
-            val unseenPost =
-                async {
-                    ConversationCardPostSynchronizer.withRegisteredShow(
-                        "other-account|unseen",
-                        0,
-                        ConversationCardScope("other-account", "unseen"),
-                    ) {
-                        unseen.complete(it)
-                        release.await()
-                    }
-                }
+            val sameKeyPost = holdShow(
+                "account|group",
+                ConversationCardScope("account", "group"),
+                sameKey,
+                release,
+            )
+            val unseenPost = holdShow(
+                "other-account|unseen",
+                ConversationCardScope("other-account", "unseen"),
+                unseen,
+                release,
+            )
             try {
                 val sameKeyToken = withTimeout(5_000) { sameKey.await() }
                 val unseenToken = withTimeout(5_000) { unseen.await() }
@@ -108,6 +94,18 @@ class NotificationGroupGenerationTest {
             // The sole initial token remains available for an actual platform write.
             assertTrue(pacer.awaitSlot() == 0L)
         }
+
+    private fun CoroutineScope.holdShow(
+        tag: String,
+        conversation: ConversationCardScope,
+        ready: CompletableDeferred<ConversationCardShowToken>,
+        release: CompletableDeferred<Unit>,
+    ) = async {
+        ConversationCardPostSynchronizer.withRegisteredShow(tag, 0, conversation) {
+            ready.complete(it)
+            release.await()
+        }
+    }
 
     private fun notification(token: ConversationCardShowToken): Notification =
         NotificationCompat

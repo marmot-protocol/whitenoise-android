@@ -44,7 +44,7 @@ class LocalNotificationReplyRaceTest {
         manager.createNotificationChannel(
             NotificationChannel(TEST_CHANNEL, "Test", NotificationManager.IMPORTANCE_DEFAULT),
         )
-        LocalNotificationPresenter(context).ensureChannels()
+        LocalNotificationPresenter(context, groupReconciliation = {}).ensureChannels()
     }
 
     @After
@@ -58,8 +58,8 @@ class LocalNotificationReplyRaceTest {
     fun replyHandledRepostCannotOverwriteNewerCardPostedDuringCriticalSection() {
         val conversation = conversationKey()
         manager.notify(conversation.tag, conversation.id, messagingNotification("msg-a", "hello" to 1_000L))
-        val replyPresenter = LocalNotificationPresenter(context)
-        val appStatePresenter = LocalNotificationPresenter(context)
+        val replyPresenter = LocalNotificationPresenter(context, groupReconciliation = {})
+        val appStatePresenter = LocalNotificationPresenter(context, groupReconciliation = {})
         val replyReadCardA = CountDownLatch(1)
         val showAwaitingLock = CountDownLatch(1)
         val allowReplyWrite = CountDownLatch(1)
@@ -151,8 +151,8 @@ class LocalNotificationReplyRaceTest {
     fun concurrentShowCannotDropCarriedHistoryReadOutsideLock() {
         val conversation = conversationKey()
         manager.notify(conversation.tag, conversation.id, messagingNotification("msg-a", "hello" to 1_000L))
-        val presenterB = LocalNotificationPresenter(context)
-        val presenterC = LocalNotificationPresenter(context)
+        val presenterB = LocalNotificationPresenter(context, groupReconciliation = {})
+        val presenterC = LocalNotificationPresenter(context, groupReconciliation = {})
         val showBReadCarried = CountDownLatch(1)
         val showCAwaitingLock = CountDownLatch(1)
         val allowShowBContinue = CountDownLatch(1)
@@ -251,8 +251,8 @@ class LocalNotificationReplyRaceTest {
     fun replyCancelCannotDropNewerCardPostedDuringCriticalSection() {
         val conversation = conversationKey()
         manager.notify(conversation.tag, conversation.id, messagingNotification("msg-a", "hello" to 1_000L))
-        val replyPresenter = LocalNotificationPresenter(context)
-        val appStatePresenter = LocalNotificationPresenter(context)
+        val replyPresenter = LocalNotificationPresenter(context, groupReconciliation = {})
+        val appStatePresenter = LocalNotificationPresenter(context, groupReconciliation = {})
         assertTrue(replyPresenter.markDirectReplyHandled(conversation.tag, conversation.id, "reply"))
 
         val cancelReadCardA = CountDownLatch(1)
@@ -341,7 +341,7 @@ class LocalNotificationReplyRaceTest {
     /** Rejects a notification whose foreground-conversation eligibility changes during show. */
     @Test
     fun visibleConversationChangeAfterShowRegistrationPreventsThePost() {
-        val presenter = LocalNotificationPresenter(context)
+        val presenter = LocalNotificationPresenter(context, groupReconciliation = {})
         val postEpoch = StalenessGuard()
         val capturedEpoch = postEpoch.capture()
         val showRegistered = CountDownLatch(1)
@@ -396,7 +396,7 @@ class LocalNotificationReplyRaceTest {
     @Test
     fun conversationDismissWaitsForInFlightPostThenCancelsIt() {
         val conversation = conversationKey()
-        val presenter = LocalNotificationPresenter(context)
+        val presenter = LocalNotificationPresenter(context, groupReconciliation = {})
         val showBeforeWrite = CountDownLatch(1)
         val dismissAwaitingLock = CountDownLatch(1)
         val allowShowWrite = CountDownLatch(1)
@@ -479,7 +479,7 @@ class LocalNotificationReplyRaceTest {
     @Test
     fun conversationDismissDuringCompletedWriteMakesShowCancelItsCard() {
         val conversation = conversationKey()
-        val presenter = LocalNotificationPresenter(context)
+        val presenter = LocalNotificationPresenter(context, groupReconciliation = {})
         val showAfterWrite = CountDownLatch(1)
         val dismissAwaitingLock = CountDownLatch(1)
         val allowShowToFinish = CountDownLatch(1)
@@ -579,6 +579,7 @@ class LocalNotificationReplyRaceTest {
         val presenter =
             LocalNotificationPresenter(
                 context = context,
+                groupReconciliation = {},
                 notificationPoster = { _, tag, id, notification ->
                     refreshReadyToWrite.countDown()
                     check(allowRefreshWrite.await(5, TimeUnit.SECONDS))
@@ -651,7 +652,7 @@ class LocalNotificationReplyRaceTest {
     @Test
     fun conversationDismissInvalidatesPostThatHasRegisteredButNotReachedTheLock() {
         val conversation = conversationKey()
-        val presenter = LocalNotificationPresenter(context)
+        val presenter = LocalNotificationPresenter(context, groupReconciliation = {})
         val showRegistered = CountDownLatch(1)
         val allowShowToContinue = CountDownLatch(1)
         val showFinished = CountDownLatch(1)
@@ -708,7 +709,7 @@ class LocalNotificationReplyRaceTest {
     /** Opening a conversation invalidates an opaque invite registered before the opening boundary. */
     @Test
     fun conversationDismissInvalidatesOpaqueInviteRegisteredBeforeTheOpen() {
-        val presenter = LocalNotificationPresenter(context)
+        val presenter = LocalNotificationPresenter(context, groupReconciliation = {})
         val invite = groupInviteUpdate()
         val showRegistered = CountDownLatch(1)
         val allowShowToContinue = CountDownLatch(1)

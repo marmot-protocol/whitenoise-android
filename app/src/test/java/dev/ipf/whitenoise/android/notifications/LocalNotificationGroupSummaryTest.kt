@@ -30,6 +30,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowSystemClock
 
 /** The production presenter/coordinator against the OS tray, with controlled settling and failures. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -577,7 +578,104 @@ class LocalNotificationGroupSummaryTest {
             assertFalse(manager.activeNotifications.any { it.tag == "account-a|group-a" })
         }
 
+    @Test
+    fun aNewChildHiddenByAPlatformReadCannotBeCancelledWithAnApparentlyEmptySummary() =
+        runTest {
+            val fixture = GroupFixture(context, backgroundScope)
+            fixture.send("account-a", "group-a", "old")
+            settle()
+            fixture.coordinator.close()
+            var hideChildren = false
+            var summaryCancels = 0
+            val coordinator = NotificationGroupReconciler(
+                context,
+                backgroundScope,
+                fixture.pacer,
+                read = { platform ->
+                    platform.activeNotifications.filter {
+                        !hideChildren || UserEventNotificationGroup.child(it) == null
+                    }.toTypedArray()
+                },
+                cancel = { compat, tag, id ->
+                    summaryCancels++
+                    // Android's summary cancellation cascades to queued as well as posted children.
+                    manager.activeNotifications.filter { UserEventNotificationGroup.child(it) != null }.forEach {
+                        compat.cancel(it.tag, it.id)
+                    }
+                    compat.cancel(tag, id)
+                },
+            )
+            try {
+                manager.cancel("account-a|group-a", LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID)
+                coordinator.request()
+                advanceTimeBy(400)
+                runCurrent()
+                hideChildren = true
+                fixture.send("account-b", "group-b", "new")
+                coordinator.request()
+                ShadowSystemClock.advanceBy(java.time.Duration.ofMillis(600))
+                advanceTimeBy(600)
+                runCurrent()
+                assertEquals(0, summaryCancels)
+                assertTrue(manager.activeNotifications.any { it.tag == "account-b|group-b" })
+                hideChildren = false
+                coordinator.request()
+                settle()
+                assertEquals(
+                    "1 notification",
+                    requireNotNull(fixture.summary()).extras.getCharSequence(Notification.EXTRA_TEXT),
+                )
+            } finally {
+                coordinator.close()
+            }
+        }
+
+    @Test
+    fun dismissReceiverFinishesOnceOnSuccessPlatformFailureAndTimeout() =
+        runTest {
+            val receiver = NotificationGroupDismissReceiver()
+            val children = listOf(NotificationGroupChild("account|group", 0, "synthetic-generation"))
+            var successFinishes = 0
+            receiver.finishDismissal(context, children, finish = { successFinishes++ }, dismiss = {})
+            assertEquals(1, successFinishes)
+            var failureFinishes = 0
+            receiver.finishDismissal(
+                context,
+                children,
+                finish = { failureFinishes++ },
+                dismiss = { throw IllegalStateException("platform failed") },
+            )
+            assertEquals(1, failureFinishes)
+            var timeoutFinishes = 0
+            receiver.finishDismissal(
+                context,
+                children,
+                finish = { timeoutFinishes++ },
+                dismiss = { kotlinx.coroutines.awaitCancellation() },
+                budgetMs = 50L,
+            )
+            assertEquals(1, timeoutFinishes)
+        }
+
+    @Test
+    fun aRealSummaryDeleteBroadcastRemovesOnlyItsDisplayedGenerations() =
+        runTest {
+            val fixture = GroupFixture(context, backgroundScope)
+            fixture.send("account-a", "group-a", "old")
+            settle()
+            val intent = shadowOf(requireNotNull(fixture.summary()).deleteIntent).savedIntent
+            fixture.send("account-b", "group-b", "later")
+            context.sendBroadcast(intent)
+            pumpingMainLooper {
+                awaitWorkerCondition("the delete broadcast must remove its displayed generation") {
+                    manager.activeNotifications.none { it.tag == "account-a|group-a" }
+                }
+            }
+            assertTrue(manager.activeNotifications.any { it.tag == "account-b|group-b" })
+        }
+
     private fun TestScope.settle() {
+        ShadowSystemClock.advanceBy(java.time.Duration.ofMillis(2_000))
         advanceTimeBy(2_000)
         runCurrent()
     }

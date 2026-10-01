@@ -61,11 +61,17 @@ internal class NotificationGroupReconciler(
     }
 
     private suspend fun reconcile() {
-        repeat(MAX_ATTEMPTS) { attempt ->
+        var observedRevision = revision.get()
+        var emptyRechecks = 0
+        repeat(MAX_ATTEMPTS) {
             val expected = revision.get()
+            if (expected != observedRevision) {
+                observedRevision = expected
+                emptyRechecks = 0
+            }
             try {
                 if (
-                    reconcileSnapshot(expected, allowEmpty = attempt >= EMPTY_RECHECKS) &&
+                    reconcileSnapshot(expected, allowEmpty = emptyRechecks >= EMPTY_RECHECKS) &&
                     expected == revision.get()
                 ) {
                     return
@@ -75,7 +81,11 @@ internal class NotificationGroupReconciler(
             } catch (_: RuntimeException) {
                 // Delivery already succeeded or failed independently. Summary failures never replay a child.
             }
-            delay(SETTLE_DELAY_MS)
+            emptyRechecks++
+            val settling = synchronized(UserEventNotificationGroup.mutationLock) {
+                NotificationGroupWriteVisibility.remainingMillis(context)
+            }
+            delay(maxOf(SETTLE_DELAY_MS, settling))
         }
     }
 
@@ -113,7 +123,7 @@ internal class NotificationGroupReconciler(
         val liveChildren = latest.mapNotNull(UserEventNotificationGroup::child)
         val liveSummary = latest.firstOrNull { it.tag == SUMMARY_TAG && it.id == SUMMARY_ID }
         if (liveChildren.isEmpty()) {
-            if (!allowEmpty) return false
+            if (!allowEmpty || NotificationGroupWriteVisibility.remainingMillis(context) > 0L) return false
             if (liveSummary != null) cancel(compat, SUMMARY_TAG, SUMMARY_ID)
         } else {
             if (!matches(liveSummary, UserEventNotificationGroup.summaryState(liveChildren))) {
@@ -195,6 +205,7 @@ internal class NotificationGroupReconciler(
                             .setSilent(true)
                             .build()
                     post(compat, requireNotNull(live.tag), live.id, adopted)
+                    NotificationGroupWriteVisibility.childWritten(context)
                     ConversationCardPostedRegistry.markPosted(
                         requireNotNull(live.tag),
                         live.id,
@@ -233,10 +244,14 @@ internal class NotificationGroupReconciler(
             request: () -> Unit = { shared(context).request() },
             block: () -> T,
         ): T =
-            try {
-                synchronized(UserEventNotificationGroup.mutationLock, block)
-            } finally {
+            synchronized(UserEventNotificationGroup.mutationLock) {
+                // Publish the revision before the platform write and before releasing the commit gate.
                 request()
+                try {
+                    block()
+                } finally {
+                    request()
+                }
             }
 
         /** Final generation/live-card check shares the summary-dismissal commit gate. */
@@ -253,6 +268,7 @@ internal class NotificationGroupReconciler(
                 }
                 if (isLive != null && !isLive()) return@mutate false
                 post()
+                NotificationGroupWriteVisibility.childWritten(context)
                 true
             }
     }

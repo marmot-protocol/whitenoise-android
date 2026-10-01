@@ -652,6 +652,7 @@ class LocalNotificationPresenter(
                         notificationContent.notificationId,
                     )
                     if (!isPostStillAllowed() || !showGenerationAllowsPost()) return@withRegisteredShow false
+                    var replacementHasChanged = false
                     val rewriteGeneration =
                         if (silentUpdate || replaceCurrentMessage) {
                             withContext(Dispatchers.Default) {
@@ -667,6 +668,8 @@ class LocalNotificationPresenter(
                                     val messageId = active?.notification?.extras?.getString(
                                         LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX,
                                     )
+                                    replacementHasChanged =
+                                        replaceCurrentMessage && active != null && messageId != update.messageIdHex
                                     active?.takeIf { messageId == update.messageIdHex }
                                         ?.notification?.extras?.getString(EXTRA_GENERATION)
                                         ?.takeIf(String::isNotBlank)
@@ -676,7 +679,7 @@ class LocalNotificationPresenter(
                         } else {
                             null
                         }
-                    if (replaceCurrentMessage && rewriteGeneration == null) return@withRegisteredShow false
+                    if (replacementHasChanged) return@withRegisteredShow false
                     // Ordinary messages keep their required People/conversation child.
                     // Other event types inherit the stable global channel until this
                     // chat has an explicit or legacy custom override.

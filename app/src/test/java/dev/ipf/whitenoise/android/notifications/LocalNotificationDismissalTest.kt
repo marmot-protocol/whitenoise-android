@@ -72,7 +72,7 @@ class LocalNotificationDismissalTest {
         val providerInvoked = AtomicBoolean(false)
         val mainLooperCallbackRan = AtomicBoolean(false)
         val presenter =
-            LocalNotificationPresenter(context) { notificationManager ->
+            LocalNotificationPresenter(context, groupReconciliation = {}) { notificationManager ->
                 providerInvoked.set(true)
                 readThread.set(Thread.currentThread())
                 notificationManager.activeNotifications
@@ -108,7 +108,7 @@ class LocalNotificationDismissalTest {
             ),
         )
         val presenter =
-            LocalNotificationPresenter(context) { _ ->
+            LocalNotificationPresenter(context, groupReconciliation = {}) { _ ->
                 throw CancellationException("cancelled during activeNotifications read")
             }
 
@@ -147,7 +147,11 @@ class LocalNotificationDismissalTest {
         val other = LocalNotificationFormatter.conversationDismissalKey("account-b", "group-b")
         manager.notify(other.tag, other.id, notification())
 
-        assertTrue(runBlocking { LocalNotificationPresenter(context).dismissConversationMessages(account, group) })
+        assertTrue(
+            runBlocking {
+                LocalNotificationPresenter(context, groupReconciliation = {}).dismissConversationMessages(account, group)
+            },
+        )
 
         val remaining = manager.activeNotifications.map { it.tag to it.id }
         assertEquals(listOf(other.tag to other.id), remaining)
@@ -164,6 +168,7 @@ class LocalNotificationDismissalTest {
         val presenter =
             LocalNotificationPresenter(
                 context = context,
+                groupReconciliation = {},
                 dismissalRetryDelay = {},
                 activeNotificationsProvider = { notificationManager ->
                     if (reads.getAndIncrement() == 0) emptyArray() else notificationManager.activeNotifications
@@ -190,6 +195,7 @@ class LocalNotificationDismissalTest {
         val presenter =
             LocalNotificationPresenter(
                 context = context,
+                groupReconciliation = {},
                 notificationCanceller = { compat, tag, id ->
                     if (tag == message.tag && failMessageOnce.compareAndSet(true, false)) {
                         throw IllegalStateException("first message cancellation failed")
@@ -231,6 +237,7 @@ class LocalNotificationDismissalTest {
         val presenter =
             LocalNotificationPresenter(
                 context = context,
+                groupReconciliation = {},
                 notificationCanceller = { _, tag, id -> cancelled += NotificationDismissalKey(tag, id) },
                 dismissalRetryDelay = {},
                 activeNotificationsProvider = {
@@ -255,6 +262,7 @@ class LocalNotificationDismissalTest {
         val presenter =
             LocalNotificationPresenter(
                 context = context,
+                groupReconciliation = {},
                 dismissalRetryDelay = { error("retry must not start after ownership is lost") },
                 activeNotificationsProvider = { notificationManager ->
                     if (reads.getAndIncrement() == 0) emptyArray() else notificationManager.activeNotifications
@@ -295,6 +303,7 @@ class LocalNotificationDismissalTest {
         val presenter =
             LocalNotificationPresenter(
                 context = context,
+                groupReconciliation = {},
                 nowMillis = { nowMs },
                 notificationCanceller = { _, tag, id -> cancelled += NotificationDismissalKey(tag, id) },
                 activeNotificationsProvider = { arrayOf(newerCard) },
@@ -316,7 +325,7 @@ class LocalNotificationDismissalTest {
         val lateSourceInvite = "invite-source-during-route" to 42
         val postedLateSourceInvite = AtomicBoolean(false)
         val presenter =
-            LocalNotificationPresenter(context) { notificationManager ->
+            LocalNotificationPresenter(context, groupReconciliation = {}) { notificationManager ->
                 if (postedLateSourceInvite.compareAndSet(false, true)) {
                     notificationManager.notify(
                         lateSourceInvite.first,
@@ -363,7 +372,7 @@ class LocalNotificationDismissalTest {
         val baseline = manager.activeNotifications.maxOf { it.postTime }
         val providerInvoked = AtomicBoolean(false)
         val presenter =
-            LocalNotificationPresenter(context) { notificationManager ->
+            LocalNotificationPresenter(context, groupReconciliation = {}) { notificationManager ->
                 providerInvoked.set(true)
                 assertFalse(
                     notificationManager.activeNotifications.any {
@@ -396,7 +405,7 @@ class LocalNotificationDismissalTest {
         manager.notify(conversation.tag, conversation.id, messagingNotification("msg-b", "newer" to 2_000L))
 
         assertTrue(
-            LocalNotificationPresenter(context).dismissActionNotificationAndOlderSiblings(
+            LocalNotificationPresenter(context, groupReconciliation = {}).dismissActionNotificationAndOlderSiblings(
                 notificationTag = conversation.tag,
                 notificationId = conversation.id,
                 actedMessageIdHex = "msg-a",
@@ -406,7 +415,13 @@ class LocalNotificationDismissalTest {
             ),
         )
 
-        assertEquals("msg-b", LocalNotificationPresenter(context).conversationCardMessageIdHex(conversation.tag, conversation.id))
+        assertEquals(
+            "msg-b",
+            LocalNotificationPresenter(context, groupReconciliation = {}).conversationCardMessageIdHex(
+                conversation.tag,
+                conversation.id,
+            ),
+        )
     }
 
     @Test
@@ -438,7 +453,7 @@ class LocalNotificationDismissalTest {
         val baseline = manager.activeNotifications.maxOf { it.postTime }
 
         assertTrue(
-            LocalNotificationPresenter(context)
+            LocalNotificationPresenter(context, groupReconciliation = {})
                 .dismissConversationSiblingCardsNotNewerThan(account, group, sinceMs = baseline),
         )
 
@@ -463,7 +478,7 @@ class LocalNotificationDismissalTest {
         val reactionPostTime = manager.activeNotifications.single().postTime
 
         assertTrue(
-            LocalNotificationPresenter(context)
+            LocalNotificationPresenter(context, groupReconciliation = {})
                 .dismissConversationSiblingCardsNotNewerThan(account, group, sinceMs = reactionPostTime - 1),
         )
 
@@ -493,7 +508,7 @@ class LocalNotificationDismissalTest {
         val invitePostTime = manager.activeNotifications.single().postTime
 
         assertTrue(
-            LocalNotificationPresenter(context)
+            LocalNotificationPresenter(context, groupReconciliation = {})
                 .dismissConversationSiblingCardsNotNewerThan(account, group, sinceMs = invitePostTime - 1),
         )
 
@@ -506,7 +521,7 @@ class LocalNotificationDismissalTest {
         val group = "group-a"
         val conversation = LocalNotificationFormatter.conversationDismissalKey(account, group)
         manager.notify(conversation.tag, conversation.id, messagingNotification("msg-a", "hello" to 1_000L))
-        val presenter = LocalNotificationPresenter(context)
+        val presenter = LocalNotificationPresenter(context, groupReconciliation = {})
 
         assertTrue(presenter.markDirectReplyHandled(conversation.tag, conversation.id, "reply"))
         presenter.cancelRepliedConversationCardIfSameGeneration(conversation.tag, conversation.id, "msg-a")
@@ -520,7 +535,7 @@ class LocalNotificationDismissalTest {
         val group = "group-a"
         val conversation = LocalNotificationFormatter.conversationDismissalKey(account, group)
         manager.notify(conversation.tag, conversation.id, messagingNotification("msg-a", "hello" to 1_000L))
-        val presenter = LocalNotificationPresenter(context)
+        val presenter = LocalNotificationPresenter(context, groupReconciliation = {})
 
         assertTrue(presenter.markDirectReplyHandled(conversation.tag, conversation.id, "reply"))
         manager.notify(
@@ -552,7 +567,7 @@ class LocalNotificationDismissalTest {
         val group = "group-a"
         val conversation = LocalNotificationFormatter.conversationDismissalKey(account, group)
         manager.notify(conversation.tag, conversation.id, messagingNotification("msg-a", "hello" to 1_000L))
-        val presenter = LocalNotificationPresenter(context)
+        val presenter = LocalNotificationPresenter(context, groupReconciliation = {})
 
         assertTrue(presenter.markDirectReplyHandled(conversation.tag, conversation.id, "reply"))
 
@@ -568,7 +583,7 @@ class LocalNotificationDismissalTest {
         val group = "group-a"
         val conversation = LocalNotificationFormatter.conversationDismissalKey(account, group)
         manager.notify(conversation.tag, conversation.id, messagingNotification(null, "hello" to 1_000L))
-        val presenter = LocalNotificationPresenter(context)
+        val presenter = LocalNotificationPresenter(context, groupReconciliation = {})
 
         assertTrue(presenter.markDirectReplyHandled(conversation.tag, conversation.id, "reply"))
         presenter.cancelRepliedConversationCardIfSameGeneration(conversation.tag, conversation.id, "msg-a")
@@ -610,6 +625,7 @@ class LocalNotificationDismissalTest {
         val presenter =
             LocalNotificationPresenter(
                 context,
+                groupReconciliation = {},
                 notificationCanceller = { compat, tag, id ->
                     cancelled += tag to id
                     compat.cancel(tag, id)
@@ -631,6 +647,7 @@ class LocalNotificationDismissalTest {
         val presenter =
             LocalNotificationPresenter(
                 context,
+                groupReconciliation = {},
                 notificationCanceller = { _, tag, id -> cancelled += tag to id },
                 activeNotificationsProvider = { emptyArray() },
             )
