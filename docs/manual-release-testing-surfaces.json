@@ -1998,7 +1998,24 @@
         "anchor": "fun Avatar(",
         "test_ids": [
           "AXY-001",
-          "INT-011"
+          "INT-011",
+          "PRO-006"
+        ]
+      },
+      {
+        "surface": "AnimatedProfileAvatarOverlay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnimatedProfileAvatar.kt",
+        "anchor": "fun AnimatedProfileAvatarOverlay(",
+        "test_ids": [
+          "PRO-006"
+        ]
+      },
+      {
+        "surface": "AnimatedProfileAvatarLayer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnimatedProfileAvatar.kt",
+        "anchor": "fun AnimatedProfileAvatarLayer(",
+        "test_ids": [
+          "PRO-006"
         ]
       },
       {
@@ -2055,7 +2072,8 @@
         "anchor": "fun GroupAvatar(",
         "test_ids": [
           "GRP-003",
-          "INT-011"
+          "INT-011",
+          "PRO-006"
         ]
       },
       {
@@ -2828,7 +2846,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTopBar.kt",
         "anchor": "fun ConversationTopBar(",
         "test_ids": [
-          "CON-001"
+          "CON-001",
+          "PRO-006"
         ]
       },
       {
@@ -7016,7 +7035,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AvatarViewer.kt",
         "anchor": "fun ZoomableAvatarImage(",
         "test_ids": [
-          "PRO-001"
+          "PRO-001",
+          "PRO-006"
         ]
       },
       {
@@ -7094,7 +7114,8 @@
         "anchor": "fun ProfileAvatar(",
         "test_ids": [
           "PRO-001",
-          "PRO-002"
+          "PRO-002",
+          "PRO-006"
         ]
       },
       {
@@ -7227,7 +7248,8 @@
         "anchor": "fun ProfileEditScreen(",
         "test_ids": [
           "PRO-001",
-          "PRO-002"
+          "PRO-002",
+          "PRO-007"
         ]
       },
       {
@@ -7236,7 +7258,9 @@
         "anchor": "fun ProfileHeroHeader(",
         "test_ids": [
           "PRO-001",
-          "PRO-002"
+          "PRO-002",
+          "PRO-006",
+          "PRO-007"
         ]
       },
       {
@@ -28816,6 +28840,14 @@
         "anchor": "internal object AvatarCacheDiagnostics",
         "test_ids": [
           "CHL-017"
+        ]
+      },
+      {
+        "surface": "Bounded reader viewport during native edge drags",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageFullScreen.kt",
+        "anchor": "internal const val MESSAGE_FULL_SCREEN_VIEWPORT_TAG",
+        "test_ids": [
+          "MSG-026"
         ]
       }
     ],

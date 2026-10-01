@@ -46,6 +46,7 @@ import dev.ipf.whitenoise.android.ui.common.readerScrollIndicator
 
 internal const val MESSAGE_FULL_SCREEN_TAG = "message-full-screen"
 internal const val MESSAGE_FULL_SCREEN_BODY_TAG = "message-full-screen-body"
+internal const val MESSAGE_FULL_SCREEN_VIEWPORT_TAG = "message-full-screen-viewport"
 
 /**
  * Full-screen reader for a body too long to show inline. Reached from the
@@ -196,26 +197,34 @@ internal fun MessageFullScreenView(
             bottomBar = bottomBar,
         ) { padding ->
             AdaptiveContent(Modifier.fillMaxSize().padding(padding)) {
-                MessageFullScreenBody(
-                    body = body,
-                    markdownDocument = bodyMarkdownDocument,
-                    mentionDisplayName = mentionDisplayName,
-                    isGroupMember = isGroupMember,
-                    onNostrProfileTap = onNostrProfileTap,
-                    onCopyMarkdownLink = onCopyMarkdownLink,
-                    selectionController = selection,
+                // Keep the viewport layer separate from the tall native scrolling child.
+                Box(
                     modifier =
                         Modifier
                             .fillMaxSize()
+                            .testTag(MESSAGE_FULL_SCREEN_VIEWPORT_TAG)
                             .readerScrollIndicator(
                                 scrollState,
                                 selectionKey,
                                 enabled = !selection.active && !overflowOpen,
-                            )
-                            // Android stretch can draw over the dialog chrome during edge drags.
-                            .verticalScroll(scrollState, overscrollEffect = null)
-                            .padding(16.dp),
-                )
+                            ),
+                ) {
+                    MessageFullScreenBody(
+                        body = body,
+                        markdownDocument = bodyMarkdownDocument,
+                        mentionDisplayName = mentionDisplayName,
+                        isGroupMember = isGroupMember,
+                        onNostrProfileTap = onNostrProfileTap,
+                        onCopyMarkdownLink = onCopyMarkdownLink,
+                        selectionController = selection,
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                // Android stretch can draw over the dialog chrome during edge drags.
+                                .verticalScroll(scrollState, overscrollEffect = null)
+                                .padding(16.dp),
+                    )
+                }
             }
         }
     }

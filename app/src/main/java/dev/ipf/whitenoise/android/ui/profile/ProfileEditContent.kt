@@ -55,6 +55,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.ui.common.AnimatedProfileAvatarOverlay
 import dev.ipf.whitenoise.android.ui.common.RandomProfileNameButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
@@ -352,7 +353,10 @@ internal fun ProfileEditContent(
     }
 }
 
-/** Prototype monogram/image geometry with production identity-scoped cache and reconnect recovery. */
+/**
+ * Prototype monogram/image geometry with production identity-scoped cache and reconnect recovery; a GIF
+ * picture animates over its first frame under the shared profile-avatar policy.
+ */
 @Suppress("FunctionNaming")
 @Composable
 internal fun ProfileAvatar(
@@ -377,6 +381,7 @@ internal fun ProfileAvatar(
                 Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
             )
+            AnimatedProfileAvatarOverlay(url, image, Modifier.fillMaxSize())
         } else {
             Text(name.trim().firstOrNull()?.uppercase() ?: "?", style = MaterialTheme.typography.headlineMedium)
         }

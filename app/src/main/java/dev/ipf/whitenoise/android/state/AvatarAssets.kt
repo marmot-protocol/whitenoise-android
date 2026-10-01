@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.marmotkit.AvatarAvailabilityFfi
 import dev.ipf.marmotkit.AvatarBytesFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.core.STORED_AVATAR_KEY_PREFIX
 
 /**
  * Byte budget for one batched read, MarmotKit's documented maximum. The engine already validated and
@@ -39,7 +40,7 @@ internal fun AvatarAssetFfi.isRenderable(): Boolean =
  */
 internal fun AvatarAssetFfi.cacheKey(accountRef: String): String? {
     val ref = reference ?: return null
-    return "marmot-avatar:$accountRef:$ref@$contentRevision"
+    return "$STORED_AVATAR_KEY_PREFIX$accountRef:$ref@$contentRevision"
 }
 
 /**

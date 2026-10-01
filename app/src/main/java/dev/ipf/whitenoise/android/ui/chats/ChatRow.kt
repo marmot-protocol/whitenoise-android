@@ -60,6 +60,7 @@ import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.messagePreviewForRetention
+import dev.ipf.whitenoise.android.state.selectedAvatarIsPersonPicture
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
@@ -330,6 +331,7 @@ internal fun ChatRow(
                     fallbackPictureUrl = avatarAccount?.let { item.selectedAvatarUrl ?: appState.avatarUrl(it) },
                     firstFrameAvatar = item.firstFrameAvatar,
                     durableAvatar = item.selectedAvatarAsset,
+                    durableAvatarIsPersonPicture = item.selectedAvatarIsPersonPicture,
                 )
                 if (pinned) {
                     Surface(

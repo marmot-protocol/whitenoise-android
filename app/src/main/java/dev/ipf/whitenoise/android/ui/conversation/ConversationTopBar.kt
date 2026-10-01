@@ -46,6 +46,8 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.adoptableSelectedAvatarAsset
 import dev.ipf.whitenoise.android.state.currentGroupAvatarItem
+import dev.ipf.whitenoise.android.state.isPeerSourced
+import dev.ipf.whitenoise.android.state.selectedAvatarIsPersonPicture
 import dev.ipf.whitenoise.android.ui.chats.ConversationSearchTopBar
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
@@ -136,6 +138,17 @@ internal fun ConversationTopBar(
                 )
             }
         }
+    // Only a member's profile picture may animate; a group-owned image always stays still.
+    val selectedAssetIsPersonPicture =
+        selectedAsset != null &&
+            if (freezeRoutePresentation || controller.window.header == null) {
+                currentRow?.selectedAvatarIsPersonPicture == true
+            } else {
+                controller.window.header
+                    ?.selected
+                    ?.avatarSource
+                    ?.isPeerSourced() == true
+            }
     val hasExplicitSelection = controller.window.header != null || liveRow?.selectedAvatarAsset != null
     val explicitSelectionMissing = hasExplicitSelection && selectedAsset == null
     val avatarGroup =
@@ -205,6 +218,7 @@ internal fun ConversationTopBar(
                                     firstFrameAvatar = firstFrameAvatar,
                                     accountRef = controller.boundAccountRef,
                                     durableAvatar = selectedAsset,
+                                    durableAvatarIsPersonPicture = selectedAssetIsPersonPicture,
                                 )
                             }
                             Column(verticalArrangement = Arrangement.spacedBy(CONVERSATION_TITLE_LINE_SPACING_DP.dp)) {
