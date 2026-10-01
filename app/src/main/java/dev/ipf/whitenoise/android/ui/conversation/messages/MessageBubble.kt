@@ -411,7 +411,7 @@ internal fun MessageBubble(
     // The same capability model the controller re-validates on the mutation
     // path; the UI only decides what to OFFER from it, never what to permit.
     val deleteCapability =
-        if (actionsReadOnly) {
+        if (readOnly) {
             MessageDeleteCapability(canDeleteForMe = false, canDeleteForEveryone = false)
         } else {
             controller.deleteCapabilityFor(record, alreadyDeleted = deleted, optimisticKeyOverride = item.id)

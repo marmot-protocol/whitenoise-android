@@ -118,6 +118,17 @@ class PollMessageActionsTest : PollMessageTestFixtures() {
         assertNull(pollController.replyingTo)
     }
 
+    @Test fun unavailablePollDiscussionKeepsLocalDeleteAvailable() {
+        val item = render(failed = true)
+        composeRule
+            .onNodeWithTag(messageBubbleRowTestTag(item.record.messageIdHex))
+            .performSemanticsAction(SemanticsActions.OnLongClick) { it() }
+        composeRule.onNodeWithText("Reply").assertDoesNotExist()
+        composeRule.onNodeWithText("Delete").performClick()
+        composeRule.onNodeWithText("Delete for me").assertExists()
+        assertTrue(recordedCalls().none { it.first == "reactToMessage" || it.first == "castPollVote" })
+    }
+
     @Test fun accessibleFullPickerClosesWhenConversationBecomesReadOnly() {
         val item = render()
         composeRule
@@ -151,8 +162,20 @@ class PollMessageActionsTest : PollMessageTestFixtures() {
         composeRule.runOnIdle { assertEquals(false, menuOpen.value) }
     }
 
-    private fun render(closed: Boolean = false, pending: Boolean = false) =
-        pollMessage(closed, mine = pending, status = if (pending) MessageStatus.Pending else MessageStatus.Received).also { item ->
+    private fun render(
+        closed: Boolean = false,
+        pending: Boolean = false,
+        failed: Boolean = false,
+    ) =
+        pollMessage(
+            closed,
+            mine = pending || failed,
+            status = when {
+                failed -> MessageStatus.Failed
+                pending -> MessageStatus.Pending
+                else -> MessageStatus.Received
+            },
+        ).also { item ->
             retain(item)
             composeRule.setContent {
                 WhiteNoiseTheme {
