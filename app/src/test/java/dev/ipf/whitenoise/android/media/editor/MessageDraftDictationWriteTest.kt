@@ -10,14 +10,20 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
+import dev.ipf.whitenoise.android.audio.ConversationDictationTargetValidation
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
+import dev.ipf.whitenoise.android.state.ComposerDraftExpansionBridge
+import dev.ipf.whitenoise.android.state.ComposerExpansionStateRetention
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -28,6 +34,107 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class MessageDraftDictationWriteTest {
+    /** Caret movement must not turn an explicit Send into the draft-conflict Paste fallback. */
+    @Test
+    fun cursorOnlyUpdatesKeepDictationSendEligible() =
+        runTest {
+            val gateway = KeyedDraftGateway(mutableMapOf((ACCOUNT to GROUP) to draft(GROUP, "Origin ")))
+            val repository = repository(gateway, UnconfinedTestDispatcher(testScheduler))
+            val writer = CoalescingMessageDraftWriter(this, repository, debounceMillis = 0)
+            val store = DraftStore(NoOpDraftPersistence)
+            val bridge = draftBridge(writer, store, repository)
+            bridge.setDraft(ACCOUNT, GROUP, TextFieldValue("Origin ", TextRange(7)))
+            writer.flush()
+            val captured = writer.generation(ACCOUNT, GROUP)
+            val sent = mutableListOf<String>()
+            val platform = DraftDictationPlatform()
+            val controller =
+                ConversationDictationController(
+                    platform = platform,
+                    readDraft = { account, group ->
+                        ConversationDictationDraftSnapshot(
+                            store.getDraft(account, group)?.textFieldValue ?: TextFieldValue(""),
+                            writer.generation(account, group).value,
+                        )
+                    },
+                    writeDraft = bridge::setDraftIfCurrent,
+                    disclosureAccepted = { true },
+                    markDisclosureAccepted = {},
+                    scheduleTimeout = { _, _ -> ConversationDictationTimeoutHandle {} },
+                    targetValidationScope = this,
+                    targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        if (request.beginDispatch()) {
+                            sent += request.payload
+                            true
+                        } else {
+                            false
+                        }
+                    },
+                )
+            controller.requestStart(ACCOUNT, GROUP, checkNotNull(store.getDraft(ACCOUNT, GROUP)).textFieldValue)
+
+            bridge.setDraft(ACCOUNT, GROUP, TextFieldValue("Origin ", TextRange(0)))
+            bridge.setDraft(ACCOUNT, GROUP, TextFieldValue("Origin ", TextRange(0), composition = TextRange(0, 6)))
+            assertEquals(captured, writer.generation(ACCOUNT, GROUP))
+            assertEquals(TextRange(0), store.getDraft(ACCOUNT, GROUP)?.textFieldValue?.selection)
+            controller.send()
+            platform.listener.onResult("dictated")
+            advanceUntilIdle()
+            writer.flush()
+
+            assertEquals(listOf("Origin dictated"), sent)
+            assertEquals("", store.get(ACCOUNT, GROUP).orEmpty())
+            // Only dispatch's intentional empty write advances the generation.
+            assertEquals(captured.value + 1, writer.generation(ACCOUNT, GROUP).value)
+        }
+
+    /** Real edits, including changing back to the original text, still invalidate a captured send. */
+    @Test
+    fun textEditsStillAdvanceTheGenerationEvenWhenRestoringOriginalContent() =
+        runTest {
+            val gateway = KeyedDraftGateway(mutableMapOf((ACCOUNT to GROUP) to draft(GROUP, "Origin")))
+            val repository = repository(gateway, UnconfinedTestDispatcher(testScheduler))
+            val writer = CoalescingMessageDraftWriter(this, repository, debounceMillis = 0)
+            val store = DraftStore(NoOpDraftPersistence)
+            val bridge = draftBridge(writer, store, repository)
+            bridge.setDraft(ACCOUNT, GROUP, TextFieldValue("Origin", TextRange(6)))
+            val captured = writer.generation(ACCOUNT, GROUP)
+
+            bridge.setDraft(ACCOUNT, GROUP, TextFieldValue("Changed"))
+            bridge.setDraft(ACCOUNT, GROUP, TextFieldValue("Origin"))
+            writer.flush()
+
+            assertEquals(captured.value + 2, writer.generation(ACCOUNT, GROUP).value)
+            assertFalse(bridge.setDraftIfCurrent(ACCOUNT, GROUP, captured.value, TextFieldValue("stale send")))
+            assertEquals("Origin", store.get(ACCOUNT, GROUP))
+        }
+
+    /** Cursor updates cannot erase an attachment mutation's stale-send fence or native media. */
+    @Test
+    fun selectionOnlyUpdatePreservesAttachmentMutationGeneration() =
+        runTest {
+            val gateway = KeyedDraftGateway(mutableMapOf((ACCOUNT to GROUP) to draft(GROUP, "Origin")))
+            val repository = repository(gateway, UnconfinedTestDispatcher(testScheduler))
+            val writer = CoalescingMessageDraftWriter(this, repository, debounceMillis = 0)
+            val store = DraftStore(NoOpDraftPersistence)
+            val bridge = draftBridge(writer, store, repository)
+            bridge.setDraft(ACCOUNT, GROUP, TextFieldValue("Origin", TextRange(6)))
+            writer.flush()
+            val captured = writer.generation(ACCOUNT, GROUP)
+            val media = attachment("new-media", byteArrayOf(1))
+            repository.addAttachment(ACCOUNT, GROUP, media)
+            val withMedia = writer.generation(ACCOUNT, GROUP)
+
+            bridge.setDraft(ACCOUNT, GROUP, TextFieldValue("Origin", TextRange(0, 6)))
+            writer.flush()
+
+            assertEquals(withMedia, writer.generation(ACCOUNT, GROUP))
+            assertFalse(bridge.setDraftIfCurrent(ACCOUNT, GROUP, captured.value, TextFieldValue("stale send")))
+            assertEquals(TextRange(0, 6), store.getDraft(ACCOUNT, GROUP)?.textFieldValue?.selection)
+            assertEquals(listOf(media), gateway.values.getValue(ACCOUNT to GROUP).mediaAttachments)
+        }
+
     @Test
     fun conditionalWriteRejectsAStaleGenerationAndPreservesAttachments() =
         runTest {
@@ -146,6 +253,20 @@ class MessageDraftDictationWriteTest {
         gateway = gateway,
         editorSessions = EditorSessionStore(TestStringStore()),
         ioDispatcher = ioDispatcher,
+    )
+
+    private fun CoroutineScope.draftBridge(
+        writer: CoalescingMessageDraftWriter,
+        store: DraftStore,
+        repository: MessageDraftRepository,
+    ) = ComposerDraftExpansionBridge(
+        draftWriter = writer,
+        draftStore = store,
+        draftRepository = repository,
+        expansionRetention = ComposerExpansionStateRetention(),
+        scope = this,
+        onDraftPresentationRestored = {},
+        onCleanupFailure = { _, cause -> throw cause },
     )
 
     private fun dictationController(

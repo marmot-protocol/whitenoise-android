@@ -3,6 +3,12 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "Composer cursor updates during dictation Send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ComposerDraftExpansionBridge.kt",
+        "anchor": "fun setDraft(",
+        "test_ids": ["DIC-002"]
+      },
+      {
         "surface": "Offline speech disclosure title",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
         "anchor": "R.string.dictation_disclosure_offline_title",
