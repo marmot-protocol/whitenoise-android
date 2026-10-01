@@ -61,6 +61,7 @@ internal class ChatListWindowSet private constructor(
     private val frameLock = lifetime.lock
     private var revision = 0L
     private val commands = Mutex()
+    private val forwardStalled = mutableSetOf<ChatListViewFfi>()
 
     val closed: Boolean get() = lifetime.closed
 
@@ -129,12 +130,33 @@ internal class ChatListWindowSet private constructor(
         }
     }
 
-    /** Loads the next page of [view] when MDK retains more rows; null when nothing newer was installed. */
-    suspend fun pageForward(view: ChatListViewFfi): ChatListWindowSnapshotFfi? =
-        command(view) { handle, sequence ->
-            if (!hasMoreAfter(view)) return@command null
-            handle.page(sequence, ChatListPageDirectionFfi.FORWARD, CHAT_LIST_WINDOW_PAGE_ROWS)
-        }
+    /**
+     * Loads the next page of [view] when MDK retains more rows; null when nothing newer was installed.
+     *
+     * A capped window can only move forward past the row it is anchored on, so a page issued before the
+     * reader's settled row has been reported may come back with the same rows (#2926). Such a no-progress
+     * page suspends forward demand for [view] until the next installed replacement, anchor report or
+     * backward page supplies fresh state: edge demand is re-evaluated then, never re-issued blindly.
+     */
+    suspend fun pageForward(view: ChatListViewFfi): ChatListWindowSnapshotFfi? {
+        val before = installed(view)?.takeIf { it.hasMoreAfter && !isForwardStalled(view) } ?: return null
+        val result =
+            command(view) { handle, sequence ->
+                if (!hasMoreAfter(view)) return@command null
+                handle.page(sequence, ChatListPageDirectionFfi.FORWARD, CHAT_LIST_WINDOW_PAGE_ROWS)
+            }
+        val after = installed(view)
+        if (after != null && after.sequence != before.sequence && after.sameRowsAs(before)) markForwardStalled(view)
+        return result
+    }
+
+    /** Whether a no-progress forward page has parked [view]'s edge demand until fresh state arrives. */
+    fun isForwardStalled(view: ChatListViewFfi): Boolean = synchronized(frameLock) { view in forwardStalled }
+
+    private fun markForwardStalled(view: ChatListViewFfi) {
+        synchronized(frameLock) { forwardStalled += view }
+        chatsDebug { "chat window forward page made no progress view=$view, waiting for fresh state" }
+    }
 
     /** Loads the preceding page of [view] when the retained window is no longer at the true top. */
     suspend fun pageBackward(view: ChatListViewFfi): ChatListWindowSnapshotFfi? =
@@ -209,6 +231,8 @@ internal class ChatListWindowSet private constructor(
             synchronized(frameLock) {
                 if (closed || !cursors.getValue(view).accept(update)) return@synchronized false
                 installed[view] = update
+                // Any newer replacement is fresh state: the forward edge may be re-evaluated against it.
+                forwardStalled -= view
                 revision++
                 true
             }
@@ -270,6 +294,11 @@ internal class ChatListWindowSet private constructor(
 }
 
 private suspend fun currentCoroutineContextIsActive(): Boolean = kotlinx.coroutines.currentCoroutineContext().isActive
+
+/** Whether two replacements retain the same rows in the same order, ignoring per-row presentation. */
+private fun ChatListWindowSnapshotFfi.sameRowsAs(other: ChatListWindowSnapshotFfi): Boolean =
+    rows.size == other.rows.size &&
+        rows.indices.all { index -> rows[index].row.groupIdHex == other.rows[index].row.groupIdHex }
 
 internal const val CHAT_LIST_LOG_HASH_RADIX = 16
 

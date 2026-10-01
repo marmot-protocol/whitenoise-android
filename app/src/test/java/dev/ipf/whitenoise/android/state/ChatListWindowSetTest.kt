@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -116,6 +117,37 @@ class ChatListWindowSetTest {
             assertEquals(1uL, windows.installed(ChatListViewFfi.CHATS)?.sequence)
         }
 
+    /**
+     * A forward page answered with the same rows parks forward demand (#2926): the next request issues no
+     * command, and demand resumes once an anchor report installs fresh state.
+     */
+    @Test
+    fun noProgressForwardPageParksDemandUntilFreshStateIsInstalled() =
+        runBlocking {
+            val chats = FakeWindow(ChatListViewFfi.CHATS, rows = listOf("CHATS-a"), hasMoreAfter = true)
+            chats.forwardPageAppends = false
+            val handles =
+                CHAT_LIST_WINDOW_VIEWS.associateWith { view ->
+                    if (view == ChatListViewFfi.CHATS) chats else FakeWindow(view)
+                }
+            val windows = ChatListWindowSet.open("acct") { _, view -> handles.getValue(view) }
+
+            val noProgress = windows.pageForward(ChatListViewFfi.CHATS)
+            assertEquals(listOf("CHATS-a"), noProgress?.rows?.map { it.row.groupIdHex })
+            assertTrue(windows.isForwardStalled(ChatListViewFfi.CHATS))
+
+            assertNull(windows.pageForward(ChatListViewFfi.CHATS))
+            assertEquals(1, chats.pageCalls.size)
+
+            assertEquals(2uL, windows.setVisibleAnchor(ChatListViewFfi.CHATS, "CHATS-a")?.sequence)
+            assertFalse(windows.isForwardStalled(ChatListViewFfi.CHATS))
+            chats.forwardPageAppends = true
+            val resumed = windows.pageForward(ChatListViewFfi.CHATS)
+            assertEquals(listOf("CHATS-a", "CHATS-page"), resumed?.rows?.map { it.row.groupIdHex })
+            assertEquals(2, chats.pageCalls.size)
+            assertFalse(windows.isForwardStalled(ChatListViewFfi.CHATS))
+        }
+
     /** A shifted capped window can page back to rows before its retained front. */
     @Test
     fun pagesBackwardOnlyWhenRowsExistBeforeTheWindow() =
@@ -158,6 +190,9 @@ private class FakeWindow(
     private var current = snapshot(0uL, rows)
     val pageCalls = mutableListOf<Pair<ULong, ChatListPageDirectionFfi>>()
     var failNextCommandWith: Throwable? = null
+
+    /** False scripts a capped window that cannot move forward: the page replies with the same rows. */
+    var forwardPageAppends = true
     var closed = false
     var cancelledNext = false
 
@@ -190,10 +225,10 @@ private class FakeWindow(
         pageCalls += sequence to direction
         val ids = current.rows.map { it.row.groupIdHex }
         val rows =
-            if (direction == ChatListPageDirectionFfi.BACKWARD) {
-                listOf("$view-page") + ids
-            } else {
-                ids + "$view-page"
+            when {
+                direction == ChatListPageDirectionFfi.BACKWARD -> listOf("$view-page") + ids
+                forwardPageAppends -> ids + "$view-page"
+                else -> ids
             }
         current = snapshot(sequence + 1uL, rows)
         return current

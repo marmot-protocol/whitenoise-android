@@ -2043,6 +2043,14 @@ class ChatsController private constructor(
     var forwardTargetsRevision by mutableLongStateOf(0L)
         private set
 
+    /**
+     * Bumps on every published chat-list window frame, including a replacement whose rows did not
+     * change, so viewport edge demand can be re-evaluated after a no-op page or an anchor report
+     * (#2926). staleness-exempt: observable window version consumed by the list's paging effects.
+     */
+    var chatListWindowRevision by mutableLongStateOf(0L)
+        private set
+
     // staleness-exempt: observable member projection version consumed by derived UI.
     var memberSnapshotsRevision by mutableLongStateOf(0L)
         private set
@@ -3956,6 +3964,7 @@ class ChatsController private constructor(
             else -> {
                 windows.publishIfCurrent(frame) { rows ->
                     replacePresentedChatRows(rows)
+                    chatListWindowRevision += 1L
                     scheduleRecompute()
                 }
                 !windows.closed

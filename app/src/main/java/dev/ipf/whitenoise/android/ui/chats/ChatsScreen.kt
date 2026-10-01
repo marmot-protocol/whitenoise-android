@@ -122,10 +122,7 @@ import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.settings.ChatFoldersScreen
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.util.Locale
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold as Scaffold
@@ -1053,35 +1050,21 @@ internal fun ChatsScreen(
             }
     }
     LaunchedEffect(chatListState, controller, chatListWindowView) {
-        snapshotFlow {
-            val info = chatListState.layoutInfo
-            (info.visibleItemsInfo.lastOrNull()?.index ?: -1) to info.totalItemsCount
-        }.distinctUntilChanged()
-            .collect { (lastVisibleIndex, totalItems) ->
-                if (totalItems > 0 && lastVisibleIndex >= totalItems - CHAT_LIST_WINDOW_PREFETCH_ROWS) {
-                    controller.loadMoreChats(chatListWindowView)
-                }
-            }
+        collectChatListForwardPaging(
+            listState = chatListState,
+            windowRevision = { controller.chatListWindowRevision },
+        ) { controller.loadMoreChats(chatListWindowView) }
     }
-    // The list also holds the inline load-error row, the pinned boundary and search headers, so the
-    // settled row is resolved by its item key rather than by index. Search rows are a filtered projection
-    // of the window and are never reported as its anchor.
     LaunchedEffect(chatListState, controller, chatListWindowView) {
-        snapshotFlow {
-            val settledRowId =
-                chatListState.layoutInfo.visibleItemsInfo.firstNotNullOfOrNull { visible ->
-                    (visible.key as? String)?.takeIf(currentVisibleChatIds::contains)
-                }
-            Triple(chatListState.isScrollInProgress, currentSearchActive, settledRowId)
-        }.filter { (scrolling, searching, _) -> !scrolling && !searching }
-            .map { (_, _, rowId) -> rowId }
-            .filterNotNull()
-            .distinctUntilChanged()
-            .collect { rowId ->
-                currentVisibleItems.firstOrNull { it.id == rowId }?.group?.groupIdHex?.let { groupIdHex ->
-                    controller.reportVisibleChat(groupIdHex, chatListWindowView)
-                }
+        collectChatListVisibleAnchor(
+            listState = chatListState,
+            searchActive = { currentSearchActive },
+            chatRowKey = { key -> (key as? String)?.takeIf(currentVisibleChatIds::contains) },
+        ) { rowId ->
+            currentVisibleItems.firstOrNull { it.id == rowId }?.group?.groupIdHex?.let { groupIdHex ->
+                controller.reportVisibleChat(groupIdHex, chatListWindowView)
             }
+        }
     }
     // Keep a new chat-list head flush at the top when live activity reorders
     // keyed items (issues #541 / #1313 / #1651). LazyColumn otherwise pins the
@@ -2050,9 +2033,6 @@ private val FAB_SNACKBAR_INSET = 80.dp
 // deeper than SNAP rows down we hard-jump to SNAP first, then animate the final
 // stretch, so a tap from hundreds of rows deep isn't a multi-second crawl.
 private const val CHAT_LIST_JUMP_TO_TOP_SHOW_INDEX = 5
-
-/** Rows from the end of the loaded window at which the next MarmotKit page is requested. */
-private const val CHAT_LIST_WINDOW_PREFETCH_ROWS = 10
 
 private const val CHAT_LIST_JUMP_TO_TOP_HIDE_INDEX = 2
 
