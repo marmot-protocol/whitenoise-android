@@ -7,6 +7,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
@@ -14,6 +15,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -70,6 +72,9 @@ class MessageFullScreenMarkdownScreenshotTest {
             ReaderSnapshot("reader_scroll_middle_large_rtl", 0.5f, rtl = true, scale = 2f),
         )
 
+    @Test fun scrollingReaderActionMenuHidesPositionThumb() =
+        captureScrollingReader(ReaderSnapshot("reader_scroll_action_menu_dark", 0.5f, dark = true, actionMenu = true))
+
     @Test fun fittingReaderHasNoPositionThumb() {
         render(false, 1f, LayoutDirection.Ltr, reader = ReaderContent("A short fitting message.", null))
         composeRule
@@ -85,6 +90,7 @@ class MessageFullScreenMarkdownScreenshotTest {
         val amoled: Boolean = false,
         val rtl: Boolean = false,
         val scale: Float = 1f,
+        val actionMenu: Boolean = false,
     )
 
     private data class ReaderContent(
@@ -112,6 +118,15 @@ class MessageFullScreenMarkdownScreenshotTest {
                 if (snapshot.fraction > 0f) moveBy(Offset(0f, -target))
             }
             composeRule.mainClock.advanceTimeBy(32)
+            if (snapshot.actionMenu) {
+                // Use the native accessibility action while the primary drag pointer stays held.
+                composeRule
+                    .onNodeWithContentDescription("Message actions")
+                    .performSemanticsAction(SemanticsActions.OnClick) { it() }
+                composeRule.mainClock.autoAdvance = true
+                composeRule.waitForIdle()
+                composeRule.onNodeWithText("Copy text").assertExists()
+            }
             composeRule
                 .onNodeWithTag(MESSAGE_FULL_SCREEN_TAG)
                 .captureRoboImage("src/test/snapshots/${snapshot.name}.png")
