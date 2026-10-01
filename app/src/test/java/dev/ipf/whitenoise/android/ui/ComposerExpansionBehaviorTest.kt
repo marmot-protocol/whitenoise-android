@@ -1244,7 +1244,7 @@ class ComposerExpansionBehaviorTest {
                         }
                 },
             readDraft = { _, _ -> ConversationDictationDraftSnapshot(draft, 0L) },
-            writeDraft = { _, _, _, _ -> true },
+            writeDraft = { _, _, _, _ -> 0L },
             disclosureAccepted = { true },
             markDisclosureAccepted = {},
             scheduleTimeout = { _, _ -> ConversationDictationTimeoutHandle {} },

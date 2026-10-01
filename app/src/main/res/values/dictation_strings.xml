@@ -10,4 +10,6 @@
     <string name="dictation_provider_window">Opens provider window</string>
     <string name="dictation_provider_keyboard">Keyboard only</string>
     <string name="dictation_provider_unknown">In-app support not verified</string>
+    <string name="dictation_send_blocked">Not sent</string>
+    <string name="dictation_retry_send">Retry Send</string>
 </resources>

@@ -65,7 +65,6 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
 import dev.ipf.whitenoise.android.audio.DictationDiagnosticLifecycle
 import dev.ipf.whitenoise.android.audio.DictationDiagnostics
 import dev.ipf.whitenoise.android.audio.MicrophoneCaptureCoordinator
-import dev.ipf.whitenoise.android.audio.discoverConversationDictationProviders
 import dev.ipf.whitenoise.android.audio.tts.AndroidTtsSpeechEngine
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineHandle
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineResolver
@@ -120,6 +119,7 @@ import dev.ipf.whitenoise.android.notifications.ConversationNotificationChannels
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationRouting
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPattern
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPreferences
+import dev.ipf.whitenoise.android.notifications.ForegroundStartTrigger
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
 import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.NotificationBatteryPolicy
@@ -1222,67 +1222,66 @@ class WhiteNoiseAppState private constructor(
     internal val conversationDictationPreferences = ConversationDictationPreferences(appContext)
     internal val microphoneCaptureCoordinator = MicrophoneCaptureCoordinator()
     private val dictationMicrophoneOwner = Any()
-    internal val conversationDictation: ConversationDictationController by lazy {
-        ConversationDictationController(
-            context = appContext,
-            readDraft = ::conversationDictationDraftSnapshot,
-            writeDraft = ::setConversationDictationDraftIfCurrent,
-            // Chat rows are a refreshable projection, not proof that the immutable origin was removed.
-            targetAvailable = { accountRef, _ ->
-                accounts.any { it.label == accountRef && it.signedOut != true }
-            },
-            targetReplyAvailable = { account, group, reply ->
-                conversationDictationReplyTargetResolution(account, group, reply).available
-            },
-            targetValidator = { account, group ->
-                val cached =
-                    synchronized(conversationControllerLock) {
-                        newestMatchingController(conversationControllers) { it.matchesConversation(account, group) }
+    internal val conversationDictation: ConversationDictationController
+        get() = conversationDictationOwner.value
+
+    /** Connection lifecycle checks must not create a speech controller in an idle process. */
+    internal fun initializedConversationDictation(): ConversationDictationController? =
+        if (conversationDictationOwner.isInitialized()) conversationDictationOwner.value else null
+
+    private val conversationDictationOwner =
+        lazy {
+            ConversationDictationController(
+                context = appContext,
+                readDraft = ::conversationDictationDraftSnapshot,
+                writeDraft = ::setConversationDictationDraftIfCurrent,
+                // Chat rows are a refreshable projection, not proof that the immutable origin was removed.
+                targetAvailable = { accountRef, _ ->
+                    accounts.any { it.label == accountRef && it.signedOut != true }
+                },
+                targetReplyAvailable = { account, group, reply ->
+                    conversationDictationReplyTargetResolution(account, group, reply).available
+                },
+                targetValidator = { account, group ->
+                    val cached =
+                        synchronized(conversationControllerLock) {
+                            newestMatchingController(conversationControllers) { it.matchesConversation(account, group) }
+                        }
+                    when {
+                        accounts.none { it.label == account && it.signedOut != true } ->
+                            TargetValidation.DefinitelyRemoved
+                        cached?.membersVerified == true && cached.isSelfMember -> TargetValidation.Available
+                        cached?.membersVerified == true -> TargetValidation.DefinitelyRemoved
+                        else ->
+                            runCatchingCancellable {
+                                marmotIo {
+                                    val member =
+                                        groupDetails(account, group).group.selfMembership ==
+                                            SelfMembershipFfi.MEMBER
+                                    if (member) TargetValidation.Available else TargetValidation.DefinitelyRemoved
+                                }
+                            }.getOrDefault(TargetValidation.Indeterminate)
                     }
-                when {
-                    accounts.none { it.label == account && it.signedOut != true } ->
-                        TargetValidation.DefinitelyRemoved
-                    cached?.membersVerified == true && cached.isSelfMember -> TargetValidation.Available
-                    cached?.membersVerified == true -> TargetValidation.DefinitelyRemoved
-                    else ->
-                        runCatchingCancellable {
-                            marmotIo {
-                                val member =
-                                    groupDetails(account, group).group.selfMembership ==
-                                        SelfMembershipFfi.MEMBER
-                                if (member) TargetValidation.Available else TargetValidation.DefinitelyRemoved
-                            }
-                        }.getOrDefault(TargetValidation.Indeterminate)
-                }
-            },
-            targetValidationScope = mutationsScope,
-            onBeforeRecognition = conversationDictationMediaHandoff::beforeRecognition,
-            onAfterAudioCapture = conversationDictationMediaHandoff::afterAudioCapture,
-            tryAcquireMicrophone = { microphoneCaptureCoordinator.tryAcquire(dictationMicrophoneOwner) },
-            releaseMicrophone = { microphoneCaptureCoordinator.release(dictationMicrophoneOwner) },
-            finishAfterSilenceMillis = {
-                conversationDictationPreferences.current().finishAfterSilenceMillis
-            },
-            pauseOtherAudio = { conversationDictationPreferences.current().pauseOtherAudio },
-            silenceDeliveryMode = {
-                conversationDictationPreferences.current().silenceDeliveryMode
-            },
-            sendTranscriptIfOriginUnchanged = ::sendDictationTranscriptIfOriginUnchanged,
-        )
-    }
+                },
+                targetValidationScope = mutationsScope,
+                onBeforeRecognition = conversationDictationMediaHandoff::beforeRecognition,
+                onAfterAudioCapture = conversationDictationMediaHandoff::afterAudioCapture,
+                tryAcquireMicrophone = { microphoneCaptureCoordinator.tryAcquire(dictationMicrophoneOwner) },
+                releaseMicrophone = { microphoneCaptureCoordinator.release(dictationMicrophoneOwner) },
+                finishAfterSilenceMillis = {
+                    conversationDictationPreferences.current().finishAfterSilenceMillis
+                },
+                pauseOtherAudio = { conversationDictationPreferences.current().pauseOtherAudio },
+                silenceDeliveryMode = {
+                    conversationDictationPreferences.current().silenceDeliveryMode
+                },
+                sendTranscriptIfOriginUnchanged = ::sendDictationTranscriptIfOriginUnchanged,
+            )
+        }
 
     /** Settings discovery is lifecycle-local; protocol data never enters this platform snapshot. */
-    internal suspend fun discoverDictationProviders(): List<ConversationDictationProvider> {
-        val providers =
-            withContext(Dispatchers.IO) {
-                discoverConversationDictationProviders(appContext)
-            }
-        val saved = conversationDictationPreferences.current().providerSelection
-        if (saved != null && providers.flatMap { it.choices }.none(saved::sameInstallation)) {
-            conversationDictationPreferences.setProviderSelection(null)
-        }
-        return providers
-    }
+    internal suspend fun discoverDictationProviders(): List<ConversationDictationProvider> =
+        discoverDictationProvidersForSettings(appContext, conversationDictationPreferences)
 
     private val legacyDraftMigrationSource by lazy { LegacyDraftMigrationSource(appContext) }
     internal val editorSourceStore: EditorSourceStore = EditorSourceStore.create(appContext)
@@ -2644,7 +2643,7 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
         expectedRevision: Long,
         value: TextFieldValue,
-    ): Boolean = composerDraftExpansionBridge.setDraftIfCurrent(accountRef, groupIdHex, expectedRevision, value)
+    ): Long? = composerDraftExpansionBridge.writeDraftIfCurrent(accountRef, groupIdHex, expectedRevision, value)
 
     /** Dictation conditionally empties only its unchanged origin; failed or unknown sends restore that exact text. */
     internal suspend fun sendDictationTranscriptIfOriginUnchanged(request: ConversationDictationSendRequest): Boolean {
@@ -11243,7 +11242,11 @@ class WhiteNoiseAppState private constructor(
     }
 
     private fun startBackgroundConnectionService(): Boolean {
-        val started = NotificationStreamForegroundService.start(appContext)
+        val started =
+            NotificationStreamForegroundService.start(
+                appContext,
+                ForegroundStartTrigger.UserToggle,
+            )
         appStateDebug { "background connection service start=$started" }
         return started
     }

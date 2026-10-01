@@ -38,8 +38,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppMessageRecordFfi
@@ -47,6 +54,8 @@ import dev.ipf.marmotkit.GroupSystemEventFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GroupSystemEvent
 import dev.ipf.whitenoise.android.core.GroupSystemEvents
+import dev.ipf.whitenoise.android.core.GroupSystemLinkedSummary
+import dev.ipf.whitenoise.android.core.GroupSystemSubjectLink
 import dev.ipf.whitenoise.android.core.MessageDebugClassifier
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.rememberGroupSystemCopy
@@ -74,6 +83,7 @@ internal fun GroupSystemRow(
     onDeleteForMe: (() -> Unit)? = null,
     onWave: (suspend (String, () -> Unit) -> Unit)? = null,
     waveAccountRef: String? = appState.activeAccountRef,
+    onOpenProfile: ((accountIdHex: String) -> Unit)? = null,
 ) {
     val copy = rememberGroupSystemCopy()
     val event =
@@ -83,11 +93,16 @@ internal fun GroupSystemRow(
     // Localized new-window label for the disappearing-timer "set to …" rows; null
     // when the event isn't a timer-on change (off/other rows need no duration).
     val retentionLabel = event?.newRetentionSeconds?.takeIf { it > 0uL }?.let { disappearingMessagesLabel(it.toLong()) }
+    val selfHex = appState.activeAccount?.accountIdHex
     val summary =
         if (event != null) {
-            run {
-                val selfHex = appState.activeAccount?.accountIdHex
-                val actorHex = GroupSystemEvents.actorHex(event, record.sender)
+            val actorHex = GroupSystemEvents.actorHex(event, record.sender)
+            val subjectName =
+                GroupSystemEvents.preferredName(
+                    event.subject?.let { appState.displayName(it) },
+                    event.subjectDisplayName,
+                )
+            GroupSystemSubjectLink.summary(event, selfHex, subjectName) { shownSubject ->
                 GroupSystemEvents.summary(
                     event = event,
                     actorName =
@@ -95,11 +110,7 @@ internal fun GroupSystemRow(
                             actorHex?.let { appState.displayName(it) },
                             event.actorDisplayName,
                         ),
-                    subjectName =
-                        GroupSystemEvents.preferredName(
-                            event.subject?.let { appState.displayName(it) },
-                            event.subjectDisplayName,
-                        ),
+                    subjectName = shownSubject,
                     actorIsSelf = GroupSystemEvents.isSelf(selfHex, actorHex),
                     subjectIsSelf = GroupSystemEvents.isSelf(selfHex, event.subject),
                     retentionLabel = retentionLabel,
@@ -107,7 +118,18 @@ internal fun GroupSystemRow(
                 )
             }
         } else {
-            copy.fallback
+            GroupSystemLinkedSummary(copy.fallback)
+        }
+    val summaryText =
+        if (onOpenProfile == null) {
+            AnnotatedString(summary.text)
+        } else {
+            groupSystemSummaryText(summary, MaterialTheme.colorScheme.primary) { subject ->
+                // Navigation only, and only under the account this row was rendered for (#2957).
+                GroupSystemSubjectLink
+                    .openTarget(subject, waveAccountRef, appState.activeAccountRef)
+                    ?.let(onOpenProfile)
+            }
         }
     var actionMenuOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     // The prototype gives every event row a flat 8.dp above and below inside a
@@ -126,7 +148,7 @@ internal fun GroupSystemRow(
         ) {
             Box {
                 Text(
-                    text = summary,
+                    text = summaryText,
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -160,7 +182,7 @@ internal fun GroupSystemRow(
                     )
                 }
             }
-            val waveTarget = waveTarget(event, appState.activeAccount?.accountIdHex)
+            val waveTarget = waveTarget(event, selfHex)
             if (waveTarget != null && onWave != null) {
                 WaveHiButton(record, appState, waveAccountRef, waveTarget, onWave)
             }
@@ -261,6 +283,35 @@ private fun WaveHiButton(
     }
 }
 
+/**
+ * The summary as styled text: the affected member's name, when [GroupSystemSubjectLink] located it, is a
+ * link that TalkBack exposes as one and that hands its authenticated account id to [onOpen].
+ */
+internal fun groupSystemSummaryText(
+    summary: GroupSystemLinkedSummary,
+    linkColor: Color,
+    onOpen: (accountIdHex: String) -> Unit,
+): AnnotatedString =
+    buildAnnotatedString {
+        append(summary.text)
+        val range = summary.subjectRange
+        val subject = summary.subjectAccountIdHex
+        if (range != null && subject != null) {
+            addLink(
+                LinkAnnotation.Clickable(
+                    tag = GROUP_SYSTEM_SUBJECT_LINK_TAG,
+                    styles = TextLinkStyles(SpanStyle(color = linkColor, fontWeight = FontWeight.SemiBold)),
+                ) { onOpen(subject) },
+                start = range.first,
+                end = range.last + 1,
+            )
+        }
+    }
+
+/** Annotation tag of the affected member's profile link inside a group system row. */
+internal const val GROUP_SYSTEM_SUBJECT_LINK_TAG = "group-system-subject"
+
+/** The member a "Wave hi" greets: an authenticated addition of someone other than the reader. */
 private fun waveTarget(
     event: GroupSystemEvent?,
     selfAccountId: String?,

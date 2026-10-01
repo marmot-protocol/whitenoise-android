@@ -18,5 +18,7 @@
     <string name="dictation_result_paste_description">傳送前檢閱或編輯文字</string>
     <string name="dictation_result_send">傳送訊息</string>
     <string name="dictation_result_send_description">僅在聊天和草稿未變更時傳送</string>
-    <string name="dictation_send_safety_note">如果訊息傳送前聊天或草稿有所變更，文字會保留在草稿中供你檢閱。</string>
+    <string name="dictation_send_safety_note">如果聊天或草稿在傳送前發生變化，聽寫內容會保持未傳送狀態。請重試傳送或選擇貼上以檢查文字。</string>
+    <string name="dictation_send_blocked">未傳送</string>
+    <string name="dictation_retry_send">重試傳送</string>
 </resources>

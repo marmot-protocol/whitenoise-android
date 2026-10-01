@@ -18,5 +18,7 @@
     <string name="dictation_result_paste_description">Controlla o modifica il testo prima di inviarlo</string>
     <string name="dictation_result_send">Invia messaggio</string>
     <string name="dictation_result_send_description">Invia solo se la chat e la bozza non sono cambiate</string>
-    <string name="dictation_send_safety_note">Se la chat o la bozza cambiano prima dell’invio del messaggio, il testo resta nella bozza così puoi controllarlo.</string>
+    <string name="dictation_send_safety_note">Se la chat o la bozza cambia prima dell’invio, la dettatura resta non inviata. Riprova l’invio o scegli Incolla per controllare il testo.</string>
+    <string name="dictation_send_blocked">Non inviato</string>
+    <string name="dictation_retry_send">Riprova invio</string>
 </resources>

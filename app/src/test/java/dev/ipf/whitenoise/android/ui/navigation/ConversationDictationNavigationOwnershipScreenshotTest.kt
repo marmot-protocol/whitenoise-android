@@ -355,7 +355,7 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
                 writeDraft = { account, group, _, value ->
                     writes += account to group
                     draft = value
-                    true
+                    0L
                 },
                 disclosureAccepted = { true },
                 markDisclosureAccepted = {},

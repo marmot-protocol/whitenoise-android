@@ -381,13 +381,13 @@ class ConversationDictationCoordinatorTest {
                 readDraft = { _, _ -> ConversationDictationDraftSnapshot(draft, revision) },
                 writeDraft = { accountRef, groupIdHex, expected, value ->
                     if (expected != revision) {
-                        false
+                        null
                     } else {
                         draft = value
                         revision += 1L
                         writes += 1
                         writeTargets += accountRef to groupIdHex
-                        true
+                        revision
                     }
                 },
                 targetAvailable = targetAvailable,
