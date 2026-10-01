@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.audio
 
+import android.os.Looper
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -8,18 +9,40 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowLog
 import java.io.IOException
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class ConversationDictationCallerAudioTest {
+    /** Production discard/finish/forced closure adapters queue recorder-thread callbacks to main. */
+    @Test
+    fun nativeCaptureClosureIsDeliveredOnlyOnMain() {
+        val nativeReturned = CountDownLatch(1)
+        val delivered = AtomicBoolean(false)
+        val onClosed =
+            mainThreadDictationCaptureClosure {
+                assertEquals(Looper.getMainLooper(), Looper.myLooper())
+                delivered.set(true)
+            }
+        Thread {
+            onClosed()
+            nativeReturned.countDown()
+        }.start()
+        assertTrue(nativeReturned.await(2, TimeUnit.SECONDS))
+        assertFalse(delivered.get())
+        shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(delivered.get())
+    }
+
     /** Cancelling a stream before it claims PCM must still free the lease for a replacement. */
     @Test
     fun cancelBeforePollReleasesTheStreamLease() {
@@ -97,6 +120,56 @@ class ConversationDictationCallerAudioTest {
             await { released.get() == 1 }
         } finally {
             stopRead.countDown()
+            capture.discard {}
+        }
+    }
+
+    /** A released recorder whose driver withholds its read cannot retain microphone ownership forever. */
+    @Test
+    fun forcedClosureSealsReleasedRecorderWhenReadDoesNotReturn() {
+        val blockedRead = CountDownLatch(1)
+        val returnRead = CountDownLatch(1)
+        val captureFinally = CountDownLatch(1)
+        val reads = AtomicInteger(0)
+        val releases = AtomicInteger(0)
+        val stops = AtomicInteger(0)
+        val device =
+            object : ConversationDictationAudioCaptureDevice by FakeCaptureDevice() {
+                override fun read(target: ShortArray): Int {
+                    if (reads.incrementAndGet() > 1) {
+                        blockedRead.countDown()
+                        check(returnRead.await(5, TimeUnit.SECONDS))
+                    }
+                    target[0] = 1
+                    target[1] = 2
+                    return 2
+                }
+
+                override fun stop() {
+                    if (stops.incrementAndGet() > 1) captureFinally.countDown()
+                }
+
+                override fun release() {
+                    releases.incrementAndGet()
+                }
+            }
+        val buffer = ConversationDictationAudioChunkBuffer(sessionId = 1L, chunkBytes = 4, maxBufferedBytes = 8)
+        val capture = callerAudio(device = device, buffer = buffer)
+        val closed = CountDownLatch(1)
+        try {
+            assertTrue(capture.start())
+            assertTrue(blockedRead.await(2, TimeUnit.SECONDS))
+            capture.forceFinish(closed::countDown)
+            assertTrue(closed.await(2, TimeUnit.SECONDS))
+            assertEquals(1, releases.get())
+            assertEquals(4, buffer.bufferedBytes)
+            assertTrue(buffer.hasPending)
+            returnRead.countDown()
+            assertTrue(captureFinally.await(2, TimeUnit.SECONDS))
+            assertEquals(4, buffer.bufferedBytes)
+            assertEquals(1, releases.get())
+        } finally {
+            returnRead.countDown()
             capture.discard {}
         }
     }

@@ -10,6 +10,9 @@ import android.widget.RemoteViews
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
 
+internal const val DICTATION_RECOVERY_NOTIFICATION_TAG = "dictation-recovery"
+internal const val DICTATION_RECOVERY_NOTIFICATION_ID = 1002
+
 /** Metadata-free rendering reads only the current controller; it never owns capture or a service lease. */
 internal fun buildConversationDictationNotification(
     context: Context,
@@ -72,7 +75,7 @@ internal fun notifyConversationDictationRecoveryExpired(context: Context) {
             .setContentIntent(openDictationAppIntent(context))
             .setAutoCancel(true)
             .build()
-    manager.notify("dictation-recovery", 1002, notification)
+    manager.notify(DICTATION_RECOVERY_NOTIFICATION_TAG, DICTATION_RECOVERY_NOTIFICATION_ID, notification)
 }
 
 private fun compactDictationControls(

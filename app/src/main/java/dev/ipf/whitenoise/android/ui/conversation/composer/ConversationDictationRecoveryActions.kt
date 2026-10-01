@@ -59,20 +59,24 @@ internal fun ConversationDictationFailureAction(
                     Icons.Default.Settings
                 },
             contentDescription =
-                stringResource(
-                    when {
-                        retrySend -> R.string.dictation_retry_send
-                        recovery == ConversationDictationRecovery.AppSettings -> R.string.open_app_settings
-                        recovery == ConversationDictationRecovery.SpeechProviderSetup -> R.string.dictation_open_speech_service
-                        else -> R.string.retry
-                    },
-                ),
+                stringResource(dictationFailureActionLabel(retrySend, recovery)),
         )
     }
     if (confirmPartialSend) {
         ConversationDictationSendConfirmation(state, controller, recovery, onDismiss = { confirmPartialSend = false })
     }
 }
+
+private fun dictationFailureActionLabel(
+    retrySend: Boolean,
+    recovery: ConversationDictationRecovery,
+): Int =
+    when {
+        retrySend -> R.string.dictation_retry_send
+        recovery == ConversationDictationRecovery.AppSettings -> R.string.open_app_settings
+        recovery == ConversationDictationRecovery.SpeechProviderSetup -> R.string.dictation_open_speech_service
+        else -> R.string.retry
+    }
 
 /** Dialog callbacks keep the displayed failed session as their owner. */
 @Composable
@@ -100,14 +104,19 @@ private fun ConversationDictationSendConfirmation(
                 {
                     when (recovery) {
                         ConversationDictationRecovery.AppSettings -> openDictationAppSettings(context)
-                        ConversationDictationRecovery.SpeechProviderSetup -> openSpeechProviderSetup(context, controller.speechProviderPackage)
+                        ConversationDictationRecovery.SpeechProviderSetup ->
+                            openSpeechProviderSetup(context, controller.speechProviderPackage)
                         ConversationDictationRecovery.Retry -> Unit
                     }
                 }
             },
         settingsLabel =
             stringResource(
-                if (recovery == ConversationDictationRecovery.SpeechProviderSetup) R.string.dictation_open_speech_service else R.string.open_app_settings,
+                if (recovery == ConversationDictationRecovery.SpeechProviderSetup) {
+                    R.string.dictation_open_speech_service
+                } else {
+                    R.string.open_app_settings
+                },
             ),
     )
 }

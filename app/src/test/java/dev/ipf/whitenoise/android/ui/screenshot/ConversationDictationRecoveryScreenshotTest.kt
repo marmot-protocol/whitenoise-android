@@ -67,7 +67,9 @@ class ConversationDictationRecoveryScreenshotTest {
         }
         if (System.getProperty("roborazzi.test.record") == "true") {
             java.io.File("build/outputs/roborazzi/diagnostics").mkdirs()
-            composeRule.onNodeWithTag("dictation-partial-send-dialog").captureRoboImage("build/outputs/roborazzi/diagnostics/$name")
+            composeRule
+                .onNodeWithTag("dictation-partial-send-dialog")
+                .captureRoboImage("build/outputs/roborazzi/diagnostics/$name")
         }
         assertWholeAction("Send recognized text")
         assertWholeAction("Paste")

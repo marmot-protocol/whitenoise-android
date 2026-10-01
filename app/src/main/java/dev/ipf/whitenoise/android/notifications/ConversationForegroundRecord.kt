@@ -84,6 +84,18 @@ internal class ConversationForegroundRecord(
         )
     }
 
+    /** An earlier rejected narrowing must retry even when dictation has already completed. */
+    fun reconcileAfterForegroundReturn() {
+        if (!isCurrent() || !foregroundPromoted) return
+        val type = connectionServiceType or dictation.foregroundServiceType
+        if (type == publishedServiceType || type and ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE != 0) return
+        if (type == 0) {
+            removeForegroundAndStop(serviceStartId())
+        } else {
+            publishForeground(foregroundNotification(), type, replaceRecord = true)
+        }
+    }
+
     fun promoteDictation(
         notification: Notification,
         type: Int,

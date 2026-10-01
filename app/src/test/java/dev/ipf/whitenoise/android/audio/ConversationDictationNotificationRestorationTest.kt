@@ -474,6 +474,58 @@ class ConversationDictationNotificationRestorationTest {
         lifecycle.destroy()
     }
 
+    /** Foreground return retries rejected completion narrowing even with an idle controller. */
+    @Test
+    fun completedDictationRetriesRejectedNarrowingOnForegroundReturn() {
+        val types = mutableListOf<Int>()
+        var reject = false
+        NotificationStreamForegroundService.foregroundPublisher = { owner, notification, type ->
+            if (reject) throw SecurityException("narrowing rejected")
+            types += type
+            defaultPublisher(owner, notification, type)
+        }
+        val harness = installHost()
+        val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
+        val service = lifecycle.get()
+        service.foreground.promoteConnection(ForegroundStartTrigger.UserToggle)
+        service.onStartCommand(startIntent(service, harness), 0, 1)
+        reject = true
+        harness.conversationDictation.cancel()
+        assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)
+        assertTrue(types.last() and ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE != 0)
+        reject = false
+        NotificationStreamForegroundService.onAppForegrounded(harness.conversationDictation)
+        assertEquals(ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING, types.last())
+        assertFalse(shadowOf(service as Service).isForegroundStopped)
+        assertCompletedPresentation(service.getSystemService(NotificationManager::class.java), true)
+        lifecycle.destroy()
+    }
+
+    /** A connection sharing special-use protection retains that legitimate type until its lease ends. */
+    @Test
+    fun connectionStartedDuringCaptureRetainsItsAcceptedSpecialUseType() {
+        val types = mutableListOf<Int>()
+        NotificationStreamForegroundService.foregroundPublisher = { owner, notification, type ->
+            types += type
+            defaultPublisher(owner, notification, type)
+        }
+        val harness = installHost()
+        val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
+        val service = lifecycle.get()
+        service.onStartCommand(startIntent(service, harness), 0, 1)
+        val promotions = types.size
+        service.foreground.promoteConnection(ForegroundStartTrigger.UserToggle)
+        assertEquals(promotions, types.size)
+        harness.conversationDictation.cancel()
+        assertEquals(ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE, types.last())
+        service.foreground.promoteConnection(ForegroundStartTrigger.PushWake)
+        assertEquals(ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE, types.last())
+        assertCompletedPresentation(service.getSystemService(NotificationManager::class.java), true)
+        service.foreground.releaseConnection()
+        assertTrue(shadowOf(service as Service).isForegroundStopped)
+        lifecycle.destroy()
+    }
+
     /** Disabling connection also handles revocation of the remaining microphone type safely. */
     @Test
     fun connectionStopDoesNotReassertMicrophoneOrPasteText() {

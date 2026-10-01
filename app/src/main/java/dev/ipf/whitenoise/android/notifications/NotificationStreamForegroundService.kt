@@ -19,6 +19,7 @@ import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
+import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationForegroundService
 import dev.ipf.whitenoise.android.state.RecoveryTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -419,6 +420,12 @@ class NotificationStreamForegroundService : Service() {
         private const val NOTIFICATION_ID = BackgroundConnectionNotification.NOTIFICATION_ID
         private var activeHost: NotificationStreamForegroundService? = null
         private val connectionStartEpoch = AtomicLong()
+
+        /** Reconcile the existing host without creating a service or reopening a microphone. */
+        internal fun onAppForegrounded(controller: ConversationDictationController?) {
+            controller?.onAppForegrounded()
+            activeHost?.foreground?.reconcileAfterForegroundReturn()
+        }
 
         internal var pendingDictationOwner: (Context) -> Boolean = { context ->
             (context.applicationContext as? WhiteNoiseApplication)

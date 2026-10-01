@@ -119,7 +119,10 @@ internal class ConversationDictationForegroundService(
             }
             ensureChannel(this)
             if (controller.state !is ConversationDictationState.Failed) {
-                service.getSystemService(NotificationManager::class.java).cancel("dictation-recovery", 1002)
+                service.getSystemService(NotificationManager::class.java).cancel(
+                    DICTATION_RECOVERY_NOTIFICATION_TAG,
+                    DICTATION_RECOVERY_NOTIFICATION_ID,
+                )
             }
             val alreadyPromoted =
                 foregroundPromoted && promotedController === controller && promotedSessionToken == sessionToken
@@ -130,19 +133,28 @@ internal class ConversationDictationForegroundService(
                     service.foreground.releaseDictation(startId)
                     return Service.START_NOT_STICKY
                 }
-                promotedController = controller
-                promotedSessionToken = sessionToken
-                activeService = this
-                controller.onDurableServiceReady(sessionToken)
-                if (controller.hasDurableSession && controller.notificationSessionToken == sessionToken) {
-                    observeNotification(controller, sessionToken)
-                } else {
-                    removeForegroundNotification()
-                    service.foreground.releaseDictation(startId)
-                }
+                publishPromotedController(controller, sessionToken, startId)
             }
         }
         return Service.START_NOT_STICKY
+    }
+
+    /** A ready callback can finish immediately; observe only its surviving promoted owner. */
+    private fun publishPromotedController(
+        controller: ConversationDictationController,
+        sessionToken: String,
+        startId: Int,
+    ) {
+        promotedController = controller
+        promotedSessionToken = sessionToken
+        activeService = this
+        controller.onDurableServiceReady(sessionToken)
+        if (controller.hasDurableSession && controller.notificationSessionToken == sessionToken) {
+            observeNotification(controller, sessionToken)
+        } else {
+            removeForegroundNotification()
+            service.foreground.releaseDictation(startId)
+        }
     }
 
     /** Promotes an active capture or cancels it when Android rejects foreground microphone ownership. */

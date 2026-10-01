@@ -45,6 +45,7 @@ private const val POST_ACTION_CAPTURE_DRAIN_READS = 6
 
 /** Bounds the tail drain even when recorder reads take longer than their nominal 100 ms. */
 private const val POST_ACTION_CAPTURE_DRAIN_MILLIS = 750L
+private const val FORCED_CAPTURE_SEAL_GRACE_MILLIS = 750L
 
 /** A terminal capture condition that must be surfaced to the owning recognition session. */
 internal enum class ConversationDictationCallerAudioFailure {
@@ -212,6 +213,21 @@ internal class ConversationDictationCallerAudio internal constructor(
             val noProducer = !captureThreadStarted.get()
             if (noProducer) buffer.finish()
             releaseRecorder(sealed = noProducer)
+            sealReleasedRecorderAfterGrace()
+        }
+    }
+
+    /** Native release proves microphone closure even if a broken driver never returns its read. */
+    private fun sealReleasedRecorderAfterGrace() {
+        if (captureSealed.get() || !recorderReleased.get()) return
+        if (runCatching { Thread.sleep(FORCED_CAPTURE_SEAL_GRACE_MILLIS) }.isFailure) return
+        synchronized(this) {
+            if (captureSealed.get() || !recorderReleased.get()) return
+            // Preserve every read completed during the grace period. Later driver completions
+            // are outside the bounded tail and cannot mutate the sealed recovery buffer.
+            if (!discarded.get()) buffer.finish()
+            conversationDictationDiagnostic("event=caller_audio_forced_seal reason=read_timeout")
+            releaseRecorder()
         }
     }
 
@@ -275,8 +291,9 @@ internal class ConversationDictationCallerAudio internal constructor(
                     progress.stopReason = "read=$read"
                 } else {
                     synchronized(this) {
+                        if (captureSealed.get()) return@synchronized
                         // A native read already in progress can return samples after stop().
-                        // Seal only in capture's finally so forced closure cannot discard that read.
+                        // Preserve completed reads until normal sealing or the forced-close grace expires.
                         currentChunkHasSpeech =
                             appendCapturedAudio(samples, read, encoded, progress, currentChunkHasSpeech)
                         if (

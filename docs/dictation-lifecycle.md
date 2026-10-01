@@ -81,6 +81,12 @@ that record protected, replaces its obsolete presentation and retries narrowing
 on a foreground return. It never detaches and restarts from background, or
 changes the user's Keep connected preference.
 
+A connection first enabled during dictation shares its already authorized
+`specialUse` protection. It retains that legitimate type for the connection lease,
+including after dictation completes, rather than adding `remoteMessaging` from a
+background wake. A later lease created without dictation derives its type from
+the initiating trigger as usual.
+
 Android 14 and later allow an unlocked user to swipe away an ongoing notification.
 There is deliberately no delete/cancel callback: hiding presentation must not
 stop capture, lose the completion intent or change Send to Paste. In-app controls
@@ -92,11 +98,20 @@ and [Task Manager Stop](https://developer.android.com/develop/background-work/se
 Recovery is volatile and never writes raw audio to disk. Force-stop, reboot,
 Android Task Manager Stop or exceptional process termination can lose it; foreground
 protection does not promise persistence across those operations. Removing the
-Activity from recents does not discard recovery (`stopWithTask=false`). The
+Activity from recents does not discard recovery because the host continues its
+owned lease in `onTaskRemoved`; `stopWithTask=false` explicitly records the
+platform default rather than changing that behavior. The
 one-second closure watchdog interrupts a stalled recorder instead of merely
 assuming closure, while normal completion retains the existing bounded tail.
+If native release returns but a broken driver withholds its final read, a further
+750 ms grace seals recovery from completed reads; a later driver completion
+cannot append to that sealed buffer. A blocked or failed native release never
+produces a fabricated microphone-closure acknowledgment.
 Logical session/lease generations and a separate notification-action generation
 reject obsolete controls after a failure and retry.
+Native discard, normal finish and forced closure deliver callbacks on the main
+looper. A separate capture generation fences closure during the replacement
+window before its new logical target is published.
 
 ## Special-use declaration
 

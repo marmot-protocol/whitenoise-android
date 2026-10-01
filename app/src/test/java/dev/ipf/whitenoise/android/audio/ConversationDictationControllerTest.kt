@@ -2896,7 +2896,12 @@ class ConversationDictationControllerTest {
     fun recoveryExpiresAtThirtyMinutesAndDoesNotSurviveExplicitDismissal() {
         var expired = 0
         var stops = 0
-        val fixture = fixture(draft = TextFieldValue(""), onRecoveryExpired = { expired++ }, stopDurableSession = { stops++ })
+        val fixture =
+            fixture(
+                draft = TextFieldValue(""),
+                onRecoveryExpired = { expired++ },
+                stopDurableSession = { stops++ },
+            )
         fixture.platform.pendingCallerAudio = true
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         fixture.platform.tracksCallerAudioDisposal = true
@@ -3030,7 +3035,12 @@ class ConversationDictationControllerTest {
     fun pasteBeforeElapsedDeadlineCompletesAndFencesOldExpiry() =
         runTest {
             var expired = 0
-            val fixture = fixture(draft = TextFieldValue(""), targetValidationScope = this, onRecoveryExpired = { expired++ })
+            val fixture =
+                fixture(
+                    draft = TextFieldValue(""),
+                    targetValidationScope = this,
+                    onRecoveryExpired = { expired++ },
+                )
             fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
             fixture.controller.send()
             fixture.platform.listener.onResult("retained body")
@@ -3111,7 +3121,10 @@ class ConversationDictationControllerTest {
         assertTrue(fixture.controller.hasDurableSession)
         assertTrue(fixture.controller.state === failed)
         assertEquals("body", failed.retainedTranscript)
-        assertEquals(ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE, fixture.controller.foregroundServiceType)
+        assertEquals(
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
+            fixture.controller.foregroundServiceType,
+        )
         assertEquals("", fixture.drafts.getValue(key()).text)
         fixture.controller.dismissFailure()
     }
@@ -3155,7 +3168,10 @@ class ConversationDictationControllerTest {
         if (leaveForeground) fixture.controller.onAppForegrounded()
         assertEquals(2, starts)
         assertTrue(fixture.controller.hasDurableSession)
-        assertEquals(ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE, fixture.controller.foregroundServiceType)
+        assertEquals(
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
+            fixture.controller.foregroundServiceType,
+        )
         assertEquals("", fixture.drafts.getValue(key()).text)
         fixture.controller.dismissFailure()
     }
@@ -3239,11 +3255,51 @@ class ConversationDictationControllerTest {
             fixture.platform.pendingCallerAudio = false
             fixture.platform.listener.onResult("tail")
             advanceUntilIdle()
-            assertEquals(listOf("body tail"), sent)
-            assertEquals("", fixture.drafts.getValue(key()).text)
-            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
-            assertEquals(1, stops)
+            assertCompletedRetainedSend(fixture, sent, stops)
         }
+
+    private fun assertCompletedRetainedSend(
+        fixture: Fixture,
+        sent: List<String>,
+        stops: Int,
+    ) {
+        assertEquals(listOf("body tail"), sent)
+        assertEquals("", fixture.drafts.getValue(key()).text)
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        assertEquals(1, stops)
+    }
+
+    /** A queued old closure cannot narrow a new capture while its logical state is being installed. */
+    @Test
+    fun oldDiscardClosureCannotClearReplacementMicrophoneBeforeTargetPublication() {
+        var onDraftRead: () -> Unit = {}
+        var oldClosures = 0
+        val fixture = fixture(draft = TextFieldValue(""), onDraftRead = { onDraftRead() })
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        val oldSessionId = fixture.controller.state.sessionId
+        fixture.platform.pendingCallerAudio = true
+        fixture.platform.tracksCallerAudioDisposal = true
+        fixture.platform.deferDiscardClosure = true
+        fixture.drafts[OTHER_ACCOUNT to OTHER_GROUP] = TextFieldValue("")
+        onDraftRead = {
+            assertEquals(oldSessionId, fixture.controller.state.sessionId)
+            onDraftRead = {}
+            requireNotNull(fixture.platform.discardClosureCallback).invoke()
+            oldClosures++
+        }
+        assertTrue(fixture.controller.requestStart(OTHER_ACCOUNT, OTHER_GROUP, TextFieldValue("")))
+        assertEquals(1, oldClosures)
+        assertEquals(
+            OTHER_GROUP,
+            fixture.controller.state.target
+                ?.groupIdHex,
+        )
+        assertTrue(fixture.controller.foregroundMicrophoneRequired)
+        assertTrue(fixture.controller.foregroundServiceType and ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE != 0)
+        requireNotNull(fixture.platform.discardClosureCallback).invoke()
+        assertTrue(fixture.controller.foregroundMicrophoneRequired)
+        fixture.controller.cancel()
+    }
 
     /** A rejected Retry launch preserves sealed audio and releases its pending foreground lease. */
     @Test
@@ -5722,6 +5778,7 @@ class ConversationDictationControllerTest {
         sendTranscriptIfOriginUnchanged: suspend (ConversationDictationSendRequest) -> Boolean = { false },
         onReadinessEvent: (ConversationDictationReadinessEvent) -> Unit = {},
         onRecoveryExpired: () -> Unit = {},
+        onDraftRead: () -> Unit = {},
     ): Fixture {
         val scheduler = FakeTimeoutScheduler()
         val drafts = mutableMapOf(key() to draft)
@@ -5731,6 +5788,7 @@ class ConversationDictationControllerTest {
             ConversationDictationController(
                 platform = platform,
                 readDraft = { account, group ->
+                    onDraftRead()
                     ConversationDictationDraftSnapshot(
                         value = drafts.getValue(account to group),
                         revision = revisions[account to group] ?: 0L,
@@ -5844,6 +5902,8 @@ class ConversationDictationControllerTest {
         var tracksCallerAudioDisposal = false
         var deferCallerAudioFinish = false
         var callerAudioFinishCallback: (() -> Unit)? = null
+        var deferDiscardClosure = false
+        var discardClosureCallback: (() -> Unit)? = null
 
         /** Simulates a platform that cannot even start the question, such as a recognizer refusal. */
         var callerAudioProbeFailure: RuntimeException? = null
@@ -5914,7 +5974,7 @@ class ConversationDictationControllerTest {
             if (!tracksCallerAudioDisposal || !pendingCallerAudio) return false
             discardedCallerAudio += 1
             pendingCallerAudio = false
-            onClosed()
+            if (deferDiscardClosure) discardClosureCallback = onClosed else onClosed()
             return true
         }
 

@@ -553,6 +553,7 @@ internal class ConversationDictationController internal constructor(
     private var generationTimeoutHandle: ConversationDictationTimeoutHandle? = null
     private var sessionTimeoutHandle: ConversationDictationTimeoutHandle? = null
     private var captureClosureTimeoutHandle: ConversationDictationTimeoutHandle? = null
+    private var captureClosureGeneration = 0L
     private var silenceTimeoutHandle: ConversationDictationTimeoutHandle? = null
     private var readinessHandle: ConversationDictationTimeoutHandle? = null
     private var readinessStartedAtMillis: Long? = null
@@ -768,6 +769,7 @@ internal class ConversationDictationController internal constructor(
         // ownership check and become no-ops.
         clearRecognitionSession(cancel = true)
         resetTranscriptSession()
+        captureClosureGeneration += 1L
         foregroundMicrophoneRequired = true
         notificationActionGeneration += 1L
         if (state.sessionId != null) conversationDictationDiagnostic("event=session_finished outcome=replaced")
@@ -938,6 +940,7 @@ internal class ConversationDictationController internal constructor(
         automatic: Boolean = false,
     ) {
         if (expireRetainedRecoveryIfDue()) return
+        val captureGeneration = captureClosureGeneration
         val current = state
         val action = deliveryMode?.name ?: "Done"
         val source = if (automatic) "automatic" else "explicit"
@@ -986,7 +989,7 @@ internal class ConversationDictationController internal constructor(
             } else {
                 runCatching {
                     recognitionSession?.stop {
-                        acknowledgeCaptureClosed(sessionId)
+                        acknowledgeCaptureClosed(sessionId, captureGeneration)
                         if (owns(sessionId, generationId)) {
                             finishPlaybackInterruption(sessionId)
                         }
@@ -1028,7 +1031,7 @@ internal class ConversationDictationController internal constructor(
         }
         runCatching {
             recognitionSession?.stop {
-                acknowledgeCaptureClosed(sessionId)
+                acknowledgeCaptureClosed(sessionId, captureGeneration)
                 if (owns(sessionId, generationId)) {
                     finishPlaybackInterruption(sessionId)
                 }
@@ -1041,12 +1044,13 @@ internal class ConversationDictationController internal constructor(
         sessionId: Long,
         target: ConversationDictationTarget,
     ) {
+        val captureGeneration = captureClosureGeneration
         state = ConversationDictationState.Processing(sessionId, target)
         armCallerAudioDrainTimeout(sessionId, target)
         val platformOwnsClosure =
             runCatching {
                 platform.finishCallerAudioCapture {
-                    acknowledgeCaptureClosed(sessionId)
+                    acknowledgeCaptureClosed(sessionId, captureGeneration)
                     if (state !is ConversationDictationState.Processing || state.sessionId != sessionId) {
                         return@finishCallerAudioCapture
                     }
@@ -1332,8 +1336,11 @@ internal class ConversationDictationController internal constructor(
     }
 
     /** Only native closure acknowledgment may narrow microphone ownership and disarm its watchdog. */
-    private fun acknowledgeCaptureClosed(sessionId: Long) {
-        if (state.sessionId != sessionId) return
+    private fun acknowledgeCaptureClosed(
+        sessionId: Long,
+        captureGeneration: Long,
+    ) {
+        if (state.sessionId != sessionId || captureGeneration != captureClosureGeneration) return
         foregroundMicrophoneRequired = false
         captureClosureTimeoutHandle?.cancel()
         captureClosureTimeoutHandle = null
@@ -2265,10 +2272,11 @@ internal class ConversationDictationController internal constructor(
         drainAlreadyExpired: Boolean,
     ) {
         val sessionId = failed.sessionId
+        val captureGeneration = captureClosureGeneration
         val token = notificationSessionToken
         val onClosed: () -> Unit = {
             finishPlaybackInterruption(sessionId)
-            acknowledgeCaptureClosed(sessionId)
+            acknowledgeCaptureClosed(sessionId, captureGeneration)
             if (state === failed && notificationSessionToken == token) {
                 if (!platform.callerAudioHasPending() && failed.retainedTranscript.isNullOrBlank()) {
                     releaseDurableSessionLease()
@@ -2747,7 +2755,9 @@ internal class ConversationDictationController internal constructor(
                 cause = reason.takeIf { failure != it },
             )
         notificationActionGeneration += 1L
-        (state as ConversationDictationState.Failed).takeIf { !retainedTranscript.isNullOrBlank() }?.let(::protectRetainedRecovery)
+        (state as ConversationDictationState.Failed)
+            .takeIf { !retainedTranscript.isNullOrBlank() }
+            ?.let(::protectRetainedRecovery)
     }
 
     /** Releases recognition and microphone ownership, optionally retaining the durable service lease. */
@@ -2774,10 +2784,11 @@ internal class ConversationDictationController internal constructor(
         silenceTimeoutHandle = null
         silenceDeadlineElapsedMillis = null
         val closingSessionId = state.sessionId
+        val closingCaptureGeneration = captureClosureGeneration
         val captureSessionId = activeCaptureSessionId
         val onCaptureFinished: () -> Unit = {
             captureSessionId?.let(::finishPlaybackInterruption)
-            closingSessionId?.let(::acknowledgeCaptureClosed)
+            closingSessionId?.let { acknowledgeCaptureClosed(it, closingCaptureGeneration) }
         }
         val platformOwnsCaptureClosure =
             runCatching { platform.discardCallerAudio(onCaptureFinished) }.getOrDefault(false)
@@ -2793,7 +2804,11 @@ internal class ConversationDictationController internal constructor(
         recoveryTimeoutHandle?.cancel()
         recoveryTimeoutHandle = null
         recoveryDeadlineElapsedMillis = null
-        if (failed.retainedTranscript.isNullOrBlank() && !runCatching(platform::callerAudioHasPending).getOrDefault(false)) return
+        if (failed.retainedTranscript.isNullOrBlank() &&
+            !runCatching(platform::callerAudioHasPending).getOrDefault(false)
+        ) {
+            return
+        }
         recoveryDeadlineElapsedMillis = elapsedRealtime() + RETAINED_RECOVERY_TIMEOUT_MILLIS
         recoveryTimeoutHandle =
             scheduleTimeout(RETAINED_RECOVERY_TIMEOUT_MILLIS) {
@@ -3633,6 +3648,16 @@ private const val MAX_EMPTY_SELECTION_SCAN_LENGTH = 4_096
 private const val EMPTY_SELECTION_SCAN_RADIUS = 1_024
 private const val READINESS_UI_FRAME_MILLIS = 16L
 
+/** Native recorder closure never mutates controller ownership from a capture thread. */
+internal fun mainThreadDictationCaptureClosure(onClosed: () -> Unit): () -> Unit =
+    {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            onClosed()
+        } else {
+            Handler(Looper.getMainLooper()).post(onClosed)
+        }
+    }
+
 @Suppress("MaxLineLength")
 internal class AndroidConversationDictationPlatform(
     private val context: Context,
@@ -3816,21 +3841,13 @@ internal class AndroidConversationDictationPlatform(
     /** Returns recorder closure on the main thread before creating another recognizer. */
     override fun finishCallerAudioCapture(onClosed: () -> Unit): Boolean {
         val capture = callerAudioCapture ?: return false
-        capture.finish {
-            if (Looper.myLooper() == Looper.getMainLooper()) {
-                onClosed()
-            } else {
-                Handler(Looper.getMainLooper()).post(onClosed)
-            }
-        }
+        capture.finish(mainThreadDictationCaptureClosure(onClosed))
         return true
     }
 
     override fun forceCallerAudioCaptureClosure(onClosed: () -> Unit): Boolean {
         val capture = callerAudioCapture ?: return false
-        capture.forceFinish {
-            Handler(Looper.getMainLooper()).post(onClosed)
-        }
+        capture.forceFinish(mainThreadDictationCaptureClosure(onClosed))
         return true
     }
 
@@ -3846,7 +3863,7 @@ internal class AndroidConversationDictationPlatform(
         val capture = callerAudioCapture
         callerAudioCapture = null
         if (capture == null) return false
-        capture.discard(onClosed)
+        capture.discard(mainThreadDictationCaptureClosure(onClosed))
         return true
     }
 
