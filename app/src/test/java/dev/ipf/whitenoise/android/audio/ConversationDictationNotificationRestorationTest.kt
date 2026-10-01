@@ -48,11 +48,11 @@ class ConversationDictationNotificationRestorationTest {
                 readDraft = { _, _ -> ConversationDictationDraftSnapshot(draft, revision) },
                 writeDraft = { _, _, expected, value ->
                     if (expected != revision) {
-                        false
+                        null
                     } else {
                         draft = value
                         revision += 1
-                        true
+                        revision
                     }
                 },
                 disclosureAccepted = { true },
@@ -205,7 +205,7 @@ class ConversationDictationNotificationRestorationTest {
         assertTrue(harness.conversationDictation.hasDurableSession)
         assertEquals(
             "Dictation active",
-            service
+            service.foreground
                 .foregroundNotification()
                 .extras
                 .getCharSequence(Notification.EXTRA_TITLE)

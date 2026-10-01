@@ -1372,7 +1372,7 @@ class ConversationDictationControllerTest {
                 },
                 writeDraft = { account, group, _, value ->
                     drafts[account to group] = value
-                    true
+                    0L
                 },
                 disclosureAccepted = { disclosureAccepted },
                 markDisclosureAccepted = {
@@ -1406,7 +1406,7 @@ class ConversationDictationControllerTest {
             ConversationDictationController(
                 platform = platform,
                 readDraft = { _, _ -> ConversationDictationDraftSnapshot(TextFieldValue(), 0) },
-                writeDraft = { _, _, _, _ -> true },
+                writeDraft = { _, _, _, _ -> 0L },
                 disclosureAccepted = { externalAccepted },
                 markDisclosureAccepted = { externalAccepted = true },
                 offlineDisclosureAccepted = { offlineAccepted },
@@ -2005,7 +2005,7 @@ class ConversationDictationControllerTest {
             ConversationDictationController(
                 platform = FakePlatform(hasPermission = false),
                 readDraft = { _, _ -> ConversationDictationDraftSnapshot(TextFieldValue(""), 0) },
-                writeDraft = { _, _, _, _ -> true },
+                writeDraft = { _, _, _, _ -> 0L },
                 disclosureAccepted = { accepted },
                 markDisclosureAccepted = { accepted = true },
             )
@@ -3979,6 +3979,84 @@ class ConversationDictationControllerTest {
             assertFalse(fixture.controller.hasDurableSession)
         }
 
+    /** A definite pre-transport rollback keeps its exact owned revision eligible for Retry Send. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun retryAfterPreTransportRollbackSendsOriginalPayloadOnce() =
+        runTest {
+            var reject = true
+            val sent = mutableListOf<String>()
+            val fixture =
+                fixture(
+                    draft = TextFieldValue("Draft", TextRange(5)),
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        assertTrue(request.beginDispatch())
+                        if (reject) {
+                            request.onDispatchRejectedBeforeTransport()
+                            false
+                        } else {
+                            sent += request.payload
+                            true
+                        }
+                    },
+                )
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.controller.send()
+            fixture.platform.listener.onResult("dictated")
+            advanceUntilIdle()
+            assertEquals("Draft", fixture.drafts.getValue(key()).text)
+            assertEquals(
+                ConversationDictationFailure.SendBlocked,
+                (fixture.controller.state as ConversationDictationState.Failed).reason,
+            )
+            reject = false
+            fixture.controller.retry()
+            advanceUntilIdle()
+            fixture.controller.retry()
+            assertEquals(listOf("Draft dictated"), sent)
+            assertEquals("", fixture.drafts.getValue(key()).text)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        }
+
+    /** A concurrent same-text mutation after rollback cannot be mistaken for this dispatch's revision. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun retryCannotAbsorbExternalGenerationDuringRollback() =
+        runTest {
+            var sends = 0
+            lateinit var fixture: Fixture
+            fixture =
+                fixture(
+                    draft = TextFieldValue("Draft", TextRange(5)),
+                    targetValidationScope = this,
+                    onDraftWritten = { value ->
+                        if (value.text == "Draft") fixture.edit(key(), value)
+                    },
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        sends++
+                        assertTrue(request.beginDispatch())
+                        request.onDispatchRejectedBeforeTransport()
+                        false
+                    },
+                )
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.controller.send()
+            fixture.platform.listener.onResult("dictated")
+            advanceUntilIdle()
+            fixture.controller.retry()
+            advanceUntilIdle()
+            assertEquals(1, sends)
+            assertEquals("Draft", fixture.drafts.getValue(key()).text)
+            assertEquals(
+                ConversationDictationFailure.SendBlocked,
+                (fixture.controller.state as ConversationDictationState.Failed).reason,
+            )
+            fixture.controller.paste()
+            assertEquals("Draft dictated", fixture.drafts.getValue(key()).text)
+            assertEquals(1, sends)
+        }
+
     /** Semantic draft mutations after Send cannot publish or be converted into Paste. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
@@ -4430,7 +4508,7 @@ class ConversationDictationControllerTest {
             ConversationDictationController(
                 platform = platform,
                 readDraft = { _, _ -> ConversationDictationDraftSnapshot(TextFieldValue(""), 0L) },
-                writeDraft = { _, _, _, _ -> true },
+                writeDraft = { _, _, _, _ -> 0L },
                 startDurableSession = { _, ready ->
                     ownershipObservedByServiceStart = controller.hasDurableSession
                     ready()
@@ -5119,6 +5197,7 @@ class ConversationDictationControllerTest {
     /** Builds a deterministic controller harness with injectable ownership, validation, and delivery seams. */
     private fun fixture(
         draft: TextFieldValue,
+        onDraftWritten: (TextFieldValue) -> Unit = {},
         targetAvailable: () -> Boolean = { true },
         targetReplyAvailable: (String?) -> Boolean? = { true },
         targetValidator: (suspend (String, String) -> ConversationDictationTargetValidation)? = null,
@@ -5157,12 +5236,13 @@ class ConversationDictationControllerTest {
                 writeDraft = { account, group, expectedRevision, value ->
                     val target = account to group
                     if ((revisions[target] ?: 0L) != expectedRevision) {
-                        false
+                        null
                     } else {
                         drafts[target] = value
                         revisions[target] = expectedRevision + 1L
                         writes += 1
-                        true
+                        onDraftWritten(value)
+                        expectedRevision + 1L
                     }
                 },
                 targetAvailable = { _, _ -> targetAvailable() },

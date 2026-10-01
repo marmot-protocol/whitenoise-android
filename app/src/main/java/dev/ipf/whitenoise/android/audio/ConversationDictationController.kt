@@ -407,7 +407,7 @@ internal class ConversationDictationController internal constructor(
         groupIdHex: String,
         expectedRevision: Long,
         value: TextFieldValue,
-    ) -> Boolean,
+    ) -> Long?,
     private val targetAvailable: (accountRef: String, groupIdHex: String) -> Boolean = { _, _ -> true },
     private val targetReplyAvailable: (
         accountRef: String,
@@ -450,7 +450,7 @@ internal class ConversationDictationController internal constructor(
             groupIdHex: String,
             expectedRevision: Long,
             value: TextFieldValue,
-        ) -> Boolean,
+        ) -> Long?,
         targetAvailable: (accountRef: String, groupIdHex: String) -> Boolean,
         targetReplyAvailable: (accountRef: String, groupIdHex: String, replyToMessageIdHex: String?) -> Boolean? =
             { _, _, _ -> true },
@@ -648,7 +648,8 @@ internal class ConversationDictationController internal constructor(
             inActiveRecognitionState &&
                 (
                     activeRecognitionGenerationId != null ||
-                        state is ConversationDictationState.Starting || finishRequested
+                        state is ConversationDictationState.Starting ||
+                        finishRequested
                 )
 
     /** One logical capture owns one absolute budget across fresh recognition and service identities. */
@@ -2690,8 +2691,8 @@ internal class ConversationDictationController internal constructor(
                                 current.revision,
                                 merge.value,
                             )
-                        }.getOrDefault(false)
-                    if (accepted) {
+                        }.getOrNull()
+                    if (accepted != null) {
                         conversationDictationDiagnostic("event=paste_write outcome=accepted")
                         complete(target)
                         return
@@ -2740,7 +2741,7 @@ internal class ConversationDictationController internal constructor(
                     )
                     return
                 }
-            if (accepted) {
+            if (accepted != null) {
                 conversationDictationDiagnostic("event=paste_write outcome=accepted source=latest_draft")
                 complete(target)
                 return
@@ -2813,14 +2814,16 @@ internal class ConversationDictationController internal constructor(
                         conversationDictationDiagnostic(
                             "event=send_outcome outcome=retained reason=$reason",
                         )
-                        restoreDraftAfterFailedDispatch(target, claim.emptiedRevision)
-                        retainUndeliveredTranscript(sessionId, target, transcript)
+                        claim.restoredRevision =
+                            restoreDraftAfterFailedDispatch(target, claim.emptiedRevision) ?: claim.restoredRevision
+                        retainUndeliveredTranscript(sessionId, claim.recoveredTarget(target), transcript)
                     }
                 } finally {
                     if (state.sessionId == sessionId && state is ConversationDictationState.Processing) {
                         conversationDictationDiagnostic("event=send_outcome outcome=retained reason=interrupted")
-                        restoreDraftAfterFailedDispatch(target, claim.emptiedRevision)
-                        retainUndeliveredTranscript(sessionId, target, transcript)
+                        claim.restoredRevision =
+                            restoreDraftAfterFailedDispatch(target, claim.emptiedRevision) ?: claim.restoredRevision
+                        retainUndeliveredTranscript(sessionId, claim.recoveredTarget(target), transcript)
                     }
                 }
             }
@@ -2829,7 +2832,11 @@ internal class ConversationDictationController internal constructor(
 
     private class ConversationDictationDispatchClaim(
         var emptiedRevision: Long? = null,
-    )
+        var restoredRevision: Long? = null,
+    ) {
+        fun recoveredTarget(target: ConversationDictationTarget): ConversationDictationTarget =
+            target.copy(capturedDraftRevision = restoredRevision ?: target.capturedDraftRevision)
+    }
 
     private fun beginDictationDispatch(
         sessionId: Long,
@@ -2854,7 +2861,7 @@ internal class ConversationDictationController internal constructor(
         val rejectedRevision = claim.emptiedRevision
         dispatchedSessionId = null
         claim.emptiedRevision = null
-        restoreDraftAfterFailedDispatch(target, rejectedRevision)
+        claim.restoredRevision = restoreDraftAfterFailedDispatch(target, rejectedRevision)
     }
 
     private fun completePendingDictationDispatch(
@@ -2877,24 +2884,20 @@ internal class ConversationDictationController internal constructor(
      * revision, and its own new revision is what [restoreDraftAfterFailedDispatch] needs to put the
      * text back, so a newer user edit during the send keeps both the edit and its geometry.
      */
-    private fun emptyDraftForDispatch(target: ConversationDictationTarget): Long? {
-        val emptied =
-            runCatching {
-                writeDraft(target.accountRef, target.groupIdHex, target.capturedDraftRevision, TextFieldValue(""))
-            }.getOrDefault(false)
-        if (!emptied) return null
-        return runCatching { readDraft(target.accountRef, target.groupIdHex).revision }.getOrNull()
-    }
+    private fun emptyDraftForDispatch(target: ConversationDictationTarget): Long? =
+        runCatching {
+            writeDraft(target.accountRef, target.groupIdHex, target.capturedDraftRevision, TextFieldValue(""))
+        }.getOrNull()
 
     /** Puts the captured text back only while the composer still holds this dispatch's empty draft. */
     private fun restoreDraftAfterFailedDispatch(
         target: ConversationDictationTarget,
         emptiedRevision: Long?,
-    ) {
-        val revision = emptiedRevision ?: return
-        runCatching {
+    ): Long? {
+        val revision = emptiedRevision ?: return null
+        return runCatching {
             writeDraft(target.accountRef, target.groupIdHex, revision, target.capturedDraft)
-        }
+        }.getOrNull()
     }
 
     /** Bounds result waiting without treating coroutine cancellation as an ordinary send failure. */

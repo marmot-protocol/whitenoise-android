@@ -2649,7 +2649,9 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
         expectedRevision: Long,
         value: TextFieldValue,
-    ): Boolean = composerDraftExpansionBridge.setDraftIfCurrent(accountRef, groupIdHex, expectedRevision, value)
+    ): Long? {
+        return composerDraftExpansionBridge.setDraftIfCurrentWithRevision(accountRef, groupIdHex, expectedRevision, value)
+    }
 
     /** Dictation conditionally empties only its unchanged origin; failed or unknown sends restore that exact text. */
     internal suspend fun sendDictationTranscriptIfOriginUnchanged(request: ConversationDictationSendRequest): Boolean {

@@ -50,3 +50,9 @@ blocked Send/retry and uncertain transport. Physical qualification additionally
 checks the actual drawer/service records and provider on the exact PR artifact.
 The permanent manual matrix is DIC-002 in
 [manual-release-testing.md](manual-release-testing.md).
+
+A rejected dispatch may advance only its draft revision after its own conditional
+rollback succeeds. The draft adapter returns the generation accepted by that
+write, rather than sampling the latest generation afterward. Retry Send keeps
+that exact fence, so even a concurrent same-text attachment mutation blocks it.
+The account, conversation, reply and captured text remain the original payload.

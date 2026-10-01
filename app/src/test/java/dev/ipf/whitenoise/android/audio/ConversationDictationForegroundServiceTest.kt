@@ -63,11 +63,11 @@ class ConversationDictationForegroundServiceTest {
                 readDraft = { _, _ -> ConversationDictationDraftSnapshot(draft, revision) },
                 writeDraft = { _, _, expected, value ->
                     if (expected != revision) {
-                        false
+                        null
                     } else {
                         draft = value
                         revision += 1
-                        true
+                        revision
                     }
                 },
                 disclosureAccepted = { true },

@@ -9676,6 +9676,12 @@
         "test_ids": ["DIC-002"]
       },
       {
+        "surface": "string:dictation_notification_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+        "anchor": "R.string.dictation_notification_title",
+        "test_ids": ["DIC-002"]
+      },
+      {
         "surface": "Explicit dictation choice overrides automatic completion before delivery",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationCompletionIntent.kt",
         "anchor": "fun choose(",

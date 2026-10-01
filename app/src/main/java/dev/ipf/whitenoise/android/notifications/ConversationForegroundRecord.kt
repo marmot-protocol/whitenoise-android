@@ -18,8 +18,9 @@ internal class ConversationForegroundRecord(
         private set
     private var foregroundPromoted = false
 
-    fun foregroundNotification(): Notification =
-        dictation.notificationOrNull() ?: BackgroundConnectionNotification.build(service)
+    fun foregroundNotification(): Notification {
+        return dictation.notificationOrNull() ?: BackgroundConnectionNotification.build(service)
+    }
 
     fun promoteConnection(trigger: ForegroundStartTrigger) {
         val type = foregroundServiceTypeForTrigger(trigger)

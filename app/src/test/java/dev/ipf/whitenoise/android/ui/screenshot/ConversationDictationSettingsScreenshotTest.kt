@@ -38,12 +38,14 @@ class ConversationDictationSettingsScreenshotTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun automaticSendExplainsUnsentRecoveryLight() =
+    fun automaticSendExplainsUnsentRecoveryLight() {
         capture("dictation_send_recovery_settings_light.png", dark = false, scale = 1f, rtl = false)
+    }
 
     @Test
-    fun automaticSendExplainsUnsentRecoveryLargeRtlDark() =
+    fun automaticSendExplainsUnsentRecoveryLargeRtlDark() {
         capture("dictation_send_recovery_settings_large_rtl_dark.png", dark = true, scale = 2f, rtl = true)
+    }
 
     private fun capture(
         name: String,
@@ -52,7 +54,11 @@ class ConversationDictationSettingsScreenshotTest {
         rtl: Boolean,
     ) {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        context.getSharedPreferences("whitenoise.composer_dictation", Context.MODE_PRIVATE).edit().clear().commit()
+        context
+            .getSharedPreferences("whitenoise.composer_dictation", Context.MODE_PRIVATE)
+            .edit()
+            .clear()
+            .commit()
         val appState =
             WhiteNoiseAppState(
                 context = context,
