@@ -43,6 +43,7 @@ class DeveloperScreenTest {
     private val streamingDebugWrites = mutableListOf<Boolean>()
     private var diagnostics = 0
     private var keyPackages = 0
+    private var quarantineOpens = 0
     private var backCount = 0
 
     /** The developer switch reports its new value once per tap. */
@@ -64,6 +65,7 @@ class DeveloperScreenTest {
         composeRule.onNodeWithText(app.getString(R.string.developer_debugging)).assertDoesNotExist()
         composeRule.onNodeWithTag("developer.streaming_debug").assertDoesNotExist()
         composeRule.onNodeWithTag("developer.diagnostics").assertDoesNotExist()
+        composeRule.onNodeWithTag("developer.quarantined_groups").assertDoesNotExist()
     }
 
     /** With developer mode on both debugging rows appear and report their own actions. */
@@ -79,6 +81,19 @@ class DeveloperScreenTest {
         composeRule.runOnIdle {
             assertEquals(listOf(false), streamingDebugWrites)
             assertEquals(1, diagnostics)
+        }
+    }
+
+    @Test
+    fun quarantinedGroupsHasItsOwnDeveloperOnlyNavigationAndCount() {
+        render(developerMode = true)
+        scrollTo("developer.quarantined_groups")
+        composeRule.onNodeWithText("Quarantined: 2").assertExists()
+        composeRule.onNodeWithTag("developer.quarantined_groups").performClick()
+        composeRule.runOnIdle {
+            assertEquals(1, quarantineOpens)
+            assertEquals(0, keyPackages)
+            assertEquals(0, diagnostics)
         }
     }
 
@@ -177,7 +192,7 @@ class DeveloperScreenTest {
         appState.updateStreamingDebugMode(true)
         composeRule.setContent {
             WhiteNoiseTheme {
-                DeveloperScreen(appState, onBack = {}, onOpenDiagnostics = {}, onOpenKeyPackages = {})
+                DeveloperScreen(appState, onBack = {}, onOpenDiagnostics = {}, onOpenRecovery = {})
             }
         }
         composeRule.onNodeWithTag("developer.mode.switch").assertIsOn().performClick()
@@ -325,6 +340,8 @@ class DeveloperScreenTest {
                     onBack = { backCount++ },
                     onOpenDiagnostics = { diagnostics++ },
                     onOpenKeyPackages = { keyPackages++ },
+                    onOpenQuarantinedGroups = { quarantineOpens++ },
+                    quarantineSummary = "Quarantined: 2",
                 )
             }
         }

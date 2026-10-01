@@ -3,6 +3,38 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "QuarantinedGroupsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "fun QuarantinedGroupsScreen(",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "QuarantinedGroupsContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "fun QuarantinedGroupsContent(",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Developer quarantined group navigation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "row(\"quarantined_groups\")",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group reason and recovery guidance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "fun quarantineGuidance(",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
         "surface": "Composer cursor updates during dictation Send",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ComposerDraftExpansionBridge.kt",
         "anchor": "fun setDraft(",

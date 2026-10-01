@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="quarantined_groups">Группы в карантине</string>
+    <string name="quarantine_explanation">Эти группы не удалось безопасно загрузить. Восстановление повторяет проверку без удаления истории, обхода проверок или повторного вступления в группу.</string>
+    <string name="quarantine_unavailable">Нет активной учётной записи с выполненным входом.</string>
+    <string name="quarantine_loading">Загрузка групп в карантине…</string>
+    <string name="quarantine_load_failed">Не удалось загрузить группы в карантине. Попробуйте обновить.</string>
+    <string name="quarantine_count">В карантине: %1$d</string>
+    <string name="quarantine_refresh">Обновить группы</string>
+    <string name="quarantine_empty">В карантине нет групп.</string>
+    <string name="quarantine_group">Группа %1$s</string>
+    <string name="quarantine_retry">Повторить восстановление</string>
+    <string name="quarantine_stored_state">Не удалось загрузить сохранённое состояние шифрования.</string>
+    <string name="quarantine_missing_state">Сохранённое состояние шифрования отсутствует.</string>
+    <string name="quarantine_member_validation">Проверка участников или состояния шифрования не пройдена.</string>
+    <string name="quarantine_group_record">Не удалось загрузить запись группы.</string>
+    <string name="quarantine_pending_commit">Не удалось восстановить прерванное обновление группы.</string>
+    <string name="quarantine_unknown">Группу не удалось безопасно загрузить.</string>
+    <string name="quarantine_recovered">Восстановление успешно. Группа может вернуться в список чатов.</string>
+    <string name="quarantine_still_quarantined">Группа остаётся в карантине. Её история не удалена.</string>
+    <string name="quarantine_retry_failed">Не удалось завершить восстановление. Попробуйте позже.</string>
+</resources>

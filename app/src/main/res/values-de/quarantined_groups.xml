@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="quarantined_groups">Quarantänegruppen</string>
+    <string name="quarantine_explanation">Diese Gruppen konnten nicht sicher geladen werden. Die Wiederherstellung prüft sie erneut, ohne den Verlauf zu löschen, Prüfungen zu umgehen oder einer Gruppe erneut beizutreten.</string>
+    <string name="quarantine_unavailable">Kein aktives angemeldetes Konto verfügbar.</string>
+    <string name="quarantine_loading">Quarantänegruppen werden geladen…</string>
+    <string name="quarantine_load_failed">Quarantänegruppen konnten nicht geladen werden. Bitte aktualisieren.</string>
+    <string name="quarantine_count">In Quarantäne: %1$d</string>
+    <string name="quarantine_refresh">Gruppen aktualisieren</string>
+    <string name="quarantine_empty">Keine Gruppen sind in Quarantäne.</string>
+    <string name="quarantine_group">Gruppe %1$s</string>
+    <string name="quarantine_retry">Wiederherstellung erneut versuchen</string>
+    <string name="quarantine_stored_state">Der gespeicherte Verschlüsselungszustand konnte nicht geladen werden.</string>
+    <string name="quarantine_missing_state">Der gespeicherte Verschlüsselungszustand fehlt.</string>
+    <string name="quarantine_member_validation">Die Prüfung von Mitgliedern oder Verschlüsselungszustand ist fehlgeschlagen.</string>
+    <string name="quarantine_group_record">Der Gruppendatensatz konnte nicht geladen werden.</string>
+    <string name="quarantine_pending_commit">Eine unterbrochene Gruppenaktualisierung konnte nicht wiederhergestellt werden.</string>
+    <string name="quarantine_unknown">Die Gruppe konnte nicht sicher geladen werden.</string>
+    <string name="quarantine_recovered">Wiederherstellung erfolgreich. Die Gruppe kann wieder in der Chatliste erscheinen.</string>
+    <string name="quarantine_still_quarantined">Die Gruppe bleibt in Quarantäne. Der Verlauf wurde nicht gelöscht.</string>
+    <string name="quarantine_retry_failed">Die Wiederherstellung konnte nicht abgeschlossen werden. Später erneut versuchen.</string>
+</resources>

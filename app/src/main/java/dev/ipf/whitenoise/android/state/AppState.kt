@@ -2836,6 +2836,8 @@ class WhiteNoiseAppState private constructor(
         marmotRuntime
             ?.let { HostPerformanceRuntimeOwner(it, runtimeGeneration) }
 
+    internal fun captureActiveAccountSwitchEpoch(): Long? = activeAccountRef?.let(accountSwitchHandoff::captureForAccount)
+
     /** Checks that a frame reporter still belongs to the current runtime identity. */
     internal fun ownsHostPerformanceRuntimeOwner(owner: HostPerformanceRuntimeOwner): Boolean =
         marmotRuntime === owner.runtime && runtimeGeneration == owner.generation

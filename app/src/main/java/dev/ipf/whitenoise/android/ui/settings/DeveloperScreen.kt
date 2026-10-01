@@ -10,6 +10,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -30,6 +31,7 @@ import dev.ipf.whitenoise.android.state.ReviewDemoStatus
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.PillShape
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.launch
@@ -59,30 +61,20 @@ internal fun DeveloperScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
     onOpenDiagnostics: () -> Unit,
-    onOpenKeyPackages: () -> Unit,
+    onOpenRecovery: (SettingsDetail) -> Unit,
     onOpenDemoChat: (ChatListItem) -> Unit = {},
 ) {
     val demo = appState.appReviewDemo
-    val scope = rememberCoroutineScope()
-    val openDemo: (String, String) -> Unit = { account, group ->
-        scope.launch {
-            val previous = appState.activeAccountRef
-            val generation = appState.runtimeGeneration
-            val activated =
-                previous == account ||
-                    appState.setActiveAccount(account, shouldActivate = {
-                        appState.runtimeGeneration == generation && appState.activeAccountRef == previous
-                    })
-            if (activated && appState.activeAccountRef == account) {
-                runCatchingCancellable { appState.preloadNotificationChatListItem(account, group) }
-                    .onSuccess(onOpenDemoChat)
-                    .onFailure { demo.reportOpenFailure() }
-            } else {
-                demo.reportOpenFailure()
-            }
-        }
-    }
+    val openDemo = rememberDemoChatOpener(appState, onOpenDemoChat)
     var seedDialogOpen by remember { mutableStateOf(false) }
+    val quarantineSummary =
+        if (appState.developerMode) {
+            val controller = rememberQuarantinedGroupsController(appState)
+            val state by controller.state.collectAsState()
+            quarantinedGroupsSummary(state)
+        } else {
+            null
+        }
     DeveloperContent(
         developerMode = appState.developerMode,
         streamingDebug = appState.streamingDebugMode,
@@ -91,7 +83,9 @@ internal fun DeveloperScreen(
         onStreamingDebugChange = { appState.updateStreamingDebugMode(it) },
         onBack = onBack,
         onOpenDiagnostics = onOpenDiagnostics,
-        onOpenKeyPackages = onOpenKeyPackages,
+        onOpenKeyPackages = { onOpenRecovery(SettingsDetail.KeyPackages) },
+        onOpenQuarantinedGroups = { onOpenRecovery(SettingsDetail.QuarantinedGroups) },
+        quarantineSummary = quarantineSummary,
         demoStatus = demo.status,
         demoAvailable = demo.canBegin,
         demoHasSavedSetup = demo.hasSavedSetup,
@@ -121,6 +115,8 @@ internal fun DeveloperContent(
     onBack: () -> Unit,
     onOpenDiagnostics: () -> Unit,
     onOpenKeyPackages: () -> Unit,
+    onOpenQuarantinedGroups: () -> Unit = {},
+    quarantineSummary: String? = null,
     demoStatus: ReviewDemoStatus = ReviewDemoStatus.Idle,
     demoAvailable: Boolean = false,
     demoHasSavedSetup: Boolean = false,
@@ -236,6 +232,19 @@ internal fun DeveloperContent(
                 }
             }
             if (developerMode) {
+                item {
+                    SettingsGroup {
+                        row("quarantined_groups") { context ->
+                            SettingsLink(
+                                context = context,
+                                title = stringResource(R.string.quarantined_groups),
+                                onClick = onOpenQuarantinedGroups,
+                                subtitle = quarantineSummary,
+                                modifier = Modifier.testTag("developer.quarantined_groups"),
+                            )
+                        }
+                    }
+                }
                 item { SettingsSection(stringResource(R.string.developer_debugging)) }
                 item {
                     SettingsGroup(modifier = Modifier.testTag("developer.debugging")) {
@@ -393,6 +402,33 @@ private fun DeveloperStagingBadge() {
                 style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
             )
+        }
+    }
+}
+
+@Composable
+private fun rememberDemoChatOpener(
+    appState: WhiteNoiseAppState,
+    onOpenDemoChat: (ChatListItem) -> Unit,
+): (String, String) -> Unit {
+    val demo = appState.appReviewDemo
+    val scope = rememberCoroutineScope()
+    return { account, group ->
+        scope.launch {
+            val previous = appState.activeAccountRef
+            val generation = appState.runtimeGeneration
+            val activated =
+                previous == account ||
+                    appState.setActiveAccount(account, shouldActivate = {
+                        appState.runtimeGeneration == generation && appState.activeAccountRef == previous
+                    })
+            if (activated && appState.activeAccountRef == account) {
+                runCatchingCancellable { appState.preloadNotificationChatListItem(account, group) }
+                    .onSuccess(onOpenDemoChat)
+                    .onFailure { demo.reportOpenFailure() }
+            } else {
+                demo.reportOpenFailure()
+            }
         }
     }
 }

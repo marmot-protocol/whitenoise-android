@@ -338,6 +338,7 @@ internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
         SettingsDetail.BugReport,
         -> SettingsDetail.Help
         SettingsDetail.KeyPackages -> SettingsDetail.Developer
+        SettingsDetail.QuarantinedGroups -> SettingsDetail.Developer
         SettingsDetail.SupportRelays -> SettingsDetail.Support
         SettingsDetail.DiagnosticsImprovements -> SettingsDetail.DevicePrivacy
         SettingsDetail.BlockedUsers -> SettingsDetail.DevicePrivacy
@@ -468,6 +469,13 @@ private fun SettingsDetailRoute(
             RelaysScreen(appState, onBack = { onDetailChange(SettingsDetail.Support) })
         SettingsDetail.KeyPackages ->
             KeyPackagesScreen(appState, onBack = { onDetailChange(SettingsDetail.Developer) })
+        SettingsDetail.QuarantinedGroups -> {
+            if (appState.developerMode) {
+                QuarantinedGroupsScreen(appState, onBack = { onDetailChange(SettingsDetail.Developer) })
+            } else {
+                LaunchedEffect(detail) { onDetailChange(SettingsDetail.Developer) }
+            }
+        }
         SettingsDetail.Notifications -> NotificationsScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.DevicePrivacy ->
             DevicePrivacyScreen(
@@ -506,7 +514,7 @@ private fun SettingsDetailRoute(
                 appState = appState,
                 onBack = { onDetailChange(null) },
                 onOpenDiagnostics = onOpenDiagnostics,
-                onOpenKeyPackages = { onDetailChange(SettingsDetail.KeyPackages) },
+                onOpenRecovery = { onDetailChange(it) },
                 onOpenDemoChat = onOpenSupportChat,
             )
     }
