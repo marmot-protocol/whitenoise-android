@@ -68,6 +68,10 @@ jobs:
         if: matrix.phase == 'tooling'
         run: python3 -m unittest scripts/test_check_manual_test_guide.py
 
+      - name: Test attachment fixture HTTP ledger and cancellation contracts
+        if: matrix.phase == 'tooling'
+        run: python3 -m unittest discover -s tools/attachment-fixture -p 'test_*.py'
+
       - name: Validate manual release guide
         if: matrix.phase == 'tooling'
         env:

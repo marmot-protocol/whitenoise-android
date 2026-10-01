@@ -207,8 +207,13 @@ internal fun MessageFullScreenView(
                     modifier =
                         Modifier
                             .fillMaxSize()
-                            .readerScrollIndicator(scrollState, selectionKey, enabled = !selection.active)
-                            .verticalScroll(scrollState)
+                            .readerScrollIndicator(
+                                scrollState,
+                                selectionKey,
+                                enabled = !selection.active && !overflowOpen,
+                            )
+                            // Android stretch can draw over the dialog chrome during edge drags.
+                            .verticalScroll(scrollState, overscrollEffect = null)
                             .padding(16.dp),
                 )
             }
