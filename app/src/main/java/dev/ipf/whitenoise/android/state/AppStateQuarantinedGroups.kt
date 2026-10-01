@@ -25,7 +25,6 @@ internal fun WhiteNoiseAppState.quarantinedGroupsAccess(): QuarantinedGroupsAcce
     val account = activeAccountRef ?: return null
     val runtime = captureHostPerformanceRuntimeOwner()?.runtime ?: return null
     val generation = runtimeGeneration
-    val accountEpoch = captureAccountSwitchEpoch() ?: return null
     if (!developerMode ||
         signOutInProgress ||
         wipeInProgress ||
@@ -36,7 +35,6 @@ internal fun WhiteNoiseAppState.quarantinedGroupsAccess(): QuarantinedGroupsAcce
     return NativeQuarantinedGroupsAccess(account, runtime, {
         activeAccountRef == account &&
             runtimeGeneration == generation &&
-            captureAccountSwitchEpoch() == accountEpoch &&
             developerMode &&
             !signOutInProgress &&
             !wipeInProgress
