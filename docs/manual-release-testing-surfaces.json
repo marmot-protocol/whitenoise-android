@@ -24248,8 +24248,8 @@
       },
       {
         "surface": "Native manual unread reminder bypasses an older retained-controller read dedupe",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "internal fun hasManualUnreadReminder(",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationReadVisibility.kt",
+        "anchor": "internal fun WhiteNoiseAppState.hasManualUnreadReminder(",
         "test_ids": [
           "CHL-008"
         ]
