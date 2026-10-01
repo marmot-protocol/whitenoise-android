@@ -17,6 +17,8 @@ import androidx.work.workDataOf
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -241,9 +243,14 @@ class AttachmentDownloadWorker : CoroutineWorker {
                 Result.success()
             }
         } catch (cancel: CancellationException) {
-            val reason = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) stopReason.toString() else "unavailable"
-            Log.w(TAG, "attachment_work_stopped reason=$reason")
-            throw cancel
+            // A cancelled shared fetch does not mean WorkManager stopped this
+            // worker. Finish that transfer so its foreground notification and
+            // interactive intent cannot linger. Scheduler cancellation still
+            // propagates and retains intent for the next run.
+            currentCoroutineContext().ensureActive()
+            Log.w(TAG, "attachment_fetch_cancelled type=${cancel.javaClass.simpleName}")
+            intentStore.setInteractive(request, interactive = false)
+            Result.failure()
         } catch (expectedFailure: Throwable) {
             // Exception class is safe to log; attachment identity, URLs and
             // decrypted metadata are deliberately excluded from logcat.
