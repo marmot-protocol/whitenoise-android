@@ -509,6 +509,7 @@ This checklist was derived from the current navigation, UI, resources, manifest 
 - `app/src/main/java/dev/ipf/whitenoise/android/state/`, `notifications/`, `updates/`, and `MainActivity.kt`
 - `app/src/main/AndroidManifest.xml` and `app/src/main/res/values/strings.xml` plus locale resources
 - `app/src/test/`, `app/src/androidTest/`, and build-flavor tests under `app/src/testPlay/` and `app/src/testZapstore/`
+- The opt-in debug avatar counters and synthetic scroll fixture in `core/AvatarCacheDiagnostics.kt` and `AvatarCacheScrollDeviceTest.kt` measure the decoded-cache portion of `CHL-017`. Their fetch-adapter count is not an HTTP or battery measurement, so retain the offline and account-switch manual checks in `CHL-017`.
 - `README.md`, `docs/`, `.github/workflows/android-ci.yml`, and release/verification scripts
 
 A feature is in scope when a release build can present it to a user, including loading, empty, disabled, permission-denied, offline, error, retry, destructive-confirmation, account-switch, background, and restored states. A visible Coming soon control is tested as a disabled/explicit state; a source-only feature with no release-build user path is not represented as working UI.
