@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
@@ -102,7 +103,8 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
                     LocalDensity provides Density(1f, configuration.fontScale),
                 ) {
                     Surface(Modifier.width(360.dp).testTag("poll-discussion")) {
-                        Column {
+                        // Reaction pills overlap the footer; leave capture room for their full outline.
+                        Column(Modifier.padding(bottom = 24.dp)) {
                             RealPollMessage(item, configuration.menu) { }
                             if (configuration.reply) {
                                 ComposerBar(

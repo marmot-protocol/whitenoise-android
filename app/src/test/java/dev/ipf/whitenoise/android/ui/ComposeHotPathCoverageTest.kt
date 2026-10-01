@@ -80,8 +80,8 @@ class ComposeHotPathCoverageTest {
             "TimelineRowMessageBubble(" in timelineRowSource,
         )
         assertTrue(
-            "TimelineRow must key the row-scoped restart scope by message id",
-            "key(item.record.messageIdHex)" in timelineRowSource,
+            "TimelineRow must key the row-scoped restart scope by its owner and message id",
+            "key(controller.boundAccountRef, controller.group.groupIdHex, item.record.messageIdHex)" in timelineRowSource,
         )
         assertTrue(
             "Row-scoped TTS highlight projection must filter by message id",

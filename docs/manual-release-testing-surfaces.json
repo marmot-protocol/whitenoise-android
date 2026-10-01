@@ -4990,6 +4990,12 @@
         ]
       },
       {
+        "surface": "Poll label in message details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.poll_preview",
+        "test_ids": ["MSG-026"]
+      },
+      {
         "surface": "MessageFactsSection",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
         "anchor": "fun MessageFactsSection(",
@@ -9233,7 +9239,7 @@
       {
         "surface": "PollMessageContent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
-        "anchor": "internal fun PollMessageContent(",
+        "anchor": "fun PollMessageContent(",
         "test_ids": ["MSG-021", "MSG-026"]
       },
       {

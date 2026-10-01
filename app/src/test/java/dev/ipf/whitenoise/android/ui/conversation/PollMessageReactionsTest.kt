@@ -95,7 +95,10 @@ class PollMessageReactionsTest : PollMessageTestFixtures() {
         openMenu(item.record.messageIdHex)
         composeRule.onNodeWithTag("$MESSAGE_ACTION_REACTION_TEST_TAG:👍").performClick()
         advanceReactionQuietPeriod()
-        composeRule.waitUntil { recordedCalls().any { it.first == "reactToMessage" } && pollController.reactions[item.record.messageIdHex].isNullOrEmpty() }
+        composeRule.waitUntil {
+            shadowOf(Looper.getMainLooper()).idle()
+            recordedCalls().any { it.first == "reactToMessage" } && pollController.reactions[item.record.messageIdHex].isNullOrEmpty()
+        }
         composeRule.runOnIdle { assertTrue(recordedCalls().none { it.first == "castPollVote" }) }
     }
 

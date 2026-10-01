@@ -143,7 +143,8 @@ open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
             textSelectionMode = false,
             onTextSelectionModeChange = {},
             onTextSelectionBoundsChange = {},
-            batchSelectable = true,
+            // ConversationScreen's selection map accepts only native kind-9 chat records.
+            batchSelectable = false,
             selected = false,
             onToggleSelection = {},
             rangeDragActive = false,
