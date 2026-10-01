@@ -9881,7 +9881,7 @@
       },
       {
         "surface": "string:notification_channel_dictation",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
         "anchor": "R.string.notification_channel_dictation",
         "test_ids": ["DIC-002"]
       },

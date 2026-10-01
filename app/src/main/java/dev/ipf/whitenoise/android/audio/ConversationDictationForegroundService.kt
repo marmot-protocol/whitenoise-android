@@ -165,7 +165,11 @@ internal class ConversationDictationForegroundService(
         startId: Int,
     ): Boolean =
         try {
-            foregroundPromoter(service, buildNotification(controller), controller.foregroundServiceType)
+            foregroundPromoter(
+                service,
+                buildConversationDictationNotification(this, controller, ::actionIntent),
+                controller.foregroundServiceType,
+            )
             foregroundPromoted = true
             val callbackSession = sessionToken.substringAfterLast(':').toLongOrNull() ?: 0L
             conversationDictationDiagnostic("event=foreground_service_promoted callback_session=$callbackSession")
@@ -212,10 +216,6 @@ internal class ConversationDictationForegroundService(
         service.foreground.releaseDictation()
     }
 
-    /** Builds presentation separately from lifecycle and recognition ownership. */
-    private fun buildNotification(controller: ConversationDictationController): Notification =
-        buildConversationDictationNotification(this, controller, ::actionIntent)
-
     /** Keeps system controls truthful when capture becomes finalization or an irrevocable dispatch. */
     private fun observeNotification(
         controller: ConversationDictationController,
@@ -250,7 +250,9 @@ internal class ConversationDictationForegroundService(
         sessionToken: String,
     ) {
         try {
-            service.foreground.updateDictationNotification(buildNotification(controller))
+            service.foreground.updateDictationNotification(
+                buildConversationDictationNotification(this, controller, ::actionIntent),
+            )
         } catch (_: SecurityException) {
             controller.onDurableServiceDestroyed(sessionToken)
             removeForegroundNotification()
@@ -371,7 +373,7 @@ internal class ConversationDictationForegroundService(
                 intent?.hasExtra(EXTRA_SESSION_TOKEN) == true
 
         /** Creates the low-importance, badge-free channel once per installation. */
-        private fun ensureChannel(context: Context) {
+        internal fun ensureChannel(context: Context) {
             val manager = context.getSystemService(NotificationManager::class.java) ?: return
             if (manager.getNotificationChannel(CHANNEL_ID) != null) return
             manager.createNotificationChannel(

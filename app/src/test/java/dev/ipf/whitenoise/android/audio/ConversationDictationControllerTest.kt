@@ -2891,6 +2891,46 @@ class ConversationDictationControllerTest {
         assertTrue(fixture.platform.pendingCallerAudio)
     }
 
+    /** A closure exception cannot substitute for the native callback's proof. */
+    @Test
+    fun forcedClosureExceptionDoesNotAcknowledgeMicrophone() {
+        val fixture = fixture(draft = TextFieldValue(""))
+        fixture.platform.pendingCallerAudio = true
+        fixture.platform.deferCallerAudioFinish = true
+        fixture.platform.forceCaptureFailure = IllegalStateException("native close failed")
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
+        fixture.scheduler.advanceBy(1_000L)
+        assertTrue(fixture.controller.foregroundMicrophoneRequired)
+        assertTrue(fixture.controller.hasDurableSession)
+        requireNotNull(fixture.platform.callerAudioFinishCallback).invoke()
+        assertFalse(fixture.controller.foregroundMicrophoneRequired)
+        fixture.controller.dismissFailure()
+    }
+
+    /** No queued PCM does not imply that a discarded native recorder has finished closing. */
+    @Test
+    fun transcriptOnlyFailureForcesDiscardedCaptureClosed() {
+        val fixture = fixture(draft = TextFieldValue("Keep"))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onResult("first segment")
+        fixture.scheduler.runDelay(500L)
+        fixture.platform.tracksCallerAudioDisposal = true
+        fixture.platform.discardCaptureActive = true
+        fixture.platform.deferDiscardClosure = true
+        fixture.platform.deferCallerAudioFinish = true
+        fixture.platform.listener.onError(ConversationDictationFailure.PermissionDenied)
+        val failed = fixture.controller.state as ConversationDictationState.Failed
+        assertEquals("first segment", failed.retainedTranscript)
+        assertTrue(fixture.controller.hasDurableSession)
+        assertTrue(fixture.controller.foregroundMicrophoneRequired)
+        fixture.scheduler.advanceBy(1_000L)
+        assertEquals(1, fixture.platform.forcedCallerAudioClosures)
+        assertFalse(fixture.controller.foregroundMicrophoneRequired)
+        assertTrue(fixture.controller.state === failed)
+        fixture.controller.dismissFailure()
+    }
+
     /** Bounded recovery expires once and clears PCM without silently writing a draft. */
     @Test
     fun recoveryExpiresAtThirtyMinutesAndDoesNotSurviveExplicitDismissal() {
@@ -3131,11 +3171,11 @@ class ConversationDictationControllerTest {
 
     /** Returning before closure preserves the watchdog and only then reattaches non-microphone recovery. */
     @Test
-    fun foregroundRecoveryReattachWaitsForActualRecorderClosure() = checkDeferredRecoveryReattach(leaveForeground = false)
+    fun recoveryReattachWaitsForClosure() = checkDeferredRecoveryReattach(leaveForeground = false)
 
     /** A deferred foreground reattach must not turn into a fresh background service start. */
     @Test
-    fun backgroundingBeforeRecorderClosureCancelsDeferredRecoveryReattach() = checkDeferredRecoveryReattach(leaveForeground = true)
+    fun backgroundingCancelsDeferredReattach() = checkDeferredRecoveryReattach(leaveForeground = true)
 
     private fun checkDeferredRecoveryReattach(leaveForeground: Boolean) {
         var starts = 0
@@ -4344,7 +4384,11 @@ class ConversationDictationControllerTest {
             val timedOutFailure = timedOut.controller.state as ConversationDictationState.Failed
             assertEquals(ConversationDictationFailure.DeliveryUnknown, timedOutFailure.reason)
             assertEquals("dictated", timedOutFailure.retainedTranscript)
-            assertTrue(timedOut.controller.hasDurableSession)
+            assertFalse(timedOut.controller.hasDurableSession)
+            timedOut.controller.onAppForegrounded()
+            timedOut.scheduler.advanceBy(30 * 60 * 1_000L)
+            assertTrue(timedOut.controller.state === timedOutFailure)
+            assertFalse(timedOut.controller.hasDurableSession)
 
             val rejected =
                 fixture(
@@ -5904,6 +5948,8 @@ class ConversationDictationControllerTest {
         var callerAudioFinishCallback: (() -> Unit)? = null
         var deferDiscardClosure = false
         var discardClosureCallback: (() -> Unit)? = null
+        var discardCaptureActive = false
+        var forceCaptureFailure: RuntimeException? = null
 
         /** Simulates a platform that cannot even start the question, such as a recognizer refusal. */
         var callerAudioProbeFailure: RuntimeException? = null
@@ -5954,7 +6000,7 @@ class ConversationDictationControllerTest {
 
         /** Simulates recorder closure separately from draining the retained caller-audio queue. */
         override fun finishCallerAudioCapture(onClosed: () -> Unit): Boolean {
-            if (!pendingCallerAudio) return false
+            if (!pendingCallerAudio && discardClosureCallback == null) return false
             if (deferCallerAudioFinish) {
                 callerAudioFinishCallback = onClosed
             } else {
@@ -5964,14 +6010,15 @@ class ConversationDictationControllerTest {
         }
 
         override fun forceCallerAudioCaptureClosure(onClosed: () -> Unit): Boolean {
-            if (!pendingCallerAudio) return false
+            forceCaptureFailure?.let { throw it }
+            if (!pendingCallerAudio && discardClosureCallback == null) return false
             forcedCallerAudioClosures += 1
             onClosed()
             return true
         }
 
         override fun discardCallerAudio(onClosed: () -> Unit): Boolean {
-            if (!tracksCallerAudioDisposal || !pendingCallerAudio) return false
+            if (!tracksCallerAudioDisposal || (!pendingCallerAudio && !discardCaptureActive)) return false
             discardedCallerAudio += 1
             pendingCallerAudio = false
             if (deferDiscardClosure) discardClosureCallback = onClosed else onClosed()

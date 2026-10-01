@@ -35,10 +35,10 @@ class ConversationDictationRecoveryScreenshotTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun partialSendConfirmationLight() = capture("dictation_partial_send_light.png", dark = false, scale = 1f, rtl = false)
+    fun lightConfirmation() = capture("dictation_partial_send_light.png", dark = false, scale = 1f, rtl = false)
 
     @Test
-    fun partialSendConfirmationLargeRtlDark() = capture("dictation_partial_send_large_rtl_dark.png", dark = true, scale = 2f, rtl = true)
+    fun largeRtlDark() = capture("dictation_partial_send_large_rtl_dark.png", dark = true, scale = 2f, rtl = true)
 
     private fun capture(
         name: String,

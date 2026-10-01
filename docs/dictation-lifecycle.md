@@ -112,6 +112,13 @@ reject obsolete controls after a failure and retry.
 Native discard, normal finish and forced closure deliver callbacks on the main
 looper. A separate capture generation fences closure during the replacement
 window before its new logical target is published.
+Discard clears PCM immediately but retains the closing recorder's identity until
+native acknowledgment; stop and release run off the main looper. Transcript-only
+recovery uses the same closure watchdog, and a closure exception cannot count as
+acknowledgment. An uncertain dispatch retains its in-app explanation without a
+recovery lease or expiry notice because retrying that dispatch could duplicate it.
+Audio wiping covers current, queued and in-flight arrays held at discard time;
+it does not promise erasure of copies already released to the provider or garbage collector.
 
 ## Special-use declaration
 

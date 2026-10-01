@@ -43,6 +43,56 @@ class ConversationDictationCallerAudioTest {
         assertTrue(delivered.get())
     }
 
+    /** The production owner keeps a discarded recorder addressable until its real release returns. */
+    @Test
+    fun discardedRecorderRemainsOwnedWhileNativeReleaseIsBlocked() {
+        val readStarted = CountDownLatch(1)
+        val returnRead = CountDownLatch(1)
+        val releaseStarted = CountDownLatch(1)
+        val returnRelease = CountDownLatch(1)
+        val releases = AtomicInteger(0)
+        val capture =
+            callerAudio(
+                object : ConversationDictationAudioCaptureDevice by FakeCaptureDevice() {
+                    override fun read(target: ShortArray): Int {
+                        readStarted.countDown()
+                        check(returnRead.await(5, TimeUnit.SECONDS))
+                        return 0
+                    }
+
+                    override fun stop() = Unit
+
+                    override fun release() {
+                        releases.incrementAndGet()
+                        releaseStarted.countDown()
+                        check(returnRelease.await(5, TimeUnit.SECONDS))
+                    }
+                },
+            )
+        val owner = ConversationDictationCaptureOwner { capture }
+        val discarded = AtomicBoolean(false)
+        val forced = AtomicBoolean(false)
+        try {
+            assertTrue(owner.acquire() === capture)
+            assertTrue(capture.start())
+            assertTrue(readStarted.await(2, TimeUnit.SECONDS))
+            assertTrue(owner.discard { discarded.set(true) })
+            assertTrue(releaseStarted.await(2, TimeUnit.SECONDS))
+            assertTrue(owner.forceClose { forced.set(true) })
+            shadowOf(Looper.getMainLooper()).idle()
+            assertFalse(discarded.get())
+            assertFalse(forced.get())
+            assertFalse(owner.hasPending())
+            returnRelease.countDown()
+            await { shadowOf(Looper.getMainLooper()).idle(); discarded.get() && forced.get() }
+            assertEquals(1, releases.get())
+            assertFalse(owner.forceClose {})
+        } finally {
+            returnRelease.countDown()
+            returnRead.countDown()
+        }
+    }
+
     /** Cancelling a stream before it claims PCM must still free the lease for a replacement. */
     @Test
     fun cancelBeforePollReleasesTheStreamLease() {

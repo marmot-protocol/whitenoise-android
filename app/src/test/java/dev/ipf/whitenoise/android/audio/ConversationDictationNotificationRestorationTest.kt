@@ -91,6 +91,19 @@ class ConversationDictationNotificationRestorationTest {
         NotificationStreamForegroundService.pendingDictationOwner = defaultPendingOwner
     }
 
+    /** Expiry as the first channel user must preserve the foreground card's badge-free settings. */
+    @Test
+    fun expiryCreatesTheSharedBadgeFreeDictationChannel() {
+        val context = RuntimeEnvironment.getApplication<Application>()
+        val manager = context.getSystemService(NotificationManager::class.java)
+        manager.deleteNotificationChannel(ConversationDictationForegroundService.CHANNEL_ID)
+        notifyConversationDictationRecoveryExpired(context)
+        val channel = requireNotNull(manager.getNotificationChannel(ConversationDictationForegroundService.CHANNEL_ID))
+        assertFalse(channel.canShowBadge())
+        assertEquals(context.getString(R.string.notification_channel_dictation_description), channel.description)
+        assertEquals(NotificationManager.IMPORTANCE_LOW, channel.importance)
+    }
+
     /** Stopping connection while Android still queues the host cannot cancel microphone ownership. */
     @Test
     fun connectionStopBeforeHostCreationPreservesQueuedDictation() {

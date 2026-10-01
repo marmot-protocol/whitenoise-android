@@ -20,9 +20,10 @@ internal class ConversationForegroundRecord(
     private var foregroundPromoted = false
     private var publishedServiceType = 0
 
-    fun foregroundNotification(): Notification = dictation.notificationOrNull() ?: connectionNotification()
+    fun foregroundNotification(): Notification = dictation.notificationOrNull() ?: connectionNotification
 
-    private fun connectionNotification(): Notification = BackgroundConnectionNotification.build(service)
+    private val connectionNotification: Notification
+        get() = BackgroundConnectionNotification.build(service)
 
     fun promoteConnection(trigger: ForegroundStartTrigger) {
         // Automatic nudges cannot change an already authorized connection's type. Dictation
@@ -124,7 +125,7 @@ internal class ConversationForegroundRecord(
     fun releaseDictation(startId: Int = serviceStartId()) {
         if (dictation.hasForegroundLease || !isCurrent()) return
         if (connectionServiceType != 0) {
-            publishForeground(connectionNotification(), connectionServiceType, replaceRecord = true)
+            publishForeground(connectionNotification, connectionServiceType, replaceRecord = true)
         } else {
             removeForegroundAndStop(startId)
         }

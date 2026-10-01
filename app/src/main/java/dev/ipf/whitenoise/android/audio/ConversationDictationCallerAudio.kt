@@ -222,12 +222,13 @@ internal class ConversationDictationCallerAudio internal constructor(
         if (captureSealed.get() || !recorderReleased.get()) return
         if (runCatching { Thread.sleep(FORCED_CAPTURE_SEAL_GRACE_MILLIS) }.isFailure) return
         synchronized(this) {
-            if (captureSealed.get() || !recorderReleased.get()) return
-            // Preserve every read completed during the grace period. Later driver completions
-            // are outside the bounded tail and cannot mutate the sealed recovery buffer.
-            if (!discarded.get()) buffer.finish()
-            conversationDictationDiagnostic("event=caller_audio_forced_seal reason=read_timeout")
-            releaseRecorder()
+            if (!captureSealed.get() && recorderReleased.get()) {
+                // Preserve every read completed during the grace period. Later driver completions
+                // are outside the bounded tail and cannot mutate the sealed recovery buffer.
+                if (!discarded.get()) buffer.finish()
+                conversationDictationDiagnostic("event=caller_audio_forced_seal reason=read_timeout")
+                releaseRecorder()
+            }
         }
     }
 
@@ -242,12 +243,8 @@ internal class ConversationDictationCallerAudio internal constructor(
         finishing.set(true)
         postActionReadsRemaining.set(0)
         postActionDrainDeadline.set(0L)
-        val wasRecording = recording.getAndSet(false)
-        if (wasRecording) {
-            runCatching(device::stop)
-        } else {
-            releaseRecorder()
-        }
+        // Native stop/release can block; discard must never block the controller's main looper.
+        forceFinish {}
     }
 
     /** Includes partial, queued, and in-flight audio until acknowledged or discarded. */
@@ -381,7 +378,7 @@ internal class ConversationDictationCallerAudio internal constructor(
         // The last read must be sealed, and native release must have returned, before
         // completion can drop microphone ownership or deliver the final transcript.
         if (!captureSealed.get() || !recorderReleased.get() || !captureClosed.compareAndSet(false, true)) return
-        while (true) captureClosedCallbacks.poll()?.invoke() ?: return
+        while (captureClosedCallbacks.isNotEmpty()) captureClosedCallbacks.poll()?.invoke()
     }
 
     companion object {
