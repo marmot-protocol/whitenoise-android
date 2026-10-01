@@ -138,6 +138,31 @@ class ByteSizeLruCacheTest {
         assertEquals(listOf("aaa", "bbb", "ccc", "ddd"), removed)
     }
 
+    /** Replacement, explicit removal, and clear do not inflate the capacity-eviction metric. */
+    @Test
+    fun evictionCallbackExcludesReplacementRemovalAndClear() {
+        val evicted = mutableListOf<String>()
+        val cache =
+            ByteSizeLruCache<String, String>(
+                maxBytes = 6,
+                sizeOf = { it.length },
+                onEvicted = { evicted += it },
+            )
+
+        cache.put("a", "aaa")
+        cache.put("a", "bbb")
+        cache.put("c", "ccc")
+        cache.remove("a")
+        cache.put("d", "ddd")
+        cache.clear()
+        assertEquals(emptyList<String>(), evicted)
+
+        cache.put("e", "eee")
+        cache.put("f", "fff")
+        cache.put("g", "ggg")
+        assertEquals(listOf("eee"), evicted)
+    }
+
     @Test
     fun sameInstanceReplaceDoesNotInvokeRemovalCallback() {
         val removed = mutableListOf<String>()

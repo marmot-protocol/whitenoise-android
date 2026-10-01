@@ -21,6 +21,7 @@ class ByteSizeLruCache<K : Any, V : Any>(
     private val sizeOf: (V) -> Int,
     private val maxEntryBytes: Long? = null,
     private val onEntryRemoved: (V) -> Unit = {},
+    private val onEvicted: (V) -> Unit = {},
 ) {
     // accessOrder = true → LinkedHashMap iterates in LRU order for eviction.
     private val entries = LinkedHashMap<K, V>(8, 0.75f, true)
@@ -90,6 +91,7 @@ class ByteSizeLruCache<K : Any, V : Any>(
 
     fun residentBytes(): Long = residentBytes
 
+    /** Removes least recently used entries and reports only capacity-driven removals. */
     private fun evictUntilUnderCap() {
         if (residentBytes <= maxBytes) return
         // CRITICAL: hold a *single* iterator across the whole loop. Each
@@ -101,6 +103,7 @@ class ByteSizeLruCache<K : Any, V : Any>(
             val eldest = it.next()
             residentBytes -= chargeOf(eldest.value)
             onEntryRemoved(eldest.value)
+            onEvicted(eldest.value)
             it.remove()
         }
     }

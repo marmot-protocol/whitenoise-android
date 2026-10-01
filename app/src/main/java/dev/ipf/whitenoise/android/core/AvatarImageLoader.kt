@@ -213,6 +213,7 @@ object AvatarImageLoader {
                     return@synchronized if (fetchLane == AvatarFetchLane.PREWARM_ADMITTED) {
                         CompletedAvatarRequest(null)
                     } else {
+                        AvatarCacheDiagnostics.deduplicatedProfile(request.variant)
                         PendingAvatarRequest(it)
                     }
                 }
@@ -379,19 +380,23 @@ object AvatarImageLoader {
         nowMillis: Long,
     ): Boolean = failureExpiresAt.isFresh(url, nowMillis)
 
+    /** Fetches bounded bytes; only list-avatar calls enter the avatar benchmark counters. */
     @Suppress("ReturnCount") // Fail-closed guards keep invalid limits and an unattached MDK adapter explicit.
     internal suspend fun fetchBytes(
         url: String,
         maxBytes: Int,
+        measureAvatar: Boolean = false,
     ): AvatarByteFetchResult {
         if (maxBytes <= 0) return AvatarByteFetchResult.Failed
         val fetcher = synchronized(lock) { profileImageFetcher } ?: return AvatarByteFetchResult.Unavailable
+        if (measureAvatar) AvatarCacheDiagnostics.fetch(AvatarCacheKind.PROFILE)
         val bytes = fetcher(url, maxBytes.toULong())
         return if (bytes.size <= maxBytes) AvatarByteFetchResult.Success(bytes) else AvatarByteFetchResult.Failed
     }
 
+    /** Fetches and decodes one URL-backed profile image within the requested variant's bounds. */
     private suspend fun fetch(request: ProfileImageRequest): AvatarImageFetchResult =
-        when (val result = fetchBytes(request.url, request.maxBytes)) {
+        when (val result = fetchBytes(request.url, request.maxBytes, request.variant == ProfileImageVariant.AVATAR)) {
             is AvatarByteFetchResult.Success ->
                 decode(result.bytes, request.variant, request.maxDimension)
                     ?.asImageBitmap()
@@ -423,6 +428,7 @@ object AvatarImageLoader {
             expectedCacheLifetime = lifetime,
             fetchLane = AvatarFetchLane.STORED,
             fetchImage = { request ->
+                AvatarCacheDiagnostics.fetch(AvatarCacheKind.PROFILE)
                 readBytes()
                     ?.let { decode(it, request.variant, request.maxDimension)?.asImageBitmap() }
                     ?.let(AvatarImageFetchResult::Success)
@@ -450,11 +456,13 @@ object AvatarImageLoader {
         return image.takeIf { published }
     }
 
+    /** Samples and bounds decoded pixels; a failed decode still counts as attempted work. */
     private fun decode(
         bytes: ByteArray,
         variant: ProfileImageVariant,
         maxDimension: Int,
     ): android.graphics.Bitmap? {
+        if (variant == ProfileImageVariant.AVATAR) AvatarCacheDiagnostics.decode(AvatarCacheKind.PROFILE)
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
@@ -525,11 +533,16 @@ internal class PartitionedProfileImageCache(
     avatarBytes: Int,
     bannerBytes: Int,
 ) {
-    private val avatars = byteBudgetedCache(avatarBytes)
-    private val banners = byteBudgetedCache(bannerBytes)
+    private val avatars = byteBudgetedCache(avatarBytes, AvatarCacheKind.PROFILE)
+    private val banners = byteBudgetedCache(bannerBytes, null)
 
     /** The image held for [cacheKey], looked up only in the partition its variant owns. */
-    fun get(cacheKey: String): ImageBitmap? = partitionFor(cacheKey).get(cacheKey)
+    fun get(cacheKey: String): ImageBitmap? =
+        partitionFor(cacheKey).get(cacheKey).also { image ->
+            if (profileImageVariantOf(cacheKey) == ProfileImageVariant.AVATAR) {
+                AvatarCacheDiagnostics.lookup(AvatarCacheKind.PROFILE, image != null)
+            }
+        }
 
     /** Publishes [image] under [cacheKey], charging it to its own variant's budget. */
     fun put(
@@ -567,13 +580,24 @@ internal class PartitionedProfileImageCache(
 
     private companion object {
         /** An LRU bounded by the decoded bytes it holds rather than by entry count. */
-        fun byteBudgetedCache(maxBytes: Int) =
-            object : LruCache<String, ImageBitmap>(maxBytes) {
-                override fun sizeOf(
-                    key: String,
-                    value: ImageBitmap,
-                ): Int = value.asAndroidBitmap().byteCount.coerceAtLeast(1)
+        fun byteBudgetedCache(
+            maxBytes: Int,
+            kind: AvatarCacheKind?,
+        ) = object : LruCache<String, ImageBitmap>(maxBytes) {
+            override fun sizeOf(
+                key: String,
+                value: ImageBitmap,
+            ): Int = value.asAndroidBitmap().byteCount.coerceAtLeast(1)
+
+            override fun entryRemoved(
+                evicted: Boolean,
+                key: String,
+                oldValue: ImageBitmap,
+                newValue: ImageBitmap?,
+            ) {
+                if (evicted && kind != null) AvatarCacheDiagnostics.evicted(kind)
             }
+        }
     }
 }
 
