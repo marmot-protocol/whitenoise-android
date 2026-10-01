@@ -22,11 +22,14 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_ACTION_MENU_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_DETAILS_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageDetailsScreen
+import dev.ipf.whitenoise.android.ui.conversation.reactions.REACTION_PILL_TEST_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -129,6 +132,16 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
                     }
                 }
             }
+        }
+        if (!configuration.menu) {
+            val card = composeRule.onNodeWithTag("poll-message-card").fetchSemanticsNode().boundsInRoot
+            val footer = composeRule.onNodeWithTag("poll-message-footer", useUnmergedTree = true)
+                .fetchSemanticsNode().boundsInRoot
+            assertTrue("Footer must remain inside the rounded card", footer.bottom <= card.bottom - 8f)
+            val trailingInset = if (configuration.rtl) footer.left - card.left else card.right - footer.right
+            assertEquals("Footer must follow the ordinary trailing alignment", 12f, trailingInset, 1f)
+            val reaction = composeRule.onNodeWithTag("$REACTION_PILL_TEST_TAG:0").fetchSemanticsNode().boundsInRoot
+            assertEquals("Reactions must overlap the card's bottom edge", card.bottom - 21f, reaction.top, 1f)
         }
         composeRule
             .onNodeWithTag(if (configuration.menu) MESSAGE_ACTION_MENU_TEST_TAG else "poll-discussion")

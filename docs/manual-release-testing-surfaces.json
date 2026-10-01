@@ -9350,7 +9350,7 @@
         "surface": "PollCard",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
         "anchor": "internal fun PollCard(",
-        "test_ids": ["MSG-021"]
+        "test_ids": ["MSG-021", "MSG-027"]
       },
       {
         "surface": "PollOptionRow",

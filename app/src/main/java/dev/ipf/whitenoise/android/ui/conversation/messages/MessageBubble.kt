@@ -2181,15 +2181,24 @@ internal fun MessageBubble(
                     ) {
                         senderNameLabel(false)
                         replyPreviewCard(false)
-                        PollMessageContent(item, controller, appState, canVote = !actionsReadOnly && !selectionMode)
-                        MessageInlineFooter(
-                            timeText = rememberedMessageBubbleTime(record.recordedAt),
-                            color = timestampColor,
-                            showStatus = showOutgoingStatus,
-                            status = item.status,
-                            editedLabel = footerLabel,
-                            onEditedClick = null,
-                            statusContainerColor = bubbleBackgroundColor,
+                        PollMessageContent(
+                            item,
+                            controller,
+                            appState,
+                            canVote = !actionsReadOnly && !selectionMode,
+                            modifier = Modifier.testTag("poll-message-card"),
+                            footer = {
+                                MessageInlineFooter(
+                                    timeText = rememberedMessageBubbleTime(record.recordedAt),
+                                    color = timestampColor,
+                                    showStatus = showOutgoingStatus,
+                                    status = item.status,
+                                    editedLabel = footerLabel,
+                                    onEditedClick = null,
+                                    modifier = Modifier.testTag("poll-message-footer"),
+                                    statusContainerColor = bubbleBackgroundColor,
+                                )
+                            },
                         )
                     }
                 } else if (hasMedia) {
@@ -2608,7 +2617,7 @@ internal fun MessageBubble(
                         }
                         val mediaPreview: (@Composable () -> Unit)? =
                             if (visiblePoll != null) {
-                                { PollCard(visiblePoll, canVote = false, onVote = {}) }
+                                { PollCard(visiblePoll, canVote = false, onVote = {}, footer = previewFooter) }
                             } else if (hasMedia) {
                                 {
                                     FocusedRenderedMessagePreview(
@@ -2656,7 +2665,10 @@ internal fun MessageBubble(
                                     )
                                 }
                                 mediaPreview?.invoke()
-                                if (!footerOnVisualMedia && !footerOnPendingVisual && remoteGiphyMedia == null) {
+                                if (
+                                    visiblePoll == null && !footerOnVisualMedia &&
+                                    !footerOnPendingVisual && remoteGiphyMedia == null
+                                ) {
                                     previewFooter()
                                 }
                             }

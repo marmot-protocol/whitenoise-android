@@ -58,6 +58,7 @@ internal fun PollMessageContent(
     appState: WhiteNoiseAppState,
     canVote: Boolean,
     modifier: Modifier = Modifier,
+    footer: (@Composable () -> Unit)? = null,
 ) {
     val poll = item.projected?.poll ?: return
     val owner =
@@ -84,6 +85,7 @@ internal fun PollMessageContent(
                 voteKey = owner.accountRef to owner.messageId,
                 canVote = canVote && !deadlineReached,
                 open = poll.open && !deadlineReached,
+                footer = footer,
                 submitVote = { replacement, onCompleted ->
                     appState.launchMutation {
                         submitOwnedPollVote(controller, owner, replacement, onCompleted)
@@ -103,6 +105,7 @@ internal fun PollVotingCard(
     canVote: Boolean,
     submitVote: (List<String>, (SendAcceptDispositionFfi?) -> Unit) -> Unit,
     open: Boolean = poll.open,
+    footer: (@Composable () -> Unit)? = null,
 ) {
     var voting by remember(voteKey) { mutableStateOf(false) }
     var pendingSelection by remember(voteKey) { mutableStateOf<List<String>?>(null) }
@@ -120,6 +123,7 @@ internal fun PollVotingCard(
         canVote = effectiveCanVote && !voting,
         open = open,
         status = if (voting) PollVoteStatus.SUBMITTING else status,
+        footer = footer,
         onVote = vote@{ optionId ->
             if (voting || !effectiveCanVote || !pollVoteAllowed(poll, System.currentTimeMillis())) return@vote
             val replacement = replacementPollSelection(displayedPoll, optionId) ?: return@vote
@@ -154,6 +158,7 @@ internal fun PollCard(
     onVote: (String) -> Unit,
     open: Boolean = poll.open,
     status: PollVoteStatus = PollVoteStatus.IDLE,
+    footer: (@Composable () -> Unit)? = null,
 ) {
     val locale = LocalConfiguration.current.locales[0]
     Surface(
@@ -205,6 +210,9 @@ internal fun PollCard(
             }
             PollVoteStatusLabel(status)
             if (!open) Text(stringResource(R.string.poll_closed), style = MaterialTheme.typography.labelMedium)
+            footer?.let { content ->
+                Box(Modifier.align(Alignment.End)) { content() }
+            }
         }
     }
 }
