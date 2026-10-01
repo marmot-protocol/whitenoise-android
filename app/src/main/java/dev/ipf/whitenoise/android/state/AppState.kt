@@ -2650,7 +2650,12 @@ class WhiteNoiseAppState private constructor(
         expectedRevision: Long,
         value: TextFieldValue,
     ): Long? {
-        return composerDraftExpansionBridge.setDraftIfCurrentWithRevision(accountRef, groupIdHex, expectedRevision, value)
+        return composerDraftExpansionBridge.setDraftIfCurrentWithRevision(
+            accountRef,
+            groupIdHex,
+            expectedRevision,
+            value,
+        )
     }
 
     /** Dictation conditionally empties only its unchanged origin; failed or unknown sends restore that exact text. */
