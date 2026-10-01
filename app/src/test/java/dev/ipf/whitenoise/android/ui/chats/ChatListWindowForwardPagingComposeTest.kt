@@ -11,7 +11,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -61,7 +60,6 @@ class ChatListWindowForwardPagingComposeTest {
             }
         }
     private var rows by mutableStateOf(windows.rowIds())
-    private var revision by mutableLongStateOf(0L)
     private lateinit var listState: LazyListState
     private lateinit var scope: CoroutineScope
 
@@ -99,6 +97,53 @@ class ChatListWindowForwardPagingComposeTest {
         assertTrue(model.pageCalls.all { it == ChatListPageDirectionFfi.FORWARD })
     }
 
+    /**
+     * A reader who scrolls slowly, settling every few rows, must see every chat in order across the
+     * first shift of the capped window. A forward page chained before the shifted rows were laid out
+     * moves the window past the lazy list's key-retention range, so the viewport falls back to its old
+     * index and skips the rows in between.
+     */
+    @Test
+    fun slowScrollAcrossTheCapShowsEveryRowInOrder() {
+        mount()
+        val seen = sortedSetOf<Int>()
+        var previous = visibleRowIndices().also { seen += it }
+        var gestures = 0
+        while (previous.last() < TOTAL_ROWS - 1 && gestures < MAX_SLOW_GESTURES) {
+            gestures += 1
+            val drag = fling(steps = SLOW_GESTURE_ROWS)
+            composeRule.waitUntil(timeoutMillis = 10_000) { drag.isCompleted }
+            awaitWindowCommandsSettled()
+            val visible = visibleRowIndices()
+            assertTrue(
+                "gesture $gestures jumped from ${previous.last()} to ${visible.first()}",
+                visible.first() <= previous.last() + 1,
+            )
+            seen += visible
+            previous = visible
+        }
+        assertEquals(TOTAL_ROWS - 1, previous.last())
+        assertEquals((0 until TOTAL_ROWS).toList(), seen.toList())
+        assertTrue(model.pageCalls.all { it == ChatListPageDirectionFfi.FORWARD })
+    }
+
+    /** Absolute row positions of the chat rows currently laid out, in viewport order. */
+    private fun visibleRowIndices(): List<Int> =
+        composeRule.runOnIdle {
+            listState.layoutInfo.visibleItemsInfo.map { rowIndex(it.key as String) }
+        }
+
+    /** Waits until no further window command lands, so a settle's anchor report and any page it triggers are in. */
+    private fun awaitWindowCommandsSettled() {
+        var last = -1
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            composeRule.waitForIdle()
+            val now = model.commandCount
+            Thread.sleep(SETTLE_PROBE_MS)
+            (now == last).also { last = now }
+        }
+    }
+
     /** Mounts a fixed-height lazy list fed by the window set, with the screen's forward and anchor effects. */
     private fun mount() {
         composeRule.setContent {
@@ -106,8 +151,8 @@ class ChatListWindowForwardPagingComposeTest {
             scope = rememberCoroutineScope()
             rowHeightPx = with(LocalDensity.current) { ROW_HEIGHT.toPx() }
             LaunchedEffect(listState) {
-                collectChatListForwardPaging(listState = listState, windowRevision = { revision }) {
-                    if (windows.pageForward(ChatListViewFfi.CHATS) != null) publish()
+                collectChatListForwardPaging(listState = listState) {
+                    windows.pageForward(ChatListViewFfi.CHATS)?.also { publish() } != null
                 }
             }
             LaunchedEffect(listState) {
@@ -125,10 +170,21 @@ class ChatListWindowForwardPagingComposeTest {
 
     private var rowHeightPx = 0f
 
-    /** Mirrors the controller: every installed frame is published and bumps the window revision. */
+    private var publishScheduled = false
+
+    /**
+     * Mirrors the controller: installed frames reach the lazy list coalesced, two frames after the
+     * first of them, because the controller debounces its projection rebuild by one frame and the
+     * list measures the rebuilt rows on the frame after that.
+     */
     private fun publish() {
-        rows = windows.rowIds()
-        revision += 1L
+        if (publishScheduled) return
+        publishScheduled = true
+        scope.launch {
+            repeat(PUBLISH_LAG_FRAMES) { withFrameNanos { } }
+            publishScheduled = false
+            rows = windows.rowIds()
+        }
     }
 
     /** One continuous drag of [steps] rows: the list reports scrolling until the gesture ends. */
@@ -156,6 +212,10 @@ class ChatListWindowForwardPagingComposeTest {
         const val FLING_STEPS = 420
         const val MAX_SCROLL_ATTEMPTS = 20
         const val MAX_PAGE_COMMANDS = 16
+        const val SLOW_GESTURE_ROWS = 8
+        const val MAX_SLOW_GESTURES = 120
+        const val SETTLE_PROBE_MS = 40L
+        const val PUBLISH_LAG_FRAMES = 2
         val ROW_HEIGHT = 48.dp
         val VIEWPORT_HEIGHT = 480.dp
     }
@@ -166,6 +226,9 @@ private fun ChatListWindowSet.rowIds(): List<String> = rows.map { it.row.groupId
 
 /** Zero-padded row key for position [index] in the 500-row account. */
 private fun rowId(index: Int): String = "row-%03d".format(index)
+
+/** The position a [rowId] key stands for. */
+private fun rowIndex(id: String): Int = id.removePrefix("row-").toInt()
 
 /**
  * A window handle with MDK's positioning rules: `limit` rows starting `before` rows ahead of the anchor,
@@ -183,6 +246,11 @@ private class ModelChatListWindow(
     private var sequence = 0uL
     private var current = read()
     val pageCalls = mutableListOf<ChatListPageDirectionFfi>()
+
+    /** Every command this window answered, pages and viewport moves alike. */
+    @Volatile
+    var commandCount = 0
+        private set
 
     /** Resolves the retained rows for the current position, the way one storage read would. */
     private fun read(): ChatListWindowSnapshotFfi {
@@ -208,6 +276,7 @@ private class ModelChatListWindow(
 
     /** Publishes the position reached by a command as the next replacement. */
     private fun commit(): ChatListWindowSnapshotFfi {
+        commandCount += 1
         sequence += 1uL
         current = read()
         return current

@@ -119,10 +119,78 @@ class ChatListWindowSetTest {
 
     /**
      * A forward page answered with the same rows parks forward demand (#2926): the next request issues no
-     * command, and demand resumes once an anchor report installs fresh state.
+     * command, a replacement that only refreshes the rows keeps the park, and the anchor report the page
+     * was missing completes it, with the page's rows as the report's result.
      */
     @Test
-    fun noProgressForwardPageParksDemandUntilFreshStateIsInstalled() =
+    fun noProgressForwardPageParksDemandUntilTheAnchorReportCompletesIt() =
+        runBlocking {
+            val chats = FakeWindow(ChatListViewFfi.CHATS, rows = listOf("CHATS-a"), hasMoreAfter = true)
+            chats.forwardPageAppends = false
+            val handles =
+                CHAT_LIST_WINDOW_VIEWS.associateWith { view ->
+                    if (view == ChatListViewFfi.CHATS) chats else FakeWindow(view)
+                }
+            val windows = ChatListWindowSet.open("acct") { _, view -> handles.getValue(view) }
+            var replacements = 0
+            val receiver = launch { windows.receive { _, _ -> replacements += 1 } }
+
+            val noProgress = windows.pageForward(ChatListViewFfi.CHATS)
+            assertEquals(listOf("CHATS-a"), noProgress?.rows?.map { it.row.groupIdHex })
+            assertTrue(windows.isForwardStalled(ChatListViewFfi.CHATS))
+
+            assertNull(windows.pageForward(ChatListViewFfi.CHATS))
+            assertEquals(1, chats.pageCalls.size)
+
+            chats.emit(sequence = 2uL, rows = listOf("CHATS-a"))
+            awaitUntil { replacements >= 1 }
+            assertTrue(windows.isForwardStalled(ChatListViewFfi.CHATS))
+            assertNull(windows.pageForward(ChatListViewFfi.CHATS))
+            assertEquals(1, chats.pageCalls.size)
+
+            chats.forwardPageAppends = true
+            val completed = windows.setVisibleAnchor(ChatListViewFfi.CHATS, "CHATS-a")
+            assertEquals(listOf("CHATS-a", "CHATS-page"), completed?.rows?.map { it.row.groupIdHex })
+            assertEquals(4uL, completed?.sequence)
+            assertEquals(2, chats.pageCalls.size)
+            assertFalse(windows.isForwardStalled(ChatListViewFfi.CHATS))
+            handles.values.forEach(FakeWindow::close)
+            receiver.join()
+        }
+
+    /**
+     * MDK publishes a command's frame to the stream before replying, so the receive loop may install it
+     * first. The anchor report is still a success then, and the parked page it completes still lands.
+     */
+    @Test
+    fun anchorReportCompletesTheParkedPageWhenTheStreamDeliveredItsFrameFirst() =
+        runBlocking {
+            val chats = FakeWindow(ChatListViewFfi.CHATS, rows = listOf("CHATS-a"), hasMoreAfter = true)
+            chats.forwardPageAppends = false
+            chats.echoAnswersToStream = true
+            val handles =
+                CHAT_LIST_WINDOW_VIEWS.associateWith { view ->
+                    if (view == ChatListViewFfi.CHATS) chats else FakeWindow(view)
+                }
+            val windows = ChatListWindowSet.open("acct") { _, view -> handles.getValue(view) }
+            val replaced = mutableListOf<ULong>()
+            val receiver = launch { windows.receive { _, update -> replaced += update.sequence } }
+
+            windows.pageForward(ChatListViewFfi.CHATS)
+            assertTrue(windows.isForwardStalled(ChatListViewFfi.CHATS))
+
+            chats.forwardPageAppends = true
+            val completed = windows.setVisibleAnchor(ChatListViewFfi.CHATS, "CHATS-a")
+            assertEquals(listOf("CHATS-a", "CHATS-page"), completed?.rows?.map { it.row.groupIdHex })
+            assertEquals(listOf(2uL), replaced)
+            assertFalse(windows.isForwardStalled(ChatListViewFfi.CHATS))
+            handles.values.forEach(FakeWindow::close)
+            receiver.join()
+        }
+
+    /** Each anchor report completes at most one page; one that again makes no progress parks demand anew. */
+    @Test
+    fun anchorReportCompletesOnePageAndParksAgainWithoutProgress() =
         runBlocking {
             val chats = FakeWindow(ChatListViewFfi.CHATS, rows = listOf("CHATS-a"), hasMoreAfter = true)
             chats.forwardPageAppends = false
@@ -132,20 +200,17 @@ class ChatListWindowSetTest {
                 }
             val windows = ChatListWindowSet.open("acct") { _, view -> handles.getValue(view) }
 
-            val noProgress = windows.pageForward(ChatListViewFfi.CHATS)
-            assertEquals(listOf("CHATS-a"), noProgress?.rows?.map { it.row.groupIdHex })
-            assertTrue(windows.isForwardStalled(ChatListViewFfi.CHATS))
-
-            assertNull(windows.pageForward(ChatListViewFfi.CHATS))
-            assertEquals(1, chats.pageCalls.size)
-
-            assertEquals(2uL, windows.setVisibleAnchor(ChatListViewFfi.CHATS, "CHATS-a")?.sequence)
-            assertFalse(windows.isForwardStalled(ChatListViewFfi.CHATS))
-            chats.forwardPageAppends = true
-            val resumed = windows.pageForward(ChatListViewFfi.CHATS)
-            assertEquals(listOf("CHATS-a", "CHATS-page"), resumed?.rows?.map { it.row.groupIdHex })
+            windows.pageForward(ChatListViewFfi.CHATS)
+            assertEquals(3uL, windows.setVisibleAnchor(ChatListViewFfi.CHATS, "CHATS-a")?.sequence)
             assertEquals(2, chats.pageCalls.size)
+            assertTrue(windows.isForwardStalled(ChatListViewFfi.CHATS))
+            assertNull(windows.pageForward(ChatListViewFfi.CHATS))
+            assertEquals(2, chats.pageCalls.size)
+
+            // Returning to the top moves the window, so forward demand is live again without a page.
+            assertEquals(4uL, windows.returnToTop(ChatListViewFfi.CHATS)?.sequence)
             assertFalse(windows.isForwardStalled(ChatListViewFfi.CHATS))
+            assertEquals(2, chats.pageCalls.size)
         }
 
     /** A shifted capped window can page back to rows before its retained front. */
@@ -171,6 +236,9 @@ class ChatListWindowSetTest {
             assertEquals(listOf("CHATS-page", "CHATS-middle"), paged?.rows?.map { it.row.groupIdHex })
         }
 }
+
+/** How long an echoing fake lets the stream copy of an answer lead the reply. */
+private const val ECHO_LEAD_MS = 50L
 
 /** Polls a condition driven by the IO-dispatched receive loops, failing after five seconds. */
 private suspend fun awaitUntil(condition: () -> Boolean) {
@@ -235,12 +303,20 @@ private class FakeWindow(
         return current
     }
 
+    /** True publishes each command's answer to the stream before replying, the way the MDK actor does. */
+    var echoAnswersToStream = false
+
+    /** Anchors without changing the rows; with [echoAnswersToStream] the frame reaches the stream first. */
     override suspend fun setVisibleAnchor(
         sequence: ULong,
         groupIdHex: String,
     ): ChatListWindowSnapshotFfi {
         throwScriptedFailure()
         current = snapshot(sequence + 1uL, current.rows.map { it.row.groupIdHex })
+        if (echoAnswersToStream) {
+            check(updates.trySend(current).isSuccess)
+            delay(ECHO_LEAD_MS)
+        }
         return current
     }
 

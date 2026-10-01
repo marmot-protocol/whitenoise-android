@@ -135,8 +135,10 @@ internal class ChatListWindowSet private constructor(
      *
      * A capped window can only move forward past the row it is anchored on, so a page issued before the
      * reader's settled row has been reported may come back with the same rows (#2926). Such a no-progress
-     * page suspends forward demand for [view] until the next installed replacement, anchor report or
-     * backward page supplies fresh state: edge demand is re-evaluated then, never re-issued blindly.
+     * page parks forward demand for [view]: the missing input is the anchor, so the next anchor report
+     * completes the parked page itself (see [setVisibleAnchor]), while a backward page or a return to top
+     * moves the window instead. Replacements that merely refresh the retained rows leave the park in
+     * place, because they cannot make a forward page progress either.
      */
     suspend fun pageForward(view: ChatListViewFfi): ChatListWindowSnapshotFfi? {
         val before = installed(view)?.takeIf { it.hasMoreAfter && !isForwardStalled(view) } ?: return null
@@ -151,33 +153,46 @@ internal class ChatListWindowSet private constructor(
         return result
     }
 
-    /** Whether a no-progress forward page has parked [view]'s edge demand until fresh state arrives. */
+    /** Whether a no-progress forward page has parked [view]'s edge demand until an anchor report arrives. */
     fun isForwardStalled(view: ChatListViewFfi): Boolean = synchronized(frameLock) { view in forwardStalled }
 
-    /** Parks [view]'s forward demand; the next installed replacement clears it. */
+    /** Parks [view]'s forward demand until a viewport command supplies the anchor it lacked. */
     private fun markForwardStalled(view: ChatListViewFfi) {
         synchronized(frameLock) { forwardStalled += view }
-        chatsDebug { "chat window forward page made no progress view=$view, waiting for fresh state" }
+        chatsDebug { "chat window forward page made no progress view=$view, waiting for an anchor report" }
     }
+
+    /** Lifts the park after a viewport command moved [view]; true when demand had been parked. */
+    private fun unparkForward(view: ChatListViewFfi): Boolean = synchronized(frameLock) { forwardStalled.remove(view) }
 
     /** Loads the preceding page of [view] when the retained window is no longer at the true top. */
     suspend fun pageBackward(view: ChatListViewFfi): ChatListWindowSnapshotFfi? =
         command(view) { handle, sequence ->
             if (installed(view)?.hasMoreBefore != true) return@command null
             handle.page(sequence, ChatListPageDirectionFfi.BACKWARD, CHAT_LIST_WINDOW_PAGE_ROWS)
-        }
+        }?.also { unparkForward(view) }
 
-    /** Reports the row the user sees so the window keeps it across replacements; null when unchanged. */
+    /**
+     * Reports the row the user sees so the window keeps it across replacements; null when unchanged.
+     *
+     * When a forward page had parked for want of this anchor, the same report completes that page: the
+     * reader was at the retained end when the page made no progress, and only an anchored position lets
+     * a capped window move forward. One page follows one report, so a second no-progress answer parks
+     * demand again instead of looping.
+     */
     suspend fun setVisibleAnchor(
         view: ChatListViewFfi,
         groupIdHex: String,
-    ): ChatListWindowSnapshotFfi? = command(view) { handle, sequence -> handle.setVisibleAnchor(sequence, groupIdHex) }
+    ): ChatListWindowSnapshotFfi? {
+        val anchored =
+            command(view) { handle, sequence -> handle.setVisibleAnchor(sequence, groupIdHex) } ?: return null
+        val completed = if (unparkForward(view)) pageForward(view) else null
+        return completed ?: anchored
+    }
 
     /** Returns [view] to the top of the list and resumes following new activity. */
-    suspend fun returnToTop(view: ChatListViewFfi): ChatListWindowSnapshotFfi? {
-        val result = command(view) { handle, sequence -> handle.returnToTop(sequence) }
-        return result
-    }
+    suspend fun returnToTop(view: ChatListViewFfi): ChatListWindowSnapshotFfi? =
+        command(view) { handle, sequence -> handle.returnToTop(sequence) }?.also { unparkForward(view) }
 
     /** Retires immediately and cancels receive workers, including any callback running in one. */
     fun close() = lifetime.close()
@@ -201,6 +216,7 @@ internal class ChatListWindowSet private constructor(
     // contract is to reassess from the newest installed replacement, which the receive loop delivers.
     // Native shutdown may precede Kotlin retirement. The receive loop owns reopening a closed
     // window; viewport commands have no result to publish and must not escape into UI effects.
+    // Null therefore means the command was refused or issued nothing, never that it was answered.
     @Suppress("SwallowedException")
     private suspend fun command(
         view: ChatListViewFfi,
@@ -222,7 +238,10 @@ internal class ChatListWindowSet private constructor(
                 } catch (ended: MarmotKitException.ChatWindowClosed) {
                     null
                 }
-            result?.takeIf { install(view, it) }
+            // MDK publishes the answered frame to the stream before it replies, so the receive loop may
+            // have installed this very frame already. The command still succeeded: callers re-apply the
+            // installed rows, which is idempotent, and a parked forward page must not lose its anchor to it.
+            result?.also { install(view, it) }
         }
 
     /** Installs a newer same-generation replacement for [view] and bumps the frame revision; false for a duplicate. */
@@ -234,8 +253,6 @@ internal class ChatListWindowSet private constructor(
             synchronized(frameLock) {
                 if (closed || !cursors.getValue(view).accept(update)) return@synchronized false
                 installed[view] = update
-                // Any newer replacement is fresh state: the forward edge may be re-evaluated against it.
-                forwardStalled -= view
                 revision++
                 true
             }
@@ -318,11 +335,16 @@ private fun ChatListWindowSnapshotFfi.logWindowFrame(
     }
 }
 
-/** Loads the next page of active chats when the list reaches its end; a no-op while nothing more is retained. */
-suspend fun ChatsController.loadMoreChats(view: ChatListViewFfi = ChatListViewFfi.CHATS) {
-    val windows = chatListWindows ?: return
-    val account = accountRef ?: return
-    if (windows.pageForward(view) != null) applyChatListWindowRows(account, windows)
+/**
+ * Loads the next page of active chats when the list reaches its end; false when no page was issued or
+ * nothing newer was installed, so the viewport need not wait for rows that are not coming.
+ */
+suspend fun ChatsController.loadMoreChats(view: ChatListViewFfi = ChatListViewFfi.CHATS): Boolean {
+    val windows = chatListWindows
+    val account = accountRef
+    if (windows == null || account == null || windows.pageForward(view) == null) return false
+    applyChatListWindowRows(account, windows)
+    return true
 }
 
 /** Loads rows before the retained active window when the reader approaches its shifted front. */

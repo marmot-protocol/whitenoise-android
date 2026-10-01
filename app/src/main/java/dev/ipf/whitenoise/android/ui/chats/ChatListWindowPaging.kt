@@ -44,27 +44,52 @@ internal fun shouldShowChatListJumpToTop(
         else -> wasVisible
     }
 
+/** The laid-out forward edge: the last visible row's index and the number of rows the list measured. */
+internal data class ChatListForwardEdge(
+    val lastVisibleIndex: Int,
+    val totalItems: Int,
+) {
+    /**
+     * Whether this layout shows the rows a page issued at [paged] brought in: a shifted window moves the
+     * retained row the reader was on, and so the last visible index, up the list, and a grown window
+     * raises the item count. A layout that only scrolled further down is still the old rows.
+     */
+    fun consumes(paged: ChatListForwardEdge): Boolean =
+        when {
+            lastVisibleIndex < paged.lastVisibleIndex -> true
+            else -> totalItems > paged.totalItems
+        }
+}
+
 /**
- * Requests the next forward page whenever the reader is within [prefetchRows] of the retained end.
+ * Requests the next forward page whenever the reader is within [prefetchRows] of the retained end,
+ * and at most one page ahead of what the lazy list has laid out.
  *
- * Edge demand is re-evaluated on every viewport change and on every installed window replacement
- * ([windowRevision]), not only when the visible index or item count changes: a page that MDK answers
- * with an unchanged window, or a settled-anchor report that merely moves the cursor, leaves the lazy
- * list identical, and without the revision term the reader parked at the end would never page again
- * (#2926). The window itself bounds re-issue, so a no-progress page cannot busy-loop here.
+ * Installed rows reach the list a frame or two after the page lands (the controller coalesces its
+ * projection rebuild), and during that lag the layout still describes the previous rows. Demand
+ * evaluated against that layout, whether because a replacement bumped a revision or because the
+ * reader scrolled another row, chains further pages against rows the reader has not reached. At the
+ * 200-row cap each chained page shifts the window another 50 rows, and once the first visible key
+ * has moved beyond the lazy list's key-retention range the viewport falls back to its old index and
+ * skips every row in between. So after [onPageForward] reports an installed page, demand waits for a
+ * layout that [ChatListForwardEdge.consumes] it. A page that MDK answers with unchanged rows parks
+ * forward demand in the window set, and the settled anchor report completes that page there (#2926).
  */
 internal suspend fun collectChatListForwardPaging(
     listState: LazyListState,
-    windowRevision: () -> Long,
     prefetchRows: Int = CHAT_LIST_WINDOW_PREFETCH_ROWS,
-    onPageForward: suspend () -> Unit,
+    onPageForward: suspend () -> Boolean,
 ) {
+    var unconsumed: ChatListForwardEdge? = null
     snapshotFlow {
         val info = listState.layoutInfo
-        Triple(info.visibleItemsInfo.lastOrNull()?.index ?: -1, info.totalItemsCount, windowRevision())
+        ChatListForwardEdge(info.visibleItemsInfo.lastOrNull()?.index ?: -1, info.totalItemsCount)
     }.distinctUntilChanged()
-        .collect { (lastVisibleIndex, totalItems, _) ->
-            if (shouldPageChatListForward(lastVisibleIndex, totalItems, prefetchRows)) onPageForward()
+        .collect { edge ->
+            unconsumed = unconsumed?.takeUnless(edge::consumes)
+            if (unconsumed != null) return@collect
+            if (!shouldPageChatListForward(edge.lastVisibleIndex, edge.totalItems, prefetchRows)) return@collect
+            if (onPageForward()) unconsumed = edge
         }
 }
 

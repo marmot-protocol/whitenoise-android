@@ -1050,10 +1050,7 @@ internal fun ChatsScreen(
             }
     }
     LaunchedEffect(chatListState, controller, chatListWindowView) {
-        collectChatListForwardPaging(
-            listState = chatListState,
-            windowRevision = { controller.chatListWindowRevision },
-        ) { controller.loadMoreChats(chatListWindowView) }
+        collectChatListForwardPaging(listState = chatListState) { controller.loadMoreChats(chatListWindowView) }
     }
     LaunchedEffect(chatListState, controller, chatListWindowView) {
         collectChatListVisibleAnchor(
