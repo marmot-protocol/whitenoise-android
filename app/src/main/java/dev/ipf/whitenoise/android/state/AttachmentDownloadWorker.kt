@@ -22,6 +22,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
@@ -247,6 +248,11 @@ class AttachmentDownloadWorker : CoroutineWorker {
             // worker. Finish that transfer so its foreground notification and
             // interactive intent cannot linger. Scheduler cancellation still
             // propagates and retains intent for the next run.
+            if (!currentCoroutineContext().isActive) {
+                val reason = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) stopReason.toString() else "unavailable"
+                Log.w(TAG, "attachment_work_stopped reason=$reason")
+                throw cancel
+            }
             currentCoroutineContext().ensureActive()
             Log.w(TAG, "attachment_fetch_cancelled type=${cancel.javaClass.simpleName}")
             intentStore.setInteractive(request, interactive = false)

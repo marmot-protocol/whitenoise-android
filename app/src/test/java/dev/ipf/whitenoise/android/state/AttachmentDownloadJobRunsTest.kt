@@ -63,12 +63,7 @@ class AttachmentDownloadJobRunsTest {
             val old =
                 runs.start(
                     jobId = 1,
-                    download = {
-                        withContext(NonCancellable) {
-                            releaseOldRun.await()
-                            throw CancellationException("stopped fetch retired")
-                        }
-                    },
+                    download = { withContext(NonCancellable) { releaseOldRun.await() } },
                     onFinished = { finishes += 1 },
                 )
             runCurrent()
