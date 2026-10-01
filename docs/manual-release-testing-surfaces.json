@@ -3,6 +3,14 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "First settled conversation read at the saved watermark",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "private var lastSubmittedReadMessageId: String? = null",
+        "test_ids": [
+          "CHL-008"
+        ]
+      },
+      {
         "surface": "PreparedVisibleGroupAvatarContent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/PreparedGroupAvatarContent.kt",
         "anchor": "fun <T> PreparedVisibleGroupAvatarContent(",
@@ -24025,6 +24033,20 @@
       }
     ],
     "source_coverage": [
+      {
+        "surface": "Native manual reminder lookup for visible-read dedupe",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "internal fun hasManualUnreadReminder(groupIdHex: String)",
+        "test_ids": ["CHL-008"]
+      },
+      {
+        "surface": "Native manual unread reminder bypasses an older retained-controller read dedupe",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "internal fun hasManualUnreadReminder(",
+        "test_ids": [
+          "CHL-008"
+        ]
+      },
       {
         "surface": "Retained dictation diagnostic metadata",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/DictationDiagnosticStore.kt",

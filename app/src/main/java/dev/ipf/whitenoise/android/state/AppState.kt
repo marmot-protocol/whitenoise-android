@@ -3371,6 +3371,15 @@ class WhiteNoiseAppState private constructor(
         return boundController != null
     }
 
+    /** Read-request dedupe must honor a newly selected native manual reminder. */
+    internal fun hasManualUnreadReminder(
+        accountRef: String,
+        groupIdHex: String,
+    ): Boolean =
+        chatsController
+            ?.takeIf { it.boundAccountRef == accountRef }
+            ?.hasManualUnreadReminder(groupIdHex) == true
+
     internal fun rollbackOptimisticSentPreview(
         accountRef: String?,
         groupIdHex: String,
