@@ -1275,7 +1275,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
         "anchor": "fun ConversationSearchNavBar(",
         "test_ids": [
-          "FIND-001"
+          "FIND-001",
+          "FIND-011"
         ]
       },
       {
@@ -12489,10 +12490,11 @@
       },
       {
         "surface": "setting:error_conversation_membership_unavailable",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupRosterReadRecovery.kt",
         "anchor": "R.string.error_conversation_membership_unavailable",
         "test_ids": [
-          "NTF-009"
+          "NTF-009",
+          "NTF-027"
         ]
       },
       {
@@ -26593,6 +26595,62 @@
         "test_ids": [
           "FIND-003",
           "CON-001"
+        ]
+      },
+      {
+        "surface": "R.string.conversation_search_loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.conversation_search_loading",
+        "test_ids": [
+          "FIND-011"
+        ]
+      },
+      {
+        "surface": "R.string.conversation_search_incomplete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.conversation_search_incomplete",
+        "test_ids": [
+          "FIND-011"
+        ]
+      },
+      {
+        "surface": "R.string.conversation_search_match_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.conversation_search_match_count",
+        "test_ids": [
+          "FIND-011"
+        ]
+      },
+      {
+        "surface": "R.string.conversation_search_match_count_loaded_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.conversation_search_match_count_loaded_only",
+        "test_ids": [
+          "FIND-011"
+        ]
+      },
+      {
+        "surface": "R.string.conversation_search_no_matches",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.conversation_search_no_matches",
+        "test_ids": [
+          "FIND-011"
+        ]
+      },
+      {
+        "surface": "R.string.conversation_search_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.conversation_search_retry",
+        "test_ids": [
+          "FIND-011"
+        ]
+      },
+      {
+        "surface": "R.string.error_conversation_membership_inconsistent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupRosterReadRecovery.kt",
+        "anchor": "R.string.error_conversation_membership_inconsistent",
+        "test_ids": [
+          "NTF-027"
         ]
       },
       {
