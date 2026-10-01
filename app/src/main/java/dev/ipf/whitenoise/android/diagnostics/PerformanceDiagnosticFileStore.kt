@@ -66,7 +66,11 @@ internal class PerformanceDiagnosticFileStore(
     fun delete(): Boolean =
         writer
             .submit<Boolean> {
-                if (!file.exists()) return@submit false
+                if (!file.exists()) {
+                    written = 0
+                    failure = null
+                    return@submit false
+                }
                 checkSafePath()
                 check(file.delete()) { "Unable to delete performance diagnostics" }
                 written = 0

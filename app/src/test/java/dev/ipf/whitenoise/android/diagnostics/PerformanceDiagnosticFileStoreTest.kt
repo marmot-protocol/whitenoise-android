@@ -78,4 +78,20 @@ class PerformanceDiagnosticFileStoreTest {
         assertTrue(runCatching { store.readForExport() }.isFailure)
         assertEquals("secret", outside.readText())
     }
+
+    /** Clearing a failed session without a file permits a later valid session to export. */
+    @Test
+    fun clearRecoversFromWriteFailureBeforeFileCreation() {
+        val blockedDirectory = temporaryFolder.newFile("blocked-diagnostics")
+        val store = PerformanceDiagnosticFileStore(blockedDirectory)
+        store.append("schema=2 op=app_start phase=accepted")
+        assertTrue(runCatching { store.readForExport() }.isFailure)
+
+        assertFalse(store.delete())
+        assertNull(store.readForExport())
+        assertTrue(blockedDirectory.delete())
+        store.reset()
+        store.append("schema=2 op=app_start phase=accepted")
+        assertEquals("schema=2 op=app_start phase=accepted\n", store.readForExport()!!.decodeToString())
+    }
 }
