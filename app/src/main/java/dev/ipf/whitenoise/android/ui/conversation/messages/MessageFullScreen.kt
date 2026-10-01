@@ -207,8 +207,11 @@ internal fun MessageFullScreenView(
                     modifier =
                         Modifier
                             .fillMaxSize()
-                            .readerScrollIndicator(scrollState, selectionKey, enabled = !selection.active)
-                            .verticalScroll(scrollState)
+                            .readerScrollIndicator(
+                                scrollState,
+                                selectionKey,
+                                enabled = !selection.active && !overflowOpen,
+                            ).verticalScroll(scrollState)
                             .padding(16.dp),
                 )
             }

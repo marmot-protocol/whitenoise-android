@@ -91,7 +91,6 @@ class MessageFullScreenMarkdownScreenshotTest {
         val body: String,
         val document: MarkdownDocumentFfi?,
         val amoled: Boolean = false,
-        val fontScale: Float = 1f,
     )
 
     private fun captureScrollingReader(snapshot: ReaderSnapshot) {
@@ -100,7 +99,7 @@ class MessageFullScreenMarkdownScreenshotTest {
             snapshot.dark,
             snapshot.scale,
             if (snapshot.rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
-            reader = ReaderContent(text, null, snapshot.amoled, snapshot.scale),
+            reader = ReaderContent(text, null, snapshot.amoled),
         )
         val body = composeRule.onNodeWithTag(MESSAGE_FULL_SCREEN_BODY_TAG)
         val range = body.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
@@ -186,8 +185,8 @@ class MessageFullScreenMarkdownScreenshotTest {
                 LocalLayoutDirection provides layoutDirection,
                 LocalTextContextMenuToolbarProvider provides selectionToolbar,
             ) {
-                // Dialogs restore the window density; scale the inherited typography for the new reader fixture.
-                WhiteNoiseTheme(darkTheme = darkTheme, amoled = reader.amoled, fontScale = reader.fontScale) {
+                // Dialogs restore window density; scale the inherited typography for every reader fixture.
+                WhiteNoiseTheme(darkTheme = darkTheme, amoled = reader.amoled, fontScale = fontScale) {
                     val controller = rememberReaderTextSelectionController(reader.body)
                     selectionController = controller
                     MessageFullScreenView(
