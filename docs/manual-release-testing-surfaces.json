@@ -3901,7 +3901,7 @@
         "surface": "Canonical retained attachment resolution before acquisition admission",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentPlaintextResolver.kt",
         "anchor": "internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(",
-        "test_ids": ["MED-009", "MED-017"]
+        "test_ids": ["MED-009", "MED-017", "MED-023"]
       },
       {
         "surface": "Persisted file open terminal download settlement",
