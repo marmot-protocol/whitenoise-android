@@ -130,6 +130,12 @@ jobs:
         if: matrix.phase == 'tooling'
         run: python3 -m unittest scripts/test_android_ci_gate.py
 
+      - name: Check committed screenshot golden owners
+        if: matrix.phase == 'tooling'
+        run: |
+          python3 -m unittest scripts/test_check_screenshot_baseline_owners.py
+          python3 scripts/check_screenshot_baseline_owners.py
+
       - name: Configure MarmotKit cache directory
         shell: bash
         run: printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$RUNNER_TEMP/marmotkit-cache" >> "$GITHUB_ENV"
@@ -421,30 +427,21 @@ jobs:
           path: ${{ runner.temp }}/marmotkit-cache
           key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
 
-      # Preserve the established baseline-owner allowlist. Other unit tests may
-      # capture diagnostic images without owning a committed golden file.
+      # Run only the committed-golden owners in config/screenshot-baseline-owners.txt.
+      # Mixed-purpose classes contribute just their golden-producing methods; the
+      # full unit job already owns their other assertions. Afterwards, require that
+      # every committed PNG was actually compared so no golden goes unverified.
       - name: Screenshot tests (Roborazzi)
         run: |
+          owner_filters="$(python3 scripts/check_screenshot_baseline_owners.py --gradle-test-args)"
+          mapfile -t owner_args <<< "$owner_filters"
           ./gradlew \
             :app:verifyRoborazziDev${{ matrix.flavor }}Debug \
-            --tests '*ScreenshotTest' \
-            --tests '*ComposerAttachmentMenuTest' \
-            --tests '*ConversationImeCollapseFocusTest' \
-            --tests '*NewGroupNameEmojiPickerTest' \
-            --tests '*EmojiPickerRecentsBehaviorTest' \
-            --tests '*ChatActionSheetTest' \
-            --tests '*ChatListPinnedBoundaryTest' \
-            --tests '*ChatListTtsTransportLayoutTest' \
-            --tests '*ChatListTopBarColdStartSelfProfileFirstFrameTest' \
-            --tests '*ConversationTtsFollowComposeTest' \
-            --tests '*BubbleCollapsibleFooterLayoutTest' \
-            --tests '*MessageBubbleEditedMarkdownTest' \
-            --tests '*GroupEditNameEmojiPickerTest' \
-            --tests '*MainShellTtsReturnTransitionTest' \
-            --tests '*ProfileAddToGroupsFlowTest' \
-            --tests '*AutoDownloadBacklogControlTest' \
+            "${owner_args[@]}" \
             --build-cache --profile --no-daemon \
             --stacktrace
+          python3 scripts/check_screenshot_baseline_owners.py \
+            --results app/build/test-results/roborazzi/dev${{ matrix.flavor }}Debug/results-summary.json
 
       - name: Upload reports
         if: failure()
