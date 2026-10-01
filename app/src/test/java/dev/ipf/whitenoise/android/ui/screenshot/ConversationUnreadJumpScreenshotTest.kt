@@ -97,6 +97,41 @@ class ConversationUnreadJumpScreenshotTest {
             .captureRoboImage("src/test/snapshots/conversation_unread_jump_off_window_projection_dark.png")
     }
 
+    /** Pins the `999+` cap (#2970) in dark theme: the badge widens past its two-digit circle without clipping. */
+    @Test
+    fun thousandUnreadRendersCappedBadgeDark() {
+        renderBadgeOnly(unreadIncomingCount = 1000, darkTheme = true, fontScale = 1f)
+        composeRule
+            .onNodeWithTag(OFF_WINDOW_ROOT_TAG)
+            .captureRoboImage("src/test/snapshots/conversation_unread_jump_capped_dark.png")
+    }
+
+    /** Pins the exact `999` boundary in light theme at 200% text, the widest label the badge must fit. */
+    @Test
+    fun nineHundredNinetyNineUnreadRendersExactBadgeLightLargeText() {
+        renderBadgeOnly(unreadIncomingCount = 999, darkTheme = false, fontScale = 2f)
+        composeRule
+            .onNodeWithTag(OFF_WINDOW_ROOT_TAG)
+            .captureRoboImage("src/test/snapshots/conversation_unread_jump_999_light_200.png")
+    }
+
+    /** Mounts only the jump button inside the off-window frame with the given count and theme. */
+    private fun renderBadgeOnly(
+        unreadIncomingCount: Int,
+        darkTheme: Boolean,
+        fontScale: Float,
+    ) {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = darkTheme, fontScale = fontScale) {
+                Surface(modifier = Modifier.size(96.dp).testTag(OFF_WINDOW_ROOT_TAG)) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        ConversationJumpToNewestButton(unreadIncomingCount = unreadIncomingCount, onClick = {})
+                    }
+                }
+            }
+        }
+    }
+
     @Test
     @Suppress("LongMethod") // One vertical harness verifies both taps against the same real list state.
     fun oversizedVisibleUnreadTopAlignsBeforeSecondTapReachesTail() {

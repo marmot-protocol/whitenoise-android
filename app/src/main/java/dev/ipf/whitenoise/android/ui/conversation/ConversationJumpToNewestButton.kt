@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
@@ -19,6 +20,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.unreadBadgeLabel
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 
@@ -57,17 +59,11 @@ internal fun ConversationJumpToNewestButton(
             }
         }
         if (unreadIncomingCount > 0) {
-            Badge(modifier = Modifier.align(Alignment.TopEnd)) {
-                Text(
-                    if (unreadIncomingCount > MAX_BADGE_COUNT) {
-                        "$MAX_BADGE_COUNT+"
-                    } else {
-                        unreadIncomingCount.toString()
-                    },
-                )
+            // Content-width badge: Material grows it past its two-digit circle for `999` and `999+`, and
+            // measuring it unbounded lets it hang past the 42 dp tap target at large text instead of clipping.
+            Badge(modifier = Modifier.align(Alignment.TopEnd).wrapContentWidth(Alignment.End, unbounded = true)) {
+                Text(unreadBadgeLabel(unreadIncomingCount))
             }
         }
     }
 }
-
-private const val MAX_BADGE_COUNT = 99

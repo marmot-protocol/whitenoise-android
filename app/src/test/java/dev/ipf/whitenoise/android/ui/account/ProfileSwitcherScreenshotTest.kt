@@ -133,7 +133,7 @@ class ProfileSwitcherScreenshotTest {
                                     },
                                     shortNpub = { "npub1…${it.takeLast(4)}" },
                                     avatarUrl = { null },
-                                    unreadCountForAccount = { if (it == "b") 125uL else 0uL },
+                                    unreadCountForAccount = { if (it == "b") 1250uL else 0uL },
                                     hasUnreadForAccount = { it == "c" },
                                     onSelectProfile = {},
                                     onAddProfile = {},

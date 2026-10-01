@@ -23,7 +23,7 @@ import org.robolectric.annotation.Config
 /**
  * The mounted jump badge across successive window replacements (#2726): the number it shows must
  * come from the one owner, hold while history pages replace the window, never flash 0 or a
- * page-local count on the way, and carry the `99+` boundary and the first frame the same way.
+ * page-local count on the way, and carry the `999+` boundary and the first frame the same way.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
@@ -147,29 +147,30 @@ class ConversationUnreadBadgeComposeTest {
     }
 
     /**
-     * The `99+` cap holds across a page, steps down as rows are read inside a partial window, and
-     * recounts at the tail.
+     * The `999+` cap (#2970) holds across a page, steps down to an exact three-digit count as rows are
+     * read inside a partial window, and recounts at the tail.
      */
     @Test
-    fun ninetyNinePlusHoldsAcrossPagesAndStepsDownAsRowsAreRead() {
+    fun nineHundredNinetyNinePlusHoldsAcrossPagesAndStepsDownAsRowsAreRead() {
         val inputs =
             Inputs().apply {
-                timeline = rows(0, 200)
+                timeline = rows(0, 1100)
                 readAnchor = "r79"
-                projection = 120
+                projection = 1020
             }
         mount(inputs)
-        composeRule.onNodeWithText("99+").assertExists()
+        composeRule.onNodeWithText("999+").assertExists()
+        composeRule.onNodeWithText("99+").assertDoesNotExist()
         composeRule.mainClock.autoAdvance = false
 
         inputs.timeline = rows(0, 150)
         inputs.windowReachesTail = false
-        assertBadgeThroughFrames("99+")
+        assertBadgeThroughFrames("999+")
         inputs.readAnchor = "r109"
-        assertBadgeThroughFrames("90", previous = "99+")
-        inputs.timeline = rows(0, 200)
+        assertBadgeThroughFrames("990", previous = "999+")
+        inputs.timeline = rows(0, 1100)
         inputs.windowReachesTail = true
-        assertBadgeThroughFrames("90")
+        assertBadgeThroughFrames("990")
     }
 
     /** A mid-history open shows the projection, not the page, and keeps it across forward pages. */
@@ -183,15 +184,15 @@ class ConversationUnreadBadgeComposeTest {
                 windowReachesTail = false
             }
         mount(inputs)
-        composeRule.onNodeWithText("99+").assertExists()
+        composeRule.onNodeWithText("300").assertExists()
         composeRule.mainClock.autoAdvance = false
 
         inputs.timeline = rows(0, 100)
-        assertBadgeThroughFrames("99+")
+        assertBadgeThroughFrames("300")
         composeRule.onNodeWithText("39").assertDoesNotExist()
         composeRule.onNodeWithText("89").assertDoesNotExist()
         inputs.timeline = rows(0, 150)
-        assertBadgeThroughFrames("99+")
+        assertBadgeThroughFrames("300")
     }
 
     /** Mounted already anchored, the very first frame carries the number rather than gaining it a frame later. */

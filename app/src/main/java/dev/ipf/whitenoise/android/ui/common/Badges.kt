@@ -26,6 +26,16 @@ private val ChatRowBadgeMinimumDiameter = 16.dp
 private val ChatRowBadgeLabelInset = 8.dp
 private const val FAILED_BADGE_GLYPH_SCALE = 1.2f
 
+/** Largest unread-message count shown exactly on the shared badge surfaces; above it the label reads `999+` (#2970). */
+internal const val UNREAD_BADGE_VISUAL_COUNT_CAP = 999
+
+/** The badge label for [count]: exact through [UNREAD_BADGE_VISUAL_COUNT_CAP], `999+` beyond it. */
+internal fun unreadBadgeLabel(count: ULong): String =
+    if (count > UNREAD_BADGE_VISUAL_COUNT_CAP.toULong()) "$UNREAD_BADGE_VISUAL_COUNT_CAP+" else count.toString()
+
+/** [unreadBadgeLabel] for the signed counts the in-conversation jump button receives. */
+internal fun unreadBadgeLabel(count: Int): String = unreadBadgeLabel(count.coerceAtLeast(0).toULong())
+
 /**
  * Material's content badge has a 16 dp minimum and 4 dp horizontal padding; measuring one label digit lets the
  * count, the marked-unread disc and the invitation badge grow together at every font scale.
@@ -57,7 +67,7 @@ internal fun UnreadCountBadge(
         containerColor = actionColors?.container ?: MaterialTheme.colorScheme.primary,
         contentColor = actionColors?.content ?: MaterialTheme.colorScheme.onPrimary,
     ) {
-        Text(if (unreadCount > 99uL) "99+" else unreadCount.toString())
+        Text(unreadBadgeLabel(unreadCount))
     }
 }
 

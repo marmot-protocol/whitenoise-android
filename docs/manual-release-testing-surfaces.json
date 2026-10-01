@@ -962,7 +962,8 @@
         "anchor": "fun ProfileSwitcherSheet(",
         "test_ids": [
           "NAV-004",
-          "NAV-006"
+          "NAV-006",
+          "CHL-022"
         ]
       },
       {
@@ -2048,7 +2049,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Badges.kt",
         "anchor": "fun UnreadCountBadge(",
         "test_ids": [
-          "AXY-001"
+          "AXY-001",
+          "CHL-022"
         ]
       },
       {
@@ -2652,7 +2654,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationJumpToNewestButton.kt",
         "anchor": "fun ConversationJumpToNewestButton(",
         "test_ids": [
-          "CON-001"
+          "CON-001",
+          "CHL-022"
         ]
       },
       {

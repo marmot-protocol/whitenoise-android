@@ -32,24 +32,28 @@ class ChatListBadgesScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Light-theme baseline of every badge leaf. */
     @Test
     fun chatListBadgesLight() {
         render(darkTheme = false)
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/chat_list_badges_light.png")
     }
 
+    /** Dark-theme baseline of every badge leaf. */
     @Test
     fun chatListBadgesDark() {
         render(darkTheme = true)
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/chat_list_badges_dark.png")
     }
 
+    /** AMOLED baseline of every badge leaf. */
     @Test
     fun chatListBadgesAmoled() {
         render(darkTheme = true, amoled = true)
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/chat_list_badges_amoled.png")
     }
 
+    /** Lays the badge leaves side by side, including the exact `999` and capped `999+` counts (#2970). */
     private fun render(
         darkTheme: Boolean,
         amoled: Boolean = false,
@@ -65,6 +69,8 @@ class ChatListBadgesScreenshotTest {
                         ManualUnreadDot()
                         UnreadCountBadge(unreadCount = 3u)
                         UnreadCountBadge(unreadCount = 128u)
+                        UnreadCountBadge(unreadCount = 999u)
+                        UnreadCountBadge(unreadCount = 1000u)
                     }
                 }
             }
