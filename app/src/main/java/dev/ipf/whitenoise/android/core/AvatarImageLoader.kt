@@ -552,9 +552,10 @@ internal class PartitionedProfileImageCache(
         partitionFor(cacheKey).put(cacheKey, image)
     }
 
-    /** Drops every entry of every variant, for account teardown. */
+    /** Drops both variants for account teardown without recording a capacity eviction. */
     fun evictAll() {
-        avatars.evictAll()
+        // LruCache.evictAll() marks each callback as evicted, just like capacity trimming.
+        avatars.snapshot().keys.forEach(avatars::remove)
         banners.evictAll()
     }
 
