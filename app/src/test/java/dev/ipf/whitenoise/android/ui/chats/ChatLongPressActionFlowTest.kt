@@ -356,14 +356,7 @@ class ChatLongPressActionFlowTest {
         composeRule.onNodeWithText(string(R.string.delete_from_device)).performClick()
 
         composeRule.onNodeWithText(string(R.string.chat_list_action_add_to_folder)).assertDoesNotExist()
-        composeRule
-            .onNodeWithText(
-                context.resources.getQuantityString(
-                    R.plurals.chat_list_bulk_delete_confirm,
-                    1,
-                    1,
-                ),
-            ).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.delete_local_does_not_leave)).assertIsDisplayed()
         composeRule.runOnIdle { assertEquals(0, confirmedDeletes) }
 
         composeRule

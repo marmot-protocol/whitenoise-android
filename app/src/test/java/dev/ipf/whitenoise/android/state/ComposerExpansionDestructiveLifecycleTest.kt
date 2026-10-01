@@ -658,6 +658,7 @@ class ComposerExpansionDestructiveLifecycleTest {
                 assertEquals(listOf("forget"), fixture.calls.order)
                 assertEquals(0, fixture.calls.leave.get())
                 assertEquals(0, fixture.calls.delete.get())
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(20))
                 assertTrue(controller.items.isEmpty())
             } finally {
                 controller.onCleared()
@@ -666,19 +667,20 @@ class ComposerExpansionDestructiveLifecycleTest {
 
     /** A shared group must retain an administrator before departure can begin. */
     @Test
-    fun soleAdminOfSharedGroupCannotLeaveAndDelete() = runBlocking {
-        val fixture = fixture(groupRecord = group().copy(admins = listOf(ACCOUNT_ID)))
-        val controller = fixture.seededChatsController()
-        try {
-            assertFalse(controller.leaveAndDeleteFromChatList(GROUP_ID))
-            assertTrue(fixture.calls.order.isEmpty())
-            assertEquals(0, fixture.calls.leave.get())
-            assertEquals(0, fixture.calls.delete.get())
-            assertFalse(controller.items.isEmpty())
-        } finally {
-            controller.onCleared()
+    fun soleAdminOfSharedGroupCannotLeaveAndDelete() =
+        runBlocking {
+            val fixture = fixture(groupRecord = group().copy(admins = listOf(ACCOUNT_ID)))
+            val controller = fixture.seededChatsController()
+            try {
+                assertFalse(controller.leaveAndDeleteFromChatList(GROUP_ID))
+                assertTrue(fixture.calls.order.isEmpty())
+                assertEquals(0, fixture.calls.leave.get())
+                assertEquals(0, fixture.calls.delete.get())
+                assertFalse(controller.items.isEmpty())
+            } finally {
+                controller.onCleared()
+            }
         }
-    }
 
     /** Rebinding after departure must not retarget cleanup to a successor account. */
     @Test

@@ -2132,4 +2132,5 @@
     <string name="checking_invitation">正在检查邀请…</string>
     <string name="couldnt_check_invitation">无法检查邀请</string>
     <string name="toast_leave_not_confirmed_history_kept">尚未确认退出。历史记录已保留。</string>
+    <string name="delete_local_does_not_leave">此操作不会退出对话。</string>
 </resources>

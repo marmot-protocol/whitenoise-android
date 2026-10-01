@@ -128,18 +128,19 @@ class ChatDeletionUxScreenshotTest {
             onSelect = {},
             onDelete = onLocal,
             onDismiss = {},
-            actions = ChatListRowActionsFfi(
-                canMarkRead = false,
-                canMarkUnread = false,
-                canPin = false,
-                canUnpin = false,
-                canMute = false,
-                canUnmute = false,
-                canArchive = false,
-                canRestore = false,
-                canStartLeave = canLeave,
-                canDeleteLocal = true,
-            ),
+            actions =
+                ChatListRowActionsFfi(
+                    canMarkRead = false,
+                    canMarkUnread = false,
+                    canPin = false,
+                    canUnpin = false,
+                    canMute = false,
+                    canUnmute = false,
+                    canArchive = false,
+                    canRestore = false,
+                    canStartLeave = canLeave,
+                    canDeleteLocal = true,
+                ),
             onLeaveAndDelete = onLeave,
         )
     }

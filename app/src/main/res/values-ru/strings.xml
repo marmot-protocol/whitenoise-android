@@ -2232,4 +2232,5 @@
     <string name="checking_invitation">Проверка приглашения…</string>
     <string name="couldnt_check_invitation">Не удалось проверить приглашение</string>
     <string name="toast_leave_not_confirmed_history_kept">Выход не подтверждён. История сохранена.</string>
+    <string name="delete_local_does_not_leave">Это не приводит к выходу из чата.</string>
 </resources>

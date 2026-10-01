@@ -4571,9 +4571,17 @@ class ChatsController private constructor(
     }
 
     /** Reject stale presentation and destructive session teardown before another departure step. */
-    private fun chatListDepartureIsCurrent(account: String, epoch: Long, runtime: Int): Boolean =
-        accountRef == account && isActiveBindEpoch(epoch) && appState.activeAccountRef == account &&
-            appState.runtimeGeneration == runtime && !appState.signOutInProgress && !appState.wipeInProgress
+    private fun chatListDepartureIsCurrent(
+        account: String,
+        epoch: Long,
+        runtime: Int,
+    ): Boolean =
+        accountRef == account &&
+            isActiveBindEpoch(epoch) &&
+            appState.activeAccountRef == account &&
+            appState.runtimeGeneration == runtime &&
+            !appState.signOutInProgress &&
+            !appState.wipeInProgress
 
     /** Confirm native departure before admitting cleanup; uncertainty always retains history. */
     private suspend fun finishChatListDeparture(
@@ -4586,29 +4594,30 @@ class ChatsController private constructor(
         val activeAccountIdHex = boundAccountIdHex()
         val soleMember = GroupProjector.shouldDissolveAsSoleMember(members, activeAccountIdHex)
         if (deleteAfterLeave && !soleMember) {
-                // A departed engine session can reject roster reads. The durable
-                // native row still records the confirmed leave without reopening MLS.
-                val departureRow = runCatchingCancellable {
+            // A departed engine session can reject roster reads. The durable
+            // native row still records the confirmed leave without reopening MLS.
+            val departureRow =
+                runCatchingCancellable {
                     appState.marmotIo { chatList(account, true) }.firstOrNull { it.groupIdHex == groupIdHex }
                 }.getOrNull()
-                if (!isCurrent()) return false
-                departureRow?.let { foldChatRow(it) }
-                if (departureRow?.selfMembership?.isNonMember() != true) {
-                    appState.presentTransient(R.string.toast_leave_not_confirmed_history_kept)
-                    return false
-                }
+            if (!isCurrent()) return false
+            departureRow?.let { foldChatRow(it) }
+            if (departureRow?.selfMembership?.isNonMember() != true) {
+                appState.presentTransient(R.string.toast_leave_not_confirmed_history_kept)
+                return false
             }
-            recordChatListDeparture(account, groupIdHex, activeAccountIdHex, members)
-            return if (deleteAfterLeave && !soleMember) {
-                deleteGroupLocalFromChatList(groupIdHex, failureMessage = R.string.toast_left_chat_delete_failed)
-            } else {
-                if (deleteAfterLeave) {
-                    removeChatRow(groupIdHex)
-                    finishRemovedChatRowClientState(groupIdHex)
-                }
-                appState.presentTransient(if (deleteAfterLeave) R.string.toast_chat_deleted_local else R.string.toast_left_chat)
-                true
+        }
+        recordChatListDeparture(account, groupIdHex, activeAccountIdHex, members)
+        return if (deleteAfterLeave && !soleMember) {
+            deleteGroupLocalFromChatList(groupIdHex, failureMessage = R.string.toast_left_chat_delete_failed)
+        } else {
+            if (deleteAfterLeave) {
+                removeChatRow(groupIdHex)
+                finishRemovedChatRowClientState(groupIdHex)
             }
+            appState.presentTransient(if (deleteAfterLeave) R.string.toast_chat_deleted_local else R.string.toast_left_chat)
+            true
+        }
     }
 
     /** Retire presentation snapshots only after the native departure settles on the current bind. */

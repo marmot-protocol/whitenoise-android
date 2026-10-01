@@ -2164,4 +2164,5 @@
     <string name="checking_invitation">A verificar o convite…</string>
     <string name="couldnt_check_invitation">Não foi possível verificar o convite</string>
     <string name="toast_leave_not_confirmed_history_kept">Saída não confirmada. Histórico mantido.</string>
+    <string name="delete_local_does_not_leave">Isso não sai da conversa.</string>
 </resources>

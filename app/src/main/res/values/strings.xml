@@ -2320,4 +2320,5 @@
     <string name="checking_invitation">Checking invitation…</string>
     <string name="couldnt_check_invitation">Couldn’t check invitation</string>
     <string name="toast_leave_not_confirmed_history_kept">Leave not confirmed. History kept.</string>
+    <string name="delete_local_does_not_leave">This does not leave the chat.</string>
 </resources>

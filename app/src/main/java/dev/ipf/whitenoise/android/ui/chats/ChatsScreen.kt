@@ -1279,7 +1279,8 @@ internal fun ChatsScreen(
     val anotherSheetVisible =
         actionSheetChatId != null ||
             folderHandoff.pickerChatIds != null ||
-            pendingBulkDelete != null
+            pendingBulkDelete != null ||
+            pendingLeaveAndDelete != null
     if (!anotherSheetVisible && !globalSearchPresentationState.filterSheetOpen) {
         diagnosticsPrompt()
     }
@@ -1526,7 +1527,9 @@ internal fun ChatsScreen(
                     ChatListSelectionControls(
                         count = selectedChatIds.size,
                         archiveAction = bulkArchiveAction,
-                        actionsEnabled = selectedChatIds.isNotEmpty(),
+                        actionsEnabled =
+                            selectedVisibleItems.isNotEmpty() &&
+                                selectedVisibleItems.none { it.group.groupIdHex in leavingAndDeleting },
                         allVisibleSelected = visibleChatIds.isNotEmpty() && selectedChatIds.containsAll(visibleChatIds),
                         showMarkRead =
                             singleSelectedItem?.effectiveHasUnread(appState.activeAccount?.accountIdHex) == true,
@@ -1551,6 +1554,9 @@ internal fun ChatsScreen(
                             archiveChats(selected, archive)
                         },
                         onDelete = {
+                            if (selectedVisibleItems.any { it.group.groupIdHex in leavingAndDeleting }) {
+                                return@ChatListSelectionControls
+                            }
                             pendingBulkDelete = selectedVisibleItems.takeIf { it.isNotEmpty() }
                         },
                         onAddToFolder = {
@@ -1921,8 +1927,10 @@ internal fun ChatsScreen(
                 if (!leavingAndDeleting.add(groupId)) return@ChatLeaveAndDeleteConfirmationDialog
                 appState.launchMutation {
                     try {
-                        if (appState.activeAccountRef != originAccount || appState.runtimeGeneration != originRuntime ||
-                            appState.signOutInProgress || appState.wipeInProgress
+                        if (appState.activeAccountRef != originAccount ||
+                            appState.runtimeGeneration != originRuntime ||
+                            appState.signOutInProgress ||
+                            appState.wipeInProgress
                         ) {
                             return@launchMutation
                         }
@@ -1941,6 +1949,7 @@ internal fun ChatsScreen(
             count = items.size,
             onConfirm = {
                 pendingBulkDelete = null
+                if (items.any { it.group.groupIdHex in leavingAndDeleting }) return@ChatDeleteConfirmationDialog
                 clearSelection()
                 appState.launchMutation {
                     var succeeded = 0

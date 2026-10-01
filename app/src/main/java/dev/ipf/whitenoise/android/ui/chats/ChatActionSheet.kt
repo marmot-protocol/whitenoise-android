@@ -155,7 +155,12 @@ internal fun ChatDeleteConfirmationDialog(
 ) {
     ConfirmDialog(
         title = stringResource(R.string.delete_from_device),
-        message = pluralStringResource(R.plurals.chat_list_bulk_delete_confirm, count, count),
+        message =
+            if (count == 1) {
+                stringResource(R.string.delete_local_does_not_leave)
+            } else {
+                pluralStringResource(R.plurals.chat_list_bulk_delete_confirm, count, count)
+            },
         confirmLabel = stringResource(R.string.delete_group_confirm),
         destructive = true,
         onConfirm = onConfirm,
