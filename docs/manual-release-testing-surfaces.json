@@ -9648,6 +9648,22 @@
         ]
       },
       {
+        "surface": "Dictation completion command avoids queued foreground repost",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
+        "anchor": "override fun onStartCommand(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "Connection service orders restoration after queued dictation controls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationStreamForegroundService.kt",
+        "anchor": "fun restoreIfForeground(context: Context)",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
         "surface": "string:dictation_notification_text",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
         "anchor": "R.string.dictation_notification_text",

@@ -300,9 +300,9 @@ class ConversationDictationForegroundServiceTest {
         lifecycle.destroy()
     }
 
-    /** A Cancel delivered as the first command still removes the notification it just promoted. */
+    /** A Cancel delivered as the first command never queues a foreground notification. */
     @Test
-    fun cancelDuringFirstStartRemovesPromotedNotificationImmediately() {
+    fun cancelDuringFirstStartNeverPromotesNotification() {
         val harness = installHost()
         val lifecycle = Robolectric.buildService(ConversationDictationForegroundService::class.java).create()
         val service = lifecycle.get()
@@ -314,7 +314,7 @@ class ConversationDictationForegroundServiceTest {
         )
 
         assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)
-        assertTrue(shadowOf(service as Service).isForegroundStopped)
+        assertNull(shadowOf(service as Service).lastForegroundNotification)
         assertTrue(service.getSystemService(NotificationManager::class.java).activeNotifications.isEmpty())
         lifecycle.destroy()
     }
