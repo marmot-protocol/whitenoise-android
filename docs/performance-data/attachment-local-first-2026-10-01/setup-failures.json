@@ -1,9 +1,0 @@
-{
-  "failure": "INSTALL_FAILED_INSUFFICIENT_STORAGE",
-  "device": "emulator-5554",
-  "in_place_update_failures": 2,
-  "primary_comparison_included": false,
-  "attempts": "Universal comparison stopped after candidate1/baseline4; arm64 comparison stopped after candidate1. Qualified partial HTTP reports are preserved in setup-partial, never pooled.",
-  "recovery": "New own API30 arm64 emulator-5556 with14GiB data partition. Existing emulator data preserved; no app uninstall/clear.",
-  "primary_zapstore_packaging": "arm64-v8a"
-}

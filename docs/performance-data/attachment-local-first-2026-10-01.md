@@ -1,81 +1,25 @@
 # Canonical local-before-network comparison — 2026-10-01
 
-Refs #2779, #2785 and #2909. Coordinated behavior draft is stacked on
-[fixture foundation #2978](https://github.com/marmot-protocol/whitenoise-android/pull/2978).
-The PR targets master to run the required Android CI matrix. Foundation #2978
-must land first; its inherited commits remain visible until then.
-The production change is restricted to resolving canonical MDK bytes before Android
-acquisition admission. Join/retry/promotion, outgoing retention, progress and
-platform-lifecycle implementation remain excluded pending their prerequisites.
+Refs #2779/#2785/#2909. Behavior draft #2980 depends on [foundation #2978](https://github.com/marmot-protocol/whitenoise-android/pull/2978), which must land first. Both target master for the required CI matrix. See the [baseline report](attachment-fixture-baseline-2026-10-01.md) for common fixture method, predeclared ceilings, host-only evidence and deferred native/device outcomes, and the single [archive manifest](attachment-evidence-manifest-2026-10-01.md) for original raw sessions, checks and failures.
 
-## What changed and what the comparison proves
+## Behavior and comparison method
 
-Previously an Android cache miss entered the shared acquisition gate before the
-native retained-source lookup. Three unrelated held downloads could delay a fully
-local read. The resolver now checks Android memory/disk and native canonical bytes
-before admitting a true miss. The native closeable lease remains caller-owned;
-post-load cancellation/failure closes it. Existing queued-tap promotion and all
-true-miss controls are preserved, including their unresolved native-contract risk.
+The resolver now checks canonical native retained bytes before Android acquisition admission. Previously an Android cache miss waited behind three unrelated held downloads before that lookup. The saturated-gate negative control fails on unchanged baseline source with the declared five-second deadlock guard; the candidate passes while all three permits remain held, with zero explicit demand/new producer calls. The baseline overlay was restored. This proves admission independence at the Android/native boundary, not a production five-second timing claim or HTTP throughput gain. Caller-owned native leases and true-miss controls remain unchanged.
 
-[The saturated-gate negative control](attachment-local-first-2026-10-01/saturated-gate-regression.json)
-runs the new regression against unchanged baseline production source: it fails with
-the declared five-second deadlock guard while all three unrelated permits are held.
-The candidate passes with those permits still held, zero explicit demands and no
-new producer call. The temporary test overlay was restored. This demonstrates
-admission independence in the Android/native-boundary fixture, not HTTP throughput
-or a five-second production timing claim.
+Each packaged-native session has one exact 1 KiB cold received read, ten reads with Android caches empty, then one native database reopen read under a 503 acquisition endpoint. The primary sequence is candidate1, baseline4, candidate2, baseline5, candidate3, baseline6 within each flavor. Foundation baseline1–3 calibrates budgets and is not pooled. API30 arm64: Play emulator-5554 / universal APK; Zapstore emulator-5556 (`wn_2779_fixture_api30`, Pixel 2, 2 GiB RAM, 14 GiB data) / arm64 APK. Each source within a flavor uses the same emulator/packaging, loopback owned adb mappings, no shaping, fresh private generated identities and an independent durable host ledger. Other builds were active. APK replacement was in place; personal-device apps/data untouched.
 
-The actual packaged-native emulator comparison uses the identical generated 1 KiB
-received TXT and cache-free retained reads from the foundation. Each session has
-one cold acquisition, ten canonical reads with both Android caches empty, and one
-native database close/reopen read. The endpoint rejects acquisition with HTTP 503
-after cold completion, without suppressing request counters. All twelve reads must
-match exact bytes. This is not app process restart, navigation, whole-device offline,
-protected worker lifetime or external file handoff qualification.
+Measured baseline source `4510a677cf1932657fc318866a516dc1e5b46271`; candidate source/test `8909bf418870cad7793a876545e4c288d35e15f0`. Both use MarmotKit 0.11.0 / MDK `946e0547485c9a2c393c2048ec3a968fd50fb441`, library archive SHA-256 `5ab8bf5f7723ed2c07d15a07c5691d05eb8a37354882020c0b69b952d6418923`. Rebase/doc updates preserve the measured production resolver blob `35a1770cd3d73594862b2146d1f1901bfe25f9c04713efc950d54b458e2e634b`; subsequent foundation probe wrapping only changes formatting. Archived per-flavor provenance retains measured probe digest and exact APK digests below.
 
-Baseline already avoids repeated HTTP once bytes are native-retained; the behavior
-change removes the Android gate dependency. There is no newly saved-request/byte
-claim. Cold timing does not demonstrate a phase-specific throughput improvement or
-reproduce the production complaint. #2785 and #2779 remain open.
+| Flavor / source | App APK SHA-256 | Instrumentation APK SHA-256 |
+| --- | --- | --- |
+| Play / baseline | `788a7263272d8904940696c4945185b0125f468dc5d2446d9457f596d81d51b6` | `626fc61f0d9ea5ecf1489e8b53a1510e0caf234f64274727e9eda77d1a90af42` |
+| Play / candidate | `283819d6222b16e00335e6279375091d3752251aa98179cbb803ca50605ac346` | `4b64d23225121807610a6f8031e2a8b989bccf4f029f19fe7f354d61d7c18e8f` |
+| Zapstore / baseline | `e42221b5320453da3fc7e85689d502d6b2fa68b96c615305f9ef97265d4821f1` | `680ea29531aca24a26b369ed7664099d4fb51a212c16bfe7a2e613b933a36566` |
+| Zapstore / candidate | `b3636867346492859690433fb2a1abed03e077763bd93d8d5c0adf72cc449a80` | `680ea29531aca24a26b369ed7664099d4fb51a212c16bfe7a2e613b933a36566` |
 
-## Provenance and predeclared acceptance
+Two `INSTALL_FAILED_INSUFFICIENT_STORAGE` attempts stopped Zapstore in-place replacement on emulator-5554. Three partial sessions (universal candidate/baseline and arm64 candidate) remain archived, excluded from primary results even though their HTTP assertions passed. Recovery created the new owned emulator without clearing/uninstalling any app. The archive also preserves the baseline-only saturated regression timeout.
 
-Baseline production commit: `4510a677cf1932657fc318866a516dc1e5b46271`.
-Candidate production/test commit: `8909bf418870cad7793a876545e4c288d35e15f0`.
-The final evidence commit changes documents only. Both use unchanged MarmotKit
-0.11.0 / MDK `946e0547485c9a2c393c2048ec3a968fd50fb441`; artifact pin and emulator
-context are in [foundation provenance](attachment-fixture-2026-10-01/provenance.json).
-Per-distribution [Play APK digests](attachment-local-first-2026-10-01/provenance-play.json)
-and [Zapstore APK digests](attachment-local-first-2026-10-01/provenance-zapstore.json)
-identify baseline/candidate app and instrumentation APKs. Test code is identical.
-Only fixture line wrapping changed in foundation `5792f1408` after those APKs
-were built. The final stacked completion gate passes the formatted probe; the
-production resolver blob remains unchanged since the measured candidate.
-Measurement package: `dev.ipf.whitenoise.android.medialatency`; API30 arm64: Play uses emulator-5554; Zapstore uses newly created
-emulator-5556 (`wn_2779_fixture_api30`, Pixel 2, 2 GiB RAM, 14 GiB data). Both sources
-within each flavor use the same emulator and APK packaging; Play is universal,
-Zapstore is arm64-only. The arm64 native library and artifact pin are unchanged.
-No personal-device package was changed. APK switching used in-place installation.
-
-Network: generated loopback relay/Blossom via owned adb reverse mappings; no shaping,
-production endpoint or metered/Wi-Fi equivalence claim. Each session has a fresh
-private generated fixture, and its durable server ledger survives native reopen.
-The primary comparison alternates candidate 1, baseline 4, candidate 2, baseline 5,
-candidate 3, baseline 6 within each distribution. The earlier foundation baseline 1–3
-calibrates the committed budgets; it is not pooled into this primary comparison.
-[Two storage-failed setup attempts](attachment-local-first-2026-10-01/setup-failures.json)
-stopped in-place replacement on emulator-5554. Their qualified partial HTTP reports
-remain in `setup-partial/`, excluded from the primary paired comparison. Recovery
-created a new emulator, without uninstalling/clearing any existing app.
-Raw ledger `at_ns` values preserve request timing/order. Other host builds were active.
-
-[Budgets committed before candidate measurements](attachment-fixture-baseline-2026-10-01.md#controlled-reference-budgets-fixed-before-candidate-measurement):
-exact bytes, exactly one GET/HEAD and 1,040 ciphertext bytes; zero additional
-acquisition/writes after cold completion; cold <= 1,500 ms, retained/reopen <= 150 ms,
-Java sampled peak <= 32 MiB and native <= 128 MiB in every measured phase. These are
-fixture-specific regression ceilings, not production latency/release targets.
-
-## Results
+## Android paired results
 
 | Flavor / source / phase | n | Median ms | p95 ms | Max ms | Java peak bytes | Native peak bytes |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -92,50 +36,16 @@ fixture-specific regression ceilings, not production latency/release targets.
 | Zapstore / candidate / Retained | 30 | 3.22 | 5.02 | 5.06 | 9579048 | 66109712 |
 | Zapstore / candidate / Native reopen | 3 | 3.74 | — | 5.38 | 11972776 | 104331840 |
 
-All twelve complete primary sessions pass the predeclared phase/memory ceilings.
-[Per-session budget checks](attachment-local-first-2026-10-01/budget-checks.json) link the raw evidence.
+All 12 primary sessions pass exact bytes and predeclared ceilings: each has 1 upload, 1 GET, 0 HEAD, 1040 uploaded/downloaded ciphertext bytes and completed GET; all 11 subsequent canonical reads add zero requests/bytes. The reusable foundation checker independently passes these archived samples. Native outgoing canonical availability is false throughout.
 
-Cold/reopen have three samples per variant/source: no p95. Retained has thirty
-observations per variant/source, with nearest-rank p95 and within-session
-correlation. Memory is the maximum 10 ms sampled absolute Java/native heap plus
-initial/final samples, not allocation deltas or guaranteed maxima. Elapsed time
-includes the sampler lifecycle. Ciphertext socket-write counts exclude HTTP
-headers/error JSON, TCP retransmissions and total link traffic.
+Cold/reopen n=3 per source/flavor: no p95. Retained n=30 with within-session correlation and nearest-rank p95. Memory is 10 ms sampled absolute Java/native heap plus initial/final samples; latency includes sampler lifecycle. Socket-write counts exclude headers/error JSON/TCP retransmits/link traffic.
 
-All twelve paired sessions preserve one upload, one GET, zero HEAD, exactly 1,040
-uploaded/downloaded ciphertext bytes and a complete GET. All eleven subsequent
-canonical reads add zero requests or ciphertext writes. Each genuine native sender
-retention query remains unavailable; received success does not qualify outgoing.
+**Baseline already avoided repeat transfers.** This change removes unnecessary gate waiting; it demonstrates neither newly saved bandwidth nor a phase-specific cold-throughput improvement. Native database reopen is not app process restart, whole-device offline, navigation or external handoff qualification.
 
-## Passing validation and qualification gaps
+## Validation and landing boundaries
 
-- 69 focused tests pass in each Play and Zapstore flavor: resolver, native chunks,
-  lease cleanup, cache races, saturated host gate and existing Open/APK/cancellation
-  consumers. Tests use an isolated 2 GiB worker. The initial stalled worker produced
-  no results and is not counted as PASS.
-- The baseline-only new saturated regression fails as expected; its candidate
-  counterparts pass. No baseline source fix or unrelated shared-worktree edit.
-- 13 fixture/relay/runner host contracts pass with real sockets and durable ledgers.
-- Shared fast gate passes both-flavor compilation, ktlint, detekt, Zapstore lint and
-  stacked fixture instrumentation compilation. Both isolated app/test variants
-  build; all twelve paired actual-emulator sessions pass the fixed budgets.
-- Manual guide validator and 33 tests pass; MED-009/MED-017 companion checks stay unchecked.
-- Hosted CI, substantive review, CodeRabbit actionable-thread resolution and its
-  required meaningful 80% docstring coverage confirmation remain pending. Foundation CodeRabbit reports its review limit reached; its SUCCESS
-  context is not a fresh substantive review or coverage confirmation. Draft status
-  does not establish landing readiness. Rendering is unchanged; Visual changes: none.
+The measured candidate passed 69 focused tests in each distribution (resolver/native chunks/leases/cache races/saturated host/Open/APK/cancellation), using 2 GiB workers. The negative control failed as expected; no baseline fix. Both measured APK/test variants built and 12 paired emulator sessions passed. Manual guide validator and 33 tests passed; MED-009/MED-017 companion acceptance remains unchecked. Reviewed-head hosted fixture jobs passed both distributions. Follow-up rebase/gate evidence belongs to the PR; new-head CI, substantive review and meaningful 80% CodeRabbit docstring confirmation remain required. Rate-limited SUCCESS is not review evidence. Visual changes: none.
 
-| Retained outcome | Disposition |
-| --- | --- |
-| Received canonical reads before Android admission | Implemented and qualified to the tests/fixture scope above |
-| Full received lifecycle, actual Open/Save/installer/device matrix and large incoming MDK sender | Deferred qualification; no process/offline/handoff/physical acceptance claim. Keep draft until any required landing gate passes |
-| Genuine outgoing canonical retention | Excluded; native probe unavailable, MDK #2135 OPEN; real Android send/restart/offline matrix required |
-| Join/promotion preserving retry budgets and tapped-file priority | Excluded until adopted MDK #2134 proves both together, including native storage budget assertions |
-| Timeout repair/cold throughput | No claim until #2936 or successor lands and phase-specific baseline/candidate qualification passes |
-| Cancellation cleanup | Datawav #2973 already merged into base and preserved; no new lifecycle change |
-| Truthful shared progress, lifecycle overlap, APK/forwarding ownership | No overlapping changes; Datawav coordination and applicable tests remain required |
-| Agent-sender | Danny #2106 untouched; no agent-specific changes/completion claim |
-| Production resume/native allocation redesign/unsupported large outgoing files | Deferred explicit outcomes; no host-only substitution |
+Production code, fixtures and existing regression tests are unchanged by this report compaction. Genuine outgoing retention stays blocked on [MDK #2135](https://github.com/marmot-protocol/mdk/issues/2135); join/promotion stays held on [MDK #2134](https://github.com/marmot-protocol/mdk/issues/2134) until adopted retry budgets and tapped-file priority are preserved together. Both prerequisites are now owned by `mubarakcoded`. Android #2936 remains open; Datawav #2973 is already included. Datawav ownership is preserved and Danny's MDK #2106 is untouched.
 
-Full-plan completion remains pending. Only this independent slice is implemented;
-there is no dormant dependent code, issue closure, merge or release authorization.
+Full lifecycle/offline/device/Open/Save/installer/large native-file qualification, genuine outgoing controller retention, protected-worker behavior, shared progress and production resume remain deferred as described in the baseline. Keep drafts until all required landing gates pass. No issue closure, merge or release; full attachment reliability work remains unfinished.
