@@ -67,6 +67,7 @@
     <string name="error_loaded_content_may_be_out_of_date">Загруженные данные по-прежнему доступны, но могли устареть. Повторная попытка…</string>
     <string name="error_loaded_content_kept">Не удалось загрузить дополнительные данные. Ваши сообщения по-прежнему доступны; повторите попытку, когда будете готовы.</string>
     <string name="error_conversation_membership_unavailable">Не удалось проверить участников этой переписки. Повторите попытку, чтобы показать сообщения.</string>
+    <string name="error_conversation_membership_inconsistent">Список участников этой переписки не совпадает с этим аккаунтом, поэтому сообщения скрыты. Повторите попытку, чтобы проверить снова.</string>
     <string name="refresh">Обновить дамп</string>
     <string name="retry">Повторить</string>
     <string name="creating_identity_title">Создание идентичности</string>

@@ -150,6 +150,7 @@ import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
 import dev.ipf.whitenoise.android.state.returnToLatestWindow
 import dev.ipf.whitenoise.android.state.setUserBlocked
 import dev.ipf.whitenoise.android.state.transcriptPresentationNeedsRetry
+import dev.ipf.whitenoise.android.state.transcriptRosterError
 import dev.ipf.whitenoise.android.state.unreadCountDivergenceReport
 import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
 import dev.ipf.whitenoise.android.ui.MentionDetectionCache
@@ -307,12 +308,6 @@ private val InitialTimelineBackfillNoProgressError =
         report =
             "Operation: CONVERSATION_INITIAL_BACKFILL_NO_PROGRESS\n" +
                 "No backward timeline progress was observed.",
-    )
-
-private val InitialTranscriptRosterError =
-    ErrorPresentation(
-        message = AppText.Resource(R.string.error_conversation_membership_unavailable),
-        report = "Operation: CONVERSATION_TRANSCRIPT_ROSTER\nAccount-owned membership could not be verified.",
     )
 
 /** Remembers navigation state per controller and cancels all controller-owned jobs on disposal. */
@@ -3937,7 +3932,7 @@ internal fun ConversationScreen(
                         )
                     transcriptPresentationNeedsRetry ->
                         ConversationLoadErrorContent(
-                            error = InitialTranscriptRosterError,
+                            error = controller.rosterBlockReason.transcriptRosterError(),
                             onRetry = { scope.launch { controller.retryMembers() } },
                         )
                     renderedTimeline.isEmpty() &&

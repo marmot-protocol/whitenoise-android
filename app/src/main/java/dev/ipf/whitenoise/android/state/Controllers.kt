@@ -5707,7 +5707,6 @@ private const val LIVE_TIMELINE_WINDOW_CAP = 200
 // One frame: long enough to collapse a chat-list sync burst into a single
 // recompute, short enough to stay imperceptible.
 private const val CHAT_LIST_RECOMPUTE_DEBOUNCE_MS = 16L
-private const val GROUP_HYDRATION_RETRY_DELAY_MS = 750L
 private const val MAX_CHAT_LIST_ACTIVITY_SEQUENCE_HISTORY = 64
 private const val CHAT_LIST_AVATAR_WARM_ROWS = 24
 
@@ -6152,6 +6151,10 @@ class ConversationController(
 
     internal val memberRosterState: GroupRosterLoadState
         get() = memberRosterLoadTracker.state
+
+    /** The settled branch that left the roster unverified, cleared by the next verified roster. */
+    internal var rosterBlockReason by mutableStateOf<GroupRosterBlockReason?>(null)
+        private set
 
     private val memberRosterRefreshGeneration = StalenessGuard()
 
@@ -12945,22 +12948,30 @@ class ConversationController(
             memberRosterRefreshGeneration.isCurrent(generation) &&
             appState.runtimeGeneration == runtimeGeneration
 
-    /** Publishes the latest authoritative roster while rejecting older refresh completions. */
+    /**
+     * Publishes the latest authoritative roster while rejecting older refresh completions.
+     * [automaticRetryAttempt] counts the bounded re-reads already spent by this chain (#2861).
+     */
     private suspend fun refreshMembers(
-        retryOnPendingRead: Boolean = true,
+        automaticRetryAttempt: Int = 0,
         prefetchedRoster: Deferred<Result<GroupRosterFfi>>? = null,
     ) {
         val account = conversationAccountRef ?: return
         val generation = beginMemberRosterRefresh() ?: return
         val runtimeGeneration = appState.runtimeGeneration
+        val recoveringFromBlock = automaticRetryAttempt > 0 || rosterBlockReason != null
         if (inviteAcceptanceResolutionPending) inviteAcceptanceResolutionState = GroupRosterLoadState.LOADING
         memberRosterLoadTracker.transition(GroupRosterRefreshEvent.STARTED)
         try {
             runCatchingCancellable {
                 readAndApplyMembers(account, generation, runtimeGeneration, prefetchedRoster)
+            }.onSuccess {
+                if (recoveringFromBlock && memberRosterState == GroupRosterLoadState.READY) {
+                    logRosterRead("recovered", kind = null, attempt = automaticRetryAttempt)
+                }
             }.onFailure { failure ->
                 if (ownsCurrentMemberRead(generation, runtimeGeneration)) {
-                    handleMemberReadFailure(account, generation, runtimeGeneration, failure, retryOnPendingRead)
+                    handleMemberReadFailure(account, generation, runtimeGeneration, failure, automaticRetryAttempt)
                 }
             }
         } catch (cancel: CancellationException) {
@@ -13000,22 +13011,30 @@ class ConversationController(
         }
     }
 
-    /** Retry one fresh read after hydration or supersession, then expose the existing Retry state. */
+    /**
+     * Re-reads a retryable failure with bounded backoff while the read is still owned, then
+     * exposes manual Retry. An account switch, newer read, disposal or runtime change wins.
+     */
     private suspend fun handleMemberReadFailure(
         account: String,
         generation: Long,
         runtimeGeneration: Int,
         failure: Throwable,
-        retryOnPendingRead: Boolean,
+        attempt: Int,
     ) {
-        val hydrationPending = failure is MarmotKitException.GroupHydrationPending
-        val superseded = failure is SupersededGroupRosterRead
-        if (superseded && !group.acceptsInviteResults()) return
-        if (retryOnPendingRead && (hydrationPending || superseded)) {
-            if (hydrationPending) delay(GROUP_HYDRATION_RETRY_DELAY_MS)
-            if (ownsCurrentMemberRead(generation, runtimeGeneration)) refreshMembers(retryOnPendingRead = false)
+        val kind = classifyGroupRosterReadFailure(failure)
+        if (kind == GroupRosterReadFailureKind.SUPERSEDED && !group.acceptsInviteResults()) return
+        val retryDelay =
+            groupRosterReadRetryDelayMs(kind, attempt, transcriptBlocked = !hasKnownTranscriptPresentation)
+                .takeUnless { failure.isUseAfterEviction() }
+        if (retryDelay != null) {
+            logRosterRead("retry", kind, attempt)
+            if (retryDelay > 0L) delay(retryDelay)
+            if (ownsCurrentMemberRead(generation, runtimeGeneration)) {
+                refreshMembers(automaticRetryAttempt = attempt + 1)
+            }
         } else {
-            settleMemberReadFailure(account, generation, runtimeGeneration, failure)
+            settleMemberReadFailure(account, generation, runtimeGeneration, failure, attempt)
         }
     }
 
@@ -13025,17 +13044,42 @@ class ConversationController(
         generation: Long,
         runtimeGeneration: Int,
         failure: Throwable,
+        attempt: Int,
     ) {
         memberRosterRefreshGeneration.runIfCurrent(generation) {
             if (!ownsCurrentMemberRead(generation, runtimeGeneration)) return@runIfCurrent
             if (failure.isUseAfterEviction()) {
                 markActiveAccountRemovedFromMembers(account)
             } else {
+                val kind = classifyGroupRosterReadFailure(failure)
                 memberRosterLoadTracker.transition(GroupRosterRefreshEvent.FAILED)
+                if (memberRosterState == GroupRosterLoadState.FAILED) {
+                    rosterBlockReason = GroupRosterBlockReason.ReadFailed(kind, attempts = attempt + 1)
+                }
                 if (inviteAcceptanceResolutionPending) inviteAcceptanceResolutionState = GroupRosterLoadState.FAILED
+                logRosterRead("failed", kind, attempt)
                 if (BuildConfig.DEBUG) Log.w("DMConversation", "refresh members failed", failure)
             }
         }
+    }
+
+    /** Logs a roster read branch with gate facts only, never account, group or member IDs. */
+    private fun logRosterRead(
+        event: String,
+        kind: GroupRosterReadFailureKind?,
+        attempt: Int,
+    ) {
+        Log.w(
+            "DMConversation",
+            groupRosterReadDiagnostic(
+                event = event,
+                kind = kind,
+                attempt = attempt,
+                transcriptBlocked = !hasKnownTranscriptPresentation,
+                initialSnapshot = initialMemberSnapshot != null,
+                targetAccountActive = conversationAccountRef == appState.activeAccountRef,
+            ),
+        )
     }
 
     /** Applies the engine's eviction proof and invalidates any in-flight group mutation result. */
@@ -13059,6 +13103,7 @@ class ConversationController(
         inviteAcceptanceAwaitingAuthority = null
         inviteConfirmationUnresolved = false
         memberRosterLoadTracker.transition(GroupRosterRefreshEvent.SUCCEEDED)
+        rosterBlockReason = null
         // UseAfterEviction is the engine's authoritative signal that this
         // conversation can no longer accept composer writes. Invalidate an
         // in-flight immutable dictation target before any late provider result
@@ -13116,6 +13161,7 @@ class ConversationController(
         )
     }
 
+    /** Applies a verified roster, or records the failed invariant that keeps the transcript gated. */
     private fun applyResolvedGroupRoster(
         account: String,
         resolution: GroupRosterResolution,
@@ -13126,6 +13172,7 @@ class ConversationController(
         val previousGroup = group
         resolution.invariant?.let { invariant ->
             memberRosterLoadTracker.transition(GroupRosterRefreshEvent.INCONSISTENT)
+            rosterBlockReason = GroupRosterBlockReason.Inconsistent(invariant)
             logGroupRosterInvariant(
                 resolution = resolution,
                 invariant = invariant,
@@ -13170,6 +13217,7 @@ class ConversationController(
         inviteAcceptanceAwaitingAuthority = null
         if (!inviteAcceptanceResolutionPending) inviteAcceptanceResolutionState = GroupRosterLoadState.READY
         memberRosterLoadTracker.transition(GroupRosterRefreshEvent.SUCCEEDED)
+        rosterBlockReason = null
         cacheAppliedGroupMembers(appState, account, group.groupIdHex, members)
         return AppliedGroupDetails(group = group, members = members)
     }

@@ -281,6 +281,7 @@
     <string name="leave">Leave</string>
     <string name="couldnt_load_conversation">Couldn\'t load conversation</string>
     <string name="error_conversation_membership_unavailable">Couldn\'t verify this conversation\'s members. Retry to show your messages.</string>
+    <string name="error_conversation_membership_inconsistent">This conversation\'s member list didn\'t match this account, so its messages stay hidden. Retry to check again.</string>
     <string name="no_messages_yet">No messages yet</string>
     <string name="wave_hi">Wave hi</string>
     <string name="conversation_empty_disappearing_title">No messages to show</string>
