@@ -23,6 +23,35 @@ internal const val HISTORY_SEARCH_MAX_PAGES = 1_000
 internal const val HISTORY_SEARCH_DEBOUNCE_MILLIS = 350L
 
 /**
+ * Whether the in-chat match set is authoritative (#2873): still loading the
+ * full local history, complete, or limited to the loaded window after a
+ * failed scan. Only a complete or explicitly loaded-only set may be stepped.
+ */
+internal enum class ConversationSearchScanStatus {
+    IDLE,
+    LOADING,
+    COMPLETE,
+    FAILED,
+}
+
+/** Derives the scan status from the query and the scan outcome published for it. */
+internal fun conversationSearchScanStatus(
+    query: String,
+    scanMatches: List<ConversationSearchMatch>?,
+    scanFailed: Boolean,
+): ConversationSearchScanStatus =
+    when {
+        query.isBlank() -> ConversationSearchScanStatus.IDLE
+        scanMatches != null -> ConversationSearchScanStatus.COMPLETE
+        scanFailed -> ConversationSearchScanStatus.FAILED
+        else -> ConversationSearchScanStatus.LOADING
+    }
+
+/** Arrows never step a partial set while the full-history scan is still loading. */
+internal fun ConversationSearchScanStatus.allowsSearchSteps(matchCount: Int): Boolean =
+    matchCount > 0 && (this == ConversationSearchScanStatus.COMPLETE || this == ConversationSearchScanStatus.FAILED)
+
+/**
  * Exhaustively searches the conversation's locally stored history for [query]
  * and returns matching message ids oldest-first (the in-chat match list's
  * timeline order). Local-only: the engine query narrows to rows whose stored

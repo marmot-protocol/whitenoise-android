@@ -1295,6 +1295,10 @@
     <string name="conversation_search_next">Risultato successivo</string>
     <string name="conversation_search_match_count">%1$d/%2$d</string>
     <string name="conversation_search_no_matches">Nessun risultato</string>
+    <string name="conversation_search_loading">Ricerca in tutti i messaggi…</string>
+    <string name="conversation_search_incomplete">Impossibile cercare nei messaggi meno recenti</string>
+    <string name="conversation_search_match_count_loaded_only">%1$d/%2$d nei messaggi caricati</string>
+    <string name="conversation_search_retry">Riprova la ricerca</string>
     <string name="message_read_more">Leggi tutto</string>
     <string name="message_react">Reagisci</string>
     <string name="sign_out">Esci</string>

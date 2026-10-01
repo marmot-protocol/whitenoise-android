@@ -70,9 +70,10 @@ internal fun ConversationBottomBar(
     searchOpen: Boolean,
     searchMatchCount: Int,
     searchActiveIndex: Int,
-    hasSearchQuery: Boolean,
+    searchScanStatus: ConversationSearchScanStatus,
     onPreviousSearchMatch: () -> Unit,
     onNextSearchMatch: () -> Unit,
+    onRetrySearchScan: () -> Unit,
     hasError: Boolean,
     composerGate: ComposerGate,
     blockedDmUnblockInFlight: Boolean = false,
@@ -157,9 +158,10 @@ internal fun ConversationBottomBar(
                 ConversationSearchNavBar(
                     matchCount = searchMatchCount,
                     activeIndex = searchActiveIndex,
-                    hasQuery = hasSearchQuery,
+                    status = searchScanStatus,
                     onPrev = onPreviousSearchMatch,
                     onNext = onNextSearchMatch,
+                    onRetryScan = onRetrySearchScan,
                 )
             hasError -> Unit
             else ->

@@ -278,6 +278,10 @@
     <!-- Match position indicator, e.g. "2/7" (current/total). -->
     <string name="conversation_search_match_count">%1$d/%2$d</string>
     <string name="conversation_search_no_matches">No matches</string>
+    <string name="conversation_search_loading">Searching all messages…</string>
+    <string name="conversation_search_incomplete">Couldn\'t search older messages</string>
+    <string name="conversation_search_match_count_loaded_only">%1$d/%2$d in loaded messages</string>
+    <string name="conversation_search_retry">Retry search</string>
     <string name="leave">Leave</string>
     <string name="couldnt_load_conversation">Couldn\'t load conversation</string>
     <string name="error_conversation_membership_unavailable">Couldn\'t verify this conversation\'s members. Retry to show your messages.</string>

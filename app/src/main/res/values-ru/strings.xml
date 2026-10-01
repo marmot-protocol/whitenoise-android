@@ -1347,6 +1347,10 @@
     <string name="conversation_search_next">Следующее совпадение</string>
     <string name="conversation_search_match_count">%1$d/%2$d</string>
     <string name="conversation_search_no_matches">Совпадений нет</string>
+    <string name="conversation_search_loading">Поиск по всем сообщениям…</string>
+    <string name="conversation_search_incomplete">Не удалось выполнить поиск по более старым сообщениям</string>
+    <string name="conversation_search_match_count_loaded_only">%1$d/%2$d в загруженных сообщениях</string>
+    <string name="conversation_search_retry">Повторить поиск</string>
     <string name="message_read_more">Читать далее</string>
     <string name="message_react">Отреагировать</string>
     <string name="sign_out">Выйти</string>

@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -56,6 +57,8 @@ import dev.ipf.whitenoise.android.ui.account.OtherAccountAvatarsRow
 import dev.ipf.whitenoise.android.ui.account.rememberQuickAccountSwitchNotice
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
+import dev.ipf.whitenoise.android.ui.conversation.ConversationSearchScanStatus
+import dev.ipf.whitenoise.android.ui.conversation.allowsSearchSteps
 import dev.ipf.whitenoise.android.ui.profile.AddIdentitySheet
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import dev.ipf.whitenoise.android.ui.updates.AppUpdateIconButton
@@ -380,17 +383,20 @@ internal fun ConversationSearchTopBar(
  * open: a centered result count with previous/next steppers on the trailing
  * edge. Lives in the conversation `bottomBar` slot in place of the composer,
  * mirroring the composer's `navigationBarsPadding().imePadding()` so it rides
- * up with the soft keyboard rather than hiding behind it.
+ * up with the soft keyboard rather than hiding behind it. While the full-history
+ * scan loads the arrows stay disabled and no partial count is shown; a failed
+ * scan labels the count as loaded-only and offers a retry (#2873).
  */
 @Composable
 internal fun ConversationSearchNavBar(
     matchCount: Int,
     activeIndex: Int,
-    hasQuery: Boolean,
+    status: ConversationSearchScanStatus,
     onPrev: () -> Unit,
     onNext: () -> Unit,
+    onRetryScan: () -> Unit,
 ) {
-    val navEnabled = matchCount > 0
+    val navEnabled = status.allowsSearchSteps(matchCount)
     Surface(
         border = amoledSurfaceBorderStroke(),
         tonalElevation = 3.dp,
@@ -405,22 +411,20 @@ internal fun ConversationSearchNavBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text =
-                    when {
-                        !hasQuery -> ""
-                        matchCount > 0 ->
-                            stringResource(
-                                R.string.conversation_search_match_count,
-                                activeIndex + 1,
-                                matchCount,
-                            )
-                        else -> stringResource(R.string.conversation_search_no_matches)
-                    },
+                text = conversationSearchStatusText(status, matchCount, activeIndex),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).testTag("conversation.search.status"),
             )
+            if (status == ConversationSearchScanStatus.FAILED) {
+                IconButton(onClick = onRetryScan) {
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription = stringResource(R.string.conversation_search_retry),
+                    )
+                }
+            }
             IconButton(onClick = onPrev, enabled = navEnabled) {
                 Icon(
                     Icons.Default.KeyboardArrowUp,
@@ -436,6 +440,30 @@ internal fun ConversationSearchNavBar(
         }
     }
 }
+
+/** Labels the match set honestly: no count while loading, a loaded-only count after a failed scan. */
+@Composable
+private fun conversationSearchStatusText(
+    status: ConversationSearchScanStatus,
+    matchCount: Int,
+    activeIndex: Int,
+): String =
+    when (status) {
+        ConversationSearchScanStatus.IDLE -> ""
+        ConversationSearchScanStatus.LOADING -> stringResource(R.string.conversation_search_loading)
+        ConversationSearchScanStatus.COMPLETE ->
+            if (matchCount > 0) {
+                stringResource(R.string.conversation_search_match_count, activeIndex + 1, matchCount)
+            } else {
+                stringResource(R.string.conversation_search_no_matches)
+            }
+        ConversationSearchScanStatus.FAILED ->
+            if (matchCount > 0) {
+                stringResource(R.string.conversation_search_match_count_loaded_only, activeIndex + 1, matchCount)
+            } else {
+                stringResource(R.string.conversation_search_incomplete)
+            }
+    }
 
 /** Keeps native caller state stable while the visual row follows the shared folder-pill composition. */
 @Suppress("LongParameterList", "FunctionNaming")

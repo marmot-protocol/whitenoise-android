@@ -1271,6 +1271,10 @@
     <string name="conversation_search_next">下一個符合項目</string>
     <string name="conversation_search_match_count">%1$d/%2$d</string>
     <string name="conversation_search_no_matches">無符合項目</string>
+    <string name="conversation_search_loading">正在搜尋所有訊息…</string>
+    <string name="conversation_search_incomplete">無法搜尋較早的訊息</string>
+    <string name="conversation_search_match_count_loaded_only">已載入訊息中的 %1$d/%2$d</string>
+    <string name="conversation_search_retry">重試搜尋</string>
     <string name="message_read_more">閱讀更多</string>
     <string name="message_react">回應</string>
     <string name="sign_out">登出</string>
