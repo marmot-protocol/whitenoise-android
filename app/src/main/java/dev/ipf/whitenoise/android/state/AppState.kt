@@ -8042,6 +8042,9 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Reuses the live native client for a retention preflight when one already exists. */
+    internal fun retentionSweepRuntimeOrNull(): MarmotInterface? = marmotRuntime?.marmot
+
     /**
      * Background disappearing-message sweep across every signed-in account
      * (#745). The in-conversation sweep ([ConversationController.start]) only
@@ -8060,8 +8063,9 @@ class WhiteNoiseAppState private constructor(
      *
      * Best-effort and per-account isolated: a failure on one account is
      * logged (cancellation re-thrown) and the sweep moves on, so one bad
-     * account can't starve the rest. Bootstraps the runtime first so the
-     * worker can run after a process death with no UI attached.
+     * account can't starve the rest. The worker first checks MDK's account
+     * inventory without starting the notification runtime; eligible accounts
+     * still bootstrap after process death with no UI attached.
      */
     suspend fun sweepExpiredDisappearingMessages() {
         ensureNotificationRuntimeStarted()

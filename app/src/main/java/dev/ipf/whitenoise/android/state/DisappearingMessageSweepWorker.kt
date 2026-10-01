@@ -8,58 +8,79 @@ import androidx.work.Operation
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
+import dev.ipf.whitenoise.android.core.MarmotClient
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
-/**
- * Periodic background sweep that prunes expired disappearing messages for the
- * user's *closed* conversations (#745).
- *
- * The in-conversation sweep only runs while a chat is open, so a message that
- * expires while its conversation is closed lingers — its decrypted L2 media
- * isn't secure-deleted and a stale tray card can keep pointing at it — until
- * the user reopens that chat. This worker closes that gap: WorkManager runs it
- * on a coarse cadence independent of any open conversation (and survives
- * process death / device reboot), and it delegates the actual work to
- * [WhiteNoiseAppState.sweepExpiredDisappearingMessages], which runs the
- * engine-owned account sweep and applies the Android-owned consequences per
- * pruned group.
- *
- * The cadence is intentionally coarse ([SWEEP_INTERVAL_HOURS]) so the sweep
- * never becomes a hot loop or a battery drain — the engine owns the precise
- * expiry decision; Android only needs to nudge it periodically. WorkManager's
- * own minimum periodic interval (15 minutes) further guards against a hot loop.
- */
+/** Test seam for the existing account sweep. */
 internal typealias PerformDisappearingMessageSweep = suspend (WhiteNoiseApplication) -> Unit
 
+/** Test seam for the authoritative account preflight. */
+internal typealias HasRetentionSweepAccount = suspend (WhiteNoiseApplication) -> Boolean
+
+/** Only an authoritative, locally signed-in signing identity needs an expiry sweep. */
+internal fun needsRetentionSweep(rows: List<AccountSummaryFfi>): Boolean = rows.any { it.isSignedInSigningAccount() }
+
+/**
+ * Reads MDK's account inventory before starting its notification and relay runtime. Reuse an
+ * already-open client when the app is active; a cold worker opens a temporary unstarted client
+ * and closes it before returning. A failed read propagates so WorkManager retries instead of
+ * mistaking an unknown account set for an empty one.
+ */
+internal suspend fun needsRetentionSweep(app: WhiteNoiseApplication): Boolean {
+    val existing = app.initializedAppState()?.retentionSweepRuntimeOrNull()
+    return withContext(Dispatchers.IO) {
+        if (existing != null) return@withContext needsRetentionSweep(existing.listAccounts())
+        val temporary = MarmotClient(app.applicationContext).marmot
+        try {
+            needsRetentionSweep(temporary.listAccounts())
+        } finally {
+            withContext(NonCancellable) { temporary.shutdownAndClose() }
+        }
+    }
+}
+
+/**
+ * Periodic background sweep for expired messages in closed conversations (#745).
+ * A cold worker checks MDK's account inventory before starting notification or relay work,
+ * then delegates eligible accounts to [WhiteNoiseAppState.sweepExpiredDisappearingMessages].
+ * WorkManager's hourly schedule survives process death and reboot.
+ */
 class DisappearingMessageSweepWorker : CoroutineWorker {
     private val sweepOverride: PerformDisappearingMessageSweep?
+    private val accountOverride: HasRetentionSweepAccount?
 
     constructor(
         appContext: Context,
         params: WorkerParameters,
-    ) : this(appContext, params, null)
+    ) : this(appContext, params, null, null)
 
     internal constructor(
         appContext: Context,
         params: WorkerParameters,
         sweepOverride: PerformDisappearingMessageSweep?,
+        accountOverride: HasRetentionSweepAccount? = null,
     ) : super(appContext, params) {
         this.sweepOverride = sweepOverride
+        this.accountOverride = accountOverride
     }
 
     override suspend fun doWork(): Result {
         val app = applicationContext as? WhiteNoiseApplication ?: return Result.success()
         return runCatching {
             withContext(Dispatchers.Main.immediate) {
-                val override = sweepOverride
-                if (override != null) {
-                    override(app)
-                } else {
-                    app.appState.sweepExpiredDisappearingMessages()
+                if ((accountOverride ?: ::needsRetentionSweep)(app)) {
+                    val override = sweepOverride
+                    if (override != null) {
+                        override(app)
+                    } else {
+                        app.appState.sweepExpiredDisappearingMessages()
+                    }
                 }
             }
             Result.success()

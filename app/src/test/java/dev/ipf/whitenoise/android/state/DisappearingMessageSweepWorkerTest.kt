@@ -9,9 +9,11 @@ import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
+import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -21,6 +23,7 @@ import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
 
 private typealias SweepOverride = PerformDisappearingMessageSweep
+private typealias AccountOverride = HasRetentionSweepAccount
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], application = WhiteNoiseApplication::class)
@@ -41,6 +44,74 @@ class DisappearingMessageSweepWorkerTest {
             val worker = buildWorkerWithSweepOverride(sweepOverride = { })
 
             assertEquals(Result.success(), worker.doWork())
+        }
+
+    @Test
+    fun emptyColdProcessSkipsRuntimeAndSweep() =
+        runTest {
+            var sweepCalls = 0
+            val worker =
+                buildWorkerWithSweepOverride(
+                    sweepOverride = { sweepCalls++ },
+                    accountOverride = { needsRetentionSweep(emptyList()) },
+                )
+
+            assertNull(application.initializedAppState())
+            assertEquals(Result.success(), worker.doWork())
+            assertEquals(0, sweepCalls)
+            assertNull(application.initializedAppState())
+        }
+
+    @Test
+    fun signedOutAndNonSigningAccountsSkipSweep() =
+        runTest {
+            var sweepCalls = 0
+            val worker =
+                buildWorkerWithSweepOverride(
+                    sweepOverride = { sweepCalls++ },
+                    accountOverride = {
+                        needsRetentionSweep(
+                            listOf(
+                                account(signedOut = true),
+                                account(label = "read-only", localSigning = false),
+                            ),
+                        )
+                    },
+                )
+
+            assertEquals(Result.success(), worker.doWork())
+            assertEquals(0, sweepCalls)
+        }
+
+    @Test
+    fun eligibleAccountRunsSweepAfterPreflight() =
+        runTest {
+            val calls = mutableListOf<String>()
+            val worker =
+                buildWorkerWithSweepOverride(
+                    sweepOverride = { calls += "sweep" },
+                    accountOverride = {
+                        calls += "read"
+                        needsRetentionSweep(listOf(account(localSigning = false, externalSigning = true)))
+                    },
+                )
+
+            assertEquals(Result.success(), worker.doWork())
+            assertEquals(listOf("read", "sweep"), calls)
+        }
+
+    @Test
+    fun uncertainEligibilityRetriesWithoutStartingSweep() =
+        runTest {
+            var sweepCalls = 0
+            val worker =
+                buildWorkerWithSweepOverride(
+                    sweepOverride = { sweepCalls++ },
+                    accountOverride = { throw IOException("account store unavailable") },
+                )
+
+            assertEquals(Result.retry(), worker.doWork())
+            assertEquals(0, sweepCalls)
         }
 
     @Test
@@ -86,13 +157,34 @@ class DisappearingMessageSweepWorkerTest {
             assertEquals(Result.success(), worker.doWork())
         }
 
-    private fun buildWorkerWithSweepOverride(sweepOverride: SweepOverride): DisappearingMessageSweepWorker =
+    private fun account(
+        label: String = "alice",
+        localSigning: Boolean = true,
+        externalSigning: Boolean = false,
+        signedOut: Boolean = false,
+    ): AccountSummaryFfi =
+        AccountSummaryFfi(
+            label = label,
+            accountIdHex = "hex-$label",
+            localSigning = localSigning,
+            externalSigning = externalSigning,
+            signedOut = signedOut,
+            running = !signedOut,
+        )
+
+    private fun buildWorkerWithSweepOverride(
+        sweepOverride: SweepOverride,
+        accountOverride: AccountOverride = { true },
+    ): DisappearingMessageSweepWorker =
         TestListenableWorkerBuilder
             .from<DisappearingMessageSweepWorker>(appContext, DisappearingMessageSweepWorker::class.java)
-            .setWorkerFactory(sweepWorkerFactory(sweepOverride))
+            .setWorkerFactory(sweepWorkerFactory(sweepOverride, accountOverride))
             .build()
 
-    private fun sweepWorkerFactory(sweepOverride: SweepOverride): WorkerFactory =
+    private fun sweepWorkerFactory(
+        sweepOverride: SweepOverride,
+        accountOverride: AccountOverride,
+    ): WorkerFactory =
         object : WorkerFactory() {
             override fun createWorker(
                 appContext: Context,
@@ -100,7 +192,7 @@ class DisappearingMessageSweepWorkerTest {
                 workerParameters: WorkerParameters,
             ): ListenableWorker? {
                 if (workerClassName != DisappearingMessageSweepWorker::class.java.name) return null
-                return DisappearingMessageSweepWorker(appContext, workerParameters, sweepOverride)
+                return DisappearingMessageSweepWorker(appContext, workerParameters, sweepOverride, accountOverride)
             }
         }
 
