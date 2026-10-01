@@ -539,6 +539,7 @@
     <string name="performance_logs">Performans günlükleri</string>
     <string name="performance_logs_description">Gizliliği koruyan zamanlama olaylarını bu cihazda geçici olarak toplar. 30 dakika sonra veya uygulama yeniden başlatıldığında durur.</string>
     <string name="performance_logs_active">Etkin · %1$d dk kaldı</string>
+    <string name="performance_logs_export_included">Bu oturum, bir sonraki kayıtlı tanılama günlükleri dışa aktarımına eklenecek.</string>
     <string name="performance_logs_inactive">Etkin değil</string>
     <string name="copy_performance_logs">Performans günlüklerini kopyala</string>
     <string name="copy_performance_logs_detail">Geçerli veya en son oturumdaki sınırlı, gizliliği koruyan olayları kopyalar.</string>
@@ -1031,6 +1032,15 @@
     <string name="share_user_view">Profili görüntüle</string>
     <string name="attach_options">Ek ekle</string>
     <string name="media_preview_position_badge">Gönderim sırası %1$d</string>
+    <string name="contact_view">Kişiyi görüntüle</string>
+    <string name="contact_add">Kişilere ekle</string>
+    <string name="contact_save_vcf">VCF kaydet</string>
+    <string name="contact_view_short">Gör</string>
+    <string name="contact_add_short">Ekle</string>
+    <string name="contact_save_short">Kaydet</string>
+    <string name="contact_invalid_vcard">Bu kişi dosyası geçersiz veya çok büyük</string>
+    <string name="contact_action_failed">Kişi işlemi tamamlanamadı</string>
+    <string name="contact_vcf_saved">VCF kaydedildi</string>
     <string name="share_contact_title">Kişiyi paylaş</string>
     <string name="share_location_title">Konumu paylaş</string>
     <string name="location_use_current">Mevcut konumu kullan</string>
@@ -1261,6 +1271,10 @@
     <string name="clear_search">Aramayı temizle</string>
     <string name="chat_list_action_add_to_folder">Klasöre ekle</string>
     <string name="chat_folder_included_by_rule">Bu klasörün kuralları tarafından dahil edildi</string>
+    <plurals name="chat_pill_unread_messages_count">
+        <item quantity="one">%1$s okunmamış mesaj</item>
+        <item quantity="other">%1$s okunmamış mesaj</item>
+    </plurals>
     <plurals name="chat_folder_chat_count">
         <item quantity="one">%1$d sohbet</item>
         <item quantity="other">%1$d sohbet</item>

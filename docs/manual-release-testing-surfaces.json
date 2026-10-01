@@ -3,11 +3,23 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "First settled conversation read at the saved watermark",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
-        "anchor": "private var lastSubmittedReadMessageId: String? = null",
+        "surface": "Modifier.conversationScrollIndicator",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScrollIndicatorWindow.kt",
+        "anchor": "fun Modifier.conversationScrollIndicator(",
         "test_ids": [
-          "CHL-008"
+          "CON-025",
+          "CON-003",
+          "CON-013",
+          "CON-014"
+        ]
+      },
+      {
+        "surface": "Modifier.readerScrollIndicator",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ReadingScrollPosition.kt",
+        "anchor": "fun Modifier.readerScrollIndicator(",
+        "test_ids": [
+          "MSG-026",
+          "MSG-002"
         ]
       },
       {
@@ -81,6 +93,72 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Clipboard.kt",
         "anchor": "fun android.content.ClipboardManager?.withPrimaryClipForPaste(",
         "test_ids": ["ONB-005", "FIND-005", "FIND-006"]
+      },
+      {
+        "surface": "Received contact Add action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
+        "anchor": "R.string.contact_add",
+        "test_ids": ["MED-014"]
+      },
+      {
+        "surface": "Received contact compact Add label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
+        "anchor": "R.string.contact_add_short",
+        "test_ids": ["MED-014"]
+      },
+      {
+        "surface": "Received contact Save VCF action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
+        "anchor": "R.string.contact_save_vcf",
+        "test_ids": ["MED-014"]
+      },
+      {
+        "surface": "Received contact compact Save label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
+        "anchor": "R.string.contact_save_short",
+        "test_ids": ["MED-014"]
+      },
+      {
+        "surface": "Received contact View action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
+        "anchor": "R.string.contact_view",
+        "test_ids": ["MED-014"]
+      },
+      {
+        "surface": "Received contact compact View label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
+        "anchor": "R.string.contact_view_short",
+        "test_ids": ["MED-014"]
+      },
+      {
+        "surface": "Received contact action failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ReceivedContactActions.kt",
+        "anchor": "R.string.contact_action_failed",
+        "test_ids": ["MED-014"]
+      },
+      {
+        "surface": "Received contact invalid VCF",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ReceivedContactActions.kt",
+        "anchor": "R.string.contact_invalid_vcard",
+        "test_ids": ["MED-014"]
+      },
+      {
+        "surface": "Received contact VCF saved",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ReceivedContactActions.kt",
+        "anchor": "R.string.contact_vcf_saved",
+        "test_ids": ["MED-014"]
+      },
+      {
+        "surface": "Received contact media load failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ReceivedContactActions.kt",
+        "anchor": "R.string.media_couldnt_load",
+        "test_ids": ["MED-014"]
+      },
+      {
+        "surface": "Received contact missing handler",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ReceivedContactActions.kt",
+        "anchor": "R.string.media_no_app_to_open",
+        "test_ids": ["MED-014"]
       },
       {
         "surface": "content",
@@ -1010,7 +1088,18 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
         "anchor": "fun ChatListSelectionControls(",
         "test_ids": [
-          "CHL-001"
+          "CHL-001",
+          "CHL-011",
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "DirectSelectionAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
+        "anchor": "fun DirectSelectionAction(",
+        "test_ids": [
+          "CHL-011",
+          "CHL-012"
         ]
       },
       {
@@ -5429,7 +5518,32 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
         "anchor": "fun ContactMessageBubble(",
         "test_ids": [
-          "CON-001"
+          "CON-001",
+          "MED-014"
+        ]
+      },
+      {
+        "surface": "ContactCardActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
+        "anchor": "fun ContactCardActions(",
+        "test_ids": [
+          "MED-014"
+        ]
+      },
+      {
+        "surface": "ContactCardAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
+        "anchor": "fun ContactCardAction(",
+        "test_ids": [
+          "MED-014"
+        ]
+      },
+      {
+        "surface": "ReceivedContactActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ReceivedContactActions.kt",
+        "anchor": "fun ReceivedContactActions(",
+        "test_ids": [
+          "MED-014"
         ]
       },
       {
@@ -20416,6 +20530,15 @@
         ]
       },
       {
+        "surface": "string:performance_logs_export_included",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.performance_logs_export_included",
+        "test_ids": [
+          "SET-021",
+          "SEC-009"
+        ]
+      },
+      {
         "surface": "string:performance_logs_description",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "R.string.performance_logs_description",
@@ -24034,10 +24157,20 @@
     ],
     "source_coverage": [
       {
+        "surface": "First settled conversation read at the saved watermark",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "private var lastSubmittedReadMessageId: String? = null",
+        "test_ids": [
+          "CHL-008"
+        ]
+      },
+      {
         "surface": "Native manual reminder lookup for visible-read dedupe",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "internal fun hasManualUnreadReminder(groupIdHex: String)",
-        "test_ids": ["CHL-008"]
+        "test_ids": [
+          "CHL-008"
+        ]
       },
       {
         "surface": "Native manual unread reminder bypasses an older retained-controller read dedupe",
@@ -24045,6 +24178,31 @@
         "anchor": "internal fun hasManualUnreadReminder(",
         "test_ids": [
           "CHL-008"
+        ]
+      },
+      {
+        "surface": "Continuous retained-window position and layout ownership",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScrollIndicatorWindow.kt",
+        "anchor": "fun conversationScrollPosition(",
+        "test_ids": [
+          "CON-025"
+        ]
+      },
+      {
+        "surface": "Measured expanded reader range",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ReadingScrollPosition.kt",
+        "anchor": "fun readerScrollPosition(",
+        "test_ids": [
+          "MSG-026"
+        ]
+      },
+      {
+        "surface": "Passive reading indicator geometry and visibility motion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ReadingScrollPosition.kt",
+        "anchor": "fun DrawScope.drawReadingScrollIndicator(",
+        "test_ids": [
+          "CON-025",
+          "MSG-026"
         ]
       },
       {
@@ -24318,6 +24476,15 @@
         "anchor": "android:scaleX=\"0.75\"",
         "test_ids": [
           "INT-003"
+        ]
+      },
+      {
+        "surface": "MDK stateless verification gates public event cards and Zapstore release metadata",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/nostr/NostrEventVerifier.kt",
+        "anchor": "verifyPublicNostrEventJson(event.toJson())",
+        "test_ids": [
+          "RDR-001",
+          "SYS-008"
         ]
       },
       {
@@ -25060,6 +25227,14 @@
         ]
       },
       {
+        "surface": "Hourly disappearing-message worker skips native startup for an empty signed-in inventory",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/DisappearingMessageSweepWorker.kt",
+        "anchor": "override suspend fun doWork()",
+        "test_ids": [
+          "GRP-017"
+        ]
+      },
+      {
         "surface": "A message past its disappearing deadline stays out of every search surface",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/MessageBodySearchSupport.kt",
         "anchor": "internal fun isRetentionExpiredForSearch(",
@@ -25739,15 +25914,6 @@
         "anchor": "R.string.save",
         "test_ids": [
           "FLD-002"
-        ]
-      },
-      {
-        "surface": "R.string.actions",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
-        "anchor": "R.string.actions",
-        "test_ids": [
-          "CHL-011",
-          "CHL-012"
         ]
       },
       {
@@ -28340,6 +28506,14 @@
         "test_ids": [
           "GRP-011",
           "GRP-014"
+        ]
+      },
+      {
+        "surface": "Opt-in avatar cache counters for decoded chat-list avatars",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/AvatarCacheDiagnostics.kt",
+        "anchor": "internal object AvatarCacheDiagnostics",
+        "test_ids": [
+          "CHL-017"
         ]
       }
     ],

@@ -14,10 +14,14 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -45,6 +49,7 @@ import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -166,6 +171,69 @@ class ConversationVideoRotationAndroidTest {
         assertEndedStateSurvivesRotation(opened.player, paused.durationMs)
         assertPlaybackResumesAfterEndedRotation(opened.player)
         assertBackAndClosePreserveAnchor()
+    }
+
+    /** Re-entering a synthetic video bubble reuses its private file and opens with one tap. */
+    @Test
+    fun locallyMaterializedVideoReturnsWithoutSourceFetch() {
+        var sourceCalls = 0
+        var viewerOpens = 0
+        var showBubble by mutableStateOf(true)
+        runBlocking {
+            materializeVideoAttachment(targetContext, MESSAGE_ID, ATTACHMENT_INDEX, reference) {
+                sourceCalls++
+                fixtureBytes
+            }
+        }
+        assertEquals(1, sourceCalls)
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                if (showBubble) {
+                    MediaVideoBubble(
+                        item = videoTimelineMessage(),
+                        attachmentIndex = ATTACHMENT_INDEX,
+                        reference = reference,
+                        controller = controller,
+                        appState = appState,
+                        onOpenConversationMedia = { viewerOpens++ },
+                        mine = true,
+                        videoFileResolver = { context, _, messageId, index, resolvedReference, _, _ ->
+                            materializeVideoAttachment(context, messageId, index, resolvedReference) {
+                                sourceCalls++
+                                fixtureBytes
+                            }
+                        },
+                    )
+                } else {
+                    Text("other screen")
+                }
+            }
+        }
+        awaitLocalPlayAffordance()
+        composeRule
+            .onNodeWithTag(videoAttachmentOpenTestTag(MESSAGE_ID, ATTACHMENT_INDEX), useUnmergedTree = true)
+            .performClick()
+        composeRule.waitUntil(PLAYER_TIMEOUT_MS) { viewerOpens == 1 }
+        assertEquals(1, viewerOpens)
+        composeRule.runOnIdle { showBubble = false }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { showBubble = true }
+        awaitLocalPlayAffordance()
+        composeRule
+            .onNodeWithTag(videoAttachmentOpenTestTag(MESSAGE_ID, ATTACHMENT_INDEX), useUnmergedTree = true)
+            .performClick()
+        composeRule.waitUntil(PLAYER_TIMEOUT_MS) { viewerOpens == 2 }
+        assertEquals(2, viewerOpens)
+        assertEquals("local return invoked the source supplier", 1, sourceCalls)
+        assertTrue(cacheFile.isFile)
+    }
+
+    /** Waits for the production bubble's play affordance after local file probing. */
+    private fun awaitLocalPlayAffordance() {
+        val playLabel = targetContext.getString(R.string.reply_media_video)
+        composeRule.waitUntil(PLAYER_TIMEOUT_MS) {
+            composeRule.onAllNodesWithContentDescription(playLabel).fetchSemanticsNodes().isNotEmpty()
+        }
     }
 
     /** Mounts the real row, conversation session host, dialog, and Media3 subtree. */

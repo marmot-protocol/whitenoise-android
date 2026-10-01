@@ -525,6 +525,7 @@
     <string name="performance_logs">效能記錄</string>
     <string name="performance_logs_description">暫時在此裝置上收集保護隱私的計時事件。30 分鐘後或應用程式重新啟動時停止。</string>
     <string name="performance_logs_active">已啟用 · 剩餘 %1$d 分鐘</string>
+    <string name="performance_logs_export_included">此工作階段將包含在下次匯出的已儲存診斷日誌中。</string>
     <string name="performance_logs_inactive">未啟用</string>
     <string name="copy_performance_logs">複製效能記錄</string>
     <string name="copy_performance_logs_detail">複製目前或最近一次工作階段中數量受限且保護隱私的事件。</string>
@@ -1013,6 +1014,15 @@
     <string name="share_user_view">查看個人檔案</string>
     <string name="attach_options">新增附件</string>
     <string name="media_preview_position_badge">傳送順序 %1$d</string>
+    <string name="contact_view">查看聯絡人</string>
+    <string name="contact_add">加入聯絡人</string>
+    <string name="contact_save_vcf">儲存 VCF</string>
+    <string name="contact_view_short">查看</string>
+    <string name="contact_add_short">加入</string>
+    <string name="contact_save_short">儲存</string>
+    <string name="contact_invalid_vcard">聯絡人檔案無效或過大</string>
+    <string name="contact_action_failed">無法完成聯絡人操作</string>
+    <string name="contact_vcf_saved">VCF 已儲存</string>
     <string name="share_contact_title">分享聯絡人</string>
     <string name="share_location_title">分享位置</string>
     <string name="location_use_current">使用目前位置</string>
@@ -1241,6 +1251,9 @@
     <string name="clear_search">清除搜尋</string>
     <string name="chat_list_action_add_to_folder">加入資料夾</string>
     <string name="chat_folder_included_by_rule">由此資料夾的規則加入</string>
+    <plurals name="chat_pill_unread_messages_count">
+        <item quantity="other">%1$s 則未讀訊息</item>
+    </plurals>
     <plurals name="chat_folder_chat_count">
         <item quantity="other">%1$d 個聊天</item>
     </plurals>

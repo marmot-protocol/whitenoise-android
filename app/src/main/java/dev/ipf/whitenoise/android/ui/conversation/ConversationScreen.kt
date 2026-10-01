@@ -168,11 +168,11 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.anchoredDragSelection
 import dev.ipf.whitenoise.android.ui.common.dragSelectionAutoScrollDelta
-import dev.ipf.whitenoise.android.ui.common.dragSelectionEndpoint
 import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
 import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
+import dev.ipf.whitenoise.android.ui.common.reverseLazyListDragSelectionEndpoint
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
@@ -864,6 +864,7 @@ internal fun ConversationScreen(
     // over it rather than a second copy.
     val renderedTimelineNewestFirst =
         remember(renderedTimeline) { renderedTimeline.asReversed() }
+    val scrollIndicatorKeys = remember(renderedTimelineNewestFirst) { renderedTimelineNewestFirst.map { it.id } }
     val navigationState =
         rememberConversationNavigationState(
             controller = controller,
@@ -1026,6 +1027,22 @@ internal fun ConversationScreen(
     // between a chronological timeline position and a lazy-list row goes
     // through this one count.
     val trailingRowCount = controller.conversationTrailingRowCount(renderedTimeline.size)
+    val hasRetentionHistoryBoundary =
+        retentionHistoryBoundaryVisible(
+            retentionSeconds = controller.group.disappearingMessageSecs,
+            hasMessages = renderedTimeline.isNotEmpty(),
+            initialLoadStarted = navigationState.initialTimelineLoadStarted,
+            hasMoreBefore = controller.hasMoreBefore,
+            isLoading = controller.isLoading,
+            isLoadingPage = controller.isLoadingPage,
+            isLoadingOlder = controller.isLoadingOlder,
+            olderLoadFailed =
+                controller.error != null &&
+                    controller.errorEdge == ConversationLoadFailureEdge.TOP,
+        )
+    val indicatorItemCount =
+        renderedTimeline.size + trailingRowCount + olderHeaderCount +
+            inlineTopErrorCount + groupRecoveryCount + (if (hasRetentionHistoryBoundary) 1 else 0) + 1
     val conversationMedia =
         rememberSharedMediaTiles(
             controller = controller,
@@ -1216,7 +1233,7 @@ internal fun ConversationScreen(
     fun updateMessageDragSelection(pointerWindowY: Float): Boolean {
         val anchorId = dragAnchorTimelineId ?: return false
         val endpointId =
-            dragSelectionEndpoint(
+            reverseLazyListDragSelectionEndpoint(
                 timelineViewport.readingLayoutInfo().visibleItemsInfo.mapNotNull { visible ->
                     val id = visible.key as? String
                     id
@@ -1229,7 +1246,11 @@ internal fun ConversationScreen(
                             )
                         }
                 },
-                pointerY = pointerWindowY - transcriptWindowTop,
+                pointerWindowY = pointerWindowY,
+                viewportWindowTop = transcriptWindowTop,
+                // A reversed list's item offsets start above its bottom content padding.
+                viewportHeight =
+                    listState.layoutInfo.viewportSize.height - listState.layoutInfo.beforeContentPadding,
             ) ?: return false
         if (endpointId == anchorId && selectedMessages.isEmpty()) return false
         val nextTimelineIds =
@@ -3981,7 +4002,23 @@ internal fun ConversationScreen(
                         Box(
                             modifier =
                                 Modifier
-                                    .fillMaxSize(),
+                                    .fillMaxSize()
+                                    .conversationScrollIndicator(
+                                        state = listState,
+                                        viewport = timelineViewport,
+                                        window =
+                                            ConversationScrollIndicatorWindow(
+                                                scrollIndicatorKeys,
+                                                trailingRowCount,
+                                                indicatorItemCount,
+                                                controller,
+                                            ),
+                                        enabled =
+                                            transcriptReadyToReveal &&
+                                                !selectionMode &&
+                                                textSelectionMessageId == null &&
+                                                openActionMenuId == null,
+                                    ),
                         ) {
                             LazyColumn(
                                 state = listState,
@@ -4199,20 +4236,7 @@ internal fun ConversationScreen(
                                         }
                                     }
                                 }
-                                if (
-                                    retentionHistoryBoundaryVisible(
-                                        retentionSeconds = controller.group.disappearingMessageSecs,
-                                        hasMessages = renderedTimeline.isNotEmpty(),
-                                        initialLoadStarted = navigationState.initialTimelineLoadStarted,
-                                        hasMoreBefore = controller.hasMoreBefore,
-                                        isLoading = controller.isLoading,
-                                        isLoadingPage = controller.isLoadingPage,
-                                        isLoadingOlder = controller.isLoadingOlder,
-                                        olderLoadFailed =
-                                            controller.error != null &&
-                                                controller.errorEdge == ConversationLoadFailureEdge.TOP,
-                                    )
-                                ) {
+                                if (hasRetentionHistoryBoundary) {
                                     item(key = "retention-history-boundary") {
                                         ConversationHistoryBoundary(controller.group.disappearingMessageSecs)
                                     }

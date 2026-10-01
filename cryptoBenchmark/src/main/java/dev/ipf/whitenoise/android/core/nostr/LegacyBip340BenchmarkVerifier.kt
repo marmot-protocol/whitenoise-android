@@ -1,10 +1,12 @@
+@file:Suppress("MagicNumber", "ReturnCount")
+
 package dev.ipf.whitenoise.android.core.nostr
 
 import java.math.BigInteger
 import java.util.Locale
 
-/** Minimal BIP-340 Schnorr verifier for Nostr event signatures on secp256k1. */
-internal object BIP340 {
+/** Benchmark-only copy of the verifier removed from the production app. */
+internal object LegacyBip340BenchmarkVerifier {
     private val zero = BigInteger.ZERO
     private val one = BigInteger.ONE
     private val two = BigInteger.valueOf(2)

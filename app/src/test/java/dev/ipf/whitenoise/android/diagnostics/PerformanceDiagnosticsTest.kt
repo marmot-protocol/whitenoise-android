@@ -294,7 +294,7 @@ class PerformanceDiagnosticSchemaTest {
     }
 
     @Test
-    fun sourceHasNoStringPayloadOrPersistentOrRemoteSink() {
+    fun typedEmitterHasNoStringPayloadOrRemoteSink() {
         val source = source("src/main/java/dev/ipf/whitenoise/android/diagnostics/PerformanceDiagnostics.kt")
         val emitterApi = source.substringAfter("internal class PerformanceDiagnosticEmitter(")
         val beginSignature = emitterApi.substringAfter("fun begin(").substringBefore(") {")
@@ -312,6 +312,7 @@ class PerformanceDiagnosticSchemaTest {
             "stackTrace",
         ).forEach { denied -> assertFalse("Unexpected sink/input: $denied", source.contains(denied)) }
         assertTrue(source.contains("Log.i(LOG_TAG, line)"))
+        assertTrue(source.contains("fileStore?.append(line)"))
     }
 
     @Test

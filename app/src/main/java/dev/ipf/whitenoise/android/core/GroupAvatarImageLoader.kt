@@ -63,14 +63,17 @@ internal object GroupAvatarImageLoader {
         ByteSizeLruCache<String, ImageBitmap>(
             maxBytes = CACHE_SIZE_BYTES.toLong(),
             sizeOf = { image -> image.asAndroidBitmap().byteCount.coerceAtLeast(1) },
+            onEvicted = { AvatarCacheDiagnostics.evicted(AvatarCacheKind.GROUP) },
         )
     private val inFlight = mutableMapOf<String, CompletableDeferred<ImageBitmap?>>()
     private val cacheLifetime = StalenessGuard()
     private val requestLifetime = StalenessGuard()
 
+    /** Returns already decoded pixels without starting a group-image fetch. */
     fun peek(key: String?): ImageBitmap? =
         key?.let {
             synchronized(lock) { cache.get(it) }
+                .also { image -> AvatarCacheDiagnostics.lookup(AvatarCacheKind.GROUP, image != null) }
         }
 
     /** Test-only injection for deterministic first-frame composition coverage. */
@@ -93,8 +96,15 @@ internal object GroupAvatarImageLoader {
         peek(key)?.let { return it }
         val request =
             synchronized(lock) {
-                cache.get(key)?.let { return@synchronized CompletedGroupAvatarRequest(it) }
-                inFlight[key]?.let { return@synchronized PendingGroupAvatarRequest(it) }
+                cache.get(key)?.let {
+                    AvatarCacheDiagnostics.lookup(AvatarCacheKind.GROUP, true)
+                    return@synchronized CompletedGroupAvatarRequest(it)
+                }
+                AvatarCacheDiagnostics.lookup(AvatarCacheKind.GROUP, false)
+                inFlight[key]?.let {
+                    AvatarCacheDiagnostics.deduplicated(AvatarCacheKind.GROUP)
+                    return@synchronized PendingGroupAvatarRequest(it)
+                }
 
                 val deferred = CompletableDeferred<ImageBitmap?>()
                 inFlight[key] = deferred
@@ -105,9 +115,11 @@ internal object GroupAvatarImageLoader {
                         runCatching {
                             loadPermits.withPermit {
                                 if (!isCurrentGeneration(launchedGeneration, launchedRequest)) return@withPermit null
+                                AvatarCacheDiagnostics.fetch(AvatarCacheKind.GROUP)
                                 val bytes = fetchBytes()
                                 if (!isCurrentGeneration(launchedGeneration, launchedRequest)) return@withPermit null
                                 if (!isGroupAvatarPayloadAccepted(bytes)) return@withPermit null
+                                AvatarCacheDiagnostics.decode(AvatarCacheKind.GROUP)
                                 MediaPipeline
                                     .decodeSampledBitmap(bytes, MAX_EDGE_PX)
                                     ?.asImageBitmap()

@@ -18,6 +18,7 @@ class ZapstoreReleaseClient internal constructor(
     private val httpClient: WebSocket.Factory,
     private val relayUrl: String,
     private val publisherPubkey: String = ZAPSTORE_PUBLISHER_PUBKEY,
+    private val verifyEvent: (NostrEvent) -> Boolean = NostrEventVerifier::verifies,
 ) {
     constructor() : this(defaultHttpClient(), ZAPSTORE_RELAY, ZAPSTORE_PUBLISHER_PUBKEY)
 
@@ -34,7 +35,7 @@ class ZapstoreReleaseClient internal constructor(
         val versions =
             fetchAppReleaseEvents(appId)
                 .asSequence()
-                .mapNotNull { event -> ZapstoreEvents.latestReleaseVersion(event, appId, publisherPubkey) }
+                .mapNotNull { event -> ZapstoreEvents.latestReleaseVersion(event, appId, publisherPubkey, verifyEvent) }
                 .distinct()
                 .toList()
         val latestVersion = versions.maxWithOrNull { a, b -> CalVer.compare(a, b) } ?: return null
@@ -113,10 +114,9 @@ internal object ZapstoreEvents {
         event: NostrEvent,
         appId: String,
         publisherPubkey: String,
+        verifyEvent: (NostrEvent) -> Boolean = NostrEventVerifier::verifies,
     ): String? {
-        if (event.kind != KIND_ZAPSTORE_RELEASE) return null
-        if (event.pubkey != publisherPubkey) return null
-        if (!NostrEventVerifier.verifies(event)) return null
+        if (event.kind != KIND_ZAPSTORE_RELEASE || event.pubkey != publisherPubkey || !verifyEvent(event)) return null
         return releaseVersionForApp(event, appId)
     }
 
@@ -142,13 +142,14 @@ internal object ZapstoreEvents {
         appId: String,
         publisherPubkey: String,
         releaseDTag: String,
+        verifyEvent: (NostrEvent) -> Boolean = NostrEventVerifier::verifies,
     ): String? {
-        if (event.kind != KIND_ZAPSTORE_RELEASE) return null
-        if (event.pubkey != publisherPubkey) return null
-        val dTag = event.firstTagValue("d") ?: return null
-        if (dTag != releaseDTag) return null
-        if (!NostrEventVerifier.verifies(event)) return null
-        return ZapstoreAddress.versionFromReleaseDTag(dTag, appId)
+        val isRequestedRelease =
+            event.kind == KIND_ZAPSTORE_RELEASE &&
+                event.pubkey == publisherPubkey &&
+                event.firstTagValue("d") == releaseDTag
+        if (!isRequestedRelease || !verifyEvent(event)) return null
+        return ZapstoreAddress.versionFromReleaseDTag(releaseDTag, appId)
     }
 }
 

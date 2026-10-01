@@ -479,6 +479,7 @@ internal fun MessageBubble(
     var selectionSeedVisibleOffset by remember(record.messageIdHex) { mutableStateOf<Int?>(null) }
     var longPressWindowY by remember { mutableStateOf<Float?>(null) }
     var actionMenuAnchorBounds by remember(record.messageIdHex) { mutableStateOf<IntRect?>(null) }
+    var initiatingMenuHoldActive by remember(record.messageIdHex) { mutableStateOf(false) }
     var reportSheetOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var reportInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
     val hasReports = item.projected?.hasReports == true
@@ -1443,10 +1444,7 @@ internal fun MessageBubble(
                 Modifier
                     .fillMaxWidth()
                     .testTag(messageBubbleRowTestTag(record.messageIdHex))
-                    .messageBubbleSelectionRow(
-                        selectionMode = selectionMode,
-                        selected = selected,
-                    ).twoFingerSwipeDown(
+                    .twoFingerSwipeDown(
                         // Batch selection and text selection own the row while
                         // they are active, and a deleted message has nothing to
                         // read. Everything else keeps the shortcut, including a
@@ -1456,6 +1454,114 @@ internal fun MessageBubble(
                         enabled = !selectionMode && !textSelectionMode && !deleted,
                         viewportLock = ttsQuickTransportViewportLock,
                         onSwipe = ::quickTransportFromTwoFingerSwipe,
+                    )
+                    // Keep the active hold detector ahead of selection chrome that changes mid-drag.
+                    .then(
+                        // Long-press lives in a raw pointerInput, not
+                        // combinedClickable, so it WINS over inner media
+                        // children (image/video/file/voice) that install their
+                        // own tap `clickable`. Those children sit deeper in the
+                        // hit-test tree and would otherwise swallow the press
+                        // before a row-level combinedClickable saw the
+                        // long-press — which is why long-press did nothing on a
+                        // media bubble while it worked on a text bubble (#262).
+                        // A quick tap still reaches the child's viewer/player.
+                        // Once held, ordinary message actions open at the platform
+                        // threshold while a vertical drag dismisses them and
+                        // switches to anchored batch selection. Markdown links
+                        // keep their copy-on-release routing. Horizontal motion
+                        // remains available to swipe-to-reply above.
+                        if (tombstoneCleanupUnavailable || longPressBlockedBySelection || textSelectionMode) {
+                            // Batch/text selection own the row. A tombstone remains
+                            // actionable only when its local cleanup path is usable.
+                            Modifier
+                        } else {
+                            Modifier.longPressOrVerticalDrag(
+                                onLongPressStart = { position ->
+                                    haptics.performHapticFeedback(
+                                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress,
+                                    )
+                                    pendingLongPressLinkDestination[0] = null
+                                    // A tombstone has exactly one action, so it skips
+                                    // the menu and opens its confirmation directly.
+                                    if (deleted) {
+                                        requestDelete()
+                                        return@longPressOrVerticalDrag
+                                    }
+                                    val windowPosition =
+                                        rowCoordinates[0]?.let {
+                                            messageBubbleLongPressPositionInWindow(it, position)
+                                        } ?: return@longPressOrVerticalDrag
+                                    val linkDestination =
+                                        if (deleted) {
+                                            null
+                                        } else {
+                                            markdownLinkDestinationAt(markdownLinkLayouts.values, windowPosition)
+                                        }
+                                    pendingLongPressLinkDestination[0] = linkDestination
+                                    if (linkDestination == null) {
+                                        // Capture the press in window space before
+                                        // opening so both the popover and text
+                                        // selection seed at the finger (#326, #1370).
+                                        longPressWindowPosition = windowPosition
+                                        selectionSeedVisibleOffset =
+                                            if (record.contentTokens.truncated) {
+                                                null
+                                            } else {
+                                                textOffsetAtWindowPosition(
+                                                    selectableTextLayouts.snapshot(),
+                                                    windowPosition,
+                                                )
+                                            }
+                                        longPressWindowY = windowPosition.y
+                                        actionMenuAnchorBounds = messageBoundsInWindow[0]
+                                        initiatingMenuHoldActive = true
+                                        // Freeze the rendered hit now. The bubble
+                                        // can move while its popup is open; an old
+                                        // window coordinate must never be re-hit-
+                                        // tested against a different line later.
+                                        onActionMenuOpenChange(true)
+                                    }
+                                },
+                                onLongPressRelease = {
+                                    initiatingMenuHoldActive = false
+                                    val linkDestination = pendingLongPressLinkDestination[0]
+                                    pendingLongPressLinkDestination[0] = null
+                                    if (linkDestination != null) copyMarkdownLink(linkDestination)
+                                },
+                                onDragStart = { position ->
+                                    initiatingMenuHoldActive = false
+                                    if (deleted) return@longPressOrVerticalDrag
+                                    // A range gesture begins after the threshold
+                                    // action was shown. Hand ownership over without
+                                    // leaving a stale popup above selection mode.
+                                    pendingLongPressLinkDestination[0] = null
+                                    onActionMenuOpenChange(false)
+                                    rowCoordinates[0]
+                                        ?.let { messageBubbleLongPressPositionInWindow(it, position).y }
+                                        ?.let(onDragSelectionStart)
+                                },
+                                onDrag = { position ->
+                                    if (deleted) return@longPressOrVerticalDrag false
+                                    rowCoordinates[0]
+                                        ?.let { messageBubbleLongPressPositionInWindow(it, position).y }
+                                        ?.let(onDragSelection)
+                                        ?: false
+                                },
+                                onDragEnd = {
+                                    if (!deleted) onDragSelectionEnd()
+                                },
+                                onGestureCancel = {
+                                    initiatingMenuHoldActive = false
+                                    pendingLongPressLinkDestination[0] = null
+                                    onActionMenuOpenChange(false)
+                                    if (!deleted) onDragSelectionCancel()
+                                },
+                            )
+                        },
+                    ).messageBubbleSelectionRow(
+                        selectionMode = selectionMode,
+                        selected = selected,
                     ).then(
                         // A deleted or selection-mode message has no actionable
                         // reply gesture; taps are owned by the selection row. Keep
@@ -1515,105 +1621,6 @@ internal fun MessageBubble(
                             onPointerFinished = ttsLinkTapCoordinator::endPointerActivation,
                             onDoubleTap = messageTextDoubleTap,
                         ),
-                    ).then(
-                        // Long-press lives in a raw pointerInput, not
-                        // combinedClickable, so it WINS over inner media
-                        // children (image/video/file/voice) that install their
-                        // own tap `clickable`. Those children sit deeper in the
-                        // hit-test tree and would otherwise swallow the press
-                        // before a row-level combinedClickable saw the
-                        // long-press — which is why long-press did nothing on a
-                        // media bubble while it worked on a text bubble (#262).
-                        // A quick tap still reaches the child's viewer/player.
-                        // Once held, ordinary message actions open at the platform
-                        // threshold while a vertical drag dismisses them and
-                        // switches to anchored batch selection. Markdown links
-                        // keep their copy-on-release routing. Horizontal motion
-                        // remains available to swipe-to-reply above.
-                        if (tombstoneCleanupUnavailable || longPressBlockedBySelection || textSelectionMode) {
-                            // Batch/text selection own the row. A tombstone remains
-                            // actionable only when its local cleanup path is usable.
-                            Modifier
-                        } else {
-                            Modifier.longPressOrVerticalDrag(
-                                onLongPressStart = { position ->
-                                    haptics.performHapticFeedback(
-                                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress,
-                                    )
-                                    pendingLongPressLinkDestination[0] = null
-                                    // A tombstone has exactly one action, so it skips
-                                    // the menu and opens its confirmation directly.
-                                    if (deleted) {
-                                        requestDelete()
-                                        return@longPressOrVerticalDrag
-                                    }
-                                    val windowPosition =
-                                        rowCoordinates[0]?.let {
-                                            messageBubbleLongPressPositionInWindow(it, position)
-                                        } ?: return@longPressOrVerticalDrag
-                                    val linkDestination =
-                                        if (deleted) {
-                                            null
-                                        } else {
-                                            markdownLinkDestinationAt(markdownLinkLayouts.values, windowPosition)
-                                        }
-                                    pendingLongPressLinkDestination[0] = linkDestination
-                                    if (linkDestination == null) {
-                                        // Capture the press in window space before
-                                        // opening so both the popover and text
-                                        // selection seed at the finger (#326, #1370).
-                                        longPressWindowPosition = windowPosition
-                                        selectionSeedVisibleOffset =
-                                            if (record.contentTokens.truncated) {
-                                                null
-                                            } else {
-                                                textOffsetAtWindowPosition(
-                                                    selectableTextLayouts.snapshot(),
-                                                    windowPosition,
-                                                )
-                                            }
-                                        longPressWindowY = windowPosition.y
-                                        actionMenuAnchorBounds = messageBoundsInWindow[0]
-                                        // Freeze the rendered hit now. The bubble
-                                        // can move while its popup is open; an old
-                                        // window coordinate must never be re-hit-
-                                        // tested against a different line later.
-                                        onActionMenuOpenChange(true)
-                                    }
-                                },
-                                onLongPressRelease = {
-                                    val linkDestination = pendingLongPressLinkDestination[0]
-                                    pendingLongPressLinkDestination[0] = null
-                                    if (linkDestination != null) copyMarkdownLink(linkDestination)
-                                },
-                                onDragStart = { position ->
-                                    if (deleted) return@longPressOrVerticalDrag
-                                    // A range gesture begins after the threshold
-                                    // action was shown. Hand ownership over without
-                                    // leaving a stale popup above selection mode.
-                                    pendingLongPressLinkDestination[0] = null
-                                    onActionMenuOpenChange(false)
-                                    rowCoordinates[0]
-                                        ?.let { messageBubbleLongPressPositionInWindow(it, position).y }
-                                        ?.let(onDragSelectionStart)
-                                },
-                                onDrag = { position ->
-                                    if (deleted) return@longPressOrVerticalDrag false
-                                    rowCoordinates[0]
-                                        ?.let { messageBubbleLongPressPositionInWindow(it, position).y }
-                                        ?.let(onDragSelection)
-                                        ?: false
-                                },
-                                onDragEnd = {
-                                    if (!deleted) onDragSelectionEnd()
-                                },
-                                onGestureCancel = {
-                                    pendingLongPressLinkDestination[0] = null
-                                    onActionMenuOpenChange(false)
-                                    if (!deleted) onDragSelectionCancel()
-                                },
-                            )
-                        },
                     ).then(
                         // The raw pointerInput above only fires on a physical
                         // pointer long-press, so it leaves accessibility services
@@ -2398,6 +2405,7 @@ internal fun MessageBubble(
                     // A tombstone gets a focused delete-only menu. Batch or partial
                     // text selection still owns the row interaction completely.
                     expanded = isActionMenuOpen && !selectionMode && !textSelectionMode,
+                    initiatingHoldActive = initiatingMenuHoldActive,
                     anchorBoundsInWindow = actionMenuAnchorBounds,
                     anchorWindowYPx = longPressWindowY,
                     canReply = !deleted && !readOnly,

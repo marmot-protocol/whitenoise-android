@@ -94,6 +94,7 @@ import dev.ipf.whitenoise.android.core.projectChatListSearchSections
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.activeAccountMessageCount
 import dev.ipf.whitenoise.android.state.collectGlobalAttachments
 import dev.ipf.whitenoise.android.state.hasEarlierChats
 import dev.ipf.whitenoise.android.state.loadEarlierChats
@@ -1599,6 +1600,7 @@ internal fun ChatsScreen(
                 key(appState.activeAccountRef, appState.runtimeGeneration) {
                     ChatListFilterChips(
                         chips = folderChipModels,
+                        chatsUnreadCount = appState.activeAccountMessageCount(),
                         selectedFolderId = selectedFolderId,
                         onSelect = onSelectFolder,
                         onEditFolder = { folderHandoff.editingFolderId = it },

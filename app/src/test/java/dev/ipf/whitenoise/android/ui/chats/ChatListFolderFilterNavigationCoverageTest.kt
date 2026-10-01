@@ -97,8 +97,8 @@ class ChatListFolderFilterNavigationCoverageTest {
     fun explicitAllActionClearsRememberedFolderFilter() {
         val pills =
             chatFolderPillsSource().readText().requiredSection(
-                start = "item(key = \"scope:chats\")",
-                end = "\n        }",
+                start = "ChatFolderPill(\n                stringResource(R.string.chats)",
+                end = "unreadMessageCount = chatsUnreadCount",
             )
 
         assertTrue(

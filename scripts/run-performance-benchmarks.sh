@@ -436,6 +436,10 @@ if [[ -n "${PAGING_DEEP_FLINGS:-}" ]]; then
   instrument_command="$instrument_command \
 -e pagingDeepFlings $(quote_device_shell_arg "$PAGING_DEEP_FLINGS")"
 fi
+if [[ -n "${IDLE_WINDOW_MS:-}" ]]; then
+  instrument_command="$instrument_command \
+-e idleWindowMs $(quote_device_shell_arg "$IDLE_WINDOW_MS")"
+fi
 if [[ -n "${CREATED_GROUP_PREFIX:-}" ]]; then
   instrument_command="$instrument_command \
 -e createdGroupPrefix $(quote_device_shell_arg "$CREATED_GROUP_PREFIX")"
