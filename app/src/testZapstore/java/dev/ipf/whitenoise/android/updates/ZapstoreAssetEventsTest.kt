@@ -303,12 +303,13 @@ class ZapstoreAssetEventsTest {
             kind = ASSET_KIND,
             tags = tags,
             content = "",
-            sig = "0".repeat(128),
+            sig = "0".repeat(SIGNATURE_HEX_LENGTH),
         )
 
     private fun signedEvent(json: String): NostrEvent = NostrEvent.fromJson(JSONObject(json)) ?: error("fixture")
 
     private companion object {
+        private const val SIGNATURE_HEX_LENGTH = 128
         private const val ASSET_KIND = 3063
         private const val APP_ID = "org.parres.darkmatter"
         private const val VERSION = "2026.6.20"
