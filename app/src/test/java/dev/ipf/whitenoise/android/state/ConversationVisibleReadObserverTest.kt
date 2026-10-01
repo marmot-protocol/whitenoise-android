@@ -47,14 +47,7 @@ class ConversationVisibleReadObserverTest {
             }
             val lifecycleOwner = ReadLifecycleOwner()
             assertEquals(Lifecycle.State.RESUMED, lifecycleOwner.lifecycle.currentStateFlow.value)
-            composeRule.setContent {
-                Text("Read observer")
-                if (observing) {
-                    observeConversationVisibleReads(state, controller, lifecycleOwner) {
-                        ConversationTimelineTestIds.MESSAGE_B
-                    }
-                }
-            }
+            installObserver(state, controller, lifecycleOwner) { observing }
             composeRule.waitForIdle()
             assertEquals(0, fixture.markReadCalls.get())
             composeRule.runOnIdle { state.setActiveConversationFromUi("another-account", row.groupIdHex) }
@@ -92,6 +85,22 @@ class ConversationVisibleReadObserverTest {
             composeRule.waitForIdle()
             controller.onCleared()
             fixture.close()
+        }
+    }
+
+    private fun installObserver(
+        state: WhiteNoiseAppState,
+        controller: ConversationController,
+        lifecycleOwner: LifecycleOwner,
+        observing: () -> Boolean,
+    ) {
+        composeRule.setContent {
+            Text("Read observer")
+            if (observing()) {
+                observeConversationVisibleReads(state, controller, lifecycleOwner) {
+                    ConversationTimelineTestIds.MESSAGE_B
+                }
+            }
         }
     }
 
