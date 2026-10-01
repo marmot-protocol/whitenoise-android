@@ -2642,8 +2642,33 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
         "anchor": "fun GroupSystemRow(",
         "test_ids": [
-          "CON-001"
+          "CON-001",
+          "CON-026"
         ]
+      },
+      {
+        "surface": "Affected member's name links to their profile in add/remove history",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": "internal fun groupSystemSummaryText(",
+        "test_ids": ["CON-026"]
+      },
+      {
+        "surface": "Subject profile link targets the authenticated member and drops stale-account taps",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/GroupSystemSubjectLink.kt",
+        "anchor": "object GroupSystemSubjectLink",
+        "test_ids": ["CON-026"]
+      },
+      {
+        "surface": "Membership chat-list preview names the affected member",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatListItem.kt",
+        "anchor": "groupSystemNames: GroupSystemPreviewNames? = null,",
+        "test_ids": ["CHL-020"]
+      },
+      {
+        "surface": "Chat row resolves the membership preview subject's name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "GroupSystemPreviewNames(activeAccountIdHex, appState::chatMemberTitle)",
+        "test_ids": ["CHL-020"]
       },
       {
         "surface": "PinnedDayRibbonLabel",
