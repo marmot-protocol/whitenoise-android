@@ -1444,6 +1444,17 @@ internal fun MessageBubble(
                 Modifier
                     .fillMaxWidth()
                     .testTag(messageBubbleRowTestTag(record.messageIdHex))
+                    .twoFingerSwipeDown(
+                        // Batch selection and text selection own the row while
+                        // they are active, and a deleted message has nothing to
+                        // read. Everything else keeps the shortcut, including a
+                        // bubble that cannot itself be spoken: holding what is
+                        // already playing does not need this message to have
+                        // anything to say.
+                        enabled = !selectionMode && !textSelectionMode && !deleted,
+                        viewportLock = ttsQuickTransportViewportLock,
+                        onSwipe = ::quickTransportFromTwoFingerSwipe,
+                    )
                     // Keep the active hold detector ahead of selection chrome that changes mid-drag.
                     .then(
                         // Long-press lives in a raw pointerInput, not
@@ -1551,16 +1562,6 @@ internal fun MessageBubble(
                     ).messageBubbleSelectionRow(
                         selectionMode = selectionMode,
                         selected = selected,
-                    ).twoFingerSwipeDown(
-                        // Batch selection and text selection own the row while
-                        // they are active, and a deleted message has nothing to
-                        // read. Everything else keeps the shortcut, including a
-                        // bubble that cannot itself be spoken: holding what is
-                        // already playing does not need this message to have
-                        // anything to say.
-                        enabled = !selectionMode && !textSelectionMode && !deleted,
-                        viewportLock = ttsQuickTransportViewportLock,
-                        onSwipe = ::quickTransportFromTwoFingerSwipe,
                     ).then(
                         // A deleted or selection-mode message has no actionable
                         // reply gesture; taps are owned by the selection row. Keep
