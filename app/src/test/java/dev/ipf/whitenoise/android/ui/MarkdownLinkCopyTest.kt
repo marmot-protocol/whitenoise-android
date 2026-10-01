@@ -58,6 +58,17 @@ class MarkdownLinkCopyTest {
         )
     }
 
+    /** Long-pressing a bare `www.` address copies the `https://` destination a tap would open. */
+    @Test
+    fun longPressingWwwAutolinkCopiesItsHttpsDestination() {
+        val typed = "www.example.network/page"
+
+        assertEquals(
+            LongPressResult(copiedUrl = "https://$typed", parentLongPresses = 0),
+            longPress(autolinkDocument(typed, MarkdownAutolinkKindFfi.WWW), visibleText = typed),
+        )
+    }
+
     @Test
     fun longPressingExplicitLinkCopiesDestinationInsteadOfLabel() {
         val destination = "https://example.com/destination"
@@ -265,14 +276,17 @@ class MarkdownLinkCopyTest {
         return context.getString(resId)
     }
 
-    private fun autolinkDocument(url: String) =
-        paragraphDocument(
-            MarkdownInlineFfi.Autolink(
-                url,
-                MarkdownAutolinkKindFfi.URI,
-                MarkdownLinkDestinationKindFfi.WEB,
-            ),
-        )
+    /** Wraps a single autolink of [kind] in a one-paragraph document. */
+    private fun autolinkDocument(
+        url: String,
+        kind: MarkdownAutolinkKindFfi = MarkdownAutolinkKindFfi.URI,
+    ) = paragraphDocument(
+        MarkdownInlineFfi.Autolink(
+            url,
+            kind,
+            MarkdownLinkDestinationKindFfi.WEB,
+        ),
+    )
 
     private fun paragraphDocument(inline: MarkdownInlineFfi) =
         MarkdownDocumentFfi(

@@ -372,6 +372,71 @@ class MarkdownInlineTextTest {
         assertEquals("mailto:user@example.com", (link.item as LinkAnnotation.Url).url)
     }
 
+    /** A bare `www.` autolink keeps its typed text but opens the synthesized `https://` destination. */
+    @Test
+    fun wwwAutolinkOpensThroughHttps() {
+        listOf(
+            "www.example.network/path?q=1#top" to "https://www.example.network/path?q=1#top",
+            "www.example.chat" to "https://www.example.chat",
+        ).forEach { (typed, destination) ->
+            val annotated = build(listOf(wwwAutolink(typed)))
+            assertEquals(typed, annotated.text)
+            val link = annotated.getLinkAnnotations(0, annotated.length).single()
+            assertEquals(destination, (link.item as LinkAnnotation.Url).url)
+            assertEquals(0, link.start)
+            assertEquals(typed.length, link.end)
+        }
+    }
+
+    /** Surrounding prose and punctuation stay outside the `www.` link span MDK selected. */
+    @Test
+    fun wwwAutolinkSpanCoversOnlyTheParsedAddress() {
+        val annotated =
+            build(
+                listOf(
+                    MarkdownInlineFfi.Text("see "),
+                    wwwAutolink("www.example.network"),
+                    MarkdownInlineFfi.Text("."),
+                ),
+            )
+        assertEquals("see www.example.network.", annotated.text)
+        val link = annotated.getLinkAnnotations(0, annotated.length).single()
+        assertEquals("https://www.example.network", (link.item as LinkAnnotation.Url).url)
+        assertEquals(4, link.start)
+        assertEquals(23, link.end)
+    }
+
+    /** `https://` synthesis never makes a malformed or non-`www.` WWW autolink tappable. */
+    @Test
+    fun wwwSynthesisCannotOpenMalformedOrNonWwwText() {
+        listOf("javascript:alert(1)", "www.exa mple.com", "example.network").forEach { typed ->
+            val annotated = build(listOf(wwwAutolink(typed)))
+            assertEquals(typed, annotated.text)
+            assertTrue(typed, annotated.getLinkAnnotations(0, annotated.length).isEmpty())
+        }
+    }
+
+    /** Destination synthesis is per kind: URI passes through trimmed, email gains mailto:, www gains https://. */
+    @Test
+    fun autolinkDestinationIsSynthesizedOnlyForItsKind() {
+        val uri = MarkdownAutolinkKindFfi.URI
+        val email = MarkdownAutolinkKindFfi.EMAIL
+        val www = MarkdownAutolinkKindFfi.WWW
+        assertEquals("https://example.com", markdownAutolinkDestination(" https://example.com ", uri))
+        assertEquals("www.example.com", markdownAutolinkDestination("www.example.com", uri))
+        assertEquals("mailto:a@example.com", markdownAutolinkDestination("a@example.com", email))
+        assertEquals("https://WWW.example.com", markdownAutolinkDestination(" WWW.example.com ", www))
+        assertEquals("example.com", markdownAutolinkDestination("example.com", www))
+    }
+
+    /** Builds the AST node MDK emits for a scheme-less `www.` address. */
+    private fun wwwAutolink(typed: String) =
+        MarkdownInlineFfi.Autolink(
+            typed,
+            MarkdownAutolinkKindFfi.WWW,
+            MarkdownLinkDestinationKindFfi.WEB,
+        )
+
     @Test
     fun schemeAllowlistAdmitsExactlyTheExternalSchemes() {
         // Allowed, case-insensitively.
