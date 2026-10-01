@@ -611,11 +611,12 @@ class LocalNotificationGroupSummaryTest {
                 )
             try {
                 manager.cancel("account-a|group-a", LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID)
-                coordinator.request()
-                advanceTimeBy(400)
-                runCurrent()
+                // Post before starting reconciliation: runTest may advance virtual delays while
+                // the presenter is dispatched to Default. The old summary must still be present
+                // when Android has accepted, but our simulated read hides, the new child.
                 hideChildren = true
                 fixture.send("account-b", "group-b", "new")
+                assertNotNull(fixture.summary())
                 coordinator.request()
                 ShadowSystemClock.advanceBy(java.time.Duration.ofMillis(600))
                 advanceTimeBy(600)

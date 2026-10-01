@@ -24,8 +24,8 @@ import java.util.concurrent.atomic.AtomicLong
 /**
  * Coalesces platform-only reconciliation. The OS tray is the sole child inventory; a failed read is
  * unknown, never empty. Retries cannot reconstruct a dismissed card from persisted messages.
+ * Only platform summary/adoption writes; child permission/eligibility policy is unchanged.
  */
-// Only platform summary/adoption writes; child permission/eligibility policy is unchanged.
 @SuppressLint("MissingPermission")
 internal class NotificationGroupReconciler(
     private val context: Context,
