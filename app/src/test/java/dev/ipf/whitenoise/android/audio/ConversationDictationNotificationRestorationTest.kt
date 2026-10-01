@@ -381,6 +381,38 @@ class ConversationDictationNotificationRestorationTest {
         lifecycle.destroy()
     }
 
+    /** Adversarial API 34/35 policy coverage: background nudges cannot reassert microphone. */
+    @Test
+    @Config(sdk = [34, 35])
+    fun backgroundConnectionChangesNeverReassertAuthorizedMicrophone() {
+        val harness = installHost()
+        val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
+        val service = lifecycle.get()
+        val types = mutableListOf<Int>()
+        var backgrounded = false
+        NotificationStreamForegroundService.foregroundPublisher = { owner, notification, type ->
+            if (backgrounded && type and ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE != 0) {
+                error("Background microphone reassertion")
+            }
+            types += type
+            defaultPublisher(owner, notification, type)
+        }
+        service.foreground.promoteConnection(ForegroundStartTrigger.UserToggle)
+        service.onStartCommand(startIntent(service, harness), 0, 1)
+        val authorizedCalls = types.size
+        backgrounded = true
+        harness.conversationDictation.onAppBackgrounded()
+        listOf(ForegroundStartTrigger.PushWake, ForegroundStartTrigger.SystemWake, ForegroundStartTrigger.UserToggle)
+            .forEach(service.foreground::promoteConnection)
+        service.foreground.releaseConnection()
+        assertEquals(authorizedCalls, types.size)
+        assertTrue(harness.conversationDictation.hasDurableSession)
+        assertEquals("", harness.draft.text)
+        harness.conversationDictation.cancel()
+        assertTrue(shadowOf(service as Service).isForegroundStopped)
+        lifecycle.destroy()
+    }
+
     /** All commands completing before microphone promotion leave the existing connection alone. */
     @Test
     fun completionBeforePromotionKeepsConnectionAndNeverStartsCapture() {
@@ -437,14 +469,14 @@ class ConversationDictationNotificationRestorationTest {
         }
         harness.conversationDictation.cancel()
         assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)
-        assertTrue(shadowOf(service as Service).isForegroundStopped)
-        assertTrue(service.getSystemService(NotificationManager::class.java).activeNotifications.isEmpty())
+        assertFalse(shadowOf(service as Service).isForegroundStopped)
+        assertCompletedPresentation(service.getSystemService(NotificationManager::class.java), true)
         lifecycle.destroy()
     }
 
     /** Disabling connection also handles revocation of the remaining microphone type safely. */
     @Test
-    fun rejectedMicrophoneRefreshDuringConnectionStopPreservesText() {
+    fun connectionStopDoesNotReassertMicrophoneOrPasteText() {
         val harness = installHost()
         val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
         val service = lifecycle.get()
@@ -455,10 +487,10 @@ class ConversationDictationNotificationRestorationTest {
             throw SecurityException("microphone revoked")
         }
         service.foreground.releaseConnection()
-        assertEquals("preserved phrase", harness.draft.text)
-        assertFalse(harness.conversationDictation.hasDurableSession)
-        assertTrue(shadowOf(service as Service).isForegroundStopped)
-        assertTrue(service.getSystemService(NotificationManager::class.java).activeNotifications.isEmpty())
+        assertEquals("", harness.draft.text)
+        assertTrue(harness.conversationDictation.hasDurableSession)
+        assertFalse(shadowOf(service as Service).isForegroundStopped)
+        harness.conversationDictation.cancel()
         lifecycle.destroy()
     }
 
@@ -470,7 +502,7 @@ class ConversationDictationNotificationRestorationTest {
         val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
         val service = lifecycle.get()
         service.foreground.promoteConnection(ForegroundStartTrigger.UserToggle)
-        ConversationDictationForegroundService.foregroundPromoter = { _, _ ->
+        ConversationDictationForegroundService.foregroundPromoter = { _, _, _ ->
             throw SecurityException("microphone denied")
         }
         service.onStartCommand(startIntent(service, harness), 0, 1)

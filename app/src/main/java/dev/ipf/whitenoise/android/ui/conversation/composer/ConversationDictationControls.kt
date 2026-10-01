@@ -23,8 +23,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentPaste
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -364,48 +362,6 @@ private fun ConversationDictationPrimaryAction(
                         .semantics { contentDescription = status },
                 strokeWidth = 2.dp,
             )
-    }
-}
-
-/** Chooses the settings page that can actually clear a failure, and retry for the rest. */
-@Composable
-private fun ConversationDictationFailureAction(
-    state: ConversationDictationState.Failed,
-    controller: ConversationDictationController,
-) {
-    val context = LocalContext.current
-    val recovery = dictationFailureRecovery(state.cause ?: state.reason)
-    IconButton(
-        onClick =
-            when (recovery) {
-                ConversationDictationRecovery.AppSettings -> ({ openDictationAppSettings(context) })
-                ConversationDictationRecovery.SpeechProviderSetup ->
-                    ({ openSpeechProviderSetup(context, controller.speechProviderPackage) })
-                ConversationDictationRecovery.Retry -> controller::retry
-            },
-        modifier = Modifier.size(48.dp),
-    ) {
-        Icon(
-            imageVector =
-                if (recovery == ConversationDictationRecovery.Retry) {
-                    Icons.Default.Refresh
-                } else {
-                    Icons.Default.Settings
-                },
-            contentDescription =
-                stringResource(
-                    when (recovery) {
-                        ConversationDictationRecovery.AppSettings -> R.string.open_app_settings
-                        ConversationDictationRecovery.SpeechProviderSetup -> R.string.dictation_open_speech_service
-                        ConversationDictationRecovery.Retry ->
-                            if (state.reason == ConversationDictationFailure.SendBlocked) {
-                                R.string.dictation_retry_send
-                            } else {
-                                R.string.retry
-                            }
-                    },
-                ),
-        )
     }
 }
 

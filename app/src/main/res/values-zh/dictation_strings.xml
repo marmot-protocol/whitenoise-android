@@ -21,4 +21,12 @@
     <string name="dictation_send_safety_note">如果聊天或草稿在发送前发生变化，听写内容会保持未发送状态。请重试发送或选择粘贴以检查文字。</string>
     <string name="dictation_send_blocked">未发送</string>
     <string name="dictation_retry_send">重试发送</string>
+    <string name="dictation_recovery_title">语音输入需要处理</string>
+    <string name="dictation_recovery_text">打开 White Noise 以恢复语音输入。未完成的语音输入最多保留 30 分钟。</string>
+    <string name="dictation_recovery_open">打开应用</string>
+    <string name="dictation_recovery_expired_title">语音输入恢复已过期</string>
+    <string name="dictation_recovery_expired_text">未完成的语音输入已从此设备清除。</string>
+    <string name="dictation_incomplete_title">听写未完成</string>
+    <string name="dictation_incomplete_text">转写在完成前停止。你可以发送已识别的文字，或粘贴后检查。</string>
+    <string name="dictation_send_recognized_text">发送已识别的文字</string>
 </resources>

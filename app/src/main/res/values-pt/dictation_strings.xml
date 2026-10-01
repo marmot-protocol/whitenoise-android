@@ -21,4 +21,12 @@
     <string name="dictation_send_safety_note">Se a conversa ou o rascunho mudar antes do envio, o ditado ficará por enviar. Tente enviar novamente ou escolha Colar para rever o texto.</string>
     <string name="dictation_send_blocked">Não enviado</string>
     <string name="dictation_retry_send">Tentar enviar novamente</string>
+    <string name="dictation_recovery_title">O ditado precisa de atenção</string>
+    <string name="dictation_recovery_text">Abra o White Noise para recuperar o ditado. Ditados inacabados são mantidos por até 30 minutos.</string>
+    <string name="dictation_recovery_open">Abrir app</string>
+    <string name="dictation_recovery_expired_title">A recuperação do ditado expirou</string>
+    <string name="dictation_recovery_expired_text">O ditado inacabado foi apagado deste dispositivo.</string>
+    <string name="dictation_incomplete_title">Ditado incompleto</string>
+    <string name="dictation_incomplete_text">A transcrição parou antes de terminar. Você pode enviar o texto reconhecido ou colá-lo para revisar.</string>
+    <string name="dictation_send_recognized_text">Enviar texto reconhecido</string>
 </resources>

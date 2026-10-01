@@ -46,6 +46,9 @@ internal class ConversationDictationForegroundService(
     val hasForegroundLease: Boolean
         get() = foregroundPromoted
 
+    val foregroundServiceType: Int
+        get() = if (foregroundPromoted) requireNotNull(promotedController).foregroundServiceType else 0
+
     /** Refreshes a remaining microphone lease after connection ownership changes. */
     fun refreshNotification() {
         val controller = promotedController ?: return
@@ -94,6 +97,14 @@ internal class ConversationDictationForegroundService(
                 }
                 return Service.START_NOT_STICKY
             }
+            if (intent.action in setOf(ACTION_CANCEL, ACTION_PASTE, ACTION_SEND) &&
+                (
+                    controller.state is ConversationDictationState.Failed ||
+                        intent.getLongExtra(EXTRA_ACTION_GENERATION, -1L) != controller.notificationActionGeneration
+                )
+            ) {
+                return Service.START_NOT_STICKY
+            }
             when (intent.action) {
                 ACTION_CANCEL -> controller.cancel()
                 ACTION_PASTE -> controller.paste()
@@ -107,6 +118,9 @@ internal class ConversationDictationForegroundService(
                 return Service.START_NOT_STICKY
             }
             ensureChannel(this)
+            if (controller.state !is ConversationDictationState.Failed) {
+                service.getSystemService(NotificationManager::class.java).cancel("dictation-recovery", 1002)
+            }
             val alreadyPromoted =
                 foregroundPromoted && promotedController === controller && promotedSessionToken == sessionToken
             if (alreadyPromoted || promoteOrCancel(controller, sessionToken, startId)) {
@@ -139,7 +153,7 @@ internal class ConversationDictationForegroundService(
         startId: Int,
     ): Boolean =
         try {
-            foregroundPromoter(service, buildNotification(controller))
+            foregroundPromoter(service, buildNotification(controller), controller.foregroundServiceType)
             foregroundPromoted = true
             val callbackSession = sessionToken.substringAfterLast(':').toLongOrNull() ?: 0L
             conversationDictationDiagnostic("event=foreground_service_promoted callback_session=$callbackSession")
@@ -199,7 +213,14 @@ internal class ConversationDictationForegroundService(
         notificationObserver =
             notificationScope.launch {
                 snapshotFlow {
-                    Triple(controller.state, controller.deliveryInProgress, controller.completionActionsEnabled)
+                    listOf(
+                        controller.state,
+                        controller.deliveryInProgress,
+                        controller.completionActionsEnabled,
+                        controller.foregroundMicrophoneRequired,
+                        controller.notificationActionGeneration,
+                        controller.foregroundRefreshRevision,
+                    )
                 }.collect {
                     if (controller.hasDurableSession && controller.notificationSessionToken == sessionToken) {
                         updateNotificationOrAbort(controller, sessionToken)
@@ -232,8 +253,12 @@ internal class ConversationDictationForegroundService(
     internal fun actionIntent(
         action: String,
         sessionToken: String,
-    ): PendingIntent =
-        PendingIntent.getService(
+    ): PendingIntent {
+        val actionGeneration =
+            (promotedController ?: hostResolver(service)?.conversationDictation)
+                ?.takeIf { it.notificationSessionToken == sessionToken }
+                ?.notificationActionGeneration ?: 0L
+        return PendingIntent.getService(
             this,
             action.hashCode(),
             Intent()
@@ -246,10 +271,13 @@ internal class ConversationDictationForegroundService(
                         .authority("session")
                         .appendPath(sessionToken)
                         .appendPath(action)
+                        .appendPath(actionGeneration.toString())
                         .build(),
-                ).putExtra(EXTRA_SESSION_TOKEN, sessionToken),
+                ).putExtra(EXTRA_SESSION_TOKEN, sessionToken)
+                .putExtra(EXTRA_ACTION_GENERATION, actionGeneration),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+    }
 
     companion object {
         internal const val CHANNEL_ID = "composer_dictation"
@@ -271,6 +299,7 @@ internal class ConversationDictationForegroundService(
         internal const val ACTION_PASTE = "dev.ipf.whitenoise.android.dictation.PASTE"
         internal const val ACTION_SEND = "dev.ipf.whitenoise.android.dictation.SEND"
         internal const val EXTRA_SESSION_TOKEN = "dictation_session_token"
+        internal const val EXTRA_ACTION_GENERATION = "dictation_action_generation"
 
         /** A foreground service can run even when Android hides all of its drawer actions. */
         internal fun notificationControlsAvailable(context: Context): Boolean {
@@ -292,8 +321,8 @@ internal class ConversationDictationForegroundService(
         }
 
         /** Test seam for simulating platform rejection of foreground promotion. */
-        internal var foregroundPromoter: (NotificationStreamForegroundService, Notification) -> Unit =
-            { service, notification -> service.foreground.promoteDictation(notification) }
+        internal var foregroundPromoter: (NotificationStreamForegroundService, Notification, Int) -> Unit =
+            { service, notification, type -> service.foreground.promoteDictation(notification, type) }
 
         /** Starts the microphone service while the initiating composer is visible. */
         fun start(

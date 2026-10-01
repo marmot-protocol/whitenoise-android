@@ -21,4 +21,12 @@
     <string name="dictation_send_safety_note">Si el chat o el borrador cambia antes del envío, el dictado quedará sin enviar. Reintenta el envío o elige Pegar para revisar el texto.</string>
     <string name="dictation_send_blocked">No enviado</string>
     <string name="dictation_retry_send">Reintentar envío</string>
+    <string name="dictation_recovery_title">El dictado necesita atención</string>
+    <string name="dictation_recovery_text">Abre White Noise para recuperar el dictado. Los dictados sin terminar se conservan hasta 30 minutos.</string>
+    <string name="dictation_recovery_open">Abrir app</string>
+    <string name="dictation_recovery_expired_title">La recuperación del dictado caducó</string>
+    <string name="dictation_recovery_expired_text">El dictado sin terminar se eliminó de este dispositivo.</string>
+    <string name="dictation_incomplete_title">Dictado incompleto</string>
+    <string name="dictation_incomplete_text">La transcripción se detuvo antes de terminar. Puedes enviar el texto reconocido o pegarlo para revisarlo.</string>
+    <string name="dictation_send_recognized_text">Enviar texto reconocido</string>
 </resources>

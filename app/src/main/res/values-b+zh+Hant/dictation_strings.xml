@@ -21,4 +21,12 @@
     <string name="dictation_send_safety_note">如果聊天或草稿在傳送前發生變化，聽寫內容會保持未傳送狀態。請重試傳送或選擇貼上以檢查文字。</string>
     <string name="dictation_send_blocked">未傳送</string>
     <string name="dictation_retry_send">重試傳送</string>
+    <string name="dictation_recovery_title">語音輸入需要處理</string>
+    <string name="dictation_recovery_text">開啟 White Noise 以復原語音輸入。未完成的語音輸入最多保留 30 分鐘。</string>
+    <string name="dictation_recovery_open">開啟應用程式</string>
+    <string name="dictation_recovery_expired_title">語音輸入復原已過期</string>
+    <string name="dictation_recovery_expired_text">未完成的語音輸入已從此裝置清除。</string>
+    <string name="dictation_incomplete_title">聽寫未完成</string>
+    <string name="dictation_incomplete_text">轉寫在完成前停止。你可以傳送已辨識的文字，或貼上後檢查。</string>
+    <string name="dictation_send_recognized_text">傳送已辨識的文字</string>
 </resources>

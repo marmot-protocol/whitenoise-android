@@ -21,4 +21,12 @@
     <string name="dictation_send_safety_note">Если чат или черновик изменится до отправки, диктовка останется неотправленной. Повторите отправку или выберите «Вставить», чтобы проверить текст.</string>
     <string name="dictation_send_blocked">Не отправлено</string>
     <string name="dictation_retry_send">Повторить отправку</string>
+    <string name="dictation_recovery_title">Диктовка требует внимания</string>
+    <string name="dictation_recovery_text">Откройте White Noise, чтобы восстановить диктовку. Незавершённая диктовка хранится до 30 минут.</string>
+    <string name="dictation_recovery_open">Открыть приложение</string>
+    <string name="dictation_recovery_expired_title">Срок восстановления диктовки истёк</string>
+    <string name="dictation_recovery_expired_text">Незавершённая диктовка удалена с этого устройства.</string>
+    <string name="dictation_incomplete_title">Неполная диктовка</string>
+    <string name="dictation_incomplete_text">Расшифровка остановилась до завершения. Можно отправить распознанный текст или вставить его для проверки.</string>
+    <string name="dictation_send_recognized_text">Отправить распознанный текст</string>
 </resources>

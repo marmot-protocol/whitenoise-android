@@ -512,11 +512,6 @@ class NotificationStreamForegroundService : Service() {
     }
 }
 
-/** Only a rejected user-owned connection restore reconciles the Keep connected preference. */
-internal fun NotificationStreamForegroundService.onConnectionRestoreRejected() {
-    (application as? WhiteNoiseApplication)?.initializedAppState()?.onBackgroundConnectionStartRejected()
-}
-
 /** Acknowledges only request generations owned by this supervised service instance. */
 private fun Application.notifyCapabilityFallbackStarted(generations: Set<Long>) {
     if (generations.isEmpty()) return

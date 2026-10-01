@@ -342,6 +342,31 @@ class ConversationDictationPersistentControlTest {
         composeRule.onNodeWithContentDescription("Paste").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Retry Send").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Dismiss").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Retry Send").performClick()
+        composeRule.onNodeWithText("Incomplete dictation").assertIsDisplayed()
+        composeRule.onNodeWithText("Send recognized text").assertIsDisplayed()
+    }
+
+    /** Provider settings remain available while the unsent prefix requires an explicit review choice. */
+    @Test
+    fun partialProviderFailureOffersRetrySendAndSettingsInConfirmation() {
+        val fixture = fixture(TextFieldValue(""))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        val initial = fixture.controller.state
+        render(
+            fixture,
+            displayedState =
+                ConversationDictationState.Failed(
+                    requireNotNull(initial.sessionId),
+                    requireNotNull(initial.target),
+                    ConversationDictationFailure.SendBlocked,
+                    "Recognized prefix",
+                    cause = ConversationDictationFailure.ProviderUnavailable,
+                ),
+        )
+        composeRule.onNodeWithContentDescription("Retry Send").performClick()
+        composeRule.onNodeWithText("Open the speech service").assertIsDisplayed()
+        composeRule.onNodeWithText("Paste").assertIsDisplayed()
     }
 
     private fun render(

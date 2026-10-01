@@ -1081,7 +1081,7 @@
     <string name="tts_playback_action_stop">Stop</string>
     <string name="tts_playback_action_previous_sentence">Previous sentence</string>
     <string name="tts_playback_action_next_sentence">Next sentence</string>
-    <string name="background_connection_special_use_subtype" translatable="false">Restart the user-enabled encrypted message background connection after device boot or app update.</string>
+    <string name="background_connection_special_use_subtype" translatable="false">User-enabled encrypted message connection, user-initiated dictation and transcription, and bounded on-device recovery of unfinished dictation.</string>
     <string name="toast_identity_created">Identity created</string>
     <string name="toast_couldnt_create_identity">Couldn\'t create identity</string>
     <string name="toast_identity_imported">Identity imported</string>

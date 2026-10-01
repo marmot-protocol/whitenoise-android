@@ -7868,6 +7868,7 @@ class WhiteNoiseAppState private constructor(
         }
         if (foreground) {
             dictationDiagnosticLifecycle.foreground { conversationDictation }
+            initializedConversationDictation()?.onAppForegrounded()
             appLockTtsBoundaryJob?.cancel()
             appLockTtsBoundaryJob = null
             maybeShowAppLockForForeground()

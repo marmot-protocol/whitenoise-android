@@ -54,6 +54,53 @@ class ConversationDictationCallerAudioTest {
         capture.discard {}
     }
 
+    /** Forced closure interrupts a blocked native read, preserves completed PCM and releases once. */
+    @Test
+    fun forceFinishClosesBlockedRecorderWithoutDiscardingCompletedAudio() {
+        val blockedRead = CountDownLatch(1)
+        val stopRead = CountDownLatch(1)
+        val released = AtomicInteger(0)
+        val reads = AtomicInteger(0)
+        val device =
+            object : ConversationDictationAudioCaptureDevice by FakeCaptureDevice() {
+                override fun read(target: ShortArray): Int {
+                    if (reads.incrementAndGet() == 1) {
+                        target[0] = 1
+                        target[1] = 2
+                        return 2
+                    }
+                    blockedRead.countDown()
+                    check(stopRead.await(2, TimeUnit.SECONDS))
+                    target[0] = 3
+                    target[1] = 4
+                    return 2
+                }
+
+                override fun stop() = stopRead.countDown()
+
+                override fun release() {
+                    released.incrementAndGet()
+                }
+            }
+        val buffer = ConversationDictationAudioChunkBuffer(sessionId = 1L, chunkBytes = 4, maxBufferedBytes = 8)
+        val capture = callerAudio(device = device, buffer = buffer)
+        val closed = CountDownLatch(1)
+        try {
+            assertTrue(capture.start())
+            assertTrue(blockedRead.await(2, TimeUnit.SECONDS))
+            capture.forceFinish(closed::countDown)
+            assertTrue(closed.await(2, TimeUnit.SECONDS))
+            assertEquals(1, released.get())
+            assertTrue(buffer.hasPending)
+            assertEquals(8, buffer.bufferedBytes)
+            capture.forceFinish {}
+            await { released.get() == 1 }
+        } finally {
+            stopRead.countDown()
+            capture.discard {}
+        }
+    }
+
     /** Finishing retains the in-progress read plus five native recorder tail reads. */
     @Test
     fun finishDrainsInProgressReadAndFiveTailReadsThenCloses() {
