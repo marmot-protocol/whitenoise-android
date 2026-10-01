@@ -70,6 +70,7 @@ import dev.ipf.whitenoise.android.core.ProfileFieldValidation
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.media.GroupImageDraftProcessor
 import dev.ipf.whitenoise.android.media.IdentityImageCropShape
+import dev.ipf.whitenoise.android.media.ProfilePictureDraftProcessor
 import dev.ipf.whitenoise.android.media.renderIdentityImageDraft
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -763,6 +764,19 @@ internal fun ProfileEditScreen(
         }
     }
 
+    /** A picked GIF skips the still-image crop and uploads intact; any other pick goes through the crop. */
+    fun pickProfilePicture(uri: android.net.Uri) {
+        scope.launch {
+            if (ProfilePictureDraftProcessor.isGifSource(context.contentResolver, uri)) {
+                uploadProfileDraft(ProfileImageTarget.Picture) {
+                    ProfilePictureDraftProcessor.fromContentUri(context.contentResolver, uri)
+                }
+            } else {
+                pendingAvatarCropUri = uri
+            }
+        }
+    }
+
     @Suppress("TooGenericExceptionCaught") // The injected or FFI profile reader can throw any non-cancellation failure.
     LaunchedEffect(activeAccountId) {
         val accountId = activeAccountId ?: return@LaunchedEffect
@@ -862,7 +876,7 @@ internal fun ProfileEditScreen(
         onOpenBanner = { fullBannerOpen = true },
         onPickImage = { target, uri ->
             if (target == ProfileImageTarget.Picture) {
-                pendingAvatarCropUri = uri
+                pickProfilePicture(uri)
             } else {
                 uploadProfileDraft(target) { GroupImageDraftProcessor.fromContentUri(context.contentResolver, uri) }
             }
@@ -877,7 +891,7 @@ internal fun ProfileEditScreen(
         onDismiss = { pendingAvatarCropUri = null },
         onUnreadable = { uri ->
             uploadProfileDraft(ProfileImageTarget.Picture) {
-                GroupImageDraftProcessor.fromContentUri(context.contentResolver, uri)
+                ProfilePictureDraftProcessor.fromContentUri(context.contentResolver, uri)
             }
         },
         onCropped = { bytes, crop ->
@@ -948,11 +962,11 @@ internal fun ProfileEditScreen(
                     showPictureSheet = false
                 } else {
                     uploadProfileDraft(target = ProfileImageTarget.Picture) {
-                        GroupImageDraftProcessor.fromRemoteUrl(picked)
+                        ProfilePictureDraftProcessor.fromRemoteUrl(picked)
                     }
                 }
             },
-            onPickPhoto = { uri -> pendingAvatarCropUri = uri },
+            onPickPhoto = ::pickProfilePicture,
             onDismiss = { if (!pictureUploading) showPictureSheet = false },
         )
     }

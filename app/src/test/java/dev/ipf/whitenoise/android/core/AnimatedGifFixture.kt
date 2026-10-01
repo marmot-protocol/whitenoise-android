@@ -2,11 +2,13 @@ package dev.ipf.whitenoise.android.core
 
 /**
  * A looping two-frame GIF whose logical screen is [width] x [height], each frame a single pixel in one of
- * two palette colours. Small enough to read by eye, real enough for the platform decoders.
+ * two palette colours, optionally carrying a private [comment] extension that sanitization must remove.
+ * Small enough to read by eye, real enough for the platform decoders.
  */
 internal fun twoFrameGif(
     width: Int = 1,
     height: Int = 1,
+    comment: String? = null,
 ): ByteArray {
     val screen =
         "GIF89a".encodeToByteArray() +
@@ -21,7 +23,12 @@ internal fun twoFrameGif(
             )
     val palette = byteArrayOf(0xff.toByte(), 0, 0, 0, 0, 0xff.toByte())
     val loop = byteArrayOf(0x21, 0xff.toByte(), 0x0b) + "NETSCAPE2.0".encodeToByteArray() + byteArrayOf(3, 1, 0, 0, 0)
-    return screen + palette + loop + gifFrame(colorIndex = 0) + gifFrame(colorIndex = 1) + byteArrayOf(0x3b)
+    val commentBlock =
+        comment?.encodeToByteArray()?.let { text ->
+            byteArrayOf(0x21, 0xfe.toByte(), text.size.toByte()) + text + byteArrayOf(0)
+        } ?: ByteArray(0)
+    return screen + palette + loop + commentBlock + gifFrame(colorIndex = 0) + gifFrame(colorIndex = 1) +
+        byteArrayOf(0x3b)
 }
 
 /** One 1x1 frame with a 100 ms delay, encoded as LZW clear / [colorIndex] / end. */

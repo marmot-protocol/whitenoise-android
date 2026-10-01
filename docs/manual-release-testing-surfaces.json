@@ -2072,7 +2072,8 @@
         "anchor": "fun GroupAvatar(",
         "test_ids": [
           "GRP-003",
-          "INT-011"
+          "INT-011",
+          "PRO-006"
         ]
       },
       {
@@ -2845,7 +2846,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTopBar.kt",
         "anchor": "fun ConversationTopBar(",
         "test_ids": [
-          "CON-001"
+          "CON-001",
+          "PRO-006"
         ]
       },
       {
@@ -7216,7 +7218,8 @@
         "anchor": "fun ProfileEditScreen(",
         "test_ids": [
           "PRO-001",
-          "PRO-002"
+          "PRO-002",
+          "PRO-007"
         ]
       },
       {
@@ -7226,7 +7229,8 @@
         "test_ids": [
           "PRO-001",
           "PRO-002",
-          "PRO-006"
+          "PRO-006",
+          "PRO-007"
         ]
       },
       {
