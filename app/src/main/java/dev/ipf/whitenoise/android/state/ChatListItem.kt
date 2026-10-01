@@ -192,6 +192,14 @@ data class ChatListItem(
 ) {
     val id: String = group.groupIdHex
 
+    /** Presentation only: conflicting snapshots cannot establish invitation consent. */
+    val checkingInvitation: Boolean
+        get() =
+            inviteConfirmationUnresolved &&
+                group.acceptsInviteResults() &&
+                projection?.disbanding != true &&
+                projection?.lifecycleState != GroupLifecycleStateFfi.DISBANDED
+
     /**
      * Case-folded group id, for the folder membership sets that key chats by
      * lowercased hex. Folded once per projection so a folder-chip pass over F

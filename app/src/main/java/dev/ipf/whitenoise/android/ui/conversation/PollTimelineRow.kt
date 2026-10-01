@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.PollOptionResultFfi
 import dev.ipf.marmotkit.PollProjectionFfi
 import dev.ipf.marmotkit.PollTypeFfi
+import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -54,66 +55,6 @@ import java.util.Date
 private const val POLL_ROW_MAX_WIDTH_FRACTION = 0.95f
 private const val POLL_MILLIS_PER_SECOND = 1_000L
 
-/** Applies an in-flight replacement vote to MDK's last projection for immediate feedback. */
-internal fun optimisticPollProjection(
-    poll: PollProjectionFfi,
-    selection: List<String>,
-): PollProjectionFfi {
-    val previous = poll.localSelection.toSet()
-    val next = selection.toSet()
-    if (previous == next) return poll
-    return poll.copy(
-        options =
-            poll.options.map { option ->
-                option.copy(
-                    votes =
-                        when {
-                            option.id in previous && option.id !in next ->
-                                if (option.votes > 0uL) option.votes - 1uL else 0uL
-                            option.id !in previous && option.id in next -> option.votes + 1uL
-                            else -> option.votes
-                        },
-                )
-            },
-        participants = if (previous.isEmpty() && next.isNotEmpty()) poll.participants + 1uL else poll.participants,
-        localSelection = selection,
-    )
-}
-
-/** Fraction of participants who selected an option, bounded for stale projections. */
-internal fun pollResultFraction(
-    votes: ULong,
-    participants: ULong,
-): Float = if (participants == 0uL) 0f else (votes.toDouble() / participants.toDouble()).toFloat().coerceIn(0f, 1f)
-
-/** Checks expiry before the first frame and again when a vote is tapped. */
-internal fun pollDeadlineReached(
-    endsAt: ULong?,
-    nowMillis: Long,
-): Boolean = endsAt != null && endsAt <= (nowMillis / POLL_MILLIS_PER_SECOND).toULong()
-
-/** Rejects a tap against an expired projection even before Compose's deadline timer fires. */
-internal fun pollVoteAllowed(
-    poll: PollProjectionFfi,
-    nowMillis: Long,
-): Boolean = poll.open && !pollDeadlineReached(poll.endsAt, nowMillis)
-
-/** Computes the complete replacement vote from native option ids, never an empty selection. */
-internal fun replacementPollSelection(
-    poll: PollProjectionFfi,
-    tappedId: String,
-): List<String>? {
-    val selection = poll.localSelection.filter { id -> poll.options.any { it.id == id } }
-    return if (poll.options.none { it.id == tappedId }) {
-        null
-    } else if (poll.pollType == PollTypeFfi.SINGLE_CHOICE) {
-        listOf(tappedId).takeUnless { it == selection }
-    } else {
-        val next = if (tappedId in selection) selection - tappedId else selection + tappedId
-        next.takeIf { it.isNotEmpty() && it != selection }
-    }
-}
-
 /** Shows MDK's poll projection and submits replacement selections through its native vote API. */
 @Composable
 @Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
@@ -128,17 +69,15 @@ internal fun PollTimelineRow(
         Text(stringResource(R.string.poll_preview), Modifier.padding(16.dp))
         return
     }
-    var voting by remember(item.record.messageIdHex) { mutableStateOf(false) }
-    var pendingSelection by remember(item.record.messageIdHex) { mutableStateOf<List<String>?>(null) }
-    LaunchedEffect(poll.localSelection, poll.open) {
-        if (!poll.open || pendingSelection?.toSet() == poll.localSelection.toSet()) pendingSelection = null
-    }
-    val displayedPoll = pendingSelection?.let { optimisticPollProjection(poll, it) } ?: poll
     var deadlineReached by remember(poll.endsAt) {
         mutableStateOf(pollDeadlineReached(poll.endsAt, System.currentTimeMillis()))
     }
     LaunchedEffect(poll.endsAt) {
-        val deadline = poll.endsAt?.toLong()?.times(1000L) ?: return@LaunchedEffect
+        val deadline =
+            poll.endsAt
+                ?.toLong()
+                ?.plus(1L)
+                ?.times(POLL_MILLIS_PER_SECOND) ?: return@LaunchedEffect
         val remaining = deadline - System.currentTimeMillis()
         if (remaining > 0L) delay(remaining)
         deadlineReached = true
@@ -163,30 +102,66 @@ internal fun PollTimelineRow(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                PollCard(
-                    poll = displayedPoll,
-                    canVote = open && controller.canSendMessages && !selectionMode && !voting,
-                    onVote = { optionId ->
-                        val replacement = replacementPollSelection(displayedPoll, optionId)
-                        if (replacement != null && pollVoteAllowed(poll, System.currentTimeMillis())) {
-                            voting = true
-                            pendingSelection = replacement
-                            appState.launchMutation {
-                                var accepted = false
-                                try {
-                                    accepted = controller.castPollVote(item.record.messageIdHex, replacement)
-                                } finally {
-                                    if (!accepted) pendingSelection = null
-                                    voting = false
-                                }
+                PollVotingCard(
+                    poll = poll,
+                    voteKey = controller.boundAccountRef to item.record.messageIdHex,
+                    canVote = open && controller.canSendMessages && !selectionMode,
+                    open = open,
+                    submitVote = { replacement, onCompleted ->
+                        appState.launchMutation {
+                            var outcome: SendAcceptDispositionFfi? = null
+                            try {
+                                outcome = controller.castPollVote(item.record.messageIdHex, replacement)
+                            } finally {
+                                onCompleted(outcome)
                             }
                         }
                     },
-                    open = open,
                 )
             }
         }
     }
+}
+
+/** Keeps the pending and failed vote visible, including when a native call waits on publication. */
+@Composable
+@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
+internal fun PollVotingCard(
+    poll: PollProjectionFfi,
+    voteKey: Pair<String?, String>,
+    canVote: Boolean,
+    submitVote: (List<String>, (SendAcceptDispositionFfi?) -> Unit) -> Unit,
+    open: Boolean = poll.open,
+) {
+    var voting by remember(voteKey) { mutableStateOf(false) }
+    var pendingSelection by remember(voteKey) { mutableStateOf<List<String>?>(null) }
+    var status by remember(voteKey) { mutableStateOf(PollVoteStatus.IDLE) }
+    LaunchedEffect(voteKey, poll.localSelection, open) {
+        if (!open || pendingSelection?.toSet() == poll.localSelection.toSet()) {
+            pendingSelection = null
+            status = PollVoteStatus.IDLE
+        }
+    }
+    val displayedPoll = pendingSelection?.let { optimisticPollProjection(poll, it) } ?: poll
+    val effectiveCanVote = canVote && open
+    PollCard(
+        poll = displayedPoll,
+        canVote = effectiveCanVote && !voting,
+        open = open,
+        status = if (voting) PollVoteStatus.SUBMITTING else status,
+        onVote = vote@{ optionId ->
+            if (voting || !effectiveCanVote || !pollVoteAllowed(poll, System.currentTimeMillis())) return@vote
+            val replacement = replacementPollSelection(displayedPoll, optionId) ?: return@vote
+            voting = true
+            status = PollVoteStatus.SUBMITTING
+            pendingSelection = replacement
+            submitVote(replacement) { outcome ->
+                status = if (pendingSelection == null) PollVoteStatus.IDLE else outcome.voteStatus()
+                if (outcome == null) pendingSelection = null
+                voting = false
+            }
+        },
+    )
 }
 
 /** Uses the same tappable group sender avatar as nearby transcript rows. */
@@ -208,6 +183,16 @@ private fun PollSenderAvatar(
     }
 }
 
+internal enum class PollVoteStatus { IDLE, SUBMITTING, UNCONFIRMED, FAILED }
+
+private fun SendAcceptDispositionFfi?.voteStatus(): PollVoteStatus =
+    when (this) {
+        SendAcceptDispositionFfi.PUBLISHED -> PollVoteStatus.IDLE
+        SendAcceptDispositionFfi.ACCEPTED_PENDING -> PollVoteStatus.SUBMITTING
+        SendAcceptDispositionFfi.COMPLETION_UNKNOWN -> PollVoteStatus.UNCONFIRMED
+        null -> PollVoteStatus.FAILED
+    }
+
 /** Renders the projected question, live tally, local selection, and closed state. */
 @Composable
 @Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
@@ -216,12 +201,14 @@ internal fun PollCard(
     canVote: Boolean,
     onVote: (String) -> Unit,
     open: Boolean = poll.open,
+    status: PollVoteStatus = PollVoteStatus.IDLE,
 ) {
     val locale = LocalConfiguration.current.locales[0]
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(
@@ -264,9 +251,33 @@ internal fun PollCard(
                         .format(Date(endsAt.toLong() * 1_000L))
                 Text(stringResource(R.string.poll_ends_at, deadline), style = MaterialTheme.typography.labelSmall)
             }
+            PollVoteStatusLabel(status)
             if (!open) Text(stringResource(R.string.poll_closed), style = MaterialTheme.typography.labelMedium)
         }
     }
+}
+
+/** Shows only presentation feedback; MDK remains authoritative for the selection and tally. */
+@Composable
+@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
+private fun PollVoteStatusLabel(status: PollVoteStatus) {
+    val label =
+        when (status) {
+            PollVoteStatus.IDLE -> return
+            PollVoteStatus.SUBMITTING -> R.string.sending
+            PollVoteStatus.UNCONFIRMED -> R.string.delivery_not_confirmed
+            PollVoteStatus.FAILED -> R.string.poll_vote_failed
+        }
+    Text(
+        stringResource(label),
+        style = MaterialTheme.typography.labelMedium,
+        color =
+            if (status == PollVoteStatus.FAILED) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+    )
 }
 
 /** Keeps vote counts readable in both live and closed polls while retaining a clear tap target. */
@@ -286,8 +297,13 @@ private fun PollOptionRow(
                 .fillMaxWidth()
                 .defaultMinSize(minHeight = 48.dp)
                 .clip(shape)
-                .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape)
-                .clickable(enabled = canVote, role = Role.Button) { onVote(option.id) }
+                .border(
+                    BorderStroke(
+                        if (selected) 2.dp else 1.dp,
+                        if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                    ),
+                    shape,
+                ).clickable(enabled = canVote, role = Role.Button) { onVote(option.id) }
                 .semantics { this.selected = selected }
                 .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),

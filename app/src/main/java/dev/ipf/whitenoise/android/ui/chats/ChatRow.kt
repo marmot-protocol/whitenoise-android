@@ -59,7 +59,7 @@ import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.messagePreviewForRetention
-import dev.ipf.whitenoise.android.ui.BuiltinEmoji
+import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
@@ -346,9 +346,10 @@ internal fun ChatRow(
                 chatRowDraftPreview(
                     item = item,
                     legacyDraft = appState.chatRowDraftFor(accountRef, item.group.groupIdHex),
-                )
+                ).takeUnless { item.checkingInvitation }
             val invitation =
-                item.selectedPreview == SelectedChatPreviewFfi.Invitation ||
+                item.checkingInvitation ||
+                    item.selectedPreview == SelectedChatPreviewFfi.Invitation ||
                     (item.selectedPreview == null && item.group.pendingConfirmation)
             val expired by rememberChatPreviewExpired(item.messagePreviewForRetention())
             val empty =
@@ -380,6 +381,7 @@ internal fun ChatRow(
                 } else {
                     AnnotatedString(
                         when {
+                            item.checkingInvitation -> stringResource(R.string.checking_invitation)
                             invitation ->
                                 stringResource(
                                     R.string.invited_to_chat_by,
@@ -409,7 +411,7 @@ internal fun ChatRow(
             // timestamp already rides `timestampAt` above), so the line the user
             // reads is the one that actually matched. Title/preview-only hits
             // (bodyMatch null) keep the normal last-message preview.
-            if (bodyMatch != null) {
+            if (bodyMatch != null && !item.checkingInvitation) {
                 val highlightStyle =
                     SpanStyle(
                         color = MaterialTheme.colorScheme.primary,
@@ -417,11 +419,11 @@ internal fun ChatRow(
                     )
                 val snippetText =
                     remember(bodyMatch.snippet, highlightStyle) {
-                        BuiltinEmoji.annotate(highlightedSnippet(bodyMatch.snippet, highlightStyle))
+                        EmojiShortcodes.annotate(highlightedSnippet(bodyMatch.snippet, highlightStyle))
                     }
                 Text(
                     text = snippetText,
-                    inlineContent = BuiltinEmoji.content(),
+                    inlineContent = EmojiShortcodes.content(),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -525,8 +527,8 @@ internal fun ChatRowPreviewLine(
                 }.orEmpty()
         }
     Text(
-        text = remember(text) { BuiltinEmoji.annotate(text) },
-        inlineContent = inlineContent + BuiltinEmoji.content(),
+        text = remember(text) { EmojiShortcodes.annotate(text) },
+        inlineContent = inlineContent + EmojiShortcodes.content(),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         fontStyle = fontStyle,

@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="poll_custom_time">Своя длительность</string>
+    <string name="poll_custom_duration">Длительность</string>
+    <string name="poll_unit_seconds">Секунды</string>
+    <string name="poll_unit_minutes">Минуты</string>
+    <string name="poll_unit_hours">Часы</string>
+    <string name="poll_unit_days">Дни</string>
+    <string name="poll_custom_duration_error">Введите целое число от 1 секунды до 30 дней.</string>
+    <string name="poll_custom_preview">Опрос завершится через %1$s после публикации.</string>
+    <string name="poll_cancel_custom_time">Вернуться к прежнему сроку</string>
     <string name="app_name">White Noise</string>
     <string name="poll_preview">Опрос</string>
     <string name="poll_unsupported">Не удалось показать этот опрос</string>
@@ -1536,6 +1545,18 @@
     <string name="notification_channel_app_updates_global_description">Уведомления Android об обновлениях приложения White Noise</string>
 
     <string name="chat_bubble_colors">Цвета сообщений</string>
+    <string name="custom_emoji">Свои эмодзи</string>
+    <string name="custom_emoji_detail">Добавленные здесь изображения становятся эмодзи :код: в сообщениях и реакциях. Они остаются на этом устройстве, а другие видят код как текст.</string>
+    <string name="custom_emoji_empty">Своих эмодзи пока нет.</string>
+    <string name="custom_emoji_name_title">Название эмодзи</string>
+    <string name="custom_emoji_name_label">Код</string>
+    <string name="custom_emoji_name_help">Буквы, цифры и подчёркивания.</string>
+    <string name="custom_emoji_replaces">Заменит текущий %1$s.</string>
+    <string name="custom_emoji_remove_title">Удалить %1$s?</string>
+    <string name="custom_emoji_remove_detail">Изображение удаляется с этого устройства. В сообщениях код останется текстом.</string>
+    <string name="custom_emoji_too_large">Изображение больше 1 МБ.</string>
+    <string name="custom_emoji_not_image">Этот файл не является изображением, которое White Noise может показать.</string>
+    <string name="custom_emoji_save_failed">Не удалось сохранить эмодзи.</string>
     <string name="action_color">Цвет действия</string>
     <string name="action_color_no_active_account">Выберите активную учётную запись, прежде чем настраивать её акцентный цвет.</string>
     <string name="bubble_color_preview">Предпросмотр</string>
@@ -2177,4 +2198,6 @@
     <string name="dictation_pause_other_audio_title">Приостанавливать другое аудио</string>
     <string name="dictation_pause_other_audio_subtitle">Музыка и подкасты приостанавливаются во время диктовки и могут возобновиться после окончания записи. Озвучивание и голосовые сообщения в White Noise всегда приостанавливаются для безопасности.</string>
     <string name="dictation_audio_focus_unavailable">Не удалось приостановить другое аудио. Повторите попытку или отключите этот параметр в настройках диктовки.</string>
+    <string name="checking_invitation">Проверка приглашения…</string>
+    <string name="couldnt_check_invitation">Не удалось проверить приглашение</string>
 </resources>

@@ -60,6 +60,59 @@ class PollScreenshotTest {
         composeRule.onNodeWithTag("poll-card").captureRoboImage("src/test/snapshots/poll_card_closed_dark_rtl.png")
     }
 
+    /** A selected received poll stays clearly outlined against the AMOLED black surface. */
+    @Test fun selectedPollAmoled() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                Surface(Modifier.width(360.dp).testTag("poll-card")) {
+                    PollCard(poll(), canVote = true, onVote = {})
+                }
+            }
+        }
+        composeRule.onNodeWithTag("poll-card").captureRoboImage("src/test/snapshots/poll_card_selected_amoled.png")
+    }
+
+    /** Slow publication explains why the option controls are temporarily disabled. */
+    @Test fun pendingPollAmoled() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                Surface(Modifier.width(360.dp).testTag("poll-card")) {
+                    PollCard(poll(), canVote = false, onVote = {}, status = PollVoteStatus.SUBMITTING)
+                }
+            }
+        }
+        composeRule.onNodeWithTag("poll-card").captureRoboImage("src/test/snapshots/poll_card_pending_amoled.png")
+    }
+
+    /** Failed votes keep an inline explanation and allow tapping an option to try again. */
+    @Test fun failedPollAmoled() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                Surface(Modifier.width(360.dp).testTag("poll-card")) {
+                    PollCard(
+                        poll().copy(localSelection = emptyList()),
+                        canVote = true,
+                        onVote = {},
+                        status = PollVoteStatus.FAILED,
+                    )
+                }
+            }
+        }
+        composeRule.onNodeWithTag("poll-card").captureRoboImage("src/test/snapshots/poll_card_failed_amoled.png")
+    }
+
+    /** An ambiguous native completion must not look like a confirmed publication. */
+    @Test fun unconfirmedPollAmoled() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                Surface(Modifier.width(360.dp).testTag("poll-card")) {
+                    PollCard(poll(), canVote = true, onVote = {}, status = PollVoteStatus.UNCONFIRMED)
+                }
+            }
+        }
+        composeRule.onNodeWithTag("poll-card").captureRoboImage("src/test/snapshots/poll_card_unconfirmed_amoled.png")
+    }
+
     /** The group composer offers question, options and choice type before publishing. */
     @Test fun createFormLight() {
         composeRule.setContent {
@@ -69,7 +122,7 @@ class PollScreenshotTest {
                         question = "Where should we meet?",
                         options = listOf("Coffee shop", "Library"),
                         multiple = false,
-                        deadlineDurationSeconds = POLL_FIVE_MINUTES_SECONDS,
+                        deadlineSelection = PollDeadlineSelection(presetSeconds = POLL_FIVE_MINUTES_SECONDS),
                         enabled = true,
                         onQuestionChange = {},
                         onOptionChange = { _, _ -> },
@@ -93,7 +146,7 @@ class PollScreenshotTest {
                         question = "Where should we meet?",
                         options = listOf("Cafe", "café"),
                         multiple = false,
-                        deadlineDurationSeconds = null,
+                        deadlineSelection = PollDeadlineSelection(),
                         enabled = true,
                         issue = PollDraftIssue.DUPLICATE_OPTION,
                         onQuestionChange = {},
@@ -124,7 +177,7 @@ class PollScreenshotTest {
                             question = "Where should we meet?",
                             options = listOf("Coffee shop", "Library"),
                             multiple = true,
-                            deadlineDurationSeconds = null,
+                            deadlineSelection = PollDeadlineSelection(),
                             enabled = true,
                             onQuestionChange = {},
                             onOptionChange = { _, _ -> },
@@ -144,6 +197,74 @@ class PollScreenshotTest {
         composeRule
             .onNodeWithTag("poll-create-form")
             .captureRoboImage("src/test/snapshots/poll_create_form_large_rtl_choices.png")
+    }
+
+    /** A custom duration and normalized preview remain readable in the compact dialog. */
+    @Test fun createFormCustomTime() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                Surface(Modifier.width(320.dp).testTag("poll-create-form")) {
+                    PollCreateForm(
+                        question = "Where should we meet?",
+                        options = listOf("Coffee shop", "Library"),
+                        multiple = false,
+                        deadlineSelection =
+                            PollDeadlineSelection(
+                                customSelected = true,
+                                customValue = "25",
+                                customUnit = PollDurationUnit.HOURS,
+                            ),
+                        enabled = true,
+                        onQuestionChange = {},
+                        onOptionChange = { _, _ -> },
+                        onRemoveOption = {},
+                        onAddOption = {},
+                        onMultipleChange = {},
+                        onDeadlineChange = {},
+                    )
+                }
+            }
+        }
+        composeRule.onNodeWithText("Use previous deadline").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("poll-create-form").captureRoboImage("src/test/snapshots/poll_create_custom_time.png")
+    }
+
+    /** Invalid custom input shows inline feedback without hiding the unit choice. */
+    @Test fun createFormCustomTimeErrorAmoledLargeRtl() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                CompositionLocalProvider(
+                    LocalLayoutDirection provides LayoutDirection.Rtl,
+                    LocalDensity provides Density(1f, 2f),
+                ) {
+                    Surface(Modifier.width(320.dp).testTag("poll-create-form")) {
+                        PollCreateForm(
+                            question = "Where should we meet?",
+                            options = listOf("Coffee shop", "Library"),
+                            multiple = false,
+                            deadlineSelection =
+                                PollDeadlineSelection(
+                                    customSelected = true,
+                                    customValue = "31",
+                                    customUnit = PollDurationUnit.DAYS,
+                                ),
+                            enabled = true,
+                            deadlineIssue = PollDeadlineIssue.TOO_LONG,
+                            onQuestionChange = {},
+                            onOptionChange = { _, _ -> },
+                            onRemoveOption = {},
+                            onAddOption = {},
+                            onMultipleChange = {},
+                            onDeadlineChange = {},
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.onNodeWithText("Use previous deadline").performScrollTo().assertIsDisplayed()
+        composeRule
+            .onNodeWithTag("poll-create-form")
+            .captureRoboImage("src/test/snapshots/poll_create_custom_time_error_amoled_large_rtl.png")
     }
 
     /** Shared native projection fixture with two options and a selected vote. */

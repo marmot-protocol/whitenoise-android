@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="poll_custom_time">Özel süre</string>
+    <string name="poll_custom_duration">Süre</string>
+    <string name="poll_unit_seconds">Saniye</string>
+    <string name="poll_unit_minutes">Dakika</string>
+    <string name="poll_unit_hours">Saat</string>
+    <string name="poll_unit_days">Gün</string>
+    <string name="poll_custom_duration_error">1 saniye ile 30 gün arasında bir tam sayı girin.</string>
+    <string name="poll_custom_preview">Anket yayımlandıktan %1$s sonra kapanır.</string>
+    <string name="poll_cancel_custom_time">Önceki süreyi kullan</string>
     <string name="app_name">White Noise</string>
     <string name="poll_preview">Anket</string>
     <string name="poll_unsupported">Bu anket görüntülenemiyor</string>
@@ -1478,6 +1487,18 @@
     <string name="notification_channel_app_updates_global_description">White Noise uygulama güncellemeleri için Android uyarı davranışı</string>
 
     <string name="chat_bubble_colors">Sohbet balonu renkleri</string>
+    <string name="custom_emoji">Özel emoji</string>
+    <string name="custom_emoji_detail">Buraya eklediğin görseller mesajlarda ve tepkilerde :kısakod: emojisine dönüşür. Bu cihazda kalırlar; diğer kişiler kısa kodu metin olarak görür.</string>
+    <string name="custom_emoji_empty">Henüz özel emoji yok.</string>
+    <string name="custom_emoji_name_title">Bu emojiye ad ver</string>
+    <string name="custom_emoji_name_label">Kısa kod</string>
+    <string name="custom_emoji_name_help">Harfler, rakamlar ve alt çizgiler.</string>
+    <string name="custom_emoji_replaces">Mevcut %1$s yerine geçer.</string>
+    <string name="custom_emoji_remove_title">%1$s kaldırılsın mı?</string>
+    <string name="custom_emoji_remove_detail">Görsel bu cihazdan silinir. Mesajlar kısa kodu metin olarak korur.</string>
+    <string name="custom_emoji_too_large">Bu görsel 1 MB’tan büyük.</string>
+    <string name="custom_emoji_not_image">Bu dosya White Noise’un gösterebileceği bir görsel değil.</string>
+    <string name="custom_emoji_save_failed">Emoji kaydedilemedi.</string>
     <string name="action_color">Eylem rengi</string>
     <string name="action_color_no_active_account">Uygulama vurgu rengini ayarlamadan önce etkin bir hesap seçin.</string>
     <string name="bubble_color_preview">Önizleme</string>
@@ -2111,4 +2132,6 @@
     <string name="dictation_pause_other_audio_title">Diğer sesleri duraklat</string>
     <string name="dictation_pause_other_audio_subtitle">Dikte sırasında müzik ve podcast yayınlarını duraklatır; kayıt bittiğinde devam edebilirler. White Noise sesli okuma ve sesli mesajları güvenlik için her zaman duraklatılır.</string>
     <string name="dictation_audio_focus_unavailable">Diğer sesler duraklatılamadı. Tekrar deneyin veya Dikte ayarlarında bu seçeneği kapatın.</string>
+    <string name="checking_invitation">Davet kontrol ediliyor…</string>
+    <string name="couldnt_check_invitation">Davet kontrol edilemedi</string>
 </resources>

@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="poll_custom_time">Eigene Dauer</string>
+    <string name="poll_custom_duration">Dauer</string>
+    <string name="poll_unit_seconds">Sekunden</string>
+    <string name="poll_unit_minutes">Minuten</string>
+    <string name="poll_unit_hours">Stunden</string>
+    <string name="poll_unit_days">Tage</string>
+    <string name="poll_custom_duration_error">Gib eine ganze Zahl von 1 Sekunde bis 30 Tagen ein.</string>
+    <string name="poll_custom_preview">Die Umfrage endet %1$s nach dem Veröffentlichen.</string>
+    <string name="poll_cancel_custom_time">Vorherige Frist verwenden</string>
     <string name="app_name">White Noise</string>
     <string name="poll_preview">Umfrage</string>
     <string name="poll_unsupported">Diese Umfrage kann nicht angezeigt werden</string>
@@ -1478,6 +1487,18 @@
     <string name="notification_channel_app_updates_global_description">Android-Benachrichtigungsverhalten für White-Noise-App-Updates</string>
 
     <string name="chat_bubble_colors">Farben der Chatblasen</string>
+    <string name="custom_emoji">Eigene Emoji</string>
+    <string name="custom_emoji_detail">Bilder, die du hier hinzufügst, werden in Nachrichten und Reaktionen zu :kurzcode:-Emoji. Sie bleiben auf diesem Gerät, und andere sehen den Kurzcode als Text.</string>
+    <string name="custom_emoji_empty">Noch keine eigenen Emoji.</string>
+    <string name="custom_emoji_name_title">Emoji benennen</string>
+    <string name="custom_emoji_name_label">Kurzcode</string>
+    <string name="custom_emoji_name_help">Buchstaben, Zahlen und Unterstriche.</string>
+    <string name="custom_emoji_replaces">Ersetzt dein bisheriges %1$s.</string>
+    <string name="custom_emoji_remove_title">%1$s entfernen?</string>
+    <string name="custom_emoji_remove_detail">Das Bild wird von diesem Gerät gelöscht. Nachrichten behalten den Kurzcode als Text.</string>
+    <string name="custom_emoji_too_large">Dieses Bild ist größer als 1 MB.</string>
+    <string name="custom_emoji_not_image">Diese Datei ist kein Bild, das White Noise anzeigen kann.</string>
+    <string name="custom_emoji_save_failed">Das Emoji konnte nicht gespeichert werden.</string>
     <string name="action_color">Aktionsfarbe</string>
     <string name="action_color_no_active_account">Wähle ein aktives Konto aus, bevor du seine App-Akzentfarbe festlegst.</string>
     <string name="bubble_color_preview">Vorschau</string>
@@ -2130,4 +2151,6 @@
     <string name="dictation_pause_other_audio_title">Andere Audioinhalte pausieren</string>
     <string name="dictation_pause_other_audio_subtitle">Musik und Podcasts während des Diktierens pausieren; nach der Aufnahme können sie weiterlaufen. Sprachausgabe und Sprachnachrichten in White Noise werden aus Sicherheitsgründen immer pausiert.</string>
     <string name="dictation_audio_focus_unavailable">Andere Audioinhalte konnten nicht pausiert werden. Versuche es erneut oder deaktiviere diese Option in den Diktiereinstellungen.</string>
+    <string name="checking_invitation">Einladung wird geprüft…</string>
+    <string name="couldnt_check_invitation">Einladung konnte nicht geprüft werden</string>
 </resources>

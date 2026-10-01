@@ -64,9 +64,9 @@
       },
       {
         "surface": "content",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/BuiltinEmoji.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiShortcodes.kt",
         "anchor": "fun content(): Map<String, InlineTextContent>",
-        "test_ids": ["MSG-022"]
+        "test_ids": ["MSG-022", "MSG-023", "MSG-024"]
       },
       {
         "surface": "Empty document send feedback",
@@ -1053,6 +1053,7 @@
           "CHL-002",
           "CHL-011",
           "CHL-016",
+          "CHL-019",
           "FIND-003"
         ]
       },
@@ -1066,6 +1067,7 @@
           "CHL-002",
           "CHL-011",
           "CHL-016",
+          "CHL-019",
           "FIND-003"
         ]
       },
@@ -2837,6 +2839,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
         "anchor": "fun InviteAcceptanceResolutionStatus(",
         "test_ids": [
+          "GRP-011",
           "GRP-012",
           "GRP-014"
         ]
@@ -3043,7 +3046,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAttachmentMenu.kt",
         "anchor": "fun ComposerAttachmentMenu(",
         "test_ids": [
-          "MED-001"
+          "MED-001",
+          "MSG-021"
         ]
       },
       {
@@ -3055,9 +3059,18 @@
           "CON-005",
           "CON-017",
           "CON-020",
+          "CON-024",
           "DIC-001",
           "DIC-002",
           "DIC-003"
+        ]
+      },
+      {
+        "surface": "Automatic composer height ceiling",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationCompactHeight.kt",
+        "anchor": "fun resolveAutomaticComposerCeiling(",
+        "test_ids": [
+          "CON-024"
         ]
       },
       {
@@ -3102,7 +3115,8 @@
           "CON-007",
           "CON-013",
           "CON-020",
-          "CON-021"
+          "CON-021",
+          "CON-024"
         ]
       },
       {
@@ -3299,12 +3313,55 @@
         ]
       },
       {
+        "surface": "EmojiArtImage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiShortcodes.kt",
+        "anchor": "fun EmojiArtImage(",
+        "test_ids": [
+          "MSG-023",
+          "MSG-024",
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "EmojiShortcodeSuggestions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiShortcodeSuggestions.kt",
+        "anchor": "fun EmojiShortcodeSuggestions(",
+        "test_ids": [
+          "MSG-023"
+        ]
+      },
+      {
+        "surface": "CustomEmojiScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "fun CustomEmojiScreen(",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "CustomEmojiContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "fun CustomEmojiContent(",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "CustomEmojiNameDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "fun CustomEmojiNameDialog(",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
         "surface": "EmojiGlyph",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt",
         "anchor": "fun EmojiGlyph(",
         "test_ids": [
           "CON-010",
-          "MSG-005"
+          "MSG-005",
+          "MSG-023"
         ]
       },
       {
@@ -3313,7 +3370,8 @@
         "anchor": "fun EmojiPickerContent(",
         "test_ids": [
           "CON-010",
-          "MSG-005"
+          "MSG-005",
+          "MSG-023"
         ]
       },
       {
@@ -9095,6 +9153,18 @@
         "test_ids": ["SET-020"]
       },
       {
+        "surface": "PollVoteStatusLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
+        "anchor": "private fun PollVoteStatusLabel(",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "PollVotingCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
+        "anchor": "internal fun PollVotingCard(",
+        "test_ids": ["MSG-021"]
+      },
+      {
         "surface": "PollCard",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
         "anchor": "internal fun PollCard(",
@@ -9122,19 +9192,73 @@
         "surface": "PollCreateDialog",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
         "anchor": "fun PollCreateDialog(",
-        "test_ids": ["MSG-021"]
+        "test_ids": ["MSG-021", "MSG-025"]
       },
       {
         "surface": "PollCreateForm",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
         "anchor": "internal fun PollCreateForm(",
-        "test_ids": ["MSG-021"]
+        "test_ids": ["MSG-021", "MSG-025"]
       },
       {
         "surface": "PollDeadlineChoices",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
         "anchor": "private fun PollDeadlineChoices(",
-        "test_ids": ["MSG-021"]
+        "test_ids": ["MSG-021", "MSG-025"]
+      },
+      {
+        "surface": "string:poll_cancel_custom_time",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_cancel_custom_time",
+        "test_ids": ["MSG-025"]
+      },
+      {
+        "surface": "string:poll_custom_duration",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_custom_duration",
+        "test_ids": ["MSG-025"]
+      },
+      {
+        "surface": "string:poll_custom_duration_error",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_custom_duration_error",
+        "test_ids": ["MSG-025"]
+      },
+      {
+        "surface": "string:poll_custom_preview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_custom_preview",
+        "test_ids": ["MSG-025"]
+      },
+      {
+        "surface": "string:poll_custom_time",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_custom_time",
+        "test_ids": ["MSG-025"]
+      },
+      {
+        "surface": "string:poll_unit_days",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollDeadlineSelection.kt",
+        "anchor": "R.string.poll_unit_days",
+        "test_ids": ["MSG-025"]
+      },
+      {
+        "surface": "string:poll_unit_hours",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollDeadlineSelection.kt",
+        "anchor": "R.string.poll_unit_hours",
+        "test_ids": ["MSG-025"]
+      },
+      {
+        "surface": "string:poll_unit_minutes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollDeadlineSelection.kt",
+        "anchor": "R.string.poll_unit_minutes",
+        "test_ids": ["MSG-025"]
+      },
+      {
+        "surface": "string:poll_unit_seconds",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollDeadlineSelection.kt",
+        "anchor": "R.string.poll_unit_seconds",
+        "test_ids": ["MSG-025"]
       },
       {
         "surface": "Group poll composer action",
@@ -9290,6 +9414,24 @@
         "surface": "string:poll_submit",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
         "anchor": "R.string.poll_submit",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "Poll vote submission status",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
+        "anchor": "R.string.sending",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "Poll inline vote failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
+        "anchor": "R.string.poll_vote_failed",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "Poll unconfirmed vote",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
+        "anchor": "R.string.delivery_not_confirmed",
         "test_ids": ["MSG-021"]
       },
       {
@@ -9970,6 +10112,159 @@
         "anchor": "R.string.emoji_category_objects",
         "test_ids": [
           "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:emoji_category_custom",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiCatalog.kt",
+        "anchor": "R.string.emoji_category_custom",
+        "test_ids": [
+          "MSG-023"
+        ]
+      },
+      {
+        "surface": "setting:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:choose_files",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.choose_files",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:choose_photos",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.choose_photos",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:custom_emoji",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.custom_emoji",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:custom_emoji_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.custom_emoji_detail",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:custom_emoji_empty",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.custom_emoji_empty",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:custom_emoji_name_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.custom_emoji_name_help",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:custom_emoji_name_label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.custom_emoji_name_label",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:custom_emoji_name_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.custom_emoji_name_title",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:custom_emoji_not_image",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.custom_emoji_not_image",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:custom_emoji_remove_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.custom_emoji_remove_detail",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:custom_emoji_remove_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.custom_emoji_remove_title",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:custom_emoji_replaces",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.custom_emoji_replaces",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:custom_emoji_save_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.custom_emoji_save_failed",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:custom_emoji_too_large",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.custom_emoji_too_large",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:remove",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.remove",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:save",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.save",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:custom_emoji",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.custom_emoji",
+        "test_ids": [
+          "SET-001",
+          "SET-030"
         ]
       },
       {
@@ -27844,6 +28139,23 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MessageOutboundShare.kt",
         "anchor": "internal const val OUTBOUND_SHARE_MAX_BYTES",
         "test_ids": ["MED-016"]
+      },
+      {
+        "surface": "Conflicting invitation snapshots retain identifiable chat-row presentation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatListItem.kt",
+        "anchor": "val checkingInvitation: Boolean",
+        "test_ids": [
+          "GRP-011"
+        ]
+      },
+      {
+        "surface": "Foreground invitation authority retry without consent mutation replay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundRestoreEffects.kt",
+        "anchor": "scope.launch { controller.retryInviteAcceptanceAuthority() }",
+        "test_ids": [
+          "GRP-011",
+          "GRP-014"
+        ]
       }
     ],
     "notification_content_contracts": [
@@ -27969,6 +28281,38 @@
           "END-002",
           "END-003",
           "END-004"
+        ]
+      },
+      {
+        "surface": "R.string.checking_invitation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "R.string.checking_invitation",
+        "test_ids": [
+          "GRP-011"
+        ]
+      },
+      {
+        "surface": "R.string.checking_invitation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+        "anchor": "R.string.checking_invitation",
+        "test_ids": [
+          "GRP-011"
+        ]
+      },
+      {
+        "surface": "R.string.couldnt_check_invitation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+        "anchor": "R.string.couldnt_check_invitation",
+        "test_ids": [
+          "GRP-011"
+        ]
+      },
+      {
+        "surface": "R.string.retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "GRP-011"
         ]
       }
     ]

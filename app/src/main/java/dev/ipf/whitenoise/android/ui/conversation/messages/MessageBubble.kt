@@ -120,6 +120,7 @@ import dev.ipf.whitenoise.android.state.reportsFor
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.ttsStartFailureMessage
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
+import dev.ipf.whitenoise.android.ui.LocalReceivedEmoji
 import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayout
 import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
 import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
@@ -370,13 +371,17 @@ internal fun MessageBubble(
     parseMarkdown: suspend (String) -> MarkdownDocumentFfi = { appState.parseMarkdownOrEmpty(it) },
 ) {
     val record = item.record
-    val messageAttachments =
+    val protocolAttachments =
         rememberMessageAttachments(
             tags = record.tags,
             messageIdHex = record.messageIdHex,
             sourceEpoch = record.sourceEpoch,
             projectedMedia = item.projected?.media,
         )
+    // NIP-30 artwork renders inline in the text, so it is not listed as a shared file.
+    val receivedEmoji = LocalReceivedEmoji.current
+    val messageAttachments =
+        remember(protocolAttachments, receivedEmoji) { protocolAttachments.withoutEmoji(receivedEmoji) }
     val mediaReferences = messageAttachments.references
     val keptMessages = LocalKeptMessages.current
     // Null until the controller has bound an account, which is also the only
@@ -1322,7 +1327,10 @@ internal fun MessageBubble(
             record.kind == 9uL -> editState?.latestText ?: record.plaintext
             else -> null
         }?.takeIf { it.isNotBlank() }
-    val protocolAttachmentCount = remember(record.tags) { record.tags.count { it.values.firstOrNull() == "imeta" } }
+    val protocolAttachmentCount =
+        remember(record.tags, receivedEmoji) {
+            record.tags.count { it.values.firstOrNull() == "imeta" } - receivedEmoji.attachmentIndexes.size
+        }
     val canShareMessage =
         !deleted &&
             !invalidated &&
@@ -2719,7 +2727,7 @@ internal fun MessageBubble(
                                 ComposerGate.PENDING ->
                                     if (controller.inviteAcceptanceResolutionPending) {
                                         InviteAcceptanceResolutionStatus(
-                                            state = controller.memberRosterState,
+                                            state = controller.inviteAcceptanceResolutionState,
                                             onRetry = {
                                                 appState.launchMutation {
                                                     controller.retryInviteAcceptanceAuthority()
