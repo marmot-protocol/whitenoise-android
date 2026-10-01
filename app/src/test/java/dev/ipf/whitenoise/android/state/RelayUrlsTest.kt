@@ -351,6 +351,21 @@ class RelayUrlsTest {
     }
 
     @Test
+    fun accountRelaysAddGeneralPurposeRelaysToTheBootstrapSet() {
+        assertEquals(
+            listOf(
+                "wss://relay.us.whitenoise.chat",
+                "wss://relay.eu.whitenoise.chat",
+                "wss://nos.lol",
+                "wss://relay.primal.net",
+                "wss://whitenoise.nostrdev.com",
+            ),
+            MarmotClient.accountRelays,
+        )
+        assertEquals(emptyList<String>(), MarmotClient.accountRelays.filterNot { isAcceptableRelayUrl(it) })
+    }
+
+    @Test
     fun bootstrapRelaysUseOnlyWhiteNoiseRegionalRelays() {
         assertEquals(
             listOf(

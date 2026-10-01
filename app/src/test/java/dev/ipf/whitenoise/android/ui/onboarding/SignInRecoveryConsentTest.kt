@@ -128,7 +128,8 @@ class SignInRecoveryConsentTest {
             ),
             engine.recoveries,
         )
-        assertEquals(MarmotClient.bootstrapRelays, ordinaryLogin.relays)
+        assertEquals(MarmotClient.accountRelays, ordinaryLogin.relays)
+        assertEquals(MarmotClient.bootstrapRelays, ordinaryLogin.keyPackageRelays)
     }
 
     @Test

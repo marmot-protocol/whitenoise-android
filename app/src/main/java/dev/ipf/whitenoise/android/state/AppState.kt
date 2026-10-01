@@ -4988,8 +4988,8 @@ class WhiteNoiseAppState private constructor(
     private suspend fun engineLogin(nsec: String): AccountSummaryFfi {
         val relays = MarmotClient.bootstrapRelays
         val injected = identityLoginCalls
-        if (injected != null) return injected.login(nsec, relays, relays)
-        return marmotIo { login(nsec, relays, relays) }
+        if (injected != null) return injected.login(nsec, MarmotClient.accountRelays, relays)
+        return marmotIo { login(nsec, MarmotClient.accountRelays, relays, relays) }
     }
 
     // The acknowledgement is a constant, never derived from state: the only
@@ -5000,13 +5000,19 @@ class WhiteNoiseAppState private constructor(
         if (injected != null) {
             return injected.loginRecoveringIncompleteSetup(
                 nsec,
-                relays,
+                MarmotClient.accountRelays,
                 relays,
                 acknowledgePossibleKeyPackageOrphan = true,
             )
         }
         return marmotIo {
-            loginRecoveringIncompleteSetup(nsec, relays, relays, acknowledgePossibleKeyPackageOrphan = true)
+            loginRecoveringIncompleteSetup(
+                nsec,
+                MarmotClient.accountRelays,
+                relays,
+                acknowledgePossibleKeyPackageOrphan = true,
+                inboxRelays = relays,
+            )
         }
     }
 
@@ -5064,6 +5070,7 @@ class WhiteNoiseAppState private constructor(
                     loginExternalSigner(
                         pubkeyHex,
                         amberSigner.buildSigner(pubkeyHex),
+                        MarmotClient.accountRelays,
                         MarmotClient.bootstrapRelays,
                         MarmotClient.bootstrapRelays,
                     )
