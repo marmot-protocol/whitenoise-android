@@ -28018,9 +28018,17 @@
         ]
       },
       {
-        "surface": "OS notification group reconciliation and blocked summary recovery",
+        "surface": "OS notification group reconciliation and blocked channel/group recovery",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationGroupReconciler.kt",
         "anchor": "internal class NotificationGroupReconciler(",
+        "test_ids": [
+          "NTF-026"
+        ]
+      },
+      {
+        "surface": "Android summary channel and group blocking",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationSummaryChannel.kt",
+        "anchor": "internal fun isNotificationSummaryChannelBlocked(",
         "test_ids": [
           "NTF-026"
         ]

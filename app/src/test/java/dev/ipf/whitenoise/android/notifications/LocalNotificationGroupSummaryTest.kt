@@ -94,51 +94,6 @@ class LocalNotificationGroupSummaryTest {
         }
 
     @Test
-    fun aBlockedSummaryChannelConsumesNoWriteSlotsAndRecoversAfterItIsUnblocked() =
-        runTest {
-            val fixture = GroupFixture(context, backgroundScope)
-            fixture.coordinator.close()
-            fixture.send("account-a", "group-a", "one")
-            val channel = requireNotNull(manager.getNotificationChannel(NotificationChannelSpec.USER_EVENT_SUMMARY.id))
-            channel.importance = NotificationManager.IMPORTANCE_NONE
-            manager.createNotificationChannel(channel)
-            assertEquals(NotificationManager.IMPORTANCE_NONE, manager.getNotificationChannel(channel.id).importance)
-            var sleeps = 0
-            var posts = 0
-            val pacer = NotificationPostPacer(burstCapacity = 1, nowMillis = { 0L }, sleep = { sleeps++ })
-            val coordinator =
-                NotificationGroupReconciler(
-                    context,
-                    backgroundScope,
-                    pacer,
-                    post = { compat, tag, id, card ->
-                        posts++
-                        compat.notify(tag, id, card)
-                    },
-                )
-            try {
-                repeat(3) {
-                    coordinator.request()
-                    settle()
-                }
-                assertEquals(0, posts)
-                assertEquals(0, sleeps)
-                assertEquals(0L, pacer.awaitSlot())
-                assertEquals(0, sleeps)
-                assertNull(fixture.summary())
-                assertTrue(manager.activeNotifications.any { it.tag == "account-a|group-a" })
-                channel.importance = NotificationManager.IMPORTANCE_DEFAULT
-                manager.createNotificationChannel(channel)
-                coordinator.request()
-                settle()
-                assertEquals(1, posts)
-                assertNotNull(fixture.summary())
-            } finally {
-                coordinator.close()
-            }
-        }
-
-    @Test
     fun removingOneAccountPreservesTheOtherAndRemovingTheLastChildRemovesTheSummary() =
         runTest {
             val fixture = GroupFixture(context, backgroundScope)
@@ -325,58 +280,6 @@ class LocalNotificationGroupSummaryTest {
             settle()
             assertNull(fixture.summary())
             assertEquals(2, fixture.summaryCancelAttempts)
-        }
-
-    @Test
-    fun staleChildDeleteIntentCannotClearANewerCardOnTheSameKey() =
-        runTest {
-            val fixture = GroupFixture(context, backgroundScope)
-            val old = fixture.send("account-a", "group-a", "old")
-            val intent = shadowOf(old.deleteIntent).savedIntent
-            fixture.send("account-a", "group-a", "new")
-            dismissNotificationGroupGenerations(
-                context,
-                requireNotNull(UserEventNotificationGroup.dismissalChildren(intent)),
-                pacer = fixture.pacer,
-                request = fixture.coordinator::request,
-            )
-            settle()
-            val live = manager.activeNotifications.single { UserEventNotificationGroup.child(it) != null }.notification
-            assertEquals("new", live.extras.getString(EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX))
-            assertNotNull(fixture.summary())
-        }
-
-    @Test
-    fun summaryDeleteIntentRemovesRepresentedGenerationsButKeepsLaterArrivalsAcrossAccounts() =
-        runTest {
-            val fixture = GroupFixture(context, backgroundScope)
-            fixture.send("account-a", "group-a", "old-a")
-            fixture.send("account-b", "group-b", "old-b")
-            settle()
-            val intent = shadowOf(requireNotNull(fixture.summary()).deleteIntent).savedIntent
-            fixture.send("account-b", "group-b", "new-b")
-            val children = requireNotNull(UserEventNotificationGroup.dismissalChildren(intent))
-            dismissNotificationGroupGenerations(
-                context,
-                children,
-                fixture.pacer,
-                request = fixture.coordinator::request,
-            )
-            fixture.coordinator.request()
-            settle()
-            val live = manager.activeNotifications.single { UserEventNotificationGroup.child(it) != null }.notification
-            assertEquals("new-b", live.extras.getString(EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX))
-            assertEquals(
-                "1 notification",
-                requireNotNull(fixture.summary()).extras.getCharSequence(Notification.EXTRA_TEXT),
-            )
-            dismissNotificationGroupGenerations(
-                context,
-                children,
-                fixture.pacer,
-                request = fixture.coordinator::request,
-            )
-            assertEquals(1, manager.activeNotifications.count { UserEventNotificationGroup.child(it) != null })
         }
 
     @Test
@@ -680,125 +583,9 @@ class LocalNotificationGroupSummaryTest {
             }
         }
 
-    @Test
-    fun dismissReceiverFinishesOnceOnSuccessPlatformFailureAndTimeout() =
-        runTest {
-            val receiver = NotificationGroupDismissReceiver()
-            val children = listOf(NotificationGroupChild("account|group", 0, "synthetic-generation"))
-            var successFinishes = 0
-            receiver.finishDismissal(context, children, finish = { successFinishes++ }, dismiss = {})
-            assertEquals(1, successFinishes)
-            var failureFinishes = 0
-            receiver.finishDismissal(
-                context,
-                children,
-                finish = { failureFinishes++ },
-                dismiss = { throw IllegalStateException("platform failed") },
-            )
-            assertEquals(1, failureFinishes)
-            var timeoutFinishes = 0
-            receiver.finishDismissal(
-                context,
-                children,
-                finish = { timeoutFinishes++ },
-                dismiss = { kotlinx.coroutines.awaitCancellation() },
-                budgetMs = 50L,
-            )
-            assertEquals(1, timeoutFinishes)
-        }
-
-    @Test
-    fun aRealSummaryDeleteBroadcastRemovesOnlyItsDisplayedGenerations() =
-        runTest {
-            val fixture = GroupFixture(context, backgroundScope)
-            fixture.send("account-a", "group-a", "old")
-            settle()
-            val intent = shadowOf(requireNotNull(fixture.summary()).deleteIntent).savedIntent
-            fixture.send("account-b", "group-b", "later")
-            context.sendBroadcast(intent)
-            pumpingMainLooper {
-                kotlinx.coroutines.withTimeout(10_000L) {
-                    while (manager.activeNotifications.any { it.tag == "account-a|group-a" }) {
-                        kotlinx.coroutines.delay(5L)
-                    }
-                }
-            }
-            assertTrue(manager.activeNotifications.any { it.tag == "account-b|group-b" })
-        }
-
     private fun TestScope.settle() {
         ShadowSystemClock.advanceBy(java.time.Duration.ofMillis(2_000))
         advanceTimeBy(2_000)
         runCurrent()
     }
-}
-
-private class GroupFixture(
-    private val context: Context,
-    scope: CoroutineScope,
-) {
-    private val manager: NotificationManager = context.getSystemService(NotificationManager::class.java)
-    val pacer = NotificationPostPacer(refillIntervalMillis = 1L, burstCapacity = 128)
-    var now = 1_700_000_000_000L
-    var childWrites = 0
-    var summaryAttempts = 0
-    var summaryCancelAttempts = 0
-    var failRead = false
-    var failChild = false
-    var failSummary = false
-    var dropSummaryCancels = 0
-    val coordinator =
-        NotificationGroupReconciler(
-            context,
-            scope,
-            pacer,
-            read = {
-                if (failRead) throw IllegalStateException("tray unavailable")
-                it.activeNotifications
-            },
-            post = { compat, tag, id, notification ->
-                summaryAttempts++
-                if (failSummary) throw IllegalStateException("summary unavailable")
-                compat.notify(tag, id, notification)
-            },
-            cancel = { compat, tag, id ->
-                summaryCancelAttempts++
-                if (dropSummaryCancels > 0) dropSummaryCancels-- else compat.cancel(tag, id)
-            },
-        )
-    val presenter =
-        LocalNotificationPresenter(
-            context,
-            shortcutPublisher = {},
-            nowMillis = { now },
-            postPacer = pacer,
-            groupReconciliation = coordinator::request,
-            notificationPoster = { compat, tag, id, notification ->
-                if (failChild) throw IllegalStateException("child unavailable")
-                childWrites++
-                compat.notify(tag, id, notification)
-            },
-            avatarBitmapResolver = { null },
-            enrichmentLauncher = { block -> scope.launch { block() } },
-        )
-
-    suspend fun send(
-        account: String,
-        group: String,
-        message: String,
-        mention: Boolean = false,
-    ): Notification {
-        now += 6_000
-        val update = alertBudgetUpdate(message, now, mention, account, group)
-        assertTrue(presenter.show(update, shortNpub = { it }))
-        val key = LocalNotificationFormatter.notificationDismissalKey(update)
-        return manager.activeNotifications.single { it.tag == key.tag && it.id == key.id }.notification
-    }
-
-    fun summary(): Notification? =
-        manager.activeNotifications
-            .singleOrNull {
-                it.tag == UserEventNotificationGroup.SUMMARY_TAG &&
-                    it.id == UserEventNotificationGroup.SUMMARY_ID
-            }?.notification
 }

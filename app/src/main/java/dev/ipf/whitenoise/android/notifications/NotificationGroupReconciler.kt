@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.notifications
 
 import android.annotation.SuppressLint
 import android.app.Notification
+import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.service.notification.StatusBarNotification
@@ -95,7 +96,7 @@ internal class NotificationGroupReconciler(
         val manager = context.getSystemService(NotificationManager::class.java) ?: return false
         val summaryChannel = manager.getNotificationChannel(NotificationChannelSpec.USER_EVENT_SUMMARY.id)
         // Android owns a blocked channel's removal. Do not spend shared write slots on discarded summaries.
-        if (summaryChannel?.importance == NotificationManager.IMPORTANCE_NONE) return true
+        if (isNotificationSummaryChannelBlocked(manager, summaryChannel)) return true
         val compat = NotificationManagerCompat.from(context)
         val first = read(manager)
         if (adoptLegacyCards(manager, compat, first)) return false
@@ -105,9 +106,7 @@ internal class NotificationGroupReconciler(
         if (children.isEmpty() && !allowEmpty) return false
         if (children.isNotEmpty() && matches(old, UserEventNotificationGroup.summaryState(children))) return true
         if (children.isEmpty() && old == null) return true
-        if (summaryChannel == null) {
-            NotificationChannels.ensureChannels(context)
-        }
+        ensureSummaryChannel(summaryChannel)
         // Pacing and coroutine suspension happen before the commit gate. Re-read after waiting.
         if (revision.get() != expected) return false
         pacer.awaitSlot()
@@ -115,6 +114,10 @@ internal class NotificationGroupReconciler(
             if (revision.get() != expected) return@synchronized false
             commitSummary(manager, compat, allowEmpty)
         }
+    }
+
+    private fun ensureSummaryChannel(channel: NotificationChannel?) {
+        if (channel == null) NotificationChannels.ensureChannels(context)
     }
 
     /** Called only under the group mutation gate, after pacing and revision validation. */
