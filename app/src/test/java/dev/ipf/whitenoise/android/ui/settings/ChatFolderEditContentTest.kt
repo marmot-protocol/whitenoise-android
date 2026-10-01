@@ -11,7 +11,6 @@ import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -59,20 +58,26 @@ class ChatFolderEditContentTest {
         composeRule.onNodeWithText(app.getString(R.string.save)).assertIsEnabled()
     }
 
-    /** The four rule switches carry their labels and checked state in prototype order. */
+    /** Category labels expose checked state through their single switch target. */
     @Test
     fun switchRowsExposeLabelsAndCheckedState() {
         render(state = editState(name = "Work", unreadOnly = true, groupsOnly = true))
-        composeRule
-            .onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)
-            .performScrollToNode(hasText(app.getString(R.string.chat_folder_include_muted)))
-        composeRule.onNodeWithText(app.getString(R.string.chat_folder_unread_only)).assertExists()
-        composeRule.onAllNodes(isToggleable())[0].assertIsOn()
-        composeRule.onNodeWithText(app.getString(R.string.chat_folder_groups_only)).assertExists()
-        composeRule.onAllNodes(isToggleable())[1].assertIsOn()
-        composeRule.onAllNodes(isToggleable())[2].assertIsOff()
-        composeRule.onNodeWithText(app.getString(R.string.chat_folder_include_muted)).assertExists()
-        composeRule.onAllNodes(isToggleable())[3].assertIsOff()
+        val categories =
+            listOf(
+                R.string.chat_folder_unread_only to true,
+                R.string.chat_folder_unread_mentions_only to false,
+                R.string.chat_folder_pinned_only to false,
+                R.string.chat_folder_groups_only to true,
+                R.string.chat_folder_direct_chats_only to false,
+                R.string.chat_folder_archived_only to false,
+                R.string.chat_folder_include_muted to false,
+            )
+        categories.forEach { (label, checked) ->
+            val text = app.getString(label)
+            composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasText(text))
+            val node = composeRule.onNodeWithText(text)
+            if (checked) node.assertIsOn() else node.assertIsOff()
+        }
     }
 
     /** Included Chats shows its count and opens the chat picker. */
@@ -196,6 +201,9 @@ class ChatFolderEditContentTest {
                         onIncludeMutedChange = {},
                         onGroupsOnlyChange = {},
                         onArchivedOnlyChange = {},
+                        onUnreadMentionsOnlyChange = {},
+                        onDirectChatsOnlyChange = {},
+                        onPinnedOnlyChange = {},
                         onOpenManualChats = onOpenManualChats,
                         onOpenPeople = onOpenPeople,
                         onOpenPreview = onOpenPreview,

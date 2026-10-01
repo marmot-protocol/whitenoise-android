@@ -1269,6 +1269,9 @@
     <string name="chat_folder_description_label">Описание</string>
     <string name="chat_folder_keyword_label">Ключевое слово</string>
     <string name="chat_folder_unread_only">Только непрочитанные</string>
+    <string name="chat_folder_unread_mentions_only">Только непрочитанные упоминания</string>
+    <string name="chat_folder_direct_chats_only">Только личные чаты</string>
+    <string name="chat_folder_pinned_only">Только закреплённые чаты</string>
     <string name="chat_folder_include_muted">Включать чаты с отключёнными уведомлениями</string>
     <string name="chat_folder_groups_only">Только группы</string>
     <string name="chat_folder_archived_only">Только архив</string>
@@ -1286,7 +1289,7 @@
     <string name="folder_manual_hint">Чаты, которые вы сюда добавляете, остаются включенными, даже если они не соответствуют автоматическим правилам.</string>
     <string name="folder_rules">Автоматические правила</string>
     <string name="folder_keyword_hint">Сопоставьте заголовок чата или описание группы. Также совпадают чаты с любым выбранным человеком.</string>
-    <string name="folder_rule_hint">Чаты попадают в папку, если соответствуют любому выбранному правилу по участнику или ключевому слову. Параметры категорий сужают результаты. Удалённый чат вернётся, если всё ещё соответствует правилам.</string>
+    <string name="folder_rule_hint">Чаты должны соответствовать любому выбранному правилу по участнику или ключевому слову и всем выбранным категориям. Если участник и ключевое слово не выбраны, действуют только категории. Чат, исключённый из папки, снова появится в ней, если по-прежнему соответствует правилам.</string>
     <string name="folder_preview">Предпросмотр</string>
     <string name="folder_discard_title">Отменить изменения?</string>
     <string name="folder_discard_detail">Изменения в папке не сохранены.</string>

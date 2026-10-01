@@ -172,18 +172,118 @@ class ChatFolderRulesTest {
         assertEquals(setOf("g2"), folderIds(items, rule = activeRule))
     }
 
+    @Test
+    fun unreadMentionsRequireAnUnreadMentionRatherThanOrdinaryOrManualUnread() {
+        val rule = ChatFolderRule(unreadMentionsOnly = true)
+        val mentioned = item("mention", unread = true, mention = true)
+        val ordinary = item("ordinary", unread = true)
+        val readMention = item("read", mention = true)
+        val manualUnread = item("manual").withRow { copy(manuallyMarkedUnread = true) }
+        val staleManualMention = readMention.withRow { copy(manuallyMarkedUnread = true) }
+
+        assertEquals(
+            setOf("mention"),
+            folderIds(listOf(mentioned, ordinary, readMention, manualUnread, staleManualMention), rule = rule),
+        )
+        val read =
+            mentioned.withRow {
+                copy(hasUnread = false, unreadCount = 0uL, unreadMention = false, unreadMentionCount = 0uL)
+            }
+        assertEquals(emptySet<String>(), folderIds(listOf(read), rule = rule))
+    }
+
+    @Test
+    fun unreadMentionsFollowTheCurrentAccountSnapshotAndSuppressTerminalMembership() {
+        val mentioned = item("g1", unread = true, mention = true)
+        val excluded =
+            listOf(
+                mentioned.copy(removed = true),
+                mentioned.withRow { copy(selfMembership = SelfMembershipFfi.LEFT) },
+                mentioned.withRow { copy(selfMembership = SelfMembershipFfi.REMOVED) },
+                mentioned.withRow { copy(leaveRequestPending = true) },
+                mentioned.withRow { copy(disbanding = true) },
+                mentioned.withRow { copy(lifecycleState = dev.ipf.marmotkit.GroupLifecycleStateFfi.DISBANDED) },
+                mentioned.copy(projection = null),
+            )
+        val rule = ChatFolderRule(unreadMentionsOnly = true)
+        assertEquals(setOf("g1"), folderIds(listOf(mentioned), rule = rule, activeAccount = "self"))
+        excluded.forEach {
+            assertEquals(emptySet<String>(), folderIds(listOf(it), rule = rule, activeAccount = "self"))
+        }
+        // The next account's row, with the same chat id but no mention, cannot inherit the prior match.
+        assertEquals(
+            emptySet<String>(),
+            folderIds(listOf(item("g1", unread = true)), rule = rule, activeAccount = "other"),
+        )
+    }
+
+    @Test
+    fun mentionCategoriesNarrowMemberOrKeywordMatchesAndRespectArchiveAndMute() {
+        val rule =
+            ChatFolderRule(
+                unreadMentionsOnly = true,
+                groupsOnly = true,
+                includeMemberPubkeys = setOf("aa"),
+                keyword = "work",
+            )
+        val items =
+            listOf(
+                item("member", members = listOf("aa"), unread = true, mention = true),
+                item("keyword", description = "work", unread = true, mention = true),
+                item("neither", unread = true, mention = true),
+                item("plain", description = "work", unread = true),
+                item("dm", description = "work", unread = true, mention = true, dm = true),
+                item("archive", description = "work", unread = true, mention = true, archived = true),
+            )
+        assertEquals(setOf("member", "keyword"), folderIds(items, rule = rule))
+        assertEquals(setOf("archive"), folderIds(items, rule = rule.copy(archivedOnly = true)))
+        assertEquals(setOf("member"), folderIds(items, rule = rule, isMuted = { it == "keyword" }))
+        assertEquals(
+            setOf("member", "keyword"),
+            folderIds(items, rule = rule.copy(includeMuted = true), isMuted = { true }),
+        )
+        assertEquals(setOf("member", "keyword", "plain"), folderIds(items, manual = setOf("plain"), rule = rule))
+    }
+
+    @Test
+    fun directAndPinnedCategoriesWorkAloneAndInCombination() {
+        val items = listOf(item("dm", dm = true, pinned = true), item("group", pinned = true), item("other", dm = true))
+        assertEquals(setOf("dm", "other"), folderIds(items, rule = ChatFolderRule(directChatsOnly = true)))
+        assertEquals(setOf("dm", "group"), folderIds(items, rule = ChatFolderRule(pinnedOnly = true)))
+        assertEquals(setOf("dm"), folderIds(items, rule = ChatFolderRule(directChatsOnly = true, pinnedOnly = true)))
+        assertEquals(
+            emptySet<String>(),
+            folderIds(items, rule = ChatFolderRule(directChatsOnly = true, groupsOnly = true)),
+        )
+        val pinnedDm = items.first()
+        assertEquals(
+            emptySet<String>(),
+            folderIds(listOf(pinnedDm.withRow { copy(pinned = false) }), rule = ChatFolderRule(pinnedOnly = true)),
+        )
+        assertEquals(
+            emptySet<String>(),
+            folderIds(listOf(pinnedDm.copy(projection = null)), rule = ChatFolderRule(pinnedOnly = true)),
+        )
+    }
+
+    private fun ChatListItem.withRow(update: ChatListRowFfi.() -> ChatListRowFfi): ChatListItem {
+        val updated = requireNotNull(projection).update()
+        return copy(projection = updated)
+    }
+
     private fun folderIds(
         items: List<ChatListItem>,
         manual: Set<String> = emptySet(),
         rule: ChatFolderRule?,
         isMuted: (String) -> Boolean = { false },
         displayTitle: (ChatListItem) -> String = { "" },
+        activeAccount: String? = null,
     ): Set<String> =
         chatFolderChatIds(
             items = items,
             manualChatIds = manual,
             rule = rule,
-            activeAccountIdHex = null,
+            activeAccountIdHex = activeAccount,
             isMuted = isMuted,
             displayTitle = displayTitle,
         )
@@ -197,6 +297,8 @@ class ChatFolderRulesTest {
         description: String = "",
         dm: Boolean = false,
         archived: Boolean = false,
+        mention: Boolean = false,
+        pinned: Boolean = false,
     ): ChatListItem =
         ChatListItem(
             group = group(groupIdHex, description, archived),
@@ -210,7 +312,12 @@ class ChatFolderRulesTest {
                     )
                 },
             presentationOtherMemberAccount = presentationOtherMember,
-            projection = row(groupIdHex, unread, dm, archived),
+            projection =
+                row(groupIdHex, unread, dm, archived).copy(
+                    unreadMention = mention,
+                    unreadMentionCount = if (mention) 1uL else 0uL,
+                    pinned = pinned,
+                ),
         )
 
     private fun row(

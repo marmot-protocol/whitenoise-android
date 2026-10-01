@@ -1221,6 +1221,9 @@
     <string name="chat_folder_description_label">Açıklama</string>
     <string name="chat_folder_keyword_label">Anahtar kelime</string>
     <string name="chat_folder_unread_only">Yalnızca okunmamış</string>
+    <string name="chat_folder_unread_mentions_only">Yalnızca okunmamış bahsetmeler</string>
+    <string name="chat_folder_direct_chats_only">Yalnızca doğrudan sohbetler</string>
+    <string name="chat_folder_pinned_only">Yalnızca sabitlenmiş sohbetler</string>
     <string name="chat_folder_include_muted">Sessize alınmış sohbetleri dahil et</string>
     <string name="chat_folder_groups_only">Yalnızca gruplar</string>
     <string name="chat_folder_archived_only">Yalnızca arşivlenmiş</string>
@@ -1238,7 +1241,7 @@
     <string name="folder_manual_hint">Buraya eklediğiniz sohbetler, otomatik kurallarla eşleşmese bile dahil olmaya devam eder.</string>
     <string name="folder_rules">Otomatik kurallar</string>
     <string name="folder_keyword_hint">Bir sohbet başlığı veya grup açıklamasıyla eşleştirin. Seçilen herhangi bir kişiyle yapılan sohbetler de eşleşir.</string>
-    <string name="folder_rule_hint">Sohbetler, seçilen kişi veya anahtar sözcük kurallarından herhangi biriyle eşleşirse dahil edilir. Kategori seçenekleri bu eşleşmeleri daraltır. Kaldırdığınız bir sohbet hâlâ eşleşiyorsa geri gelir.</string>
+    <string name="folder_rule_hint">Sohbetler seçilen kişi veya anahtar sözcük kurallarından herhangi birini ve seçilen tüm kategorileri karşılamalıdır. Kişi veya anahtar sözcük seçilmediğinde kategoriler tek başına çalışır. Kaldırdığınız bir sohbet hâlâ eşleşiyorsa geri gelir.</string>
     <string name="folder_preview">Önizleme</string>
     <string name="folder_discard_title">Değişiklikler silinsin mi?</string>
     <string name="folder_discard_detail">Klasör değişiklikleriniz kaydedilmedi.</string>

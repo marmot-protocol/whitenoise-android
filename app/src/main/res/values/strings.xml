@@ -113,6 +113,9 @@
     <string name="chat_folder_keyword_label">Keyword</string>
     <string name="chat_folder_unread_only">Unread only</string>
     <string name="chat_folder_include_muted">Include muted chats</string>
+    <string name="chat_folder_unread_mentions_only">Unread mentions only</string>
+    <string name="chat_folder_direct_chats_only">Direct chats only</string>
+    <string name="chat_folder_pinned_only">Pinned chats only</string>
     <string name="chat_folder_groups_only">Groups only</string>
     <string name="chat_folder_archived_only">Archived only</string>
     <string name="chat_folder_people">People</string>
@@ -129,7 +132,7 @@
     <string name="folder_manual_hint">Chats you add here stay included, even when they do not match the automatic rules.</string>
     <string name="folder_rules">Automatic rules</string>
     <string name="folder_keyword_hint">Match a chat title or group description. Chats with any selected person also match.</string>
-    <string name="folder_rule_hint">Chats match when they meet any selected person or keyword rule. Category options narrow those matches. A chat you remove comes back if it still matches.</string>
+    <string name="folder_rule_hint">Chats match any selected person or keyword rule, then must meet all selected categories. With no person or keyword, categories work on their own. A chat you remove comes back if it still matches.</string>
     <string name="folder_preview">Preview</string>
     <string name="folder_discard_title">Discard changes?</string>
     <string name="folder_discard_detail">Your folder changes have not been saved.</string>

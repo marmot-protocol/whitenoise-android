@@ -1202,6 +1202,9 @@
     <string name="chat_folder_description_label">描述</string>
     <string name="chat_folder_keyword_label">关键词</string>
     <string name="chat_folder_unread_only">仅未读</string>
+    <string name="chat_folder_unread_mentions_only">仅未读提及</string>
+    <string name="chat_folder_direct_chats_only">仅私聊</string>
+    <string name="chat_folder_pinned_only">仅置顶聊天</string>
     <string name="chat_folder_include_muted">包含已静音的聊天</string>
     <string name="chat_folder_groups_only">仅群组</string>
     <string name="chat_folder_archived_only">仅已归档</string>
@@ -1219,7 +1222,7 @@
     <string name="folder_manual_hint">你在此添加的聊天会一直包含在内，即使它们不符合自动规则。</string>
     <string name="folder_rules">自动规则</string>
     <string name="folder_keyword_hint">匹配聊天标题或群组描述。包含任一所选人员的聊天也会匹配。</string>
-    <string name="folder_rule_hint">聊天只要符合任一所选人员或关键词规则就会匹配。类别选项会进一步缩小匹配范围。你移除的聊天如果仍然符合规则，就会重新出现。</string>
+    <string name="folder_rule_hint">聊天必须符合任一所选人员或关键词规则，并符合所有所选类别。未选择人员或关键词时，类别可单独生效。你移除的聊天如果仍然符合规则，就会重新出现。</string>
     <string name="folder_preview">预览</string>
     <string name="folder_discard_title">放弃更改？</string>
     <string name="folder_discard_detail">你的文件夹更改尚未保存。</string>
