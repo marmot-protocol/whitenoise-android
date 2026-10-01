@@ -89,6 +89,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.core.AgentOperationProjector
@@ -3292,16 +3293,24 @@ internal fun ConversationScreen(
     // (`readAnchorMessageId`) so the FFI only sees IDs that strictly advance
     // the pointer — scroll-up cannot regress the count. Settle-gated
     // (`!isScrollInProgress`) avoids per-frame FFI hops while scrolling.
+    val readHostResumed =
+        resumeLifecycleOwner?.lifecycle?.currentStateFlow?.collectAsState()?.value == Lifecycle.State.RESUMED
+    val currentReadHostResumed by rememberUpdatedState(readHostResumed)
     LaunchedEffect(listState, controller) {
         snapshotFlow {
-            if (!initialTimelineAnchored || listState.isScrollInProgress) {
+            if (
+                !initialTimelineAnchored ||
+                listState.isScrollInProgress ||
+                !currentReadHostResumed ||
+                appState.appLockScreenVisible
+            ) {
                 null
             } else {
-                readAnchorMessageId
+                readAnchorMessageId to controller.latestChatListRow?.manuallyMarkedUnread
             }
-        }.filterNotNull()
-            .distinctUntilChanged()
-            .collect { messageId ->
+        }.distinctUntilChanged()
+            .filterNotNull()
+            .collect { (messageId, _) ->
                 if (messageId.isNotBlank()) {
                     controller.markReadUpTo(messageId)
                     controller.reportVisibleMessage(messageId)

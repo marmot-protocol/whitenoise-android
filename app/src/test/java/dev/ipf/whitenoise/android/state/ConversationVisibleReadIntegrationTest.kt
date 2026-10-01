@@ -388,6 +388,91 @@ class ConversationVisibleReadIntegrationTest {
             }
         }
 
+    @Test
+    fun firstAndRetriedReadsWaitForVisibleConversation() =
+        runBlocking {
+            val reminder = reminderRow()
+            val calls = AtomicInteger()
+            val fixture =
+                fixture(reminder) {
+                    if (calls.incrementAndGet() == 1) error("first visible read failed")
+                    reminder.copy(manuallyMarkedUnread = false, hasUnread = false)
+                }
+            try {
+                fixture.bootstrap()
+                val chats = attachChats(fixture.appState, reminder)
+                val controller = controller(fixture.appState, reminder)
+                fixture.appState.clearActiveConversation()
+                controller.markReadUpTo(MESSAGE_ID)
+                assertEquals(0, fixture.markReadCalls.get())
+                activateConversation(fixture.appState, reminder)
+                controller.markReadUpTo(MESSAGE_ID)
+                assertEquals(1, fixture.markReadCalls.get())
+                fixture.appState.clearActiveConversation()
+                chats.applyChatListRow(reminder)
+                controller.markReadUpTo(MESSAGE_ID)
+                assertEquals(1, fixture.markReadCalls.get())
+                assertTrue(chats.chatItemForGroup(reminder.groupIdHex)!!.projection!!.manuallyMarkedUnread)
+                activateConversation(fixture.appState, reminder)
+                controller.markReadUpTo(MESSAGE_ID)
+                assertEquals(2, fixture.markReadCalls.get())
+                assertFalse(chats.chatItemForGroup(reminder.groupIdHex)!!.projection!!.manuallyMarkedUnread)
+            } finally {
+                closeFixture(fixture)
+            }
+        }
+
+    @Test
+    fun failedReadWithoutBoundChatListRestoresMostRecentlyConfirmedWatermark() =
+        runBlocking {
+            val newerId = "cc".repeat(32)
+            val row = overlappingUnreadRow(newerId)
+            val read =
+                row.copy(
+                    lastReadMessageIdHex = MESSAGE_ID,
+                    lastReadTimelineAt = 2uL,
+                    unreadCount = 1uL,
+                    firstUnreadMessageIdHex = newerId,
+                )
+            val calls = AtomicInteger()
+            val fixture =
+                fixture(row) {
+                    when (calls.incrementAndGet()) {
+                        1 -> read
+                        2 -> error("later read failed")
+                        else ->
+                            read.copy(
+                                lastReadMessageIdHex = newerId,
+                                lastReadTimelineAt = 3uL,
+                                unreadCount = 0uL,
+                                hasUnread = false,
+                                firstUnreadMessageIdHex = null,
+                            )
+                    }
+                }
+            try {
+                fixture.bootstrap()
+                val controller = controller(fixture.appState, row)
+                controller.markReadUpTo(MESSAGE_ID)
+                assertEquals(MESSAGE_ID, controller.latestChatListRow!!.lastReadMessageIdHex)
+                controller.markReadUpTo(newerId)
+                assertEquals(MESSAGE_ID, controller.lastReadMessageId)
+                assertEquals(1uL, controller.latestChatListRow!!.unreadCount)
+                controller.markReadUpTo(newerId)
+                assertEquals(newerId, controller.lastReadMessageId)
+                assertEquals(listOf(MESSAGE_ID, newerId, newerId), fixture.markReadRequests.map { it.third })
+            } finally {
+                closeFixture(fixture)
+            }
+        }
+
+    private fun activateConversation(
+        state: WhiteNoiseAppState,
+        row: ChatListRowFfi,
+    ) {
+        state.setActiveConversationFromUi(ConversationTimelineTestIds.ACCOUNT_REF, row.groupIdHex)
+    }
+
     private fun showAppLock(state: WhiteNoiseAppState) {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         Shadow

@@ -273,7 +273,7 @@ class StalenessGuardCoverageTest {
                 // Export returns a temporary file and does not publish controller state.
                 "Controllers.kt:exportConversationTranscriptFile" to "pure returned export result",
                 // MDK advances read state monotonically and rollback only restores the matching read request.
-                "Controllers.kt:markReadUpTo" to "monotonic engine cursor with conditional rollback",
+                "Controllers.kt:submitVisibleReadUpTo" to "monotonic engine cursor with conditional rollback",
                 // activeStreamIds admits one watcher per stream; removal is a separate terminal tombstone.
                 "Controllers.kt:watchAgentTextStream" to "keyed single-owner stream lifecycle",
             )

@@ -11734,13 +11734,18 @@ class ConversationController(
      * (settled on the same row) doesn't issue redundant FFI hops.
      */
     suspend fun markReadUpTo(messageId: String) {
-        val trimmed = messageId.takeIf { it.isNotBlank() } ?: return
-        // Optimistic messages carry a Kotlin UUID as their messageIdHex
-        // ("xxxxxxxx-xxxx-..."). The FFI rejects anything that isn't a 64-char
-        // hex blob (InvalidHex at the first '-'). Skip — the projection will
-        // call markReadUpTo again with the confirmed hex id once it echoes.
-        if (!HEX_MESSAGE_ID.matches(trimmed)) return
+        // Optimistic UUIDs and missing anchors cannot reach native read commands.
+        val trimmed = messageId.takeIf { it.isNotBlank() && HEX_MESSAGE_ID.matches(it) } ?: return
         val account = conversationAccountRef ?: return
+        if (appState.isConversationReadVisible(account, group.groupIdHex)) {
+            submitVisibleReadUpTo(account, trimmed)
+        }
+    }
+
+    private suspend fun submitVisibleReadUpTo(
+        account: String,
+        trimmed: String,
+    ) {
         val consumeManualReminder = shouldConsumeManualUnreadReminder(account)
         if (trimmed == lastSubmittedReadMessageId && !consumeManualReminder) return
         val previousRequestId = lastReadRequestId
@@ -11766,14 +11771,7 @@ class ConversationController(
             if (BuildConfig.DEBUG) Log.w("DMConversation", "mark read failed", markReadFailure)
             return
         }
-        markReadResult.getOrNull()?.let { row ->
-            persistedLastReadTimelineAt =
-                foldMarkReadReturnedRow(
-                    row = row,
-                    persistedLastReadTimelineAt = persistedLastReadTimelineAt,
-                    applyChatListRow = { appState.applyChatListRowFromMarkRead(account, it) },
-                )
-        }
+        markReadResult.getOrNull()?.let { row -> foldVisibleReadRow(account, row) }
         if (lastReadRequestId == requestId && consumeManualReminder) {
             manualUnreadReminderConsumed = true
         }
@@ -11784,6 +11782,22 @@ class ConversationController(
         }.onFailure {
             if (BuildConfig.DEBUG) Log.w("DMConversation", "dismiss read notifications failed", it)
         }
+    }
+
+    private fun foldVisibleReadRow(
+        accountRef: String,
+        row: ChatListRowFfi,
+    ) {
+        persistedLastReadTimelineAt =
+            foldMarkReadReturnedRow(row, persistedLastReadTimelineAt) { incoming ->
+                if (!appState.applyChatListRowFromMarkRead(accountRef, incoming)) {
+                    val folded =
+                        latestChatListRow?.let { current ->
+                            reduceSubscriptionChatListRow(current, incoming, ChatListUpdateTriggerFfi.UNREAD_CHANGED)
+                        } ?: incoming
+                    applyAuthoritativeChatListRow(accountRef, folded)
+                }
+            }
     }
 
     private fun shouldConsumeManualUnreadReminder(accountRef: String): Boolean =

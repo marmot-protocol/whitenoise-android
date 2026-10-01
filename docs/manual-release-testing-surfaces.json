@@ -24157,6 +24157,14 @@
     ],
     "source_coverage": [
       {
+        "surface": "Settled visible-read retry on resume and manual-reminder changes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "val readHostResumed =",
+        "test_ids": [
+          "CHL-008"
+        ]
+      },
+      {
         "surface": "Visible conversation read eligibility",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationReadVisibility.kt",
         "anchor": "fun WhiteNoiseAppState.isConversationReadVisible(",
