@@ -12,6 +12,7 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import dev.ipf.whitenoise.android.core.MarmotClient
+import dev.ipf.whitenoise.android.core.MarmotClientRootGate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -29,18 +30,21 @@ internal fun needsRetentionSweep(rows: List<AccountSummaryFfi>): Boolean = rows.
 /**
  * Reads MDK's account inventory before starting its notification and relay runtime. Reuse an
  * already-open client when the app is active; a cold worker opens a temporary unstarted client
- * and closes it before returning. A failed read propagates so WorkManager retries instead of
- * mistaking an unknown account set for an empty one.
+ * and closes it before returning. The root lease excludes foreground construction, which is
+ * rechecked after waiting. A failed read propagates so WorkManager retries instead of mistaking
+ * an unknown account set for an empty one.
  */
 internal suspend fun needsRetentionSweep(app: WhiteNoiseApplication): Boolean {
-    val existing = app.initializedAppState()?.retentionSweepRuntimeOrNull()
     return withContext(Dispatchers.IO) {
-        if (existing != null) return@withContext needsRetentionSweep(existing.listAccounts())
-        val temporary = MarmotClient(app.applicationContext).marmot
-        try {
-            needsRetentionSweep(temporary.listAccounts())
-        } finally {
-            withContext(NonCancellable) { temporary.shutdownAndClose() }
+        MarmotClientRootGate.withLease {
+            val existing = app.initializedAppState()?.retentionSweepRuntimeOrNull()
+            if (existing != null) return@withLease needsRetentionSweep(existing.listAccounts())
+            val temporary = MarmotClient(app.applicationContext).marmot
+            try {
+                needsRetentionSweep(temporary.listAccounts())
+            } finally {
+                withContext(NonCancellable) { temporary.shutdownAndClose() }
+            }
         }
     }
 }
