@@ -19,7 +19,6 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.test.core.app.ApplicationProvider
@@ -271,6 +270,8 @@ class MessageBubbleLongPressDragTest {
         val rowBounds = arrayOfNulls<Rect>(items.size)
         var selectedIds by mutableStateOf(emptySet<String>())
         var anchorIndex by mutableIntStateOf(-1)
+        var openedIndex by mutableIntStateOf(-1)
+        var actionOpens = 0
         var dragEnds = 0
         var dragCancels = 0
 
@@ -325,8 +326,11 @@ class MessageBubbleLongPressDragTest {
                                 quickReactionEmojis = emptyList(),
                                 recentEmojis = emptyList(),
                                 onEmojiUsed = {},
-                                isActionMenuOpen = false,
-                                onActionMenuOpenChange = {},
+                                isActionMenuOpen = openedIndex == index,
+                                onActionMenuOpenChange = { open ->
+                                    if (open) actionOpens++
+                                    openedIndex = if (open) index else -1
+                                },
                                 onQuickReactionsSave = {},
                                 onReplyPreviewClick = {},
                                 composerGate = ComposerGate.COMPOSER,
@@ -357,13 +361,23 @@ class MessageBubbleLongPressDragTest {
                 .onNodeWithTag("message-range-row-3")
                 .fetchSemanticsNode()
                 .boundsInRoot.center
-        val root = composeRule.onRoot()
+        val root = composeRule.onNodeWithTag(MESSAGE_RANGE_HOST_TAG)
         root.performTouchInput {
             down(start)
             advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            move()
+        }
+        composeRule.runOnIdle {
+            assertEquals(1, actionOpens)
+            assertEquals(0, openedIndex)
+        }
+        root.performTouchInput {
             moveTo(second)
         }
-        composeRule.runOnIdle { assertEquals(2, selectedIds.size) }
+        composeRule.runOnIdle {
+            assertEquals(2, selectedIds.size)
+            assertEquals(-1, openedIndex)
+        }
         root.performTouchInput {
             updatePointerTo(0, fourth)
             move(100)

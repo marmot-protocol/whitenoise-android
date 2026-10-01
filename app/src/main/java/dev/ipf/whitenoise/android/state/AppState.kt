@@ -62,6 +62,8 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationProvider
 import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
+import dev.ipf.whitenoise.android.audio.DictationDiagnosticLifecycle
+import dev.ipf.whitenoise.android.audio.DictationDiagnostics
 import dev.ipf.whitenoise.android.audio.MicrophoneCaptureCoordinator
 import dev.ipf.whitenoise.android.audio.discoverConversationDictationProviders
 import dev.ipf.whitenoise.android.audio.tts.AndroidTtsSpeechEngine
@@ -88,6 +90,7 @@ import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.HostSafety
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.MarmotClient
+import dev.ipf.whitenoise.android.core.MarmotClientRootGate
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
@@ -1088,6 +1091,8 @@ class WhiteNoiseAppState private constructor(
     initialAccounts: List<AccountSummaryFfi>,
     initialActiveAccountRef: String?,
 ) {
+    private val dictationDiagnosticLifecycle = DictationDiagnosticLifecycle()
+
     /** Interactive imports stay separate from the active account until MDK certifies readiness. */
     internal val accountSetup by lazy {
         AccountSetupCoordinator(
@@ -2536,6 +2541,9 @@ class WhiteNoiseAppState private constructor(
     private fun updateNotificationSuppression(next: NotificationSuppression) {
         if (next != suppression) notificationPostEpoch.advance()
         suppression = next
+        dictationDiagnosticLifecycle.originVisibility({ conversationDictation }) {
+            isConversationDictationOriginVisible(it.accountRef, it.groupIdHex)
+        }
     }
 
     internal val appInForeground: Boolean
@@ -4487,13 +4495,15 @@ class WhiteNoiseAppState private constructor(
                     construct = {
                         startupPerformance.stage(PerformancePhase.CLIENT_CONSTRUCTION) {
                             withContext(Dispatchers.IO) {
-                                marmotRuntimeFactory(appContext).also { runtime ->
-                                    // Publish before start so lifecycle consumers
-                                    // and later listener retries can resolve Marmot.
-                                    publishMarmotRuntime(runtime)
-                                    diagnostics.bind(runtime.marmot)
-                                    AvatarImageLoader.attachProfileImageFetcher { url, maxBytes ->
-                                        runtime.marmot.downloadProfileImage(url, maxBytes)
+                                MarmotClientRootGate.withLease {
+                                    marmotRuntimeFactory(appContext).also { runtime ->
+                                        // Publish before start so lifecycle consumers
+                                        // and later listener retries can resolve Marmot.
+                                        publishMarmotRuntime(runtime)
+                                        diagnostics.bind(runtime.marmot)
+                                        AvatarImageLoader.attachProfileImageFetcher { url, maxBytes ->
+                                            runtime.marmot.downloadProfileImage(url, maxBytes)
+                                        }
                                     }
                                 }
                             }
@@ -6660,7 +6670,10 @@ class WhiteNoiseAppState private constructor(
         diagnostics.refresh(marmot())
         auditLogSettingsMutex.withLock {
             // A failed re-read keeps what is on screen rather than presenting a settled choice as off.
-            runCatchingCancellable { marmotIo { auditLogSettings() } }.getOrNull()?.let { auditLogSettings = it }
+            runCatchingCancellable { marmotIo { auditLogSettings() } }.getOrNull()?.let {
+                auditLogSettings = it
+                DictationDiagnostics.setEnabled(it.enabled && auditUploadConsent.granted)
+            }
         }
     }
 
@@ -6687,6 +6700,8 @@ class WhiteNoiseAppState private constructor(
 
     suspend fun setAuditLogsEnabled(enabled: Boolean): Boolean =
         runCatching {
+            // Stop the local sink before a revoke/save, including a failed native update.
+            DictationDiagnostics.setEnabled(false)
             // setAuditLogSettings now applies the switch to every live session
             // in place via a recorder hot-swap (enable → live recorder,
             // disable → flush + close); no session reopen or runtime restart
@@ -6694,7 +6709,10 @@ class WhiteNoiseAppState private constructor(
             updateAuditLogSettingsSerialized(
                 mutex = auditLogSettingsMutex,
                 cachedSettings = { auditLogSettings },
-                storeCachedSettings = { auditLogSettings = it },
+                storeCachedSettings = {
+                    auditLogSettings = it
+                    DictationDiagnostics.setEnabled(it.enabled && auditUploadConsent.granted)
+                },
                 loadFromEngine = { marmotIo { auditLogSettings() } },
                 transform = { it.copy(enabled = enabled) },
                 persistToEngine = { settings ->
@@ -6716,13 +6734,7 @@ class WhiteNoiseAppState private constructor(
             false
         }
 
-    /**
-     * Archives the current audit files into the app cache for a user-confirmed export.
-     *
-     * The engine paths, file names and archive entries are never logged or included in failures.
-     * Returns null when there is nothing to export or the archive could not be prepared in full;
-     * a partial archive is never returned, so the caller cannot present one as a complete export.
-     */
+    /** Archives audit, dictation, and performance data; empty or partial exports return null. */
     @Suppress("ReturnCount") // Each engine/cache failure is a distinct fail-closed export outcome.
     suspend fun prepareAuditLogArchiveForExport(): java.io.File? {
         val sourcePaths =
@@ -6732,37 +6744,24 @@ class WhiteNoiseAppState private constructor(
                     present(R.string.toast_couldnt_export_audit_logs)
                     return null
                 }
-        if (sourcePaths.isEmpty()) {
-            presentTransient(R.string.toast_no_audit_logs_to_export)
-            return null
-        }
-
         return runCatchingCancellable {
             withContext(Dispatchers.IO) {
-                prepareAuditLogArchive(
-                    cacheDir = appContext.cacheDir,
-                    allowedSourceRoot = java.io.File(appContext.filesDir, "Marmot"),
-                    sourcePaths = sourcePaths,
-                )
-            }
+                prepareAuditAndDictationLogArchive(appContext, sourcePaths)
+            }.also { if (it == null) presentTransient(R.string.toast_no_audit_logs_to_export) }
         }.getOrElse {
             present(R.string.toast_couldnt_export_audit_logs)
             return null
         }
     }
 
-    /**
-     * Delete every local audit log file. Each delete is best-effort; the
-     * runtime hot-swaps any live recorder so logging keeps running on a
-     * fresh file when audit logging is currently on. Returns true if at
-     * least one file was successfully removed (or rotated).
-     */
+    /** Clears audit, dictation, and performance files while surfacing native deletion failures. */
+    @Suppress("CyclomaticComplexMethod", "ReturnCount")
     suspend fun deleteAuditLogs(): Boolean {
         var engineFailure: Throwable? = null
         var cacheFailure: Throwable? = null
         val preparedDeleted =
             runCatchingCancellable {
-                withContext(Dispatchers.IO) { clearPreparedAuditLogShares(appContext.cacheDir) }
+                withContext(Dispatchers.IO) { clearAuditAndDictationLogShares(appContext.cacheDir) }
             }.onFailure { cacheFailure = it }.getOrDefault(false)
         val files =
             runCatching { marmotIo { auditLogFiles() } }
@@ -6798,14 +6797,15 @@ class WhiteNoiseAppState private constructor(
             presentFailure(R.string.toast_couldnt_delete_audit_logs, "AUDIT_LOG_DELETE", it)
             return false
         }
-        if (anyDeleted) {
+        val deleted = anyDeleted || (preparedDeleted && engineFailure == null)
+        if (deleted) {
             presentTransient(R.string.toast_audit_logs_deleted)
         } else {
             engineFailure?.let {
                 presentFailure(R.string.toast_couldnt_delete_audit_logs, "AUDIT_LOG_DELETE", it)
             } ?: present(R.string.toast_couldnt_delete_audit_logs)
         }
-        return anyDeleted
+        return deleted
     }
 
     fun updateThemeMode(mode: AppThemeMode) {
@@ -7868,6 +7868,7 @@ class WhiteNoiseAppState private constructor(
             }
         }
         if (foreground) {
+            dictationDiagnosticLifecycle.foreground { conversationDictation }
             appLockTtsBoundaryJob?.cancel()
             appLockTtsBoundaryJob = null
             maybeShowAppLockForForeground()
@@ -8035,26 +8036,21 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Reuses the live native client for a retention preflight when one already exists. */
+    internal fun retentionSweepRuntimeOrNull(): MarmotInterface? = marmotRuntime?.marmot
+
     /**
-     * Background disappearing-message sweep across every signed-in account
-     * (#745). The in-conversation sweep ([ConversationController.start]) only
-     * runs while a chat is open; this is the closed-conversation counterpart,
-     * driven on a coarse cadence by [DisappearingMessageSweepWorker] so a
-     * message that expires while its conversation is closed is still pruned,
-     * its decrypted L2 media still secure-deleted, and a stale tray card still
-     * cleared — without waiting for the user to reopen the chat.
+     * Sweeps closed conversations across signed-in accounts (#745) on the coarse worker cadence.
+     * Expired messages, decrypted L2 media, and stale tray cards are removed without reopening a
+     * conversation; [ConversationController.start] handles the open-conversation path.
      *
-     * The sweep core is engine-owned: one `sweepExpiredRetention` call per
-     * account covers every retention-enabled group with the same clock-skew,
-     * unread-anchor, and scan-cap deferrals Android used to gate app-side,
-     * run atomically with the prune on the account's serialized command
-     * worker. Android keeps only what it owns per pruned group: tray-card
-     * dismissal (#333) and decrypted media-cache eviction (#334).
+     * One engine-owned `sweepExpiredRetention` call per account atomically applies clock-skew,
+     * unread-anchor, and scan-cap deferrals on its serialized command worker. Android handles
+     * tray-card dismissal (#333) and decrypted media-cache eviction (#334) per pruned group.
      *
-     * Best-effort and per-account isolated: a failure on one account is
-     * logged (cancellation re-thrown) and the sweep moves on, so one bad
-     * account can't starve the rest. Bootstraps the runtime first so the
-     * worker can run after a process death with no UI attached.
+     * Failures are isolated per account and logged; cancellation propagates. The worker checks
+     * MDK's account inventory before starting the notification runtime, and eligible accounts
+     * can still bootstrap after process death without a UI.
      */
     suspend fun sweepExpiredDisappearingMessages() {
         ensureNotificationRuntimeStarted()
@@ -10436,14 +10432,8 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /** Installs independent telemetry, audit and product destinations before native startup. */
-    private suspend fun MarmotInterface.configurePrivacyRuntime() {
-        configureTelemetryRuntime()
-        auditLogSettingsMutex.withLock {
-            auditUploadConsent.prepare(this)
-        }
-        setProductAnalyticsRuntimeConfig(androidProductAnalyticsRuntimeConfig())
-    }
+    private suspend fun MarmotInterface.configurePrivacyRuntime() =
+        configureAndroidPrivacyRuntime(this, auditUploadConsent, auditLogSettingsMutex) { configureTelemetryRuntime() }
 
     private fun warmProfile(accountIdHex: String) {
         userProfile(accountIdHex)

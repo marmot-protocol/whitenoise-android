@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.PersistableBundle
 import androidx.core.content.FileProvider
+import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnosticFileStore
 import java.io.File
 import java.io.IOException
 import java.nio.file.Files
@@ -16,6 +17,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 private const val AUDIT_LOG_SHARE_DIRECTORY = "audit_logs"
+private const val MAX_DICTATION_EXPORT_ENTRY_BYTES = 256 * 1024
 private val unsafeAuditFileName = Regex("[^A-Za-z0-9._-]")
 
 /**
@@ -36,7 +38,7 @@ internal const val AUDIT_LOG_ARCHIVE_NAME = "white-noise-diagnostic-logs.zip"
 internal const val AUDIT_LOG_ARCHIVE_MIME_TYPE = "application/zip"
 
 /**
- * Stages engine-owned audit logs as one archive in the app cache for an explicit export.
+ * Stages engine-owned audit logs and immutable app-owned dictation and performance snapshots.
  *
  * Symlinks and non-regular files are rejected so a compromised path cannot make the FileProvider
  * expose an unrelated file, and entry names are sanitised to safe, unique, relative names so an
@@ -51,8 +53,12 @@ internal fun prepareAuditLogArchive(
     cacheDir: File,
     allowedSourceRoot: File,
     sourcePaths: List<String>,
+    supplementalEntries: Map<String, ByteArray> = emptyMap(),
+    performanceLogBytes: ByteArray? = null,
 ): File {
-    require(sourcePaths.isNotEmpty()) { "At least one audit log is required" }
+    require(sourcePaths.isNotEmpty() || supplementalEntries.isNotEmpty() || performanceLogBytes != null) {
+        "At least one diagnostic log is required"
+    }
     val shareRoot = File(cacheDir, AUDIT_LOG_SHARE_DIRECTORY)
     check(shareRoot.mkdirs() || shareRoot.isDirectory) { "Unable to prepare audit log export" }
     pruneAuditLogShareSessions(shareRoot, RETAINED_AUDIT_EXPORT_SESSIONS - 1)
@@ -60,20 +66,33 @@ internal fun prepareAuditLogArchive(
     check(shareDirectory.mkdir()) { "Unable to prepare audit log export" }
 
     val allowedLexicalRoot = allowedSourceRoot.toPath().toAbsolutePath().normalize()
-    val allowedRealRoot = allowedLexicalRoot.toRealPath()
+    val allowedRealRoot = if (sourcePaths.isEmpty()) null else allowedLexicalRoot.toRealPath()
     val archive = File(shareDirectory, AUDIT_LOG_ARCHIVE_NAME)
     try {
         val usedNames = mutableSetOf<String>()
         ZipOutputStream(archive.outputStream().buffered()).use { zip ->
+            performanceLogBytes?.let { bytes ->
+                zip.putNextEntry(ZipEntry(PerformanceDiagnosticFileStore.FILE_NAME))
+                zip.write(bytes)
+                zip.closeEntry()
+                usedNames += PerformanceDiagnosticFileStore.FILE_NAME
+            }
             sourcePaths.forEach { sourcePath ->
                 val source =
                     confinedRegularAuditFile(
                         candidate = File(sourcePath),
                         allowedLexicalRoot = allowedLexicalRoot,
-                        allowedRealRoot = allowedRealRoot,
+                        allowedRealRoot = checkNotNull(allowedRealRoot),
                     ) ?: throw IOException("An audit log could not be included")
                 zip.putNextEntry(ZipEntry(uniqueAuditFileName(safeAuditEntryName(source.name), usedNames)))
                 source.inputStream().buffered().use { it.copyTo(zip) }
+                zip.closeEntry()
+            }
+            supplementalEntries.forEach { (name, bytes) ->
+                require(name in setOf("dictation-current.jsonl", "dictation-previous.jsonl", "dictation-manifest.json"))
+                require(bytes.size <= MAX_DICTATION_EXPORT_ENTRY_BYTES)
+                zip.putNextEntry(ZipEntry(uniqueAuditFileName(name, usedNames)))
+                zip.write(bytes)
                 zip.closeEntry()
             }
         }

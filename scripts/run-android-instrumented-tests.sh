@@ -27,12 +27,18 @@ fi
 smoke_annotation=dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 
 if [[ "$event_name" == "pull_request" ]]; then
-  exec ./gradlew :app:connectedDevZapstoreDebugAndroidTest \
+  ./gradlew :app:connectedDevZapstoreDebugAndroidTest \
     -Pandroid.testInstrumentationRunnerArguments.annotation="$smoke_annotation" \
+    -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
+    --no-daemon --stacktrace
+else
+  ./gradlew :app:connectedDevZapstoreDebugAndroidTest \
     -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
     --no-daemon --stacktrace
 fi
 
-exec ./gradlew :app:connectedDevZapstoreDebugAndroidTest \
-  -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
+# PRs and master run native correctness only. Timing is a manual physical-device
+# operation; explicit opt-in app suites returned above.
+exec ./gradlew :cryptoBenchmark:connectedReleaseAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=dev.ipf.whitenoise.android.core.nostr.NostrEventVerifierInstrumentedTest \
   --no-daemon --stacktrace

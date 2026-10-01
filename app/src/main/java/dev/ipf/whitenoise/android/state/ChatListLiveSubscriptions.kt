@@ -22,7 +22,7 @@ internal interface ChatListWindowHandle {
     /** Returns the complete first replacement captured when this window opened; consumed once. */
     fun snapshot(): ChatListWindowSnapshotFfi?
 
-    /** Waits for the next complete replacement, or null once the window is closed. */
+    /** Waits for a complete replacement or native stream end; the owner cancels pending waits on retirement. */
     suspend fun next(): ChatListWindowSnapshotFfi?
 
     /** Extends the retained window from the installed [sequence] in [direction]. */
@@ -41,7 +41,7 @@ internal interface ChatListWindowHandle {
     /** Returns the window to the top of the view and resumes following new activity. */
     suspend fun returnToTop(sequence: ULong): ChatListWindowSnapshotFfi
 
-    /** Releases this handle and unblocks any pending receive. */
+    /** Releases this wrapper. Its owner must cancel pending receives; native destruction alone may not wake them. */
     fun close()
 }
 

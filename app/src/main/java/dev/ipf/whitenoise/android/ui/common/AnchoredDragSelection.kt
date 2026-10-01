@@ -57,6 +57,18 @@ internal fun <T> dragSelectionEndpoint(
                 abs(pointerY - ((item.start + item.end) / 2f))
             }?.key
 
+/** Maps a window pointer to the bottom-origin offsets reported by a reversed lazy list. */
+internal fun <T> reverseLazyListDragSelectionEndpoint(
+    visibleItems: List<DragSelectionVisibleItem<T>>,
+    pointerWindowY: Float,
+    viewportWindowTop: Float,
+    viewportHeight: Int,
+): T? =
+    dragSelectionEndpoint(
+        visibleItems = visibleItems,
+        pointerY = viewportHeight - (pointerWindowY - viewportWindowTop),
+    )
+
 /**
  * A bounded per-frame auto-scroll delta. The speed ramps toward the viewport
  * edge so a small overshoot remains controllable while a deliberate edge hold

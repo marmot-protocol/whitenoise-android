@@ -1,0 +1,62 @@
+[
+  {
+    "name": "unicode",
+    "expected": true,
+    "event": {
+      "id": "d75e80a3c5a3cb64573ffd67d256095772d6cd125b37bba58235682578cc52e0",
+      "pubkey": "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "created_at": 1707409439,
+      "kind": 1,
+      "tags": [
+        [
+          "t",
+          "slashes / </notes> quote \" backslash \\ CJK 雪 Arabic مرحبا emoji 😀 combining é separators    controls \u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f"
+        ],
+        [
+          "-"
+        ]
+      ],
+      "content": "slashes / </notes> quote \" backslash \\ CJK 雪 Arabic مرحبا emoji 😀 combining é separators    controls \u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f",
+      "sig": "e8cc49ef21790cbc853d34478dda40370ccfd3ef60754f376ca112096f6b3dd63b286d5ea60eb049a44a506d0186c22e46fe1f7cb6f15fab2790810278b75880"
+    }
+  },
+  {
+    "name": "max-kind-and-time",
+    "expected": true,
+    "event": {
+      "id": "dd71c99ac6638e6b2c89dbb1f8eec29c00f2c943a5decfc69ed98e4bf0242b7a",
+      "pubkey": "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "created_at": 9223372036854775807,
+      "kind": 65535,
+      "tags": [],
+      "content": "",
+      "sig": "cdeeddf3152296712560c21519fddd6201d301febc5ade4b0c97f21527ba23070569aaa8e271be161a444a130eceac77840d788853b9dd2d3451b48461b1e663"
+    }
+  },
+  {
+    "name": "zero-kind-and-time",
+    "expected": true,
+    "event": {
+      "id": "6b6e2724d7e862a1f4438d936a7dc5bb7c4459cccbe5cb6a78f7172025f6829b",
+      "pubkey": "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "created_at": 0,
+      "kind": 0,
+      "tags": [],
+      "content": "{\"name\":\"雪😀\"}",
+      "sig": "89cde2e6c72fc78fc08a00467ba973a52e8b0d0f232cd1240989bd33ba781a9aa17c6efd385e61974d819287306585e3b64099c7b5d591c0ae9fb735b4424a6b"
+    }
+  },
+  {
+    "name": "kind-overflow",
+    "expected": false,
+    "event": {
+      "id": "b7f529af4c88453ef0dae5355a2f1399c67d3106c0671b5ee2ccdd748f8113bd",
+      "pubkey": "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "created_at": 1707409439,
+      "kind": 65536,
+      "tags": [],
+      "content": "",
+      "sig": "b0fac3ba28bd6304374796c9d095274c6f4e1333acc60655ba30e0b048ca9ad3221735ac4b261c95fda72c8c1b8ae1c9daf024842f96a9d6a63fa29ca5bee5ff"
+    }
+  }
+]

@@ -4,15 +4,12 @@ import android.content.Context
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.captureClickCallbackForReplay
-import dev.ipf.whitenoise.android.ui.common.dispatchNativePopupBack
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -55,17 +52,16 @@ class ChatSelectionAdmissionTest {
         assertEquals(0, selections)
     }
 
-    /** Captured native archive action cannot run for replacement selection. */
-    @Test fun capturedNativeArchiveActionCannotRunForReplacementSelection() {
+    /** Captured direct archive action cannot run for replacement selection. */
+    @Test fun capturedDirectArchiveActionCannotRunForReplacementSelection() {
         var current = true
         var archives = 0
         composeRule.setContent {
             WhiteNoiseTheme { chatSelectionFixture(isCurrent = { current }, onArchive = { archives++ }) }
         }
-        composeRule.onNodeWithContentDescription(context.getString(R.string.actions)).performClick()
         val archive =
             composeRule
-                .onNodeWithText(context.getString(R.string.archive))
+                .onNodeWithContentDescription(context.getString(R.string.archive))
                 .captureClickCallbackForReplay()
         composeRule.runOnIdle {
             current = false
@@ -74,34 +70,42 @@ class ChatSelectionAdmissionTest {
         assertEquals(0, archives)
     }
 
-    /** Dismissed popup rejects captured archive and delete after reopen. */
-    @Test fun dismissedPopupRejectsCapturedArchiveAndDeleteAfterReopen() {
+    /** A disposed direct bar rejects its captured actions even after a new selection appears. */
+    @Test fun disposedDirectBarRejectsCapturedArchiveAndDeleteAfterReopen() {
+        val visible = mutableStateOf(true)
         var actions = 0
         composeRule.setContent {
-            WhiteNoiseTheme { chatSelectionFixture(onArchive = { actions++ }, onDelete = { actions++ }) }
+            WhiteNoiseTheme {
+                if (visible.value) chatSelectionFixture(onArchive = { actions++ }, onDelete = { actions++ })
+            }
         }
-        composeRule.onNodeWithContentDescription(context.getString(R.string.actions)).performClick()
         val archive =
             composeRule
-                .onNodeWithText(context.getString(R.string.archive))
+                .onNodeWithContentDescription(context.getString(R.string.archive))
                 .captureClickCallbackForReplay()
         val delete =
             composeRule
-                .onNodeWithText(context.getString(R.string.delete))
+                .onNodeWithContentDescription(context.getString(R.string.delete))
                 .captureClickCallbackForReplay()
-        composeRule.onNode(isPopup()).dispatchNativePopupBack()
+        composeRule.runOnIdle { visible.value = false }
+        composeRule.waitForIdle()
         composeRule.runOnIdle {
             archive()
             delete()
         }
         assertEquals(0, actions)
-        composeRule.onNodeWithContentDescription(context.getString(R.string.actions)).performClick()
+        composeRule.runOnIdle { visible.value = true }
+        composeRule.waitForIdle()
         composeRule.runOnIdle {
             archive()
             delete()
         }
         assertEquals(0, actions)
-        composeRule.onNodeWithText(context.getString(R.string.delete)).performClick()
+        val currentDelete =
+            composeRule
+                .onNodeWithContentDescription(context.getString(R.string.delete))
+                .captureClickCallbackForReplay()
+        composeRule.runOnIdle { currentDelete() }
         assertEquals(1, actions)
     }
 

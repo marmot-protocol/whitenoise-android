@@ -19,6 +19,7 @@
 .DS_Store
 /build
 /benchmark/build
+/cryptoBenchmark/build
 /trace_processor
 /captures
 .externalNativeBuild

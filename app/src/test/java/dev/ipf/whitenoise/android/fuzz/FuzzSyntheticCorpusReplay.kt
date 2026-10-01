@@ -10,7 +10,6 @@ import dev.ipf.whitenoise.android.amber.trustedSignerPackageFailureReason
 import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.core.RecipientReference
 import dev.ipf.whitenoise.android.core.nostr.NostrEvent
-import dev.ipf.whitenoise.android.core.nostr.NostrEventVerifier
 import dev.ipf.whitenoise.android.core.nostr.NostrRelayFrames
 import dev.ipf.whitenoise.android.updates.ZapstoreEvents
 import org.json.JSONObject
@@ -102,7 +101,7 @@ object FuzzSyntheticCorpusReplay {
             runCatching { JSONObject(jsonText) }
                 .getOrNull()
                 ?.let { NostrEvent.fromJson(it) }
-                ?.let(NostrEventVerifier::verifies)
+                ?.let { it.toJson() }
         }
     }
 
@@ -112,9 +111,13 @@ object FuzzSyntheticCorpusReplay {
             runCatching { JSONObject(jsonText) }
                 .getOrNull()
                 ?.let { NostrEvent.fromJson(it) }
-                ?.takeIf(NostrEventVerifier::verifies)
                 ?.let { parsed ->
-                    ZapstoreEvents.latestReleaseVersion(parsed, "org.parres.darkmatter", parsed.pubkey)
+                    ZapstoreEvents.latestReleaseVersion(
+                        parsed,
+                        "org.parres.darkmatter",
+                        "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+                        verifyEvent = { true },
+                    )
                     ZapstoreEvents.releaseVersionForApp(parsed, "org.parres.darkmatter")
                 }
         }

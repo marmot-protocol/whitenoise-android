@@ -45,6 +45,15 @@ internal object BenchmarkConfig {
     val originalAirplaneMode: BenchmarkAirplaneMode?
         get() = BenchmarkAirplaneMode.fromStatusValue(arguments.getString("originalAirplaneMode"))
 
+    /** Smoke-run override for a [BackgroundIdleBenchmark] method's sleep window; defaults apply when absent. */
+    val idleWindowMs: Long?
+        get() =
+            arguments
+                .getString("idleWindowMs")
+                ?.trim()
+                ?.toLongOrNull()
+                ?.takeIf { it > 0 }
+
     private fun fixtureList(argumentName: String): List<String> =
         arguments
             .getString(argumentName)

@@ -122,6 +122,11 @@ class DiagnosticsScreenScreenshotTest {
         composeRule
             .onNodeWithTag("sheet.surface")
             .captureRoboImage("src/test/snapshots/diagnostics_screen_performance_active_dark.png")
+
+        composeRule
+            .onNodeWithTag("diagnostics.health")
+            .performScrollToNode(hasText("This session will be included", substring = true))
+        composeRule.onNodeWithText("This session will be included", substring = true).assertIsDisplayed()
     }
 
     /** Renders the SDK event through the formatter while suppressing wall-clock-dependent relative time. */

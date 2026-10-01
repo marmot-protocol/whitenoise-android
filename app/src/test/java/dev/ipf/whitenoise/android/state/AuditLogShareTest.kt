@@ -5,6 +5,9 @@ import android.content.Context
 import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.FileProviderStrategyCacheRule
+import dev.ipf.whitenoise.android.audio.DictationDiagnostics
+import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -27,6 +30,75 @@ class AuditLogShareTest {
     @get:Rule
     val fileProviderStrategyCacheRule = FileProviderStrategyCacheRule()
 
+    /** Retained dictation and performance data export without native audit files and clear locally. */
+    @Test
+    fun retainedDiagnosticExportAndClearWorkWithoutNativeLogs() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        DictationDiagnostics.attach(context)
+        try {
+            PerformanceDiagnostics.stop()
+            clearAuditAndDictationLogShares(context.cacheDir)
+            assertNull(prepareAuditAndDictationLogArchive(context, emptyList()))
+            val performance = "schema=2 op=app_start phase=accepted\n".toByteArray()
+            val performanceOnly = requireNotNull(prepareAuditAndDictationLogArchive(context, emptyList(), performance))
+            assertEquals(performance.decodeToString(), performanceOnly.entries()["performance-session.log"])
+            DictationDiagnostics.setEnabled(true)
+            DictationDiagnostics.record("event=session_started session=4")
+            val archive = requireNotNull(prepareAuditAndDictationLogArchive(context, emptyList()))
+            ZipFile(archive).use { zip -> assertTrue(zip.getEntry("dictation-current.jsonl") != null) }
+            assertTrue(clearAuditAndDictationLogShares(context.cacheDir))
+            assertNull(prepareAuditAndDictationLogArchive(context, emptyList()))
+        } finally {
+            DictationDiagnostics.setEnabled(false)
+            clearAuditAndDictationLogShares(context.cacheDir)
+        }
+    }
+
+    @Test
+    fun invalidRetainedFileStillExportsItsRecoveryManifest() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        DictationDiagnostics.attach(context)
+        try {
+            PerformanceDiagnostics.stop()
+            clearAuditAndDictationLogShares(context.cacheDir)
+            val directory = File(context.noBackupFilesDir, "dictation-diagnostics")
+            File(directory, "dictation-current.jsonl").writeText("PRIVATE_PARTIAL")
+            val archive = requireNotNull(prepareAuditAndDictationLogArchive(context, emptyList()))
+            val entries = archive.entries()
+            assertEquals(setOf("dictation-manifest.json"), entries.keys)
+            assertFalse(entries.values.any { it.contains("PRIVATE") })
+            assertEquals(1L, JSONObject(entries.values.single()).getLong("invalid_files_in_process"))
+            assertTrue(clearAuditAndDictationLogShares(context.cacheDir))
+            assertNull(prepareAuditAndDictationLogArchive(context, emptyList()))
+        } finally {
+            DictationDiagnostics.setEnabled(false)
+            clearAuditAndDictationLogShares(context.cacheDir)
+        }
+    }
+
+    @Test
+    fun exportContainsRetainedDictationEvenWithoutNativeAuditFiles() {
+        val archive =
+            prepareAuditLogArchive(
+                temporaryFolder.newFolder("dictation-cache"),
+                File(temporaryFolder.root, "absent-engine"),
+                emptyList(),
+                mapOf("dictation-current.jsonl" to "{\"event\":\"session_started\"}\n".toByteArray()),
+            )
+        assertEquals(setOf("dictation-current.jsonl"), archive.entries().keys)
+        assertTrue(archive.entries().getValue("dictation-current.jsonl").contains("session_started"))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun supplementalExportRejectsUnknownEntryNames() {
+        prepareAuditLogArchive(
+            temporaryFolder.newFolder("bad-supplement-cache"),
+            temporaryFolder.root,
+            emptyList(),
+            mapOf("../private.txt" to "PRIVATE".toByteArray()),
+        )
+    }
+
     /** One export yields one archive in private cache holding every confined log, byte for byte. */
     @Test
     fun prepareAuditLogArchiveWritesEveryConfinedLogIntoOneArchive() {
@@ -40,6 +112,35 @@ class AuditLogShareTest {
         assertEquals(AUDIT_LOG_ARCHIVE_NAME, archive.name)
         assertEquals(File(cache, "audit_logs"), archive.parentFile?.parentFile)
         assertEquals(mapOf("audit.jsonl" to "one", "audit-b.jsonl" to "two"), archive.entries())
+    }
+
+    /** One archive combines audit, dictation, and WNPerf; performance alone also exports. */
+    @Test
+    fun prepareAuditLogArchiveIncludesPerformanceSessionWithAndWithoutAuditFiles() {
+        val audit = temporaryFolder.newFile("audit.jsonl").apply { writeText("audit") }
+        val cache = temporaryFolder.newFolder("performance-cache")
+        val performance = "schema=2 op=app_start phase=accepted\n".toByteArray()
+
+        val combined =
+            prepareAuditLogArchive(
+                cache,
+                temporaryFolder.root,
+                listOf(audit.absolutePath),
+                supplementalEntries = mapOf("dictation-current.jsonl" to "dictation".toByteArray()),
+                performanceLogBytes = performance,
+            )
+        assertEquals(
+            mapOf(
+                "performance-session.log" to performance.decodeToString(),
+                "audit.jsonl" to "audit",
+                "dictation-current.jsonl" to "dictation",
+            ),
+            combined.entries(),
+        )
+
+        val onlyPerformance =
+            prepareAuditLogArchive(cache, temporaryFolder.root, emptyList(), performanceLogBytes = performance)
+        assertEquals(mapOf("performance-session.log" to performance.decodeToString()), onlyPerformance.entries())
     }
 
     /** An allowed root reached through a filesystem alias is still the same confined root. */

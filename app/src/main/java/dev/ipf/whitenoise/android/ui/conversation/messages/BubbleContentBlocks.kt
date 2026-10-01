@@ -79,12 +79,13 @@ import dev.ipf.whitenoise.android.ui.conversation.media.VoicePresentationAttachm
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberVoicePresentationOwner
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCards
-import dev.ipf.whitenoise.android.ui.conversation.share.ContactMessageBubble
 import dev.ipf.whitenoise.android.ui.conversation.share.LocationMessageBubble
+import dev.ipf.whitenoise.android.ui.conversation.share.ReceivedContactActions
 import dev.ipf.whitenoise.android.ui.conversation.share.SharedContact
 import dev.ipf.whitenoise.android.ui.conversation.share.SharedLocation
 import dev.ipf.whitenoise.android.ui.conversation.share.SharedUser
 import dev.ipf.whitenoise.android.ui.conversation.share.UserMessageBubble
+import dev.ipf.whitenoise.android.ui.conversation.share.VCARD_MIME_TYPE
 import dev.ipf.whitenoise.android.ui.conversation.share.formatCoordinate
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import dev.ipf.whitenoise.android.ui.ttsSentenceAccessibilityActions
@@ -197,8 +198,25 @@ internal fun ColumnScope.BubbleMediaBlocks(
             },
         )
     }
-    if (sharedContact != null) {
-        ContactMessageBubble(contact = sharedContact)
+    val contactAttachment =
+        if (sharedContact == null) {
+            null
+        } else {
+            bubbleMedia.files.firstOrNull { entry ->
+                entry.value.mediaType.equals(VCARD_MIME_TYPE, ignoreCase = true) ||
+                    entry.value.fileName.endsWith(".vcf", ignoreCase = true)
+            }
+        }
+    if (sharedContact != null && contactAttachment != null) {
+        ReceivedContactActions(
+            contact = sharedContact,
+            messageIdHex = record.messageIdHex,
+            attachmentIndex = contactAttachment.index,
+            reference = contactAttachment.value,
+            mine = mine,
+            controller = controller,
+            appState = appState,
+        )
     }
     if (sharedUser != null) {
         // Resolve the shared npub the same way a mention of that person resolves, so a shared
@@ -312,16 +330,17 @@ internal fun ColumnScope.BubbleMediaBlocks(
         }
     }
     if (!deleted && bubbleMedia.files.isNotEmpty()) {
+        val visibleFiles = bubbleMedia.files.filterNot { it.index == contactAttachment?.index }
         val fileOwnsFooter =
             fileCardOwnsFooter(
                 deleted = deleted,
-                fileCount = bubbleMedia.files.size,
+                fileCount = visibleFiles.size,
                 visualOwnsFooter = footerOnVisualMedia,
                 hasCaption = hasCaption,
             )
         val fileTimestamp = if (fileOwnsFooter) rememberedMessageBubbleTime(record.recordedAt) else null
-        bubbleMedia.files.forEachIndexed { filePosition, entry ->
-            val isFooterOwner = fileOwnsFooter && filePosition == bubbleMedia.files.lastIndex
+        visibleFiles.forEachIndexed { filePosition, entry ->
+            val isFooterOwner = fileOwnsFooter && filePosition == visibleFiles.lastIndex
             MediaFileBubble(
                 messageIdHex = record.messageIdHex,
                 attachmentIndex = entry.index,

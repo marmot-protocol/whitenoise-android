@@ -7,8 +7,11 @@ import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.AuditLogTrackerConfigV4Ffi
 import dev.ipf.marmotkit.AuditOtlpConfigV5Ffi
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.whitenoise.android.audio.DictationDiagnostics
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.runTest
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -310,6 +313,77 @@ class AuditUploadConsentTest {
             assertFalse(AuditUploadConsent(preferences).granted)
         }
 
+    @Test
+    fun successfulGrantRecordsLocallyAndRevocationStopsNewEvents() =
+        runTest {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            DictationDiagnostics.attach(context)
+            DictationDiagnostics.clear()
+            preferences.edit().clear().commit()
+            val consent = AuditUploadConsent(preferences)
+            try {
+                consent.applyChoice(AuditLogSettingsFfi(true), configureUpload = {}, persistSettings = { it })
+                DictationDiagnostics.record("event=session_started session=1")
+                val first = DictationDiagnostics.snapshot().getValue("dictation-current.jsonl").decodeToString()
+                consent.applyChoice(AuditLogSettingsFfi(false), configureUpload = {}, persistSettings = { it })
+                DictationDiagnostics.record("event=session_started session=2")
+                val afterRevocation =
+                    DictationDiagnostics.snapshot().getValue("dictation-current.jsonl").decodeToString()
+                assertEquals(first, afterRevocation)
+            } finally {
+                DictationDiagnostics.setEnabled(false)
+                DictationDiagnostics.clear()
+            }
+        }
+
+    @Test
+    fun failedConsentAndSettingsWritesStopLocalCollectionImmediately() =
+        runTest {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            DictationDiagnostics.attach(context)
+            DictationDiagnostics.clear()
+            preferences.edit().clear().commit()
+            val consent = AuditUploadConsent(preferences)
+            try {
+                consent.applyChoice(AuditLogSettingsFfi(true), configureUpload = {}, persistSettings = { it })
+                expectFailure { AuditUploadConsent(failingPreferences()).choose(false) }
+                DictationDiagnostics.record("event=session_started session=1")
+                assertTrue(DictationDiagnostics.snapshot().keys.none { it.endsWith(".jsonl") })
+                consent.applyChoice(AuditLogSettingsFfi(true), configureUpload = {}, persistSettings = { it })
+                expectFailure {
+                    consent.applyChoice(
+                        AuditLogSettingsFfi(false),
+                        configureUpload = {},
+                        persistSettings = { error("Unavailable") },
+                    )
+                }
+                DictationDiagnostics.record("event=session_started session=2")
+                val snapshot = DictationDiagnostics.snapshot()
+                assertTrue(snapshot.keys.none { it.endsWith(".jsonl") })
+                val manifest = JSONObject(snapshot.getValue("dictation-manifest.json").decodeToString())
+                assertFalse(manifest.getBoolean("collection_enabled"))
+            } finally {
+                DictationDiagnostics.setEnabled(false)
+                DictationDiagnostics.clear()
+            }
+        }
+
+    @Test
+    fun unavailableDiagnosticSettingsReadDoesNotBlockProductConfiguration() =
+        runTest {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            DictationDiagnostics.attach(context)
+            DictationDiagnostics.clear()
+            preferences.edit().clear().commit()
+            val consent = AuditUploadConsent(preferences)
+            consent.choose(true)
+            val native = Native(enabled = true, failSettingsRead = true)
+            configureAndroidPrivacyRuntime(native.runtime, consent, Mutex(), configureTelemetry = {})
+            assertTrue(native.productConfigured)
+            DictationDiagnostics.record("event=session_started session=1")
+            assertTrue(DictationDiagnostics.snapshot().keys.none { it.endsWith(".jsonl") })
+        }
+
     private fun failingPreferences(): SharedPreferences =
         Proxy.newProxyInstance(
             SharedPreferences::class.java.classLoader,
@@ -344,7 +418,9 @@ class AuditUploadConsentTest {
         var enabled: Boolean,
         val failDisable: Boolean = false,
         val failSecondV5Set: Boolean = false,
+        val failSettingsRead: Boolean = false,
     ) {
+        var productConfigured = false
         val mutations = mutableListOf<String>()
         val auditUploadAttempts = mutableListOf<Boolean>()
         val runtime =
@@ -362,7 +438,11 @@ class AuditUploadConsentTest {
                         (args!![0] as AuditLogTrackerConfigV4Ffi).also {
                             mutations += if (it.authorizationBearerToken == null) "clear-upload" else "allow-upload"
                         }
-                    "auditLogSettings" -> AuditLogSettingsFfi(enabled)
+                    "auditLogSettings" -> {
+                        check(!failSettingsRead) { "Read unavailable" }
+                        AuditLogSettingsFfi(enabled)
+                    }
+                    "setProductAnalyticsRuntimeConfig" -> args!!.first().also { productConfigured = true }
                     "setAuditLogSettings" ->
                         (args!![0] as AuditLogSettingsFfi).also {
                             check(!failDisable) { "Storage unavailable" }

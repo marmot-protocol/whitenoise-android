@@ -8,6 +8,7 @@ import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.PresentedChatRowFfi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.joinAll
@@ -16,7 +17,6 @@ import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 /** The window handle opened for each rendered view. */
@@ -57,12 +57,12 @@ internal class ChatListWindowSet private constructor(
 ) {
     private val cursors = initial.mapValues { (_, snapshot) -> ChatListWindowCursor(snapshot) }
     private val installed = initial.toMutableMap()
-    private val frameLock = Any()
+    private val lifetime = ChatListWindowLifetime(handles)
+    private val frameLock = lifetime.lock
     private var revision = 0L
     private val commands = Mutex()
-    private val isClosed = AtomicBoolean(false)
 
-    val closed: Boolean get() = isClosed.get()
+    val closed: Boolean get() = lifetime.closed
 
     /** Every retained row across the merged views, in view order. */
     val rows: List<PresentedChatRowFfi>
@@ -87,10 +87,10 @@ internal class ChatListWindowSet private constructor(
     fun isCurrent(frame: ChatListFrame): Boolean = synchronized(frameLock) { !closed && frame.revision == revision }
 
     /** Whether MDK retains rows beyond this view's window that a forward page can load. */
-    fun hasMoreAfter(view: ChatListViewFfi): Boolean = installed[view]?.hasMoreAfter == true
+    fun hasMoreAfter(view: ChatListViewFfi): Boolean = installed(view)?.hasMoreAfter == true
 
     /** Newest installed replacement for [view], or null when the view is not open. */
-    fun installed(view: ChatListViewFfi): ChatListWindowSnapshotFfi? = installed[view]
+    fun installed(view: ChatListViewFfi): ChatListWindowSnapshotFfi? = synchronized(frameLock) { installed[view] }
 
     /**
      * Runs one receive loop per view until any stream ends or reports a foreign generation, then
@@ -104,18 +104,23 @@ internal class ChatListWindowSet private constructor(
             val ended = CompletableDeferred<Unit>()
             val failure = AtomicReference<Throwable?>(null)
             val jobs =
-                handles.map { (view, handle) ->
-                    launch {
-                        try {
-                            receiveView(view, handle, onReplacement)
-                        } catch (cancel: CancellationException) {
-                            throw cancel
-                        } catch (throwable: Throwable) {
-                            failure.compareAndSet(null, throwable)
-                        } finally {
-                            ended.complete(Unit)
+                handles.keys.map { view ->
+                    val job =
+                        launch(start = CoroutineStart.LAZY) {
+                            try {
+                                receiveView(view, onReplacement)
+                            } catch (cancel: CancellationException) {
+                                throw cancel
+                            } catch (throwable: Throwable) {
+                                failure.compareAndSet(null, throwable)
+                            }
                         }
+                    job.invokeOnCompletion {
+                        lifetime.unregisterReceiver(job)
+                        ended.complete(Unit)
                     }
+                    if (lifetime.registerReceiver(job)) job.start() else job.cancel()
+                    job
                 }
             ended.await()
             jobs.forEach { it.cancel() }
@@ -134,7 +139,7 @@ internal class ChatListWindowSet private constructor(
     /** Loads the preceding page of [view] when the retained window is no longer at the true top. */
     suspend fun pageBackward(view: ChatListViewFfi): ChatListWindowSnapshotFfi? =
         command(view) { handle, sequence ->
-            if (installed[view]?.hasMoreBefore != true) return@command null
+            if (installed(view)?.hasMoreBefore != true) return@command null
             handle.page(sequence, ChatListPageDirectionFfi.BACKWARD, CHAT_LIST_WINDOW_PAGE_ROWS)
         }
 
@@ -150,41 +155,47 @@ internal class ChatListWindowSet private constructor(
         return result
     }
 
-    /** Releases every native handle; these windows expose no separate cancel. */
-    fun close() {
-        synchronized(frameLock) { isClosed.set(true) }
-        handles.values.forEach { handle -> runCatching { handle.close() } }
-    }
+    /** Retires immediately and cancels receive workers, including any callback running in one. */
+    fun close() = lifetime.close()
+
+    /** Waits for the finite native cleanup without delaying logical retirement. */
+    suspend fun awaitReleased() = lifetime.awaitReleased()
 
     private suspend fun receiveView(
         view: ChatListViewFfi,
-        handle: ChatListWindowHandle,
         onReplacement: suspend (ChatListViewFfi, ChatListWindowSnapshotFfi) -> Unit,
     ) {
         val cursor = cursors.getValue(view)
-        while (currentCoroutineContextIsActive()) {
-            val update = withContext(Dispatchers.IO) { handle.next() } ?: return
-            if (cursor.requiresReopen(update)) return
+        while (!closed && currentCoroutineContextIsActive()) {
+            val update = withContext(Dispatchers.IO) { lifetime.withHandle(view) { it.next() } } ?: return
+            if (closed || cursor.requiresReopen(update)) return
             if (install(view, update)) onReplacement(view, update)
         }
     }
 
     // A stale sequence or an anchor outside the retained rows carries no detail worth surfacing: the
     // contract is to reassess from the newest installed replacement, which the receive loop delivers.
+    // Native shutdown may precede Kotlin retirement. The receive loop owns reopening a closed
+    // window; viewport commands have no result to publish and must not escape into UI effects.
     @Suppress("SwallowedException")
     private suspend fun command(
         view: ChatListViewFfi,
         block: suspend (ChatListWindowHandle, ULong) -> ChatListWindowSnapshotFfi?,
     ): ChatListWindowSnapshotFfi? =
         commands.withLock {
-            val handle = handles[view] ?: return@withLock null
-            val sequence = cursors.getValue(view).sequence
             val result =
                 try {
-                    withContext(Dispatchers.IO) { block(handle, sequence) }
+                    withContext(Dispatchers.IO) {
+                        lifetime.withHandle(view) { handle ->
+                            val sequence = synchronized(frameLock) { cursors.getValue(view).sequence }
+                            block(handle, sequence)
+                        }
+                    }
                 } catch (stale: MarmotKitException.ChatWindowStale) {
                     null
                 } catch (outside: MarmotKitException.ChatWindowAnchorOutside) {
+                    null
+                } catch (ended: MarmotKitException.ChatWindowClosed) {
                     null
                 }
             result?.takeIf { install(view, it) }
@@ -196,7 +207,7 @@ internal class ChatListWindowSet private constructor(
     ): Boolean {
         val accepted =
             synchronized(frameLock) {
-                if (!cursors.getValue(view).accept(update)) return@synchronized false
+                if (closed || !cursors.getValue(view).accept(update)) return@synchronized false
                 installed[view] = update
                 revision++
                 true

@@ -6,7 +6,17 @@ import dev.ipf.marmotkit.CursorPersistenceFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotAndroid
 import dev.ipf.marmotkit.MarmotOptions
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
+
+/** Serializes root ownership while a cold preflight opens, reads, and closes its temporary client. */
+internal object MarmotClientRootGate {
+    private val mutex = Mutex()
+
+    /** Foreground construction publishes its client before a waiting preflight checks for reuse. */
+    suspend fun <T> withLease(block: suspend () -> T): T = mutex.withLock { block() }
+}
 
 class MarmotClient(
     context: Context,
