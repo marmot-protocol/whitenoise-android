@@ -25,18 +25,18 @@ object NativeVerifierCorrectnessBridge {
             TEXT_EVENT.copy(id = "invalid"),
         ).all { !NostrEventVerifier.verifies(it) }
 
-    // Public fixture from the pinned Rust Nostr event tests.
+    // Canonical event signed with public test scalar 1 and zero auxiliary randomness.
     private val TEXT_EVENT =
         NostrEvent(
-            id = "cb8feca582979d91fe90455867b34dbf4d65e4b86e86b3c68c368ca9f9eef6f2",
+            id = "f017727ad7c6b4c872639506b75ad7c8f85e0896f71610fb491625e1c0b8b2e6",
             pubkey = "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
             createdAt = 1_707_409_439L,
             kind = 1,
             tags = listOf(listOf("-")),
             content = "hello members of the secret group",
             sig =
-                "fa163f5cfb75d77d9b6269011872ee22b34fb48d23251e9879bb1e4ccbdd8aaaf" +
-                    "4b6dc5f5084a65ef42c52fbcde8f3178bac3ba207de827ec513a6aa39fa684c",
+                "05a6cc87a4e03cd93efd843d45ec927b13dedcaf653518c0dc7e929f2cd3588587" +
+                    "ea4402009afaa9d4dfff5c7e74a8e15aee9cd71c2aaadf04ff3e7e690a3e9d",
         )
     private const val FIELD_PRIME_HEX = "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"
     private const val CURVE_ORDER_HEX = "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141"

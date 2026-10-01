@@ -10,8 +10,8 @@ import org.junit.runner.RunWith
 class NostrEventVerifierInstrumentedTest {
     @Test
     fun acceptsSignedReleaseAndTextEvents() {
-        assertTrue(Bip340ComparisonBridge.replacementFullEvent())
-        assertTrue(NativeVerifierCorrectnessBridge.acceptsSignedTextEvent())
+        assertTrue("signed release fixture", Bip340ComparisonBridge.replacementFullEvent())
+        assertTrue("signed text fixture", NativeVerifierCorrectnessBridge.acceptsSignedTextEvent())
     }
 
     @Test
