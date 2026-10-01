@@ -2625,13 +2625,14 @@ internal class ConversationDictationController internal constructor(
         conversationDictationDiagnostic("event=session_failed failure=${failure.name}")
         clearRecognitionSession(cancel = cancelSession)
         resetTranscriptSession()
-        state = ConversationDictationState.Failed(
-            sessionId,
-            target,
-            failure,
-            retainedTranscript,
-            cause = reason.takeIf { failure != it },
-        )
+        state =
+            ConversationDictationState.Failed(
+                sessionId,
+                target,
+                failure,
+                retainedTranscript,
+                cause = reason.takeIf { failure != it },
+            )
     }
 
     /** Releases recognition and microphone ownership, optionally retaining the durable service lease. */
@@ -3250,6 +3251,7 @@ internal class ConversationDictationController internal constructor(
         const val CALLER_AUDIO_PROBE_TIMEOUT_MILLIS = 6_000L
         const val MAX_SESSION_MILLIS = 65L * 60L * 1_000L
         const val CALLER_AUDIO_DRAIN_TIMEOUT_MILLIS = 90_000L
+
         // Recorder tail reads are bounded at 750 ms; a stalled closure cannot retain foreground forever.
         const val CALLER_AUDIO_FAILURE_CLOSE_TIMEOUT_MILLIS = 1_000L
         const val PROCESSING_TIMEOUT_MILLIS = 20_000L
