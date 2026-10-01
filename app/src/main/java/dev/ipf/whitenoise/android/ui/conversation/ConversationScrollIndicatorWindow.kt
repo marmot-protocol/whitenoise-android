@@ -105,7 +105,7 @@ internal fun Modifier.conversationScrollIndicator(
     enabled: Boolean,
 ): Modifier {
     var origin by remember(viewport) { mutableStateOf<Offset?>(null) }
-    val alpha = rememberReadingIndicatorAlpha(window.owner to window.messageKeys, enabled) { state.isScrollInProgress }
+    val alpha = rememberReadingIndicatorAlpha(window.owner, enabled) { state.isScrollInProgress }
     val color = MaterialTheme.colorScheme.onSurfaceVariant
     return onGloballyPositioned { origin = it.positionInWindow() }.drawWithContent {
         drawContent()
