@@ -24010,6 +24010,35 @@
     ],
     "source_coverage": [
       {
+        "surface": "Retained dictation diagnostic metadata",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/DictationDiagnosticStore.kt",
+        "anchor": "internal class DictationDiagnosticStore(",
+        "test_ids": [
+          "DIC-002",
+          "SEC-009",
+          "SEC-010"
+        ]
+      },
+      {
+        "surface": "Dictation export consent and queue",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/DictationDiagnostics.kt",
+        "anchor": "internal object DictationDiagnostics {",
+        "test_ids": [
+          "DIC-002",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010"
+        ]
+      },
+      {
+        "surface": "Empty native and dictation diagnostic export",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.toast_no_audit_logs_to_export",
+        "test_ids": [
+          "SEC-009"
+        ]
+      },
+      {
         "surface": "Stored group-avatar surface: R.string.chat_list_filter_groups",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
         "anchor": "R.string.chat_list_filter_groups",
@@ -24813,7 +24842,7 @@
       },
       {
         "surface": "host timing configuration and consent boundary",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/DictationAuditLogShare.kt",
         "anchor": "setProductAnalyticsRuntimeConfig(",
         "test_ids": [
           "SEC-011"

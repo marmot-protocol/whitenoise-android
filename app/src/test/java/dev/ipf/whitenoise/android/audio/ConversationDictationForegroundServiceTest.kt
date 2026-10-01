@@ -33,6 +33,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowLog
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -119,6 +120,26 @@ class ConversationDictationForegroundServiceTest {
             ),
         )
         assertFalse(ConversationDictationForegroundService.notificationControlsAvailable(context))
+    }
+
+    @Test
+    fun serviceTraceCorrelatesTheRequestedSession() {
+        ShadowLog.clear()
+        val harness = installHost()
+        val lifecycle = Robolectric.buildService(ConversationDictationForegroundService::class.java).create()
+        try {
+            val service = lifecycle.get()
+            service.onStartCommand(startIntent(service, harness), 0, 1)
+            assertCorrelatedServiceTrace()
+        } finally {
+            lifecycle.destroy()
+        }
+    }
+
+    private fun assertCorrelatedServiceTrace() {
+        val trace = ShadowLog.getLogsForTag("WNDictation").mapNotNull { DictationDiagnosticSchema.fields(it.msg) }
+        assertTrue(trace.any { it["event"] == "foreground_service_on_start" && it["callback_session"] == 1L })
+        assertTrue(trace.any { it["event"] == "foreground_service_promoted" && it["callback_session"] == 1L })
     }
 
     /** Verifies active capture uses a metadata-free notification whose actions reach the controller. */

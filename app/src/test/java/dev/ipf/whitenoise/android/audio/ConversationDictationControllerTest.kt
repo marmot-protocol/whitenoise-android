@@ -18,11 +18,131 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowLog
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 @Suppress("LargeClass")
 class ConversationDictationControllerTest {
+    @Test
+    fun refusedReplyStartDoesNotPublishAnActiveSession() {
+        ShadowLog.clear()
+        DictationDiagnostics.activeSession = 0
+        val active = fixture(draft = TextFieldValue(""), targetReplyAvailable = { false })
+        assertFalse(
+            active.controller.requestStart(
+                ACCOUNT,
+                GROUP,
+                active.drafts.getValue(key()),
+                replyToMessageIdHex = REPLY_MESSAGE_ID,
+            ),
+        )
+        assertEquals(0L, DictationDiagnostics.activeSession)
+        assertTrue(ShadowLog.getLogsForTag("WNDictation").none { it.msg.contains("event=session_started") })
+    }
+
+    @Test
+    fun visibilityTraceEmitsOnlyOriginTransitions() {
+        val active = fixture(draft = TextFieldValue(""))
+        active.controller.requestStart(ACCOUNT, GROUP, active.drafts.getValue(key()))
+        ShadowLog.clear()
+        val lifecycle = DictationDiagnosticLifecycle()
+        lifecycle.originVisibility({ active.controller }) { true }
+        lifecycle.originVisibility({ active.controller }) { true }
+        lifecycle.originVisibility({ active.controller }) { false }
+        val entries = ShadowLog.getLogsForTag("WNDictation").mapNotNull { DictationDiagnosticSchema.fields(it.msg) }
+        val changes = entries.filter { it["event"] == "origin_visibility" }
+        assertEquals(listOf(true, false), changes.map { it["visible"] })
+        assertTrue(changes.all { it["session"] == 1L })
+    }
+
+    @Test
+    fun lateInternalCaptureClosureIsNotARejectedProviderCallback() {
+        val active = fixture(draft = TextFieldValue(""), platform = FakePlatform(deferCaptureCompletion = true))
+        active.controller.requestStart(ACCOUNT, GROUP, active.drafts.getValue(key()))
+        active.platform.listener.onReady()
+        val session = active.platform.session
+        active.controller.stop()
+        active.platform.listener.onResult("captured")
+        ShadowLog.clear()
+        session.completeCapture()
+        assertTrue(ShadowLog.getLogsForTag("WNDictation").none { it.msg.contains("event=callback_rejected") })
+    }
+
+    @Test
+    fun idleVisibilityHooksDoNotInitializeTheController() {
+        DictationDiagnostics.activeSession = 0
+        val lifecycle = DictationDiagnosticLifecycle()
+        lifecycle.originVisibility({ error("Idle controller must remain lazy") }) { true }
+        lifecycle.foreground { error("Idle controller must remain lazy") }
+    }
+
+    @Test
+    fun processingBackgroundAndServiceLossHaveCorrelatedCausalDiagnostics() {
+        ShadowLog.clear()
+        val active = fixture(draft = TextFieldValue("PRIVATE_DRAFT"))
+        active.controller.requestStart(ACCOUNT, GROUP, active.drafts.getValue(key()))
+        active.platform.listener.onReady()
+        active.controller.stop()
+        active.controller.onAppBackgrounded()
+        assertTrue(active.controller.state is ConversationDictationState.Processing)
+        active.controller.onDurableServiceDestroyed(requireNotNull(active.controller.notificationSessionToken))
+        val logs = ShadowLog.getLogsForTag("WNDictation").joinToString("\n") { it.msg }
+        assertTrue(
+            logs.contains(
+                "event=app_visibility foreground=false durable=true phase=Processing outcome=continued session=1",
+            ),
+        )
+        assertTrue(logs.contains("event=session_abort reason=service_destroyed accepted=true"))
+        assertTrue(logs.contains("event=state_changed session=1 from=Processing to=Idle"))
+        val retained = ShadowLog.getLogsForTag("WNDictation").mapNotNull { DictationDiagnosticSchema.fields(it.msg) }
+        assertTrue(
+            retained.any {
+                it["event"] == "app_visibility" && it["phase"] == "Processing" && it["outcome"] == "continued"
+            },
+        )
+        assertTrue(retained.any { it["event"] == "foreground_service_start" && it["requested"] == true })
+        assertFalse(logs.contains("PRIVATE_DRAFT"))
+        assertFalse(logs.contains(ACCOUNT))
+        assertFalse(logs.contains(GROUP))
+    }
+
+    @Test
+    fun processingTimeoutTraceNamesItsDeadlineAndRecoveryCause() {
+        ShadowLog.clear()
+        val active = fixture(draft = TextFieldValue(""))
+        active.controller.requestStart(ACCOUNT, GROUP, active.drafts.getValue(key()))
+        active.platform.listener.onReady()
+        active.controller.stop()
+        active.scheduler.runDelay(20_000L)
+        val logs = ShadowLog.getLogsForTag("WNDictation").joinToString("\n") { it.msg }
+        assertTrue(logs.contains("event=watchdog_fired session=1 phase=processing accepted=true"))
+        assertTrue(logs.contains("event=failure_recovery failure=TimedOut"))
+        assertTrue(active.controller.state is ConversationDictationState.Failed)
+    }
+
+    @Test
+    fun callerAudioDrainAndStaleCallbackHaveDistinctDiagnosticOutcomes() {
+        ShadowLog.clear()
+        val active = fixture(draft = TextFieldValue(""))
+        active.platform.pendingCallerAudio = true
+        active.controller.requestStart(ACCOUNT, GROUP, active.drafts.getValue(key()))
+        val stale = active.platform.listener
+        active.platform.listener.onResult("PRIVATE_SPEECH")
+        active.scheduler.runDelay(500L)
+        active.controller.paste()
+        active.scheduler.advanceBy(20_000L)
+        active.controller.retry()
+        active.scheduler.runDelay(500L)
+        active.platform.listener.onReady()
+        active.scheduler.runDelay(90_000L)
+        stale.onResult("PRIVATE_STALE")
+        val logs = ShadowLog.getLogsForTag("WNDictation").joinToString("\n") { it.msg }
+        assertTrue(logs.contains("event=watchdog_fired session=1 phase=caller_audio_drain"))
+        assertTrue(logs.contains("event=callback_rejected callback_session=1"))
+        assertFalse(logs.contains("PRIVATE_"))
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun unacceptedSendOnFinishRestoresTheDraftAndCarriesTheCapturedReplyIdentity() =
