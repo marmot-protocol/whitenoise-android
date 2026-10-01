@@ -147,13 +147,11 @@ internal open class ZapstoreEventPolicy(
         publisherPubkey: String,
         releaseDTag: String,
     ): String? {
-        if (event.kind != KIND_ZAPSTORE_RELEASE ||
-            event.pubkey != publisherPubkey ||
-            event.firstTagValue("d") != releaseDTag ||
-            !verifyEvent(event)
-        ) {
-            return null
-        }
+        val isRequestedRelease =
+            event.kind == KIND_ZAPSTORE_RELEASE &&
+                event.pubkey == publisherPubkey &&
+                event.firstTagValue("d") == releaseDTag
+        if (!isRequestedRelease || !verifyEvent(event)) return null
         return ZapstoreAddress.versionFromReleaseDTag(releaseDTag, appId)
     }
 }
