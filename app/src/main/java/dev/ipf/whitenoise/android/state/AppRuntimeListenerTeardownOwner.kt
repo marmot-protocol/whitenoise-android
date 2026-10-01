@@ -20,9 +20,9 @@ internal class AppRuntimeListenerTeardownOwner(
         clearUnreadRefresh()
     }
 
-    suspend fun withNotificationSubscription(
+    suspend inline fun withNotificationSubscription(
         subscription: AppNotificationSubscription,
-        consume: suspend () -> Unit,
+        consume: () -> Unit,
     ) {
         receiverActive.value = true
         try {

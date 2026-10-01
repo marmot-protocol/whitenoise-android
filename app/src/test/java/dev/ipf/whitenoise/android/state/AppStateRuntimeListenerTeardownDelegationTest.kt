@@ -101,7 +101,8 @@ class AppStateRuntimeListenerTeardownDelegationTest {
                 }
             state = state { subscription }
             val ownerStops = AtomicInteger()
-            val observingOwnerInstalled = observeProductionOwnerStops(state, ownerStops)
+            val receiverPublications = AtomicInteger()
+            val observingOwnerInstalled = observeProductionOwnerStops(state, ownerStops, receiverPublications)
             val slot = field<NotificationJobSlot>(state, "notificationJob")
             val listener = launch(start = CoroutineStart.UNDISPATCHED) { state.runNotificationListenerLoop(marmot) }
             slot.startIfInactive { listener }
@@ -126,7 +127,10 @@ class AppStateRuntimeListenerTeardownDelegationTest {
                     second.join()
                 }
                 state.stopNotificationListenerForAccountTeardown()
-                if (observingOwnerInstalled) assertEquals(3, ownerStops.get())
+                if (observingOwnerInstalled) {
+                    assertEquals(3, ownerStops.get())
+                    assertEquals(2, receiverPublications.get())
+                }
                 assertEquals(1, closes.get())
                 assertFalse(activeAtClose.get())
                 assertTrue("cleanup was never released", closeReleased.get())
@@ -172,6 +176,7 @@ class AppStateRuntimeListenerTeardownDelegationTest {
     private fun observeProductionOwnerStops(
         state: WhiteNoiseAppState,
         calls: AtomicInteger,
+        receiverPublications: AtomicInteger,
     ): Boolean {
         val ownerField =
             WhiteNoiseAppState::class.java.declaredFields.singleOrNull {
@@ -179,6 +184,16 @@ class AppStateRuntimeListenerTeardownDelegationTest {
             } ?: return false
         ownerField.isAccessible = true
         val original = ownerField.get(state) as AppRuntimeListenerTeardownOwner
+        val realReceiverActive = field<MutableStateFlow<Boolean>>(state, "notificationReceiverActive")
+        val observingReceiverActive =
+            object : MutableStateFlow<Boolean> by realReceiverActive {
+                override var value: Boolean
+                    get() = realReceiverActive.value
+                    set(value) {
+                        receiverPublications.incrementAndGet()
+                        realReceiverActive.value = value
+                    }
+            }
         // Keep the original teardown collaborators and shared receiver state.
         // The observation wraps the whole existing stop rather than faking its cancellation/lifetime behavior.
         ownerField.set(
@@ -191,7 +206,7 @@ class AppStateRuntimeListenerTeardownDelegationTest {
                 cancelPushWakeDrain = {},
                 cancelListener = {},
                 clearUnreadRefresh = {},
-                receiverActive = field<MutableStateFlow<Boolean>>(state, "notificationReceiverActive"),
+                receiverActive = observingReceiverActive,
             ),
         )
         return true
