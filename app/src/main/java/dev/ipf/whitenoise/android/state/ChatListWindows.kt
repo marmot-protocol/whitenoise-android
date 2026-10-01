@@ -146,7 +146,8 @@ internal class ChatListWindowSet private constructor(
                 handle.page(sequence, ChatListPageDirectionFfi.FORWARD, CHAT_LIST_WINDOW_PAGE_ROWS)
             }
         val after = installed(view)
-        if (after != null && after.sequence != before.sequence && after.sameRowsAs(before)) markForwardStalled(view)
+        val noProgress = after != null && after.sequence != before.sequence && after.sameRowsAs(before)
+        if (result != null && noProgress) markForwardStalled(view)
         return result
     }
 

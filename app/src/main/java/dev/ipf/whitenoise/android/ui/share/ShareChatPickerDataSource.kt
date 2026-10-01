@@ -156,8 +156,14 @@ private fun rememberAccountWideForwardTargets(
     LaunchedEffect(accountController, selectedAccountRef, boundAccountRef) {
         targets.value = null
         if (selectedAccountRef == null || boundAccountRef != selectedAccountRef) return@LaunchedEffect
+        // A bound controller is authoritative for its account: a null read must not fall back to the active
+        // account's rows, which would list another account's chats under this selection.
         targets.value =
-            accountController?.loadAccountWideForwardTargets() ?: appState.loadAccountWideForwardTargets()
+            if (accountController != null) {
+                accountController.loadAccountWideForwardTargets()
+            } else {
+                appState.loadAccountWideForwardTargets()
+            }
     }
     return targets.value
 }
